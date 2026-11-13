@@ -42,6 +42,13 @@ export type SalonArtName =
   | 'ruzgar-ozet-rozet'
   | 'ruzgar-merkez'
   | 'ruzgar-ok'
+  // Rüzgâr Gülü (docs/RUZGAR_GULU.md "ChatGPT görsel listesi"): its cover, the JACKPOT and one picture per tier
+  // (the tier ids are the tiers' first names: kiyi Klasik, acik Yüksek, okyanus Zirve)
+  | 'oyun-ruzgar-gulu'
+  | 'ruzgar-jackpot'
+  | 'ruzgar-alan-kiyi'
+  | 'ruzgar-alan-acik'
+  | 'ruzgar-alan-okyanus'
   // §17 Yörünge, Balon Avı, Yıldız Avı
   | 'yorunge-roket'
   | 'yorunge-gezegen'
@@ -232,6 +239,11 @@ const ART: Partial<Record<SalonArtName, number>> = {
   // 'ruzgar-ozet-rozet': require('../../../../assets/art/ruzgar-ozet-rozet.png'),
   'ruzgar-merkez': require('../../../../assets/games/ruzgar-merkez.png'),
   // 'ruzgar-ok': require('../../../../assets/art/ruzgar-ok.png'),
+  'oyun-ruzgar-gulu': require('../../../../assets/games/oyun-ruzgar-gulu.png'),
+  'ruzgar-jackpot': require('../../../../assets/games/ruzgar-jackpot.png'),
+  'ruzgar-alan-kiyi': require('../../../../assets/games/ruzgar-alan-kiyi.png'),
+  'ruzgar-alan-acik': require('../../../../assets/games/ruzgar-alan-acik.png'),
+  'ruzgar-alan-okyanus': require('../../../../assets/games/ruzgar-alan-okyanus.png'),
   // §17
   // 'yorunge-roket': require('../../../../assets/art/yorunge-roket.png'),
   // 'yorunge-gezegen': require('../../../../assets/art/yorunge-gezegen.png'),

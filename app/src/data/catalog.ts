@@ -284,7 +284,8 @@ export const STICKER_PACKS: StickerPack[] = [
     name: 'VIP',
     price: 0,
     minVip: 5,
-    // "Kristal" is left out until it is redrawn: its file is the same picture as "Elmas".
+    // "Kristal" is left out until it is redrawn: its file is the same picture as "Elmas". The VIP emojis of
+    // docs/GORSEL_URETIM_LISTESI.md §21 (Taçlı Kalp … Uykulu Hilal) came after the first seven.
     stickers: [
       st('vip-tac', 'Taç', '👑'),
       st('vip-elmas', 'Elmas', '💎'),
@@ -293,6 +294,14 @@ export const STICKER_PACKS: StickerPack[] = [
       st('vip-kupa', 'Kupa', '🏆'),
       st('vip-aslan', 'Aslan', '🦁'),
       st('vip-zambak-armasi', 'Zambak Arması', '⚜️'),
+      st('vip-tacli-kalp', 'Taçlı Kalp', '💖'),
+      st('vip-altin-mikrofon', 'Altın Mikrofon', '🎤'),
+      st('vip-kristal-gul', 'Kristal Gül', '🌹'),
+      st('vip-altin-alkis', 'Altın Alkış', '👏'),
+      st('vip-alevli-elmas', 'Alevli Elmas', '💎'),
+      st('vip-saygi-selami', 'Saygı Selamı', '🫡'),
+      st('vip-monoklu-goz-kirpma', 'Monoklu Göz Kırpma', '🧐'),
+      st('vip-uykulu-hilal', 'Uykulu Hilal', '🌙'),
     ],
   },
   {
@@ -307,6 +316,84 @@ export const STICKER_PACKS: StickerPack[] = [
       st('animasyonlu-patlama', 'Patlama', '💥'),
       st('animasyonlu-konfeti', 'Konfeti', '🎉'),
       st('animasyonlu-disko-topu', 'Disko Topu', '🪩'),
+    ],
+  },
+  // The app's own sticker packs (docs/CIKARTMA_URETIM_LISTESI.md §1–5): moments standard emoji don't have. Sold in
+  // the shop like the packs above (server/api/catalog.mjs 'pack-<id>').
+  {
+    id: 'voice',
+    name: 'Ses Odası',
+    price: 80,
+    stickers: [
+      st('oda-mikrofonda', 'Mikrofonda', '🎤'),
+      st('oda-soz-istiyorum', 'Söz İstiyorum', '✋'),
+      st('oda-sessizdeyim', 'Sessizdeyim', '🤐'),
+      st('oda-kulakligi-taktim', 'Dinliyorum', '🎧'),
+      st('oda-alkis-yagmuru', 'Alkış Yağmuru', '👏'),
+      st('oda-pk-hazir', 'PK Hazır', '🥊'),
+      st('oda-dj', 'DJ', '🎶'),
+      st('oda-sahne-senin', 'Sahne Senin', '🫵'),
+    ],
+  },
+  {
+    id: 'tea',
+    name: 'Çay Ocağı',
+    price: 60,
+    stickers: [
+      st('cay-cay-ister-misin', 'Çay İster misin', '🍵'),
+      st('cay-simit', 'Simit', '🍩'),
+      st('cay-turk-kahvesi', 'Kahve Falı', '☕'),
+      st('cay-nazar', 'Nazar Değmesin', '🔵'),
+      st('cay-lokum', 'Lokum', '🍬'),
+      st('cay-afiyet-olsun', 'Afiyet Olsun', '😋'),
+      st('cay-kolay-gelsin', 'Kolay Gelsin', '💪'),
+      st('cay-gecmis-olsun', 'Geçmiş Olsun', '💐'),
+    ],
+  },
+  {
+    id: 'feels',
+    name: 'Duygular+',
+    price: 50,
+    stickers: [
+      st('duygu-utandim', 'Utandım', '🙈'),
+      st('duygu-kiskandim', 'Kıskandım', '😒'),
+      st('duygu-eridim', 'Eridim', '🫠'),
+      st('duygu-sinirden-buhar', 'Buhar Oldum', '😤'),
+      st('duygu-sevincten-agliyorum', 'Sevinçten Ağlıyorum', '🥹'),
+      st('duygu-kalbim-kirildi', 'Kalbim Kırıldı', '💔'),
+      st('duygu-sabah-kahvesi', 'Kahvesiz Olmaz', '☕'),
+      st('duygu-kafam-karisik', 'Kafam Karışık', '😵'),
+    ],
+  },
+  {
+    id: 'party',
+    name: 'Kutlama',
+    price: 80,
+    stickers: [
+      st('kutlama-dogum-gunu', 'Doğum Günü', '🎂'),
+      st('kutlama-tebrikler', 'Tebrikler', '🎉'),
+      st('kutlama-sampanya', 'Şerefe', '🥂'),
+      st('kutlama-hediye-acti', 'Hediye Geldi', '🎁'),
+      st('kutlama-yildiz', 'Yıldızsın', '⭐'),
+      st('kutlama-madalya', 'Birinci', '🥇'),
+      st('kutlama-dans', 'Dans', '💃'),
+      st('kutlama-havai-fisek', 'Kutlu Olsun', '🎆'),
+    ],
+  },
+  {
+    // The mascot in animal costumes (Hayvanlar above is the animals themselves).
+    id: 'costume',
+    name: 'Maskot Hayvanlar',
+    price: 100,
+    stickers: [
+      st('kostum-kedi', 'Kedi Kostümü', '🐱'),
+      st('kostum-ayi', 'Ayıcık', '🐻'),
+      st('kostum-tavsan', 'Tavşan', '🐰'),
+      st('kostum-dinozor', 'Dinozor', '🦖'),
+      st('kostum-ari', 'Arı', '🐝'),
+      st('kostum-penguen', 'Penguen', '🐧'),
+      st('kostum-tilki', 'Tilki', '🦊'),
+      st('kostum-aslan', 'Aslan', '🦁'),
     ],
   },
 ];

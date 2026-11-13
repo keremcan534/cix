@@ -1,14 +1,13 @@
 // Stickers: one PNG per sticker of the sticker packs (data/catalog STICKER_PACKS), custom-drawn at 192 px
-// (docs/GORSEL_URETIM_LISTESI.md §3), and the free Duygular, Müzik and Hamle packs (the emoji panel's Emoji tab):
-// Google's Animated Noto Emoji as Lottie animations (CC BY 4.0), played by components/lottie-sticker. The dice's faces
-// on a mic are the die pictures the games use (assets/art). Stickers are what the packs sell; standard Unicode emoji are
-// free and always drawn as text. A sticker travels as a token (lib/stickers), so typing an emoji
-// never shows a paid sticker. Two files are duplicates and not wired: tepki-eglence-yerlere-yattim
-// (= temel-kahkaha) and tepki-vip-kristal (= vip-elmas). Delivered and sized (192 px) but waiting for a pack in
-// data/catalog STICKER_PACKS (price and VIP level are the owner's call, with server/api/catalog.mjs): Ses Odası's
-// tepki-oda-{mikrofonda,soz-istiyorum,sessizdeyim,kulakligi-taktim,alkis-yagmuru} (docs/CIKARTMA_URETIM_LISTESI.md §1)
-// and the new VIP ones tepki-vip-{tacli-kalp,altin-mikrofon,kristal-gul,altin-alkis,alevli-elmas,uykulu-hilal}
-// (docs/GORSEL_URETIM_LISTESI.md §21). Each goes into SRC below together with its pack.
+// (docs/GORSEL_URETIM_LISTESI.md §3 and §21, docs/CIKARTMA_URETIM_LISTESI.md), and the free Duygular, Müzik and Hamle
+// packs (the emoji panel's Emoji tab): Google's Animated Noto Emoji as Lottie animations (CC BY 4.0), played by
+// components/lottie-sticker. The dice's faces on a mic are the die pictures the games use (assets/art). Stickers are
+// what the packs sell; standard Unicode emoji are free and always drawn as text. A sticker travels as a token
+// (lib/stickers), so typing an emoji never shows a paid sticker. Two files are duplicates and not wired:
+// tepki-eglence-yerlere-yattim (= temel-kahkaha) and tepki-vip-kristal (= vip-elmas). Every other delivered sticker is
+// in a pack (Ses Odası, Çay Ocağı, Duygular+, Kutlama and Maskot Hayvanlar; the §21 VIP emojis in VIP), so none waits
+// for one. A new one goes into SRC below together with its pack (data/catalog, and server/api/catalog.mjs for a sold
+// pack).
 import { Image, StyleSheet, View, type StyleProp, type TextStyle } from 'react-native';
 
 import { Text } from '@/components/text';
@@ -63,6 +62,14 @@ const SRC: Record<string, number> = {
   'vip-kupa': require('../../assets/reactions/tepki-vip-kupa.png'),
   'vip-aslan': require('../../assets/reactions/tepki-vip-aslan.png'),
   'vip-zambak-armasi': require('../../assets/reactions/tepki-vip-zambak-armasi.png'),
+  'vip-tacli-kalp': require('../../assets/reactions/tepki-vip-tacli-kalp.png'),
+  'vip-altin-mikrofon': require('../../assets/reactions/tepki-vip-altin-mikrofon.png'),
+  'vip-kristal-gul': require('../../assets/reactions/tepki-vip-kristal-gul.png'),
+  'vip-altin-alkis': require('../../assets/reactions/tepki-vip-altin-alkis.png'),
+  'vip-alevli-elmas': require('../../assets/reactions/tepki-vip-alevli-elmas.png'),
+  'vip-saygi-selami': require('../../assets/reactions/tepki-vip-saygi-selami.png'),
+  'vip-monoklu-goz-kirpma': require('../../assets/reactions/tepki-vip-monoklu-goz-kirpma.png'),
+  'vip-uykulu-hilal': require('../../assets/reactions/tepki-vip-uykulu-hilal.png'),
   'animasyonlu-havai-fisek': require('../../assets/reactions/tepki-animasyonlu-havai-fisek.png'),
   'animasyonlu-maytap': require('../../assets/reactions/tepki-animasyonlu-maytap.png'),
   'animasyonlu-gokkusagi': require('../../assets/reactions/tepki-animasyonlu-gokkusagi.png'),
@@ -71,6 +78,51 @@ const SRC: Record<string, number> = {
   'animasyonlu-disko-topu': require('../../assets/reactions/tepki-animasyonlu-disko-topu.png'),
   'oda-alkis': require('../../assets/reactions/tepki-oda-alkis.png'),
   'oda-saskin': require('../../assets/reactions/tepki-oda-saskin.png'),
+  // Ses Odası
+  'oda-mikrofonda': require('../../assets/reactions/tepki-oda-mikrofonda.png'),
+  'oda-soz-istiyorum': require('../../assets/reactions/tepki-oda-soz-istiyorum.png'),
+  'oda-sessizdeyim': require('../../assets/reactions/tepki-oda-sessizdeyim.png'),
+  'oda-kulakligi-taktim': require('../../assets/reactions/tepki-oda-kulakligi-taktim.png'),
+  'oda-alkis-yagmuru': require('../../assets/reactions/tepki-oda-alkis-yagmuru.png'),
+  'oda-pk-hazir': require('../../assets/reactions/tepki-oda-pk-hazir.png'),
+  'oda-dj': require('../../assets/reactions/tepki-oda-dj.png'),
+  'oda-sahne-senin': require('../../assets/reactions/tepki-oda-sahne-senin.png'),
+  // Çay Ocağı
+  'cay-cay-ister-misin': require('../../assets/reactions/tepki-cay-cay-ister-misin.png'),
+  'cay-simit': require('../../assets/reactions/tepki-cay-simit.png'),
+  'cay-turk-kahvesi': require('../../assets/reactions/tepki-cay-turk-kahvesi.png'),
+  'cay-nazar': require('../../assets/reactions/tepki-cay-nazar.png'),
+  'cay-lokum': require('../../assets/reactions/tepki-cay-lokum.png'),
+  'cay-afiyet-olsun': require('../../assets/reactions/tepki-cay-afiyet-olsun.png'),
+  'cay-kolay-gelsin': require('../../assets/reactions/tepki-cay-kolay-gelsin.png'),
+  'cay-gecmis-olsun': require('../../assets/reactions/tepki-cay-gecmis-olsun.png'),
+  // Duygular+
+  'duygu-utandim': require('../../assets/reactions/tepki-duygu-utandim.png'),
+  'duygu-kiskandim': require('../../assets/reactions/tepki-duygu-kiskandim.png'),
+  'duygu-eridim': require('../../assets/reactions/tepki-duygu-eridim.png'),
+  'duygu-sinirden-buhar': require('../../assets/reactions/tepki-duygu-sinirden-buhar.png'),
+  'duygu-sevincten-agliyorum': require('../../assets/reactions/tepki-duygu-sevincten-agliyorum.png'),
+  'duygu-kalbim-kirildi': require('../../assets/reactions/tepki-duygu-kalbim-kirildi.png'),
+  'duygu-sabah-kahvesi': require('../../assets/reactions/tepki-duygu-sabah-kahvesi.png'),
+  'duygu-kafam-karisik': require('../../assets/reactions/tepki-duygu-kafam-karisik.png'),
+  // Kutlama
+  'kutlama-dogum-gunu': require('../../assets/reactions/tepki-kutlama-dogum-gunu.png'),
+  'kutlama-tebrikler': require('../../assets/reactions/tepki-kutlama-tebrikler.png'),
+  'kutlama-sampanya': require('../../assets/reactions/tepki-kutlama-sampanya.png'),
+  'kutlama-hediye-acti': require('../../assets/reactions/tepki-kutlama-hediye-acti.png'),
+  'kutlama-yildiz': require('../../assets/reactions/tepki-kutlama-yildiz.png'),
+  'kutlama-madalya': require('../../assets/reactions/tepki-kutlama-madalya.png'),
+  'kutlama-dans': require('../../assets/reactions/tepki-kutlama-dans.png'),
+  'kutlama-havai-fisek': require('../../assets/reactions/tepki-kutlama-havai-fisek.png'),
+  // Maskot Hayvanlar
+  'kostum-kedi': require('../../assets/reactions/tepki-kostum-kedi.png'),
+  'kostum-ayi': require('../../assets/reactions/tepki-kostum-ayi.png'),
+  'kostum-tavsan': require('../../assets/reactions/tepki-kostum-tavsan.png'),
+  'kostum-dinozor': require('../../assets/reactions/tepki-kostum-dinozor.png'),
+  'kostum-ari': require('../../assets/reactions/tepki-kostum-ari.png'),
+  'kostum-penguen': require('../../assets/reactions/tepki-kostum-penguen.png'),
+  'kostum-tilki': require('../../assets/reactions/tepki-kostum-tilki.png'),
+  'kostum-aslan': require('../../assets/reactions/tepki-kostum-aslan.png'),
   // The face a Hamle die landed on (lib/room-moves diceFace).
   'hamle-zar-1': require('../../assets/art/zar-zar-yuzu-1.png'),
   'hamle-zar-2': require('../../assets/art/zar-zar-yuzu-2.png'),

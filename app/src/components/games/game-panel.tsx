@@ -17,6 +17,7 @@ import { GoldTreePlayer } from '@/components/games/gold-tree';
 import { BoardPlayer } from '@/components/games/board';
 import { LineSlotPlayer } from '@/components/games/line-slot';
 import { SkinBackdrop, SkinOverlay, slotSkinOf } from '@/components/games/fx/slot-skin';
+import { salonArt } from '@/components/games/fx/salon-art';
 import { FenerPlayer } from '@/components/games/fener';
 import { RocketPlayer } from '@/components/games/rocket';
 import { BilyePlayer } from '@/components/games/bilye';
@@ -41,6 +42,8 @@ import { colors, semantic } from '@/theme';
 /** `wheel`: Rüzgâr Gülü, the Oyun Salonu game the server plays (components/games/wheel). */
 export type OpenGame = { kind: 'room'; id: string } | { kind: 'casino'; id: CasinoGame['id'] } | { kind: 'wheel' };
 const WHEEL_NAME = 'Rüzgâr Gülü';
+/** Rüzgâr Gülü's cover (fx/salon-art); the compass stands in until it is there. */
+const WHEEL_ART = salonArt('oyun-ruzgar-gulu');
 const keyOf = (g: OpenGame) => (g.kind === 'room' ? `r:${g.id}` : g.kind === 'casino' ? `c:${g.id}` : 'w');
 export type VoiceState = { seated: boolean; micOn: boolean; onToggleMic: () => void };
 
@@ -115,7 +118,7 @@ export function GamePanel({
   const switchable = [
     ...roomGames.filter((g) => g.active && g.playable && (!tables || isTableGame(g.id))).map((g) => ({ key: `r:${g.id}`, name: g.name, emoji: g.emoji, art: gameArtOf(g.id), go: { kind: 'room', id: g.id } as OpenGame })),
     // Rüzgâr Gülü and, in a live build, every other casino game are played on the server; the level gates them all.
-    ...(casinoVisible(wealthLevel, paidGames) ? [{ key: 'w', name: WHEEL_NAME, emoji: '', art: undefined, go: { kind: 'wheel' } as OpenGame }] : []),
+    ...(casinoVisible(wealthLevel, paidGames) ? [{ key: 'w', name: WHEEL_NAME, emoji: '', art: WHEEL_ART, go: { kind: 'wheel' } as OpenGame }] : []),
     ...casino.filter((g) => casinoVisible(wealthLevel, paidGames) && g.active && (inRoom ? g.fromRoom : g.fromProfile)).map((g) => ({ key: `c:${g.id}`, name: g.name, emoji: g.emoji, art: gameArtOf(g.id), go: { kind: 'casino', id: g.id } as OpenGame })),
   ];
   const current = keyOf(open);
@@ -123,14 +126,14 @@ export function GamePanel({
   // Live: the server's switches, stakes and JACKPOT funds again when a game opens (nothing to read in the demo).
   useEffect(() => void refreshCasino(), [openId]);
   const titleEmoji = roomGame?.emoji ?? casinoGame?.emoji;
-  const titleArt = wheel ? undefined : gameArtOf(open.id);
+  const titleArt = wheel ? WHEEL_ART : gameArtOf(open.id);
 
   const body = (
     <View style={[p.panel, inRoom ? p.sheet : p.full, inRoom && isTall(openId) && p.tall, skin && p.skinned, hidden && { display: 'none' }]}>
       {skin && <SkinBackdrop skin={skin} />}
       <View style={p.head}>
         {titleArt && <Image source={titleArt} style={{ width: 28, height: 28, marginRight: -6 }} />}
-        {wheel && <Ionicons name="compass" size={24} color={colors.gold} style={{ marginRight: -6 }} />}
+        {wheel && !titleArt && <Ionicons name="compass" size={24} color={colors.gold} style={{ marginRight: -6 }} />}
         <Text style={p.title} numberOfLines={1}>
           {titleArt || wheel ? '' : `${titleEmoji} `}
           {title}
@@ -178,7 +181,7 @@ export function GamePanel({
               accessibilityLabel={`${s.name} oyununa geç`}
             >
               {s.art && <Image source={s.art} style={{ width: 16, height: 16 }} />}
-              {s.key === 'w' && <Ionicons name="compass" size={15} color={colors.gold} />}
+              {s.key === 'w' && !s.art && <Ionicons name="compass" size={15} color={colors.gold} />}
               <Text style={p.chipText}>{s.art || !s.emoji ? s.name : `${s.emoji} ${s.name}`}</Text>
             </Pressable>
           ))}

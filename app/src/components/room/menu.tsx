@@ -93,7 +93,7 @@ function Tile({ item, hue, index, onPress }: { item: MenuItem; hue: string; inde
         </LinearGradient>
         <View style={styles.tileIcon}>
           {item.icon && !item.art ? (
-            // No picture yet (e.g. Rüzgâr Gülü until its art arrives): the line icon on the game's light.
+            // No picture (Rüzgâr Gülü, until its cover is there): the line icon on the game's light.
             <View style={styles.tileGlyph}>
               <Halo size={58} hue={hue} />
               <Ionicons name={item.icon} size={40} color={hue} />

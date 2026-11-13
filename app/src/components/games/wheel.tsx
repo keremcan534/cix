@@ -17,7 +17,7 @@ import { CasinoLock } from '@/components/games/casino';
 import { GameInfoSheet, InfoButton } from '@/components/games/fx/info-sheet';
 import { ResultTrail, type TrailItem } from '@/components/games/fx/result-trail';
 import { SalonStage, glowNumber } from '@/components/games/fx/salon';
-import { SalonArt } from '@/components/games/fx/salon-art';
+import { SalonArt, type SalonArtName } from '@/components/games/fx/salon-art';
 import { tally } from '@/components/games/fx/spin-plan';
 import { RimBulbs, SpinBlur, WheelPointer, useWheelSpin, type WheelSpin as SpinHandle } from '@/components/games/fx/wheel-stage';
 import { useWinFx } from '@/components/games/fx/win-fx';
@@ -47,6 +47,8 @@ import { colors, semantic } from '@/theme';
 const STEP = 360 / WHEEL_SLICES.length;
 const n = (x: number) => x.toLocaleString('tr-TR');
 const IDLE = 'Alanını seç, çarkı çevir';
+/** Each tier's picture on its tab (docs/RUZGAR_GULU.md): one coin, three towers of coins, a crown on a pile. */
+const TIER_ART: Record<WheelTierId, SalonArtName> = { kiyi: 'ruzgar-alan-kiyi', acik: 'ruzgar-alan-acik', okyanus: 'ruzgar-alan-okyanus' };
 /** How long the wheel turns for a request of that many spins (ms): a longer request counts its results meanwhile. */
 const TURN_MS: Record<WheelCount, number> = { 1: 4400, 10: 4800, 50: 5600 };
 
@@ -197,7 +199,7 @@ export function WheelPlayer({ entry }: { entry: Entry }) {
           <View style={w.head}>
             <LinearGradient colors={['#4A1426', '#1B2B4A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={w.jackpot} accessibilityLabel={`JACKPOT ${WHEEL_TIERS[tier].label}, ${n(view.funds[tier])} jeton`}>
               <LinearGradient colors={['rgba(255,255,255,0.14)', 'rgba(255,255,255,0)']} style={w.jackpotGloss} />
-              <Ionicons name="trophy" size={20} color={colors.gold} />
+              <SalonArt name="ruzgar-jackpot" size={34} fallback={<Ionicons name="trophy" size={20} color={colors.gold} />} />
               <View style={{ flex: 1 }}>
                 <Text style={w.jackpotLabel} numberOfLines={1}>
                   JACKPOT · {WHEEL_TIERS[tier].label}
@@ -243,8 +245,11 @@ export function WheelPlayer({ entry }: { entry: Entry }) {
               accessibilityState={{ selected: tier === t }}
               accessibilityLabel={`${WHEEL_TIERS[t].label}, tur başı ${n(WHEEL_TIERS[t].price)} jeton`}
             >
-              <Text style={[w.tierName, tier === t && { color: semantic.moneyInk }]}>{WHEEL_TIERS[t].label}</Text>
-              <Text style={[w.tierPrice, tier === t && { color: semantic.moneyInk }]}>{n(WHEEL_TIERS[t].price)}</Text>
+              <SalonArt name={TIER_ART[t]} size={28} fallback={null} />
+              <View style={w.tierText}>
+                <Text style={[w.tierName, tier === t && { color: semantic.moneyInk }]}>{WHEEL_TIERS[t].label}</Text>
+                <Text style={[w.tierPrice, tier === t && { color: semantic.moneyInk }]}>{n(WHEEL_TIERS[t].price)}</Text>
+              </View>
             </Pressable>
           ))}
         </View>
@@ -568,7 +573,8 @@ const w = StyleSheet.create({
   tallyText: { fontWeight: '800', fontSize: 12, fontVariant: ['tabular-nums'] },
 
   tiers: { flexDirection: 'row', gap: 6, backgroundColor: colors.bg, borderRadius: 16, padding: 4, borderWidth: 1, borderColor: colors.border },
-  tier: { flex: 1, borderRadius: 12, paddingVertical: 6, alignItems: 'center', gap: 1 },
+  tier: { flex: 1, flexDirection: 'row', borderRadius: 12, paddingVertical: 6, alignItems: 'center', justifyContent: 'center', gap: 5 },
+  tierText: { alignItems: 'center', gap: 1 },
   tierOn: { backgroundColor: semantic.money },
   tierName: { color: colors.text, fontWeight: '900', fontSize: 13 },
   tierPrice: { color: colors.textDim, fontWeight: '800', fontSize: 11 },
