@@ -151,7 +151,8 @@ import {
 } from '@/lib/room-presence';
 import { kindOf, mergeFeed, type FeedMsg } from '@/lib/chat-feed';
 import { blockedFeature } from '@/lib/remote-control';
-import { ALL_FEATURES, applyServerStage, changeLayout, layoutById, modeById, seedStage, setClassicCapacity, setStageInfo, slotStates, stagePermission, useStages, type StageInfo } from '@/lib/room-modes';
+import { ALL_FEATURES, applyServerStage, applyServerVideo, changeLayout, layoutById, modeById, seedStage, setClassicCapacity, setStageInfo, slotStates, stagePermission, useStages, type PlaybackState, type StageInfo } from '@/lib/room-modes';
+import { shareVideo, videoPlayback } from '@/lib/live/room-video';
 import { MIC_BLOCK_LABEL, endRoom, getSession, micBlock, micSending, reportRoomState, setMicWant, setNoiseSuppression, setPlaybackVolume, useRoomSession, type MicBlock } from '@/lib/room-session';
 import { shareLink } from '@/lib/links';
 import { balconyOnly, canInviteFollowers, defaultMicQueue, followerCount, knownFollowers, roomInviteText, seatAccess } from '@/lib/room-invites';
@@ -438,6 +439,19 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     applyServerStage(id, { layoutId: metaLayout, classicCapacity: Math.min(metaMics ?? maxMics, maxMics) });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, real, !!liveState, metaLayout, metaMics, maxMics]);
+  // The shared YouTube screen of a server room (lib/live/room-video): the server's video, from the metadata, on every
+  // phone. My own change goes to the server; refused, the screen goes back to what the server has.
+  const metaVideo = real ? (liveState?.video ?? null) : null;
+  const metaVideoKey = metaVideo ? `${metaVideo.videoId}:${metaVideo.status}:${metaVideo.position}:${metaVideo.updatedAt}` : 'none';
+  useEffect(() => {
+    if (real && liveState) applyServerVideo(id, metaVideo && videoPlayback(metaVideo), metaVideoKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, real, !!liveState, metaVideoKey]);
+  const shareScreen = (p: PlaybackState | null) =>
+    shareVideo(id, p).catch((e) => {
+      showAlert(refusalTitle(e, 'Yapılamadı'), errorText(e));
+      applyServerVideo(id, metaVideo && videoPlayback(metaVideo), `${metaVideoKey}:${Date.now()}`);
+    });
   const seats = live.seats;
   const mutedUsers = useMemo(() => new Set(live.micMuted), [live.micMuted]);
   // People who can't be in the room right now (running kick ban or blacklist); expired bans don't count.
@@ -3478,6 +3492,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                     width={win.width}
                     offline={offline}
                     onChanged={(text) => addMsg({ system: true, text: `${ME.name}: ${text}` })}
+                    share={real ? shareScreen : undefined}
                   />
                 )}
               </>

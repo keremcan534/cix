@@ -36,6 +36,7 @@ export function RoomScreen({
   width,
   offline,
   onChanged,
+  share,
 }: {
   roomId: string;
   playback: PlaybackState | null;
@@ -48,6 +49,8 @@ export function RoomScreen({
   offline: boolean;
   /** A successful room-wide change, for the chat line. */
   onChanged: (text: string) => void;
+  /** Server room: a room-wide change goes to every phone (lib/live/room-video); null closes the screen. */
+  share?: (playback: PlaybackState | null) => void;
 }) {
   const [linkOpen, setLinkOpen] = useState(false);
   const [link, setLink] = useState('');
@@ -75,14 +78,18 @@ export function RoomScreen({
   }, [ticking]);
   const h = Math.round(Math.min(width - space.lg * 2, 640) * 9 / 16);
 
-  const run = (r: Result, text?: string) => {
+  const run = (r: Result<{ playback?: PlaybackState }>, text?: string) => {
     if (!r.ok) showAlert('Yapılamadı', r.reason);
-    else if (text) onChanged(text);
+    else {
+      if (text) onChanged(text);
+      share?.(r.playback ?? null);
+    }
     return r.ok;
   };
   const open = () => {
     const r = setVideo(roomId, 'me', link);
     if (!r.ok) return setLinkError(r.reason);
+    share?.(r.playback);
     setLinkOpen(false);
     setLink('');
     setLinkError(null);

@@ -18,7 +18,8 @@
 //    and that the room closed for lack of staff (server/api/room-autoclose.mjs: parseServerClosed, which the voice
 //    engine turns into the session's end with its reason);
 //  - the room's state the server keeps on LiveKit: the room metadata (server/api/rooms.mjs pushRoomMeta: locked
-//    mics, the layout, the mic count, the mic queue and who waits in it, the room's music: server/api/music.mjs),
+//    mics, the layout, the mic count, the mic queue and who waits in it, the room's music: server/api/music.mjs, the shared YouTube screen:
+//    server/api/room-video.mjs),
 //    which LiveKit hands every phone on join and on each change, and a seat the owner or an admin set for me (my
 //    own `seat` attribute changed by the server).
 import { useEffect, useRef, useSyncExternalStore } from 'react';
@@ -56,7 +57,7 @@ type Link = { setSeat: (seat: number | null) => void; send: (msg: PeerSignal) =>
  * mic count (null = the level's most), whether the mic queue is on and who waits in it (server user ids, first
  * asked first). Null when the metadata has none of it (an older server, or nothing written yet).
  */
-export type RoomState = { layoutId: string | null; micCount: number | null; micQueue: boolean; queue: string[]; music: RoomMusic | null };
+export type RoomState = { layoutId: string | null; micCount: number | null; micQueue: boolean; queue: string[]; music: RoomMusic | null; video: RoomVideo | null };
 /**
  * A row of the room's playlist: `key` the row (the same track can be on the list twice), `by` who added it (server
  * user id), `artist` '' when the file's name gave none.
@@ -135,7 +136,7 @@ export function parseRoomState(metadata: string | undefined): RoomState | null {
     const layoutId = typeof m.layoutId === 'string' && m.layoutId.length <= 40 ? m.layoutId : null;
     const micCount = Number.isInteger(m.micCount) && (m.micCount as number) >= 1 && (m.micCount as number) <= 99 ? (m.micCount as number) : null;
     const queue = Array.isArray(m.queue) ? [...new Set(m.queue.filter((x): x is string => typeof x === 'string' && !!x && x.length <= 64))].slice(0, 50) : [];
-    return { layoutId, micCount, micQueue: m.micQueue, queue, music: parseMusic(m.music) };
+    return { layoutId, micCount, micQueue: m.micQueue, queue, music: parseMusic(m.music), video: parseRoomVideo(m.video) };
   } catch {
     return null;
   }
@@ -178,6 +179,21 @@ export function parseMusic(raw: unknown): RoomMusic | null {
   const keys = [...new Set([...order, ...tracks.map((t) => t.key)])];
   const list = keys.map((k) => byKey.get(k)!);
   return { tracks, startedAt, pausedAt: startedAt === null ? null : stamp(m.pausedAt), repeat, list };
+}
+
+/** The shared YouTube screen (server/api/room-video.mjs, lib/live/room-video). */
+/** The room's shared video as the server wrote it: `updatedAt` is on the server's clock (ms). */
+export type RoomVideo = { videoId: string; status: 'playing' | 'paused'; position: number; updatedAt: number; by: string };
+
+const VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
+/** The video the server wrote (metadata or an API answer); null when there is none or it is odd. */
+export function parseRoomVideo(raw: unknown): RoomVideo | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const v = raw as Record<string, unknown>;
+  if (typeof v.videoId !== 'string' || !VIDEO_ID.test(v.videoId) || (v.status !== 'playing' && v.status !== 'paused')) return null;
+  const position = typeof v.position === 'number' && Number.isFinite(v.position) && v.position >= 0 ? v.position : 0;
+  const updatedAt = typeof v.updatedAt === 'number' && Number.isFinite(v.updatedAt) && v.updatedAt > 0 ? v.updatedAt : 0;
+  return { videoId: v.videoId, status: v.status, position, updatedAt, by: typeof v.by === 'string' ? v.by.slice(0, 64) : '' };
 }
 
 /** `{"lockedSeats":[2,5]}` → [2, 5]; mic 0 is the owner's and never locked; anything else → none. */
