@@ -235,6 +235,8 @@ type AppState = {
   buyNoble: (tier: number) => boolean;
   vipDays: number;
   buyVipPlan: (days: number) => boolean;
+  /** Test accounts (Sunucu hesabı screen): Rütbe Paşa, a year of Abonelik and VIP 10 on this phone too. */
+  maxOutForTest: () => void;
   // central role & permission center (demo state)
   rbac: RbacState;
   updateRbac: (fn: (s: RbacState) => RbacState) => void;
@@ -1082,6 +1084,12 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       if (!plan) return false;
       setVipDays((d) => d + days);
       return true;
+    },
+    maxOutForTest: () => {
+      setNobleTier(5);
+      setNobleDays(NOBLE_DAYS);
+      setVipDays((d) => Math.max(d, 365));
+      setSvipXp((x) => Math.max(x, SVIP_LEVELS[SVIP_LEVELS.length - 1].xp));
     },
     agencyId,
     agencyRole,

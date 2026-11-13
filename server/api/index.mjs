@@ -48,14 +48,14 @@ import { paidGamesOpen, wealthPoints, wheelRoutes } from './wheel.mjs';
 import { casinoRoutes } from './casino.mjs';
 import { roomXpRoutes } from './room-xp.mjs';
 import { roomGameRoutes } from './room-games.mjs';
-import { EXCHANGE, exchangeCoins } from './catalog.mjs';
+import { EXCHANGE, SHOP, SVIP_XP, exchangeCoins } from './catalog.mjs';
 import { financeSyncRoutes, startFinanceSync, stopFinanceSync } from './finance-sync.mjs';
 import { FILE_PATH, HttpError, RawText, allow, auth, claimRef, clientIp, db, env, filesOut, int, migrate, once, readJson, sha, userId } from './core.mjs';
 import { giftRoutes } from './gifts.mjs';
 import { jetonRoutes } from './jeton.mjs';
 import { liveRoutes } from './live.mjs';
 import { luckyRoutes } from './lucky.mjs';
-import { economyRoutes } from './economy.mjs';
+import { economyRoutes, grantInTx, statusOf } from './economy.mjs';
 import { familyRoutes } from './families.mjs';
 import { familyMoreRoutes } from './family-more.mjs';
 import { exchangeOk } from './live-registry.mjs';
@@ -70,6 +70,7 @@ import { privacyRoutes } from './privacy.mjs';
 import { purchaseRoutes } from './purchases.mjs';
 import { pkRoutes } from './pk.mjs';
 import { crossPkRoutes } from './pk-cross.mjs';
+import { CHARM_XP, WEALTH_XP } from './profile-rules.mjs';
 import { profileRoutes } from './profiles.mjs';
 import { pushRoutes } from './push.mjs';
 import { roomRoutes } from './rooms.mjs';
@@ -112,6 +113,8 @@ const STARTED = Date.now();
 /** Test top-ups: the coin pack sizes; at most TEST_DAILY play coins per user per day (wallet.mjs). */
 const TOPUP_PACKS = [1000, 5000, 10000, 50000, 100000];
 const GIFT_MAX = 1_000_000;
+/** The test-max button tops the balance up to this many coins. */
+const TEST_MAX_COINS = 6_000_000;
 /** Largest single diamond → coin exchange (the users table holds bigint, this keeps one request sane). */
 const EXCHANGE_MAX = 1_000_000_000;
 /**
@@ -173,6 +176,30 @@ const walletRoutes = {
       // One daily cap for all play coins: test top-ups and test purchases together (wallet.mjs).
       if ((await playCoinsToday(c, u.id)) + amount > TEST_DAILY) throw new HttpError(429, `Günlük test yükleme sınırı: ${TEST_DAILY.toLocaleString('tr-TR')} jeton`);
       await creditCoins(c, u.id, [{ channel: 'test', amount }], 'Test yüklemesi', ref);
+    });
+  },
+
+  /**
+   * Test servers only: everything to the top for the signed-in account, so every level-gated feature can be tried:
+   * coins up to TEST_MAX_COINS, Cömertlik and Yankı Lv.50 (users.test_wealth / test_charm, a floor read only while
+   * play money is on), VIP 10 (svip_xp), and Rütbe Paşa for 30 days unless it is already live.
+   */
+  async 'POST /api/wallet/test-max'(req) {
+    if (!TEST_TOPUP) throw new HttpError(403, 'Test yüklemesi kapalı');
+    const u = await auth(req);
+    const { ref } = await readJson(req);
+    return once(u.id, 'coin', ref, async (c) => {
+      const me = (await c.query('SELECT coins FROM users WHERE id = $1 FOR UPDATE', [u.id])).rows[0];
+      await claimRef(c, u.id, 'coin', ref);
+      const add = TEST_MAX_COINS - Number(me.coins);
+      if (add > 0) {
+        if ((await playCoinsToday(c, u.id)) + add > TEST_DAILY) throw new HttpError(429, `Günlük test yükleme sınırı: ${TEST_DAILY.toLocaleString('tr-TR')} jeton`);
+        await creditCoins(c, u.id, [{ channel: 'test', amount: add }], 'Test yüklemesi', ref);
+      }
+      await c.query('UPDATE users SET svip_xp = greatest(svip_xp, $2), test_wealth = $3, test_charm = $4 WHERE id = $1', [u.id, SVIP_XP.at(-1), WEALTH_XP.at(-1), CHARM_XP.at(-1)]);
+      if (((await statusOf(c, u.id)).noble?.tier ?? 0) < 5) {
+        await grantInTx(c, u.id, SHOP.get('noble-5'), { ref: `test-max:${ref}`, source: 'admin', price: 0, mode: 'admin', actor: u.id });
+      }
     });
   },
 

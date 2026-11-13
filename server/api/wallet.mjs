@@ -200,6 +200,17 @@ export async function charmPoints(c, userId) {
   return (await charmPointsOf(c, [userId])).get(userId) ?? 0;
 }
 
+/**
+ * Test servers only: the Cömertlik / Yankı points the test-max button set (users.test_wealth, test_charm) count as a
+ * floor under the ledger's points. With play money off (a live server) they are ignored.
+ */
+export async function withTestBoost(c, ids, points, column) {
+  if (!PLAY_MONEY) return points;
+  const r = await c.query(`SELECT id, ${column === 'charm' ? 'test_charm' : 'test_wealth'} AS n FROM users WHERE id = ANY($1::uuid[])`, [ids]);
+  for (const x of r.rows) if (Number(x.n) > (points.get(x.id) ?? 0)) points.set(x.id, Number(x.n));
+  return points;
+}
+
 /** charmPoints of many people in one query (other people's levels in lists, profiles.mjs): id → points. */
 export async function charmPointsOf(c, ids) {
   const r = await c.query(
@@ -208,7 +219,7 @@ export async function charmPointsOf(c, ids) {
       GROUP BY user_id`,
     [ids],
   );
-  return new Map(r.rows.map((x) => [x.user_id, Math.max(0, Number(x.n))]));
+  return withTestBoost(c, ids, new Map(r.rows.map((x) => [x.user_id, Math.max(0, Number(x.n))])), 'charm');
 }
 
 /** An account's diamonds: all of them, those still locked, and those that may leave. */
