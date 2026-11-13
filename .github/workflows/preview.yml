@@ -106,6 +106,12 @@ jobs:
             fs.writeFileSync("app.json", JSON.stringify(a, null, 2));
             console.log("Firebase file added: push notifications on.");
           '
+      # Each APK gets a higher Android version code (the run number, as in preview-N), so the phone takes a newer one as
+      # an update of the installed app (the in-app "Güncelle", lib/app-install) and never as an older copy.
+      - name: Version code
+        env:
+          RUN: ${{ github.run_number }}
+        run: node -e 'const fs = require("fs"); const a = JSON.parse(fs.readFileSync("app.json", "utf8")); a.expo.android.versionCode = Number(process.env.RUN); fs.writeFileSync("app.json", JSON.stringify(a, null, 2));'
       - run: npx expo prebuild --platform android --no-install
       # Release build signed with the debug keystore (fine for side-loading a preview).
       - name: Build APK

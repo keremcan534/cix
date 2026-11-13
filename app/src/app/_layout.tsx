@@ -21,6 +21,7 @@ import { EventCenterHost } from '@/components/events/event-center';
 import { FeatureGate, RemoteControl } from '@/components/remote-control';
 import { RoomHost } from '@/components/room/room-host';
 import { SanctionLayer } from '@/components/sanction-screen';
+import { UpdatePrompt } from '@/components/update-prompt';
 import { ME } from '@/data/mock';
 import { prepareAudioMode } from '@/lib/audio-mode';
 import { IS_DEMO } from '@/lib/build';
@@ -174,6 +175,8 @@ function RootStack() {
       <SanctionLayer signedIn={loggedIn} />
       {/* The server's notice and required update, signed in or not. */}
       <RemoteControl />
+      {/* A newer APK is out: download and install it from inside the app (components/update-prompt). */}
+      <UpdatePrompt />
     </>
   );
 }
