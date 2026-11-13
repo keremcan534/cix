@@ -30,6 +30,7 @@ export function FadeImage({ style, onLoadEnd, ...rest }: Omit<ImageProps, 'style
 }
 
 const COVERS = Object.values(SCENES).map((s) => s.photo);
+const FILL = { width: '100%', height: '100%' } as const;
 
 const pick = (seed = '') => {
   let h = 0;
@@ -56,7 +57,9 @@ export function Photo({ uri, kind, seed, style, onError, ...rest }: Props) {
       />
     );
   }
-  if (kind === 'cover') return <Image source={pick(seed)} style={style} resizeMode="cover" {...rest} />;
+  // A bundled picture brings its own size (a whole screen wide): it fills the box it is given instead, or a box sized
+  // by flex alone (the mini room card's cover) would spill out of its frame.
+  if (kind === 'cover') return <Image source={pick(seed)} style={[FILL, style]} resizeMode="cover" {...rest} />;
   const flat = StyleSheet.flatten(style) ?? {};
   const side = typeof flat.width === 'number' ? flat.width : typeof flat.height === 'number' ? flat.height : 40;
   return (

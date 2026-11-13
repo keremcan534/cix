@@ -18,10 +18,10 @@ export type DiscoverShortcut = {
 };
 
 export const DISCOVER_SHORTCUTS: DiscoverShortcut[] = [
-  { id: 'call', title: 'Hemen Tanış', subtitle: 'Görüntülü & sesli', emoji: '📞', colors: ['#C2306E', '#D02E78'], href: '/eslesme', wide: true },
-  { id: 'party', title: 'Canlı Odalar', subtitle: 'Odalara katıl', emoji: '🎉', colors: ['#FF6576', '#C93C4F'], href: '/(tabs)' },
-  { id: 'tribe', title: 'Aile', subtitle: 'Birlikte sohbet', emoji: '⛺', colors: ['#D02E78', '#F0468E'], href: '/aile' },
-  { id: 'free', title: 'Jeton Kazan', subtitle: 'Günlük görevler', emoji: '🪙', colors: ['#FF8A97', '#FF6576'], href: '/gorevler' },
+  { id: 'call', title: 'Hemen Tanış', subtitle: 'Görüntülü & sesli', emoji: '📞', colors: ['#FF5C93', '#C8246A'], href: '/eslesme', wide: true },
+  { id: 'party', title: 'Canlı Odalar', subtitle: 'Odalara katıl', emoji: '🎉', colors: ['#FF9D47', '#E8462A'], href: '/(tabs)' },
+  { id: 'tribe', title: 'Aile', subtitle: 'Birlikte sohbet', emoji: '⛺', colors: ['#2FD0A4', '#0B8F80'], href: '/aile' },
+  { id: 'free', title: 'Jeton Kazan', subtitle: 'Günlük görevler', emoji: '🪙', colors: ['#FFB62E', '#DB6A06'], href: '/gorevler' },
 ];
 
 /** Avatars shown on the "Canlı Odalar" shortcut card. */

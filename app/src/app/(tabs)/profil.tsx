@@ -307,7 +307,10 @@ function StatusCard({ title, sub, colors: c, dot, onPress }: { title: string; su
     <Pressable style={{ flex: 1 }} onPress={onPress} accessibilityLabel={title}>
       <LinearGradient colors={c} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.status}>
         {dot && <View style={[styles.redDot, { position: 'absolute', top: 8, right: 8 }]} />}
-        <Text style={styles.statusTitle}>{title}</Text>
+        {/* One line in every tile, so the three stay the same height ("Abonelik" broke in two on narrow phones). */}
+        <Text style={styles.statusTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+          {title}
+        </Text>
         <Text style={styles.statusSub} numberOfLines={1}>
           {sub}
         </Text>
@@ -325,7 +328,9 @@ function Shortcut({ emoji, label, onPress }: { emoji: string; label: string; onP
       <View style={styles.shortIcon}>
         <EmojiIcon emoji={emoji} size={30} />
       </View>
-      <Text style={{ color: colors.text, fontSize: 14 }}>{label}</Text>
+      <Text style={{ color: colors.text, fontSize: 14, textAlign: 'center' }} numberOfLines={2}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -360,8 +365,8 @@ const useStyles = makeStyles(({ colors, semantic, lift, dark }) => ({
   rewardTag: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: dark ? 'rgba(246,189,96,0.14)' : 'rgba(246,189,96,0.22)', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
   rewardText: { color: semantic.moneyText, fontWeight: '700', fontSize: 12 },
   coinN: { color: colors.gold, fontWeight: '800', fontSize: 18, marginLeft: 'auto' },
-  status: { borderRadius: 14, padding: 12, minHeight: 74, justifyContent: 'center', gap: 4 },
-  statusTitle: { color: '#fff', fontSize: 20, fontWeight: '900' },
+  status: { borderRadius: 14, padding: 12, paddingRight: 10, height: 80, justifyContent: 'center', gap: 4, overflow: 'hidden' },
+  statusTitle: { color: '#fff', fontSize: 18, fontWeight: '900' },
   statusSub: { color: 'rgba(255,255,255,0.85)', fontSize: 12 },
   shortIcon: { width: 60, height: 60, borderRadius: 18, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center' },
   gameCard: { marginHorizontal: 16, backgroundColor: colors.card, borderRadius: 16, padding: 12, gap: 10, borderWidth: 1, borderColor: 'rgba(246,189,96,0.35)', ...(dark ? {} : { boxShadow: lift.boxShadow }) },
