@@ -21,6 +21,7 @@ import { Icon3D } from '@/components/Icon3D';
 import { EMOJI_PACKS_ICON, StickerArt } from '@/components/ReactionArt';
 import { SPECIAL_ID_ART, STORE_TAB_ART, frameBadgeArtOf, storeArtOf } from '@/components/StoreArt';
 import { Photo } from '@/components/photo';
+import { WavePreview, voiceOf } from '@/components/room/voice-wave';
 
 type Tab = CosmeticKind | 'emoji';
 
@@ -116,7 +117,7 @@ export default function StoreScreen() {
               const isEquipped = equipped[c.kind] === c.id;
               return (
                 <Shelf key={c.id} hue={c.color?.[0] ?? hueAt(i)} on={isEquipped}>
-                  <Preview item={c} avatar={me.avatar} still={settings.reduceMotion} />
+                  <Preview item={c} avatar={me.avatar} voice={voiceOf(me.gender, me.showGender !== false)} still={settings.reduceMotion} />
                   {(c.kind === 'entry' || c.kind === 'ride') && (
                     <Pressable onPress={() => playPreview(c)} style={styles.previewBtn} accessibilityRole="button" accessibilityLabel={`${c.name} önizle`}>
                       <Ionicons name="play" size={12} color={t.colors.primaryText} />
@@ -181,9 +182,15 @@ function Shelf({ hue, on, children }: { hue: string; on?: boolean; children: Rea
   );
 }
 
-function Preview({ item, avatar, still }: { item: Cosmetic; avatar: string; still?: boolean }) {
+function Preview({ item, avatar, voice, still }: { item: Cosmetic; avatar: string; voice: string; still?: boolean }) {
   const { colors } = useTheme();
   const styles = useStyles();
+  if (item.kind === 'wave')
+    return (
+      <View style={{ height: 104, justifyContent: 'center', alignItems: 'center' }} accessibilityLabel={`${item.name} ses dalgası`}>
+        <WavePreview wave={item.id} uri={avatar} color={voice} still={still} />
+      </View>
+    );
   const art = item.kind === 'frame' ? frameArtOf(item.id) : undefined;
   if (art) {
     // Size the avatar so the whole illustrated frame (wings, crown) fits the card.

@@ -3252,6 +3252,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         index={i}
         userId={uid}
         gender={uid === 'me' ? (app.me.showGender === false ? null : (app.me.gender ?? null)) : uid ? lookFor(uid)?.gender : undefined}
+        wave={uid === 'me' ? equipped.wave : uid ? lookFor(uid)?.wave : undefined}
         host={host}
         vipLevel={uid === 'me' ? vipLevel : (uid ? (lookFor(uid)?.vipLevel ?? 0) : 0)}
         frameId={uid === 'me' ? equipped.frame : uid ? (lookFor(uid)?.frame ?? undefined) : undefined}

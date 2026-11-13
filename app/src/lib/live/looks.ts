@@ -13,6 +13,8 @@ export type Look = {
   bubble: string | null;
   specialId: string | null;
   micfx: string | null;
+  /** Their voice wave (components/room/voice-wave); an older server sends no field. */
+  wave?: string | null;
   noble: number | null;
   vipLevel: number;
   /** Colors their speaking ring; none when hidden (an older server sends no field). */

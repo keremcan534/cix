@@ -20,6 +20,7 @@ import { HOST_FRAME_SCALE, SEAT_ART } from '@/components/RoomArt';
 import { Gloss, Shine, useSpringPress } from '@/components/fx/surface';
 import { Photo } from '@/components/photo';
 import { RoleMark, type StaffMark } from '@/components/room/role-mark';
+import { VOICE_RING, VoiceWave, waveTint } from '@/components/room/voice-wave';
 import { BondBubble, BondChip, BondLink } from '@/components/room/room-bonds';
 import type { RoomBond } from '@/data/bonds';
 import { nameLine, nameSize } from '@/lib/seat-fit';
@@ -33,14 +34,13 @@ export type ChatMsg = FeedMsg;
 export type RoomRole = 'owner' | 'admin' | 'member';
 export const ROLE_RANK: Record<RoomRole, number> = { owner: 3, admin: 2, member: 1 };
 
-/** The speaking ring's color: pink for women, blue for men, white when the gender isn't known or is hidden. */
-export const VOICE_RING = { Kadın: semantic.live, Erkek: '#3D9BFF', none: '#FFFFFF' } as const;
-const ringGlow = (c: string) => `0 0 12px ${c}CC`;
+export { VOICE_RING } from '@/components/room/voice-wave';
 
 export function Seat({
   index,
   userId,
   gender,
+  wave,
   host,
   vipLevel,
   frameId,
@@ -69,6 +69,8 @@ export function Seat({
   userId: string | null;
   /** The seated person's gender, for the speaking ring's color (VOICE_RING). */
   gender?: 'Kadın' | 'Erkek' | null;
+  /** Their worn voice wave (shop 'wave' slot, components/room/voice-wave); none: the plain ring. */
+  wave?: string | null;
   host: boolean;
   vipLevel: number;
   frameId?: string;
@@ -132,7 +134,8 @@ export function Seat({
   const user = userId ? userById(userId) : null;
   // The room's word wins (its looks, null: hidden); else what this phone knows of them.
   const g = gender !== undefined ? gender : user?.showGender === false ? null : user?.gender;
-  const ring = g ? VOICE_RING[g] : VOICE_RING.none;
+  const voice = g ? VOICE_RING[g] : VOICE_RING.none;
+  const ring = waveTint(wave, voice);
   const size = avatarSize ?? (host ? 60 : 48);
   // Small faces: a smaller icon and no badge by the name. The name grows a little with the face (lib/seat-fit, which
   // sizes the stage by the same numbers) and may be as wide as the seat's slot.
@@ -164,18 +167,7 @@ export function Seat({
         ]}
       >
         <Animated.View ref={anchorRef} collapsable={false} style={[{ width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center', transform: [{ scale: press.scale }] }, speaking && { boxShadow: `0 0 18px ${ring}A6` }]}>
-          {speaking && (
-            <Animated.View
-              pointerEvents="none"
-              style={[
-                styles.ring,
-                { width: size, height: size, borderRadius: size / 2, borderColor: ring, boxShadow: ringGlow(ring) },
-                still
-                  ? { opacity: 0.85, transform: [{ scale: 1.08 }] }
-                  : { opacity: level.interpolate({ inputRange: [0, 1], outputRange: [0.45, 1] }), transform: [{ scale: level.interpolate({ inputRange: [0, 1], outputRange: [1.04, 1.38] }) }] },
-              ]}
-            />
-          )}
+          {speaking && <VoiceWave wave={wave} size={size} color={voice} level={level} still={still} />}
           {user && !mini && (vipLevel > 0 || frameId) ? (
             <FramedAvatar uri={user.avatar} size={size} vipLevel={vipLevel} frameId={frameId} />
           ) : user ? (
@@ -682,7 +674,6 @@ const styles = StyleSheet.create({
   seat: { alignItems: 'center', gap: 4 },
   seatBody: { alignSelf: 'stretch', alignItems: 'center', gap: 4 },
   hostSeat: { width: '100%' },
-  ring: { position: 'absolute', borderWidth: 4 },
   emptySeat: {
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',
