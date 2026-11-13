@@ -26,6 +26,10 @@ export type LiveKitConfig = {
   /** Native: start / stop the phone's audio session around a room. */
   onRoomOpen?: () => Promise<void> | void;
   onRoomClosed?: () => Promise<void> | void;
+  /** Native: the room's audio keeps going in the background right now (Android foreground service, webrtc-globals). */
+  backgroundAudio?: () => boolean;
+  /** Native: my mic track is on (the background service then keeps the mic going too). */
+  onMicStarted?: () => void;
 };
 
 /** LiveKit room names allow what the token service allows: letters, digits, _ and -. */
@@ -64,7 +68,7 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
     if (recapturing) return void recapturing.then(() => room === r && setMic(r, s.publishing));
     // Voice muted by the server: asking LiveKit would only fail (and read as a missing phone permission).
     if (on && !grant(r).canPublish) return;
-    r.localParticipant.setMicrophoneEnabled(on, on ? capture() : undefined).catch((e) => {
+    r.localParticipant.setMicrophoneEnabled(on, on ? capture() : undefined).then(() => void (on && cfg.onMicStarted?.()), (e) => {
       // The phone said no to the microphone: the session shows "Mikrofon izni yok" and keeps the room playing.
       const name = e instanceof Error ? e.name : '';
       if (name === 'NotAllowedError' || name === 'PermissionDeniedError' || /permission/i.test(String(e))) tell(r, { type: 'mic_denied' });
@@ -217,7 +221,14 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
 
   const engine: AudioEngine = {
     name: 'LiveKit (gerçek ses)',
-    capabilities: { realAudio: true, backgroundAudio: false, reportsState: true },
+    capabilities: {
+      realAudio: true,
+      // Read when the app goes to the background (room-session onAppState): off, the room pauses until it is back.
+      get backgroundAudio() {
+        return cfg.backgroundAudio?.() ?? false;
+      },
+      reportsState: true,
+    },
     connect(roomId) {
       if (s.roomId === roomId) return;
       if (s.roomId) engine.disconnect();

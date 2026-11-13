@@ -1,26 +1,39 @@
 // Betting chips of the bet boards (components/games/board): the chips of the tray, the stack a bet stands as on
-// an option, and the face the flying chip wears (fx/flights). Plain views, no pictures: a disc with eight edge
-// marks and a darker middle for the amount.
+// an option, and the face the flying chip wears (fx/flights). Each look has its chip picture (fx/salon-art, fiş 1–6)
+// with the amount over its middle; without the picture, a disc with eight edge marks and a darker middle.
 import { memo, useEffect, useState, type Ref } from 'react';
-import { Animated, Pressable, StyleSheet, View, type HostInstance } from 'react-native';
+import { Animated, Image, Pressable, StyleSheet, View, type HostInstance } from 'react-native';
 
 import { RollingNumber } from '@/components/fx/rolling-number';
+import { salonArt } from '@/components/games/fx/salon-art';
 import { chipOf, shortCoins } from '@/components/games/fx/spin-plan';
 import { Text } from '@/components/text';
 
-export type ChipLook = { fill: string; core: string; mark: string; ink: string };
-/** By the stake's place in the game's list, smallest first. */
+export type ChipLook = { fill: string; core: string; mark: string; ink: string; pic?: number };
+/** By the stake's place in the game's list, smallest first; each with the chip picture of its colour. */
 const CHIP_LOOKS: ChipLook[] = [
-  { fill: '#2563EB', core: '#1E3A8A', mark: '#DBEAFE', ink: '#FFFFFF' },
-  { fill: '#16A34A', core: '#14532D', mark: '#DCFCE7', ink: '#FFFFFF' },
-  { fill: '#DC2626', core: '#7F1D1D', mark: '#FEE2E2', ink: '#FFFFFF' },
-  { fill: '#0FB8BE', core: '#0A5F63', mark: '#D5FBFC', ink: '#FFFFFF' },
-  { fill: '#EA580C', core: '#7C2D12', mark: '#FFEDD5', ink: '#FFFFFF' },
-  { fill: '#1F2937', core: '#0B1220', mark: '#FACC15', ink: '#FDE68A' },
+  { fill: '#2563EB', core: '#1E3A8A', mark: '#DBEAFE', ink: '#FFFFFF', pic: salonArt('fis-4') },
+  { fill: '#16A34A', core: '#14532D', mark: '#DCFCE7', ink: '#FFFFFF', pic: salonArt('fis-2') },
+  { fill: '#DC2626', core: '#7F1D1D', mark: '#FEE2E2', ink: '#FFFFFF', pic: salonArt('fis-3') },
+  { fill: '#0FB8BE', core: '#0A5F63', mark: '#D5FBFC', ink: '#FFFFFF', pic: salonArt('fis-1') },
+  { fill: '#EA580C', core: '#7C2D12', mark: '#FFEDD5', ink: '#FFFFFF', pic: salonArt('fis-5') },
+  { fill: '#1F2937', core: '#0B1220', mark: '#FACC15', ink: '#FDE68A', pic: salonArt('fis-6') },
 ];
 export const chipLook = (chips: readonly number[], value: number) => CHIP_LOOKS[Math.max(0, chips.indexOf(value)) % CHIP_LOOKS.length];
 
 export const ChipFace = memo(function ChipFace({ size, look, label }: { size: number; look: ChipLook; label?: string }) {
+  const text = label !== undefined && (
+    <Text style={[look.pic !== undefined && c.picInk, { color: look.ink, fontWeight: '900', fontSize: Math.round(size * (label.length > 2 ? 0.27 : 0.32)), fontVariant: ['tabular-nums'] }]} numberOfLines={1}>
+      {label}
+    </Text>
+  );
+  if (look.pic !== undefined)
+    return (
+      <View style={[c.picChip, { width: size, height: size, borderRadius: size / 2 }]}>
+        <Image source={look.pic} style={{ position: 'absolute', width: size, height: size }} accessibilityIgnoresInvertColors />
+        {text}
+      </View>
+    );
   const mark = Math.max(2, Math.round(size * 0.15));
   const core = Math.round(size * 0.7);
   return (
@@ -32,11 +45,7 @@ export const ChipFace = memo(function ChipFace({ size, look, label }: { size: nu
         </View>
       ))}
       <View style={[c.core, { width: core, height: core, borderRadius: core / 2, backgroundColor: look.core, borderWidth: size > 30 ? 1.5 : 1 }]}>
-        {label !== undefined && (
-          <Text style={{ color: look.ink, fontWeight: '900', fontSize: Math.round(size * (label.length > 2 ? 0.27 : 0.32)), fontVariant: ['tabular-nums'] }} numberOfLines={1}>
-            {label}
-          </Text>
-        )}
+        {text}
       </View>
     </View>
   );
@@ -82,6 +91,8 @@ const c = StyleSheet.create({
   chip: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden', boxShadow: '0 2px 4px rgba(0,0,0,0.45)' },
   arm: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'space-between' },
   core: { alignItems: 'center', justifyContent: 'center', borderColor: 'rgba(255,255,255,0.55)' },
+  picChip: { alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 4px rgba(0,0,0,0.45)' },
+  picInk: { textShadowColor: 'rgba(0,0,0,0.75)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   ring: { padding: 2, borderWidth: 2, borderColor: 'transparent' },
   ringOn: { borderColor: '#FACC15', boxShadow: '0 0 10px rgba(250,204,21,0.55)' },
   stack: { flexDirection: 'row', alignItems: 'flex-end', gap: 3, backgroundColor: 'rgba(5,3,20,0.82)', borderRadius: 999, paddingLeft: 3, paddingRight: 7, paddingVertical: 2, borderWidth: 1, borderColor: 'rgba(250,204,21,0.7)' },

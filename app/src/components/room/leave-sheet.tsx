@@ -84,7 +84,7 @@ export function LeaveSheet() {
     <Modal visible={visible} transparent animationType={still ? 'fade' : 'slide'} onRequestClose={closeLeaveDialog}>
       <Pressable style={s.scrim} onPress={closeLeaveDialog} accessibilityLabel="Vazgeç, odada kal" />
       <View style={[s.sheet, { paddingBottom }]} accessibilityViewIsModal>
-        <LinearGradient colors={['rgba(19,217,223,0.12)', 'rgba(22,37,60,0)']} style={s.glow} pointerEvents="none" />
+        <LinearGradient colors={['rgba(255,95,162,0.12)', 'rgba(22,37,60,0)']} style={s.glow} pointerEvents="none" />
         <View style={s.handle} />
         <View style={s.where}>
           <View style={s.liveDot} />
@@ -94,7 +94,7 @@ export function LeaveSheet() {
         </View>
         <View style={s.actions}>
           <Choice still={still} label="Küçült" note="Oda arkada sürer" onPress={minimize}>
-            <LinearGradient colors={['#3DE6EA', '#0FB8BE']} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={[s.circle, s.stayCircle]}>
+            <LinearGradient colors={['#FF7AB3', '#F0468E']} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={[s.circle, s.stayCircle]}>
               <Ionicons name="contract" size={30} color={semantic.actionInk} />
             </LinearGradient>
           </Choice>
@@ -230,7 +230,7 @@ const useStyles = makeStyles(({ colors, semantic, ink, edge }) => ({
   actions: { flexDirection: 'row', justifyContent: 'center', gap: 56, marginTop: space.lg },
   choice: { alignItems: 'center', width: 104 },
   circle: { width: 76, height: 76, borderRadius: 38, alignItems: 'center', justifyContent: 'center' },
-  stayCircle: { boxShadow: '0 8px 22px rgba(19,217,223,0.35)' },
+  stayCircle: { boxShadow: '0 8px 22px rgba(255,95,162,0.35)' },
   exitCircle: { backgroundColor: 'rgba(255,122,130,0.12)', borderWidth: 1.5, borderColor: semantic.danger },
   choiceLabel: { color: colors.text, fontFamily: fonts.display, fontSize: type.bodyL, marginTop: space.sm },
   choiceLabelExit: { color: semantic.danger },

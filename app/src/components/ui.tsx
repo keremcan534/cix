@@ -348,7 +348,8 @@ function TierBadge({ tier: t, level, size, label }: { tier: LevelTier; level: nu
       accessibilityLabel={`${label}, ${t.name}`}
     >
       <View style={[styles.wealthDot, lg && { width: 22, height: 22, borderRadius: 11 }]}>
-        <Ionicons name={t.icon} size={lg ? 13 : 10} color={t.colors[1]} />
+        {/* The group's picture fills the dot (the art keeps its own margin); the Ionicons glyph is the fallback. */}
+        {t.art ? <Art name={t.art} size={lg ? 22 : 15} /> : <Ionicons name={t.icon} size={lg ? 13 : 10} color={t.colors[1]} />}
       </View>
       <Text style={[styles.wealthNum, { color: t.ink }, lg && { fontSize: 15 }]}>{level}</Text>
     </LinearGradient>

@@ -165,7 +165,7 @@ const queueOf = async (roomId) =>
  */
 export async function pushRoomMeta(roomId) {
   try {
-    const r = (await db.query('SELECT locked_seats, layout_id, mic_count, mic_queue FROM rooms WHERE id = $1', [roomId])).rows[0];
+    const r = (await db.query('SELECT locked_seats, layout_id, mic_count, mic_queue, video, seat_color FROM rooms WHERE id = $1', [roomId])).rows[0];
     if (!r) return false;
     // The music's files go out at this server's address, like every answer (core.mjs filesOut).
     const metadata = filesOut(
@@ -176,6 +176,10 @@ export async function pushRoomMeta(roomId) {
         micQueue: !!r.mic_queue,
         queue: await queueOf(roomId),
         music: await roomMusic(roomId),
+        // The shared YouTube screen (room-video.mjs): checked when it was written.
+        video: r.video ?? null,
+        // The empty mics' color (room-seat-color.mjs); null: the free turquoise.
+        seatColor: r.seat_color ?? null,
       }),
     );
     const name = liveKitName(roomId);
@@ -193,14 +197,15 @@ export async function leftVoiceRoom(name, identity) {
   if (r.rowCount) await pushRoomMeta(m[1]);
 }
 /**
- * LiveKit opened the room (someone joined it while empty): nobody waits for a mic yet and no music plays; it gets
- * the room's mics.
+ * LiveKit opened the room (someone joined it while empty): nobody waits for a mic yet, no music plays and the shared
+ * screen is empty; it gets the room's mics.
  */
 export async function voiceRoomStarted(name) {
   const m = ROOM_NAME.exec(name);
   if (!m) return;
   await db.query('DELETE FROM room_mic_queue WHERE room_id = $1', [m[1]]);
   await clearRoomMusic(m[1]);
+  await db.query('UPDATE rooms SET video = NULL WHERE id = $1 AND video IS NOT NULL', [m[1]]);
   await pushRoomMeta(m[1]);
 }
 /** A made-up or deleted account gets a 404, not a room_admins / room_bans row. */

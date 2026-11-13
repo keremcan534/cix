@@ -367,7 +367,7 @@ const useStyles = makeStyles(({ colors, semantic, ink, dark }) => ({
     gap: 12,
     borderTopWidth: 1,
     borderColor: ink(0.12),
-    boxShadow: dark ? '0 -10px 30px rgba(0,0,0,0.45)' : '0 -1px 2px rgba(16,36,64,0.05), 0 -10px 30px rgba(16,36,64,0.12)',
+    boxShadow: dark ? '0 -10px 30px rgba(0,0,0,0.45)' : '0 -1px 2px rgba(64,20,40,0.05), 0 -10px 30px rgba(64,20,40,0.12)',
   },
   handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },

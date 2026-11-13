@@ -162,7 +162,7 @@ const useStyles = makeStyles(({ colors, semantic, dark }) => ({
   stepNText: { color: semantic.socialText, fontWeight: '800', fontSize: 13 },
   stepText: { color: colors.text, fontSize: 14, flex: 1, lineHeight: 20 },
   dim: { color: colors.textDim, fontSize: 12, lineHeight: 18 },
-  sticky: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 24, backgroundColor: dark ? 'rgba(8,15,30,0.92)' : 'rgba(243,246,251,0.92)' },
+  sticky: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 24, backgroundColor: dark ? 'rgba(22,14,18,0.92)' : 'rgba(251,244,247,0.92)' },
   stickyBtn: { flexDirection: 'row', justifyContent: 'center', gap: 8, borderRadius: 999, paddingVertical: 16, alignItems: 'center' },
   stickyText: { color: '#fff', fontWeight: '700', fontSize: 17 },
 }));

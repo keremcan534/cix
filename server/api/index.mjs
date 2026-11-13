@@ -48,14 +48,14 @@ import { paidGamesOpen, wealthPoints, wheelRoutes } from './wheel.mjs';
 import { casinoRoutes } from './casino.mjs';
 import { roomXpRoutes } from './room-xp.mjs';
 import { roomGameRoutes } from './room-games.mjs';
-import { EXCHANGE, exchangeCoins } from './catalog.mjs';
+import { EXCHANGE, SHOP, SVIP_XP, exchangeCoins } from './catalog.mjs';
 import { financeSyncRoutes, startFinanceSync, stopFinanceSync } from './finance-sync.mjs';
-import { FILE_PATH, HttpError, RawText, allow, auth, claimRef, clientIp, db, env, filesOut, int, migrate, once, readJson, sha, userId } from './core.mjs';
+import { FILE_PATH, HttpError, RawText, allow, auth, claimRef, clientIp, db, env, filesOut, int, migrate, once, readJson, sha, tx, userId } from './core.mjs';
 import { giftRoutes } from './gifts.mjs';
 import { jetonRoutes } from './jeton.mjs';
 import { liveRoutes } from './live.mjs';
 import { luckyRoutes } from './lucky.mjs';
-import { economyRoutes } from './economy.mjs';
+import { economyRoutes, grantInTx } from './economy.mjs';
 import { familyRoutes } from './families.mjs';
 import { familyMoreRoutes } from './family-more.mjs';
 import { exchangeOk } from './live-registry.mjs';
@@ -72,14 +72,17 @@ import { pkRoutes } from './pk.mjs';
 import { crossPkRoutes } from './pk-cross.mjs';
 import { profileRoutes } from './profiles.mjs';
 import { pushRoutes } from './push.mjs';
-import { roomRoutes } from './rooms.mjs';
+import { ROOM_XP_THRESHOLDS, roomRoutes } from './rooms.mjs';
 import { sanctionRoutes, startSanctionSweep, stopSanctionSweep } from './sanctions.mjs';
 import { socialRoutes } from './social.mjs';
 import { supportRoutes } from './support.mjs';
 import { myDataRoutes } from './my-data.mjs';
 import { spendLimitRoutes } from './spend-limit.mjs';
 import { teamRoutes } from './team.mjs';
+import { TEST_ADMIN } from './test-admin.mjs';
 import { musicRoutes } from './music.mjs';
+import { roomVideoRoutes } from './room-video.mjs';
+import { roomSeatColorRoutes } from './room-seat-color.mjs';
 import { roomFxRoutes } from './room-fx.mjs';
 import { roomEventRoutes } from './room-events.mjs';
 import { eventRoutes, startEventSweep, stopEventSweep } from './events.mjs';
@@ -134,6 +137,38 @@ const LOG = env.LOG_REQUESTS !== '0';
 /** Paths without the limit: LiveKit's signed webhooks and the uptime check. */
 const UNLIMITED = new Set(['/api/livekit/webhook', '/api/health']);
 
+// --- Test server: admins at the top of everything (test-admin.mjs) ------------------------------------------------
+const ADMIN_COINS_MIN = 5_000_000;
+const ADMIN_COINS = 10_000_000;
+const ADMIN_RANK = [...SHOP.values()].filter((x) => x.kind === 'noble').sort((a, b) => b.tier - a.tier)[0];
+/** An unrevoked row of the top rank that lasts past tomorrow (a new term then starts where it ends). */
+const RANKED = `SELECT 1 FROM entitlements WHERE user_id = $1 AND sku = $2 AND revoked_at IS NULL AND (ends_at IS NULL OR ends_at > now() + interval '1 day')`;
+
+/**
+ * On the test server, tops up an admin account on GET /api/me: coins back to 10 million once under 5 million (play
+ * money on the 'test' channel, past TEST_DAILY: it is the owner's own testing), SVIP 10, the top room level and the
+ * top noble rank (a staff grant at price 0, ADMIN_RANK.days long, renewed a day before it ends). The account row is
+ * locked and everything read again under the lock, so two /me calls at once fill once. Returns whether it ran.
+ */
+async function fillTestAdmin(u) {
+  if (!TEST_ADMIN || u.role !== 'admin') return false;
+  const svipTop = SVIP_XP.at(-1);
+  const roomTop = ROOM_XP_THRESHOLDS.at(-1);
+  const full = (x) => Number(x.coins) >= ADMIN_COINS_MIN && Number(x.svip_xp) >= svipTop && Number(x.room_xp) >= roomTop;
+  if (full(u) && (await db.query(RANKED, [u.id, ADMIN_RANK.sku])).rowCount) return false;
+  await tx(async (c) => {
+    const me = (await c.query('SELECT coins, svip_xp, room_xp FROM users WHERE id = $1 FOR UPDATE', [u.id])).rows[0];
+    const stamp = Date.now().toString(36);
+    const coins = Number(me.coins);
+    if (coins < ADMIN_COINS_MIN) await creditCoins(c, u.id, [{ channel: 'test', amount: ADMIN_COINS - coins }], 'Test yüklemesi', `test-admin-${stamp}`);
+    await c.query('UPDATE users SET svip_xp = greatest(svip_xp, $2), room_xp = greatest(room_xp, $3) WHERE id = $1', [u.id, svipTop, roomTop]);
+    if (!(await c.query(RANKED, [u.id, ADMIN_RANK.sku])).rowCount) {
+      await grantInTx(c, u.id, ADMIN_RANK, { ref: `admin:test-${stamp}`, source: 'admin', price: 0, mode: 'admin', actor: u.id });
+    }
+  });
+  return true;
+}
+
 // --- Routes ----------------------------------------------------------------------------------------------
 const walletRoutes = {
   async 'GET /api/health'() {
@@ -150,10 +185,12 @@ const walletRoutes = {
   /**
    * wealthXp: the Cömertlik points the server counts (wheel.mjs wealthPoints), so the app gates games with the same
    * value; charmXp: the Yankı points (wallet.mjs charmPoints), which open posting in Anlar. paidGames: whether the
-   * coin games are open to this account (wheel.mjs paidGamesOpen); the app hides them when it says false.
+   * coin games are open to this account (wheel.mjs paidGamesOpen); the app hides them when it says false. On the
+   * test server an admin account is topped up first (fillTestAdmin).
    */
   async 'GET /api/me'(req) {
     const u = await auth(req);
+    if (await fillTestAdmin(u)) Object.assign(u, (await db.query('SELECT * FROM users WHERE id = $1', [u.id])).rows[0]);
     return { user: { ...(await withSignIn(u)), wealthXp: await wealthPoints(db, u.id), charmXp: await charmPoints(db, u.id), paidGames: paidGamesOpen(u) } };
   },
 
@@ -284,6 +321,8 @@ const routes = {
   ...momentRoutes,
   ...teamRoutes,
   ...musicRoutes,
+  ...roomVideoRoutes,
+  ...roomSeatColorRoutes,
   ...roomFxRoutes,
   ...roomEventRoutes,
   ...roomSocialRoutes,

@@ -15,16 +15,16 @@ export const CHARM_MAX = CHARM_XP.length - 1;
 export const charmLevelOf = (xp: number) => levelFromTable(CHARM_XP, xp);
 
 export const CHARM_TIERS: LevelTier[] = [
-  { from: 0, to: 5, name: 'Kıvılcım', icon: 'flash', colors: ['#94A3B8', '#334155'], ink: '#F8FAFC' },
-  { from: 6, to: 10, name: 'Işıltı', icon: 'sparkles', colors: ['#5EEAD4', '#115E59'], ink: '#F0FDFA' },
-  { from: 11, to: 15, name: 'Parıltı', icon: 'moon', colors: ['#FCD34D', '#92400E'], ink: '#FFFBEB' },
-  { from: 16, to: 20, name: 'Şafak', icon: 'heart', colors: ['#FB7185', '#9F1239'], ink: '#FFF1F2' },
-  { from: 21, to: 25, name: 'Ay Işığı', icon: 'musical-notes', colors: ['#FB923C', '#9A3412'], ink: '#FFF7ED' },
-  { from: 26, to: 30, name: 'Yıldız', icon: 'star', colors: ['#F472B6', '#831843'], ink: '#FDF2F8' },
-  { from: 31, to: 35, name: 'Kutup Yıldızı', icon: 'color-palette', colors: ['#E879F9', '#86198F'], ink: '#FDF4FF' },
-  { from: 36, to: 40, name: 'Gökkuşağı', icon: 'flower', colors: ['#F9A8D4', '#BE185D'], ink: '#500724' },
-  { from: 41, to: 45, name: 'Kutup Işığı', icon: 'rose', colors: ['#EF4444', '#450A0A'], ink: '#FEF2F2' },
-  { from: 46, to: 50, name: 'Efsane Yankı', icon: 'diamond', colors: ['#C084FC', '#3B0764'], ink: '#FAF5FF' },
+  { from: 0, to: 5, name: 'Kıvılcım', icon: 'flash', colors: ['#94A3B8', '#334155'], ink: '#F8FAFC', art: 'yanki-simge-kivilcim', emblem: 'yanki-amblem-kivilcim' },
+  { from: 6, to: 10, name: 'Işıltı', icon: 'sparkles', colors: ['#5EEAD4', '#115E59'], ink: '#F0FDFA', art: 'yanki-simge-isilti', emblem: 'yanki-amblem-isilti' },
+  { from: 11, to: 15, name: 'Parıltı', icon: 'moon', colors: ['#FCD34D', '#92400E'], ink: '#FFFBEB', art: 'yanki-simge-parilti', emblem: 'yanki-amblem-parilti' },
+  { from: 16, to: 20, name: 'Şafak', icon: 'heart', colors: ['#FB7185', '#9F1239'], ink: '#FFF1F2', art: 'yanki-simge-safak', emblem: 'yanki-amblem-safak' },
+  { from: 21, to: 25, name: 'Ay Işığı', icon: 'musical-notes', colors: ['#FB923C', '#9A3412'], ink: '#FFF7ED', art: 'yanki-simge-ay-isigi', emblem: 'yanki-amblem-ay-isigi' },
+  { from: 26, to: 30, name: 'Yıldız', icon: 'star', colors: ['#F472B6', '#831843'], ink: '#FDF2F8', art: 'yanki-simge-yildiz', emblem: 'yanki-amblem-yildiz' },
+  { from: 31, to: 35, name: 'Kutup Yıldızı', icon: 'color-palette', colors: ['#E879F9', '#86198F'], ink: '#FDF4FF', art: 'yanki-simge-kutup-yildizi', emblem: 'yanki-amblem-kutup-yildizi' },
+  { from: 36, to: 40, name: 'Gökkuşağı', icon: 'flower', colors: ['#F9A8D4', '#BE185D'], ink: '#500724', art: 'yanki-simge-gokkusagi', emblem: 'yanki-amblem-gokkusagi' },
+  { from: 41, to: 45, name: 'Kutup Işığı', icon: 'rose', colors: ['#EF4444', '#450A0A'], ink: '#FEF2F2', art: 'yanki-simge-kutup-isigi', emblem: 'yanki-amblem-kutup-isigi' },
+  { from: 46, to: 50, name: 'Efsane Yankı', icon: 'diamond', colors: ['#C084FC', '#3B0764'], ink: '#FAF5FF', art: 'yanki-simge-efsane', emblem: 'yanki-amblem-efsane' },
 ];
 export const charmTier = (level: number) => CHARM_TIERS.find((t) => level >= t.from && level <= t.to) ?? CHARM_TIERS[0];
 

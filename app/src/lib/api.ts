@@ -476,6 +476,12 @@ export const verifyPurchase = (proof: StoreProof) =>
 export const roomAnimation = (room: string, animationId: string, ref = newRef()) =>
   call<{ user: ServerUser; replay: boolean; eventId: number; price: number }>('POST', '/api/rooms/animation', { room, animationId, ref });
 
+/** Koltuk rengi (server/api/room-seat-color.mjs): the room's empty-mic color and the colors it has bought. */
+export const roomSeatColor = (room: string) => call<{ color: string; owned: string[] }>('GET', `/api/rooms/seat-color?room=${encodeURIComponent(room)}`);
+/** Sets it (owner only); a paid color the room doesn't have yet is bought with my coins, once. */
+export const setRoomSeatColor = (room: string, color: string, ref = newRef()) =>
+  call<{ color: string; owned: string[]; price: number; user?: ServerUser; replay?: boolean }>('POST', '/api/rooms/seat-color', { room, color, ref });
+
 /** This phone's push token: an Expo one, or Firebase's own (kind 'fcm', lib/push), which the server sends to through Firebase. */
 export const registerPush = (token: string, platform: 'ios' | 'android' | 'web', kind: 'expo' | 'fcm' = 'expo') =>
   call<{ registered: boolean }>('POST', '/api/push/register', { token, platform, kind });
@@ -955,6 +961,8 @@ export async function countContactRefusal(category: string, place: string) {
 export const earnings = () => call<ServerEarnings>('GET', '/api/wallet/earnings');
 /** An in-app purchase paid with coins (VIP, store items, game entries): the server takes the coins once. */
 export const spend = (amount: number, reason: string, ref = newRef()) => call<{ user: ServerUser; replay: boolean }>('POST', '/api/wallet/spend', { amount, reason, ref });
+/** Wears a shop item I own in its slot, or takes it off (sku null); others see it in GET /api/looks. */
+export const equipShop = (slot: string, sku: string | null) => call<{ economy: unknown }>('POST', '/api/shop/equip', { slot, sku });
 /** Çevir. `usdTry`: the rate the screen showed; the server never gives less than it, and answers 409 rate_changed
  *  (nothing taken) when its own rate is lower now. */
 export const exchange = (diamonds: number, ref = newRef(), usdTry?: number) =>

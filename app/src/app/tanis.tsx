@@ -142,9 +142,9 @@ function MatchCall() {
       {video ? (
         <Photo uri={peer.avatar} kind="face" style={StyleSheet.absoluteFill} />
       ) : (
-        <LinearGradient colors={['#0B3B4A', colors.bg]} style={StyleSheet.absoluteFill} />
+        <LinearGradient colors={['#4A1630', colors.bg]} style={StyleSheet.absoluteFill} />
       )}
-      <LinearGradient colors={['rgba(8,15,30,0.7)', 'transparent', 'rgba(8,15,30,0.85)']} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={['rgba(22,14,18,0.7)', 'transparent', 'rgba(22,14,18,0.85)']} style={StyleSheet.absoluteFill} />
 
       <SafeAreaView style={{ flex: 1 }}>
         <View style={s.top}>
@@ -273,7 +273,7 @@ const s = StyleSheet.create({
   primaryText: { color: semantic.actionInk, fontWeight: '900', fontSize: 16 },
   secondary: { backgroundColor: colors.card, borderRadius: 999, paddingVertical: 13, paddingHorizontal: 24, alignItems: 'center', alignSelf: 'stretch' },
   secondaryText: { color: '#fff', fontWeight: '800' },
-  roomBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginTop: 10, backgroundColor: 'rgba(8,15,30,0.7)', borderRadius: 12, padding: 10 },
+  roomBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginTop: 10, backgroundColor: 'rgba(22,14,18,0.7)', borderRadius: 12, padding: 10 },
   roomBannerText: { color: colors.text, fontSize: 12, flex: 1 },
   low: { color: colors.gold, textAlign: 'center', marginTop: 8, marginHorizontal: 16, fontWeight: '700' },
   ring: { position: 'absolute', width: 180, height: 180, borderRadius: 90, borderWidth: 3, borderColor: semantic.action },

@@ -6,10 +6,11 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Modal, Pressable, RefreshControl, ScrollView, View } from 'react-native';
+import { ActivityIndicator, FlatList, Image, Modal, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ActionSheet } from '@/components/ActionSheet';
+import { eventTypeArt } from '@/components/events/event-art';
 import { EventCard } from '@/components/events/event-card';
 import { EventDetailView } from '@/components/events/event-detail';
 import { EventFormView } from '@/components/events/event-form';
@@ -155,8 +156,11 @@ function EventCenter({ open }: { open: NonNullable<CenterOpen> }) {
     loadMeta();
   };
 
+  // The picked event type shows its sign on its chip.
+  const catArt = eventTypeArt(filters.cat);
   const filterChip = (key: 'status' | 'cat' | 'when' | 'sort', text: string, active: boolean) => (
     <Pressable key={key} onPress={() => setPicker(key)} style={[styles.chip, active && styles.chipOn]} accessibilityRole="button">
+      {key === 'cat' && catArt && <Image source={catArt} style={{ width: 18, height: 18 }} resizeMode="contain" />}
       <Text style={[styles.chipText, active && styles.chipTextOn]} numberOfLines={1}>
         {text}
       </Text>
@@ -399,7 +403,7 @@ function MineTab({
           {e.room.title} · {whenText(e.startsAt, now)}
         </Text>
       </View>
-      <View style={[styles.badge, e.state === 'live' && { backgroundColor: 'rgba(19,217,223,0.18)' }, (e.state === 'rejected' || e.state === 'cancelled') && { backgroundColor: 'rgba(239,68,68,0.14)' }]}>
+      <View style={[styles.badge, e.state === 'live' && { backgroundColor: 'rgba(255,95,162,0.18)' }, (e.state === 'rejected' || e.state === 'cancelled') && { backgroundColor: 'rgba(239,68,68,0.14)' }]}>
         <Text style={styles.badgeText} numberOfLines={1}>
           {e.mine === 'attended' ? 'Katıldın' : e.mine === 'missed' ? 'Katılmadın' : e.stateLabel}
         </Text>

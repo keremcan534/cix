@@ -366,7 +366,7 @@ function PackTile({
 }
 
 const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark }) => ({
-  testBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 8, height: 34, paddingHorizontal: 12, borderRadius: 999, backgroundColor: dark ? 'rgba(19,217,223,0.18)' : 'rgba(0,140,148,0.11)' },
+  testBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 8, height: 34, paddingHorizontal: 12, borderRadius: 999, backgroundColor: dark ? 'rgba(255,95,162,0.18)' : 'rgba(208,46,120,0.11)' },
   testText: { color: colors.primaryText, fontWeight: '700', fontSize: 13 },
   segment: { flexDirection: 'row', alignSelf: 'center', backgroundColor: colors.card, borderRadius: 999, padding: 4, marginBottom: 12 },
   segBtn: { paddingHorizontal: 18, paddingVertical: 8, borderRadius: 999 },
@@ -383,7 +383,7 @@ const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark }) =>
   grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 10 },
   packHead: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, marginTop: 18, marginBottom: 8 },
   shopNotice: { color: colors.text, fontSize: 14, lineHeight: 20, paddingHorizontal: 20, paddingVertical: 18 },
-  pack: { flex: 1, alignItems: 'center', gap: 6, paddingTop: 26, paddingBottom: 16, borderRadius: 16, minHeight: 130, borderWidth: 1, borderColor: surface.rim, ...(dark ? {} : { boxShadow: '0 1px 2px rgba(16,36,64,0.05), 0 6px 16px rgba(16,36,64,0.06)' }) },
+  pack: { flex: 1, alignItems: 'center', gap: 6, paddingTop: 26, paddingBottom: 16, borderRadius: 16, minHeight: 130, borderWidth: 1, borderColor: surface.rim, ...(dark ? {} : { boxShadow: '0 1px 2px rgba(64,20,40,0.05), 0 6px 16px rgba(64,20,40,0.06)' }) },
   packFirst: { borderColor: 'rgba(246,189,96,0.75)', paddingTop: 12 },
   svipLink: { alignItems: 'center', gap: 2, marginTop: 14, paddingVertical: 8 },
   svipLinkText: { color: colors.gold, fontWeight: '700', fontSize: 14 },

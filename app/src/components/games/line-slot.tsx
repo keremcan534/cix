@@ -5,9 +5,10 @@
 // wait on the last ones when a scatter or the JACKPOT is one symbol away, and the win is shown by win-fx. Oto is
 // repeated rounds from this screen and stops at the JACKPOT, a big win, the loss limit or any refusal (daily limit,
 // balance, pool). The reels take the height the phone leaves them: the cells grow with it, within a reel's shape.
-// A machine with a skin (fx/slot-skin: Kızıl Yedi) is drawn in its own pictures instead of the shell's stage: the
+// A machine with a skin (fx/slot-skin: all six) is drawn in its own pictures instead of the shell's stage: the
 // cabinet over the reels, picture symbols, the spin button and the win plate, and its own JACKPOT / Büyük Kazanç
-// show (fx/jackpot-show); the round, the controls and Oto are the same.
+// show (fx/jackpot-show); its JACKPOT fund and Kayıp Parşömen's prizes stand over the cabinet. The round, the
+// controls and Oto are the same.
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Image, StyleSheet, View } from 'react-native';
@@ -20,7 +21,7 @@ import { GameInfoSheet, InfoButton } from '@/components/games/fx/info-sheet';
 import { useJackpotShow } from '@/components/games/fx/jackpot-show';
 import { Reel, type ReelHandle } from '@/components/games/fx/reel';
 import { ContactShadow, FundPlaque, Marquee, SALON, SalonStage, StageHeader, StageStatus, SymbolPlate, plaqueValue, salonScreen, symbolShadow, useBox, type ActionLook, type StatusTone } from '@/components/games/fx/salon';
-import { SkinPlate, slotSkinOf, type SlotSkin } from '@/components/games/fx/slot-skin';
+import { SKIN_GAP, SKIN_PAD, SKIN_RIM, SkinCabinet, SkinPlate, fitSkin, slotSkinOf, windowRadius } from '@/components/games/fx/slot-skin';
 import { useWinFx } from '@/components/games/fx/win-fx';
 import { SpinControls, fmt, sleep } from '@/components/games/slot-kit';
 import type { LineSlotId } from '@/lib/casino-odds';
@@ -159,31 +160,6 @@ function Symbol({ label, sym, theme, dim, size }: { label: string; sym: string; 
       {face}
     </View>
   );
-}
-
-/** Between two symbols and two reels of a skinned machine, its window's inner margin and a reel's rim (px). */
-const SKIN_GAP = 3;
-const SKIN_PAD = 3;
-const SKIN_RIM = 1.5;
-
-/**
- * A skinned machine in the area it is given: the win plate under the cabinet, the cabinet as large as the rest
- * allows, the reels in its window.
- */
-function fitSkin(skin: SlotSkin, w: number, h: number, reels: number, rows: number) {
-  const plateW = Math.round(Math.min(w * 0.86, 330));
-  const plateH = Math.round(plateW / skin.plate.aspect);
-  // Short of height, the plate stands over the cabinet's base (up to this much of it); with room, under it.
-  const most = Math.round(plateH * 0.42);
-  const fw = Math.floor(Math.min(w, (h - plateH + most) * skin.frame.aspect));
-  const fh = Math.round(fw / skin.frame.aspect);
-  const lap = Math.max(0, Math.min(most, fh + plateH - h));
-  const f = skin.frame.window;
-  const win = { x: f.x * fw, y: f.y * fh, w: f.w * fw, h: f.h * fh };
-  const reelW = Math.floor((win.w - 2 * SKIN_PAD - (reels - 1) * SKIN_GAP) / reels);
-  const cellH = Math.floor((win.h - 2 * SKIN_PAD - 2 * SKIN_RIM - (rows - 1) * SKIN_GAP) / rows);
-  const symSize = Math.round(Math.min(reelW - 2 * SKIN_RIM, cellH) * 0.96);
-  return { plateW, plateH, lap, fw, fh, win, reelW, cellH, symSize };
 }
 
 export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) {
@@ -450,6 +426,24 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
       caption={`${c.lines.length} çizgi × ${fmt(bet / c.lines.length)}`}
     />
   );
+  // The JACKPOT fund and Kayıp Parşömen's three prizes, over the reels.
+  const fundPlaque = fund !== undefined && (
+    <FundPlaque name={jackpotName} style={{ marginHorizontal: 12 }}>
+      <View accessibilityLabel={`${jackpotName} ${Math.floor(fund)} jeton`}>
+        <RollingNumber value={Math.floor(fund)} style={plaqueValue} duration={900} />
+      </View>
+    </FundPlaque>
+  );
+  const prizes = id === 'spellbook' && (
+    <View style={{ flexDirection: 'row', gap: 6, alignSelf: 'stretch' }}>
+      {(['MINI', 'MAJOR', 'MINOR'] as const).map((k) => (
+        <View key={k} style={[s.prize, k === 'MAJOR' && s.prizeMajor]}>
+          <Text style={s.prizeName}>{k}</Text>
+          <Text style={s.prizeVal}>{fmt(SPELL_PRIZES[k] * bet)}</Text>
+        </View>
+      ))}
+    </View>
+  );
   const infoSheet = (
     <GameInfoSheet visible={info} onClose={() => setInfo(false)} title={game.name} rules={game.rules}>
       <View style={s.pays}>
@@ -480,15 +474,22 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
     return (
       <View style={salonScreen}>
         <View style={s.skinStage}>
+          {/* The fund and the prizes leave room on the right for the "?" button. */}
+          {(fundPlaque || prizes) && (
+            <View style={s.skinHead}>
+              {fundPlaque}
+              {prizes}
+            </View>
+          )}
           <View style={s.area} onLayout={area.onLayout}>
             {fit && cellH > 0 && (
               <View style={{ width: fit.fw, alignItems: 'center' }}>
                 <View style={{ width: fit.fw, height: fit.fh }}>
                   {/* The reels fill the cabinet's window and run a little under its edge; the cabinet is drawn over them. */}
-                  <LinearGradient colors={skin.reels} style={[s.skinWindow, { left: fit.win.x - 2, top: fit.win.y - 2, width: fit.win.w + 4, height: fit.win.h + 4, padding: SKIN_PAD + 2 }]} accessibilityLabel={reelsLabel}>
+                  <LinearGradient colors={skin.reels} style={[s.skinWindow, { left: fit.win.x - 2, top: fit.win.y - 2, width: fit.win.w + 4, height: fit.win.h + 4, padding: SKIN_PAD + 2, borderRadius: windowRadius(skin), overflow: skin.frame ? 'visible' : 'hidden' }]} accessibilityLabel={reelsLabel}>
                     {columns()}
                   </LinearGradient>
-                  <Image source={skin.frame.src} style={{ position: 'absolute', left: 0, top: 0, width: fit.fw, height: fit.fh }} resizeMode="stretch" pointerEvents="none" accessibilityIgnoresInvertColors />
+                  <SkinCabinet skin={skin} fit={fit} />
                 </View>
                 <SkinPlate skin={skin} width={fit.plateW} text={status.text} tone={status.tone} amount={status.amount} label={status.label} style={{ marginTop: -fit.lap }} />
               </View>
@@ -509,23 +510,8 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
     <View style={salonScreen}>
       <SalonStage colors={theme.colors} win={shine} minHeight={reels === 3 ? 330 : 300}>
         <StageHeader title={theme.title} kicker={`${reels} MAKARA · ${c.lines.length} ÇİZGİ`} onInfo={() => setInfo(true)} />
-        {fund !== undefined && (
-          <FundPlaque name={jackpotName} style={{ marginHorizontal: 12 }}>
-            <View accessibilityLabel={`${jackpotName} ${Math.floor(fund)} jeton`}>
-              <RollingNumber value={Math.floor(fund)} style={plaqueValue} duration={900} />
-            </View>
-          </FundPlaque>
-        )}
-        {id === 'spellbook' && (
-          <View style={{ flexDirection: 'row', gap: 6, alignSelf: 'stretch' }}>
-            {(['MINI', 'MAJOR', 'MINOR'] as const).map((k) => (
-              <View key={k} style={[s.prize, k === 'MAJOR' && s.prizeMajor]}>
-                <Text style={s.prizeName}>{k}</Text>
-                <Text style={s.prizeVal}>{fmt(SPELL_PRIZES[k] * bet)}</Text>
-              </View>
-            ))}
-          </View>
-        )}
+        {fundPlaque}
+        {prizes}
         <View style={s.area} onLayout={area.onLayout}>
           {cellH > 0 && (
           <View style={[CABINET > 0 && s.cabinet, CABINET > 0 && { borderColor: `${theme.frame}55` }]}>
@@ -567,6 +553,7 @@ const s = StyleSheet.create({
   // A skinned machine: no stage of the shell's, the game panel's picture behind it (fx/slot-skin).
   skinStage: { flex: 1, minHeight: 330 },
   skinWindow: { position: 'absolute', flexDirection: 'row', gap: SKIN_GAP },
+  skinHead: { gap: 6, paddingRight: 40, paddingTop: 2 },
   skinReel: { borderRadius: 6, borderWidth: SKIN_RIM, borderColor: 'transparent' },
   skinInfo: { position: 'absolute', top: 0, right: 0 },
   skinLit: { borderColor: 'rgba(255,224,138,0.75)', backgroundColor: 'rgba(255,190,80,0.16)', boxShadow: '0 0 12px rgba(255,200,90,0.55), inset 0 0 10px rgba(255,214,120,0.35)' },

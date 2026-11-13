@@ -5,7 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { Pressable, View } from 'react-native';
+import { Image, Pressable, View } from 'react-native';
 
 import { ActionSheet } from '@/components/ActionSheet';
 import { Text } from '@/components/text';
@@ -18,6 +18,15 @@ import { message } from '@/lib/live';
 import { liveBondsFor, liveEndBond, liveRequestBond, liveRespondBond, liveSetBondsHidden, liveWithdrawBond, loadBondRequests, loadBonds } from '@/lib/live/bonds';
 import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
+
+/** Bond gift pictures (docs/BAGLAR.md "Görsel listesi", app/assets/bonds, 192 px). A kind without one yet keeps its
+ *  sign on the kind's colours. */
+const BOND_ART: Partial<Record<BondKind, number>> = {
+  cift: require('../../assets/bonds/bag-cift.png'),
+  kardes: require('../../assets/bonds/bag-kardes.png'),
+  baci: require('../../assets/bonds/bag-baci.png'),
+  agabey: require('../../assets/bonds/bag-agabey.png'),
+};
 
 // --- Offline demo: my requests and endings on this phone, until the app closes ---------------------------
 type Demo = { sent: Bond[]; ended: Set<string>; hidden: boolean };
@@ -307,6 +316,7 @@ function BondRow({ owner, bond, now, canEnd, onEnd }: { owner: User; bond: Bond;
   const { me } = useApp();
   const partner = bond.partnerId === 'me' ? me : userById(bond.partnerId);
   const k = BOND_KINDS[bond.kind];
+  const art = BOND_ART[bond.kind];
   const from = BOND_LEVELS[bond.level - 1] ?? 0;
   const progress = bond.nextLevelAt ? Math.min(1, Math.max(0, (bond.score - from) / (bond.nextLevelAt - from))) : 1;
   const open = (id: string) => router.push(`/kullanici/${id}`);
@@ -328,9 +338,13 @@ function BondRow({ owner, bond, now, canEnd, onEnd }: { owner: User; bond: Bond;
           </Text>
         </Pressable>
         <View style={{ alignItems: 'center', gap: 4 }}>
-          <LinearGradient colors={bond.kind === 'cift' ? ['#FF8AA6', '#D81B60'] : ['#5ED3E6', '#3B5BDB']} style={styles.kindDot}>
-            <Ionicons name={k.icon} size={20} color="#fff" />
-          </LinearGradient>
+          {art ? (
+            <Image source={art} style={styles.kindArt} resizeMode="contain" accessibilityIgnoresInvertColors />
+          ) : (
+            <LinearGradient colors={bond.kind === 'cift' ? ['#FF8AA6', '#D81B60'] : ['#5ED3E6', '#3B5BDB']} style={styles.kindDot}>
+              <Ionicons name={k.icon} size={20} color="#fff" />
+            </LinearGradient>
+          )}
           <Text style={styles.kindLabel}>{k.label}</Text>
           <Text style={[styles.meta, { fontSize: 11 }]}>{bondDays(bond.since, now)} gün</Text>
         </View>
@@ -402,6 +416,7 @@ const useStyles = makeStyles(({ colors, semantic, lift, ink, dark }) => ({
   person: { alignItems: 'center', gap: 4, flex: 1 },
   name: { color: colors.text, fontSize: 13, fontWeight: '600', maxWidth: 96 },
   kindDot: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  kindArt: { width: 44, height: 44 },
   kindLabel: { color: colors.text, fontSize: 13, fontWeight: '800' },
   track: { height: 6, borderRadius: 3, backgroundColor: dark ? 'rgba(255,255,255,0.1)' : ink(0.08), marginTop: 12, overflow: 'hidden' },
   fill: { height: 6, borderRadius: 3, backgroundColor: colors.primary },

@@ -64,7 +64,8 @@ import { GiftShowFx, type GiftShowPlay } from '@/components/fx/gift-show';
 import { giftShowOf } from '@/data/gift-shows';
 import { GamePanel, type OpenGame } from '@/components/games/game-panel';
 import type { CasinoGame } from '@/data/games';
-import { ChatLine, GiftAnimation, MicBtn, REACTION_MS, RESULT_MS, RoomSoundBtn, RoundBtn, Seat, type ChatMsg, type RoomRole, type SeatReactionData } from '@/components/room/parts';
+import { BAR_BTN, ChatLine, GiftAnimation, MicBtn, REACTION_MS, RESULT_MS, RoomSoundBtn, RoundBtn, Seat, type ChatMsg, type RoomRole, type SeatReactionData } from '@/components/room/parts';
+import { type StaffMark } from '@/components/room/role-mark';
 import { CrossPkInvitePrompt, PkBoard, PkSetupSheet, SoloBoard, TeamArena, type ArenaSlot } from '@/components/room/pk';
 import { CrownScreen, PkResultScreen } from '@/components/room/pk-result';
 import { BalconyBar, MicInvitePrompt, ParticipantsSheet, type ParticipantActions } from '@/components/room/balcony';
@@ -101,6 +102,8 @@ import { useFollowerInvite, useServerMicInvites, useServerPoll } from '@/lib/liv
 import { followerInviteAt, inviteSeat as pickInviteSeat, roomShareText, serverInviteId } from '@/lib/room-social';
 import { liveDm } from '@/lib/live/messages';
 import { LiveMusicSheet, useRoomMusicPlayer } from '@/components/room/room-music';
+import { SeatColorSheet } from '@/components/room/seat-color-sheet';
+import { seatColorName } from '@/data/seat-colors';
 import { roomUnmute } from '@/lib/api';
 import { showAlert } from '@/lib/alert';
 import { checkText, messageRefusal, noteSent, refusalTitle } from '@/lib/contact-filter';
@@ -147,10 +150,12 @@ import {
   useLatched,
   useRoomLive,
   type InviteStatus,
+  type Result,
 } from '@/lib/room-presence';
 import { kindOf, mergeFeed, type FeedMsg } from '@/lib/chat-feed';
 import { blockedFeature } from '@/lib/remote-control';
-import { ALL_FEATURES, applyServerStage, changeLayout, layoutById, modeById, seedStage, setClassicCapacity, setStageInfo, slotStates, stagePermission, useStages, type StageInfo } from '@/lib/room-modes';
+import { ALL_FEATURES, applyServerStage, applyServerVideo, changeLayout, layoutById, modeById, seedStage, setClassicCapacity, setStageInfo, slotStates, stagePermission, useStages, type PlaybackState, type StageInfo } from '@/lib/room-modes';
+import { shareVideo, videoPlayback } from '@/lib/live/room-video';
 import { MIC_BLOCK_LABEL, endRoom, getSession, micBlock, micSending, reportRoomState, setMicWant, setNoiseSuppression, setPlaybackVolume, useRoomSession, type MicBlock } from '@/lib/room-session';
 import { shareLink } from '@/lib/links';
 import { balconyOnly, canInviteFollowers, defaultMicQueue, followerCount, knownFollowers, roomInviteText, seatAccess } from '@/lib/room-invites';
@@ -329,6 +334,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // DJs (server rooms, server/api/music.mjs): the owner names them; they play music in the room and nothing else.
   const djIds = real ? staff.djs : [];
   const rankOf = (uid: string) => (uid === hostId ? 3 : superIds.includes(uid) ? 2 : adminIds.includes(uid) ? 1 : 0);
+  // The mark on a staff member's mic (components/room/role-mark), each role its own; a DJ's only without a higher one.
+  const staffOf = (uid: string): StaffMark | null => (uid === hostId ? 'owner' : superIds.includes(uid) ? 'super' : adminIds.includes(uid) ? 'admin' : djIds.includes(uid) ? 'dj' : null);
   const myRank = rankOf('me');
   const rankLabel = (uid: string) => ['Üye', 'Yönetici', 'Süper Yönetici', 'Oda sahibi'][rankOf(uid)];
   const canManage = myRole !== 'member';
@@ -437,6 +444,21 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     applyServerStage(id, { layoutId: metaLayout, classicCapacity: Math.min(metaMics ?? maxMics, maxMics) });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, real, !!liveState, metaLayout, metaMics, maxMics]);
+  // The shared YouTube screen of a server room (lib/live/room-video): the server's video, from the metadata, on every
+  // phone. My own change goes to the server; refused, the screen goes back to what the server has.
+  const metaVideo = real ? (liveState?.video ?? null) : null;
+  // The empty mics' color the owner bought for the room (Koltuk rengi); null: the turquoise ones.
+  const seatColor = real ? (liveState?.seatColor ?? null) : null;
+  const metaVideoKey = metaVideo ? `${metaVideo.videoId}:${metaVideo.status}:${metaVideo.position}:${metaVideo.updatedAt}` : 'none';
+  useEffect(() => {
+    if (real && liveState) applyServerVideo(id, metaVideo && videoPlayback(metaVideo), metaVideoKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, real, !!liveState, metaVideoKey]);
+  const shareScreen = (p: PlaybackState | null) =>
+    shareVideo(id, p).catch((e) => {
+      showAlert(refusalTitle(e, 'Yapılamadı'), errorText(e));
+      applyServerVideo(id, metaVideo && videoPlayback(metaVideo), `${metaVideoKey}:${Date.now()}`);
+    });
   const seats = live.seats;
   const mutedUsers = useMemo(() => new Set(live.micMuted), [live.micMuted]);
   // People who can't be in the room right now (running kick ban or blacklist); expired bans don't count.
@@ -548,7 +570,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const [inviteSeat, setInviteSeat] = useState<number | null>(null);
   const [sheet, setSheet] = useState<{ title: string; options: SheetOption[] } | null>(null);
   const [msgFilter, setMsgFilter] = useState({ joins: true, gifts: true, bot: true });
-  const [panel, setPanel] = useState<null | 'menu' | 'msgSettings' | 'info' | 'settings' | 'music' | 'envelope' | 'bag' | 'dice' | 'contrib' | 'requests' | 'poll' | 'goal' | 'events' | 'qa' | 'effects' | 'mod' | 'invite' | 'results' | 'session'>(null);
+  const [panel, setPanel] = useState<null | 'menu' | 'msgSettings' | 'info' | 'settings' | 'music' | 'envelope' | 'bag' | 'dice' | 'contrib' | 'requests' | 'poll' | 'goal' | 'events' | 'qa' | 'effects' | 'mod' | 'invite' | 'results' | 'session' | 'seatColor'>(null);
   const [poll, setPoll] = useState<Poll | null>(null);
   const [goal, setGoal] = useState<Goal | null>(null);
   const [events, setEvents] = useState<RoomEvent[]>(() =>
@@ -731,8 +753,11 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     }
     reportRoomState(id, { joined: true });
     // Own room: the host takes mic 1 with the mic on, except after a restart (the mic always starts off then).
-    if (hostId === 'me' && !joinedInCall && !getRoom(id)?.seats[0]) {
-      takeSeat(id, 'me', 0);
+    // Back in a room that still has me on a mic (left and came straight back): the mic is on again too.
+    const seats = getRoom(id)?.seats ?? [];
+    const back = seats.includes('me');
+    if (!joinedInCall && (back || (hostId === 'me' && !seats[0]))) {
+      if (!back) takeSeat(id, 'me', 0);
       if (!getSession().session?.recovered) setMicWant(true);
     }
     return () => {
@@ -1088,10 +1113,13 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // the room read has them, my demo room's from its own state.
   const look = useRoomLook({ roomId: id, real, isOwn, rank: myRank, level, theme, cover, serverBackground: base?.background, serverFreeId: base?.bgId, serverCoverUrl: base?.coverUrl, onChanged: () => setRoomEdits((n) => n + 1), log: (what) => logMod(what, 'Oda') });
   // Mode / layout ("Yayına Katılma Modu"): only the stage server decides; its refusal goes back to the sheet as is.
-  const pickLayout = (layoutId: string | null) => {
+  const pickLayout = (layoutId: string | null, retry = false): Result => {
     const changed = (stage?.layoutId ?? null) !== layoutId;
     const r = changeLayout(id, 'me', layoutId);
     if (!r.ok) {
+      // A smaller layout with people beyond it: when there are free mics inside it, move them there first.
+      const moved = retry ? null : shiftInside(layoutId);
+      if (moved) return moved;
       errorHaptic();
       return r;
     }
@@ -1111,6 +1139,49 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       successHaptic();
     }
     return r;
+  };
+  /**
+   * The people sitting beyond a smaller layout's mics move to its free, unlocked mics (seat 1 only for the host),
+   * then the layout is asked again. Null when nobody sits beyond it or there aren't enough free mics; a server room
+   * moves them through the server (the owner or an admin may move anyone they outrank, and themselves).
+   */
+  const shiftInside = (layoutId: string | null): Result | null => {
+    const target = layoutId === null ? null : layoutById(layoutId);
+    if (layoutId !== null && !target) return null;
+    const cap = target ? target.microphoneCapacity : classicCapacity;
+    const out = allSeats.map((uid, index) => ({ uid, index })).filter((s): s is { uid: string; index: number } => !!s.uid && s.index >= cap);
+    if (!out.length) return null;
+    const free = [...Array(cap).keys()].filter((i) => !allSeats[i] && !lockedSeats.includes(i));
+    const plan: { uid: string; seat: number }[] = [];
+    for (const s of out) {
+      const k = free.findIndex((i) => i !== 0 || s.uid === hostId);
+      if (k < 0) return null;
+      plan.push({ uid: s.uid, seat: free.splice(k, 1)[0] });
+    }
+    if (offlineBlocked()) return null;
+    const line = (p: { uid: string; seat: number }) => addMsg({ system: true, text: `${userById(p.uid).name} ${p.seat + 1}. koltuğa taşındı` });
+    if (!real) {
+      for (const p of plan) {
+        const m = seatBy(id, 'me', p.uid, p.seat);
+        if (!m.ok) return m;
+        line(p);
+      }
+      return pickLayout(layoutId, true);
+    }
+    if (plan.some((p) => !toServer(p.uid))) return null;
+    (async () => {
+      for (const p of plan) {
+        await roomSeat(id, { action: 'move', user: toServer(p.uid)!, seat: p.seat });
+        seatBy(id, 'me', p.uid, p.seat);
+        line(p);
+      }
+      const again = pickLayout(layoutId, true);
+      if (!again.ok) showAlert('Düzen değiştirilemedi', again.reason);
+    })().catch((e) => {
+      showAlert(refusalTitle(e, 'Taşınamadı'), errorText(e));
+      syncServerStage(id).catch(() => {});
+    });
+    return { ok: true };
   };
   const layoutSheet = (open: boolean, onClose: () => void) => (
     <LayoutPickerSheet
@@ -2857,13 +2928,13 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       variant: 'round',
       items: [
         // In live mode Oda içi PK runs on the server (lib/live/pk), so only in a server room.
-        ...(myRole !== 'member' && !pk && (!liveMode() || real) ? [{ key: 'pk', label: 'PK', emoji: '⚔️', art: artSource('pk-takim-pk'), colors: ['#FF6576', '#087A80'] as [string, string], onPress: () => (setPanel(null), setPkSetup(true)) }] : []),
+        ...(myRole !== 'member' && !pk && (!liveMode() || real) ? [{ key: 'pk', label: 'PK', emoji: '⚔️', art: artSource('pk-takim-pk'), colors: ['#FF6576', '#B81F66'] as [string, string], onPress: () => (setPanel(null), setPkSetup(true)) }] : []),
         // Live mode: the server's Şanslı çanta, in a server room only (lib/live/lucky-bags); the demo keeps its envelope.
         ...(!liveMode() || real ? [{ key: 'env', label: 'Şanslı çanta', emoji: '🧧', art: ROOM_ICON_ART.envelope, colors: ['#B91C1C', '#F59E0B'] as [string, string], onPress: () => setPanel(liveMode() ? 'bag' : 'envelope') }] : []),
         ...(canFunctions ? [{ key: 'poll', label: 'Anket', emoji: '📊', art: ROOM_ICON_ART.poll, colors: ['#0EA5E9', '#2563EB'] as [string, string], onPress: () => setPanel('poll') }] : []),
         ...(roomType === 'qa' ? [{ key: 'qa', label: 'Sorular', emoji: '❓', art: ROOM_ICON_ART.questions, colors: ['#F97316', '#DC2626'] as [string, string], onPress: () => setPanel('qa'), badge: questions.filter((q) => !q.picked).length }] : []),
         // Müzik is the room's staff's and its DJs' (they play it); everyone else just hears it.
-        ...(canControlMusic ? [{ key: 'music', label: 'Müzik', emoji: '🎵', art: ROOM_ICON_ART.music, colors: ['#C93C4F', '#0A8F95'] as [string, string], onPress: () => setPanel('music') }] : []),
+        ...(canControlMusic ? [{ key: 'music', label: 'Müzik', emoji: '🎵', art: ROOM_ICON_ART.music, colors: ['#C93C4F', '#D02E78'] as [string, string], onPress: () => setPanel('music') }] : []),
       ],
     },
     // The free room games are opened by the room's staff (owner and admins); everyone else joins the table they open.
@@ -2930,7 +3001,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                     { key: 'bans', label: 'Giriş yasakları', value: String(staff.bans?.length ?? 0), hint: 'Odadan atılanlar ve kara liste; yasağı buradan kaldırırsın', onPress: fromSettings(openBans) },
                     { key: 'admins', label: 'Oda yöneticileri', value: `${staff.admins.length}`, hint: 'Süper Yönetici: oda adı, bülten ve etkinlikler', onPress: fromSettings(openAdmins) },
                     ...(myRole === 'owner'
-                      ? [{ key: 'djs', label: 'DJ’ler', value: `${djIds.length}/${djCapacity(level)}`, hint: 'Odada yalnızca müzik çalarlar; başka yetkileri yok', onPress: fromSettings(openDjs) }]
+                      ? [
+                          { key: 'djs', label: 'DJ’ler', value: `${djIds.length}/${djCapacity(level)}`, hint: 'Odada yalnızca müzik çalarlar; başka yetkileri yok', onPress: fromSettings(openDjs) },
+                          { key: 'seatColor', label: 'Koltuk rengi', value: seatColorName(seatColor), hint: 'Boş mikrofonların rengi; bir kez alınır, oda hep kullanır', onPress: fromSettings(() => setPanel('seatColor')) },
+                        ]
                       : []),
                   ]
                 : []),
@@ -3178,12 +3252,15 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const renderSeat = (i: number, extra?: { host?: boolean; compact?: boolean; slot?: ArenaSlot; grid?: ArenaSlot; next?: { index: number; gap: number }; mini?: boolean }) => {
     const uid = allSeats[i];
     const link = extra?.next ? micLinkOf(roomBonds, uid, allSeats[extra.next.index]) : null;
+    const host = extra?.slot ? false : (extra?.host ?? i === 0);
     return (
       <Seat
         key={i}
         index={i}
         userId={uid}
-        host={extra?.slot ? false : (extra?.host ?? i === 0)}
+        gender={uid === 'me' ? (app.me.showGender === false ? null : (app.me.gender ?? null)) : uid ? lookFor(uid)?.gender : undefined}
+        wave={uid === 'me' ? equipped.wave : uid ? lookFor(uid)?.wave : undefined}
+        host={host}
         vipLevel={uid === 'me' ? vipLevel : (uid ? (lookFor(uid)?.vipLevel ?? 0) : 0)}
         frameId={uid === 'me' ? equipped.frame : uid ? (lookFor(uid)?.frame ?? undefined) : undefined}
         speaking={!!uid && speaking.has(uid)}
@@ -3191,7 +3268,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         modMuted={!!uid && mutedUsers.has(uid)}
         invitee={!uid && slots[i]?.state === 'invited' && slots[i].invitee ? userById(slots[i].invitee!).name : undefined}
         similarity={uid ? simScores.get(uid) : undefined}
-        role={uid ? roleOf(uid) : i === 0 && extra?.host ? 'owner' : undefined}
+        // The owner on the host's mic has the crown by the name already.
+        staff={uid && !(host && uid === hostId) ? staffOf(uid) : undefined}
         locked={!uid && i > 0 && (lockedSeats.includes(i) || (!amSeated && seatAccess(micQueue, myRole) === 'request'))}
         compact={extra?.compact}
         reaction={uid && settings.seatReactions ? reactions[uid] : undefined}
@@ -3204,6 +3282,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         slotWidth={extra?.slot?.width ?? extra?.grid?.width}
         bondLink={link && extra?.next ? { bond: link, gap: extra.next.gap } : null}
         mini={extra?.mini}
+        seatColor={seatColor}
         enterDelay={Math.min(i, 24) * 22}
         onPress={() => onSeatPress(i)}
       />
@@ -3389,7 +3468,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                   </View>
                 )}
                 {myQueuePos !== null && (
-                  <View style={[styles.queueChipRow, { backgroundColor: 'rgba(19,217,223,0.35)' }]}>
+                  <View style={[styles.queueChipRow, { backgroundColor: 'rgba(255,95,162,0.35)' }]}>
                     <Art name="oda-konusmaci-kuyrugu-el-kaldir" size={18} />
                     <Text style={styles.queueChipText}>Konuşmacı kuyruğundasın · sıran: {myQueuePos + 1}{freeSeatIndex < 0 ? ' · mikrofonlar dolu, bekleme listesindesin' : ''}</Text>
                   </View>
@@ -3428,6 +3507,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                     width={win.width}
                     offline={offline}
                     onChanged={(text) => addMsg({ system: true, text: `${ME.name}: ${text}` })}
+                    share={real ? shareScreen : undefined}
                   />
                 )}
               </>
@@ -3761,6 +3841,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         classicLabel={`Klasik düzen · ${classicCapacity} mikrofon`}
         onPick={pickLayout}
       />
+      {real && myRole === 'owner' && (
+        <SeatColorSheet visible={panel === 'seatColor'} onClose={closePanel} room={id} current={seatColor} onDone={(text) => addMsg({ system: true, text })} />
+      )}
       {real ? (
         <LiveMusicSheet
           visible={panel === 'music'}
@@ -4086,7 +4169,7 @@ const styles = StyleSheet.create({
   title: { color: '#fff', fontSize: 15, fontWeight: '700', flexShrink: 1 },
   sub: { color: colors.textDim, fontSize: 12 },
   subRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  levelBadge: { backgroundColor: colors.primary, borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1, borderWidth: 1, borderColor: 'rgba(165,243,245,0.35)', boxShadow: '0 0 8px rgba(19,217,223,0.35)' },
+  levelBadge: { backgroundColor: colors.primary, borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1, borderWidth: 1, borderColor: 'rgba(165,243,245,0.35)', boxShadow: '0 0 8px rgba(255,95,162,0.35)' },
   levelText: { color: '#fff', fontSize: 11, fontWeight: '800' },
   reqBadge: { position: 'absolute', top: -4, right: -6, backgroundColor: colors.red, borderRadius: 8, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center' },
   reqBadgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
@@ -4131,14 +4214,14 @@ const styles = StyleSheet.create({
   mentionRow: { gap: 6, paddingHorizontal: 10, paddingTop: 4 },
   mentionChip: { flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: 160, paddingLeft: 3, paddingRight: 10, paddingVertical: 3, borderRadius: 999, backgroundColor: 'rgba(15,23,42,0.85)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
   mentionName: { color: colors.text, fontSize: 13, fontWeight: '700', flexShrink: 1 },
-  micGroup: { flexDirection: 'row', alignItems: 'flex-end', gap: 4 },
+  micGroup: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   mutedRow: { alignSelf: 'center', marginTop: 4, paddingHorizontal: 12 },
   mutedChip: { color: colors.gold, fontSize: 12, textAlign: 'center' },
-  queueChip: { color: '#fff', fontSize: 12, backgroundColor: 'rgba(19,217,223,0.35)', marginHorizontal: 12, marginTop: 6, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, overflow: 'hidden' },
+  queueChip: { color: '#fff', fontSize: 12, backgroundColor: 'rgba(255,95,162,0.35)', marginHorizontal: 12, marginTop: 6, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, overflow: 'hidden' },
   queueChipRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginHorizontal: 12, marginTop: 6, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6 },
   queueChipText: { color: '#fff', fontSize: 12, flexShrink: 1 },
   eventBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 12, marginTop: 6, backgroundColor: 'rgba(245,158,11,0.25)', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
-  inputWrap: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', borderTopColor: 'rgba(255,255,255,0.24)', borderRadius: 999, paddingLeft: 10, height: 48 },
+  inputWrap: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', borderTopColor: 'rgba(255,255,255,0.24)', borderRadius: 999, paddingLeft: 10, height: BAR_BTN },
   input: { flex: 1, minWidth: 0, color: '#fff', paddingRight: 14, paddingVertical: 10, fontSize: 15 },
   sendBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
 });

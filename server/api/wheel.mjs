@@ -14,6 +14,8 @@ import crypto from 'node:crypto';
 
 import { HttpError, REF, auth, db, env, limit, move, readJson, selfUser, tx } from './core.mjs';
 import { live } from './live-settings.mjs';
+import { WEALTH_XP } from './profile-rules.mjs';
+import { TEST_ADMIN, withTopFor } from './test-admin.mjs';
 import { spendCoins } from './wallet.mjs';
 import { COUNTS, SLICES, TIERS, WEIGHT_TOTAL, jackpotSeed, playSpins } from './wheel-rules.mjs';
 
@@ -63,7 +65,9 @@ export async function wealthPointsOf(c, ids) {
       GROUP BY l.user_id`,
     [ids],
   );
-  return new Map(r.rows.map((x) => [x.user_id, Number(x.n)]));
+  const points = new Map(r.rows.map((x) => [x.user_id, Number(x.n)]));
+  // Test server: admins at the top level (test-admin.mjs).
+  return TEST_ADMIN ? withTopFor(c, ids, points, WEALTH_XP.at(-1)) : points;
 }
 
 async function funds(c, lock = null) {

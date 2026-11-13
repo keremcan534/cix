@@ -102,7 +102,7 @@ export function RewardBurst({ reward, still, onDone }: { reward: Reward; still?:
 }
 
 const s = StyleSheet.create({
-  dim: { backgroundColor: 'rgba(8,15,30,0.82)', zIndex: 50 },
+  dim: { backgroundColor: 'rgba(22,14,18,0.82)', zIndex: 50 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 },
   stage: { width: 240, height: 240, alignItems: 'center', justifyContent: 'center' },
   ring: { position: 'absolute', width: 240, height: 240, alignItems: 'center', justifyContent: 'center' },

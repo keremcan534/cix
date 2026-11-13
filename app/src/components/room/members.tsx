@@ -9,8 +9,8 @@ import { useState } from 'react';
 import { FlatList, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon3D } from '@/components/Icon3D';
 import { ArtText, ROOM_ICON_ART } from '@/components/RoomArt';
+import { RoleMark as StaffBadge } from '@/components/room/role-mark';
 import { Text } from '@/components/text';
 import { Avatar } from '@/components/ui';
 import { memberLimit } from '@/data/catalog';
@@ -227,22 +227,8 @@ export function RoomMembersSection(p: RoomMembersProps) {
   );
 }
 
-/** The small mark on a staff avatar: the owner's crown, an admin's shield (gold for a Süper Yönetici). */
-function RoleMark({ role }: { role: MemberRole }) {
-  if (role === 'owner') {
-    return (
-      <View style={[styles.mark, { backgroundColor: '#24232B', padding: 2 }]} accessibilityLabel={MEMBER_ROLE_LABEL.owner}>
-        <Icon3D name="crown" size={13} />
-      </View>
-    );
-  }
-  if (role !== 'super' && role !== 'admin') return null;
-  return (
-    <View style={[styles.mark, { backgroundColor: role === 'super' ? semantic.money : semantic.action }]} accessibilityLabel={MEMBER_ROLE_LABEL[role]}>
-      <Ionicons name="shield-checkmark" size={10} color={role === 'super' ? semantic.moneyInk : semantic.actionInk} />
-    </View>
-  );
-}
+/** The mark on a staff avatar (components/room/role-mark): the owner's crown, a Süper Yönetici's star, a Yönetici's shield. */
+const RoleMark = ({ role }: { role: MemberRole }) => <StaffBadge mark={role === 'owner' || role === 'super' || role === 'admin' ? role : null} />;
 
 // --- The full list -----------------------------------------------------------------------------------------------
 const FILTERS: { key: MemberFilter; label: string; empty: string }[] = [
@@ -439,7 +425,6 @@ const styles = StyleSheet.create({
   more: { width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' },
   moreText: { color: '#fff', fontWeight: '800', fontSize: 12 },
   // Bottom left: the bottom right is where a list row's "in the room" dot sits.
-  mark: { position: 'absolute', left: -3, bottom: -3, borderRadius: 10, padding: 3, borderWidth: 1.5, borderColor: '#24232B' },
   joinBtn: { backgroundColor: colors.primary, borderRadius: 999, paddingVertical: 11, alignItems: 'center' },
   joinText: { color: '#fff', fontWeight: '800', fontSize: 15 },
   state: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10 },

@@ -21,6 +21,7 @@ import { Icon3D } from '@/components/Icon3D';
 import { EMOJI_PACKS_ICON, StickerArt } from '@/components/ReactionArt';
 import { SPECIAL_ID_ART, STORE_TAB_ART, frameBadgeArtOf, storeArtOf } from '@/components/StoreArt';
 import { Photo } from '@/components/photo';
+import { WavePreview, voiceOf } from '@/components/room/voice-wave';
 
 type Tab = CosmeticKind | 'emoji';
 
@@ -116,7 +117,7 @@ export default function StoreScreen() {
               const isEquipped = equipped[c.kind] === c.id;
               return (
                 <Shelf key={c.id} hue={c.color?.[0] ?? hueAt(i)} on={isEquipped}>
-                  <Preview item={c} avatar={me.avatar} still={settings.reduceMotion} />
+                  <Preview item={c} avatar={me.avatar} voice={voiceOf(me.gender, me.showGender !== false)} still={settings.reduceMotion} />
                   {(c.kind === 'entry' || c.kind === 'ride') && (
                     <Pressable onPress={() => playPreview(c)} style={styles.previewBtn} accessibilityRole="button" accessibilityLabel={`${c.name} önizle`}>
                       <Ionicons name="play" size={12} color={t.colors.primaryText} />
@@ -167,7 +168,7 @@ function Shelf({ hue, on, children }: { hue: string; on?: boolean; children: Rea
         styles.item,
         {
           borderColor: on ? colors.primaryText : `${hue}40`,
-          boxShadow: `${dark ? '0 8px 20px rgba(0,0,0,0.35)' : '0 1px 2px rgba(16,36,64,0.05), 0 8px 20px rgba(16,36,64,0.08)'}, 0 0 16px ${hue}1F`,
+          boxShadow: `${dark ? '0 8px 20px rgba(0,0,0,0.35)' : '0 1px 2px rgba(64,20,40,0.05), 0 8px 20px rgba(64,20,40,0.08)'}, 0 0 16px ${hue}1F`,
         },
       ]}
     >
@@ -181,9 +182,15 @@ function Shelf({ hue, on, children }: { hue: string; on?: boolean; children: Rea
   );
 }
 
-function Preview({ item, avatar, still }: { item: Cosmetic; avatar: string; still?: boolean }) {
+function Preview({ item, avatar, voice, still }: { item: Cosmetic; avatar: string; voice: string; still?: boolean }) {
   const { colors } = useTheme();
   const styles = useStyles();
+  if (item.kind === 'wave')
+    return (
+      <View style={{ height: 104, justifyContent: 'center', alignItems: 'center' }} accessibilityLabel={`${item.name} ses dalgası`}>
+        <WavePreview wave={item.id} uri={avatar} color={voice} still={still} />
+      </View>
+    );
   const art = item.kind === 'frame' ? frameArtOf(item.id) : undefined;
   if (art) {
     // Size the avatar so the whole illustrated frame (wings, crown) fits the card.
@@ -263,7 +270,7 @@ function Preview({ item, avatar, still }: { item: Cosmetic; avatar: string; stil
 }
 
 const useStyles = makeStyles((t) => ({
-  previewBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, height: 30, borderRadius: 999, backgroundColor: t.dark ? 'rgba(19,217,223,0.18)' : 'rgba(0,140,148,0.11)' },
+  previewBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, height: 30, borderRadius: 999, backgroundColor: t.dark ? 'rgba(255,95,162,0.18)' : 'rgba(208,46,120,0.11)' },
   previewText: { color: t.colors.primaryText, fontWeight: '700', fontSize: 12 },
   entryPreview: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 40, borderRadius: 20, paddingHorizontal: 10, marginVertical: 12, maxWidth: '100%', borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)' },
   entryPreviewSmall: { height: 32, marginVertical: 0 },
@@ -273,7 +280,7 @@ const useStyles = makeStyles((t) => ({
   rideArt: { width: 72, height: 72 },
   tabTrack: { marginHorizontal: 16, marginBottom: 12, borderRadius: 999, overflow: 'hidden', ...glassChipOf(t) },
   tab: { paddingHorizontal: 13, paddingVertical: 6, borderRadius: 999 },
-  tabActive: { backgroundColor: t.semantic.action, boxShadow: '0 3px 12px rgba(19,217,223,0.4)' },
+  tabActive: { backgroundColor: t.semantic.action, boxShadow: '0 3px 12px rgba(255,95,162,0.4)' },
   tabText: { color: t.colors.textDim, fontFamily: fonts.displayBold, fontSize: 13, lineHeight: 18 },
   tabRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   warn: { color: t.colors.gold, fontSize: 12, paddingHorizontal: 16, paddingBottom: 8 },

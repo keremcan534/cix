@@ -137,6 +137,12 @@ export function LayoutPickerSheet({
           })}
         </ScrollView>
         <Text style={st.desc}>{modeById(tab).desc}</Text>
+        {/* Above the cards: below them a refusal was off screen. */}
+        {note && (
+          <Text style={[st.note, note.tone === 'ok' ? st.noteOk : note.tone === 'warn' ? st.noteWarn : st.noteErr]} accessibilityLiveRegion="polite" accessibilityRole="alert">
+            {note.text}
+          </Text>
+        )}
         <ScrollView contentContainerStyle={{ paddingBottom: space.lg }} onLayout={(e) => setGridW(e.nativeEvent.layout.width)}>
           <View style={st.grid}>
             {cardW > 0 &&
@@ -174,11 +180,6 @@ export function LayoutPickerSheet({
                 );
               })}
           </View>
-          {note && (
-            <Text style={[st.note, note.tone === 'ok' ? st.noteOk : note.tone === 'warn' ? st.noteWarn : st.noteErr]} accessibilityLiveRegion="polite" accessibilityRole="alert">
-              {note.text}
-            </Text>
-          )}
           <Pressable onPress={() => pick(null)} style={[st.classic, layoutId === null && st.cardOn]} accessibilityRole="button" accessibilityState={{ selected: layoutId === null }} accessibilityLabel={`${classicLabel}${layoutId === null ? ', şu an seçili' : ''}`}>
             <Ionicons name="grid-outline" size={18} color={layoutId === null ? semantic.action : colors.textDim} />
             <Text style={st.classicText}>{classicLabel}</Text>
@@ -206,11 +207,11 @@ const st = StyleSheet.create({
   desc: { color: colors.textDim, fontSize: 12, marginVertical: space.sm },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP },
   card: { backgroundColor: colors.cardAlt, borderRadius: radius.md, borderWidth: 2, borderColor: 'transparent', alignItems: 'center', paddingVertical: space.sm, gap: 6, minHeight: 132 },
-  cardOn: { borderColor: semantic.action, backgroundColor: 'rgba(19,217,223,0.10)' },
+  cardOn: { borderColor: semantic.action, backgroundColor: 'rgba(255,95,162,0.10)' },
   cardLocked: { opacity: 0.6 },
   preview: { height: PREVIEW_H, alignItems: 'center', justifyContent: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,0.18)', borderRadius: radius.sm, overflow: 'hidden' },
   screen: { backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 4, alignItems: 'center', justifyContent: 'center' },
-  tile: { backgroundColor: 'rgba(19,217,223,0.18)', borderRadius: 3, alignItems: 'center', justifyContent: 'center' },
+  tile: { backgroundColor: 'rgba(255,95,162,0.18)', borderRadius: 3, alignItems: 'center', justifyContent: 'center' },
   cardName: { color: colors.text, fontWeight: '800', fontSize: 13 },
   lv: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 2 },
   lvLocked: { backgroundColor: 'rgba(246,189,96,0.14)' },
@@ -218,7 +219,7 @@ const st = StyleSheet.create({
   pk: { position: 'absolute', left: 6, top: 6, zIndex: 1, backgroundColor: semantic.social, borderRadius: radius.pill, paddingHorizontal: 6, paddingVertical: 1 },
   pkText: { color: '#3A0A10', fontSize: 10, fontWeight: '900' },
   check: { position: 'absolute', right: 6, top: 6, zIndex: 1, backgroundColor: semantic.action, borderRadius: 9, width: 18, height: 18, alignItems: 'center', justifyContent: 'center' },
-  note: { marginTop: space.md, padding: space.sm, borderRadius: radius.sm, fontSize: 13, lineHeight: 18 },
+  note: { marginTop: space.xs, marginBottom: space.sm, padding: space.sm, borderRadius: radius.sm, fontSize: 13, lineHeight: 18 },
   noteOk: { color: semantic.tonalText, backgroundColor: semantic.tonal },
   noteWarn: { color: colors.gold, backgroundColor: 'rgba(246,189,96,0.12)' },
   noteErr: { color: semantic.danger, backgroundColor: 'rgba(217,58,69,0.14)' },

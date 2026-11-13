@@ -10,7 +10,7 @@ import { Image, Pressable, ScrollView, View, useWindowDimensions, type NativeScr
 import { Text } from '@/components/text';
 import { FloatIcon } from '@/components/fx/float';
 import { Gloss, PressableScale } from '@/components/fx/surface';
-import { Icon3D, icon3dSource, type Icon3DName } from '@/components/Icon3D';
+import { Icon3D, type Icon3DName } from '@/components/Icon3D';
 import { Avatar } from '@/components/ui';
 import { AGENCIES } from '@/data/agency';
 import { LEADERBOARDS } from '@/data/economy';
@@ -31,11 +31,14 @@ const PERIODS: { key: BoardPeriod; label: string; screen: string }[] = [
   { key: 'week', label: 'Hafta', screen: 'weekly' },
   { key: 'month', label: 'Ay', screen: 'monthly' },
 ];
-const BOARD: Record<BoardKey, { title: string; sub: string; icon: Icon3DName; unit: Icon3DName; tint: readonly [string, string]; screen: string }> = {
-  agency: { title: 'Zirvedeki ajanslar', sub: 'Yayıncılarının kazandığı elmas', icon: 'briefcase', unit: 'diamond', tint: ['#123A52', '#1D1846'], screen: 'ajans' },
-  charm: { title: 'En çok hediye alanlar', sub: 'Gelen hediyelerin elması', icon: 'diamond', unit: 'diamond', tint: ['#4A1838', '#24163F'], screen: 'yayinci' },
-  wealth: { title: 'En çok hediye gönderenler', sub: 'Gönderilen hediyelerin jetonu', icon: 'gift', unit: 'coin', tint: ['#4A3510', '#241A3D'], screen: 'zengin' },
+// Each board's sign (docs/GORSEL_URETIM_LISTESI.md § 13, app/assets/banners, 192 px).
+const BOARD: Record<BoardKey, { title: string; sub: string; art: number; unit: Icon3DName; tint: readonly [string, string]; screen: string }> = {
+  agency: { title: 'Zirvedeki ajanslar', sub: 'Yayıncılarının kazandığı elmas', art: require('../../assets/banners/banner-zirvedeki-ajanslar.png'), unit: 'diamond', tint: ['#123A52', '#1D1846'], screen: 'ajans' },
+  charm: { title: 'En çok hediye alanlar', sub: 'Gelen hediyelerin elması', art: require('../../assets/banners/banner-en-cok-hediye-alan.png'), unit: 'diamond', tint: ['#4A1838', '#24163F'], screen: 'yayinci' },
+  wealth: { title: 'En çok hediye gönderenler', sub: 'Gönderilen hediyelerin jetonu', art: require('../../assets/banners/banner-en-cok-hediye-gonderen.png'), unit: 'coin', tint: ['#4A3510', '#241A3D'], screen: 'zengin' },
 };
+/** A management event without its own picture: a cup and a calendar leaf in the corner. */
+const EVENT_ART: number = require('../../assets/banners/banner-etkinlik-varsayilan.png');
 const EVENT_TINT = ['#2563EB', '#5B21B6'] as const;
 const EVERY_MS = 5500;
 
@@ -182,7 +185,7 @@ function EventCard({ s, live }: { s: EventSlide; live: boolean }) {
           {s.image ? (
             href && <Ionicons name="chevron-forward-circle" size={28} color="rgba(255,255,255,0.9)" />
           ) : (
-            <FloatIcon source={icon3dSource('trophy')} size={64} hue="#A5B4FC" bob />
+            <FloatIcon source={EVENT_ART} size={64} hue="#A5B4FC" bob />
           )}
         </View>
       </View>
@@ -205,7 +208,7 @@ function BoardCard({ s }: { s: BoardSlide }) {
       <LinearGradient colors={b.tint} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.fill}>
         <Gloss radius={18} strength={0.12} />
         <View style={styles.boardHead}>
-          <Icon3D name={b.icon} size={30} />
+          <Image source={b.art} style={{ width: 30, height: 30 }} resizeMode="contain" accessibilityIgnoresInvertColors />
           <View style={{ flex: 1 }}>
             <Text style={styles.boardTitle} numberOfLines={1}>
               {b.title}

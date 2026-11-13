@@ -418,7 +418,7 @@ export function RoomInfoSheet({
                   </LinearGradient>
                 )}
                 <Pressable style={{ flex: 1 }} onPress={() => setSub('traffic')} accessibilityLabel="Trafik paneli izleme">
-                  <LinearGradient colors={['#0A8F95', '#076A70']} style={[styles.card, { flexDirection: 'row', alignItems: 'center' }]}>
+                  <LinearGradient colors={['#D02E78', '#9C1857']} style={[styles.card, { flexDirection: 'row', alignItems: 'center' }]}>
                     <Text style={[styles.cardLabel, { flex: 1 }]}>Trafik paneli izleme</Text>
                     <Ionicons name="stats-chart" size={20} color="#fff" />
                   </LinearGradient>

@@ -144,6 +144,11 @@ const SHOP_ROWS = [
   ['id-777', 'specialId', 'ID 777', 8_000, null, 0],
   ['id-2026', 'specialId', 'ID 2026', 3_000, null, 0],
   ['id-1001', 'specialId', 'ID 1001', 2_000, null, 0],
+  // Ses dalgası: the ring around the seat while one talks (app components/room/voice-wave.tsx). Kept for good.
+  ['wv-sparkle', 'wave', 'Parıltı', 1_500, null, 0],
+  ['wv-flame', 'wave', 'Alev', 2_500, null, 0],
+  ['wv-rainbow', 'wave', 'Gökkuşağı', 3_500, null, 0],
+  ['wv-gold', 'wave', 'Altın Halka', 5_000, null, 0],
   ['pack-fun', 'sticker', 'Eğlence', 50, null, 0],
   ['pack-love', 'sticker', 'Aşk', 80, null, 0],
   ['pack-animals', 'sticker', 'Hayvanlar', 60, null, 0],
@@ -161,7 +166,7 @@ export const SHOP = new Map(
   SHOP_ROWS.map(([sku, kind, name, price, days, minVip]) => [sku, Object.freeze({ sku, kind, name, price, days, minVip, tier: kind === 'noble' ? Number(sku.slice(6)) : null })]),
 );
 /** What a person wears, one each (users.equipped). Sticker packs and noble rank are owned, not worn. */
-export const SLOTS = ['frame', 'entry', 'ride', 'bubble', 'specialId', 'micfx'];
+export const SLOTS = ['frame', 'entry', 'ride', 'bubble', 'specialId', 'micfx', 'wave'];
 /** One of a kind: bought coins only, never reward coins. */
 export const PAID_ONLY = ['specialId'];
 /** Mic effects anyone may wear without buying. */
@@ -177,6 +182,20 @@ export function labelOf(item) {
   if (item.kind === 'noble') return `Rütbe: ${item.name} (${item.days} gün)`;
   return `Mağaza: ${item.name}${item.days ? ` (${item.days} gün)` : ''}`;
 }
+
+// --- Koltuk rengi (room-seat-color.mjs): the color of a room's empty mics, bought once per room by its owner and
+// kept; turquoise is the free default. In step with the app (app/src/data/catalog.ts SEAT_COLORS); the catalog test
+// fails when they drift.
+/** [id, name, price in coins] */
+const SEAT_COLOR_ROWS = [
+  ['turkuaz', 'Turkuaz', 0],
+  ['pembe', 'Pembe', 2_000],
+  ['kirmizi', 'Kırmızı', 2_000],
+  ['turuncu', 'Turuncu', 2_000],
+  ['yesil', 'Yeşil', 2_000],
+  ['gumus', 'Gümüş', 3_000],
+];
+export const SEAT_COLORS = new Map(SEAT_COLOR_ROWS.map(([id, name, price]) => [id, Object.freeze({ id, name, price })]));
 
 // --- Hareketli in rooms (room-fx.mjs): the paid room animations, in step with the app (app/src/data/animations.ts
 // rows of type reaction, gift and fullscreen with a price); tests/server-catalog.test.ts fails when they drift.

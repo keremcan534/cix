@@ -2,6 +2,9 @@
 export const ensureWebRtc = () => {};
 export const holdAudio = async (_who: 'room' | 'call') => {};
 export const releaseAudio = async (_who: 'room' | 'call') => {};
+/** The browser tab keeps its voices while hidden; nothing to start for the mic. */
+export const audioInBackground = () => false;
+export const micStarted = () => {};
 
 /** Plays a remote voice; returns what removes it again. */
 export function playRemote(track: { attach: () => unknown; detach: () => unknown }) {

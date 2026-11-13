@@ -261,6 +261,6 @@ const useStyles = makeStyles(({ colors, dark, lift }) => ({
   // Light: white chips carry a hairline-blue outline so they read on the paper background.
   chip: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, backgroundColor: colors.card, borderWidth: 1.5, borderColor: dark ? 'transparent' : colors.border },
   chipRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  chipActive: { borderColor: colors.primaryText, backgroundColor: dark ? 'rgba(19,217,223,0.18)' : 'rgba(0,140,148,0.11)' },
+  chipActive: { borderColor: colors.primaryText, backgroundColor: dark ? 'rgba(255,95,162,0.18)' : 'rgba(208,46,120,0.11)' },
   chipText: { color: colors.textDim, fontWeight: '600' },
 }));

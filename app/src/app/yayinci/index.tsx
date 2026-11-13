@@ -124,7 +124,7 @@ function Dashboard() {
     <SafeAreaView style={styles.safe}>
       <Header title="Yayıncı Merkezi" />
       <ScrollView contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: 40 }}>
-        <LinearGradient colors={['#0EA5E9', '#0A8F95']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.balance}>
+        <LinearGradient colors={['#0EA5E9', '#D02E78']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.balance}>
           <Text style={styles.balanceLabel}>Elmas bakiyesi</Text>
           <Text style={styles.balanceN}>💎 {diamonds.toLocaleString('tr-TR')}</Text>
           <Text style={styles.balanceLabel}>≈ {usd(diamonds)}</Text>

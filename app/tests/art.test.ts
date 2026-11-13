@@ -17,12 +17,24 @@ import { stickerIdOf, stickersOf, stickerText, stickerToken } from '@/lib/sticke
 
 const SRC = resolve(dirname(fileURLToPath(import.meta.url)), '../src');
 const read = (file: string) => readFileSync(resolve(SRC, file), 'utf8');
-const ART_FILES = ['components/GiftArt.tsx', 'components/ReactionArt.tsx', 'components/StoreArt.tsx', 'components/RoomArt.tsx', 'components/Art.tsx', 'components/fx/anim-art.tsx'];
+const ART_FILES = [
+  'components/GiftArt.tsx',
+  'components/ReactionArt.tsx',
+  'components/StoreArt.tsx',
+  'components/RoomArt.tsx',
+  'components/Art.tsx',
+  'components/fx/anim-art.tsx',
+  'components/events/event-art.ts',
+  'components/room-banners.tsx',
+  'app/(tabs)/mesajlar.tsx',
+  'components/bonds.tsx',
+  'components/heart-level.tsx',
+];
 
 describe('Görsel dosyaları', () => {
   test('bağlanan her PNG diskte var', () => {
     for (const file of ART_FILES) {
-      const paths = [...read(file).matchAll(/require\('([^']+\.png)'\)/g)].map((m) => m[1]);
+      const paths = [...read(file).matchAll(/require\('([^']+\.(?:png|jpg))'\)/g)].map((m) => m[1]);
       assert.ok(paths.length > 0, file);
       for (const p of paths) assert.ok(existsSync(resolve(SRC, dirname(file), p)), `${file}: ${p}`);
     }

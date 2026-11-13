@@ -152,7 +152,7 @@ const s = StyleSheet.create({
   pill: { position: 'absolute', left: 16, right: 16, bottom: 96, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.cardAlt, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 11, borderWidth: 1, borderColor: colors.border, zIndex: 60 },
   pillText: { color: colors.text, fontWeight: '700', flex: 1, fontSize: 13 },
   pillAction: { color: semantic.action, fontWeight: '900' },
-  backdrop: { flex: 1, backgroundColor: 'rgba(8,15,30,0.78)', alignItems: 'center', justifyContent: 'center', padding: 20 },
+  backdrop: { flex: 1, backgroundColor: 'rgba(22,14,18,0.78)', alignItems: 'center', justifyContent: 'center', padding: 20 },
   inline: { flex: 0, backgroundColor: 'transparent', padding: 0 },
   card: { width: '100%', maxWidth: 380, backgroundColor: colors.card, borderRadius: 24, padding: 18, gap: 8, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
   kicker: { color: semantic.action, fontWeight: '900', fontSize: 13 },

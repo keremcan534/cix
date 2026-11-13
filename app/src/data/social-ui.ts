@@ -19,10 +19,10 @@ export type DiscoverShortcut = {
 };
 
 export const DISCOVER_SHORTCUTS: DiscoverShortcut[] = [
-  { id: 'call', title: 'Hemen Tanış', subtitle: 'Görüntülü & sesli', emoji: '📞', colors: ['#0E7C9A', '#0A8F95'], href: '/eslesme', wide: true },
-  { id: 'party', title: 'Canlı Odalar', subtitle: 'Odalara katıl', emoji: '🎉', colors: ['#14B8A6', '#0E7C9A'], href: '/(tabs)' },
-  { id: 'tribe', title: 'Aile', subtitle: 'Birlikte sohbet', emoji: '⛺', colors: ['#0A8F95', '#0FB8BE'], href: '/aile' },
-  { id: 'free', title: 'Jeton Kazan', subtitle: 'Günlük görevler', emoji: '🪙', colors: ['#FF8A97', '#FF6576'], href: '/gorevler' },
+  { id: 'call', title: 'Hemen Tanış', subtitle: 'Görüntülü & sesli', emoji: '📞', colors: ['#FF5C93', '#C8246A'], href: '/eslesme', wide: true },
+  { id: 'party', title: 'Canlı Odalar', subtitle: 'Odalara katıl', emoji: '🎉', colors: ['#FF9D47', '#E8462A'], href: '/(tabs)' },
+  { id: 'tribe', title: 'Aile', subtitle: 'Birlikte sohbet', emoji: '⛺', colors: ['#2FD0A4', '#0B8F80'], href: '/aile' },
+  { id: 'free', title: 'Jeton Kazan', subtitle: 'Günlük görevler', emoji: '🪙', colors: ['#FFB62E', '#DB6A06'], href: '/gorevler' },
 ];
 
 /** Avatars shown on the "Canlı Odalar" shortcut card. */
@@ -76,11 +76,11 @@ export const DISCOVER_PROMO = {
 export type MomentTopic = { id: string; title: string; views: string; emoji: string; art?: ArtName; colors: readonly [string, string] };
 
 export const MOMENT_TOPICS: MomentTopic[] = [
-  { id: 'date', title: 'Romantik Randevu', views: '238,4 B', emoji: '💞', art: 'konu-romantik-randevu-konu', colors: ['#087A80', '#C93C4F'] },
+  { id: 'date', title: 'Romantik Randevu', views: '238,4 B', emoji: '💞', art: 'konu-romantik-randevu-konu', colors: ['#B81F66', '#C93C4F'] },
   { id: 'pk', title: 'Odalar Arası PK', views: '25,6 B', emoji: '⚔️', art: 'konu-odalar-arasi-pk-konu', colors: ['#1D4ED8', '#DC2626'] },
   { id: 'ootd', title: 'Günün Kombini', views: '109,3 B', emoji: '👗', art: 'konu-ootd', colors: ['#BE185D', '#F59E0B'] },
-  { id: 'travel', title: 'Gezi Günlüğü', views: '64,1 B', emoji: '🧳', art: 'konu-gezi-gunlugu', colors: ['#0A8F95', '#0EA5E9'] },
-  { id: 'music', title: 'Bu Akşam Ne Dinliyoruz', views: '41,1 B', emoji: '🎧', art: 'konu-bu-aksam-ne-dinliyoruz', colors: ['#0B4F63', '#0FB8BE'] },
+  { id: 'travel', title: 'Gezi Günlüğü', views: '64,1 B', emoji: '🧳', art: 'konu-gezi-gunlugu', colors: ['#D02E78', '#0EA5E9'] },
+  { id: 'music', title: 'Bu Akşam Ne Dinliyoruz', views: '41,1 B', emoji: '🎧', art: 'konu-bu-aksam-ne-dinliyoruz', colors: ['#5A1A3A', '#F0468E'] },
 ];
 
 /** Extra moments so every topic has content (ids don't clash with MOMENTS). */

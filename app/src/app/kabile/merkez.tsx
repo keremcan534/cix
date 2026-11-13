@@ -130,7 +130,7 @@ function DemoKabileMerkez() {
       />
       <ScrollView contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: 40 }}>
         <Pressable onPress={() => router.push(KABILE_ROUTES.kasa)}>
-          <LinearGradient colors={['#0B3B4A', '#831843']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.treasury}>
+          <LinearGradient colors={['#4A1630', '#831843']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.treasury}>
             <View style={styles.treasureBadge}>
               <Text style={styles.treasureLabel}>Aile Sandığı</Text>
               <Text style={styles.treasureValue}>🔮 {fmt(treasure)}</Text>
@@ -296,7 +296,7 @@ const useStyles = makeStyles(({ colors, semantic, ink, dark }) => ({
     overflow: 'hidden',
   },
   task: { borderTopWidth: 1, borderTopColor: colors.border, paddingVertical: 12, gap: 8, marginTop: 6 },
-  taskIcon: { width: 48, height: 48, borderRadius: 14, backgroundColor: dark ? 'rgba(19,217,223,0.2)' : 'rgba(0,140,148,0.12)', alignItems: 'center', justifyContent: 'center' },
+  taskIcon: { width: 48, height: 48, borderRadius: 14, backgroundColor: dark ? 'rgba(255,95,162,0.2)' : 'rgba(208,46,120,0.12)', alignItems: 'center', justifyContent: 'center' },
   taskTitle: { color: colors.text, fontWeight: '700', fontSize: 14 },
   reward: { color: semantic.tonalText, fontWeight: '700', fontSize: 13 },
   rateText: { color: semantic.tonalText, fontSize: 12, lineHeight: 17 },

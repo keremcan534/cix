@@ -484,7 +484,7 @@ const s = StyleSheet.create({
   mini: { position: 'absolute', right: space.lg, flexDirection: 'row', alignItems: 'center', gap: space.xs, backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, paddingLeft: space.sm, paddingRight: space.xs, paddingVertical: space.sm, zIndex: 50, ...shadow },
   miniMain: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: space.sm },
   coverWrap: { width: 44, height: 44, borderRadius: radius.md, borderWidth: 2, padding: 1 },
-  cover: { flex: 1, borderRadius: radius.sm },
+  cover: { width: '100%', height: '100%', borderRadius: radius.sm },
   coverBadge: { position: 'absolute', right: -4, bottom: -4, width: 18, height: 18, borderRadius: 9, backgroundColor: semantic.live, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.card },
   miniTitle: { color: colors.text, fontWeight: '800', fontSize: 13 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
@@ -499,7 +499,7 @@ const s = StyleSheet.create({
   edgeDot: { position: 'absolute', right: 4, top: 4, width: 10, height: 10, borderRadius: 5, borderWidth: 2, borderColor: colors.card },
   center: { flex: 1, backgroundColor: SCRIM, alignItems: 'center', justifyContent: 'center', padding: space.xl },
   // The room ended under me (closed, or I was removed): a notice that stops everything, so it keeps a veil.
-  centerDim: { flex: 1, backgroundColor: 'rgba(8,15,30,0.7)', alignItems: 'center', justifyContent: 'center', padding: space.xl },
+  centerDim: { flex: 1, backgroundColor: 'rgba(22,14,18,0.7)', alignItems: 'center', justifyContent: 'center', padding: space.xl },
   dialog: { width: '100%', maxWidth: 360, backgroundColor: colors.card, borderRadius: radius.xl, padding: space.xl, gap: space.md, alignItems: 'center', ...edge.card },
   dialogTitle: { color: colors.text, fontWeight: '900', fontSize: type.title, textAlign: 'center' },
   dialogText: { color: colors.textDim, fontSize: type.body, lineHeight: 20, textAlign: 'center' },

@@ -197,7 +197,7 @@ export async function economyOf(uid, q = db) {
 export async function looksOf(ids, q = db) {
   if (!ids.length) return {};
   const r = await q.query(
-    `SELECT u.id, u.equipped, u.svip_xp,
+    `SELECT u.id, u.equipped, u.svip_xp, u.gender, u.gender_hidden,
             (SELECT max(e.tier) FROM entitlements e WHERE e.user_id = u.id AND e.kind = 'noble' AND ${LIVE}) AS noble,
             (SELECT coalesce(array_agg(e.kind || ':' || e.sku), '{}') FROM entitlements e WHERE e.user_id = u.id AND e.kind = ANY($2::text[]) AND ${LIVE}) AS owned
        FROM users u WHERE u.id = ANY($1::uuid[])`,
@@ -207,7 +207,8 @@ export async function looksOf(ids, q = db) {
   for (const x of r.rows) {
     const worn = wornOf(x.equipped, (slot, sku) => x.owned.includes(`${slot}:${sku}`));
     const noble = x.noble === null ? null : Number(x.noble);
-    out[x.id] = { ...Object.fromEntries(SLOTS.map((s) => [s, worn[s] ?? null])), noble, vipLevel: vipLevelOf(x.svip_xp, noble) };
+    // The gender colors their speaking ring in rooms (pink, blue); a hidden one is none, as on the profile.
+    out[x.id] = { ...Object.fromEntries(SLOTS.map((s) => [s, worn[s] ?? null])), noble, vipLevel: vipLevelOf(x.svip_xp, noble), gender: x.gender_hidden ? null : (x.gender ?? null) };
   }
   return out;
 }
@@ -255,7 +256,7 @@ export async function refundItems(c, { purchase, buyer, lots, held, actor, ip })
 
 // --- Old apps --------------------------------------------------------------------------------------------------
 const PREFIX = [
-  ['Mağaza: ', ['frame', 'entry', 'ride', 'bubble', 'specialId']],
+  ['Mağaza: ', ['frame', 'entry', 'ride', 'bubble', 'specialId', 'wave']],
   ['Çıkartma paketi: ', ['sticker']],
   ['Mikrofon efekti: ', ['micfx']],
   ['Rütbe: ', ['noble']],

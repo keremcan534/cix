@@ -330,9 +330,9 @@ const useStyles = makeStyles(({ colors, semantic, dark }) => ({
   rowTitle: { color: colors.text, fontSize: 15, fontWeight: '700' },
   // Diamond amount: white in the dark scheme (as before), the diamond's blue on the light one.
   diamondAmount: { color: dark ? colors.text : semantic.diamondText },
-  senders: { color: dark ? '#5EEAF0' : semantic.actionText, fontWeight: '600' },
+  senders: { color: dark ? '#FF94C2' : semantic.actionText, fontWeight: '600' },
   dim: { color: colors.textDim, fontSize: 13, lineHeight: 19 },
   empty: { alignItems: 'center', gap: 8, paddingVertical: 60 },
   retry: { marginTop: 10, backgroundColor: colors.cardAlt, borderRadius: 999, paddingHorizontal: 30, paddingVertical: 12 },
-  retryText: { color: dark ? '#5EEAF0' : semantic.actionText, fontWeight: '800', fontSize: 16 },
+  retryText: { color: dark ? '#FF94C2' : semantic.actionText, fontWeight: '800', fontSize: 16 },
 }));

@@ -2,7 +2,9 @@
 // (Settings.gameVolume; 0 is off). They mix with whatever else is playing: a room's voices and music are never
 // paused or turned down for them. Sound is a nicety like haptics: a device or browser that can't play one must
 // never break the round, so every call here is safe to make anywhere.
-import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
+import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
+
+import { mixWithVoices } from '@/lib/audio-mode';
 
 const SRC = {
   tap: require('../../assets/sfx/tap.wav'),
@@ -51,7 +53,7 @@ export function playSfx(name: Sfx, gain = 1) {
     if (!modeSet) {
       modeSet = true;
       // The same mode the room's music asks for: mixed with the room's voices, never taking the microphone away.
-      void setAudioModeAsync({ interruptionMode: 'mixWithOthers', allowsRecording: true, playsInSilentMode: true, shouldPlayInBackground: false }).catch(() => {});
+      mixWithVoices();
     }
     let e = players.get(name);
     if (!e) players.set(name, (e = { list: [], next: 0 }));

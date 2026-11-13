@@ -518,7 +518,7 @@ export default function UserProfile() {
         {/* Cover + header */}
         <View>
           <Photo uri={user.avatar} kind="face" style={styles.cover} />
-          <LinearGradient colors={['rgba(8,15,30,0.55)', 'transparent', 'rgba(8,15,30,0.6)']} style={StyleSheet.absoluteFill} />
+          <LinearGradient colors={['rgba(22,14,18,0.55)', 'transparent', 'rgba(22,14,18,0.6)']} style={StyleSheet.absoluteFill} />
           {/* The voice intro ("Kayıt") control comes back once recording one exists. */}
         </View>
 
@@ -1210,7 +1210,7 @@ function InfoBox({ icon, text }: { icon: keyof typeof Ionicons.glyphMap; text: s
   const styles = useStyles();
   return (
     <View style={styles.infoBox}>
-      <LinearGradient colors={['#13D9DF', colors.primary]} style={styles.infoIcon}>
+      <LinearGradient colors={['#FF5FA2', colors.primary]} style={styles.infoIcon}>
         <Ionicons name={icon} size={20} color="#fff" />
       </LinearGradient>
       <Text style={{ color: dark ? '#E9E4FF' : colors.text, flex: 1, fontSize: 14 }}>{text}</Text>
@@ -1402,7 +1402,7 @@ function OnurTab({
 
       <WallBanner
         title="Unvanlar"
-        colors={['#0B3B4A', '#087A80', '#0B3B4A']}
+        colors={['#4A1630', '#B81F66', '#4A1630']}
         subtitle="Yalnızca dinamik unvanları göster"
         onPress={explain('Unvanlar', server ? TITLE_HOWTO : 'Sıralamalarda ve etkinliklerde derece yaparak unvan kazan.')}
         right={
@@ -1490,7 +1490,7 @@ function OnurTab({
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
             {collections.map((c) => (
-              <LinearGradient key={c.id} colors={c.done > 0 ? c.colors : dark ? ['#3F3A52', '#1F1B2E'] : ['#E9EFF7', '#D5DEEA']} style={styles.collection}>
+              <LinearGradient key={c.id} colors={c.done > 0 ? c.colors : dark ? ['#3F3A52', '#1F1B2E'] : ['#F6E9EF', '#EBD5DF']} style={styles.collection}>
                 {c.art ? <Art name={c.art} size={56} style={{ opacity: c.done > 0 ? 1 : 0.4 }} /> : <Text style={{ fontSize: 44, opacity: c.done > 0 ? 1 : 0.4 }}>{c.emoji}</Text>}
                 <Text style={[styles.collectionName, c.done === 0 && styles.collectionNameLocked]} numberOfLines={2}>
                   {c.name}
@@ -1807,7 +1807,7 @@ const useStyles = makeStyles(({ colors, semantic, lift, ink, dark, edge }) => ({
   track: { height: 6, borderRadius: 3, backgroundColor: colors.cardAlt, overflow: 'hidden' },
   photo: { width: 110, height: 110, borderRadius: 12 },
   addPhoto: { backgroundColor: colors.card, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.border, alignItems: 'center', justifyContent: 'center', gap: 2 },
-  removePhoto: { position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(8,15,30,0.75)', alignItems: 'center', justifyContent: 'center' },
+  removePhoto: { position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(22,14,18,0.75)', alignItems: 'center', justifyContent: 'center' },
   heartPin: { position: 'absolute', right: -4, bottom: -2 },
   cameraBadge: { position: 'absolute', right: 2, bottom: 2, width: 28, height: 28, borderRadius: 14, backgroundColor: colors.primary, borderWidth: 2, borderColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
   reviewNote: { color: colors.gold, fontSize: 12, fontWeight: '700' },
@@ -1820,7 +1820,7 @@ const useStyles = makeStyles(({ colors, semantic, lift, ink, dark, edge }) => ({
   privateValue: { color: colors.text, fontWeight: '900', fontSize: 15 },
   fieldError: { color: semantic.danger, fontSize: 12, marginTop: 4, fontWeight: '600' },
   editChip: { backgroundColor: colors.cardAlt, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: 'transparent' },
-  editChipOn: { borderColor: dark ? semantic.action : semantic.actionText, backgroundColor: dark ? 'rgba(19,217,223,0.18)' : 'rgba(0,140,148,0.11)' },
+  editChipOn: { borderColor: dark ? semantic.action : semantic.actionText, backgroundColor: dark ? 'rgba(255,95,162,0.18)' : 'rgba(208,46,120,0.11)' },
   empty: { alignItems: 'center', paddingVertical: 48, gap: 4 },
   moment: { backgroundColor: colors.card, borderRadius: 16, padding: 12, gap: 10, ...lift },
   momentImg: { width: '100%', aspectRatio: 1, borderRadius: 12, backgroundColor: colors.cardAlt },
@@ -1873,6 +1873,6 @@ const useStyles = makeStyles(({ colors, semantic, lift, ink, dark, edge }) => ({
   input: { backgroundColor: colors.cardAlt, color: colors.text, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15 },
   cancelBtn: { paddingVertical: 12, paddingHorizontal: 20, borderRadius: 999, backgroundColor: colors.cardAlt, alignItems: 'center' },
   pickRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, borderRadius: 14 },
-  presence: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12, backgroundColor: dark ? 'rgba(19,217,223,0.15)' : 'rgba(0,140,148,0.09)', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: dark ? '#0FB8BE' : 'rgba(0,117,123,0.4)' },
-  presenceGo: { color: '#fff', fontWeight: '800', backgroundColor: '#0FB8BE', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 6, overflow: 'hidden' },
+  presence: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12, backgroundColor: dark ? 'rgba(255,95,162,0.15)' : 'rgba(208,46,120,0.09)', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: dark ? '#F0468E' : 'rgba(184,31,102,0.4)' },
+  presenceGo: { color: '#fff', fontWeight: '800', backgroundColor: '#F0468E', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 6, overflow: 'hidden' },
 }));

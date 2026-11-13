@@ -11,8 +11,8 @@ const topRoomCovers = [...ROOMS].sort((a, b) => b.listeners - a.listeners).slice
 export const RANK_CARDS: RankCard[] = [
   { key: 'cazibe', title: 'Yankı Listesi', board: 'yayinci', colors: ['#5A2232', '#2A1A24'], avatars: LEADERBOARDS.yayinci.daily.slice(0, 3).map((r) => r.user.avatar) },
   { key: 'zengin', title: 'Cömertler', board: 'zengin', colors: ['#5C4012', '#2E2414'], avatars: LEADERBOARDS.zengin.daily.slice(0, 3).map((r) => r.user.avatar) },
-  { key: 'oda', title: 'Haftanın Odaları', board: 'oda', colors: ['#0B4F63', '#12304A'], avatars: topRoomCovers },
-  { key: 'dost', title: 'Dost Listesi', board: 'odaxp', colors: ['#0B3B4A', '#16253C'], avatars: ['u5', 'u11', 'u2'].map((id) => userById(id).avatar) },
+  { key: 'oda', title: 'Haftanın Odaları', board: 'oda', colors: ['#5A1A3A', '#3A1A2A'], avatars: topRoomCovers },
+  { key: 'dost', title: 'Dost Listesi', board: 'odaxp', colors: ['#4A1630', '#2A1A22'], avatars: ['u5', 'u11', 'u2'].map((id) => userById(id).avatar) },
 ];
 
 // --- Category tabs --------------------------------------------------------------------------
@@ -71,11 +71,11 @@ export type RoomBadge = { emoji: string; label: string; colors: readonly [string
 export const roomBadge = (room: Room): RoomBadge | null => {
   const x = rowExtra(room);
   if (x.agencyName) return { emoji: '', icon: 'business', label: x.agencyName, colors: ['#B45309', '#7C2D12'] };
-  if (x.familyName) return { emoji: '', icon: 'people', label: x.familyName, colors: ['#087A80', '#0B3B4A'] };
+  if (x.familyName) return { emoji: '', icon: 'people', label: x.familyName, colors: ['#B81F66', '#4A1630'] };
   const agency = x.agencyId ? AGENCIES.find((a) => a.id === x.agencyId) : undefined;
   if (agency) return { emoji: agency.logo, label: agency.name, colors: ['#B45309', '#7C2D12'] };
   const family = x.familyId ? FAMILIES.find((f) => f.id === x.familyId) : undefined;
-  if (family) return { emoji: family.emoji, label: family.name, colors: ['#087A80', '#0B3B4A'] };
+  if (family) return { emoji: family.emoji, label: family.name, colors: ['#B81F66', '#4A1630'] };
   return null;
 };
 
@@ -126,7 +126,7 @@ export const ROOM_BANNER = {
   title: 'Odana daha fazla koltuk aç',
   sub: 'Oda seviyen yükseldikçe sahnede yer açılır',
   emoji: '🎤',
-  colors: ['#2563EB', '#087A80'] as const,
+  colors: ['#2563EB', '#B81F66'] as const,
 };
 
 // --- Calendar (events) ------------------------------------------------------------------------

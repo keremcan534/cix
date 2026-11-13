@@ -377,7 +377,7 @@ const useStyles = makeStyles(({ colors, semantic, dark }) => ({
   alBtn: { backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 5, minWidth: 54, alignItems: 'center' },
   btnText: { color: '#fff', fontWeight: '800', fontSize: 13 },
   task: { borderTopWidth: 1, borderTopColor: colors.border, paddingVertical: 12, gap: 6, marginTop: 6 },
-  taskIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: dark ? 'rgba(19,217,223,0.2)' : 'rgba(0,140,148,0.12)', alignItems: 'center', justifyContent: 'center' },
+  taskIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: dark ? 'rgba(255,95,162,0.2)' : 'rgba(208,46,120,0.12)', alignItems: 'center', justifyContent: 'center' },
   taskTitle: { color: colors.text, fontWeight: '700', fontSize: 14 },
   reward: { color: semantic.tonalText, fontWeight: '700', fontSize: 13 },
   rateText: { color: semantic.tonalText, fontSize: 12, lineHeight: 17 },

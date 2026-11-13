@@ -1,7 +1,7 @@
 // Catalogs for the prototype: cosmetics, emoji and sticker packs, room levels, music, support.
 
 // --- Cosmetics store ---------------------------------------------------------
-export type CosmeticKind = 'frame' | 'entry' | 'ride' | 'bubble' | 'specialId';
+export type CosmeticKind = 'frame' | 'entry' | 'ride' | 'bubble' | 'specialId' | 'wave';
 export type Cosmetic = {
   id: string;
   kind: CosmeticKind;
@@ -21,6 +21,7 @@ export const COSMETIC_KINDS: { kind: CosmeticKind; label: string; emoji: string 
   { kind: 'ride', label: 'Binek', emoji: '🏎️' },
   { kind: 'bubble', label: 'Sohbet balonu', emoji: '💬' },
   { kind: 'specialId', label: 'Özel ID', emoji: '🔢' },
+  { kind: 'wave', label: 'Ses dalgası', emoji: '🔊' },
 ];
 
 export const COSMETICS: Cosmetic[] = [
@@ -51,6 +52,11 @@ export const COSMETICS: Cosmetic[] = [
   { id: 'id-777', kind: 'specialId', name: 'ID 777', emoji: '🔢', price: 8_000, days: null },
   { id: 'id-2026', kind: 'specialId', name: 'ID 2026', emoji: '🔢', price: 3_000, days: null },
   { id: 'id-1001', kind: 'specialId', name: 'ID 1001', emoji: '🔢', price: 2_000, days: null },
+  // Ses dalgası: the ring around my seat while I talk (components/room/voice-wave.tsx draws them). Kept for good.
+  { id: 'wv-sparkle', kind: 'wave', name: 'Parıltı', emoji: '✨', price: 1_500, days: null, color: ['#FFFFFF', '#3D9BFF'] },
+  { id: 'wv-flame', kind: 'wave', name: 'Alev', emoji: '🔥', price: 2_500, days: null, color: ['#FF8A3D', '#FF3B30'] },
+  { id: 'wv-rainbow', kind: 'wave', name: 'Gökkuşağı', emoji: '🌈', price: 3_500, days: null, color: ['#FFD60A', '#34C759'] },
+  { id: 'wv-gold', kind: 'wave', name: 'Altın Halka', emoji: '💫', price: 5_000, days: null, color: ['#F6BD60', '#B7832E'] },
 ];
 export const cosmeticById = (id?: string | null) => COSMETICS.find((c) => c.id === id);
 

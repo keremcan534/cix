@@ -370,7 +370,24 @@ export function reportPlayer(roomId: string, reporterId: string, report: { video
   if (next !== p) put({ ...s, playback: next });
 }
 
+/**
+ * Server rooms: the video the server keeps (server/api/room-video.mjs, through the room metadata), already on this
+ * phone's clock (lib/live/room-video videoPlayback). `key` names that server state: the same state again changes
+ * nothing, so what this phone learned about the video since (its length, its end, a YouTube error) stays until the
+ * server says something new. A video that stays the same keeps its known length.
+ */
+const serverVideo = new Map<string, string>();
+export function applyServerVideo(roomId: string, playback: PlaybackState | null, key: string) {
+  const s = state.stages[roomId];
+  if (!s || serverVideo.get(roomId) === key) return;
+  serverVideo.set(roomId, key);
+  const cur = s.playback;
+  const next = playback && cur?.videoId === playback.videoId && cur.duration ? { ...playback, duration: cur.duration } : playback;
+  put({ ...s, playback: next });
+}
+
 /** Test support: forget all stages and restore the catalog. */
 export function resetStages() {
+  serverVideo.clear();
   state = { stages: {}, info: {}, layouts: ROOM_LAYOUTS, audit: [] };
 }

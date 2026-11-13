@@ -253,7 +253,7 @@ export default function RoomsScreen() {
 
       <View style={[styles.fab, { bottom: TAB_BAR_HEIGHT + insets.bottom + 18 }]}>
         <PressableScale to={0.9} onPress={() => router.push('/oda/yeni')} accessibilityLabel="Oda oluştur">
-          <LinearGradient colors={gradient} style={[styles.fabInner, glow('rgba(19,217,223,0.5)', 14, 4)]}>
+          <LinearGradient colors={gradient} style={[styles.fabInner, glow('rgba(255,95,162,0.5)', 14, 4)]}>
             <Gloss />
             <Ionicons name="add" size={30} color={semantic.actionInk} />
           </LinearGradient>
@@ -283,10 +283,10 @@ function ClosestRoomCard({ match }: { match: RoomMatch }) {
   const styles = useStyles();
   return (
     <PressableScale style={{ marginHorizontal: 16 }} to={0.98} onPress={() => router.push(`/oda/${room.id}`)} accessibilityRole="button" accessibilityLabel={`Sana en yakın oda: ${room.title}, yüzde ${score} benzer. ${reason}. Katıl`}>
-      <DepthCard style={[styles.hero, glow('rgba(19,217,223,0.22)', 24, 8)]}>
+      <DepthCard style={[styles.hero, glow('rgba(255,95,162,0.22)', 24, 8)]}>
         <View style={styles.heroCover}>
           <Photo uri={room.cover} kind="cover" seed={room.id} style={styles.heroImg} />
-          <LinearGradient colors={['rgba(8,15,30,0.1)', 'rgba(8,15,30,0.25)', 'rgba(8,15,30,0.92)']} style={StyleSheet.absoluteFill} />
+          <LinearGradient colors={['rgba(22,14,18,0.1)', 'rgba(22,14,18,0.25)', 'rgba(22,14,18,0.92)']} style={StyleSheet.absoluteFill} />
           <View style={styles.heroKicker}>
             <Ionicons name="compass" size={12} color={semantic.action} />
             <Text style={styles.heroKickerText}>SANA EN YAKIN ODA</Text>
@@ -333,7 +333,7 @@ function QuickStrip({ coins, checkedInToday }: { coins: number; checkedInToday: 
   const styles = useStyles();
   const items: { key: string; source: number | undefined; hue: string; label: string; a11y?: string; onPress: () => void; dot?: boolean }[] = [
     { key: 'coins', source: icon3dSource('coin'), hue: '#F6BD60', label: coins.toLocaleString('tr-TR'), a11y: 'Cüzdan', onPress: () => router.push('/cuzdan') },
-    ...(oneOnOneOpen() ? [{ key: 'match', source: icon3dSource('bolt'), hue: '#13D9DF', label: 'Hemen Tanış', onPress: () => router.push('/eslesme') }] : []),
+    ...(oneOnOneOpen() ? [{ key: 'match', source: icon3dSource('bolt'), hue: '#FF5FA2', label: 'Hemen Tanış', onPress: () => router.push('/eslesme') }] : []),
     { key: 'games', source: artSource('ana-oyun-merkezi'), hue: '#FF6576', label: 'Oyun merkezi', onPress: () => router.push('/oyunlar') },
     { key: 'tasks', source: artSource('ana-gorevler'), hue: '#A78BFA', label: 'Görevler', onPress: () => router.push('/gorevler'), dot: !checkedInToday },
   ];
@@ -452,7 +452,7 @@ function SuggestionsRow({ items }: { items: Suggestion[] }) {
           <PressableScale key={r.id} style={styles.suggest} onPress={() => router.push(`/oda/${r.id}`)}>
             <View style={styles.suggestFrame}>
               <Photo uri={r.cover} kind="cover" seed={r.id} style={styles.suggestImg} />
-              <LinearGradient colors={['rgba(8,15,30,0)', 'rgba(8,15,30,0.55)']} style={styles.suggestFade} />
+              <LinearGradient colors={['rgba(22,14,18,0)', 'rgba(22,14,18,0.55)']} style={styles.suggestFade} />
               <EdgeLight inset={10} strength={0.35} />
               <View style={styles.liveBadge}>
                 <View style={styles.liveDot} />
@@ -480,7 +480,7 @@ function MyRoomCard({ title, announcement, cover, locked, avatar, listeners = 0 
   const styles = useStyles();
   return (
     <Pressable style={{ marginHorizontal: 16 }} onPress={() => router.push('/oda/yeni')}>
-      <LinearGradient colors={[dark ? '#123B3A' : '#DDF2F1', colors.card]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.myRoom}>
+      <LinearGradient colors={[dark ? '#3D1428' : '#FCE4EE', colors.card]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.myRoom}>
         <Photo uri={cover || avatar} kind="cover" style={styles.myCover} />
         <View style={{ flex: 1, gap: 6 }}>
           <View style={styles.titleRow}>
@@ -621,7 +621,7 @@ function RoomRowBody({ room, match, pk, mark, closed }: { room: Room; match: num
             </View>
           )}
           {pk && (
-            <LinearGradient colors={['#FF6576', '#0E7C9A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.pkPill}>
+            <LinearGradient colors={['#FF6576', '#C2306E']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.pkPill}>
               <Gloss strength={0.35} />
               <Text style={styles.pkText}>PK</Text>
             </LinearGradient>
@@ -706,7 +706,7 @@ function RoomSearch({ visible, rooms, onClose }: { visible: boolean; rooms: Room
 }
 
 // Shadow under cards and photo frames: deep and black at night, a soft navy lift on paper.
-const SOFT_SHADOW = '0 1px 2px rgba(16,36,64,0.05), 0 6px 16px rgba(16,36,64,0.06)';
+const SOFT_SHADOW = '0 1px 2px rgba(64,20,40,0.05), 0 6px 16px rgba(64,20,40,0.06)';
 
 const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark, edge }) => ({
   headerBar: { position: 'absolute', top: 0, left: 0, right: 0, borderBottomWidth: 1, borderBottomColor: ink(0.06) },
@@ -714,11 +714,11 @@ const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark, edge
   // header segment
   segment: { flexDirection: 'row', backgroundColor: ink(0.06), borderRadius: 999, padding: 3, borderWidth: 1, borderColor: surface.hairline },
   segItem: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999 },
-  segItemOn: { backgroundColor: semantic.action, boxShadow: '0 0 12px rgba(19,217,223,0.45)' },
+  segItemOn: { backgroundColor: semantic.action, boxShadow: '0 0 12px rgba(255,95,162,0.45)' },
   segText: { color: colors.textDim, fontFamily: fonts.displayBold, fontSize: 14, lineHeight: 18 },
   segTextOn: { color: semantic.actionInk },
   // Active tab marker: bright turquoise with a soft glow, like a lit LED.
-  underlineSm: { width: 14, height: 3, borderRadius: 2, backgroundColor: semantic.action, marginTop: 3, boxShadow: '0 0 6px rgba(19,217,223,0.9)' },
+  underlineSm: { width: 14, height: 3, borderRadius: 2, backgroundColor: semantic.action, marginTop: 3, boxShadow: '0 0 6px rgba(255,95,162,0.9)' },
   headerIcons: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   dot: { position: 'absolute', top: -2, right: -2, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.red },
   section: { color: colors.text, fontSize: 18, lineHeight: 24, fontFamily: fonts.display, paddingHorizontal: 16 },
@@ -727,12 +727,12 @@ const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark, edge
   hero: { padding: 0, overflow: 'hidden', borderRadius: 18 },
   heroCover: { height: 150, overflow: 'hidden' },
   heroImg: { width: '100%', height: '100%' },
-  heroKicker: { position: 'absolute', left: 12, top: 12, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(8,15,30,0.62)', borderRadius: 999, paddingHorizontal: 9, paddingVertical: 4, borderWidth: 1, borderColor: 'rgba(19,217,223,0.35)' },
+  heroKicker: { position: 'absolute', left: 12, top: 12, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(22,14,18,0.62)', borderRadius: 999, paddingHorizontal: 9, paddingVertical: 4, borderWidth: 1, borderColor: 'rgba(255,95,162,0.35)' },
   heroKickerText: { color: '#fff', fontSize: 10, fontWeight: '900', letterSpacing: 1.1 },
   heroScore: { position: 'absolute', right: 14, bottom: 8, alignItems: 'flex-end' },
-  heroPct: { color: '#fff', fontFamily: fonts.display, fontSize: 30, lineHeight: 34, letterSpacing: -0.6, textShadowColor: 'rgba(19,217,223,0.55)', textShadowRadius: 14 },
+  heroPct: { color: '#fff', fontFamily: fonts.display, fontSize: 30, lineHeight: 34, letterSpacing: -0.6, textShadowColor: 'rgba(255,95,162,0.55)', textShadowRadius: 14 },
   // On the cover's dark fade: the night palette's dim text in both schemes.
-  heroPctCap: { color: '#A3B1CF', fontSize: 11, fontWeight: '700', marginTop: -3 },
+  heroPctCap: { color: '#CDB3C0', fontSize: 11, fontWeight: '700', marginTop: -3 },
   heroBody: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12 },
   heroHost: { width: 44, height: 44, margin: 4 },
   heroTitle: { color: colors.text, fontFamily: fonts.display, fontSize: 17, lineHeight: 22 },
@@ -760,8 +760,8 @@ const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark, edge
   suggestFrame: { width: 150, height: 90, borderRadius: 12, overflow: 'hidden', backgroundColor: colors.card, borderWidth: 1, borderColor: surface.hairline, boxShadow: dark ? '0 6px 16px rgba(0,0,0,0.4)' : SOFT_SHADOW },
   suggestImg: { width: '100%', height: '100%' },
   suggestFade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 40 },
-  liveBadge: { position: 'absolute', left: 6, bottom: 6, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(8,15,30,0.6)', borderRadius: 999, paddingHorizontal: 6, paddingVertical: 2 },
-  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: semantic.live, boxShadow: '0 0 6px #13D9DF' },
+  liveBadge: { position: 'absolute', left: 6, bottom: 6, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(22,14,18,0.6)', borderRadius: 999, paddingHorizontal: 6, paddingVertical: 2 },
+  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: semantic.live, boxShadow: '0 0 6px #FF5FA2' },
   liveText: { color: '#fff', fontSize: 11, fontWeight: '800' },
   suggestTitle: { color: colors.text, fontWeight: '700', fontSize: 13 },
   suggestWhy: { color: colors.textDim, fontSize: 12 },
@@ -777,7 +777,7 @@ const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark, edge
   chipRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   badgeChip: { flexDirection: 'row', alignItems: 'center', gap: 3, borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2, maxWidth: 128, overflow: 'hidden' },
   badgeText: { color: '#fff', fontSize: 11, fontWeight: '800', flexShrink: 1 },
-  tagChip: { backgroundColor: dark ? 'rgba(19,217,223,0.2)' : 'rgba(0,140,148,0.12)', borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2 },
+  tagChip: { backgroundColor: dark ? 'rgba(255,95,162,0.2)' : 'rgba(208,46,120,0.12)', borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2 },
   tagText: { color: semantic.tonalText, fontSize: 11, fontWeight: '600' },
   pkPill: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2, overflow: 'hidden' },
   pkText: { color: '#fff', fontSize: 11, fontWeight: '900', fontStyle: 'italic' },

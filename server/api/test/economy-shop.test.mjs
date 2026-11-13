@@ -232,6 +232,23 @@ describe('Giyme ve görünüm', () => {
     assert.equal((await ok(equip(u.session, 'micfx', null))).economy.equipped.micfx, undefined);
   });
 
+  test('ses dalgası: mağazadan bir kez alınır, giyilir, çıkarılır; odadakiler görünümden görür', async () => {
+    const u = await person('Dalgalı', 3000);
+    const other = await person('Dinleyen');
+    assert.equal((await spend(u.session, 2000, 'Mağaza: Alev'))[0], 409, 'eksik fiyat');
+    assert.equal(await coins(u), 3000);
+    await ok(spend(u.session, 2500, 'Mağaza: Alev'));
+    assert.equal(await coins(u), 500);
+    const e = await economy(u.session);
+    assert.equal(e.equipped.wave, 'wv-flame', 'alınınca giyilir');
+    assert.equal(e.items.find((x) => x.sku === 'wv-flame').until, null, 'kalıcı');
+    assert.equal((await looks(other.session, u.user.id))[u.user.id].wave, 'wv-flame');
+    assert.equal((await ok(equip(u.session, 'wave', null))).economy.equipped.wave, undefined);
+    assert.equal((await looks(other.session, u.user.id))[u.user.id].wave, null);
+    assert.equal((await ok(equip(u.session, 'wave', 'wv-flame'))).economy.equipped.wave, 'wv-flame');
+    assert.equal((await equip(u.session, 'wave', 'wv-gold'))[0], 403, 'alınmamış dalga');
+  });
+
   test('süresi biten giyili ürün görünümden düşer', async () => {
     const u = await person('Süresi Biten', 1000);
     const e = (await ok(buy(u.session, 'fr-neon', 150))).economy;
@@ -270,6 +287,12 @@ describe('Giyme ve görünüm', () => {
     const [, prof] = await call('GET', `/api/user?id=${u.user.id}`, null, other.session);
     assert.equal(prof.looks.entry, 'en-sparkle');
     assert.equal((await call('GET', '/api/looks?ids=bozuk', null, other.session))[0], 400);
+    // The gender colors the speaking ring; a hidden one is never told.
+    assert.equal((await looks(other.session, u.user.id))[u.user.id].gender, null, 'cinsiyet yok');
+    await ok(call('PATCH', '/api/me', { gender: 'Kadın' }, u.session));
+    assert.equal((await looks(other.session, u.user.id))[u.user.id].gender, 'Kadın');
+    await ok(call('PATCH', '/api/me/extras', { genderHidden: true }, u.session));
+    assert.equal((await looks(other.session, u.user.id))[u.user.id].gender, null, 'gizli cinsiyet söylenmez');
   });
 });
 

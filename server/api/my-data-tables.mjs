@@ -58,4 +58,5 @@ export const NOT_EXPORTED = {
   room_music_queue: 'kept while the track is on a room’s playlist',
   phone_claims: 'a phone check’s one-time code, kept minutes',
   room_tables: 'a free game table in a room, kept only while it is played',
+  room_seat_colors: 'a room’s seat colors; the coins paid for each are in ledger',
 };

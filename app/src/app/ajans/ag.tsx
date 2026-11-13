@@ -15,7 +15,7 @@ import { colors } from '@/theme';
 
 const STATUS_COLOR: Record<string, string> = {
   Oluşturuldu: colors.textDim,
-  Doğrulamada: '#13D9DF',
+  Doğrulamada: '#FF5FA2',
   Beklemede: colors.gold,
   Onaylandı: '#7DD3FC',
   Ödenebilir: colors.green,

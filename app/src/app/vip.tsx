@@ -476,7 +476,7 @@ function Noble() {
 }
 
 // Light scheme only: the soft card shadow (the night screen's cards stand out by color).
-const LIGHT_SHADOW = '0 1px 2px rgba(16,36,64,0.05), 0 6px 16px rgba(16,36,64,0.06)';
+const LIGHT_SHADOW = '0 1px 2px rgba(64,20,40,0.05), 0 6px 16px rgba(64,20,40,0.06)';
 
 // The privilege center keeps its warm night palette in the dark scheme. In the light one the screen, the plan cards,
 // boxes and table become white cards with dark-gold text; the VIP level cards, emblems and gold fills stay as they are.
@@ -491,7 +491,7 @@ const useStyles = makeStyles(({ colors, surface, ink, dark }) => {
     segActive: { backgroundColor: GOLD },
     segText: { color: colors.textDim, fontWeight: '800' },
     svipCard: { borderRadius: 16, padding: 16, minHeight: 170, gap: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },
-    lockChip: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(8,15,30,0.55)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+    lockChip: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(22,14,18,0.55)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
     lockText: { color: '#fff', fontWeight: '800', fontSize: 12 },
     svipTitle: { color: GOLD, fontSize: 40, fontWeight: '900', fontStyle: 'italic' },
     cardText: { color: '#fff', fontSize: 14 },
@@ -523,12 +523,12 @@ const useStyles = makeStyles(({ colors, surface, ink, dark }) => {
     giftBox: { backgroundColor: dark ? 'rgba(255,255,255,0.04)' : 'rgba(232,185,121,0.10)', borderRadius: 14, padding: 14, gap: 12 },
     toggles: { backgroundColor: surface.pressed, borderRadius: 14, paddingHorizontal: 14 },
     toggleRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14 },
-    noble: { flex: 1, backgroundColor: dark ? '#0F2A30' : '#E6F2F2' },
+    noble: { flex: 1, backgroundColor: dark ? '#2A1A22' : '#F6E9EF' },
     nobleTabs: { flexDirection: 'row', justifyContent: 'space-around', paddingTop: 10 },
     nobleTab: { color: ink(0.5), fontSize: 16, fontWeight: '700', paddingVertical: 6 },
     nobleTabOn: { color: colors.text, borderBottomWidth: 3, borderBottomColor: colors.text },
     emblem: { width: 170, height: 170, borderRadius: 85, alignItems: 'center', justifyContent: 'center' },
-    bottomBar: { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, backgroundColor: dark ? '#1B1A17' : colors.card, borderTopLeftRadius: 22, borderTopRightRadius: 22, borderTopWidth: 2, borderColor: '#B8955A', ...(dark ? {} : { boxShadow: '0 -4px 16px rgba(16,36,64,0.08)' }) },
+    bottomBar: { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, backgroundColor: dark ? '#1B1A17' : colors.card, borderTopLeftRadius: 22, borderTopRightRadius: 22, borderTopWidth: 2, borderColor: '#B8955A', ...(dark ? {} : { boxShadow: '0 -4px 16px rgba(64,20,40,0.08)' }) },
     alBtn: { backgroundColor: GOLD, borderRadius: 999, paddingHorizontal: 34, paddingVertical: 12 },
   };
 });

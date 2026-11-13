@@ -1,11 +1,12 @@
-// Etkinlik Merkezi: one event in a list. The cover is the event's own picture, else its theme's colours with the
-// category's sign (the theme art comes from docs/GORSEL_URETIM_LISTESI.md § 20). The time, the state and the places
-// are the server's (server/api/events.mjs).
+// Etkinlik Merkezi: one event in a list. The cover is the event's own picture, else its theme's art
+// (docs/GORSEL_URETIM_LISTESI.md § 20, components/events/event-art), else its colours with the category's sign.
+// The time, the state and the places are the server's (server/api/events.mjs).
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { memo } from 'react';
-import { Pressable, View } from 'react-native';
+import { Image, Pressable, View } from 'react-native';
 
+import { eventTypeArt, themeCoverArt } from '@/components/events/event-art';
 import { FadeImage } from '@/components/photo';
 import { Text } from '@/components/text';
 import { Avatar } from '@/components/ui';
@@ -39,16 +40,29 @@ export function StatePill({ e, small }: { e: Pick<EventItem, 'state' | 'stateLab
   );
 }
 
-/** The cover: the uploaded picture, else the theme's gradient with the category's sign. */
+/** The event type's sign: its picture, else its Ionicons glyph (else `fallback`). */
+export function EventTypeSign({ category, size, color, fallback = 'sparkles' }: { category: Pick<EventItem['category'], 'id' | 'icon'>; size: number; color: string; fallback?: Glyph }) {
+  const art = eventTypeArt(category.id);
+  if (art) return <Image source={art} style={{ width: size, height: size }} resizeMode="contain" accessibilityIgnoresInvertColors />;
+  return <Ionicons name={(category.icon as Glyph) in Ionicons.glyphMap ? (category.icon as Glyph) : fallback} size={size} color={color} />;
+}
+
+/** The cover: the uploaded picture, else the theme's art, else its gradient with the category's sign. */
 export function EventCover({ e, height, radius = 18 }: { e: Pick<EventItem, 'coverUrl' | 'theme' | 'category'>; height: number; radius?: number }) {
   const look = lookOf(e.theme);
+  const art = themeCoverArt(e.theme);
   const styles = useStyles();
   return (
     <View style={{ height, borderRadius: radius, overflow: 'hidden' }}>
       <LinearGradient colors={look.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.fill}>
-        <Ionicons name={(e.category.icon as Glyph) in Ionicons.glyphMap ? (e.category.icon as Glyph) : look.icon} size={height * 0.36} color="rgba(255,255,255,0.9)" />
-        <Ionicons name={look.icon} size={height * 0.9} color="rgba(255,255,255,0.08)" style={styles.watermark} />
+        {!art && (
+          <>
+            <EventTypeSign category={e.category} size={height * 0.36} color="rgba(255,255,255,0.9)" fallback={look.icon} />
+            <Ionicons name={look.icon} size={height * 0.9} color="rgba(255,255,255,0.08)" style={styles.watermark} />
+          </>
+        )}
       </LinearGradient>
+      {art && !e.coverUrl && <Image source={art} style={styles.fill} resizeMode="cover" />}
       {e.coverUrl && <FadeImage source={{ uri: e.coverUrl }} style={styles.fill} resizeMode="cover" />}
     </View>
   );
@@ -62,7 +76,7 @@ export const EventCard = memo(function EventCard({ e, onPress, now }: { e: Event
       <View>
         <EventCover e={e} height={150} radius={16} />
         <View style={styles.tag}>
-          <Ionicons name={(e.category.icon as Glyph) in Ionicons.glyphMap ? (e.category.icon as Glyph) : 'sparkles'} size={12} color="#fff" />
+          <EventTypeSign category={e.category} size={eventTypeArt(e.category.id) ? 16 : 12} color="#fff" />
           <Text style={styles.tagText} numberOfLines={1}>
             {e.category.name}
           </Text>

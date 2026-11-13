@@ -106,7 +106,7 @@ export default function TabLayout() {
 
 const useStyles = makeStyles(({ colors, dark, surface }) => ({
   pill: { width: 56, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-  pillOn: { backgroundColor: dark ? 'rgba(19,217,223,0.16)' : 'rgba(0,140,148,0.10)' },
+  pillOn: { backgroundColor: dark ? 'rgba(255,95,162,0.16)' : 'rgba(208,46,120,0.10)' },
   badge: { position: 'absolute', top: -5, right: 2, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.red, borderWidth: 2, borderColor: colors.bg },
   badgeText: { color: '#fff', fontSize: 10, fontWeight: '800', fontVariant: ['tabular-nums'] },
   hairline: { position: 'absolute', top: 0, left: 0, right: 0, height: StyleSheet.hairlineWidth, backgroundColor: surface.hairline },

@@ -352,7 +352,7 @@ export function EarningRow({ e }: { e: Earning }) {
 const useStyles = makeStyles(({ colors, semantic, ink, dark }) => ({
   safe: { flex: 1, backgroundColor: colors.bg },
   headIcon: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center' },
-  balance: { borderRadius: 24, padding: 20, borderWidth: 1, borderColor: colors.border, ...(dark ? null : { boxShadow: '0 1px 2px rgba(16,36,64,0.05), 0 6px 16px rgba(16,36,64,0.06)' }) },
+  balance: { borderRadius: 24, padding: 20, borderWidth: 1, borderColor: colors.border, ...(dark ? null : { boxShadow: '0 1px 2px rgba(64,20,40,0.05), 0 6px 16px rgba(64,20,40,0.06)' }) },
   balanceLabel: { color: ink(0.92), fontSize: 15 },
   balanceN: { color: colors.text, fontSize: 40, fontWeight: '900', marginTop: 4 },
   meter: { flexDirection: 'row', gap: 2, height: 6, borderRadius: 3, overflow: 'hidden', backgroundColor: ink(0.12), marginTop: 12 },
@@ -383,7 +383,7 @@ const useStyles = makeStyles(({ colors, semantic, ink, dark }) => ({
   trackFill: { height: 4, borderRadius: 2, backgroundColor: semantic.success },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   rowTitle: { color: colors.text, fontSize: 16, fontWeight: '600' },
-  sender: { color: dark ? '#5EEAF0' : semantic.actionText, fontWeight: '700' },
+  sender: { color: dark ? '#FF94C2' : semantic.actionText, fontWeight: '700' },
   // Diamond amount: white in the dark scheme (as before), the diamond's blue on the light one.
   amount: { color: dark ? colors.text : semantic.diamondText, fontWeight: '800', fontSize: 15 },
   dim: { color: colors.textDim, fontSize: 13 },

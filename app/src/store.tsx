@@ -29,7 +29,7 @@ import { setHapticsEnabled } from '@/lib/haptics';
 import { CONVERSATIONS, GIFTS, ME, isServerId, type Conversation, type EventShareCard, type RoomInviteCard, type User } from '@/data/mock';
 import type { ServerEarnings, ServerUser } from '@/lib/api';
 import { block as serverBlock, follow } from '@/lib/api';
-import { bindWallet, forgetLiveAccount, liveMode, liveSpend, myServerId, rememberUser, toLocal, toServer } from '@/lib/live';
+import { bindWallet, forgetLiveAccount, liveEquip, liveMode, liveSpend, myServerId, rememberUser, toLocal, toServer } from '@/lib/live';
 import { forgetSeen, hideDms, markLiveRead } from '@/lib/live/messages';
 import { noteSpent, serverLimitBlock } from '@/lib/live/spend-limit';
 import { applyThread, markSent, type ServerDm, type ThreadSync } from '@/lib/dm-thread';
@@ -911,7 +911,11 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       setEquipped((e) => ({ ...e, [item.kind]: id }));
       return null;
     },
-    equip: (id, kind) => setEquipped((e) => ({ ...e, [kind]: id ?? undefined })),
+    equip: (id, kind) => {
+      setEquipped((e) => ({ ...e, [kind]: id ?? undefined }));
+      // Others see what I wear from the server (GET /api/looks), so it hears this too.
+      liveEquip(kind, id);
+    },
     emojiPacks,
     packUnlocked: (id) => {
       const pack = STICKER_PACKS.find((p) => p.id === id);

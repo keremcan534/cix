@@ -6,9 +6,10 @@
 // server's answer (server/api/events.mjs); the demo keeps a place and its reminder on this screen only.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { eventTypeArt } from '@/components/events/event-art';
 import { EventCover, StatePill } from '@/components/events/event-card';
 import { EventShareSheet } from '@/components/events/event-share';
 import { ListGroup, ListSwitch } from '@/components/list';
@@ -151,6 +152,7 @@ export function EventDetailView({ id, demo, onDemoReserve, onClose, onChanged, o
   };
 
   const look = lookOf(e?.theme ?? 'sade');
+  const typeArt = eventTypeArt(e?.category.id);
   // Reminders: an upcoming event I have a place at, on a server that sends any.
   const kinds = e?.reminders ?? [];
   const showRemind = !!e && e.state === 'upcoming' && e.mine === 'confirmed' && typeof e.remind === 'boolean' && kinds.length > 0;
@@ -197,7 +199,7 @@ export function EventDetailView({ id, demo, onDemoReserve, onClose, onChanged, o
               <View style={styles.body}>
                 <View style={styles.tagRow}>
                   <View style={[styles.tag, { backgroundColor: `${look.colors[0]}33` }]}>
-                    <Ionicons name={look.icon} size={13} color={colors.text} />
+                    {typeArt ? <Image source={typeArt} style={{ width: 16, height: 16 }} resizeMode="contain" /> : <Ionicons name={look.icon} size={13} color={colors.text} />}
                     <Text style={styles.tagText}>{e.category.name}</Text>
                   </View>
                   {e.visibility === 'room' && (
@@ -411,7 +413,7 @@ const useStyles = makeStyles(({ colors, semantic, edge }) => ({
   tag: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, backgroundColor: colors.cardAlt },
   tagText: { color: colors.text, fontSize: 12.5, fontWeight: '700' },
   title: { color: colors.text, fontSize: 24, fontWeight: '800', lineHeight: 30 },
-  liveBox: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', backgroundColor: 'rgba(19,217,223,0.14)', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999 },
+  liveBox: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', backgroundColor: 'rgba(255,95,162,0.14)', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999 },
   liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: semantic.live },
   liveText: { color: colors.primaryText, fontWeight: '800', fontSize: 14, fontVariant: ['tabular-nums'] },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },

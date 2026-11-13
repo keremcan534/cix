@@ -6,13 +6,14 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useState } from 'react';
-import { Animated, FlatList, Modal, Platform, Pressable, View, useWindowDimensions } from 'react-native';
+import { Animated, FlatList, Image, Modal, Platform, Pressable, View, useWindowDimensions } from 'react-native';
 
 import { Text } from '@/components/text';
 import { Art, type ArtName } from '@/components/Art';
 import { BrandLoader } from '@/components/fx/brand-loader';
 import { Icon3D } from '@/components/Icon3D';
 import { Photo } from '@/components/photo';
+import { CONTRIB_PODIUM, CONTRIB_PODIUM_ART, CONTRIB_WREATH_ART, CONTRIB_WREATH_SCALE } from '@/components/RoomArt';
 import { useSheetBottom } from '@/components/room/parts';
 import { FramedAvatar } from '@/components/ui';
 import { USERS, userById } from '@/data/mock';
@@ -123,6 +124,13 @@ export function ContribBoard({
     set(v);
   };
 
+  // The podium picture spans the three places; each place stands on its own step (RoomArt CONTRIB_PODIUM). Until the
+  // row is measured the window's width stands in for it (the sheet is as wide as the window).
+  const [podiumW, setPodiumW] = useState<number | null>(null);
+  const stepsW = (podiumW ?? win.width) - 2 * space.md;
+  const stepsH = CONTRIB_PODIUM_ART !== undefined && stepsW > 0 ? Math.round(stepsW / CONTRIB_PODIUM.aspect) : 0;
+  const stand = (place: 1 | 2 | 3) => (stepsH ? Math.round(stepsH * (1 - CONTRIB_PODIUM.top[place])) : undefined);
+
   const head = (
     <>
       {loading ? (
@@ -142,10 +150,21 @@ export function ContribBoard({
           <Text style={s.dim}>{side === 'sent' ? 'İlk hediyeyi gönderen zirveye çıkar.' : 'İlk hediyeyi alan zirveye çıkar.'}</Text>
         </View>
       ) : (
-        <View style={s.podium}>
+        <View style={s.podium} onLayout={(e) => setPodiumW(e.nativeEvent.layout.width)}>
+          {stepsH > 0 && <Image source={CONTRIB_PODIUM_ART} style={[s.steps, { height: stepsH }]} resizeMode="stretch" accessibilityIgnoresInvertColors />}
           {([2, 1, 3] as const).map((place) => {
             const row = rows[place - 1];
-            return <PodiumSpot key={place} place={place} row={row} who={row ? person(row.uid) : null} unit={tone.unit} onPress={row && open ? () => open(row.uid) : undefined} />;
+            return (
+              <PodiumSpot
+                key={place}
+                place={place}
+                row={row}
+                who={row ? person(row.uid) : null}
+                unit={tone.unit}
+                stand={stand(place)}
+                onPress={row && open ? () => open(row.uid) : undefined}
+              />
+            );
           })}
         </View>
       )}
@@ -241,10 +260,22 @@ function Amount({ unit, n, small }: { unit: 'coin' | 'diamond'; n: number; small
   );
 }
 
-/** Their photo in their own shop frame when they wear one; otherwise in `ring` (a podium place's metal) or plain. */
-function Face({ who, size, ring }: { who: Person; size: number; ring?: readonly [string, string, string] }) {
+/**
+ * Their photo in their own shop frame when they wear one; otherwise in `wreath` (a podium place's laurel), in `ring`
+ * (the place's metal, when there is no laurel) or plain.
+ */
+function Face({ who, size, ring, wreath }: { who: Person; size: number; ring?: readonly [string, string, string]; wreath?: number }) {
   const s = useStyles();
   if (who.frame || who.vip > 0) return <FramedAvatar uri={who.avatar} size={size} frameId={who.frame} vipLevel={who.vip} />;
+  if (wreath !== undefined) {
+    const w = Math.round(size * CONTRIB_WREATH_SCALE);
+    return (
+      <View style={{ width: size, height: size }}>
+        <Photo uri={who.avatar} kind="face" style={{ width: size, height: size, borderRadius: size / 2 }} />
+        <Image source={wreath} style={{ position: 'absolute', width: w, height: w, left: (size - w) / 2, top: (size - w) / 2 }} accessibilityIgnoresInvertColors />
+      </View>
+    );
+  }
   if (!ring) return <Photo uri={who.avatar} kind="face" style={{ width: size, height: size, borderRadius: size / 2 }} />;
   return (
     <LinearGradient colors={ring} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={{ width: size, height: size, borderRadius: size / 2, padding: 3 }}>
@@ -253,10 +284,12 @@ function Face({ who, size, ring }: { who: Person; size: number; ring?: readonly 
   );
 }
 
-function PodiumSpot({ place, row, who, unit, onPress }: { place: 1 | 2 | 3; row?: ContribRow; who: Person | null; unit: 'coin' | 'diamond'; onPress?: () => void }) {
+/** One of the first three. `stand`: the height of its step in the podium picture; without it a gradient step is drawn. */
+function PodiumSpot({ place, row, who, unit, stand, onPress }: { place: 1 | 2 | 3; row?: ContribRow; who: Person | null; unit: 'coin' | 'diamond'; stand?: number; onPress?: () => void }) {
   const s = useStyles();
   const { colors } = useTheme();
   const p = PLACE[place];
+  const wreath = CONTRIB_WREATH_ART[place];
   return (
     <Pressable
       onPress={onPress}
@@ -265,10 +298,10 @@ function PodiumSpot({ place, row, who, unit, onPress }: { place: 1 | 2 | 3; row?
       accessibilityRole={onPress ? 'button' : undefined}
       accessibilityLabel={row && who ? `${place}. ${who.name}, ${contribAmount(row.score)} puan` : `${place}. sıra boş`}
     >
-      {place === 1 && <Icon3D name="crown" size={30} style={s.crown} />}
+      {place === 1 && <Icon3D name="crown" size={30} style={[s.crown, who && wreath !== undefined && s.crownOnWreath]} />}
       <View style={{ width: p.face, height: p.face }}>
         {who ? (
-          <Face who={who} size={p.face} ring={p.ring} />
+          <Face who={who} size={p.face} ring={p.ring} wreath={wreath} />
         ) : (
           <View style={[s.emptyFace, { width: p.face, height: p.face, borderRadius: p.face / 2 }]}>
             <Ionicons name="person-outline" size={Math.round(p.face * 0.36)} color={colors.textDim} />
@@ -280,9 +313,13 @@ function PodiumSpot({ place, row, who, unit, onPress }: { place: 1 | 2 | 3; row?
         {who ? (row?.uid === 'me' ? youLabel(who.name) : who.name) : 'Boş'}
       </Text>
       {row ? <Amount unit={unit} n={row.score} small /> : <View style={{ height: 18 }} />}
-      <LinearGradient colors={[p.light, 'rgba(255,255,255,0.015)']} style={[s.pedestal, { height: p.pedestal, borderTopColor: p.ring[1] }]}>
-        <Text style={[s.pedestalNum, place === 1 && s.pedestalNumTop]}>{place}</Text>
-      </LinearGradient>
+      {stand !== undefined ? (
+        <View style={{ height: stand }} />
+      ) : (
+        <LinearGradient colors={[p.light, 'rgba(255,255,255,0.015)']} style={[s.pedestal, { height: p.pedestal, borderTopColor: p.ring[1] }]}>
+          <Text style={[s.pedestalNum, place === 1 && s.pedestalNumTop]}>{place}</Text>
+        </LinearGradient>
+      )}
     </Pressable>
   );
 }
@@ -324,6 +361,8 @@ const useStyles = makeStyles(({ colors, ink, edge, surface }) => ({
   podium: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: space.md, paddingTop: space.lg, marginBottom: space.sm },
   spot: { flex: 1, alignItems: 'center', gap: 2 },
   crown: { marginBottom: -6, zIndex: 1 },
+  crownOnWreath: { marginBottom: 2 },
+  steps: { position: 'absolute', left: space.md, right: space.md, bottom: 0 },
   ringFace: { flex: 1, borderWidth: 2, borderColor: colors.card },
   emptyFace: { alignItems: 'center', justifyContent: 'center', backgroundColor: ink(0.05), borderWidth: 1.5, borderStyle: 'dashed', borderColor: ink(0.16) },
   medal: { position: 'absolute' },
@@ -332,7 +371,7 @@ const useStyles = makeStyles(({ colors, ink, edge, surface }) => ({
   pedestalNum: { color: ink(0.3), fontFamily: fonts.display, fontSize: 18 },
   pedestalNumTop: { fontSize: 24, color: ink(0.38) },
   row: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.lg, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: surface.hairline },
-  rowMe: { backgroundColor: 'rgba(19,217,223,0.08)' },
+  rowMe: { backgroundColor: 'rgba(255,95,162,0.08)' },
   rowPressed: { backgroundColor: surface.pressed },
   rank: { width: 26, textAlign: 'center', color: colors.textDim, fontFamily: fonts.displayBold, fontSize: 15, fontVariant: ['tabular-nums'] },
   name: { flex: 1, color: colors.text, fontWeight: '700', fontSize: type.body },
