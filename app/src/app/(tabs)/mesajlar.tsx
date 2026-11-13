@@ -19,7 +19,7 @@ import { friendRows, type Friend } from '@/lib/friend-rows';
 import { callPair } from '@/components/one-on-one-bar';
 import { useApp } from '@/store';
 import { makeStyles, useTheme, type Theme } from '@/theme';
-import { Icon3D, type Icon3DName } from '@/components/Icon3D';
+import { Icon3D } from '@/components/Icon3D';
 import { Backdrop, Gloss, PressableScale } from '@/components/fx/surface';
 import { TeamInbox } from '@/components/team-inbox';
 import { teamUnread } from '@/lib/live/team';
@@ -185,9 +185,9 @@ export default function MessagesScreen() {
   const messagesHeader = (
     <View>
       <View style={styles.hubs}>
-        <HubTile title="Similar Ekibi" sub="Duyuru, etkinlik, ödül" icon="envelope" tint={['#2B4FD8', '#5B21B6']} badge={teamNew} onPress={() => setTeamOpen(true)} />
-        <HubTile title="Çevrim içi hizmet" sub="Destek ekibine yaz" icon="chat" tint={['#0B7A86', '#14532D']} onPress={() => router.push('/destek')} />
-        <HubTile title="Ajansım" sub="Ajans ve kazanç" icon="briefcase" tint={['#9A4A12', '#6B1F3A']} onPress={() => router.push('/ajans')} />
+        <HubTile title="Similar Ekibi" sub="Duyuru, etkinlik, ödül" art={HUB_ART.team} tint={['#2B4FD8', '#5B21B6']} badge={teamNew} onPress={() => setTeamOpen(true)} />
+        <HubTile title="Çevrim içi hizmet" sub="Destek ekibine yaz" art={HUB_ART.support} tint={['#0B7A86', '#14532D']} onPress={() => router.push('/destek')} />
+        <HubTile title="Ajansım" sub="Ajans ve kazanç" art={HUB_ART.agency} tint={['#9A4A12', '#6B1F3A']} onPress={() => router.push('/ajans')} />
       </View>
       <View style={styles.chips}>
         {FILTERS.map((f) => (
@@ -335,8 +335,15 @@ function Chip({ label, active, onPress }: { label: string; active: boolean; onPr
   );
 }
 
+/** The three doors' pictures (docs/GORSEL_URETIM_LISTESI.md § 13, app/assets/banners, 192 px). */
+const HUB_ART = {
+  team: require('../../../assets/banners/mesaj-similar-ekibi.png'),
+  support: require('../../../assets/banners/mesaj-cevrimici-hizmet.png'),
+  agency: require('../../../assets/banners/mesaj-ajansim.png'),
+} as const;
+
 /** One of the three big doors at the top of Mesajlar. */
-function HubTile({ title, sub, icon, tint, badge = 0, onPress }: { title: string; sub: string; icon: Icon3DName; tint: readonly [string, string]; badge?: number; onPress: () => void }) {
+function HubTile({ title, sub, art, tint, badge = 0, onPress }: { title: string; sub: string; art: number; tint: readonly [string, string]; badge?: number; onPress: () => void }) {
   const styles = useStyles();
   // The outer View takes the third of the row: PressableScale puts its style on the inner view, so a flex there
   // would leave each tile as wide as its text and push the last one off a narrow screen.
@@ -345,7 +352,7 @@ function HubTile({ title, sub, icon, tint, badge = 0, onPress }: { title: string
       <PressableScale onPress={onPress} accessibilityRole="button" accessibilityLabel={badge > 0 ? `${title}, ${badge} yeni` : title}>
         <LinearGradient colors={tint} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hub}>
           <Gloss radius={16} strength={0.18} />
-          <Icon3D name={icon} size={38} />
+          <Image source={art} style={{ width: 38, height: 38 }} resizeMode="contain" accessibilityIgnoresInvertColors />
           <View style={{ gap: 1 }}>
             <Text style={styles.hubTitle} numberOfLines={2}>
               {title}

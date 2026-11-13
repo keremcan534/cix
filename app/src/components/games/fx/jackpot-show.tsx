@@ -1,7 +1,8 @@
 // A skinned machine's big moment in its own pictures (fx/slot-skin): the game dims, light rays turn behind the
 // JACKPOT plaque as it springs in with a shine, the coin pile rises, gold coins burst out of it and rain down
 // (fx/coins with the skin's coin), sparkles twinkle and the amount counts up on the win plate; then it closes
-// itself. A Büyük Kazanç is the same pieces, lighter and shorter: no plaque and no pile. A tap ends it early.
+// itself. A Büyük Kazanç is the same pieces, lighter and shorter: its title on the shared Büyük Kazanç plaque
+// (fx/salon-art) instead of the JACKPOT one, and no pile. A tap ends it early.
 // "Animasyonları azalt" and "Efektleri kapat" show it still: everything in place, the amount at once, no coins.
 // Native-driven Animated only (the count-up is the text). Decoration: the round was settled before it starts.
 import { useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -10,6 +11,7 @@ import { Animated, Easing, Image, Pressable, StyleSheet, View, type LayoutChange
 import { Shine } from '@/components/fx/surface';
 import { Coins } from '@/components/games/fx/coins';
 import { SALON } from '@/components/games/fx/salon';
+import { salonArt } from '@/components/games/fx/salon-art';
 import { SkinOverlay, type SlotSkin } from '@/components/games/fx/slot-skin';
 import { Text } from '@/components/text';
 import { playSfx } from '@/lib/game-sound';
@@ -22,6 +24,9 @@ export type ShowKind = 'jackpot' | 'big';
 type Play = (s: { kind: ShowKind; amount: number; bet: number }) => Promise<void>;
 
 const fmt = (n: number) => Math.floor(n).toLocaleString('tr-TR');
+/** The Büyük Kazanç plaque every machine shares; its middle is empty for the title. */
+const BIG_PLAQUE = salonArt('levha-buyuk-kazanc');
+const BIG_ASPECT = 768 / 263;
 
 /** How long each show stays (ms), moving and still. */
 const SHOW_MS: Record<ShowKind, { ms: number; calm: number }> = { jackpot: { ms: 4500, calm: 2200 }, big: { ms: 2800, calm: 1600 } };
@@ -221,6 +226,13 @@ function JackpotShow({ skin, kind, amount, bet, onDone }: { skin: SlotSkin; kind
                       <Shine radius={plaqueH * 0.2} every={1300} />
                     </View>
                   )}
+                </View>
+              ) : BIG_PLAQUE !== undefined ? (
+                <View style={{ width: plaqueW, height: plaqueH, justifyContent: 'center' }}>
+                  <Image source={BIG_PLAQUE} style={[s.abs, { left: 0, top: (plaqueH - plaqueW / BIG_ASPECT) / 2, width: plaqueW, height: plaqueW / BIG_ASPECT }]} resizeMode="contain" />
+                  <Text style={[s.title, { fontSize: Math.round(plaqueW * 0.085), marginHorizontal: plaqueW * 0.12 }]} numberOfLines={1} adjustsFontSizeToFit>
+                    {title}
+                  </Text>
                 </View>
               ) : (
                 <View style={{ height: plaqueH, justifyContent: 'center' }}>

@@ -299,7 +299,7 @@ export function BilyePlayer({ entry }: { entry: Entry }) {
       </View>
       <WalletRow held={held} bets={game.bets} bet={bet} onBet={setBet} disabled={auto !== null} />
       <View style={s.row}>
-        <SideButton onPress={() => void toggleAuto()} on={auto !== null} icon={auto !== null ? 'stop' : 'repeat'} label={auto !== null ? `DUR · ${auto}` : 'OTO'} a11y={auto !== null ? 'Otomatik atışı durdur' : `${AUTO_LAUNCHES} kez otomatik fırlat`} style={{ flex: 0, minWidth: 96 }} />
+        <SideButton onPress={() => void toggleAuto()} on={auto !== null} icon={auto !== null ? 'stop' : 'repeat'} pic={salonArt(auto !== null ? 'dugme-oto-acik' : 'dugme-oto')} label={auto !== null ? `DUR · ${auto}` : 'OTO'} a11y={auto !== null ? 'Otomatik atışı durdur' : `${AUTO_LAUNCHES} kez otomatik fırlat`} style={{ flex: 0, minWidth: 96 }} />
         <WideAction onPress={play} disabled={auto !== null} label={`Fırlat, ${LANE_NAME[lane]} atış, ${bet} jeton`} style={{ flex: 1 }}>
           <Ionicons name="radio-button-on" size={20} color={SALON.goldInk} />
           <Text style={[tabular, s.goText, wideInk()]}>Fırlat · {fmt(bet)}</Text>

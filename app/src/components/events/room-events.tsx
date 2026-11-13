@@ -5,9 +5,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useState } from 'react';
-import { Animated, Easing, Modal, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Animated, Easing, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { themeRoomArt } from '@/components/events/event-art';
 import { openEvents } from '@/components/events/open';
 import { Text } from '@/components/text';
 import { Button } from '@/components/ui';
@@ -81,14 +82,23 @@ export function EventRoomBanner({ data, rank, onChanged }: { data: RoomEvents | 
   );
 }
 
-/** While an event runs: the theme's colours over the top of the stage, and its light effect (off with "Efektleri
- *  kapat" or "Animasyonları azalt"). Never takes a touch. */
+/** While an event runs: the theme's room picture behind the stage (components/events/event-art; Sade keeps the
+ *  room's own), its colours over the top, and its light effect (off with "Efektleri kapat" or "Animasyonları
+ *  azalt"). Never takes a touch. */
 export function EventThemeLayer({ event }: { event: api.EventItem | null }) {
   const { effectsOff, reduceMotion } = useSettings();
   if (!event) return null;
   const look = lookOf(event.theme);
+  const art = themeRoomArt(event.theme);
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      {art && (
+        <>
+          <Image source={art} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          {/* Darker at the top (the header) and the bottom (chat), so the room's words stay readable on it. */}
+          <LinearGradient colors={['rgba(0,0,0,0.45)', 'rgba(0,0,0,0.12)', 'rgba(0,0,0,0.5)']} locations={[0, 0.4, 1]} style={StyleSheet.absoluteFill} />
+        </>
+      )}
       <LinearGradient colors={[`${look.colors[0]}59`, `${look.colors[1]}26`, 'transparent']} locations={[0, 0.35, 0.7]} style={StyleSheet.absoluteFill} />
       {!effectsOff && !reduceMotion && look.fx !== 'none' && <Drift fx={look.fx} />}
     </View>

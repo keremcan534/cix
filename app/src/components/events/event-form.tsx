@@ -8,6 +8,7 @@ import { useMemo, useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { themeCoverArt } from '@/components/events/event-art';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { Text, TextInput } from '@/components/text';
 import { Button } from '@/components/ui';
@@ -155,6 +156,7 @@ export function EventFormView({ meta, room: roomId, edit, onClose, onSaved }: Pr
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingRight: 8 }}>
                 {meta.themes.map((t) => {
                   const look = THEME_LOOK[t.id] ?? lookOf(t.id);
+                  const art = themeCoverArt(t.id);
                   const locked = t.minLevel > level;
                   const on = t.id === shownTheme;
                   return (
@@ -167,7 +169,7 @@ export function EventFormView({ meta, room: roomId, edit, onClose, onSaved }: Pr
                       accessibilityLabel={`${t.name}${locked ? `, Oda Lv.${t.minLevel} ile açılır` : ''}`}
                     >
                       <LinearGradient colors={look.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.themeArt, locked && { opacity: 0.45 }]}>
-                        <Ionicons name={look.icon} size={26} color="#fff" />
+                        {art ? <Image source={art} style={StyleFill} resizeMode="cover" /> : <Ionicons name={look.icon} size={26} color="#fff" />}
                       </LinearGradient>
                       <Text style={styles.themeName} numberOfLines={1}>
                         {t.name}
@@ -304,7 +306,7 @@ const useStyles = makeStyles(({ colors, semantic }) => ({
   chipText: { color: colors.text, fontSize: 13.5, fontWeight: '700' },
   chipTextOn: { color: semantic.actionInk },
   theme: { width: 104, padding: 6, borderRadius: 16, borderWidth: 2, borderColor: 'transparent', backgroundColor: colors.card, gap: 4 },
-  themeArt: { height: 64, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  themeArt: { height: 64, borderRadius: 12, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   themeName: { color: colors.text, fontSize: 12.5, fontWeight: '800' },
   themeLv: { color: colors.textDim, fontSize: 11 },
   lvRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },

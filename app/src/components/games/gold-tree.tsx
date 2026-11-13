@@ -1,15 +1,19 @@
 // Bereket Ağacı: 3 reels, the middle row pays by combination (lib/gold-tree). playCasino (lib/games) settles the round
 // before the reels come to rest; they (components/games/fx/reel) only replay outcome.tree, the last one waited for
-// when the first two already match. Oto stops at a big win, the loss limit or any refusal.
+// when the first two already match. Oto stops at a big win, the loss limit or any refusal. With its skin
+// (fx/slot-skin) the machine is drawn in its own pictures: the cabinet over the reels, the coins and the tree as
+// pictures, its win plate and spin button, and the 🌳🌳🌳 / big wins in the skin's show (fx/jackpot-show).
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, StyleSheet, View } from 'react-native';
+import { Animated, Easing, Image, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/text';
 import { CasinoLock } from '@/components/games/casino';
-import { GameInfoSheet } from '@/components/games/fx/info-sheet';
+import { GameInfoSheet, InfoButton } from '@/components/games/fx/info-sheet';
+import { useJackpotShow } from '@/components/games/fx/jackpot-show';
 import { Reel, type ReelHandle } from '@/components/games/fx/reel';
 import { ContactShadow, SALON, SalonStage, StageHeader, StageStatus, SymbolPlate, salonScreen, symbolShadow, useBox, type StatusTone } from '@/components/games/fx/salon';
+import { SKIN_GAP, SKIN_PAD, SKIN_RIM, SkinCabinet, SkinPlate, fitSkin, slotSkinOf, windowRadius } from '@/components/games/fx/slot-skin';
 import { useWinFx } from '@/components/games/fx/win-fx';
 import { SpinControls, fmt, sleep } from '@/components/games/slot-kit';
 import { playSfx, warmSfx } from '@/lib/game-sound';
@@ -49,6 +53,12 @@ function TreeCell({ sym, size }: { sym: TreeSym; size: number }) {
   );
 }
 
+/** A stop in the skin's pictures; an empty stop is a faint bar on the dark reel. */
+function SkinCell({ src, size }: { src: number | undefined; size: number }) {
+  if (src === undefined) return <View style={[t.blank, t.skinBlank, { width: size * 0.4 }]} />;
+  return <Image source={src} style={{ width: size, height: size }} resizeMode="contain" accessibilityIgnoresInvertColors />;
+}
+
 /** Between two stops of a reel and between two reels (px). */
 const GAP = 4;
 /** The reels' box: padding 6 and rim 2 a side; a reel: rim 2 a side. */
@@ -82,6 +92,8 @@ export function GoldTreePlayer({ entry }: { entry: Entry }) {
   const [pulse] = useState(() => new Animated.Value(0));
   const beat = useRef<Animated.CompositeAnimation | null>(null);
   const win = useWinFx();
+  const skin = slotSkinOf('goldtree');
+  const show = useJackpotShow(skin);
   useEffect(() => {
     balance.current = coins + gameCoins;
   });
@@ -100,9 +112,12 @@ export function GoldTreePlayer({ entry }: { entry: Entry }) {
   // A stop as tall as the area allows, a little wider than tall; the coins grow with it.
   const fitW = area.w ? Math.floor((area.w - BOX_EDGE - 2 * GAP) / 3) - REEL_EDGE : 0;
   const fitH = area.h ? Math.floor((area.h - BOX_EDGE - REEL_EDGE - 2 * GAP) / 3) : 0;
-  const CELL = fitW && fitH ? Math.max(48, Math.min(Math.round(fitW * 1.1), fitH, 150)) : 70;
-  const cellW = fitW ? Math.min(fitW, Math.round(CELL * 1.3)) : 0;
-  const coin = Math.round(CELL * 0.8);
+  // A skin's reels fill its cabinet's window instead (fx/slot-skin).
+  const fit = skin && area.w && area.h ? fitSkin(skin, area.w, area.h, 3, 3) : null;
+  const gap = skin ? SKIN_GAP : GAP;
+  const CELL = skin ? (fit ? Math.max(30, fit.cellH) : 70) : fitW && fitH ? Math.max(48, Math.min(Math.round(fitW * 1.1), fitH, 150)) : 70;
+  const cellW = skin ? (fit ? fit.reelW - 2 * SKIN_RIM : 0) : fitW ? Math.min(fitW, Math.round(CELL * 1.3)) : 0;
+  const coin = fit ? fit.symSize : Math.round(CELL * 0.8);
   // The reels keep the same pace in symbols a second however tall a stop is.
   const paceOf = (p: ReelPace): ReelPace => ({ ...p, speed: p.speed * Math.max(1, CELL / 70) });
 
@@ -129,7 +144,7 @@ export function GoldTreePlayer({ entry }: { entry: Entry }) {
     if (!alive.current) return null;
     if (!r.ok) {
       const quick = paceOf(REEL_PACE.turbo);
-      await Promise.all(handles.current.map((h, i) => h?.land(grid[i], reelRun(i, CELL + GAP, 3, quick), quick, still)));
+      await Promise.all(handles.current.map((h, i) => h?.land(grid[i], reelRun(i, CELL + gap, 3, quick), quick, still)));
       if (!alive.current) return null;
       setHeld(null);
       setStatus({ text: r.reason, tone: 'err' });
@@ -142,7 +157,7 @@ export function GoldTreePlayer({ entry }: { entry: Entry }) {
     const wait = !turbo && !still && a === b && (a === 'tree' || a in COIN);
     await Promise.all(
       sp.grid.map((col, i) =>
-        handles.current[i]?.land(col, reelRun(i, CELL + GAP, 3, pace, wait && i === 2 ? 1 : 0), pace, still).then(() => {
+        handles.current[i]?.land(col, reelRun(i, CELL + gap, 3, pace, wait && i === 2 ? 1 : 0), pace, still).then(() => {
           if (!alive.current) return;
           playSfx('stop', 0.75);
           tapHaptic();
@@ -159,8 +174,10 @@ export function GoldTreePlayer({ entry }: { entry: Entry }) {
     setHeld(null);
     const payout = r.row.payout;
     if (sp.win) {
+      // In the skin's pictures, three trees (188×) are the machine's JACKPOT and three coins of a colour a Büyük Kazanç.
+      const kind = skin && payout >= bet * skin.show.jackpotX ? 'jackpot' : skin && payout >= bet * skin.show.bigX ? 'big' : null;
       setHit(sp.win.name);
-      setStatus({ text: `${sp.win.name} · +${fmt(payout)}`, tone: 'win', amount: payout, label: sp.win.name.toLocaleUpperCase('tr-TR') });
+      setStatus({ text: `${sp.win.name} · +${fmt(payout)}`, tone: kind === 'jackpot' ? 'jackpot' : 'win', amount: payout, label: kind === 'jackpot' ? 'JACKPOT' : kind === 'big' ? 'BÜYÜK KAZANÇ' : sp.win.name.toLocaleUpperCase('tr-TR') });
       setShine((x) => x + 1);
       if (!still) {
         beat.current = Animated.loop(
@@ -171,7 +188,7 @@ export function GoldTreePlayer({ entry }: { entry: Entry }) {
         );
         beat.current.start();
       }
-      const seen = win.celebrate({ amount: payout, bet });
+      const seen = kind ? show.play({ kind, amount: payout, bet }) : win.celebrate({ amount: payout, bet, smallOnly: !!skin });
       if (!(turbo && winTierOf(payout, bet) === 'small')) await seen;
     }
     return { net: payout - bet, stop: payout >= bet * BIG_WIN ? 'büyük kazanç' : null };
@@ -220,18 +237,108 @@ export function GoldTreePlayer({ entry }: { entry: Entry }) {
     setStatus({ text: `${note} · net ${net >= 0 ? '+' : ''}${fmt(net)}`, tone: net > 0 ? 'win' : undefined });
   };
 
+  const controls = (
+    <SpinControls
+      held={held}
+      bets={game.bets}
+      bet={bet}
+      onBet={setBet}
+      busy={busy}
+      turbo={turbo}
+      onTurbo={() => setTurbo((v) => !v)}
+      auto={auto}
+      autoSpins={AUTO_SPINS}
+      onAuto={toggleAuto}
+      onSpin={play}
+      look={{ ring: ['#FFF1C9', '#F6BD60', '#B7832E'], core: ['#C93C4F', '#5A1020'], ink: SALON.win }}
+      art={skin?.spin.src}
+    />
+  );
+  const infoSheet = (
+    <GameInfoSheet visible={info} onClose={() => setInfo(false)} title={game.name} rules={game.rules}>
+      <View style={{ gap: 6 }}>
+        <Text style={t.infoHead}>Orta çizgi öder · bahsin katı</Text>
+        {TREE_PAYS.map((p) => (
+          <View key={p.name} style={t.infoRow}>
+            <Text style={t.infoName}>{p.name}</Text>
+            <Text style={t.infoVal}>
+              {p.pay}× · {fmt(p.pay * bet)}
+            </Text>
+          </View>
+        ))}
+        <Text style={t.infoNote}>
+          Oto {AUTO_SPINS} tur çevirir; {BIG_WIN} kat kazanç veya {AUTO_LOSS} bahislik kayıpta kendiliğinden durur.
+        </Text>
+      </View>
+    </GameInfoSheet>
+  );
+  const paytable = (
+    <View style={t.paytable}>
+      {TREE_PAYS.map((p) => (
+        <View key={p.name} style={[t.pay, hit === p.name && t.payOn]}>
+          <Text style={t.payName}>{p.name}</Text>
+          <Text style={t.payVal}>{p.pay}</Text>
+        </View>
+      ))}
+    </View>
+  );
+
+  if (skin)
+    return (
+      <View style={salonScreen}>
+        <View style={t.skinStage}>
+          {/* The pays leave room on the right for the "?" button. */}
+          <View style={t.skinHead}>{paytable}</View>
+          <View style={t.area} onLayout={area.onLayout}>
+            {fit && cellW > 0 && (
+              <View style={{ width: fit.fw, alignItems: 'center' }}>
+                <View style={{ width: fit.fw, height: fit.fh }}>
+                  {/* The reels fill the cabinet's window and run a little under its edge; the cabinet is drawn over them. */}
+                  <LinearGradient colors={skin.reels} style={[t.skinWindow, { left: fit.win.x - 2, top: fit.win.y - 2, width: fit.win.w + 4, height: fit.win.h + 4, padding: SKIN_PAD + 2, borderRadius: windowRadius(skin), overflow: skin.frame ? 'visible' : 'hidden' }]} accessibilityLabel={`Orta çizgi: ${grid.map((c) => c[1]).join(', ')}`}>
+                    {opening.map((col, reel) => (
+                      <View key={reel} style={[t.skinReel, { width: cellW + 2 * SKIN_RIM }, waiting && reel === 2 && t.reelWait]}>
+                        <Reel
+                          ref={(h) => {
+                            handles.current[reel] = h;
+                          }}
+                          symbols={col}
+                          strip={TREE_STRIPS[reel]}
+                          cell={CELL}
+                          gap={gap}
+                          pulse={pulse}
+                          dim={!!hit}
+                          lit={[false, !!hit, false]}
+                          shade="rgba(0,0,0,0.5)"
+                          litStyle={t.skinLit}
+                          render={(sym) => <SkinCell src={skin.symbols[sym]} size={coin} />}
+                        />
+                      </View>
+                    ))}
+                    {/* Through the middle of the middle row (the window's padding and the reel's rim above it). */}
+                    <View style={[t.line, { top: SKIN_PAD + 2 + SKIN_RIM + CELL + gap + CELL / 2 - 1.5 }]} pointerEvents="none" />
+                  </LinearGradient>
+                  <SkinCabinet skin={skin} fit={fit} />
+                </View>
+                <SkinPlate skin={skin} width={fit.plateW} text={status.text} tone={status.tone} amount={status.amount} label={status.label} style={{ marginTop: -fit.lap }} />
+              </View>
+            )}
+          </View>
+          <View style={t.skinInfo}>
+            <InfoButton onPress={() => setInfo(true)} tint="rgba(255,231,176,0.7)" />
+          </View>
+          {win.layer}
+        </View>
+        {controls}
+        {infoSheet}
+        {show.layer}
+      </View>
+    );
+
   return (
     <View style={salonScreen}>
       <SalonStage colors={['#2F7038', '#184425', '#0A1E12']} win={shine} minHeight={330}>
         <StageHeader title="BEREKET AĞACI" kicker="3 MAKARA · ORTA ÇİZGİ ÖDER" onInfo={() => setInfo(true)} />
-        <View style={t.paytable}>
-          {TREE_PAYS.map((p) => (
-            <View key={p.name} style={[t.pay, hit === p.name && t.payOn]}>
-              <Text style={t.payName}>{p.name}</Text>
-              <Text style={t.payVal}>{p.pay}</Text>
-            </View>
-          ))}
-        </View>
+        {paytable}
         <View style={t.area} onLayout={area.onLayout}>
           {cellW > 0 && (
             <View style={t.reels} accessibilityLabel={`Orta çizgi: ${grid.map((c) => c[1]).join(', ')}`}>
@@ -266,36 +373,8 @@ export function GoldTreePlayer({ entry }: { entry: Entry }) {
         <StageStatus text={status.text} tone={status.tone} amount={status.amount} label={status.label} />
         {win.layer}
       </SalonStage>
-      <SpinControls
-        held={held}
-        bets={game.bets}
-        bet={bet}
-        onBet={setBet}
-        busy={busy}
-        turbo={turbo}
-        onTurbo={() => setTurbo((v) => !v)}
-        auto={auto}
-        autoSpins={AUTO_SPINS}
-        onAuto={toggleAuto}
-        onSpin={play}
-        look={{ ring: ['#FFF1C9', '#F6BD60', '#B7832E'], core: ['#C93C4F', '#5A1020'], ink: SALON.win }}
-      />
-      <GameInfoSheet visible={info} onClose={() => setInfo(false)} title={game.name} rules={game.rules}>
-        <View style={{ gap: 6 }}>
-          <Text style={t.infoHead}>Orta çizgi öder · bahsin katı</Text>
-          {TREE_PAYS.map((p) => (
-            <View key={p.name} style={t.infoRow}>
-              <Text style={t.infoName}>{p.name}</Text>
-              <Text style={t.infoVal}>
-                {p.pay}× · {fmt(p.pay * bet)}
-              </Text>
-            </View>
-          ))}
-          <Text style={t.infoNote}>
-            Oto {AUTO_SPINS} tur çevirir; {BIG_WIN} kat kazanç veya {AUTO_LOSS} bahislik kayıpta kendiliğinden durur.
-          </Text>
-        </View>
-      </GameInfoSheet>
+      {controls}
+      {infoSheet}
     </View>
   );
 }
@@ -319,6 +398,14 @@ const t = StyleSheet.create({
   coinGloss: { position: 'absolute', left: 0, right: 0, top: 0, height: '50%' },
   coinHole: { backgroundColor: '#FEF3C7', borderWidth: 2, borderColor: '#92400E' },
   blank: { height: 5, borderRadius: 3, backgroundColor: 'rgba(15,23,42,0.15)' },
+  // In the skin's pictures: no stage of the shell's, the game panel's picture behind it (fx/slot-skin).
+  skinStage: { flex: 1, minHeight: 330 },
+  skinHead: { paddingRight: 40, paddingTop: 2 },
+  skinWindow: { position: 'absolute', flexDirection: 'row', gap: SKIN_GAP },
+  skinReel: { borderRadius: 6, borderWidth: SKIN_RIM, borderColor: 'transparent' },
+  skinInfo: { position: 'absolute', top: 0, right: 0 },
+  skinLit: { borderColor: 'rgba(255,224,138,0.75)', backgroundColor: 'rgba(255,190,80,0.16)', boxShadow: '0 0 12px rgba(255,200,90,0.55), inset 0 0 10px rgba(255,214,120,0.35)' },
+  skinBlank: { backgroundColor: 'rgba(255,231,176,0.16)' },
   line: { position: 'absolute', left: 2, right: 2, height: 3, borderRadius: 2, backgroundColor: '#FF6576', opacity: 0.9, boxShadow: '0 0 8px rgba(255,101,118,0.8)' },
   infoHead: { color: '#FDE68A', fontSize: 12, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
   infoRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },

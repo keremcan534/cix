@@ -17,7 +17,7 @@ import { firstCoinAt, useFlights } from '@/components/games/fx/flights';
 import { GameInfoSheet } from '@/components/games/fx/info-sheet';
 import { ResultTrail, pushTrail, type TrailItem } from '@/components/games/fx/result-trail';
 import { ContactShadow, SALON, SalonStage, SideButton, StageHeader, StageStatus, WideAction, salonScreen, symbolShadow, tabular, useBox, wideInk, type StatusTone } from '@/components/games/fx/salon';
-import { OPTION_ART, SalonArt } from '@/components/games/fx/salon-art';
+import { OPTION_ART, SalonArt, salonArt } from '@/components/games/fx/salon-art';
 import { chipOf, isHotResult, litRange, optionShare, percentText, planLight, resultShare, shortCoins } from '@/components/games/fx/spin-plan';
 import { RimBulbs, SpinBlur, WheelPointer, useWheelSpin, type WheelSpin } from '@/components/games/fx/wheel-stage';
 import { useWinFx } from '@/components/games/fx/win-fx';
@@ -467,8 +467,8 @@ export function BoardPlayer({ id, entry }: { id: BoardId; entry: Entry }) {
             <BalancePill shown={held} />
           </View>
         </Animated.View>
-        <SideButton compact onPress={clear} disabled={busy || !total} icon="trash-outline" a11y="Bahisleri temizle" />
-        <SideButton onPress={() => start(last, true)} disabled={busy || !lastTotal} icon="refresh" label="Tekrar" sub={lastTotal > 0 ? shortCoins(lastTotal) : undefined} a11y={lastTotal ? `Son bahisleri tekrarla, ${lastTotal} jeton` : 'Son bahisleri tekrarla'} style={{ flex: 0, minWidth: 96 }} />
+        <SideButton compact onPress={clear} disabled={busy || !total} icon="trash-outline" pic={salonArt('dugme-temizle')} a11y="Bahisleri temizle" />
+        <SideButton onPress={() => start(last, true)} disabled={busy || !lastTotal} icon="refresh" pic={salonArt('dugme-tekrar')} label="Tekrar" sub={lastTotal > 0 ? shortCoins(lastTotal) : undefined} a11y={lastTotal ? `Son bahisleri tekrarla, ${lastTotal} jeton` : 'Son bahisleri tekrarla'} style={{ flex: 0, minWidth: 96 }} />
       </View>
       <WideAction onPress={() => start(bets)} disabled={busy || !total} off={!busy && !total} label={`${look.verb}, toplam ${total} jeton`}>
         {busy ? (

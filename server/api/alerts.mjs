@@ -8,7 +8,8 @@
 //   finance_sync_failed events the finance panel refused are waiting (finance_sync_failed)
 //   refunds_high        more than ALERT_REFUNDS_1H store refunds in the last hour (3)
 //   diamonds_spike      one account received more than ALERT_DIAMONDS_1H diamonds in the last hour (500.000)
-//   test_topups_high    more than ALERT_TEST_TOPUP_1H coins of test top-ups in the last hour (500.000)
+//   test_topups_high    more than ALERT_TEST_TOPUP_1H coins of test top-ups in the last hour (500.000; not the
+//                       test server's own admin fill, index.mjs fillTestAdmin)
 //   mail_quota_high     today's e-mail codes passed ALERT_MAIL_QUOTA_PCT % (80) of the free daily quota of the mail
 //                       providers (mail.mjs); at 100 % e-mail sign-in stops until midnight UTC
 //   mail_failing        the last 10 e-mail codes could not be sent by any provider
@@ -90,6 +91,7 @@ export async function checkAll() {
     await db.query(
       `SELECT l.user_id, sum(l.amount) AS n FROM ledger l
         WHERE l.currency = 'coin' AND l.amount > 0 AND l.channel = 'test' AND l.created_at > now() - interval '1 hour'
+          AND l.ref !~ '^test-admin-'
         GROUP BY l.user_id ORDER BY n DESC`,
     )
   ).rows;

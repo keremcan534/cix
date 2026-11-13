@@ -7,7 +7,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { NavigationContext } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useCallback, useContext, useEffect, useState, useSyncExternalStore } from 'react';
-import { Animated, AppState, Easing, Platform, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Animated, AppState, Easing, Image, Platform, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Text } from '@/components/text';
 import { Avatar } from '@/components/ui';
@@ -31,6 +31,14 @@ import { useSettings } from '@/store';
 import { makeStyles } from '@/theme';
 
 const GLOW = require('../../assets/fx/glow.png');
+/**
+ * Each look's heart picture (docs/GORSEL_URETIM_LISTESI.md § 23, app/assets/hearts, 192 px). A look without one yet
+ * keeps the drawn heart (Ionicons in its tint); the light, the motion, the rising hearts and the gold rim stay code.
+ */
+const HEART_ART: Partial<Record<HeartTier['id'], number>> = {
+  soft: require('../../assets/hearts/kalp-seviye-kivilcim.png'),
+  glow: require('../../assets/hearts/kalp-seviye-isilti.png'),
+};
 const NATIVE = Platform.OS !== 'web';
 const fmt = (n: number) => n.toLocaleString('tr-TR');
 
@@ -144,6 +152,7 @@ export function HeartGlyph({ level, size = 22, t: outer, still }: { level: numbe
   const t = outer !== undefined ? outer : own;
   const scale = on(t, scaleCurve(tier.motion));
   const rim = Math.round(size * 1.2);
+  const art = HEART_ART[tier.id];
   return (
     <View style={{ width: size, height: size }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
       <Glow tier={tier} size={size} t={t} />
@@ -151,7 +160,11 @@ export function HeartGlyph({ level, size = 22, t: outer, still }: { level: numbe
       <Particles tier={tier} size={size} t={t} />
       <Animated.View style={{ width: size, height: size, transform: [{ scale }] }}>
         {tier.rim && <Ionicons name="heart" size={rim} color={tier.rim} style={{ position: 'absolute', left: (size - rim) / 2, top: (size - rim) / 2 }} />}
-        <Ionicons name={tier.id === 'none' ? 'heart-outline' : 'heart'} size={size} color={tier.tint} />
+        {art ? (
+          <Image source={art} style={{ width: size, height: size }} resizeMode="contain" />
+        ) : (
+          <Ionicons name={tier.id === 'none' ? 'heart-outline' : 'heart'} size={size} color={tier.tint} />
+        )}
       </Animated.View>
     </View>
   );

@@ -5,12 +5,13 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, type Href } from 'expo-router';
 import { createContext, useContext, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
 
 import { Icon3D } from '@/components/Icon3D';
 import { RollingNumber } from '@/components/fx/rolling-number';
 import { GameInfoSheet } from '@/components/games/fx/info-sheet';
 import { ActionButton, SALON, SideButton, tabular, type ActionLook } from '@/components/games/fx/salon';
+import { salonArt } from '@/components/games/fx/salon-art';
 import { Text } from '@/components/text';
 import { tapHaptic } from '@/lib/haptics';
 import { useApp } from '@/store';
@@ -59,6 +60,16 @@ export function BalancePill({ shown }: { /** Shown instead of the balance while 
   );
 }
 
+// The shared controls' pictures (fx/salon-art, "Ortak kontroller"); each falls back to its icon.
+const MINUS = salonArt('dugme-eksi');
+const PLUS = salonArt('dugme-arti');
+const TURBO = { off: salonArt('dugme-turbo'), on: salonArt('dugme-turbo-acik') };
+const AUTO = { off: salonArt('dugme-oto'), on: salonArt('dugme-oto-acik') };
+
+function StepFace({ pic, icon }: { pic: number | undefined; icon: 'remove' | 'add' }) {
+  return pic !== undefined ? <Image source={pic} style={k.stepPic} accessibilityIgnoresInvertColors /> : <Ionicons name={icon} size={20} color={SALON.win} />;
+}
+
 /** − amount + over the game's allowed bets: the stake in gold digits under a small BAHİS. */
 export function BetStepper({ bets, bet, onChange, disabled }: { bets: number[]; bet: number; onChange: (b: number) => void; disabled?: boolean }) {
   const i = bets.indexOf(bet);
@@ -74,7 +85,7 @@ export function BetStepper({ bets, bet, onChange, disabled }: { bets: number[]; 
   return (
     <LinearGradient colors={SALON.glass} style={[k.stepper, disabled && { opacity: 0.6 }]}>
       <Pressable onPress={() => step(-1)} disabled={low} style={({ pressed }) => [k.stepBtn, low && { opacity: 0.35 }, pressed && k.stepPressed]} accessibilityLabel="Bahsi azalt">
-        <Ionicons name="remove" size={20} color={SALON.win} />
+        <StepFace pic={MINUS} icon="remove" />
       </Pressable>
       <View style={k.betBox}>
         <Text style={k.betHead}>BAHİS</Text>
@@ -83,7 +94,7 @@ export function BetStepper({ bets, bet, onChange, disabled }: { bets: number[]; 
         </Text>
       </View>
       <Pressable onPress={() => step(1)} disabled={high} style={({ pressed }) => [k.stepBtn, high && { opacity: 0.35 }, pressed && k.stepPressed]} accessibilityLabel="Bahsi artır">
-        <Ionicons name="add" size={20} color={SALON.win} />
+        <StepFace pic={PLUS} icon="add" />
       </Pressable>
     </LinearGradient>
   );
@@ -153,11 +164,12 @@ export function SpinControls({
           }}
           on={turbo}
           icon="flash"
+          pic={turbo ? TURBO.on : TURBO.off}
           label="TURBO"
           a11y={turbo ? 'Turbo kapat' : 'Turbo aç'}
         />
         <ActionButton onPress={auto !== null ? onAuto : onSpin} disabled={waiting} busy={busy} count={auto} look={look} art={art} label={auto !== null ? 'Otomatik çevirmeyi durdur' : `Çevir, ${bet} jeton`} />
-        <SideButton onPress={onAuto} on={auto !== null} disabled={waiting} icon={auto !== null ? 'stop' : 'repeat'} label={auto !== null ? 'DUR' : 'OTO'} a11y={auto !== null ? 'Otomatik çevirmeyi durdur' : `${autoSpins} kez otomatik çevir`} />
+        <SideButton onPress={onAuto} on={auto !== null} disabled={waiting} icon={auto !== null ? 'stop' : 'repeat'} pic={auto !== null ? AUTO.on : AUTO.off} label={auto !== null ? 'DUR' : 'OTO'} a11y={auto !== null ? 'Otomatik çevirmeyi durdur' : `${autoSpins} kez otomatik çevir`} />
       </View>
       {!!caption && <Text style={k.caption}>{caption}</Text>}
     </View>
@@ -192,6 +204,7 @@ const k = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: SALON.row },
   caption: { color: SALON.dim, fontSize: 12, lineHeight: 16, textAlign: 'center', marginTop: -4, fontVariant: ['tabular-nums'] },
   stepper: { flexDirection: 'row', alignItems: 'center', height: SALON.control, borderRadius: SALON.controlRadius, borderWidth: 1, borderColor: SALON.glassRim, overflow: 'hidden', boxShadow: '0 4px 10px rgba(0,0,0,0.35)' },
+  stepPic: { width: 34, height: 34 },
   stepBtn: { width: 40, height: SALON.control, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.05)' },
   stepPressed: { backgroundColor: 'rgba(246,189,96,0.22)' },
   betBox: { minWidth: 66, alignItems: 'center', paddingHorizontal: 4 },

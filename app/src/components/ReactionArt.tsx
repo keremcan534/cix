@@ -4,7 +4,11 @@
 // on a mic are the die pictures the games use (assets/art). Stickers are what the packs sell; standard Unicode emoji are
 // free and always drawn as text. A sticker travels as a token (lib/stickers), so typing an emoji
 // never shows a paid sticker. Two files are duplicates and not wired: tepki-eglence-yerlere-yattim
-// (= temel-kahkaha) and tepki-vip-kristal (= vip-elmas).
+// (= temel-kahkaha) and tepki-vip-kristal (= vip-elmas). Delivered and sized (192 px) but waiting for a pack in
+// data/catalog STICKER_PACKS (price and VIP level are the owner's call, with server/api/catalog.mjs): Ses Odası's
+// tepki-oda-{mikrofonda,soz-istiyorum,sessizdeyim,kulakligi-taktim,alkis-yagmuru} (docs/CIKARTMA_URETIM_LISTESI.md §1)
+// and the new VIP ones tepki-vip-{tacli-kalp,altin-mikrofon,kristal-gul,altin-alkis,alevli-elmas,uykulu-hilal}
+// (docs/GORSEL_URETIM_LISTESI.md §21). Each goes into SRC below together with its pack.
 import { Image, StyleSheet, View, type StyleProp, type TextStyle } from 'react-native';
 
 import { Text } from '@/components/text';

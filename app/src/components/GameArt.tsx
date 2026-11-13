@@ -19,12 +19,21 @@ const COVER: Record<string, ArtName> = {
   wheel: 'oyun-sans-carki',
   dice: 'oyun-zar-casino',
   slot: 'oyun-lucky-77',
-  jackpot: 'oyun-hazine-sandigi',
   dragon: 'oyun-dragon-tiger',
   // Balon Avı (fish) shows its emoji until its own cover arrives: the old cover is a fishing rod.
 };
-// Covers that came with a machine's own pack (components/games/fx/salon-art, §24).
-const SALON_COVER: Record<string, SalonArtName> = { super777: 'kizil-yedi-kapak' };
+// Covers that came with a machine's own pack (components/games/fx/salon-art, §16, §24).
+const SALON_COVER: Record<string, SalonArtName> = {
+  super777: 'kizil-yedi-kapak',
+  jackpot: 'hazine-kulesi-kapak',
+  jungle: 'vahsi-patika-kapak',
+  neon: 'neon-bulvar-kapak',
+  pinata: 'konfeti-kutusu-kapak',
+  spellbook: 'kayip-parsomen-kapak',
+  goldtree: 'bereket-agaci-kapak',
+  foodwheel: 'lezzet-carki-kapak',
+  magiccard: 'sihir-destesi-kapak',
+};
 const ART: Record<string, number> = Object.fromEntries([
   ...Object.entries(COVER).map(([id, name]) => [id, artSource(name)]),
   ...Object.entries(SALON_COVER).flatMap(([id, name]) => {
