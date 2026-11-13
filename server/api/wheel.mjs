@@ -14,7 +14,7 @@ import crypto from 'node:crypto';
 
 import { HttpError, REF, auth, db, env, limit, move, readJson, selfUser, tx } from './core.mjs';
 import { live } from './live-settings.mjs';
-import { spendCoins } from './wallet.mjs';
+import { spendCoins, withTestBoost } from './wallet.mjs';
 import { COUNTS, SLICES, TIERS, WEIGHT_TOTAL, jackpotSeed, playSpins } from './wheel-rules.mjs';
 
 export { COUNTS, SLICES, TIERS };
@@ -63,7 +63,7 @@ export async function wealthPointsOf(c, ids) {
       GROUP BY l.user_id`,
     [ids],
   );
-  return new Map(r.rows.map((x) => [x.user_id, Number(x.n)]));
+  return withTestBoost(c, ids, new Map(r.rows.map((x) => [x.user_id, Number(x.n)])), 'wealth');
 }
 
 async function funds(c, lock = null) {

@@ -9,7 +9,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon3D } from '@/components/Icon3D';
 import { Text, TextInput } from '@/components/text';
 import { Card, Header, StateIcon } from '@/components/ui';
-import { apiEnabled, ensureSignedIn, gift, ledger, newRef, testTopup, type ServerLedgerRow, type ServerUser } from '@/lib/api';
+import { apiEnabled, ensureSignedIn, gift, ledger, newRef, testMax, testTopup, type ServerLedgerRow, type ServerUser } from '@/lib/api';
+import { applyServerUser, refreshWallet } from '@/lib/live';
 import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 
@@ -17,7 +18,7 @@ const CURRENCY = { coin: 'jeton', diamond: 'elmas', game: 'oyun jetonu' } as con
 const fmt = (n: number) => n.toLocaleString('tr-TR');
 
 export default function ServerAccount() {
-  const { me } = useApp();
+  const { me, maxOutForTest } = useApp();
   const [user, setUser] = useState<ServerUser | null>(null);
   const [rows, setRows] = useState<ServerLedgerRow[]>([]);
   const [busy, setBusy] = useState(apiEnabled);
@@ -135,6 +136,25 @@ export default function ServerAccount() {
               </Pressable>
             ))}
           </View>
+        </Card>
+
+        <Card style={{ gap: 10 }}>
+          <Text style={s.title}>Her şey son seviye</Text>
+          <Text style={s.dim}>6 milyon jeton, Cömertlik ve Yankı Lv.50, VIP 10, Rütbe Paşa ve bir yıl Abonelik. Jeton 6 milyonun altına inince tekrar bas. Yalnızca test için.</Text>
+          <Pressable
+            style={[s.btn, (busy || !user) && s.off]}
+            disabled={busy || !user}
+            onPress={() =>
+              run(async () => {
+                applyServerUser(await testMax(), 'Test: her şey son seviye');
+                maxOutForTest();
+                await refreshWallet();
+                return 'Hesap her şeyde son seviyeye çıktı.';
+              })
+            }
+          >
+            <Text style={s.btnText}>Son seviyeye çıkar</Text>
+          </Pressable>
         </Card>
 
         <Card style={{ gap: 10 }}>

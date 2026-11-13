@@ -51,6 +51,7 @@ describe('yayın sunucusu', () => {
     [admin, buyer, host] = await Promise.all([h.account('Yönetici', 'admin'), h.account('Alıcı'), h.account('Yayıncı')]);
     assert.equal((await call('POST', '/api/auth/dev', { deviceKey: rnd(24), name: 'Deneme' }))[0], 403);
     assert.equal((await call('POST', '/api/wallet/test-topup', { amount: 1000, ref: ref() }, buyer.session))[0], 403);
+    assert.equal((await call('POST', '/api/wallet/test-max', { ref: ref() }, buyer.session))[0], 403, 'son seviye test düğmesi kapalı');
     assert.equal((await call('POST', '/api/wallet/purchase', { platform: 'test', productId: 'coins_1000', transactionId: ref() }, buyer.session))[0], 403);
     assert.equal((await call('POST', '/api/wallet/gift', { to: host.user.id, amount: 10, ref: ref() }, buyer.session))[0], 403);
     assert.equal((await me(buyer.session)).coins, 0);

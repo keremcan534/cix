@@ -344,6 +344,8 @@ export function ensureSignedIn(name: string): Promise<ServerUser> {
 export const me = () => call<{ user: ServerUser }>('GET', '/api/me').then((r) => r.user);
 export const ledger = () => call<{ rows: ServerLedgerRow[] }>('GET', '/api/ledger').then((r) => r.rows);
 export const testTopup = (amount: number, ref = newRef()) => call<{ user: ServerUser; replay: boolean }>('POST', '/api/wallet/test-topup', { amount, ref });
+/** Test servers only: coins to 6 million, Cömertlik and Yankı Lv.50, VIP 10 and Rütbe Paşa on the server. */
+export const testMax = (ref = newRef()) => call<{ user: ServerUser; replay: boolean }>('POST', '/api/wallet/test-max', { ref });
 export const gift = (to: string, amount: number, ref = newRef()) => call<{ user: ServerUser; replay: boolean }>('POST', '/api/wallet/gift', { to, amount, ref });
 /**
  * LiveKit token for a room; needs a signed-in user. A password room's token needs the password the person typed
