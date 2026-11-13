@@ -147,6 +147,7 @@ import {
   useLatched,
   useRoomLive,
   type InviteStatus,
+  type Result,
 } from '@/lib/room-presence';
 import { kindOf, mergeFeed, type FeedMsg } from '@/lib/chat-feed';
 import { blockedFeature } from '@/lib/remote-control';
@@ -1088,10 +1089,13 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // the room read has them, my demo room's from its own state.
   const look = useRoomLook({ roomId: id, real, isOwn, rank: myRank, level, theme, cover, serverBackground: base?.background, serverFreeId: base?.bgId, serverCoverUrl: base?.coverUrl, onChanged: () => setRoomEdits((n) => n + 1), log: (what) => logMod(what, 'Oda') });
   // Mode / layout ("Yayına Katılma Modu"): only the stage server decides; its refusal goes back to the sheet as is.
-  const pickLayout = (layoutId: string | null) => {
+  const pickLayout = (layoutId: string | null, retry = false): Result => {
     const changed = (stage?.layoutId ?? null) !== layoutId;
     const r = changeLayout(id, 'me', layoutId);
     if (!r.ok) {
+      // A smaller layout with people beyond it: when there are free mics inside it, move them there first.
+      const moved = retry ? null : shiftInside(layoutId);
+      if (moved) return moved;
       errorHaptic();
       return r;
     }
@@ -1111,6 +1115,49 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       successHaptic();
     }
     return r;
+  };
+  /**
+   * The people sitting beyond a smaller layout's mics move to its free, unlocked mics (seat 1 only for the host),
+   * then the layout is asked again. Null when nobody sits beyond it or there aren't enough free mics; a server room
+   * moves them through the server (the owner or an admin may move anyone they outrank, and themselves).
+   */
+  const shiftInside = (layoutId: string | null): Result | null => {
+    const target = layoutId === null ? null : layoutById(layoutId);
+    if (layoutId !== null && !target) return null;
+    const cap = target ? target.microphoneCapacity : classicCapacity;
+    const out = allSeats.map((uid, index) => ({ uid, index })).filter((s): s is { uid: string; index: number } => !!s.uid && s.index >= cap);
+    if (!out.length) return null;
+    const free = [...Array(cap).keys()].filter((i) => !allSeats[i] && !lockedSeats.includes(i));
+    const plan: { uid: string; seat: number }[] = [];
+    for (const s of out) {
+      const k = free.findIndex((i) => i !== 0 || s.uid === hostId);
+      if (k < 0) return null;
+      plan.push({ uid: s.uid, seat: free.splice(k, 1)[0] });
+    }
+    if (offlineBlocked()) return null;
+    const line = (p: { uid: string; seat: number }) => addMsg({ system: true, text: `${userById(p.uid).name} ${p.seat + 1}. koltuğa taşındı` });
+    if (!real) {
+      for (const p of plan) {
+        const m = seatBy(id, 'me', p.uid, p.seat);
+        if (!m.ok) return m;
+        line(p);
+      }
+      return pickLayout(layoutId, true);
+    }
+    if (plan.some((p) => !toServer(p.uid))) return null;
+    (async () => {
+      for (const p of plan) {
+        await roomSeat(id, { action: 'move', user: toServer(p.uid)!, seat: p.seat });
+        seatBy(id, 'me', p.uid, p.seat);
+        line(p);
+      }
+      const again = pickLayout(layoutId, true);
+      if (!again.ok) showAlert('Düzen değiştirilemedi', again.reason);
+    })().catch((e) => {
+      showAlert(refusalTitle(e, 'Taşınamadı'), errorText(e));
+      syncServerStage(id).catch(() => {});
+    });
+    return { ok: true };
   };
   const layoutSheet = (open: boolean, onClose: () => void) => (
     <LayoutPickerSheet
