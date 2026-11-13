@@ -63,6 +63,7 @@ import { GiftFlights, type Flight, type Point } from '@/components/fx/gift-fligh
 import { GiftShowFx, type GiftShowPlay } from '@/components/fx/gift-show';
 import { GiftVideoFx, VideoFx, entryVideoOf, giftVideoOf } from '@/components/fx/video-fx';
 import { giftShowOf } from '@/data/gift-shows';
+import { SalonArt, salonArt } from '@/components/games/fx/salon-art';
 import { GamePanel, type OpenGame } from '@/components/games/game-panel';
 import type { CasinoGame } from '@/data/games';
 import { BAR_BTN, ChatLine, GiftAnimation, MicBtn, REACTION_MS, RESULT_MS, RoomSoundBtn, RoundBtn, Seat, type ChatMsg, type RoomRole, type SeatReactionData } from '@/components/room/parts';
@@ -2980,7 +2981,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             note: 'Sonuçlar sunucuda doğrulanır · jeton harcaması günlük limite dahildir',
             items: [
               // Rüzgâr Gülü: the server plays it (components/games/wheel); Oyun Salonu is only shown from Lv.2.
-              { key: 'cg-ruzgar', label: 'Rüzgâr Gülü', icon: 'compass' as const, hue: '#F6BD60', badge: 'NEW' as const, onPress: () => (setPanel(null), setGame({ kind: 'wheel' }), setGameMin(false)) },
+              { key: 'cg-ruzgar', label: 'Rüzgâr Gülü', icon: 'compass' as const, art: salonArt('oyun-ruzgar-gulu'), hue: '#F6BD60', badge: 'NEW' as const, onPress: () => (setPanel(null), setGame({ kind: 'wheel' }), setGameMin(false)) },
               ...gameCatalog.casino
                 .filter((g) => g.active && g.fromRoom)
                 .map((g) => ({ key: `cg-${g.id}`, label: g.name, emoji: g.emoji, art: gameArtOf(g.id), hue: gameHueOf(g.id), onPress: () => openCasino(g.id) })),
@@ -4151,9 +4152,15 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           aside while the emoji panel, the keyboard or a refusal note is up, so it never covers their text. */}
       {wheelShown && (
         <Pressable style={styles.wheelBtn} onPress={() => (setGame({ kind: 'wheel' }), setGameMin(false))} accessibilityRole="button" accessibilityLabel="Rüzgâr Gülü">
-          <View style={styles.wheelDisc}>
-            <Ionicons name="compass" size={26} color="#3A2A08" />
-          </View>
+          <SalonArt
+            name="oyun-ruzgar-gulu"
+            size={46}
+            fallback={
+              <View style={styles.wheelDisc}>
+                <Ionicons name="compass" size={26} color="#3A2A08" />
+              </View>
+            }
+          />
           <Text style={styles.wheelText}>Rüzgâr Gülü</Text>
         </Pressable>
       )}

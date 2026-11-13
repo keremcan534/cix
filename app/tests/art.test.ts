@@ -107,7 +107,7 @@ describe('Emoji ve çıkartma paketleri', () => {
   test('eski paket kimlikleri korunuyor, satın alınanlar kaybolmuyor', () => {
     assert.deepEqual(
       STICKER_PACKS.map((p) => p.id),
-      ['basic', 'duygu', 'muzik', 'hamle', 'fun', 'love', 'animals', 'vip', 'anim'],
+      ['basic', 'duygu', 'muzik', 'hamle', 'fun', 'love', 'animals', 'vip', 'anim', 'voice', 'tea', 'feels', 'party', 'costume'],
     );
     assert.deepEqual(FREE_PACK_IDS, ['basic', 'duygu', 'muzik', 'hamle']);
   });

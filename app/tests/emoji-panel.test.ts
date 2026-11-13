@@ -35,7 +35,7 @@ describe('Emoji paneli: sekmeler', () => {
     const tabs = panelTabs(false);
     assert.deepEqual(
       tabs.map((t) => `${t.kind}:${t.id}`),
-      ['sabit:emoji', 'sabit:fav', 'vip:fun', 'vip:love', 'vip:animals', 'vip:vip', 'vip:anim'],
+      ['sabit:emoji', 'sabit:fav', 'vip:fun', 'vip:love', 'vip:animals', 'vip:vip', 'vip:anim', 'vip:voice', 'vip:tea', 'vip:feels', 'vip:party', 'vip:costume'],
     );
   });
 
@@ -43,7 +43,7 @@ describe('Emoji paneli: sekmeler', () => {
     const { panelTabs } = await pure();
     assert.deepEqual(
       panelTabs(true).map((t) => `${t.kind}:${t.id}`),
-      ['sabit:emoji', 'sabit:fav', 'sabit:animated-free', 'vip:animated', 'vip:fun', 'vip:love', 'vip:animals', 'vip:vip', 'vip:anim'],
+      ['sabit:emoji', 'sabit:fav', 'sabit:animated-free', 'vip:animated', 'vip:fun', 'vip:love', 'vip:animals', 'vip:vip', 'vip:anim', 'vip:voice', 'vip:tea', 'vip:feels', 'vip:party', 'vip:costume'],
     );
   });
 

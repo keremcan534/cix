@@ -16,6 +16,7 @@ import { RollingNumber } from '@/components/fx/rolling-number';
 import { SCENES } from '@/components/fx/scenes';
 import { Backdrop, DepthCard, EdgeLight, Shine, glassChipOf } from '@/components/fx/surface';
 import { icon3dSourceFor } from '@/components/Icon3D';
+import { SalonArt } from '@/components/games/fx/salon-art';
 import { GamePanel, type OpenGame } from '@/components/games/game-panel';
 import { Card, Header } from '@/components/ui';
 import type { CasinoGame } from '@/data/games';
@@ -109,7 +110,7 @@ export default function GameCenter() {
                 <EdgeLight inset={22} strength={0.35} />
                 <Shine radius={22} every={5200} />
                 <LinearGradient colors={['#2A4470', '#160E12']} style={s.wheelBadge}>
-                  <Ionicons name="compass" size={54} color="#F6BD60" />
+                  <SalonArt name="oyun-ruzgar-gulu" size={64} fallback={<Ionicons name="compass" size={54} color="#F6BD60" />} />
                 </LinearGradient>
                 <View style={{ flex: 1, gap: 4 }}>
                   <Text style={s.wheelTag}>YENİ · JACKPOT</Text>

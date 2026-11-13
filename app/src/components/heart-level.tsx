@@ -33,12 +33,22 @@ import { makeStyles } from '@/theme';
 const GLOW = require('../../assets/fx/glow.png');
 /**
  * Each look's heart picture (docs/GORSEL_URETIM_LISTESI.md § 23, app/assets/hearts, 192 px). A look without one yet
- * keeps the drawn heart (Ionicons in its tint); the light, the motion, the rising hearts and the gold rim stay code.
+ * keeps the drawn heart (Ionicons in its tint); the light, the motion, the rising hearts and the gold ring stay code
+ * (the top look's picture has its own gold edge, so the drawn gold heart behind it goes).
  */
 const HEART_ART: Partial<Record<HeartTier['id'], number>> = {
   soft: require('../../assets/hearts/kalp-seviye-kivilcim.png'),
   glow: require('../../assets/hearts/kalp-seviye-isilti.png'),
+  pulse: require('../../assets/hearts/kalp-seviye-nabiz.png'),
+  beat: require('../../assets/hearts/kalp-seviye-tutku.png'),
+  crown: require('../../assets/hearts/kalp-seviye-sonsuz.png'),
 };
+/** The heartbeat that travels the line (§ 23 #6): a small heart with its light trailing behind, facing right. */
+const BEAT_ART = require('../../assets/hearts/kalp-atis.png');
+const BEAT_RATIO = 192 / 111;
+/** The line between the two photos (§ 23 #7), stretched to the line's length; its band sits this far down the picture. */
+const LINE_ART = require('../../assets/hearts/kalp-cizgisi.png');
+const LINE_MID = 0.73;
 const NATIVE = Platform.OS !== 'web';
 const fmt = (n: number) => n.toLocaleString('tr-TR');
 
@@ -159,7 +169,7 @@ export function HeartGlyph({ level, size = 22, t: outer, still }: { level: numbe
       <Ripple tier={tier} size={size} t={t} />
       <Particles tier={tier} size={size} t={t} />
       <Animated.View style={{ width: size, height: size, transform: [{ scale }] }}>
-        {tier.rim && <Ionicons name="heart" size={rim} color={tier.rim} style={{ position: 'absolute', left: (size - rim) / 2, top: (size - rim) / 2 }} />}
+        {tier.rim && !art && <Ionicons name="heart" size={rim} color={tier.rim} style={{ position: 'absolute', left: (size - rim) / 2, top: (size - rim) / 2 }} />}
         {art ? (
           <Image source={art} style={{ width: size, height: size }} resizeMode="contain" />
         ) : (
@@ -211,9 +221,11 @@ export function HeartBadge({ level, size = 'sm', t: outer, still, style }: { lev
 
 // --- The heartbeat line between two photos ---------------------------------------------------------------------
 
+// `beat`: the travelling heartbeat's height; `line`: the line picture's height (its band is about a fifth of it, as
+// thick as `thick`, the drawn line Lv.0 keeps).
 const LINK = {
-  sm: { face: 24, thick: 2, pulse: 8, gap: -2, heart: 18 },
-  lg: { face: 46, thick: 3, pulse: 11, gap: -4, heart: 0 },
+  sm: { face: 24, thick: 2, beat: 10, line: 10, gap: -2, heart: 18 },
+  lg: { face: 46, thick: 3, beat: 14, line: 15, gap: -4, heart: 0 },
 } as const;
 
 /**
@@ -226,7 +238,8 @@ export function HeartLink({ level, me, them, size = 'lg', still }: { level: numb
   const t = useHeartLoop(tier, still);
   const l = LINK[size];
   const [w, setW] = useState(0);
-  const travel = Math.max(0, w - l.pulse);
+  const beatW = Math.round(l.beat * BEAT_RATIO);
+  const travel = Math.max(0, w - beatW);
   const pulse = (from: 'me' | 'them', at: number) => {
     const c = pulseCurves(tier.line, from);
     if (!c) return null;
@@ -234,17 +247,22 @@ export function HeartLink({ level, me, them, size = 'lg', still }: { level: numb
     const x = t ? t.interpolate({ inputRange: c.at.inputRange, outputRange: c.at.outputRange.map((v) => v * travel) }) : at * travel;
     const opacity = t ? t.interpolate(c.opacity) : 0.85;
     return (
-      <Animated.View key={from} style={{ position: 'absolute', left: 0, top: (l.face - l.pulse) / 2, opacity, transform: [{ translateX: x }], pointerEvents: 'none' }}>
-        <Ionicons name="heart" size={l.pulse} color={tier.rim && from === 'them' ? tier.rim : tier.tint} />
+      <Animated.View key={from} style={{ position: 'absolute', left: 0, top: (l.face - l.beat) / 2, opacity, transform: [{ translateX: x }], pointerEvents: 'none' }}>
+        {/* From their photo it runs the other way: the picture turned round, its light trailing behind it. */}
+        <Image source={BEAT_ART} style={{ width: beatW, height: l.beat, transform: from === 'them' ? [{ scaleX: -1 }] : undefined }} resizeMode="contain" />
       </Animated.View>
     );
   };
-  const track = tier.rim ? [tier.tint, tier.rim, tier.tint] as const : ([`${tier.tint}66`, tier.tint, `${tier.tint}66`] as const);
+  const lineOpacity = tier.line === 'still' ? 0.6 : 0.9;
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center' }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
       <Avatar uri={me.uri} name={me.name} size={l.face} />
       <View style={{ flex: 1, minWidth: l.face, height: l.face, marginHorizontal: l.gap, alignItems: 'center', justifyContent: 'center' }} onLayout={(e) => setW(e.nativeEvent.layout.width)}>
-        <LinearGradient colors={track} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={{ position: 'absolute', left: 0, right: 0, top: (l.face - l.thick) / 2, height: l.thick, borderRadius: l.thick, opacity: tier.line === 'still' ? 0.6 : 0.9 }} />
+        {tier.line === 'none' ? (
+          <LinearGradient colors={[`${tier.tint}66`, tier.tint, `${tier.tint}66`]} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={{ position: 'absolute', left: 0, right: 0, top: (l.face - l.thick) / 2, height: l.thick, borderRadius: l.thick, opacity: lineOpacity }} />
+        ) : (
+          <Image source={LINE_ART} resizeMode="stretch" style={{ position: 'absolute', left: 0, right: 0, top: l.face / 2 - l.line * LINE_MID, height: l.line, opacity: lineOpacity }} />
+        )}
         {w > 0 && (tier.line === 'one' || tier.line === 'both') && (
           <>
             {pulse('me', 0.25)}

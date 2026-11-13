@@ -26,6 +26,10 @@ const BOND_ART: Partial<Record<BondKind, number>> = {
   kardes: require('../../assets/bonds/bag-kardes.png'),
   baci: require('../../assets/bonds/bag-baci.png'),
   agabey: require('../../assets/bonds/bag-agabey.png'),
+  abla: require('../../assets/bonds/bag-abla.png'),
+  yenge: require('../../assets/bonds/bag-yenge.png'),
+  enishte: require('../../assets/bonds/bag-enishte.png'),
+  kanka: require('../../assets/bonds/bag-kanka.png'),
 };
 
 // --- Offline demo: my requests and endings on this phone, until the app closes ---------------------------

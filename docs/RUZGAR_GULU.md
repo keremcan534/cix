@@ -71,7 +71,7 @@ Kurallar değişirse **iki dosya birlikte** değişir (`wheel-rules.mjs` ve `dat
 
 ## ChatGPT görsel listesi
 
-Şu an çarkın ortasında ve kartlarda Ionicons pusula simgesi duruyor; görseller gelince bunlar değişecek.
+1–6 teslim edildi ve bağlandı (`app/assets/games/`, kayıt `app/src/components/games/fx/salon-art.tsx`): kapak Oyun Merkezi kartında, oyun panelinin başlığında ve oyun değiştirme listesinde, oda menüsünde ve odadaki kısayolda; JACKPOT görseli JACKPOT şeridinde; alan görselleri alan sekmelerinde; göbek çarkın ortasında. Yalnız ok (7) bekleniyor; gelene kadar ok kodla çiziliyor.
 
 `docs/GORSEL_URETIM_LISTESI.md` içindeki **stil metnini** bir kez gönderin, sonra bu tabloyu verin. Kurallar:
 - Her görsel 1024 × 1024 px, şeffaf arka planlı PNG olacak.
