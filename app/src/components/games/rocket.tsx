@@ -12,6 +12,7 @@ import { CasinoLock } from '@/components/games/casino';
 import { GameInfoSheet, InfoButton } from '@/components/games/fx/info-sheet';
 import { ResultTrail, pushTrail, type TrailItem } from '@/components/games/fx/result-trail';
 import { ChoiceChip, SALON, SalonStage, SideButton, WideAction, choiceInk, salonScreen, tabular, useBox, wideInk } from '@/components/games/fx/salon';
+import { salonArt } from '@/components/games/fx/salon-art';
 import { useWinFx } from '@/components/games/fx/win-fx';
 import { climbSeconds, driftEnd, flightPlan, milestones, multiplierAt, orbitY, stageGeo, type FlightPlan } from '@/components/games/rocket-flight';
 import { EndMark, FlightLayer, ORBIT, Planet, ReadyRocket, Route, STAR_LAYERS, Space, type Flight } from '@/components/games/rocket-stage';
@@ -394,7 +395,7 @@ export function RocketPlayer({ entry }: { entry: Entry }) {
           disabled={locked}
         />
         <View style={s.row}>
-          <SideButton onPress={toggleAuto} on={auto} disabled={burning && !auto} icon={auto ? 'stop' : 'repeat'} label={auto ? 'DUR' : 'OTO'} a11y={auto ? 'Otomatik fırlatmayı durdur' : 'Otomatik fırlat'} style={{ flex: 0, minWidth: 96 }} />
+          <SideButton onPress={toggleAuto} on={auto} disabled={burning && !auto} icon={auto ? 'stop' : 'repeat'} pic={salonArt(auto ? 'dugme-oto-acik' : 'dugme-oto')} label={auto ? 'DUR' : 'OTO'} a11y={auto ? 'Otomatik fırlatmayı durdur' : 'Otomatik fırlat'} style={{ flex: 0, minWidth: 96 }} />
           <WideAction onPress={play} disabled={locked} label={`Fırlat, kaçış ${target.toLocaleString('tr-TR')} kat, ${bet} jeton`} style={{ flex: 1 }}>
             <Ionicons name="rocket" size={19} color={SALON.goldInk} />
             <Text style={[tabular, s.goText, wideInk()]} numberOfLines={1}>

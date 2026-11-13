@@ -3,9 +3,10 @@
 // all a player sees while playing.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { ReactNode } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { salonArt } from '@/components/games/fx/salon-art';
 import { Text } from '@/components/text';
 import { tapHaptic } from '@/lib/haptics';
 import { SCRIM, edge } from '@/theme';
@@ -46,10 +47,13 @@ export function GameInfoSheet({ visible, onClose, title, rules, children }: { vi
 }
 
 /** The round "?" on a game's stage. */
+// The shared "Kurallar" button picture (fx/salon-art); without it, a ring in the game's tint around a "?".
+const RULES = salonArt('dugme-kurallar');
+
 export function InfoButton({ onPress, tint = 'rgba(255,255,255,0.55)' }: { onPress: () => void; tint?: string }) {
   return (
     <Pressable
-      style={[s.round, { borderColor: tint }]}
+      style={RULES !== undefined ? s.roundPic : [s.round, { borderColor: tint }]}
       onPress={() => {
         tapHaptic();
         onPress();
@@ -58,7 +62,7 @@ export function InfoButton({ onPress, tint = 'rgba(255,255,255,0.55)' }: { onPre
       accessibilityRole="button"
       accessibilityLabel="Kurallar ve ödeme tablosu"
     >
-      <Ionicons name="help" size={18} color="#fff" />
+      {RULES !== undefined ? <Image source={RULES} style={s.pic} accessibilityIgnoresInvertColors /> : <Ionicons name="help" size={18} color="#fff" />}
     </Pressable>
   );
 }
@@ -73,4 +77,6 @@ const s = StyleSheet.create({
   label: { color: '#FDE68A', fontSize: 12, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
   body: { color: 'rgba(255,255,255,0.84)', fontSize: 14, lineHeight: 21 },
   round: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.35)', borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  roundPic: { width: 34, height: 34, borderRadius: 17, boxShadow: '0 3px 6px rgba(0,0,0,0.45)' },
+  pic: { width: 34, height: 34 },
 });

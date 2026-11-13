@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, View, type HostInstance } from 'react-native';
+import { Animated, Easing, Image, Pressable, StyleSheet, View, type HostInstance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
@@ -16,6 +16,7 @@ import { micHaptic, pressHaptic, tapHaptic } from '@/lib/haptics';
 import { SCRIM, colors, edge, fonts, semantic } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
 import { Art } from '@/components/Art';
+import { HOST_FRAME_SCALE, SEAT_ART } from '@/components/RoomArt';
 import { Gloss, Shine, useSpringPress } from '@/components/fx/surface';
 import { Photo } from '@/components/photo';
 import { BondBubble, BondChip, BondLink } from '@/components/room/room-bonds';
@@ -125,6 +126,11 @@ export function Seat({
   // sizes the stage by the same numbers) and may be as wide as the seat's slot.
   const small = size < 46;
   const name = { fontSize: nameSize(size), lineHeight: nameLine(size), maxWidth: slotWidth ? slotWidth - 6 : 64 };
+  // An empty or locked seat is its picture (a pending invite keeps the gold bubble); the host's own photo sits in the
+  // gold host frame unless they wear a VIP or shop frame.
+  const seatArt = user ? undefined : locked ? SEAT_ART.locked : invitee ? undefined : SEAT_ART.empty;
+  const hostFrame = host && !mini ? SEAT_ART.hostFrame : undefined;
+  const frameSize = Math.round(size * HOST_FRAME_SCALE);
   const muteText = modMuted ? ', yönetim tarafından susturuldu' : muted ? ', mikrofonu kapalı' : '';
   const label = user
     ? `${index + 1}. mikrofon, ${user.name}${similarity !== undefined ? `, sana yüzde ${similarity} benzer` : ''}${muteText}${pkPoints !== undefined ? `, ${pkPoints} PK puanı` : ''}`
@@ -161,7 +167,26 @@ export function Seat({
           {user && !mini && (vipLevel > 0 || frameId) ? (
             <FramedAvatar uri={user.avatar} size={size} vipLevel={vipLevel} frameId={frameId} />
           ) : user ? (
-            <Photo uri={user.avatar} kind="face" style={{ width: size, height: size, borderRadius: size / 2, borderWidth: 2, borderColor: speaking ? semantic.live : 'transparent' }} />
+            <>
+              <Photo uri={user.avatar} kind="face" style={{ width: size, height: size, borderRadius: size / 2, borderWidth: 2, borderColor: speaking ? semantic.live : 'transparent' }} />
+              {hostFrame !== undefined && (
+                <Image
+                  source={hostFrame}
+                  style={{ position: 'absolute', width: frameSize, height: frameSize, left: (size - frameSize) / 2, top: (size - frameSize) / 2 }}
+                  accessibilityIgnoresInvertColors
+                />
+              )}
+            </>
+          ) : seatArt !== undefined ? (
+            <View style={{ width: size, height: size }}>
+              <Image source={seatArt} style={{ width: size, height: size }} resizeMode="contain" accessibilityIgnoresInvertColors />
+              {!locked && (
+                // The "+" on the seat's dark front, under its gold band.
+                <View pointerEvents="none" style={[StyleSheet.absoluteFill, { top: size * 0.36, alignItems: 'center', justifyContent: 'center' }]}>
+                  <Ionicons name="add" size={mini ? 12 : Math.round(Math.max(13, Math.min(24, size * 0.28)))} color="rgba(255,255,255,0.85)" />
+                </View>
+              )}
+            </View>
           ) : (
             // A glass bubble lit from above instead of a dashed outline; gold while a mic invite is pending.
             <LinearGradient

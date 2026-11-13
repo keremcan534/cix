@@ -456,7 +456,7 @@ function WideShine() {
 }
 
 /** A side button of the controls (Turbo, Oto, Tekrar, Temizle): navy glass, gold when on. */
-export function SideButton({ onPress, on, disabled, icon, label, sub, a11y, style, compact }: { onPress: () => void; on?: boolean; disabled?: boolean; icon?: keyof typeof Ionicons.glyphMap; label?: string; sub?: string; a11y: string; style?: StyleProp<ViewStyle>; /** Icon only, square. */ compact?: boolean }) {
+export function SideButton({ onPress, on, disabled, icon, pic, label, sub, a11y, style, compact }: { onPress: () => void; on?: boolean; disabled?: boolean; icon?: keyof typeof Ionicons.glyphMap; /** A round picture of the control (fx/salon-art) in place of the icon. */ pic?: number; label?: string; sub?: string; a11y: string; style?: StyleProp<ViewStyle>; /** Icon only, square. */ compact?: boolean }) {
   const press = usePress(0.94);
   const ink = on ? SALON.goldInk : SALON.win;
   return (
@@ -464,7 +464,7 @@ export function SideButton({ onPress, on, disabled, icon, label, sub, a11y, styl
       <Animated.View style={{ transform: [{ scale: press.scale }], opacity: disabled ? 0.45 : 1 }}>
         <LinearGradient colors={on ? ['#FFE7B0', '#F6BD60', '#D9952F'] : SALON.glass} style={[st.side, compact && st.sideCompact, on && st.sideOn]}>
           <LinearGradient colors={['rgba(255,255,255,0.16)', 'rgba(255,255,255,0)']} style={st.sideGloss} />
-          {icon && <Ionicons name={icon} size={compact ? 20 : 16} color={ink} />}
+          {pic !== undefined ? <Image source={pic} style={compact ? st.sidePicCompact : st.sidePic} accessibilityIgnoresInvertColors /> : icon && <Ionicons name={icon} size={compact ? 20 : 16} color={ink} />}
           {(!!label || !!sub) && (
             <View style={{ alignItems: 'center' }}>
               {!!label && <Text style={[st.sideText, { color: ink }]}>{label}</Text>}
@@ -538,6 +538,8 @@ const st = StyleSheet.create({
   wideShine: { position: 'absolute', top: -20, bottom: -20, width: 46 },
   side: { height: SALON.control, borderRadius: SALON.controlRadius, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 12, borderWidth: 1, borderColor: SALON.glassRim, overflow: 'hidden', boxShadow: '0 4px 10px rgba(0,0,0,0.35)' },
   sideCompact: { width: SALON.control, paddingHorizontal: 0 },
+  sidePic: { width: 32, height: 32, marginLeft: -4 },
+  sidePicCompact: { width: 40, height: 40 },
   sideOn: { borderColor: '#FFF1C9', boxShadow: '0 0 14px rgba(246,189,96,0.55)' },
   sideGloss: { position: 'absolute', left: 0, right: 0, top: 0, height: '50%' },
   sideText: { fontFamily: fonts.displayBold, fontSize: 14, lineHeight: 18, letterSpacing: 0.8 },

@@ -195,11 +195,17 @@ function TierEmblem({ tier, on, reached, onPress }: { tier: LevelTier; on: boole
   return (
     <Pressable onPress={onPress} style={s.tier} accessibilityRole="button" accessibilityState={{ selected: on }} accessibilityLabel={`${tier.name}, seviye ${Math.max(1, tier.from)}–${tier.to}${reached ? '' : ', henüz ulaşılmadı'}`}>
       <View style={{ height: 76, justifyContent: 'center' }}>
-        <LinearGradient colors={tier.colors} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={[s.emblem, { width: size, height: size, borderRadius: size * 0.3, opacity: reached || on ? 1 : 0.45 }, on && s.emblemOn]}>
-          <View style={{ transform: [{ rotate: '-45deg' }] }}>
-            <Ionicons name={tier.icon} size={on ? 34 : 24} color={tier.ink} />
-          </View>
-        </LinearGradient>
+        {tier.emblem ? (
+          // The emblem art is a finished, upright diamond with a clear margin; drawn 1.25× so the stone itself
+          // spans about the width of the drawn diamond below.
+          <Art name={tier.emblem} size={Math.round(size * 1.25)} style={{ opacity: reached || on ? 1 : 0.45 }} />
+        ) : (
+          <LinearGradient colors={tier.colors} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={[s.emblem, { width: size, height: size, borderRadius: size * 0.3, opacity: reached || on ? 1 : 0.45 }, on && s.emblemOn]}>
+            <View style={{ transform: [{ rotate: '-45deg' }] }}>
+              <Ionicons name={tier.icon} size={on ? 34 : 24} color={tier.ink} />
+            </View>
+          </LinearGradient>
+        )}
       </View>
       <Text style={[s.tierName, on && { color: colors.text }]} numberOfLines={1}>
         {tier.name}

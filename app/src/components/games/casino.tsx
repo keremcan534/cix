@@ -1,7 +1,7 @@
 // Casino games UI (Servet Seviyesi 2+). Every round goes through playCasino (lib/games), the same path for profile and
 // room entry; this component only shows the result. It never touches the room or the microphone.
 import { useState } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
+import { Animated, Easing, Image, Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/text';
 import { Art, type ArtName } from '@/components/Art';
@@ -13,6 +13,10 @@ import { useApp } from '@/store';
 import { colors, semantic } from '@/theme';
 import { StateIcon } from '@/components/ui';
 import { useGameNav } from '@/components/games/slot-kit';
+import { salonArt } from '@/components/games/fx/salon-art';
+
+// The shared padlock picture of a closed game (fx/salon-art); the state icon without it.
+const LOCK = salonArt('kilit-oyun');
 
 const PICKS: Partial<Record<CasinoGame['id'], [key: string, label: string, art?: ArtName][]>> = {
   dice: [
@@ -126,7 +130,7 @@ export function CasinoLock({ reason, needWealth }: { reason: string; needWealth?
   const go = useGameNav();
   return (
     <View style={c.lock}>
-      <StateIcon name="lock-closed" />
+      {LOCK !== undefined ? <Image source={LOCK} style={c.lockPic} accessibilityIgnoresInvertColors /> : <StateIcon name="lock-closed" />}
       <Text style={c.lockText}>{reason}</Text>
       {needWealth !== undefined ? (
         <Pressable style={c.btn} onPress={() => go('/seviye')}>
@@ -191,6 +195,7 @@ const c = StyleSheet.create({
   resultMain: { color: colors.text, fontWeight: '900', fontSize: 18, textAlign: 'center' },
   err: { color: colors.gold, textAlign: 'center', fontWeight: '700' },
   lock: { alignItems: 'center', gap: 10, paddingVertical: 20 },
+  lockPic: { width: 88, height: 88 },
   lockText: { color: colors.text, textAlign: 'center', lineHeight: 20 },
   pointer: { color: colors.gold, fontSize: 22, marginBottom: -6, zIndex: 2 },
   wheel: { width: 180, height: 180, borderRadius: 90, borderWidth: 4, borderColor: colors.gold, backgroundColor: colors.cardAlt },

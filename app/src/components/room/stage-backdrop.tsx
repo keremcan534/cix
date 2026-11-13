@@ -1,7 +1,7 @@
-// The room's stage: a sea photo chosen by the room theme (the same set as the screens' backdrops) under a
-// navy veil tinted in the theme's colors, two soft spotlights falling on the host seat, a glow behind the
-// mics, a few out-of-focus lights, and a darker floor so the chat stays readable. When the room art from
-// docs/ODA_GORSEL_LISTESI.md arrives it replaces the photo here. Colors follow docs/TASARIM_YONU.md.
+// The room's stage: the room theme's own picture (docs/ODA_GORSEL_LISTESI.md, STAGE_ART) under a light veil, two
+// soft spotlights falling on the host seat, a glow behind the mics, a few out-of-focus lights, and a darker floor so
+// the chat stays readable. A theme with no picture there shows its sea photo (the same set as the screens'
+// backdrops) under a veil tinted in the theme's colors. Colors follow docs/TASARIM_YONU.md.
 // Oda Süslemesi (components/room/decor) puts a background of the room's own over the theme's photo: a free or
 // paid one from the app's pictures (ROOM_BG_ART), or the owner's uploaded picture. The spotlights and the theme's
 // tint make way for it; the floor stays dark so the chat stays readable.
@@ -24,6 +24,17 @@ const LOOKS: Record<RoomTheme, Look> = {
   friends: { photo: require('../../../assets/bg/sahne-giris.jpg'), top: '#33202A', mid: '#111526', light: semantic.social, second: semantic.action },
 };
 
+// Each theme's stage picture (720 × 1080 JPEG). Drawn to be the stage: calm in the middle and the top third where the
+// mics sit, dark at the bottom under the chat.
+const STAGE_ART: Partial<Record<RoomTheme, ImageSourcePropType>> = {
+  chat: require('../../../assets/room/oda-arka-sohbet.jpg'),
+  music: require('../../../assets/room/oda-arka-muzik.jpg'),
+  game: require('../../../assets/room/oda-arka-oyun.jpg'),
+  party: require('../../../assets/room/oda-arka-parti.jpg'),
+  pk: require('../../../assets/room/oda-arka-pk.jpg'),
+  friends: require('../../../assets/room/oda-arka-arkadaslik.jpg'),
+};
+
 // Out-of-focus lights: fixed spots (left %, top %, size, which color), so the stage never jumps.
 const BOKEH: [number, number, number, 0 | 1][] = [
   [8, 14, 46, 0],
@@ -37,17 +48,23 @@ const BOKEH: [number, number, number, 0 | 1][] = [
 
 /**
  * The pictures of the room backgrounds the app carries, by id: the free ones (data/catalog ROOM_BACKGROUNDS, the
- * sea scenes no room theme uses) and, once their art is delivered, the paid ones (ROOM_BG_PAID; none yet, see
- * docs/GORSEL_URETIM_LISTESI.md §14). A paid background with no picture here can't be bought in this app.
+ * sea scenes) and the paid ones (ROOM_BG_PAID, docs/GORSEL_URETIM_LISTESI.md §14, 720 × 1080 JPEG). A paid
+ * background with no picture here can't be bought in this app; the server sells one only once it is switched on there.
  */
 export const ROOM_BG_ART: Record<string, ImageSourcePropType> = {
   bg1: require('../../../assets/bg/sahne-ana-sayfa.jpg'),
   bg2: require('../../../assets/bg/sahne-seviye.jpg'),
   bg3: require('../../../assets/bg/sahne-cuzdan.jpg'),
   bg4: require('../../../assets/bg/sahne-magaza.jpg'),
+  'rb-yildiz': require('../../../assets/room/oda-susleme-yildizli-gece.jpg'),
+  'rb-neon': require('../../../assets/room/oda-susleme-neon-sokak.jpg'),
+  'rb-konser': require('../../../assets/room/oda-susleme-konser-sahnesi.jpg'),
+  'rb-teras': require('../../../assets/room/oda-susleme-teras-partisi.jpg'),
+  'rb-galaksi': require('../../../assets/room/oda-susleme-galaksi.jpg'),
+  'rb-salon': require('../../../assets/room/oda-susleme-altin-salon.jpg'),
 };
-/** The theme's own stage photo (Oda Süslemesi's "Tema görünümü" tile). */
-export const themeStagePhoto = (theme: RoomTheme): ImageSourcePropType => (LOOKS[theme] ?? LOOKS.chat).photo;
+/** The theme's own stage picture (Oda Süslemesi's "Tema görünümü" tile), or its sea photo when it has none. */
+export const themeStagePhoto = (theme: RoomTheme): ImageSourcePropType => STAGE_ART[theme] ?? (LOOKS[theme] ?? LOOKS.chat).photo;
 
 /**
  * The picture a room background draws, or null for the theme's stage: the owner's picture by its address, a paid
@@ -61,6 +78,8 @@ export function roomBgSource(bg: RoomBackground | null | undefined, freeId?: str
 
 export function StageBackdrop({ theme, background, freeId }: { theme: RoomTheme; background?: RoomBackground | null; freeId?: string | null }) {
   const look = LOOKS[theme] ?? LOOKS.chat;
+  const art = STAGE_ART[theme];
+  const stage = art ?? look.photo;
   const picture = roomBgSource(background, freeId);
   // A picture that can't be loaded (the address that failed): the theme's stage shows instead.
   const [failed, setFailed] = useState<string | null>(null);
@@ -68,7 +87,7 @@ export function StageBackdrop({ theme, background, freeId }: { theme: RoomTheme;
   if (picture && !(uri && uri === failed)) {
     return (
       <View style={[StyleSheet.absoluteFill, { pointerEvents: 'none', overflow: 'hidden', backgroundColor: colors.bg }]}>
-        <Image source={look.photo} resizeMode="cover" style={[StyleSheet.absoluteFill, { width: '100%', height: '100%' }]} />
+        <Image source={stage} resizeMode="cover" style={[StyleSheet.absoluteFill, { width: '100%', height: '100%' }]} />
         <Image source={picture} resizeMode="cover" onError={() => setFailed(uri)} style={[StyleSheet.absoluteFill, { width: '100%', height: '100%' }]} />
         {/* A navy veil, lighter than the theme's so the picture shows behind the mics (names and seats stay readable
             on a bright picture), solid toward the chat. */}
@@ -79,9 +98,14 @@ export function StageBackdrop({ theme, background, freeId }: { theme: RoomTheme;
   }
   return (
     <View style={[StyleSheet.absoluteFill, { pointerEvents: 'none', overflow: 'hidden', backgroundColor: colors.bg }]}>
-      <Image source={look.photo} resizeMode="cover" style={[StyleSheet.absoluteFill, { width: '100%', height: '100%' }]} />
-      {/* Theme tint over the photo: light at the top so the scene shows behind the mics, solid toward the chat. */}
-      <LinearGradient colors={[`${look.top}99`, `${look.mid}8C`, `${look.mid}E6`, colors.bg]} locations={[0, 0.4, 0.68, 0.9]} style={StyleSheet.absoluteFill} />
+      <Image source={stage} resizeMode="cover" style={[StyleSheet.absoluteFill, { width: '100%', height: '100%' }]} />
+      {/* The stage picture has its own colors: a light veil of the app's ground over it. The sea photo takes the theme's
+          tint. Both are light at the top so the scene shows behind the mics, solid toward the chat. */}
+      <LinearGradient
+        colors={art ? [`${colors.bg}40`, `${colors.bg}66`, `${colors.bg}E0`, colors.bg] : [`${look.top}99`, `${look.mid}8C`, `${look.mid}E6`, colors.bg]}
+        locations={[0, 0.4, 0.68, 0.9]}
+        style={StyleSheet.absoluteFill}
+      />
       {/* Glow behind the mic grid. */}
       <Image source={GLOW} style={[s.glow, { top: -120, opacity: 0.35, tintColor: look.light }]} />
       <Image source={GLOW} style={[s.glowSmall, { top: 180, right: -180, opacity: 0.14, tintColor: look.second }]} />

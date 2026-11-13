@@ -13,7 +13,9 @@
 // diamonds count in the balance but can't be exchanged, sold or withdrawn; a store refund inside the lock
 // takes them back (jeton.mjs).
 import { HttpError, auth, db, env, move } from './core.mjs';
+import { CHARM_XP } from './profile-rules.mjs';
 import { assertUnderLimit, countSpent } from './spend-limit.mjs';
+import { TEST_ADMIN, withTopFor } from './test-admin.mjs';
 
 const lockHoursFrom = (v, days) => {
   const n = Number(v ?? days);
@@ -208,7 +210,9 @@ export async function charmPointsOf(c, ids) {
       GROUP BY user_id`,
     [ids],
   );
-  return new Map(r.rows.map((x) => [x.user_id, Math.max(0, Number(x.n))]));
+  const points = new Map(r.rows.map((x) => [x.user_id, Math.max(0, Number(x.n))]));
+  // Test server: admins at the top level (test-admin.mjs).
+  return TEST_ADMIN ? withTopFor(c, ids, points, CHARM_XP.at(-1)) : points;
 }
 
 /** An account's diamonds: all of them, those still locked, and those that may leave. */
