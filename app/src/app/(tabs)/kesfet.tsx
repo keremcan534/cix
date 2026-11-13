@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState, type ComponentRef } from 'react';
 import { FlatList, Modal, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -45,6 +45,15 @@ const byOnlineThenCharm = (a: User, b: User) => Number(b.online) - Number(a.onli
 
 export default function DiscoverScreen() {
   const [tab, setTab] = useState<Tab>('Ana Sayfa');
+  // The tab strip scrolls: a picked tab slides fully into view instead of staying cut under the trophy.
+  const tabStrip = useRef<ComponentRef<typeof ScrollView>>(null);
+  const tabAt = useRef(new Map<Tab, { x: number; w: number }>());
+  const [stripW, setStripW] = useState(0);
+  const pickTab = (t: Tab) => {
+    setTab(t);
+    const at = tabAt.current.get(t);
+    if (at && stripW) tabStrip.current?.scrollTo({ x: Math.max(0, at.x + at.w / 2 - stripW / 2), animated: true });
+  };
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [filterOpen, setFilterOpen] = useState(false);
   const { hasGreeted, greet } = useGreet();
@@ -122,9 +131,16 @@ export default function DiscoverScreen() {
             </ScrollView>
 
             <View style={styles.tabsRow}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={styles.tabs}>
+              <ScrollView ref={tabStrip} horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={styles.tabs} onLayout={(e) => setStripW(e.nativeEvent.layout.width)}>
                 {TABS.map((t) => (
-                  <Pressable key={t} onPress={() => setTab(t)} style={{ alignItems: 'center' }} accessibilityRole="tab" accessibilityState={{ selected: t === tab }}>
+                  <Pressable
+                    key={t}
+                    onPress={() => pickTab(t)}
+                    onLayout={(e) => tabAt.current.set(t, { x: e.nativeEvent.layout.x, w: e.nativeEvent.layout.width })}
+                    style={{ alignItems: 'center' }}
+                    accessibilityRole="tab"
+                    accessibilityState={{ selected: t === tab }}
+                  >
                     <Text style={[styles.tab, t === tab && styles.tabActive]}>{t}</Text>
                     {t === tab && <View style={styles.underline} />}
                   </Pressable>

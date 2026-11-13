@@ -1,4 +1,5 @@
-// Back or close on the full room: two large round choices, "Küçült" (the room keeps playing; the mini card brings it
+// Back or close on the full room: a sheet that comes down from the top edge, under the room's close button, with two
+// large round choices, "Küçült" (the room keeps playing; the mini card brings it
 // back) and "Çıkış" (leave it), and under them "Şu an popüler": the four busiest open rooms right now that can be
 // entered straight away (lib/room-picks). A room there leaves this one the way a switch does (mic off, voice
 // closed, lib/room-session leaveForRoom) and opens that one. The owner of a server room can also close it for
@@ -6,13 +7,13 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { useEffect, useMemo, type ReactNode } from 'react';
-import { Modal, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Animated, Easing, Modal, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
 import { PressableScale } from '@/components/fx/surface';
 import { Photo } from '@/components/photo';
-import { useSheetBottom } from '@/components/room/parts';
 import { ROOMS, type Room } from '@/data/mock';
 import { roomBadge } from '@/data/rooms-ui';
 import { showAlert } from '@/lib/alert';
@@ -33,9 +34,19 @@ export function LeaveSheet() {
   const { semantic } = useTheme();
   const s = useStyles();
   const win = useWindowDimensions();
-  const paddingBottom = useSheetBottom(20);
+  const insets = useSafeAreaInsets();
   const visible = leaveDialog && !!session;
   const still = settings.reduceMotion;
+  // It slides down from the top edge each time it opens; "Animasyonları azalt": it only fades in.
+  const [drop] = useState(() => new Animated.Value(0));
+  useEffect(() => {
+    if (!visible || still) return;
+    drop.setValue(-win.height * 0.7);
+    const a = Animated.timing(drop, { toValue: 0, duration: 280, easing: Easing.out(Easing.cubic), useNativeDriver: true });
+    a.start();
+    return () => a.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, still, drop]);
   const live = liveMode();
   const serverRooms = useServerRoomList();
   // The list as it is now: read it again whenever the sheet opens.
@@ -81,11 +92,9 @@ export function LeaveSheet() {
   };
 
   return (
-    <Modal visible={visible} transparent animationType={still ? 'fade' : 'slide'} onRequestClose={closeLeaveDialog}>
-      <Pressable style={s.scrim} onPress={closeLeaveDialog} accessibilityLabel="Vazgeç, odada kal" />
-      <View style={[s.sheet, { paddingBottom }]} accessibilityViewIsModal>
-        <LinearGradient colors={['rgba(255,95,162,0.12)', 'rgba(22,37,60,0)']} style={s.glow} pointerEvents="none" />
-        <View style={s.handle} />
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={closeLeaveDialog}>
+      <Animated.View style={[s.sheet, { paddingTop: insets.top + space.xs, transform: [{ translateY: drop }] }]} accessibilityViewIsModal>
+        <LinearGradient colors={['rgba(22,37,60,0)', 'rgba(255,95,162,0.12)']} style={s.glow} pointerEvents="none" />
         <View style={s.where}>
           <View style={s.liveDot} />
           <Text style={s.whereText} numberOfLines={1}>
@@ -125,7 +134,9 @@ export function LeaveSheet() {
             </View>
           </>
         )}
-      </View>
+        <View style={s.handle} />
+      </Animated.View>
+      <Pressable style={s.scrim} onPress={closeLeaveDialog} accessibilityLabel="Vazgeç, odada kal" />
     </Modal>
   );
 }
@@ -216,14 +227,15 @@ const useStyles = makeStyles(({ colors, semantic, ink, edge }) => ({
     maxWidth: MAX_W,
     alignSelf: 'center',
     backgroundColor: colors.card,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
+    borderBottomLeftRadius: radius.xl,
+    borderBottomRightRadius: radius.xl,
     paddingHorizontal: space.lg,
+    paddingBottom: space.sm,
     overflow: 'hidden',
     ...edge.sheet,
   },
-  glow: { position: 'absolute', left: 0, right: 0, top: 0, height: 180 },
-  handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: ink(0.18), marginTop: space.sm },
+  glow: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 180 },
+  handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: ink(0.18), marginTop: space.lg },
   where: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: space.md, paddingHorizontal: space.xl },
   liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: semantic.live },
   whereText: { color: colors.textDim, fontWeight: '700', fontSize: 13, flexShrink: 1 },
