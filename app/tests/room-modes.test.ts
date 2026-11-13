@@ -75,6 +75,17 @@ describe('Katalog', () => {
     assert.notDeepEqual(sixes[0].layoutSchema, sixes[1].layoutSchema);
     assert.equal(layoutsOf('video').filter((l) => l.microphoneCapacity === 10).length, 2);
   });
+  test('PK olmayan odada takım düzenleri gizli: aynı görünen kart iki kez çıkmaz; odanın seçili düzeni kalır', () => {
+    const plain = layoutsOf('audio', { pkRoom: false });
+    assert.ok(!plain.some((l) => l.id.endsWith('-team')));
+    assert.equal(plain.filter((l) => l.microphoneCapacity === 6).length, 2);
+    assert.equal(plain.filter((l) => l.microphoneCapacity === 9).length, 1);
+    // Outside a PK room no two cards draw the same shape.
+    const shape = (l: RoomLayout) => JSON.stringify(l.layoutSchema.slots.map((s) => [s.row, s.col, s.area, s.kind, !!s.host]));
+    assert.equal(new Set(plain.map(shape)).size, plain.length);
+    assert.ok(layoutsOf('audio', { pkRoom: false, keep: 'audio-9-team' }).some((l) => l.id === 'audio-9-team'));
+    assert.equal(layoutsOf('audio', { pkRoom: true }).length, layoutsOf('audio').length);
+  });
   test('şema içeriği: sinemada ve videoda ortak ekran, seste yok; PK takım yerleşiminde kırmızı/mavi bölgeler eşit', () => {
     assert.ok(layoutsOf('cinema').every((l) => l.layoutSchema.content));
     assert.ok(layoutsOf('video').every((l) => l.layoutSchema.content));

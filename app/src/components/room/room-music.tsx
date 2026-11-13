@@ -6,7 +6,7 @@
 // plays the same thing); this only shows it, asks the server for changes and plays the file at the point the clock
 // gives. No music comes from us: only what people add from their own phone.
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
+import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
 import * as DocumentPicker from 'expo-document-picker';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -15,6 +15,7 @@ import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { useSheetBottom } from '@/components/room/parts';
 import { Text, TextInput } from '@/components/text';
 import { showAlert } from '@/lib/alert';
+import { ensureMixAudioMode } from '@/lib/audio-mode';
 import { message } from '@/lib/live';
 import {
   LIBRARY_MAX,
@@ -99,8 +100,9 @@ export function useRoomMusicPlayer(music: RoomMusic | null, enabled: boolean, vo
       return;
     }
     if (!p) {
-      // Mixes with the room's voice: no audio focus taken from it (Android), recording stays on (iOS).
-      void setAudioModeAsync({ interruptionMode: 'mixWithOthers', allowsRecording: true, playsInSilentMode: true, shouldPlayInBackground: false }).catch(() => {});
+      // Mixes with the room's voice: no audio focus taken from it (Android), recording stays on (iOS). Set once,
+      // before the room's audio session started; setting it again here broke the room's echo cancellation.
+      void ensureMixAudioMode();
       p = player.current = createAudioPlayer(null, { updateInterval: 1000 });
     }
     const fresh = loaded.current !== key;

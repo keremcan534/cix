@@ -83,8 +83,16 @@ const OFFLINE = 'Bağlantı yok. Değişiklik gönderilmedi; bağlantı gelince 
 export const layoutById = (id: string | null | undefined) => (id ? state.layouts.find((l) => l.id === id) : undefined);
 export const modeById = (id: ModeId) => ROOM_MODES.find((m) => m.id === id)!;
 export const enabledModes = () => ROOM_MODES.filter((m) => m.isEnabled).sort((a, b) => a.sortOrder - b.sortOrder);
-/** Cards of one tab: enabled layouts of the mode, in catalog order. */
-export const layoutsOf = (modeId: ModeId) => state.layouts.filter((l) => l.modeId === modeId && l.isEnabled).sort((a, b) => a.sortOrder - b.sortOrder);
+/** A red/blue team layout: outside a PK room its zones aren't drawn, so it looks like the plain layout of its size. */
+export const isTeamLayout = (l: RoomLayout) => l.layoutSchema.slots.some((s) => s.team);
+/**
+ * Cards of one tab: enabled layouts of the mode, in catalog order. With `pkRoom: false` the team layouts are left
+ * out (they would show as copies of the plain ones), except `keep` (the room's current layout stays visible).
+ */
+export const layoutsOf = (modeId: ModeId, opts?: { pkRoom: boolean; keep?: string | null }) =>
+  state.layouts
+    .filter((l) => l.modeId === modeId && l.isEnabled && (!opts || opts.pkRoom || !isTeamLayout(l) || l.id === opts.keep))
+    .sort((a, b) => a.sortOrder - b.sortOrder);
 /** Admin/test support: replace the catalog (a panel would edit this list; no code change needed). */
 export const setLayoutCatalog = (layouts: RoomLayout[]) => emit({ layouts });
 

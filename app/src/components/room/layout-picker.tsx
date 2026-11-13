@@ -137,10 +137,16 @@ export function LayoutPickerSheet({
           })}
         </ScrollView>
         <Text style={st.desc}>{modeById(tab).desc}</Text>
+        {/* Above the grid: a refusal under a long list of cards would be off screen and the tap would look ignored. */}
+        {note && (
+          <Text style={[st.note, note.tone === 'ok' ? st.noteOk : note.tone === 'warn' ? st.noteWarn : st.noteErr]} accessibilityLiveRegion="polite" accessibilityRole="alert">
+            {note.text}
+          </Text>
+        )}
         <ScrollView contentContainerStyle={{ paddingBottom: space.lg }} onLayout={(e) => setGridW(e.nativeEvent.layout.width)}>
           <View style={st.grid}>
             {cardW > 0 &&
-              layoutsOf(tab).map((l) => {
+              layoutsOf(tab, { pkRoom, keep: layoutId }).map((l) => {
                 const access = layoutAccess(l, info);
                 const selected = l.id === layoutId;
                 const locked = !access.ok;
@@ -174,11 +180,6 @@ export function LayoutPickerSheet({
                 );
               })}
           </View>
-          {note && (
-            <Text style={[st.note, note.tone === 'ok' ? st.noteOk : note.tone === 'warn' ? st.noteWarn : st.noteErr]} accessibilityLiveRegion="polite" accessibilityRole="alert">
-              {note.text}
-            </Text>
-          )}
           <Pressable onPress={() => pick(null)} style={[st.classic, layoutId === null && st.cardOn]} accessibilityRole="button" accessibilityState={{ selected: layoutId === null }} accessibilityLabel={`${classicLabel}${layoutId === null ? ', şu an seçili' : ''}`}>
             <Ionicons name="grid-outline" size={18} color={layoutId === null ? semantic.action : colors.textDim} />
             <Text style={st.classicText}>{classicLabel}</Text>
@@ -218,7 +219,7 @@ const st = StyleSheet.create({
   pk: { position: 'absolute', left: 6, top: 6, zIndex: 1, backgroundColor: semantic.social, borderRadius: radius.pill, paddingHorizontal: 6, paddingVertical: 1 },
   pkText: { color: '#3A0A10', fontSize: 10, fontWeight: '900' },
   check: { position: 'absolute', right: 6, top: 6, zIndex: 1, backgroundColor: semantic.action, borderRadius: 9, width: 18, height: 18, alignItems: 'center', justifyContent: 'center' },
-  note: { marginTop: space.md, padding: space.sm, borderRadius: radius.sm, fontSize: 13, lineHeight: 18 },
+  note: { marginBottom: space.sm, padding: space.sm, borderRadius: radius.sm, fontSize: 13, lineHeight: 18 },
   noteOk: { color: semantic.tonalText, backgroundColor: semantic.tonal },
   noteWarn: { color: colors.gold, backgroundColor: 'rgba(246,189,96,0.12)' },
   noteErr: { color: semantic.danger, backgroundColor: 'rgba(217,58,69,0.14)' },
