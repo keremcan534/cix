@@ -1,0 +1,20 @@
+// Oda sesi arka planda: a foreground service (RoomAudioService) that keeps the room's voice and the mic running
+// while the app is in the background.
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'com.similarclub'
+version = '1.0.0'
+
+android {
+  namespace "expo.modules.similarroomservice"
+  defaultConfig {
+    versionCode 1
+    versionName "1.0.0"
+  }
+  lintOptions {
+    abortOnError false
+  }
+}

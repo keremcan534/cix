@@ -5,7 +5,7 @@
 import { apiEnabled, ensureSignedIn, voiceToken } from '@/lib/api';
 import { createLiveKitEngine } from '@/lib/livekit-engine';
 import { engineEvent, setEngine } from '@/lib/room-session';
-import { ensureWebRtc, holdAudio, releaseAudio } from '@/lib/webrtc-globals';
+import { audioInBackground, ensureWebRtc, holdAudio, micStarted, releaseAudio } from '@/lib/webrtc-globals';
 
 export function setupVoice(name: () => string) {
   const url = process.env.EXPO_PUBLIC_LIVEKIT_URL;
@@ -24,6 +24,8 @@ export function setupVoice(name: () => string) {
       attachAudio: false,
       onRoomOpen: () => holdAudio('room'),
       onRoomClosed: () => releaseAudio('room'),
+      backgroundAudio: audioInBackground,
+      onMicStarted: micStarted,
     }),
   );
 }
