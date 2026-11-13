@@ -13,6 +13,12 @@ const WEIGHT: Record<string, Weight> = { normal: 400, '100': 400, '200': 400, '3
 
 export const faceFor = (weight?: string | number) => FACE[WEIGHT[String(weight ?? 'normal')] ?? 400];
 
+/**
+ * How much the phone's own text size ("Yazı boyutu", "Ekran boyutu") may grow the app's text. Icons, badges and
+ * seats keep their size, so a number grown past this no longer fits its badge or circle and spills out of it.
+ */
+export const MAX_FONT_SCALE = 1.15;
+
 /** The face of the nearest Text above, so nested text inherits instead of resetting to regular. */
 const ParentFace = createContext<string | null>(null);
 
@@ -28,7 +34,7 @@ export function Text({ style, children, ...rest }: TextProps) {
     own = { fontFamily: face, fontWeight: 'normal' };
   } else face = parent;
   return (
-    <RNText style={own ? [style, own] : style} {...rest}>
+    <RNText style={own ? [style, own] : style} maxFontSizeMultiplier={MAX_FONT_SCALE} {...rest}>
       <ParentFace.Provider value={face}>{children}</ParentFace.Provider>
     </RNText>
   );
@@ -39,5 +45,5 @@ export function TextInput({ style, ref, ...rest }: TextInputProps & { ref?: Ref<
   const own = flat?.fontFamily ? null : { fontFamily: faceFor(flat?.fontWeight), fontWeight: 'normal' as const };
   // Android centres the text of a tall box vertically: a multi-line box starts at the top unless its style says otherwise.
   const top = rest.multiline ? { textAlignVertical: 'top' as const } : null;
-  return <RNTextInput ref={ref} style={own || top ? [top, style, own] : style} {...rest} />;
+  return <RNTextInput ref={ref} style={own || top ? [top, style, own] : style} maxFontSizeMultiplier={MAX_FONT_SCALE} {...rest} />;
 }

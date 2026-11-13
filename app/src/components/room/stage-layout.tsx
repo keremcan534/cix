@@ -7,10 +7,12 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import { CallVideo } from '@/components/call-video';
 import { Text } from '@/components/text';
 import type { LayoutSlot, RoomLayout } from '@/data/room-layouts';
 import { Art } from '@/components/Art';
 import type { ArenaSlot } from '@/components/room/pk';
+import type { TrackRef } from '@/lib/call-media';
 import { layoutPlan, layoutSizes, videoTile as videoSize } from '@/lib/seat-fit';
 import { colors, radius, semantic, space } from '@/theme';
 
@@ -25,6 +27,7 @@ export function StageLayout({
   seats,
   pkRoom,
   cameraOf,
+  videoOf,
   renderSeat,
 }: {
   layout: RoomLayout;
@@ -34,8 +37,10 @@ export function StageLayout({
   seats: (string | null)[];
   /** PK room theme: each team row sits in a labeled red/blue band. Outside PK rooms team rows are plain rows. */
   pkRoom: boolean;
-  /** Whether a seat holder's camera is on (prototype: only the viewer's own). */
+  /** Whether a seat holder's camera is on (the demo: only the viewer's own). */
   cameraOf: (uid: string) => boolean;
+  /** A server room: the seat holder's live camera, drawn over the whole tile (lib/live/room-cams). */
+  videoOf?: (uid: string) => TrackRef | null;
   /** `next`: the seat beside it on the same mic row (and the gap between them), for the Lv4 bond line. */
   renderSeat: (index: number, slot: ArenaSlot, next?: { index: number; gap: number }) => ReactNode;
 }) {
@@ -54,12 +59,15 @@ export function StageLayout({
   const videoTile = (x: LayoutSlot, w: number, h: number) => {
     const uid = seats[x.index];
     const cam = !!uid && cameraOf(uid);
+    const video = uid ? (videoOf?.(uid) ?? null) : null;
     return (
       <View key={x.index} style={[st.tile, { width: w, height: h }, cam && st.tileLive]} accessibilityLabel={`Görüntülü yuva ${x.index + 1}${cam ? ', kamera açık' : uid ? ', kamera kapalı' : ''}`}>
+        {video && <CallVideo track={video} style={st.tileVideo} mirror={uid === 'me'} />}
         <View style={st.tileIcon}>
           <Ionicons name={cam ? 'videocam' : 'videocam-off-outline'} size={12} color={cam ? semantic.live : colors.textDim} />
         </View>
-        {renderSeat(x.index, { width: w - 8, size: clamp(Math.min(w, h) - 40, 32, 72) })}
+        {/* With the picture on, the seat (name, mic, gifts, menu) shrinks to the tile's corner. */}
+        {video ? <View style={st.tileSeat}>{renderSeat(x.index, { width: 64, size: 28 })}</View> : renderSeat(x.index, { width: w - 8, size: clamp(Math.min(w, h) - 40, 32, 72) })}
       </View>
     );
   };
@@ -136,6 +144,8 @@ const st = StyleSheet.create({
   tile: { backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   tileLive: { borderColor: semantic.live },
   tileIcon: { position: 'absolute', left: 6, top: 6 },
+  tileVideo: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 },
+  tileSeat: { position: 'absolute', left: 2, bottom: 2 },
   heart: { paddingHorizontal: 2 },
   zone: { borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: 5, gap: 4 },
   zoneName: { fontWeight: '800', fontSize: 12, textAlign: 'center' },

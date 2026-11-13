@@ -359,7 +359,7 @@ export async function refreshVoice(uid) {
     const g = await voiceGrant(uid, room);
     await roomService(
       'UpdateParticipant',
-      { room, identity: uid, permission: { canSubscribe: true, canPublish: g.canPublish, canPublishData: g.canPublishData, canPublishSources: ['MICROPHONE'], canUpdateMetadata: true } },
+      { room, identity: uid, permission: { canSubscribe: true, canPublish: g.canPublish, canPublishData: g.canPublishData, canPublishSources: ['MICROPHONE', 'CAMERA'], canUpdateMetadata: true } },
       { roomAdmin: true, room },
     ).catch((e) => console.error('livekit UpdateParticipant', room, String(e).slice(0, 200)));
   }
