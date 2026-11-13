@@ -16,7 +16,8 @@ import { micHaptic, pressHaptic, tapHaptic } from '@/lib/haptics';
 import { SCRIM, colors, edge, fonts, semantic } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
 import { Art } from '@/components/Art';
-import { HOST_FRAME_SCALE, SEAT_ART } from '@/components/RoomArt';
+import { HOST_FRAME_SCALE, SEAT_ART, SEAT_COLOR_ART } from '@/components/RoomArt';
+import type { SeatColorId } from '@/data/seat-colors';
 import { Gloss, Shine, useSpringPress } from '@/components/fx/surface';
 import { Photo } from '@/components/photo';
 import { RoleMark, type StaffMark } from '@/components/room/role-mark';
@@ -47,6 +48,7 @@ export function Seat({
   speaking,
   muted,
   staff,
+  seatColor,
   locked,
   compact,
   reaction,
@@ -76,6 +78,8 @@ export function Seat({
   muted: boolean;
   /** The staff mark on the avatar (components/room/role-mark). */
   staff?: StaffMark | null;
+  /** The room's color for its empty mics (data/seat-colors); none: turquoise. */
+  seatColor?: SeatColorId | null;
   locked?: boolean;
   /** Host seat sharing the top row (e.g. with the boss seat). */
   compact?: boolean;
@@ -140,7 +144,8 @@ export function Seat({
   const name = { fontSize: nameSize(size), lineHeight: nameLine(size), maxWidth: slotWidth ? slotWidth - 6 : 64 };
   // An empty or locked seat is its picture (a pending invite keeps the gold bubble); the host's own photo sits in the
   // gold host frame unless they wear a VIP or shop frame.
-  const seatArt = user ? undefined : locked ? SEAT_ART.locked : invitee ? undefined : SEAT_ART.empty;
+  const art = seatColor ? SEAT_COLOR_ART[seatColor] : SEAT_ART;
+  const seatArt = user ? undefined : locked ? art.locked : invitee ? undefined : art.empty;
   const hostFrame = host && !mini ? SEAT_ART.hostFrame : undefined;
   const frameSize = Math.round(size * HOST_FRAME_SCALE);
   const muteText = modMuted ? ', yönetim tarafından susturuldu' : muted ? ', mikrofonu kapalı' : '';

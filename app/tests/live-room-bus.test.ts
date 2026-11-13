@@ -102,19 +102,20 @@ test('oda durumu (düzen, mikrofon sayısı, kuyruk) oda bilgisinden gelir; bozu
   assert.equal(parseRoomState(''), null);
   assert.equal(parseRoomState('bozuk'), null);
   assert.equal(parseRoomState('null'), null);
-  assert.deepEqual(parseRoomState('{"lockedSeats":[],"layoutId":"sofra","micCount":12,"micQueue":true,"queue":["u1","u2","u1"]}'), {
+  assert.deepEqual(parseRoomState('{"lockedSeats":[],"layoutId":"sofra","micCount":12,"micQueue":true,"queue":["u1","u2","u1"],"seatColor":"pembe"}'), {
     layoutId: 'sofra',
     micCount: 12,
     micQueue: true,
     queue: ['u1', 'u2'],
     music: null,
     video: null,
+    seatColor: 'pembe',
   });
-  assert.deepEqual(parseRoomState('{"layoutId":5,"micCount":0,"micQueue":false,"queue":[1,"",null,"u3"]}'), { layoutId: null, micCount: null, micQueue: false, queue: ['u3'], music: null, video: null });
-  assert.deepEqual(parseRoomState(`{"layoutId":"${'x'.repeat(41)}","micCount":2.5,"micQueue":false,"queue":"u1"}`), { layoutId: null, micCount: null, micQueue: false, queue: [], music: null, video: null });
+  assert.deepEqual(parseRoomState('{"layoutId":5,"micCount":0,"micQueue":false,"queue":[1,"",null,"u3"],"seatColor":"mor"}'), { layoutId: null, micCount: null, micQueue: false, queue: ['u3'], music: null, video: null, seatColor: null });
+  assert.deepEqual(parseRoomState(`{"layoutId":"${'x'.repeat(41)}","micCount":2.5,"micQueue":false,"queue":"u1"}`), { layoutId: null, micCount: null, micQueue: false, queue: [], music: null, video: null, seatColor: null });
 
   reportRoomMeta('oda-d', '{"lockedSeats":[1],"layoutId":null,"micCount":8,"micQueue":true,"queue":["u9"]}');
-  assert.deepEqual(getLivePeers('oda-d').state, { layoutId: null, micCount: 8, micQueue: true, queue: ['u9'], music: null, video: null });
+  assert.deepEqual(getLivePeers('oda-d').state, { layoutId: null, micCount: 8, micQueue: true, queue: ['u9'], music: null, video: null, seatColor: null });
   assert.deepEqual(getLivePeers('oda-d').lockedSeats, [1]);
   reportRoomMeta('oda-d', '{"lockedSeats":[1],"layoutId":null,"micCount":8,"micQueue":false,"queue":[]}');
   assert.equal(getLivePeers('oda-d').state?.micQueue, false);

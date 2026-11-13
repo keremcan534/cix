@@ -7,6 +7,7 @@ import { Image, View, type StyleProp, type TextStyle } from 'react-native';
 
 import { Text } from '@/components/text';
 import type { RoomTheme, RoomType } from '@/data/catalog';
+import type { SeatColorId } from '@/data/seat-colors';
 
 export const ROOM_TYPE_ART: Record<RoomType, number> = {
   free: require('../../assets/room/oda-turu-serbest-sohbet.png'),
@@ -76,6 +77,15 @@ export const SEAT_ART: Partial<Record<'empty' | 'locked' | 'hostFrame', number>>
   empty: require('../../assets/room/koltuk-bos.png'),
   locked: require('../../assets/room/koltuk-kilitli.png'),
   hostFrame: require('../../assets/room/koltuk-ev-sahibi-cercevesi.png'),
+};
+/** Koltuk rengi (data/seat-colors): the empty and locked mic in each color; turquoise is SEAT_ART's own. */
+export const SEAT_COLOR_ART: Record<SeatColorId, { empty: number; locked: number }> = {
+  turkuaz: { empty: require('../../assets/room/koltuk-bos.png'), locked: require('../../assets/room/koltuk-kilitli.png') },
+  pembe: { empty: require('../../assets/room/koltuk-bos-pembe.png'), locked: require('../../assets/room/koltuk-kilitli-pembe.png') },
+  kirmizi: { empty: require('../../assets/room/koltuk-bos-kirmizi.png'), locked: require('../../assets/room/koltuk-kilitli-kirmizi.png') },
+  turuncu: { empty: require('../../assets/room/koltuk-bos-turuncu.png'), locked: require('../../assets/room/koltuk-kilitli-turuncu.png') },
+  yesil: { empty: require('../../assets/room/koltuk-bos-yesil.png'), locked: require('../../assets/room/koltuk-kilitli-yesil.png') },
+  gumus: { empty: require('../../assets/room/koltuk-bos-gumus.png'), locked: require('../../assets/room/koltuk-kilitli-gumus.png') },
 };
 /** The host frame's square picture is this many times the avatar: its ring sits on the photo's edge, the crown above. */
 export const HOST_FRAME_SCALE = 1.64;

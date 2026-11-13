@@ -165,7 +165,7 @@ const queueOf = async (roomId) =>
  */
 export async function pushRoomMeta(roomId) {
   try {
-    const r = (await db.query('SELECT locked_seats, layout_id, mic_count, mic_queue, video FROM rooms WHERE id = $1', [roomId])).rows[0];
+    const r = (await db.query('SELECT locked_seats, layout_id, mic_count, mic_queue, video, seat_color FROM rooms WHERE id = $1', [roomId])).rows[0];
     if (!r) return false;
     // The music's files go out at this server's address, like every answer (core.mjs filesOut).
     const metadata = filesOut(
@@ -178,6 +178,8 @@ export async function pushRoomMeta(roomId) {
         music: await roomMusic(roomId),
         // The shared YouTube screen (room-video.mjs): checked when it was written.
         video: r.video ?? null,
+        // The empty mics' color (room-seat-color.mjs); null: the free turquoise.
+        seatColor: r.seat_color ?? null,
       }),
     );
     const name = liveKitName(roomId);

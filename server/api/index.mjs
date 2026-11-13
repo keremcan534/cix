@@ -82,6 +82,7 @@ import { teamRoutes } from './team.mjs';
 import { TEST_ADMIN } from './test-admin.mjs';
 import { musicRoutes } from './music.mjs';
 import { roomVideoRoutes } from './room-video.mjs';
+import { roomSeatColorRoutes } from './room-seat-color.mjs';
 import { roomFxRoutes } from './room-fx.mjs';
 import { roomEventRoutes } from './room-events.mjs';
 import { eventRoutes, startEventSweep, stopEventSweep } from './events.mjs';
@@ -321,6 +322,7 @@ const routes = {
   ...teamRoutes,
   ...musicRoutes,
   ...roomVideoRoutes,
+  ...roomSeatColorRoutes,
   ...roomFxRoutes,
   ...roomEventRoutes,
   ...roomSocialRoutes,
