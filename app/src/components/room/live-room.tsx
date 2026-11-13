@@ -110,6 +110,7 @@ import { checkText, messageRefusal, noteSent, refusalTitle } from '@/lib/contact
 import { ContactNote } from '@/components/contact-note';
 import { animById, getAnimations, isLive, isSentAnim, newAnimRequestId, playRoomAnim, sendAnimation, simulateRemoteSend, subscribeRoom } from '@/lib/animations';
 import { loadLooks, lookOf, useLooks, type Look } from '@/lib/live/looks';
+import { useRoomCams } from '@/lib/live/room-cams';
 import { casinoAccess, casinoVisible, playDuel, useGames } from '@/lib/games';
 import { refreshCasino } from '@/lib/live/casino';
 import { useTableNews } from '@/lib/live/room-table';
@@ -156,7 +157,7 @@ import { kindOf, mergeFeed, type FeedMsg } from '@/lib/chat-feed';
 import { blockedFeature } from '@/lib/remote-control';
 import { ALL_FEATURES, applyServerStage, applyServerVideo, changeLayout, layoutById, modeById, seedStage, setClassicCapacity, setStageInfo, slotStates, stagePermission, useStages, type PlaybackState, type StageInfo } from '@/lib/room-modes';
 import { shareVideo, videoPlayback } from '@/lib/live/room-video';
-import { MIC_BLOCK_LABEL, endRoom, getSession, micBlock, micSending, reportRoomState, setMicWant, setNoiseSuppression, setPlaybackVolume, useRoomSession, type MicBlock } from '@/lib/room-session';
+import { MIC_BLOCK_LABEL, endRoom, getSession, micBlock, micSending, reportRoomState, setMicWant, setNoiseSuppression, setPlaybackVolume, setRoomCamera, useRoomSession, type MicBlock } from '@/lib/room-session';
 import { shareLink } from '@/lib/links';
 import { balconyOnly, canInviteFollowers, defaultMicQueue, followerCount, knownFollowers, roomInviteText, seatAccess } from '@/lib/room-invites';
 import { demoJoinMode } from '@/lib/room-follow';
@@ -623,6 +624,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const [reopenOnReturn, setReopenOnReturn] = useState<null | 'menu' | 'settings' | 'info'>(null);
   const teamPk = pk?.kind === 'room' && pk.mode === 'team' && pk.status !== 'invite' ? pk : null;
   const teamColorOf = (uid: string | null) => (uid && teamPk ? teamOf(teamPk, uid)?.color : undefined);
+  // Mic 1 is the owner's crowned seat, except where the stage draws it as a plain mic (a team PK, or a layout with
+  // no host slot: team rooms, Düğün). There anyone takes it like any other mic.
+  const hostSeat = !teamPk && (!layout || layout.layoutSchema.slots.some((x) => x.index === 0 && x.host));
   /**
    * PK points under a seat, only for people in the PK: team members in Takım PK, everyone on a mic in Normal /
    * cross PK. A server room's Normal PK scores only the people it started with (server/api/pk.mjs), so a mic taken
@@ -859,6 +863,15 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     setSawCamAllowed(camAllowed);
     if (!camAllowed) setCamOn(false);
   }
+  // Server room: my camera goes out from a camera seat while the room is on screen and the app in front (a 1v1 call
+  // takes it); every live camera fills its seat's tile (lib/live/room-cams).
+  const roomCams = useRoomCams();
+  const camOf = (uid: string | null) => (real && uid ? (roomCams.get(uid === 'me' ? 'me' : (toServer(uid) ?? '')) ?? null) : null);
+  const camLive = real && full && camOn && camAllowed && !callActive && session?.appState !== 'background';
+  useEffect(() => {
+    if (real) setRoomCamera(camLive);
+  }, [real, camLive]);
+  useEffect(() => () => void (real && setRoomCamera(false)), [real]);
   const seatedKey = [...seatedOthers, bossId && bossId !== 'me' ? bossId : ''].join(',');
   // Balkon: people in the room who are not on a mic (from the presence model, never a separate list).
   const audience = useMemo(() => view.balconyIds.filter((u) => u !== 'me' && !blocked.has(u)).map(userById), [view.balconyIds, blocked]);
@@ -2381,7 +2394,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       const note = [`${index + 1}. koltuk`, rankOf(uid) > 0 && rankLabel(uid), sim !== undefined && `%${sim} benzer`].filter(Boolean).join(' · ');
       return setPerson({ uid, note, manage: manage.length ? () => openSeatMenu(index, parts.join(' · '), manage) : undefined });
     }
-    if (index === 0) return isOwn ? sitMe(0) : undefined;
+    // The owner's mic: in a server room too the owner gets back on it after leaving it; anyone else hears why not.
+    if (index === 0 && hostSeat)
+      return hostId === 'me' ? sitMe(0) : showAlert('Oda sahibinin koltuğu', 'Taçlı 1. koltuk oda sahibine ayrılmış. Boş başka bir mikrofona dokunabilirsin.');
     if (canManage) {
       const locked = lockedSeats.includes(index);
       const items: SeatMenuItem[] = [
@@ -2429,7 +2444,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // The big mic button for a listener: take a free mic, or raise a hand when all are taken.
   const raiseHand = () => {
     if (devicesBusy()) return;
-    if (isOwn && allSeats[0] === null) return sitMe(0);
+    if (hostId === 'me' && allSeats[0] === null && !lockedSeats.includes(0)) return sitMe(0);
     if (freeSeatIndex > 0) return isOwn ? sitMe(freeSeatIndex) : onSeatPress(freeSeatIndex);
     if (myRole === 'member' && micPermission === 'members' && membership !== 'member') return onSeatPress(1);
     joinQueue();
@@ -3275,7 +3290,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         reaction={uid && settings.seatReactions ? reactions[uid] : undefined}
         still={settings.reduceMotion}
         anchorRef={seatAnchor(uid, i)}
-        camera={uid === 'me' && camOn}
+        camera={uid === 'me' ? camOn : !!camOf(uid)}
         teamColor={teamColorOf(uid)}
         pkPoints={pkPointsOf(uid)}
         avatarSize={extra?.slot?.size ?? extra?.grid?.size}
@@ -3311,7 +3326,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     ) : strip || !f ? (
       <View style={styles.micStrip}>
         {bossOn && <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} mini={stripSlot} reaction={bossReaction} still={settings.reduceMotion} anchor={bossAnchor} />}
-        {allSeats.map((_, i) => renderSeat(i, { host: i === 0, grid: stripSlot, mini: true }))}
+        {allSeats.map((_, i) => renderSeat(i, { host: i === 0 && hostSeat, grid: stripSlot, mini: true }))}
       </View>
     ) : layout ? (
       <>
@@ -3320,7 +3335,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} reaction={bossReaction} still={settings.reduceMotion} anchor={bossAnchor} />
           </View>
         )}
-        <StageLayout layout={layout} width={win.width} face={f.face} seats={allSeats} pkRoom={theme === 'pk'} cameraOf={(uid) => uid === 'me' && camOn} renderSeat={(i, slot, next) => renderSeat(i, { slot, next })} />
+        <StageLayout layout={layout} width={win.width} face={f.face} seats={allSeats} pkRoom={theme === 'pk'} cameraOf={(uid) => (uid === 'me' ? camOn : !!camOf(uid))} videoOf={camOf} renderSeat={(i, slot, next) => renderSeat(i, { slot, next })} />
       </>
     ) : (
       <View style={styles.seatGrid}>

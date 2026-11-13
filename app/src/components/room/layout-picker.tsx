@@ -146,7 +146,7 @@ export function LayoutPickerSheet({
         <ScrollView contentContainerStyle={{ paddingBottom: space.lg }} onLayout={(e) => setGridW(e.nativeEvent.layout.width)}>
           <View style={st.grid}>
             {cardW > 0 &&
-              layoutsOf(tab).map((l) => {
+              layoutsOf(tab, { pkRoom, keep: layoutId }).map((l) => {
                 const access = layoutAccess(l, info);
                 const selected = l.id === layoutId;
                 const locked = !access.ok;

@@ -46,6 +46,8 @@ export interface AudioEngine {
   setNoiseSuppression?(on: boolean): void;
   /** How loud the other people in the room play on this phone, 0 (room sound off) to 1. */
   setPlaybackVolume?(volume: number): void;
+  /** My camera in a Video layout's camera seat (görüntülü yuva); engines without real media skip it. */
+  setCamera?(on: boolean): void;
   stats(): EngineStats;
 }
 

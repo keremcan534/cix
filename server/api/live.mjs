@@ -270,11 +270,12 @@ export const liveRoutes = {
     if (!ROOM.test(room)) throw new HttpError(400, 'Geçersiz oda');
     await voiceAccess(room, u, url.searchParams.get('password'));
     // The identity is the signed-in account, never a value from the request, so nobody can join as someone else.
-    // Voice only: no camera or screen share (the app publishes just the microphone).
+    // Microphone, and the camera for a Video layout's camera seats (görüntülü yuva; the app sends it only from one).
+    // No screen share.
     // canUpdateOwnMetadata: each phone shows which mic it sits on as its own participant attribute (app lib/live).
     // A mute (sanctions.mjs) takes the mic (voice) or room chat (text) away; seat and role stay as they are.
     const g = await voiceGrant(u.id, room);
-    const video = { room, roomJoin: true, canPublish: g.canPublish, canPublishSources: ['microphone'], canSubscribe: true, canPublishData: g.canPublishData, canUpdateOwnMetadata: true };
+    const video = { room, roomJoin: true, canPublish: g.canPublish, canPublishSources: ['microphone', 'camera'], canSubscribe: true, canPublishData: g.canPublishData, canUpdateOwnMetadata: true };
     const token = liveKitJwt({ sub: u.id, name: u.name, video }, TOKEN_TTL);
     return { token, ttl: TOKEN_TTL, canPublish: g.canPublish, canChat: g.canPublishData };
   },

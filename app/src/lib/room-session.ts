@@ -492,6 +492,8 @@ export function setPlaybackVolume(v: number) {
   volume = Math.max(0, Math.min(1, Number.isFinite(v) ? v : 1));
   engine.setPlaybackVolume?.(callHold ? 0 : volume);
 }
+/** My camera in the room (a Video layout's camera seat): the room screen decides when; only a real engine sends it. */
+export const setRoomCamera = (on: boolean) => engine.setCamera?.(on);
 /**
  * A 1v1 call (lib/call-media) holds the room instead of ending it: I stay in the room (its screen takes me off my
  * mic to the Balkon and says so) while its voices go quiet on this phone, and my mic in it is off. When the call

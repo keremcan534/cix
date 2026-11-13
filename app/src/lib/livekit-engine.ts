@@ -5,10 +5,12 @@
 // The AudioEngine calls are synchronous while joining is not: connect() updates the counters at once and joins
 // in the background (token from our API, then the room). Every async step checks that the room is
 // still the current one, so leaving or switching rooms mid-join never leaves a second connection open.
-import { ConnectionState, DisconnectReason, Room, RoomEvent, Track } from 'livekit-client';
+import { ConnectionState, DisconnectReason, Room, RoomEvent, Track, VideoPresets, type Participant } from 'livekit-client';
 
 import type { AudioEngine, EngineStats } from '@/lib/audio-engine';
+import type { TrackRef } from '@/lib/call-media';
 import { bindLink, decodeSignal, encodeSignal, parseSeat, parseServerClosed, reportPeers, reportRoomMeta, reportServerSeat, reportSignal, type PeerSignal } from '@/lib/live/room-bus';
+import { reportCams } from '@/lib/live/room-cams';
 import { reportLevel } from '@/lib/live/voice-level';
 import type { EngineEvent } from '@/lib/room-session';
 import { setAiDenoise } from '../../modules/similar-denoise';
@@ -40,6 +42,8 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
   let room: Room | null = null;
   // The mic I sit on, shown to the other phones as my `seat` attribute (lib/live/room-bus); set again after a reconnect.
   let seat: number | null = null;
+  // My camera, wanted by the room screen (a camera seat of a Video layout); put on again after a reconnect.
+  let camera = false;
   // My own `seat` writes the server hasn't echoed yet: their echo is not the owner or an admin moving me.
   let pendingSeats: { v: string; at: number }[] = [];
   const fail = (what: string, e: unknown) => cfg.onError?.(`${what}: ${e instanceof Error ? e.message : String(e)}`);
@@ -76,6 +80,28 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
     });
   };
 
+  // Live cameras in the room, mine as 'me', for the stage's camera seats (lib/live/room-cams).
+  const showCams = (r: Room) => {
+    if (room !== r) return;
+    const m = new Map<string, TrackRef>();
+    const add = (id: string, p: Participant) => {
+      const pub = p.getTrackPublication(Track.Source.Camera);
+      if (pub?.track && !pub.isMuted) m.set(id, { participant: p, publication: pub, source: Track.Source.Camera });
+    };
+    add('me', r.localParticipant);
+    r.remoteParticipants.forEach((p) => add(p.identity, p));
+    reportCams(m);
+  };
+  const setCam = (r: Room, on: boolean) => {
+    if (r.state !== ConnectionState.Connected) return;
+    // A voice mute takes everything I send away, the camera too.
+    if (on && !grant(r).canPublish) return;
+    r.localParticipant.setCameraEnabled(on, on ? { facingMode: 'user', resolution: VideoPresets.h360.resolution } : undefined).then(
+      () => showCams(r),
+      (e) => fail('Kamera', e),
+    );
+  };
+
   // Rooms holding the phone's audio session. A left room closes only after its disconnect finishes, which can be
   // after the next room opened the session: the session stops when the last room lets go, not on every close.
   const audioRooms = new Set<Room>();
@@ -97,8 +123,10 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
       // Browsers block sound until a user gesture; opening a room is one, so this usually succeeds at once.
       await r.startAudio().catch(() => {});
       if (s.publishing) setMic(r, true);
+      if (camera) setCam(r, true);
       if (seat !== null) pushSeat(r);
       snapshot(r);
+      showCams(r);
       if (s.roomId) reportRoomMeta(s.roomId, r.metadata);
       tell(r, { type: 'connected' });
       tell(r, { type: 'grant', ...grant(r) });
@@ -159,6 +187,8 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
     const r = new Room({ dynacast: true, audioCaptureDefaults: capture() });
     const update = () => snapshot(r);
     [RoomEvent.ParticipantConnected, RoomEvent.ParticipantDisconnected, RoomEvent.ParticipantAttributesChanged, RoomEvent.ParticipantNameChanged, RoomEvent.ActiveSpeakersChanged, RoomEvent.TrackMuted, RoomEvent.TrackUnmuted, RoomEvent.TrackPublished, RoomEvent.TrackUnpublished, RoomEvent.Reconnected].forEach((ev) => r.on(ev, update));
+    const cams = () => showCams(r);
+    [RoomEvent.TrackSubscribed, RoomEvent.TrackUnsubscribed, RoomEvent.TrackMuted, RoomEvent.TrackUnmuted, RoomEvent.LocalTrackPublished, RoomEvent.LocalTrackUnpublished, RoomEvent.ParticipantDisconnected].forEach((ev) => r.on(ev, cams));
     r.on(RoomEvent.Reconnected, () => {
       if (seat !== null) pushSeat(r);
       tell(r, { type: 'connected' });
@@ -184,6 +214,7 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
       const g = grant(r);
       tell(r, { type: 'grant', ...g });
       if (g.canPublish && s.publishing) setMic(r, true);
+      if (g.canPublish && camera) setCam(r, true);
     });
     // Our own leave sets `room` to null first, so this only reports drops we didn't ask for.
     r.on(RoomEvent.Disconnected, (reason?: DisconnectReason) => {
@@ -253,8 +284,10 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
       s.publishing = false;
       s.roomId = null;
       seat = null;
+      camera = false;
       pendingSeats = [];
       reportPeers(null, []);
+      reportCams(new Map());
       s.concurrent--;
       s.disconnects++;
       if (r) {
@@ -268,6 +301,12 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
       if (on) s.publishStarts++;
       s.publishing = on;
       if (room) setMic(room, on);
+    },
+    setCamera(on) {
+      if (!s.roomId) on = false;
+      if (on === camera) return;
+      camera = on;
+      if (room) setCam(room, on);
     },
     setPlaybackVolume(v) {
       volume = v;
