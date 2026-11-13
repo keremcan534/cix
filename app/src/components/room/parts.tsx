@@ -32,9 +32,14 @@ export type ChatMsg = FeedMsg;
 export type RoomRole = 'owner' | 'admin' | 'member';
 export const ROLE_RANK: Record<RoomRole, number> = { owner: 3, admin: 2, member: 1 };
 
+/** The speaking ring's color: pink for women, blue for men, white when the gender isn't known or is hidden. */
+export const VOICE_RING = { Kadın: semantic.live, Erkek: '#3D9BFF', none: '#FFFFFF' } as const;
+const ringGlow = (c: string) => `0 0 12px ${c}CC`;
+
 export function Seat({
   index,
   userId,
+  gender,
   host,
   vipLevel,
   frameId,
@@ -61,6 +66,8 @@ export function Seat({
 }: {
   index: number;
   userId: string | null;
+  /** The seated person's gender, for the speaking ring's color (VOICE_RING). */
+  gender?: 'Kadın' | 'Erkek' | null;
   host: boolean;
   vipLevel: number;
   frameId?: string;
@@ -121,6 +128,9 @@ export function Seat({
   const press = useSpringPress(0.9);
 
   const user = userId ? userById(userId) : null;
+  // The room's word wins (its looks, null: hidden); else what this phone knows of them.
+  const g = gender !== undefined ? gender : user?.showGender === false ? null : user?.gender;
+  const ring = g ? VOICE_RING[g] : VOICE_RING.none;
   const size = avatarSize ?? (host ? 60 : 48);
   // Small faces: a smaller icon and no badge by the name. The name grows a little with the face (lib/seat-fit, which
   // sizes the stage by the same numbers) and may be as wide as the seat's slot.
@@ -151,13 +161,13 @@ export function Seat({
           { opacity: appear, transform: [{ translateY: appear.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }, { scale: appear.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }] },
         ]}
       >
-        <Animated.View ref={anchorRef} collapsable={false} style={[{ width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center', transform: [{ scale: press.scale }] }, speaking && styles.speakingGlow]}>
+        <Animated.View ref={anchorRef} collapsable={false} style={[{ width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center', transform: [{ scale: press.scale }] }, speaking && { boxShadow: `0 0 18px ${ring}A6` }]}>
           {speaking && (
             <Animated.View
               pointerEvents="none"
               style={[
                 styles.ring,
-                { width: size, height: size, borderRadius: size / 2 },
+                { width: size, height: size, borderRadius: size / 2, borderColor: ring, boxShadow: ringGlow(ring) },
                 still
                   ? { opacity: 0.85, transform: [{ scale: 1.08 }] }
                   : { opacity: level.interpolate({ inputRange: [0, 1], outputRange: [0.45, 1] }), transform: [{ scale: level.interpolate({ inputRange: [0, 1], outputRange: [1.04, 1.38] }) }] },
@@ -168,7 +178,7 @@ export function Seat({
             <FramedAvatar uri={user.avatar} size={size} vipLevel={vipLevel} frameId={frameId} />
           ) : user ? (
             <>
-              <Photo uri={user.avatar} kind="face" style={{ width: size, height: size, borderRadius: size / 2, borderWidth: 2, borderColor: speaking ? semantic.live : 'transparent' }} />
+              <Photo uri={user.avatar} kind="face" style={{ width: size, height: size, borderRadius: size / 2, borderWidth: 2, borderColor: speaking ? ring : 'transparent' }} />
               {hostFrame !== undefined && (
                 <Image
                   source={hostFrame}
@@ -674,8 +684,7 @@ const styles = StyleSheet.create({
   seat: { alignItems: 'center', gap: 4 },
   seatBody: { alignSelf: 'stretch', alignItems: 'center', gap: 4 },
   hostSeat: { width: '100%' },
-  ring: { position: 'absolute', borderWidth: 4, borderColor: semantic.live, boxShadow: '0 0 12px rgba(255,95,162,0.8)' },
-  speakingGlow: { boxShadow: '0 0 18px rgba(255,95,162,0.65)' },
+  ring: { position: 'absolute', borderWidth: 4 },
   emptySeat: {
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',
