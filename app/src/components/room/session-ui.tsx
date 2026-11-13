@@ -484,7 +484,7 @@ const s = StyleSheet.create({
   mini: { position: 'absolute', right: space.lg, flexDirection: 'row', alignItems: 'center', gap: space.xs, backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, paddingLeft: space.sm, paddingRight: space.xs, paddingVertical: space.sm, zIndex: 50, ...shadow },
   miniMain: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: space.sm },
   coverWrap: { width: 44, height: 44, borderRadius: radius.md, borderWidth: 2, padding: 1 },
-  cover: { flex: 1, borderRadius: radius.sm },
+  cover: { width: '100%', height: '100%', borderRadius: radius.sm },
   coverBadge: { position: 'absolute', right: -4, bottom: -4, width: 18, height: 18, borderRadius: 9, backgroundColor: semantic.live, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.card },
   miniTitle: { color: colors.text, fontWeight: '800', fontSize: 13 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
