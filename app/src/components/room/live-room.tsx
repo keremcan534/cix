@@ -65,6 +65,7 @@ import { giftShowOf } from '@/data/gift-shows';
 import { GamePanel, type OpenGame } from '@/components/games/game-panel';
 import type { CasinoGame } from '@/data/games';
 import { BAR_BTN, ChatLine, GiftAnimation, MicBtn, REACTION_MS, RESULT_MS, RoomSoundBtn, RoundBtn, Seat, type ChatMsg, type RoomRole, type SeatReactionData } from '@/components/room/parts';
+import { type StaffMark } from '@/components/room/role-mark';
 import { CrossPkInvitePrompt, PkBoard, PkSetupSheet, SoloBoard, TeamArena, type ArenaSlot } from '@/components/room/pk';
 import { CrownScreen, PkResultScreen } from '@/components/room/pk-result';
 import { BalconyBar, MicInvitePrompt, ParticipantsSheet, type ParticipantActions } from '@/components/room/balcony';
@@ -331,6 +332,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // DJs (server rooms, server/api/music.mjs): the owner names them; they play music in the room and nothing else.
   const djIds = real ? staff.djs : [];
   const rankOf = (uid: string) => (uid === hostId ? 3 : superIds.includes(uid) ? 2 : adminIds.includes(uid) ? 1 : 0);
+  // The mark on a staff member's mic (components/room/role-mark), each role its own; a DJ's only without a higher one.
+  const staffOf = (uid: string): StaffMark | null => (uid === hostId ? 'owner' : superIds.includes(uid) ? 'super' : adminIds.includes(uid) ? 'admin' : djIds.includes(uid) ? 'dj' : null);
   const myRank = rankOf('me');
   const rankLabel = (uid: string) => ['Üye', 'Yönetici', 'Süper Yönetici', 'Oda sahibi'][rankOf(uid)];
   const canManage = myRole !== 'member';
@@ -3242,13 +3245,14 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const renderSeat = (i: number, extra?: { host?: boolean; compact?: boolean; slot?: ArenaSlot; grid?: ArenaSlot; next?: { index: number; gap: number }; mini?: boolean }) => {
     const uid = allSeats[i];
     const link = extra?.next ? micLinkOf(roomBonds, uid, allSeats[extra.next.index]) : null;
+    const host = extra?.slot ? false : (extra?.host ?? i === 0);
     return (
       <Seat
         key={i}
         index={i}
         userId={uid}
         gender={uid === 'me' ? (app.me.showGender === false ? null : (app.me.gender ?? null)) : uid ? lookFor(uid)?.gender : undefined}
-        host={extra?.slot ? false : (extra?.host ?? i === 0)}
+        host={host}
         vipLevel={uid === 'me' ? vipLevel : (uid ? (lookFor(uid)?.vipLevel ?? 0) : 0)}
         frameId={uid === 'me' ? equipped.frame : uid ? (lookFor(uid)?.frame ?? undefined) : undefined}
         speaking={!!uid && speaking.has(uid)}
@@ -3256,7 +3260,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         modMuted={!!uid && mutedUsers.has(uid)}
         invitee={!uid && slots[i]?.state === 'invited' && slots[i].invitee ? userById(slots[i].invitee!).name : undefined}
         similarity={uid ? simScores.get(uid) : undefined}
-        role={uid ? roleOf(uid) : i === 0 && extra?.host ? 'owner' : undefined}
+        // The owner on the host's mic has the crown by the name already.
+        staff={uid && !(host && uid === hostId) ? staffOf(uid) : undefined}
         locked={!uid && i > 0 && (lockedSeats.includes(i) || (!amSeated && seatAccess(micQueue, myRole) === 'request'))}
         compact={extra?.compact}
         reaction={uid && settings.seatReactions ? reactions[uid] : undefined}
