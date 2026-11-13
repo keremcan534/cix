@@ -256,7 +256,7 @@ export async function refundItems(c, { purchase, buyer, lots, held, actor, ip })
 
 // --- Old apps --------------------------------------------------------------------------------------------------
 const PREFIX = [
-  ['Mağaza: ', ['frame', 'entry', 'ride', 'bubble', 'specialId']],
+  ['Mağaza: ', ['frame', 'entry', 'ride', 'bubble', 'specialId', 'wave']],
   ['Çıkartma paketi: ', ['sticker']],
   ['Mikrofon efekti: ', ['micfx']],
   ['Rütbe: ', ['noble']],

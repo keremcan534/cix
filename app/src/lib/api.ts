@@ -961,6 +961,8 @@ export async function countContactRefusal(category: string, place: string) {
 export const earnings = () => call<ServerEarnings>('GET', '/api/wallet/earnings');
 /** An in-app purchase paid with coins (VIP, store items, game entries): the server takes the coins once. */
 export const spend = (amount: number, reason: string, ref = newRef()) => call<{ user: ServerUser; replay: boolean }>('POST', '/api/wallet/spend', { amount, reason, ref });
+/** Wears a shop item I own in its slot, or takes it off (sku null); others see it in GET /api/looks. */
+export const equipShop = (slot: string, sku: string | null) => call<{ economy: unknown }>('POST', '/api/shop/equip', { slot, sku });
 /** Çevir. `usdTry`: the rate the screen showed; the server never gives less than it, and answers 409 rate_changed
  *  (nothing taken) when its own rate is lower now. */
 export const exchange = (diamonds: number, ref = newRef(), usdTry?: number) =>

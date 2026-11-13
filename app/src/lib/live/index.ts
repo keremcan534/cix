@@ -209,6 +209,12 @@ export function forgetLiveAccount() {
   setRooms([]);
 }
 
+/** Mirrors wearing or taking off a shop item (the store already did it locally); others read it from the server. */
+export function liveEquip(slot: string, sku: string | null) {
+  if (!liveMode() || !myId) return;
+  api.equipShop(slot, sku).catch(() => {});
+}
+
 /** Mirrors a purchase the store already took locally; a refusal re-reads the real balance. */
 export function liveSpend(n: number, reason: string) {
   if (!liveMode() || !myId) return;

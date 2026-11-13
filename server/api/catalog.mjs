@@ -144,6 +144,11 @@ const SHOP_ROWS = [
   ['id-777', 'specialId', 'ID 777', 8_000, null, 0],
   ['id-2026', 'specialId', 'ID 2026', 3_000, null, 0],
   ['id-1001', 'specialId', 'ID 1001', 2_000, null, 0],
+  // Ses dalgası: the ring around the seat while one talks (app components/room/voice-wave.tsx). Kept for good.
+  ['wv-sparkle', 'wave', 'Parıltı', 1_500, null, 0],
+  ['wv-flame', 'wave', 'Alev', 2_500, null, 0],
+  ['wv-rainbow', 'wave', 'Gökkuşağı', 3_500, null, 0],
+  ['wv-gold', 'wave', 'Altın Halka', 5_000, null, 0],
   ['pack-fun', 'sticker', 'Eğlence', 50, null, 0],
   ['pack-love', 'sticker', 'Aşk', 80, null, 0],
   ['pack-animals', 'sticker', 'Hayvanlar', 60, null, 0],
@@ -161,7 +166,7 @@ export const SHOP = new Map(
   SHOP_ROWS.map(([sku, kind, name, price, days, minVip]) => [sku, Object.freeze({ sku, kind, name, price, days, minVip, tier: kind === 'noble' ? Number(sku.slice(6)) : null })]),
 );
 /** What a person wears, one each (users.equipped). Sticker packs and noble rank are owned, not worn. */
-export const SLOTS = ['frame', 'entry', 'ride', 'bubble', 'specialId', 'micfx'];
+export const SLOTS = ['frame', 'entry', 'ride', 'bubble', 'specialId', 'micfx', 'wave'];
 /** One of a kind: bought coins only, never reward coins. */
 export const PAID_ONLY = ['specialId'];
 /** Mic effects anyone may wear without buying. */
