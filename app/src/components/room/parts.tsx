@@ -19,6 +19,7 @@ import { Art } from '@/components/Art';
 import { HOST_FRAME_SCALE, SEAT_ART } from '@/components/RoomArt';
 import { Gloss, Shine, useSpringPress } from '@/components/fx/surface';
 import { Photo } from '@/components/photo';
+import { RoleMark, type StaffMark } from '@/components/room/role-mark';
 import { BondBubble, BondChip, BondLink } from '@/components/room/room-bonds';
 import type { RoomBond } from '@/data/bonds';
 import { nameLine, nameSize } from '@/lib/seat-fit';
@@ -40,7 +41,7 @@ export function Seat({
   frameId,
   speaking,
   muted,
-  role,
+  staff,
   locked,
   compact,
   reaction,
@@ -66,7 +67,8 @@ export function Seat({
   frameId?: string;
   speaking: boolean;
   muted: boolean;
-  role?: RoomRole;
+  /** The staff mark on the avatar (components/room/role-mark). */
+  staff?: StaffMark | null;
   locked?: boolean;
   /** Host seat sharing the top row (e.g. with the boss seat). */
   compact?: boolean;
@@ -207,11 +209,7 @@ export function Seat({
               <Ionicons name={modMuted ? 'mic-off' : 'mic-off-outline'} size={10} color="#fff" />
             </View>
           )}
-          {role === 'admin' && (
-            <View style={styles.roleBadge} accessibilityLabel="Oda yöneticisi">
-              <Ionicons name="shield-checkmark" size={10} color={semantic.actionInk} />
-            </View>
-          )}
+          {user && <RoleMark mark={staff} edge={colors.bg} style={{ left: -2, bottom: -2 }} />}
           {reaction && user && <SeatReaction key={reaction.key} emoji={reaction.emoji} art={reaction.art} pre={reaction.pre} badge={reaction.badge} badgeAt={reaction.badgeAt} ms={reaction.ms} size={size} still={still} />}
         </Animated.View>
         {mini ? (
@@ -683,7 +681,6 @@ const styles = StyleSheet.create({
   mutedBadge: { position: 'absolute', right: 0, bottom: 0, backgroundColor: colors.red, borderRadius: 10, padding: 3 },
   selfMutedBadge: { backgroundColor: '#475569' },
   invitedSeat: { borderColor: colors.gold, backgroundColor: 'rgba(246,189,96,0.12)' },
-  roleBadge: { position: 'absolute', left: -2, bottom: -2, backgroundColor: semantic.action, borderRadius: 10, padding: 3, borderWidth: 1.5, borderColor: colors.bg },
   pkWrap: { alignItems: 'center', marginTop: -1 },
   pkPill: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(246,189,96,0.18)', borderColor: 'rgba(246,189,96,0.55)', borderWidth: 1, borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1, maxWidth: 76 },
   pkPillBig: { backgroundColor: 'rgba(246,189,96,0.3)' },
