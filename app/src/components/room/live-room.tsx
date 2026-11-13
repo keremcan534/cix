@@ -3348,10 +3348,12 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         ) : (
           <View style={styles.hostRow}>{renderSeat(0, { grid: { width: Math.max(96, f.host + 28), size: f.host } })}</View>
         )}
-        {/* The others wrap `f.cols` to a row (equal widths, no gap). */}
-        {allSeats.map((_, i) =>
-          i === 0 ? null : renderSeat(i, { grid: { width: f.slot, size: f.face }, next: i + 1 < allSeats.length && (i - 1) % f.cols !== f.cols - 1 ? { index: i + 1, gap: 0 } : undefined }),
-        )}
+        {/* The others `f.cols` to a row (equal widths, no gap), the rows together in the middle. */}
+        <View style={[styles.guestGrid, { width: f.cols * f.slot }]}>
+          {allSeats.map((_, i) =>
+            i === 0 ? null : renderSeat(i, { grid: { width: f.slot, size: f.face }, next: i + 1 < allSeats.length && (i - 1) % f.cols !== f.cols - 1 ? { index: i + 1, gap: 0 } : undefined }),
+          )}
+        </View>
       </View>
     );
 
@@ -4223,6 +4225,7 @@ const styles = StyleSheet.create({
   topAvatar: { borderWidth: 2, borderRadius: 14 },
   seatGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', paddingHorizontal: 8, paddingTop: 8, rowGap: 10 },
   hostRow: { width: '100%', alignItems: 'center' },
+  guestGrid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 10 },
   // Küçült: the mics as one short strip (ten to a row, from the left), the chat takes the rest.
   micStrip: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-start', paddingHorizontal: 8, paddingTop: 6, paddingBottom: 2, rowGap: 6 },
   bottom: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 8 },

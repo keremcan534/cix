@@ -53,12 +53,18 @@ export const easedChange = (a: Fitted, b: Fitted) => a.cols !== b.cols || Math.a
 /** The grid's inner width (the room's padding taken off). */
 const gridWidth = (width: number) => Math.max(200, Math.min(width, 640) - 16);
 
+/**
+ * The width one mic takes: never more than its share of the row, and no wider than its face and a short gap, so a
+ * row of small faces stays together in the middle instead of spreading over the whole screen.
+ */
+export const gridSlot = (w: number, cols: number, face: number) => Math.min(Math.floor(w / cols), Math.round(face * 1.25) + 16);
+
 function gridAt(guests: number, w: number, cols: number, face: number, o: FitOpts): Fitted {
   const rows = Math.ceil(guests / cols);
   // Beside the Patron seat the host is at most the boss seat's ring; alone on its row a little bigger than the rest.
   const host = o.boss ? Math.min(hostFaceOf(face), 70) : hostFaceOf(face);
   const top = o.boss ? Math.max(BOSS_H, seatHeight(host, o.pk)) : seatHeight(host, o.pk);
-  return { cols, slot: Math.floor(w / cols), face, host, height: 8 + top + rows * (ROW_GAP + seatHeight(face, o.pk)) };
+  return { cols, slot: gridSlot(w, cols, face), face, host, height: 8 + top + rows * (ROW_GAP + seatHeight(face, o.pk)) };
 }
 
 /** Fits beats doesn't; then the bigger face; then the one that fills the height more. None fits: the shortest. */

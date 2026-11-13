@@ -91,7 +91,7 @@ export function StageBackdrop({ theme, background, freeId }: { theme: RoomTheme;
         <Image source={picture} resizeMode="cover" onError={() => setFailed(uri)} style={[StyleSheet.absoluteFill, { width: '100%', height: '100%' }]} />
         {/* A navy veil, lighter than the theme's so the picture shows behind the mics (names and seats stay readable
             on a bright picture), solid toward the chat. */}
-        <LinearGradient colors={['rgba(22,14,18,0.40)', 'rgba(22,14,18,0.50)', 'rgba(22,14,18,0.88)', colors.bg]} locations={[0, 0.4, 0.68, 0.9]} style={StyleSheet.absoluteFill} />
+        <LinearGradient colors={['rgba(22,14,18,0.18)', 'rgba(22,14,18,0.26)', 'rgba(22,14,18,0.84)', colors.bg]} locations={[0, 0.4, 0.7, 0.92]} style={StyleSheet.absoluteFill} />
         <LinearGradient colors={['transparent', 'rgba(22,14,18,0.85)', colors.bg]} locations={[0, 0.6, 1]} style={s.floor} />
       </View>
     );
@@ -102,8 +102,8 @@ export function StageBackdrop({ theme, background, freeId }: { theme: RoomTheme;
       {/* The stage picture has its own colors: a light veil of the app's ground over it. The sea photo takes the theme's
           tint. Both are light at the top so the scene shows behind the mics, solid toward the chat. */}
       <LinearGradient
-        colors={art ? [`${colors.bg}40`, `${colors.bg}66`, `${colors.bg}E0`, colors.bg] : [`${look.top}99`, `${look.mid}8C`, `${look.mid}E6`, colors.bg]}
-        locations={[0, 0.4, 0.68, 0.9]}
+        colors={art ? [`${colors.bg}1A`, `${colors.bg}33`, `${colors.bg}D6`, colors.bg] : [`${look.top}66`, `${look.mid}59`, `${look.mid}E0`, colors.bg]}
+        locations={[0, 0.4, 0.7, 0.92]}
         style={StyleSheet.absoluteFill}
       />
       {/* Glow behind the mic grid. */}
