@@ -270,6 +270,12 @@ describe('Giyme ve görünüm', () => {
     const [, prof] = await call('GET', `/api/user?id=${u.user.id}`, null, other.session);
     assert.equal(prof.looks.entry, 'en-sparkle');
     assert.equal((await call('GET', '/api/looks?ids=bozuk', null, other.session))[0], 400);
+    // The gender colors the speaking ring; a hidden one is never told.
+    assert.equal((await looks(other.session, u.user.id))[u.user.id].gender, null, 'cinsiyet yok');
+    await ok(call('PATCH', '/api/me', { gender: 'Kadın' }, u.session));
+    assert.equal((await looks(other.session, u.user.id))[u.user.id].gender, 'Kadın');
+    await ok(call('PATCH', '/api/me/extras', { genderHidden: true }, u.session));
+    assert.equal((await looks(other.session, u.user.id))[u.user.id].gender, null, 'gizli cinsiyet söylenmez');
   });
 });
 
