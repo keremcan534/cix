@@ -1,13 +1,17 @@
 // The test server (ALLOW_TEST_TOPUP=1) puts admin accounts at the top of everything (test-admin.mjs, index.mjs
 // fillTestAdmin): millions of coins, SVIP 10, the top rank and room level, the last Cömertlik and Yankı levels. An
 // ordinary account gets none of it.
+import fs from 'node:fs';
+import path from 'node:path';
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { SVIP_XP, svipLevel } from '../catalog.mjs';
 import { CHARM_XP, WEALTH_XP } from '../profile-rules.mjs';
-import { ROOM_XP_THRESHOLDS } from '../rooms.mjs';
 import { startApi } from './harness.mjs';
+
+// rooms.mjs needs the voice server's keys at import, so its last room-level step is read from the source.
+const ROOM_TOP = Number(/ROOM_XP_THRESHOLDS = \[[^\]]*?([\d_]+)\]/.exec(fs.readFileSync(path.join(import.meta.dirname, '..', 'rooms.mjs'), 'utf8'))[1].replaceAll('_', ''));
 
 const h = startApi({ TEST_ADMIN_MAX: undefined, LEVELS_CACHE_MS: '0' });
 const { call } = h;
@@ -33,7 +37,7 @@ describe('test sunucusu: yönetici her şeyin en üstünde', () => {
     assert.equal(a.charmXp, CHARM_XP.at(-1));
     assert.equal(svipLevel(a.svipXp), SVIP_XP.length);
     const [row] = await q('SELECT room_xp FROM users WHERE id = $1', [admin.user.id]);
-    assert.equal(Number(row.room_xp), ROOM_XP_THRESHOLDS.at(-1));
+    assert.equal(Number(row.room_xp), ROOM_TOP);
     assert.deepEqual(await ranks(admin), [{ sku: 'noble-5', price: '0', source: 'admin' }]);
     const eco = await ok(call('GET', '/api/economy', null, admin.session));
     assert.equal(eco.noble.tier, 5);
