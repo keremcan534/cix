@@ -29,6 +29,7 @@
     "expo-iap": "6.4.1",
     "expo-image-manipulator": "~58.0.16",
     "expo-image-picker": "~58.0.10",
+    "expo-intent-launcher": "~58.0.3",
     "expo-linear-gradient": "~58.0.3",
     "expo-linking": "~58.0.14",
     "expo-notifications": "~58.1.8",
