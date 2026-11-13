@@ -334,6 +334,9 @@ export const GIFTS: Gift[] = [
   { id: 'h10', name: 'Anı Fotoğrafı', emoji: '📸', price: 1_299, cat: 'hot', badge: '3D' },
   { id: 'h11', name: 'Altın Çan', emoji: '🔔', price: 4_950, cat: 'hot' },
   { id: 'h12', name: 'Altın Kuğu', emoji: '🦢', price: 99_950, cat: 'hot', badge: 'music' },
+  // Full-screen transparent videos with sound (components/fx/video-fx).
+  { id: 'h13', name: 'Tatlı Ayıcık', emoji: '🧸', price: 2_999, cat: 'hot', badge: 'music' },
+  { id: 'h14', name: 'Kraliyet Tacı', emoji: '👑', price: 9_999, cat: 'hot', badge: 'music' },
   // --- Gameplay: interactive "throw" gifts (fixed price, no random rewards) ---
   { id: 'p1', name: 'Kar Topu', emoji: '❄️', price: 50, cat: 'gameplay' },
   { id: 'p2', name: 'Sulu Balon', emoji: '🎈', price: 99, cat: 'gameplay' },
@@ -358,6 +361,7 @@ export const GIFTS: Gift[] = [
   couple('c10', 'Kristal Kolye', '📿', 9_999),
   couple('c11', 'Lunapark Randevusu', '🎡', 49_950, '3D'),
   couple('c12', 'Aşk Ateşi', '❤️‍🔥', 1_999),
+  couple('c13', 'Pırlanta Yüzük', '💍', 19_999, 'music'),
   // --- Ayrıcalık (SVIP-gated) ---
   { id: 'v1', name: 'Zümrüt Saat', emoji: '⌚', price: 4_950, cat: 'privilege', minSvip: 2 },
   { id: 'v2', name: 'Gizemli Gül', emoji: '🥀', price: 350, cat: 'privilege', minSvip: 2 },

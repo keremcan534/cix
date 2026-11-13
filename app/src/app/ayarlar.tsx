@@ -9,6 +9,7 @@ import { Icon3D } from '@/components/Icon3D';
 import { ChoiceChips, ListBlock, ListGroup, ListRow, ListSwitch } from '@/components/list';
 import { AdminPanel } from '@/components/admin/admin-panel';
 import { AlphaVideoTestPanel } from '@/components/admin/alpha-video-test';
+import { EffectPreviewPanel } from '@/components/admin/effect-preview';
 import { LicensesSheet } from '@/components/licenses-sheet';
 import { Avatar, Header } from '@/components/ui';
 import { userById } from '@/data/mock';
@@ -178,6 +179,7 @@ export default function SettingsScreen() {
   // Şeffaf video testi (POC): a live build's admins, and the offline demo (like its other demo admin tools).
   const alphaTest = staff === 'admin' || (IS_DEMO && !liveMode());
   const [alphaOpen, setAlphaOpen] = useState(false);
+  const [fxOpen, setFxOpen] = useState(false);
   const { colors, semantic } = useTheme();
   const styles = useStyles();
   const snoozed = settings.snoozeUntil > nowMs();
@@ -240,6 +242,9 @@ export default function SettingsScreen() {
               subtitle={staff === 'admin' ? 'Şikâyetler, yaptırımlar, destek, para çekme, ajans ödemeleri ve iadeler' : 'Yaptırımlar, itirazlar ve destek talepleri'}
               onPress={() => setAdminOpen(true)}
             />
+          )}
+          {alphaTest && (
+            <ListRow icon="sparkles-outline" tone="neutral" title="Hediye ve giriş efektleri" subtitle="Yönetim · videolu hediyeleri ve girişleri göndermeden dene" onPress={() => setFxOpen(true)} />
           )}
           {alphaTest && (
             <ListRow icon="film-outline" tone="neutral" title="Şeffaf video testi (POC)" subtitle="Yönetim · oda üstünde şeffaf video denemesi" onPress={() => setAlphaOpen(true)} />
@@ -558,6 +563,7 @@ export default function SettingsScreen() {
       {liveMode() && <VerifySheet kind={verifyKind} onClose={() => setVerifyKind(null)} />}
       {staff && <AdminPanel visible={adminOpen} onClose={() => setAdminOpen(false)} moderator={staff === 'moderator'} />}
       {alphaTest && <AlphaVideoTestPanel visible={alphaOpen} onClose={() => setAlphaOpen(false)} />}
+      {alphaTest && <EffectPreviewPanel visible={fxOpen} onClose={() => setFxOpen(false)} />}
     </SafeAreaView>
   );
 }
