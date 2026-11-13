@@ -101,6 +101,8 @@ import { useFollowerInvite, useServerMicInvites, useServerPoll } from '@/lib/liv
 import { followerInviteAt, inviteSeat as pickInviteSeat, roomShareText, serverInviteId } from '@/lib/room-social';
 import { liveDm } from '@/lib/live/messages';
 import { LiveMusicSheet, useRoomMusicPlayer } from '@/components/room/room-music';
+import { SeatColorSheet } from '@/components/room/seat-color-sheet';
+import { seatColorName } from '@/data/seat-colors';
 import { roomUnmute } from '@/lib/api';
 import { showAlert } from '@/lib/alert';
 import { checkText, messageRefusal, noteSent, refusalTitle } from '@/lib/contact-filter';
@@ -442,6 +444,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // The shared YouTube screen of a server room (lib/live/room-video): the server's video, from the metadata, on every
   // phone. My own change goes to the server; refused, the screen goes back to what the server has.
   const metaVideo = real ? (liveState?.video ?? null) : null;
+  // The empty mics' color the owner bought for the room (Koltuk rengi); null: the turquoise ones.
+  const seatColor = real ? (liveState?.seatColor ?? null) : null;
   const metaVideoKey = metaVideo ? `${metaVideo.videoId}:${metaVideo.status}:${metaVideo.position}:${metaVideo.updatedAt}` : 'none';
   useEffect(() => {
     if (real && liveState) applyServerVideo(id, metaVideo && videoPlayback(metaVideo), metaVideoKey);
@@ -563,7 +567,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const [inviteSeat, setInviteSeat] = useState<number | null>(null);
   const [sheet, setSheet] = useState<{ title: string; options: SheetOption[] } | null>(null);
   const [msgFilter, setMsgFilter] = useState({ joins: true, gifts: true, bot: true });
-  const [panel, setPanel] = useState<null | 'menu' | 'msgSettings' | 'info' | 'settings' | 'music' | 'envelope' | 'bag' | 'dice' | 'contrib' | 'requests' | 'poll' | 'goal' | 'events' | 'qa' | 'effects' | 'mod' | 'invite' | 'results' | 'session'>(null);
+  const [panel, setPanel] = useState<null | 'menu' | 'msgSettings' | 'info' | 'settings' | 'music' | 'envelope' | 'bag' | 'dice' | 'contrib' | 'requests' | 'poll' | 'goal' | 'events' | 'qa' | 'effects' | 'mod' | 'invite' | 'results' | 'session' | 'seatColor'>(null);
   const [poll, setPoll] = useState<Poll | null>(null);
   const [goal, setGoal] = useState<Goal | null>(null);
   const [events, setEvents] = useState<RoomEvent[]>(() =>
@@ -2994,7 +2998,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                     { key: 'bans', label: 'Giriş yasakları', value: String(staff.bans?.length ?? 0), hint: 'Odadan atılanlar ve kara liste; yasağı buradan kaldırırsın', onPress: fromSettings(openBans) },
                     { key: 'admins', label: 'Oda yöneticileri', value: `${staff.admins.length}`, hint: 'Süper Yönetici: oda adı, bülten ve etkinlikler', onPress: fromSettings(openAdmins) },
                     ...(myRole === 'owner'
-                      ? [{ key: 'djs', label: 'DJ’ler', value: `${djIds.length}/${djCapacity(level)}`, hint: 'Odada yalnızca müzik çalarlar; başka yetkileri yok', onPress: fromSettings(openDjs) }]
+                      ? [
+                          { key: 'djs', label: 'DJ’ler', value: `${djIds.length}/${djCapacity(level)}`, hint: 'Odada yalnızca müzik çalarlar; başka yetkileri yok', onPress: fromSettings(openDjs) },
+                          { key: 'seatColor', label: 'Koltuk rengi', value: seatColorName(seatColor), hint: 'Boş mikrofonların rengi; bir kez alınır, oda hep kullanır', onPress: fromSettings(() => setPanel('seatColor')) },
+                        ]
                       : []),
                   ]
                 : []),
@@ -3268,6 +3275,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         slotWidth={extra?.slot?.width ?? extra?.grid?.width}
         bondLink={link && extra?.next ? { bond: link, gap: extra.next.gap } : null}
         mini={extra?.mini}
+        seatColor={seatColor}
         enterDelay={Math.min(i, 24) * 22}
         onPress={() => onSeatPress(i)}
       />
@@ -3826,6 +3834,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         classicLabel={`Klasik düzen · ${classicCapacity} mikrofon`}
         onPick={pickLayout}
       />
+      {real && myRole === 'owner' && (
+        <SeatColorSheet visible={panel === 'seatColor'} onClose={closePanel} room={id} current={seatColor} onDone={(text) => addMsg({ system: true, text })} />
+      )}
       {real ? (
         <LiveMusicSheet
           visible={panel === 'music'}

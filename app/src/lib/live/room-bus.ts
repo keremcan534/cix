@@ -24,6 +24,7 @@
 //    own `seat` attribute changed by the server).
 import { useEffect, useRef, useSyncExternalStore } from 'react';
 
+import { isSeatColor, type SeatColorId } from '@/data/seat-colors';
 import type { BossNews } from '@/lib/patron-seat';
 import { parseMove, type Move } from '@/lib/room-moves';
 
@@ -57,7 +58,16 @@ type Link = { setSeat: (seat: number | null) => void; send: (msg: PeerSignal) =>
  * mic count (null = the level's most), whether the mic queue is on and who waits in it (server user ids, first
  * asked first). Null when the metadata has none of it (an older server, or nothing written yet).
  */
-export type RoomState = { layoutId: string | null; micCount: number | null; micQueue: boolean; queue: string[]; music: RoomMusic | null; video: RoomVideo | null };
+export type RoomState = {
+  layoutId: string | null;
+  micCount: number | null;
+  micQueue: boolean;
+  queue: string[];
+  music: RoomMusic | null;
+  video: RoomVideo | null;
+  /** The empty mics' color (server/api/room-seat-color.mjs); null: the free turquoise. */
+  seatColor: SeatColorId | null;
+};
 /**
  * A row of the room's playlist: `key` the row (the same track can be on the list twice), `by` who added it (server
  * user id), `artist` '' when the file's name gave none.
@@ -136,7 +146,7 @@ export function parseRoomState(metadata: string | undefined): RoomState | null {
     const layoutId = typeof m.layoutId === 'string' && m.layoutId.length <= 40 ? m.layoutId : null;
     const micCount = Number.isInteger(m.micCount) && (m.micCount as number) >= 1 && (m.micCount as number) <= 99 ? (m.micCount as number) : null;
     const queue = Array.isArray(m.queue) ? [...new Set(m.queue.filter((x): x is string => typeof x === 'string' && !!x && x.length <= 64))].slice(0, 50) : [];
-    return { layoutId, micCount, micQueue: m.micQueue, queue, music: parseMusic(m.music), video: parseRoomVideo(m.video) };
+    return { layoutId, micCount, micQueue: m.micQueue, queue, music: parseMusic(m.music), video: parseRoomVideo(m.video), seatColor: isSeatColor(m.seatColor) ? m.seatColor : null };
   } catch {
     return null;
   }

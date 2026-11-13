@@ -184,6 +184,13 @@ export async function liveRoomAnimation(room: string, animationId: string) {
   return applied(await once(`anim:${room}:${animationId}`, (ref) => api.roomAnimation(room, animationId, ref)), 'Animasyon');
 }
 
+/** The room's empty-mic color (server/api/room-seat-color.mjs); a paid one the room lacks is bought with my coins. */
+export async function liveSetSeatColor(room: string, color: string) {
+  const r = await once(`seatcolor:${room}:${color}`, (ref) => api.setRoomSeatColor(room, color, ref));
+  if (r.user) applied({ ...r, user: r.user }, 'Koltuk rengi');
+  return r;
+}
+
 /** Signed out: the next account on this phone starts without this one's id, balance or pending request ids. */
 export function forgetLiveAccount() {
   setMyId(null);

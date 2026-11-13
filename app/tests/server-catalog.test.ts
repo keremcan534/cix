@@ -10,6 +10,7 @@ import { ANIMATION_SEED } from '@/data/animations';
 import { COSMETICS, ROOM_BACKGROUNDS, ROOM_THEMES, STICKER_PACKS, roomCoverUrl } from '@/data/catalog';
 import { GIFTS } from '@/data/mock';
 import { RULES } from '@/data/rules';
+import { SEAT_COLORS } from '@/data/seat-colors';
 import { convertDiamonds, diamondValueTl, exchangeOwnDiamonds, selfExchangeRate, wholesaleQuote } from '@/lib/coins-bank';
 import { NOBLE_DAYS, NOBLE_TIERS, RECHARGE_PACKS, SVIP_LEVELS } from '@/data/status';
 // Plain JavaScript module of the server; TypeScript reads it through allowJs.
@@ -58,6 +59,10 @@ describe('Sunucu kataloğu uygulamayla aynı', () => {
     assert.deepEqual(shop, app);
     const free = ANIMATION_SEED.filter((a) => a.display_type === 'mic_effect' && a.is_free).map((a) => a.animation_id);
     assert.deepEqual(server.FREE_MICFX, free);
+  });
+
+  test('koltuk renkleri: kimlik, ad ve fiyat', () => {
+    assert.deepEqual([...(server.SEAT_COLORS as Map<string, { id: string; name: string; price: number }>).values()], SEAT_COLORS.map((c) => ({ ...c })));
   });
 
   test('hediye adetleri (hediye paneli)', () => {

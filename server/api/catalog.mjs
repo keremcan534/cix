@@ -178,6 +178,20 @@ export function labelOf(item) {
   return `Mağaza: ${item.name}${item.days ? ` (${item.days} gün)` : ''}`;
 }
 
+// --- Koltuk rengi (room-seat-color.mjs): the color of a room's empty mics, bought once per room by its owner and
+// kept; turquoise is the free default. In step with the app (app/src/data/catalog.ts SEAT_COLORS); the catalog test
+// fails when they drift.
+/** [id, name, price in coins] */
+const SEAT_COLOR_ROWS = [
+  ['turkuaz', 'Turkuaz', 0],
+  ['pembe', 'Pembe', 2_000],
+  ['kirmizi', 'Kırmızı', 2_000],
+  ['turuncu', 'Turuncu', 2_000],
+  ['yesil', 'Yeşil', 2_000],
+  ['gumus', 'Gümüş', 3_000],
+];
+export const SEAT_COLORS = new Map(SEAT_COLOR_ROWS.map(([id, name, price]) => [id, Object.freeze({ id, name, price })]));
+
 // --- Hareketli in rooms (room-fx.mjs): the paid room animations, in step with the app (app/src/data/animations.ts
 // rows of type reaction, gift and fullscreen with a price); tests/server-catalog.test.ts fails when they drift.
 // Free reactions go phone to phone and never reach the server. A campaign row sells only inside its window
