@@ -57,7 +57,7 @@ export default function DiscoverScreen() {
   const serverPeople = useDiscoverPeople(list);
   const peopleState = useDiscoverState(list);
   const pool = live ? (serverPeople ?? []) : USERS;
-  const { colors, dark } = useTheme();
+  const { colors } = useTheme();
   const styles = useStyles();
   // Nearby discovery only with the user's opt-in; blocked users never show up (spec §8.3, PRIV-01).
   const needsOptIn = tab === 'Yakındakiler' && !settings.cityDiscovery;
@@ -109,8 +109,8 @@ export default function DiscoverScreen() {
               {/* Aile (groups) is local-only: a live build doesn't offer it until the server has it. */}
               {DISCOVER_SHORTCUTS.filter((s) => s.id !== 'call' || oneOnOneOpen()).map((s) => (
                 <Pressable key={s.id} onPress={() => router.push(s.href)}>
-                  {/* The shortcut's color lights a navy card from the top instead of filling it. */}
-                  <LinearGradient colors={[`${s.colors[1]}${dark ? '5C' : '33'}`, dark ? 'rgba(22,37,60,0.94)' : 'rgba(255,255,255,0.94)']} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={[styles.shortcut, s.wide && styles.shortcutWide]}>
+                  {/* Each shortcut fills its card with its own color, so the four never read as one. */}
+                  <LinearGradient colors={s.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.shortcut, s.wide && styles.shortcutWide]}>
                     <ShortcutArt id={s.id} emoji={s.emoji} />
                     <Text style={[styles.shortcutTitle, !s.wide && { textAlign: 'center' }]} numberOfLines={s.wide ? 1 : 2}>
                       {s.title}
@@ -228,20 +228,20 @@ export default function DiscoverScreen() {
 }
 
 function ShortcutArt({ id, emoji }: { id: string; emoji: string }) {
-  const { colors, ink } = useTheme();
+  const { colors } = useTheme();
   const styles = useStyles();
   if (id === 'call')
     return (
       <View style={styles.artRow}>
-        <Ionicons name="mic" size={26} color={ink(0.9)} />
-        <Ionicons name="heart" size={22} color="#F87171" />
-        <Ionicons name="videocam" size={26} color={ink(0.9)} />
+        <Ionicons name="mic" size={26} color="#fff" />
+        <Ionicons name="heart" size={22} color="#FFE3EC" />
+        <Ionicons name="videocam" size={26} color="#fff" />
       </View>
     );
   if (id === 'party')
     return (
       <View style={styles.artCenter}>
-        <Ionicons name="stats-chart" size={12} color={colors.text} style={{ position: 'absolute', left: 0, top: 0 }} />
+        <Ionicons name="stats-chart" size={12} color="#fff" style={{ position: 'absolute', left: 0, top: 0 }} />
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           {/* No photo: the person glyph, like every other face in the app (never an empty ring). */}
           {PARTY_AVATAR_IDS.map((uid, i) => (
@@ -424,11 +424,12 @@ const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark, edge
   greet: { color: colors.textDim, fontSize: 20, fontFamily: fonts.displayBold, letterSpacing: -0.3, paddingHorizontal: 16, paddingTop: 12 },
   greetName: { color: colors.text },
   shortcuts: { gap: 8, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4 },
-  shortcut: { width: 92, height: 104, borderRadius: 16, padding: 10, overflow: 'hidden', justifyContent: 'flex-end', gap: 2, borderWidth: 1, borderColor: surface.hairline, ...(dark ? {} : { boxShadow: lift.boxShadow }) },
+  shortcut: { width: 92, height: 104, borderRadius: 16, padding: 10, overflow: 'hidden', justifyContent: 'flex-end', gap: 2, ...(dark ? {} : { boxShadow: lift.boxShadow }) },
   shortcutWide: { width: 150 },
   // Two lines for the narrow cards, so "Canlı Odalar" and "Jeton Kazan" are never cut at 360 px.
-  shortcutTitle: { color: colors.text, fontWeight: '800', fontSize: 14, lineHeight: 17 },
-  shortcutSub: { color: ink(0.8), fontSize: 12 },
+  // White on the colored card; a soft shadow keeps it readable on the light end of each gradient.
+  shortcutTitle: { color: '#fff', fontWeight: '800', fontSize: 14, lineHeight: 18, textShadowColor: 'rgba(0,0,0,0.25)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
+  shortcutSub: { color: 'rgba(255,255,255,0.9)', fontSize: 12 },
   artRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
   artCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', alignSelf: 'stretch' },
   // White rings read on the navy card; on paper a soft shadow keeps the stacked faces apart.
