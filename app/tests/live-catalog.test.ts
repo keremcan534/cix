@@ -46,9 +46,9 @@ describe('Canlı katalog: hediye rafı', () => {
     assert.deepEqual(visibleGifts(GIFTS, extra), [GIFTS.find((g) => g.id === 'g1')]);
   });
 
-  test('boş sunucu tablosu (eski sunucu gibi): 54 hediyenin hepsi', () => {
+  test('boş sunucu tablosu (eski sunucu gibi): 57 hediyenin hepsi', () => {
     const c = parseLiveCatalog(body());
-    assert.equal(visibleGifts(GIFTS, c).length, 54);
+    assert.equal(visibleGifts(GIFTS, c).length, 57);
     assert.equal(c.packs.length, 9);
   });
 
@@ -185,7 +185,7 @@ describe('Canlı katalog: telefondaki kopya', () => {
     const back = parseSavedLiveCatalog(JSON.stringify({ ...c, fetchedAt: NOW }));
     assert.deepEqual(back, { catalog: c, fetchedAt: NOW });
     assert.equal(c.v, 12);
-    assert.equal(c.giftIds?.length, 53);
+    assert.equal(c.giftIds?.length, 56);
   });
 
   test('bozuk kopya hiç kullanılmaz; bozuk alanlar derlenmiş değere döner', () => {

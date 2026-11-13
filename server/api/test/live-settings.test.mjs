@@ -71,7 +71,7 @@ describe('nothing saved', () => {
     assert.deepEqual(await config(), { minVersion: null, updateUrl: null, notice: null, featuresOff: ['dm'], v: 0, ...SIGN_IN });
     const [st, cat] = await call('GET', '/api/catalog');
     assert.equal(st, 200);
-    assert.equal(cat.gifts.length, 54);
+    assert.equal(cat.gifts.length, 57);
     assert.equal(cat.packs.length, 9);
   });
 

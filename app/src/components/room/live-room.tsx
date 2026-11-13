@@ -61,6 +61,7 @@ import { AnimLayer } from '@/components/fx/anim-layer';
 import { WinBanner } from '@/components/fx/win-banner';
 import { GiftFlights, type Flight, type Point } from '@/components/fx/gift-flight';
 import { GiftShowFx, type GiftShowPlay } from '@/components/fx/gift-show';
+import { GiftVideoFx, VideoFx, entryVideoOf, giftVideoOf } from '@/components/fx/video-fx';
 import { giftShowOf } from '@/data/gift-shows';
 import { GamePanel, type OpenGame } from '@/components/games/game-panel';
 import type { CasinoGame } from '@/data/games';
@@ -742,6 +743,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // --- Mic/camera arbitration with one-to-one calls (Hemen Tanış spec §3–4, lib/media) -----------------
   const media = useMedia();
   const callActive = !!media.call;
+  // The video gifts and entries play their sound unless the room's sound or gift sounds are off, or a call is on.
+  const fxMuted = settings.roomMuted || !settings.giftSounds || callActive;
   useEffect(() => {
     reportRoom({ roomId: id, title, seated: amSeated, micOn: amSeated && micOn, camOn: amSeated && camOn });
   }, [id, title, amSeated, micOn, camOn]);
@@ -4155,7 +4158,18 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         </Pressable>
       )}
       {giftFx &&
-        (giftShowOf(giftFx.gift.id) ? (
+        (giftVideoOf(giftFx.gift.id) ? (
+          <GiftVideoFx
+            key={giftFx.key}
+            media={giftVideoOf(giftFx.gift.id)!}
+            fromName={giftFx.fromName}
+            toText={giftFx.toText}
+            giftName={giftFx.gift.name}
+            count={giftFx.count}
+            muted={fxMuted}
+            onDone={() => setGiftFx(null)}
+          />
+        ) : giftShowOf(giftFx.gift.id) ? (
           <GiftShowFx key={giftFx.key} show={giftShowOf(giftFx.gift.id)!} play={giftFx} lite={settings.lowData} onDone={() => setGiftFx(null)} />
         ) : (
           <GiftAnimation key={giftFx.key} gift={giftFx.gift} onDone={() => setGiftFx(null)} />
@@ -4176,7 +4190,15 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       {luckyFx && <LuckyResult key={luckyFx[0].txId} records={luckyFx} still={settings.effectsOff || settings.reduceMotion} onDone={() => setLuckyFx(null)} />}
       {/* Platform-wide win announcements (every room shows every win). */}
       {visible && <WinBanner top={110} still={settings.reduceMotion} />}
-      {entry && <EntryEffect key={`${entry.name}-${entry.fx}-${entry.avatar}`} show={entry} still={settings.reduceMotion} onDone={nextEntry} />}
+      {entry &&
+        (entryVideoOf(entry.fx) && !settings.reduceMotion ? (
+          // A video entry (Ejderha): the name banner over the full-screen clip, which ends the turn.
+          <VideoFx key={`${entry.name}-${entry.fx}-${entry.avatar}`} media={entryVideoOf(entry.fx)!} muted={fxMuted} onDone={nextEntry}>
+            <EntryEffect show={entry} />
+          </VideoFx>
+        ) : (
+          <EntryEffect key={`${entry.name}-${entry.fx}-${entry.avatar}`} show={entry} still={settings.reduceMotion} onDone={nextEntry} />
+        ))}
     </View>
   );
 }

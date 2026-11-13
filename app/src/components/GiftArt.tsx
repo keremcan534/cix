@@ -28,6 +28,9 @@ const ART: Record<string, Art> = {
   h10: { sm: require('../../assets/gifts/192/hediye-ani-fotografi.png'), lg: require('../../assets/gifts/512/hediye-ani-fotografi.png') },
   h11: { sm: require('../../assets/gifts/192/hediye-altin-can.png'), lg: require('../../assets/gifts/512/hediye-altin-can.png') },
   h12: { sm: require('../../assets/gifts/192/hediye-altin-kugu.png'), lg: require('../../assets/gifts/512/hediye-altin-kugu.png') },
+  // Cut out of their full-screen videos (components/fx/video-fx).
+  h13: { sm: require('../../assets/gifts/192/hediye-tatli-ayicik.png'), lg: require('../../assets/gifts/512/hediye-tatli-ayicik.png') },
+  h14: { sm: require('../../assets/gifts/192/hediye-kraliyet-taci.png'), lg: require('../../assets/gifts/512/hediye-kraliyet-taci.png') },
   p1: { sm: require('../../assets/gifts/192/hediye-kar-topu.png'), lg: require('../../assets/gifts/512/hediye-kar-topu.png') },
   p2: { sm: require('../../assets/gifts/192/hediye-sulu-balon.png'), lg: require('../../assets/gifts/512/hediye-sulu-balon.png') },
   p3: { sm: require('../../assets/gifts/192/hediye-domates-at.png'), lg: require('../../assets/gifts/512/hediye-domates-at.png') },
@@ -50,6 +53,7 @@ const ART: Record<string, Art> = {
   c10: { sm: require('../../assets/gifts/192/hediye-kristal-kolye.png'), lg: require('../../assets/gifts/512/hediye-kristal-kolye.png') },
   c11: { sm: require('../../assets/gifts/192/hediye-lunapark-randevusu.png'), lg: require('../../assets/gifts/512/hediye-lunapark-randevusu.png') },
   c12: { sm: require('../../assets/gifts/192/hediye-ask-atesi.png'), lg: require('../../assets/gifts/512/hediye-ask-atesi.png') },
+  c13: { sm: require('../../assets/gifts/192/hediye-pirlanta-yuzuk.png'), lg: require('../../assets/gifts/512/hediye-pirlanta-yuzuk.png') },
   v1: { sm: require('../../assets/gifts/192/hediye-zumrut-saat.png'), lg: require('../../assets/gifts/512/hediye-zumrut-saat.png') },
   v2: { sm: require('../../assets/gifts/192/hediye-gizemli-gul.png'), lg: require('../../assets/gifts/512/hediye-gizemli-gul.png') },
   v3: { sm: require('../../assets/gifts/192/hediye-sihirli-sapka.png'), lg: require('../../assets/gifts/512/hediye-sihirli-sapka.png') },
