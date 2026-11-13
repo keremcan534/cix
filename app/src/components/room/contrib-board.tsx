@@ -332,7 +332,7 @@ const useStyles = makeStyles(({ colors, ink, edge, surface }) => ({
   pedestalNum: { color: ink(0.3), fontFamily: fonts.display, fontSize: 18 },
   pedestalNumTop: { fontSize: 24, color: ink(0.38) },
   row: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.lg, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: surface.hairline },
-  rowMe: { backgroundColor: 'rgba(19,217,223,0.08)' },
+  rowMe: { backgroundColor: 'rgba(255,95,162,0.08)' },
   rowPressed: { backgroundColor: surface.pressed },
   rank: { width: 26, textAlign: 'center', color: colors.textDim, fontFamily: fonts.displayBold, fontSize: 15, fontVariant: ['tabular-nums'] },
   name: { flex: 1, color: colors.text, fontWeight: '700', fontSize: type.body },

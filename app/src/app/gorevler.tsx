@@ -236,7 +236,7 @@ const useStyles = makeStyles(({ colors, semantic, lift, dark }) => ({
   large: { position: 'absolute', top: -7, backgroundColor: semantic.money, color: semantic.moneyInk, fontSize: 9, fontWeight: '800', letterSpacing: 0.4, borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1, overflow: 'hidden' },
   dayLabel: { color: colors.textDim, fontWeight: '700', fontSize: 13 },
   dayCoins: { color: colors.gold, fontSize: 12, fontWeight: '700' },
-  tomorrow: { backgroundColor: dark ? 'rgba(19,217,223,0.12)' : 'rgba(0,140,148,0.07)', borderRadius: 16, padding: 14, gap: 12 },
+  tomorrow: { backgroundColor: dark ? 'rgba(255,95,162,0.12)' : 'rgba(208,46,120,0.07)', borderRadius: 16, padding: 14, gap: 12 },
   tomorrowTitle: { color: colors.text, fontWeight: '700', fontSize: 15 },
   rewardBox: { flex: 1, alignItems: 'center', gap: 4, backgroundColor: colors.cardAlt, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 4 },
   h1: { color: colors.text, fontSize: 20, fontFamily: fonts.display, letterSpacing: -0.3 },

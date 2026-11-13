@@ -409,7 +409,7 @@ const useStyles = makeStyles(({ colors, semantic, dark }) => ({
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: { borderRadius: 999, borderWidth: 1.5, borderColor: colors.border, paddingHorizontal: 12, paddingVertical: 6 },
-  chipOn: { borderColor: semantic.actionText, backgroundColor: dark ? 'rgba(19,217,223,0.15)' : 'rgba(0,140,148,0.09)' },
+  chipOn: { borderColor: semantic.actionText, backgroundColor: dark ? 'rgba(255,95,162,0.15)' : 'rgba(208,46,120,0.09)' },
   chipText: { color: colors.text, fontWeight: '700', fontSize: 12 },
   chipRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   chipIcon: { width: 18, height: 18 },
@@ -418,7 +418,7 @@ const useStyles = makeStyles(({ colors, semantic, dark }) => ({
   btnText: { color: semantic.actionInk, fontWeight: '900' },
   input: { backgroundColor: colors.cardAlt, color: colors.text, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, width: 90 },
   inputWide: { backgroundColor: colors.cardAlt, color: colors.text, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9 },
-  stage: { flex: 1, backgroundColor: 'rgba(8,15,30,0.92)' },
+  stage: { flex: 1, backgroundColor: 'rgba(22,14,18,0.92)' },
   seat: { position: 'absolute', width: 60, height: 60, borderRadius: 30, borderWidth: 2, borderColor: colors.border, backgroundColor: colors.card },
   stageText: { position: 'absolute', bottom: 40, left: 0, right: 0, textAlign: 'center', color: colors.textDim },
 }));

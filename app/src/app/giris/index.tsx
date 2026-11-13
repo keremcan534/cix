@@ -108,7 +108,7 @@ export default function WelcomeScreen() {
   const [primary, ...more] = options;
 
   return (
-    <LinearGradient colors={[dark ? '#0B3B4A' : '#D9F1F3', colors.bg, colors.bg]} style={{ flex: 1 }}>
+    <LinearGradient colors={[dark ? '#4A1630' : '#FCE4EE', colors.bg, colors.bg]} style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>
         <Backdrop scene={SCENES.login} />
         <View style={styles.hero}>
@@ -187,7 +187,7 @@ const useStyles = makeStyles(({ colors, semantic, dark, lift }) => ({
   logoMark: { width: 96, height: 96 },
   logo: { color: colors.text, fontSize: 38, fontWeight: '900', letterSpacing: -1 },
   // White with a soft shadow: the hero photo behind it is a bright sky.
-  tagline: { color: colors.text, fontSize: 16, fontWeight: '600', textAlign: 'center', lineHeight: 23, textShadowColor: dark ? 'rgba(8,15,30,0.85)' : 'rgba(243,246,251,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
+  tagline: { color: colors.text, fontSize: 16, fontWeight: '600', textAlign: 'center', lineHeight: 23, textShadowColor: dark ? 'rgba(22,14,18,0.85)' : 'rgba(251,244,247,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
   actions: { paddingHorizontal: 20, paddingBottom: 16, gap: 12 },
   placeholder: { height: 52 },
   social: {

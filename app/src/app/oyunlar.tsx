@@ -105,10 +105,10 @@ export default function GameCenter() {
             </DepthCard>
             <Pressable onPress={() => setOpen({ kind: 'wheel' })} accessibilityRole="button" accessibilityLabel="Rüzgâr Gülü aç">
               {/* Dark and gold in both schemes, like the game's own stage: a gold rim, a light along the top, a slow shine. */}
-              <LinearGradient colors={['#3B2300', '#16253C', '#0A3A4A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.wheelCard}>
+              <LinearGradient colors={['#3B2300', '#2A1A22', '#4A1630']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.wheelCard}>
                 <EdgeLight inset={22} strength={0.35} />
                 <Shine radius={22} every={5200} />
-                <LinearGradient colors={['#2A4470', '#080F1E']} style={s.wheelBadge}>
+                <LinearGradient colors={['#2A4470', '#160E12']} style={s.wheelBadge}>
                   <Ionicons name="compass" size={54} color="#F6BD60" />
                 </LinearGradient>
                 <View style={{ flex: 1, gap: 4 }}>
@@ -285,7 +285,7 @@ export default function GameCenter() {
 const useStyles = makeStyles((t) => ({
   tabs: { flexDirection: 'row', gap: 4, marginHorizontal: 16, marginTop: 4, padding: 4, borderRadius: 999, ...glassChipOf(t) },
   tab: { flex: 1, borderRadius: 999, paddingVertical: 7, alignItems: 'center' },
-  tabOn: { backgroundColor: t.semantic.action, boxShadow: '0 3px 12px rgba(19,217,223,0.4)' },
+  tabOn: { backgroundColor: t.semantic.action, boxShadow: '0 3px 12px rgba(255,95,162,0.4)' },
   tabText: { color: t.colors.textDim, fontFamily: fonts.displayBold, fontSize: 13, lineHeight: 18 },
   title: { color: t.colors.text, fontWeight: '800', fontSize: 15 },
   banner: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14, paddingLeft: 18 },
@@ -299,7 +299,7 @@ const useStyles = makeStyles((t) => ({
   heroName: { color: t.colors.text, fontFamily: fonts.display, fontSize: 24, lineHeight: 30 },
   section: { color: t.colors.text, fontFamily: fonts.display, fontSize: 18, lineHeight: 24, marginTop: 4 },
   // A slot's JACKPOT fund on its card: dark and gold in both schemes, like the plaque in the game.
-  fund: { flexDirection: 'row', alignItems: 'baseline', gap: 6, alignSelf: 'flex-start', backgroundColor: 'rgba(8,15,30,0.82)', borderRadius: 999, borderWidth: 1, borderColor: 'rgba(246,189,96,0.6)', paddingHorizontal: 9, paddingVertical: 2 },
+  fund: { flexDirection: 'row', alignItems: 'baseline', gap: 6, alignSelf: 'flex-start', backgroundColor: 'rgba(22,14,18,0.82)', borderRadius: 999, borderWidth: 1, borderColor: 'rgba(246,189,96,0.6)', paddingHorizontal: 9, paddingVertical: 2 },
   fundTag: { color: '#F6BD60', fontSize: 9, fontWeight: '900', letterSpacing: 1 },
   fundValue: { color: '#FDE68A', fontSize: 13, fontWeight: '900', fontVariant: ['tabular-nums'] },
   dim: { color: t.colors.textDim, fontSize: 12, lineHeight: 17 },

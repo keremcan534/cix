@@ -499,7 +499,7 @@ const s = StyleSheet.create({
   edgeDot: { position: 'absolute', right: 4, top: 4, width: 10, height: 10, borderRadius: 5, borderWidth: 2, borderColor: colors.card },
   center: { flex: 1, backgroundColor: SCRIM, alignItems: 'center', justifyContent: 'center', padding: space.xl },
   // The room ended under me (closed, or I was removed): a notice that stops everything, so it keeps a veil.
-  centerDim: { flex: 1, backgroundColor: 'rgba(8,15,30,0.7)', alignItems: 'center', justifyContent: 'center', padding: space.xl },
+  centerDim: { flex: 1, backgroundColor: 'rgba(22,14,18,0.7)', alignItems: 'center', justifyContent: 'center', padding: space.xl },
   dialog: { width: '100%', maxWidth: 360, backgroundColor: colors.card, borderRadius: radius.xl, padding: space.xl, gap: space.md, alignItems: 'center', ...edge.card },
   dialogTitle: { color: colors.text, fontWeight: '900', fontSize: type.title, textAlign: 'center' },
   dialogText: { color: colors.textDim, fontSize: type.body, lineHeight: 20, textAlign: 'center' },

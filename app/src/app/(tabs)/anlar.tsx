@@ -734,7 +734,7 @@ function MomentCard({
         <Pressable onPress={openProfile}>
           <FramedAvatar uri={author.avatar} size={50} vipLevel={svip} frameId={frameId} online={!svip && author.online} />
           {svip > 0 && (
-            <LinearGradient colors={['#0FB8BE', '#FF6576']} style={styles.svipTag}>
+            <LinearGradient colors={['#F0468E', '#FF6576']} style={styles.svipTag}>
               <Text style={styles.svipText}>VIP {svip}</Text>
             </LinearGradient>
           )}
@@ -1079,7 +1079,7 @@ const useStyles = makeStyles(({ colors, lift, dark, edge }) => ({
   preview: { width: 110, height: 110, borderRadius: 12, backgroundColor: colors.cardAlt },
   removeImage: { position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 999, padding: 3 },
   topicChip: { backgroundColor: colors.cardAlt, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: 'transparent' },
-  topicChipActive: { borderColor: colors.primaryText, backgroundColor: dark ? 'rgba(19,217,223,0.18)' : 'rgba(0,140,148,0.11)' },
+  topicChipActive: { borderColor: colors.primaryText, backgroundColor: dark ? 'rgba(255,95,162,0.18)' : 'rgba(208,46,120,0.11)' },
   topicChipText: { color: colors.textDim, fontSize: 12, fontWeight: '600' },
   comment: { flexDirection: 'row', gap: 10 },
   commentAvatar: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.cardAlt },

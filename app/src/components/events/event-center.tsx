@@ -399,7 +399,7 @@ function MineTab({
           {e.room.title} · {whenText(e.startsAt, now)}
         </Text>
       </View>
-      <View style={[styles.badge, e.state === 'live' && { backgroundColor: 'rgba(19,217,223,0.18)' }, (e.state === 'rejected' || e.state === 'cancelled') && { backgroundColor: 'rgba(239,68,68,0.14)' }]}>
+      <View style={[styles.badge, e.state === 'live' && { backgroundColor: 'rgba(255,95,162,0.18)' }, (e.state === 'rejected' || e.state === 'cancelled') && { backgroundColor: 'rgba(239,68,68,0.14)' }]}>
         <Text style={styles.badgeText} numberOfLines={1}>
           {e.mine === 'attended' ? 'Katıldın' : e.mine === 'missed' ? 'Katılmadın' : e.stateLabel}
         </Text>

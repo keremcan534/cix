@@ -197,7 +197,7 @@ function emojiPieces(text: string, base: number, key: string) {
 }
 
 // @bahset: a name in the line stands out; mine in gold on a light of its own, so I see it's me at a glance.
-const MENTION: TextStyle = { color: '#7FE7EC', fontFamily: fonts.displayBold };
+const MENTION: TextStyle = { color: '#FF94C2', fontFamily: fonts.displayBold };
 const MENTION_ME: TextStyle = { color: colors.gold, fontFamily: fonts.displayBold, backgroundColor: 'rgba(246,189,96,0.18)' };
 const same = (a: string, b?: string) => !!b && a.trim().toLocaleLowerCase('tr-TR') === b.trim().toLocaleLowerCase('tr-TR');
 

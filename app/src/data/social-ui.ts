@@ -18,9 +18,9 @@ export type DiscoverShortcut = {
 };
 
 export const DISCOVER_SHORTCUTS: DiscoverShortcut[] = [
-  { id: 'call', title: 'Hemen Tanış', subtitle: 'Görüntülü & sesli', emoji: '📞', colors: ['#0E7C9A', '#0A8F95'], href: '/eslesme', wide: true },
-  { id: 'party', title: 'Canlı Odalar', subtitle: 'Odalara katıl', emoji: '🎉', colors: ['#14B8A6', '#0E7C9A'], href: '/(tabs)' },
-  { id: 'tribe', title: 'Aile', subtitle: 'Birlikte sohbet', emoji: '⛺', colors: ['#0A8F95', '#0FB8BE'], href: '/aile' },
+  { id: 'call', title: 'Hemen Tanış', subtitle: 'Görüntülü & sesli', emoji: '📞', colors: ['#C2306E', '#D02E78'], href: '/eslesme', wide: true },
+  { id: 'party', title: 'Canlı Odalar', subtitle: 'Odalara katıl', emoji: '🎉', colors: ['#FF6576', '#C93C4F'], href: '/(tabs)' },
+  { id: 'tribe', title: 'Aile', subtitle: 'Birlikte sohbet', emoji: '⛺', colors: ['#D02E78', '#F0468E'], href: '/aile' },
   { id: 'free', title: 'Jeton Kazan', subtitle: 'Günlük görevler', emoji: '🪙', colors: ['#FF8A97', '#FF6576'], href: '/gorevler' },
 ];
 
@@ -75,11 +75,11 @@ export const DISCOVER_PROMO = {
 export type MomentTopic = { id: string; title: string; views: string; emoji: string; colors: readonly [string, string] };
 
 export const MOMENT_TOPICS: MomentTopic[] = [
-  { id: 'date', title: 'Romantik Randevu', views: '238,4 B', emoji: '💞', colors: ['#087A80', '#C93C4F'] },
+  { id: 'date', title: 'Romantik Randevu', views: '238,4 B', emoji: '💞', colors: ['#B81F66', '#C93C4F'] },
   { id: 'pk', title: 'Odalar Arası PK', views: '25,6 B', emoji: '⚔️', colors: ['#1D4ED8', '#DC2626'] },
   { id: 'ootd', title: 'Günün Kombini', views: '109,3 B', emoji: '👗', colors: ['#BE185D', '#F59E0B'] },
-  { id: 'travel', title: 'Gezi Günlüğü', views: '64,1 B', emoji: '🧳', colors: ['#0A8F95', '#0EA5E9'] },
-  { id: 'music', title: 'Bu Akşam Ne Dinliyoruz', views: '41,1 B', emoji: '🎧', colors: ['#0B4F63', '#0FB8BE'] },
+  { id: 'travel', title: 'Gezi Günlüğü', views: '64,1 B', emoji: '🧳', colors: ['#D02E78', '#0EA5E9'] },
+  { id: 'music', title: 'Bu Akşam Ne Dinliyoruz', views: '41,1 B', emoji: '🎧', colors: ['#5A1A3A', '#F0468E'] },
 ];
 
 /** Extra moments so every topic has content (ids don't clash with MOMENTS). */

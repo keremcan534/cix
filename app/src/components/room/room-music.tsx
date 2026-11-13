@@ -796,7 +796,7 @@ const useStyles = makeStyles(({ colors, semantic, surface, edge, ink }) => ({
   controls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: space.xs, paddingHorizontal: space.sm },
   ctrl: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   repeatOne: { position: 'absolute', right: 6, top: 6, color: semantic.actionText, fontSize: 10, fontWeight: '800' },
-  play: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', backgroundColor: semantic.action, boxShadow: '0 6px 18px rgba(19,217,223,0.3)' },
+  play: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', backgroundColor: semantic.action, boxShadow: '0 6px 18px rgba(255,95,162,0.3)' },
   off: { opacity: 0.35 },
   volume: { flexDirection: 'row', alignItems: 'center', gap: space.md, marginTop: space.sm, paddingVertical: space.xs },
   volumeNote: { color: colors.textDim, fontSize: 11 },

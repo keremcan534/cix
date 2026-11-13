@@ -2857,13 +2857,13 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       variant: 'round',
       items: [
         // In live mode Oda içi PK runs on the server (lib/live/pk), so only in a server room.
-        ...(myRole !== 'member' && !pk && (!liveMode() || real) ? [{ key: 'pk', label: 'PK', emoji: '⚔️', art: artSource('pk-takim-pk'), colors: ['#FF6576', '#087A80'] as [string, string], onPress: () => (setPanel(null), setPkSetup(true)) }] : []),
+        ...(myRole !== 'member' && !pk && (!liveMode() || real) ? [{ key: 'pk', label: 'PK', emoji: '⚔️', art: artSource('pk-takim-pk'), colors: ['#FF6576', '#B81F66'] as [string, string], onPress: () => (setPanel(null), setPkSetup(true)) }] : []),
         // Live mode: the server's Şanslı çanta, in a server room only (lib/live/lucky-bags); the demo keeps its envelope.
         ...(!liveMode() || real ? [{ key: 'env', label: 'Şanslı çanta', emoji: '🧧', art: ROOM_ICON_ART.envelope, colors: ['#B91C1C', '#F59E0B'] as [string, string], onPress: () => setPanel(liveMode() ? 'bag' : 'envelope') }] : []),
         ...(canFunctions ? [{ key: 'poll', label: 'Anket', emoji: '📊', art: ROOM_ICON_ART.poll, colors: ['#0EA5E9', '#2563EB'] as [string, string], onPress: () => setPanel('poll') }] : []),
         ...(roomType === 'qa' ? [{ key: 'qa', label: 'Sorular', emoji: '❓', art: ROOM_ICON_ART.questions, colors: ['#F97316', '#DC2626'] as [string, string], onPress: () => setPanel('qa'), badge: questions.filter((q) => !q.picked).length }] : []),
         // Müzik is the room's staff's and its DJs' (they play it); everyone else just hears it.
-        ...(canControlMusic ? [{ key: 'music', label: 'Müzik', emoji: '🎵', art: ROOM_ICON_ART.music, colors: ['#C93C4F', '#0A8F95'] as [string, string], onPress: () => setPanel('music') }] : []),
+        ...(canControlMusic ? [{ key: 'music', label: 'Müzik', emoji: '🎵', art: ROOM_ICON_ART.music, colors: ['#C93C4F', '#D02E78'] as [string, string], onPress: () => setPanel('music') }] : []),
       ],
     },
     // The free room games are opened by the room's staff (owner and admins); everyone else joins the table they open.
@@ -3389,7 +3389,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                   </View>
                 )}
                 {myQueuePos !== null && (
-                  <View style={[styles.queueChipRow, { backgroundColor: 'rgba(19,217,223,0.35)' }]}>
+                  <View style={[styles.queueChipRow, { backgroundColor: 'rgba(255,95,162,0.35)' }]}>
                     <Art name="oda-konusmaci-kuyrugu-el-kaldir" size={18} />
                     <Text style={styles.queueChipText}>Konuşmacı kuyruğundasın · sıran: {myQueuePos + 1}{freeSeatIndex < 0 ? ' · mikrofonlar dolu, bekleme listesindesin' : ''}</Text>
                   </View>
@@ -4086,7 +4086,7 @@ const styles = StyleSheet.create({
   title: { color: '#fff', fontSize: 15, fontWeight: '700', flexShrink: 1 },
   sub: { color: colors.textDim, fontSize: 12 },
   subRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  levelBadge: { backgroundColor: colors.primary, borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1, borderWidth: 1, borderColor: 'rgba(165,243,245,0.35)', boxShadow: '0 0 8px rgba(19,217,223,0.35)' },
+  levelBadge: { backgroundColor: colors.primary, borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1, borderWidth: 1, borderColor: 'rgba(165,243,245,0.35)', boxShadow: '0 0 8px rgba(255,95,162,0.35)' },
   levelText: { color: '#fff', fontSize: 11, fontWeight: '800' },
   reqBadge: { position: 'absolute', top: -4, right: -6, backgroundColor: colors.red, borderRadius: 8, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center' },
   reqBadgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
@@ -4134,7 +4134,7 @@ const styles = StyleSheet.create({
   micGroup: { flexDirection: 'row', alignItems: 'flex-end', gap: 4 },
   mutedRow: { alignSelf: 'center', marginTop: 4, paddingHorizontal: 12 },
   mutedChip: { color: colors.gold, fontSize: 12, textAlign: 'center' },
-  queueChip: { color: '#fff', fontSize: 12, backgroundColor: 'rgba(19,217,223,0.35)', marginHorizontal: 12, marginTop: 6, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, overflow: 'hidden' },
+  queueChip: { color: '#fff', fontSize: 12, backgroundColor: 'rgba(255,95,162,0.35)', marginHorizontal: 12, marginTop: 6, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, overflow: 'hidden' },
   queueChipRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginHorizontal: 12, marginTop: 6, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6 },
   queueChipText: { color: '#fff', fontSize: 12, flexShrink: 1 },
   eventBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 12, marginTop: 6, backgroundColor: 'rgba(245,158,11,0.25)', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },

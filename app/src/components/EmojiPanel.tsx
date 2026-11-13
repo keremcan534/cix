@@ -276,7 +276,7 @@ const useStyles = makeStyles(({ colors, semantic, dark }) => ({
   kindText: { color: colors.text, fontSize: 12, fontWeight: '700' },
   kindTextOn: { color: '#fff' },
   // Light: a hairline and a soft upward shadow so the white panel lifts off the paper behind it.
-  wrap: { backgroundColor: colors.card, borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingTop: 10, paddingBottom: 6, ...(dark ? null : { borderWidth: StyleSheet.hairlineWidth, borderBottomWidth: 0, borderColor: 'rgba(11,26,46,0.08)', boxShadow: '0 -4px 16px rgba(16,36,64,0.06)' }) },
+  wrap: { backgroundColor: colors.card, borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingTop: 10, paddingBottom: 6, ...(dark ? null : { borderWidth: StyleSheet.hairlineWidth, borderBottomWidth: 0, borderColor: 'rgba(42,21,32,0.08)', boxShadow: '0 -4px 16px rgba(64,20,40,0.06)' }) },
   tab: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999 },
   tabIcon: { width: 18, height: 18 },
   tabActive: { backgroundColor: colors.cardAlt },
@@ -292,7 +292,7 @@ const useStyles = makeStyles(({ colors, semantic, dark }) => ({
   empty: { color: colors.textDim, padding: 12 },
   sub: { color: colors.textDim, fontSize: 11, fontWeight: '700' },
   fx: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 999, borderWidth: 1.5, borderColor: colors.border, paddingHorizontal: 10, paddingVertical: 5 },
-  fxOn: { borderColor: semantic.actionText, backgroundColor: dark ? 'rgba(19,217,223,0.15)' : 'rgba(0,140,148,0.09)' },
+  fxOn: { borderColor: semantic.actionText, backgroundColor: dark ? 'rgba(255,95,162,0.15)' : 'rgba(208,46,120,0.09)' },
   fxText: { color: colors.text, fontSize: 12, fontWeight: '700' },
   fxPrice: { color: colors.gold, fontSize: 11, fontWeight: '800' },
   animCell: { width: '25%', alignItems: 'center', paddingVertical: 6, gap: 1 },

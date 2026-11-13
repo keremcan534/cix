@@ -194,7 +194,7 @@ function StartButton({ mode, onPress }: { mode: MatchMode; onPress: () => void }
 const useStyles = makeStyles(({ colors, semantic, lift, dark }) => ({
   chips: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8 },
   chip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, borderWidth: 1.5, borderColor: colors.border },
-  chipOn: { borderColor: dark ? semantic.action : semantic.actionText, backgroundColor: dark ? 'rgba(19,217,223,0.15)' : 'rgba(0,140,148,0.09)' },
+  chipOn: { borderColor: dark ? semantic.action : semantic.actionText, backgroundColor: dark ? 'rgba(255,95,162,0.15)' : 'rgba(208,46,120,0.09)' },
   chipText: { color: colors.textDim, fontWeight: '700', fontSize: 13 },
   chipTextOn: { color: colors.text },
   stage: { alignItems: 'center', gap: 10, minHeight: 280, justifyContent: 'center' },

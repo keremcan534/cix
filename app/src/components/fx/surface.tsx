@@ -185,7 +185,7 @@ const useDepth = makeStyles(({ surface, dark }) => ({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: surface.rim,
-    boxShadow: dark ? '0 8px 20px rgba(0,0,0,0.35)' : '0 1px 2px rgba(16,36,64,0.05), 0 8px 20px rgba(16,36,64,0.08)',
+    boxShadow: dark ? '0 8px 20px rgba(0,0,0,0.35)' : '0 1px 2px rgba(64,20,40,0.05), 0 8px 20px rgba(64,20,40,0.08)',
   },
 }));
 

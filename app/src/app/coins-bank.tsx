@@ -870,7 +870,7 @@ function LockedCard({ icon, title, text, action, onPress }: { icon: keyof typeof
 }
 
 // Light scheme only: the soft card shadow (dark cards stand out by color).
-const LIGHT_SHADOW = '0 1px 2px rgba(16,36,64,0.05), 0 6px 16px rgba(16,36,64,0.06)';
+const LIGHT_SHADOW = '0 1px 2px rgba(64,20,40,0.05), 0 6px 16px rgba(64,20,40,0.06)';
 
 const useStyles = makeStyles(({ colors, semantic, ink, dark }) => ({
   safe: { flex: 1, backgroundColor: colors.bg },
@@ -887,7 +887,7 @@ const useStyles = makeStyles(({ colors, semantic, ink, dark }) => ({
   heroLabel: { color: ink(0.9), fontSize: 14 },
   heroN: { color: colors.text, fontSize: 36, fontWeight: '900' },
   heroSub: { color: ink(0.8), fontSize: 12 },
-  heroBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 12, borderWidth: 1.5, borderColor: dark ? ink(0.85) : 'rgba(0,117,123,0.45)', borderRadius: 999, paddingVertical: 10, backgroundColor: dark ? ink(0.12) : semantic.tonal },
+  heroBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 12, borderWidth: 1.5, borderColor: dark ? ink(0.85) : 'rgba(184,31,102,0.45)', borderRadius: 999, paddingVertical: 10, backgroundColor: dark ? ink(0.12) : semantic.tonal },
   heroBtnText: { color: dark ? colors.text : semantic.tonalText, fontWeight: '800', fontSize: 15 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   stat: { flexGrow: 1, flexBasis: '45%', backgroundColor: colors.card, borderRadius: 16, padding: 12, gap: 2, borderWidth: 1, borderColor: colors.border, ...(dark ? {} : { boxShadow: LIGHT_SHADOW }) },

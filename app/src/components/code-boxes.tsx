@@ -107,7 +107,7 @@ const useStyles = makeStyles(({ colors, semantic, dark }) => ({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  boxLift: dark ? {} : { boxShadow: '0 1px 2px rgba(16,36,64,0.05), 0 6px 16px rgba(16,36,64,0.06)' },
+  boxLift: dark ? {} : { boxShadow: '0 1px 2px rgba(64,20,40,0.05), 0 6px 16px rgba(64,20,40,0.06)' },
   // A sheet is already the card: its boxes sit a step deeper, like the sheet's other fields.
   boxOnSheet: { height: 54, backgroundColor: colors.bg, borderColor: colors.border },
   boxActive: { borderColor: colors.primaryText },

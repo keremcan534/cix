@@ -446,13 +446,13 @@ export function Field({ label, value, onChange, placeholder, keyboard, multiline
 const st = StyleSheet.create({
   body: { padding: space.lg, paddingBottom: 48 },
   center: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.lg },
-  centerIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(19,217,223,0.14)' },
+  centerIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,95,162,0.14)' },
   agency: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.lg },
-  monogram: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(19,217,223,0.14)', borderWidth: 1, borderColor: 'rgba(19,217,223,0.3)' },
+  monogram: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,95,162,0.14)', borderWidth: 1, borderColor: 'rgba(255,95,162,0.3)' },
   monoText: { color: semantic.action, fontSize: 20, fontFamily: fonts.display },
   pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   note: { color: colors.textDim, fontSize: 12, lineHeight: 17 },
   transfer: { gap: 8, padding: space.md, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.04)' },
-  found: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md, borderRadius: 14, backgroundColor: 'rgba(19,217,223,0.08)', borderWidth: 1, borderColor: 'rgba(19,217,223,0.25)' },
+  found: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md, borderRadius: 14, backgroundColor: 'rgba(255,95,162,0.08)', borderWidth: 1, borderColor: 'rgba(255,95,162,0.25)' },
   label: { color: colors.textDim, fontSize: 12, fontWeight: '700' },
 });

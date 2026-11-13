@@ -24,8 +24,8 @@ import { fromN } from '@/lib/tr';
 const fmt = (n: number) => n.toLocaleString('tr-TR');
 const TIER_W = 96;
 /** The "me" card fades from the level group's color into night blue and keeps white text in both schemes. */
-const NIGHT_CARD = '#16253C';
-const NIGHT_BORDER = '#2B3F63';
+const NIGHT_CARD = '#2A1A22';
+const NIGHT_BORDER = '#4A3040';
 type Kind = 'wealth' | 'charm';
 
 type System = {
@@ -323,7 +323,7 @@ const useStyles = makeStyles(({ colors, semantic, lift, dark }) => ({
   segItem: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 8, borderRadius: 999 },
   segOn: { backgroundColor: semantic.action },
   segText: { color: colors.textDim, fontWeight: '800', fontSize: 13 },
-  me: { flexDirection: 'row', alignItems: 'center', gap: 14, margin: 16, marginTop: 6, padding: 16, borderRadius: 20, borderWidth: 1, borderColor: NIGHT_BORDER, ...(dark ? {} : { boxShadow: '0 2px 4px rgba(16,36,64,0.08), 0 10px 24px rgba(16,36,64,0.14)' }) },
+  me: { flexDirection: 'row', alignItems: 'center', gap: 14, margin: 16, marginTop: 6, padding: 16, borderRadius: 20, borderWidth: 1, borderColor: NIGHT_BORDER, ...(dark ? {} : { boxShadow: '0 2px 4px rgba(64,20,40,0.08), 0 10px 24px rgba(64,20,40,0.14)' }) },
   name: { color: '#fff', fontSize: 18, fontWeight: '900', flexShrink: 1 },
   meLine: { color: 'rgba(255,255,255,0.85)', fontSize: 13 },
   meDim: { color: 'rgba(255,255,255,0.7)', fontSize: 12 },
@@ -333,7 +333,7 @@ const useStyles = makeStyles(({ colors, semantic, lift, dark }) => ({
   tier: { width: TIER_W, alignItems: 'center', gap: 2 },
   emblem: { alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.25)', transform: [{ rotate: '45deg' }] },
   // The selected emblem's white ring; on paper a soft shadow lifts it so the ring reads.
-  emblemOn: { borderColor: '#fff', ...(dark ? {} : { boxShadow: '0 4px 12px rgba(16,36,64,0.22)' }) },
+  emblemOn: { borderColor: '#fff', ...(dark ? {} : { boxShadow: '0 4px 12px rgba(64,20,40,0.22)' }) },
   tierName: { color: colors.textDim, fontWeight: '800', fontSize: 12, marginTop: 4 },
   tierRange: { color: colors.textDim, fontSize: 11 },
   levels: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingVertical: 14 },

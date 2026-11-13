@@ -426,7 +426,7 @@ export function ChatLine({
   }
   const u = userById(msg.userId!);
   const bubble = msg.userId === 'me' ? cosmeticById(bubbleId) : msg.userId && !msg.system && !msg.bot && bubbleOf ? cosmeticById(bubbleOf(msg.userId)) : undefined;
-  const nameColor = msg.userId === 'me' ? colors.gold : '#A5F3F5';
+  const nameColor = msg.userId === 'me' ? colors.gold : '#FFC2DC';
   const stickers = stickersOf(msg.text);
   // Avatar, name above, text in its own bubble: who said what reads at a glance, like a group chat.
   const body = stickers ? (
@@ -640,8 +640,8 @@ const styles = StyleSheet.create({
   seat: { alignItems: 'center', gap: 4 },
   seatBody: { alignSelf: 'stretch', alignItems: 'center', gap: 4 },
   hostSeat: { width: '100%' },
-  ring: { position: 'absolute', borderWidth: 4, borderColor: semantic.live, boxShadow: '0 0 12px rgba(19,217,223,0.8)' },
-  speakingGlow: { boxShadow: '0 0 18px rgba(19,217,223,0.65)' },
+  ring: { position: 'absolute', borderWidth: 4, borderColor: semantic.live, boxShadow: '0 0 12px rgba(255,95,162,0.8)' },
+  speakingGlow: { boxShadow: '0 0 18px rgba(255,95,162,0.65)' },
   emptySeat: {
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',
@@ -697,7 +697,7 @@ const styles = StyleSheet.create({
   micRound: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   soundRound: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', borderTopColor: 'rgba(255,255,255,0.28)' },
   soundRoundOff: { backgroundColor: 'rgba(252,165,165,0.14)', borderColor: 'rgba(252,165,165,0.45)' },
-  micGlowOn: { boxShadow: '0 4px 16px rgba(19,217,223,0.6)' },
+  micGlowOn: { boxShadow: '0 4px 16px rgba(255,95,162,0.6)' },
   micGlowHand: { boxShadow: '0 4px 16px rgba(8,122,128,0.7)' },
   micCaption: { color: colors.textDim, fontSize: 10, fontWeight: '800', letterSpacing: 0.4 },
   badge: { position: 'absolute', top: -4, right: -4, backgroundColor: colors.red, borderRadius: 9, minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
