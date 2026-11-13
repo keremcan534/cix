@@ -732,8 +732,11 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     }
     reportRoomState(id, { joined: true });
     // Own room: the host takes mic 1 with the mic on, except after a restart (the mic always starts off then).
-    if (hostId === 'me' && !joinedInCall && !getRoom(id)?.seats[0]) {
-      takeSeat(id, 'me', 0);
+    // Back in a room that still has me on a mic (left and came straight back): the mic is on again too.
+    const seats = getRoom(id)?.seats ?? [];
+    const back = seats.includes('me');
+    if (!joinedInCall && (back || (hostId === 'me' && !seats[0]))) {
+      if (!back) takeSeat(id, 'me', 0);
       if (!getSession().session?.recovered) setMicWant(true);
     }
     return () => {

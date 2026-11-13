@@ -11,7 +11,7 @@ import { useSyncExternalStore } from 'react';
 import { beginCall, endCall } from '@/lib/media';
 import { holdForCall } from '@/lib/room-session';
 import { BEAUTY_EFFECT, registerBeauty } from '../../modules/similar-beauty';
-import { ensureWebRtc, holdAudio, playRemote, releaseAudio } from '@/lib/webrtc-globals';
+import { ensureWebRtc, holdAudio, micStarted, playRemote, releaseAudio } from '@/lib/webrtc-globals';
 
 /** What a video view shows (the shape of @livekit/components-react's TrackReference). */
 export type TrackRef = { participant: Participant; publication: TrackPublication; source: Track.Source };
@@ -102,7 +102,7 @@ export async function joinCallMedia(callId: number, token: string, video: boolea
     if (room !== r) return void r.disconnect();
     await r.startAudio().catch(() => {});
     patch({ status: 'connected' });
-    await r.localParticipant.setMicrophoneEnabled(true, CAPTURE).catch(() => room === r && patch({ micOn: false, error: 'Mikrofon izni yok' }));
+    await r.localParticipant.setMicrophoneEnabled(true, CAPTURE).then(micStarted, () => room === r && patch({ micOn: false, error: 'Mikrofon izni yok' }));
     if (video) await r.localParticipant.setCameraEnabled(true, { facingMode: 'user' }).catch(() => room === r && patch({ camOn: false, error: 'Kamera izni yok' }));
     if (video) beautify(r);
     refresh(r);
