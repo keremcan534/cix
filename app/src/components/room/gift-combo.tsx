@@ -1,7 +1,9 @@
-// Lucky combo wheel (bottom right). After a Lucky send it shows that gift; a line runs once around the
-// circle while the combo is open. Tapping sends the same gift to the same person again (×1, ×2, ×3 …)
-// and restarts the line, so the user doesn't reopen the gift panel every time. When the line closes,
-// the wheel goes away. Visual only: it never touches seats, the mic or the voice connection.
+// The repeat wheel (bottom right). After a gift goes out from the gift sheet (any gift; Şanslı ones too) it shows
+// that gift; a line runs once around the circle while the wheel is open. Tapping sends the same gift to the same
+// people with the same count again (×1, ×2, ×3 …) and restarts the line, so the user doesn't reopen the gift sheet
+// every time. When the line closes, the wheel goes away. The room sends each repeat the usual way (the server
+// prices it); a send that fails takes the wheel away. Visual only: it never touches seats, the mic or the voice
+// connection.
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 
@@ -14,7 +16,7 @@ const S = 76;
 const W = 4;
 const LINE = semantic.money;
 
-export function LuckyCombo({
+export function GiftCombo({
   giftId,
   emoji,
   name,

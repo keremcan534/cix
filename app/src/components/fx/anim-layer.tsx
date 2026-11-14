@@ -2,6 +2,8 @@
 //  1. Room events (manual sends, free or paid) arrive on the room bus and start at the event's startAt,
 //     so everyone in the room sees them together. Caps keep the room smooth: one full-screen effect at a
 //     time, a few small ones at once, the rest waits in a short queue (oldest free reactions dropped first).
+//     With `onFullscreen` the full-screen ones go there instead: the room plays them on its stage, in line with
+//     the big gifts (lib/fx-queue), so a gift's video and a full-screen effect never cover each other.
 //  2. The equipped mic effect plays locally around my seat only while I'm on the mic, unmuted and speaking.
 //     It is never a gift and never charges anything; voice level only drives this visual.
 import { useEffect, useRef, useState } from 'react';
@@ -16,6 +18,8 @@ export const MAX_SMALL = 6;
 const MAX_QUEUE = 12;
 
 type Item = { key: string; anim: Animation; origin: Pt | null };
+/** A full-screen effect handed to the room's stage: `from` is who sent it. */
+export type FullscreenAnim = Item & { from: string };
 
 export function AnimLayer({
   roomId,
@@ -23,6 +27,7 @@ export function AnimLayer({
   lite,
   off,
   micEffect,
+  onFullscreen,
 }: {
   roomId: string;
   /** Window position of a user's seat (null when not seated). */
@@ -31,6 +36,8 @@ export function AnimLayer({
   off?: boolean;
   /** active = on a mic and unmuted; isSpeaking is polled so effects follow actual talking. */
   micEffect?: { animationId: string | null; active: boolean; isSpeaking: () => boolean };
+  /** Takes the full-screen effects (from their start time on) instead of this layer playing them. */
+  onFullscreen?: (it: FullscreenAnim) => void;
 }) {
   const screen = useWindowDimensions();
   const [playing, setPlaying] = useState<Item[]>([]);
@@ -70,8 +77,10 @@ export function AnimLayer({
     pumpRef.current();
   };
   const enqueueRef = useRef(enqueue);
+  const fullscreenRef = useRef(onFullscreen);
   useEffect(() => {
     enqueueRef.current = enqueue;
+    fullscreenRef.current = onFullscreen;
   });
 
   // 1. Room events.
@@ -83,7 +92,9 @@ export function AnimLayer({
       setTimeout(
         async () => {
           const origin = await originOf(e.fromUserId);
-          enqueueRef.current({ key: e.eventId, anim, origin });
+          const toStage = anim.display_type === 'fullscreen' ? fullscreenRef.current : undefined;
+          if (toStage) toStage({ key: e.eventId, anim, origin, from: e.fromUserId });
+          else enqueueRef.current({ key: e.eventId, anim, origin });
         },
         Math.max(0, e.startAt - Date.now()),
       );
