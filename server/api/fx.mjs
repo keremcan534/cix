@@ -30,8 +30,7 @@ export const FX_VIDEOS = {
     h21: 'altin-super-otomobil.mp4',
     h22: 'altin-aslan.mp4',
   },
-  // The video entries share their gift's clip (one file, downloaded once).
-  entry: { dragon: 'ejderha.mp4', roket: 'roket.mp4', ayicik: 'tatli-ayicik.mp4', panda: 'sevimli-panda.mp4', tac: 'kraliyet-taci.mp4', tekboynuz: 'efsanevi-tek-boynuz.mp4', anka: 'anka-kusu.mp4', gemi: 'altin-gemi.mp4', saray: 'kristal-saray.mp4', otomobil: 'altin-super-otomobil.mp4', aslan: 'altin-aslan.mp4' },
+  entry: { dragon: 'ejderha.mp4' },
 };
 
 /** An MP4's length in ms from its movie header (moov › mvhd); 0 when it can't be read. */

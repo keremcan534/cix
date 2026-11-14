@@ -24,11 +24,11 @@ type ServerPack = { id: string; productId: string; coins: number; firstBonus: nu
 type ServerShopItem = { sku: string; kind: string; name: string; price: number; days: number | null; minVip: number };
 
 describe('Sunucu kataloğu uygulamayla aynı', () => {
-  test('satıştan kalkan giriş efektleri iki tarafta aynı: yalnız çizimli olanlar; video girişleri satışta', () => {
+  test('satıştan kalkan giriş efektleri iki tarafta aynı: çizimliler ve hediye klipleri; satışta yalnız Ejderha', () => {
     const retired = COSMETICS.filter((c) => c.retired).map((c) => c.id).sort();
     assert.deepEqual(retired, [...(server.SHOP_PAUSED_DEFAULT as string[])].sort());
-    assert.deepEqual(retired, ['en-comet', 'en-sparkle', 'en-thunder']);
-    assert.ok(COSMETICS.filter((c) => c.kind === 'entry' && !c.retired).length >= 11, 'Ejderha ve video girişleri satışta');
+    assert.equal(retired.length, 13);
+    assert.deepEqual(COSMETICS.filter((c) => c.kind === 'entry' && !c.retired).map((c) => c.id), ['en-dragon']);
   });
 
   test('şimdilik raftan kalkan hediyeler iki tarafta aynı: animasyonu olmayanlar, dört standart hariç', async () => {
