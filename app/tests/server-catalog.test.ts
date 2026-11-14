@@ -24,6 +24,23 @@ type ServerPack = { id: string; productId: string; coins: number; firstBonus: nu
 type ServerShopItem = { sku: string; kind: string; name: string; price: number; days: number | null; minVip: number };
 
 describe('Sunucu kataloğu uygulamayla aynı', () => {
+  test('satıştan kalkan giriş efektleri iki tarafta aynı: yalnız çizimli olanlar; video girişleri satışta', () => {
+    const retired = COSMETICS.filter((c) => c.retired).map((c) => c.id).sort();
+    assert.deepEqual(retired, [...(server.SHOP_PAUSED_DEFAULT as string[])].sort());
+    assert.deepEqual(retired, ['en-comet', 'en-sparkle', 'en-thunder']);
+    assert.ok(COSMETICS.filter((c) => c.kind === 'entry' && !c.retired).length >= 11, 'Ejderha ve video girişleri satışta');
+  });
+
+  test('şimdilik raftan kalkan hediyeler iki tarafta aynı: animasyonu olmayanlar, dört standart hariç', async () => {
+    const { GIFTS_PAUSED } = await import('@/data/gifts-paused');
+    const { giftShowOf } = await import('@/data/gift-shows');
+    const { FX_VIDEOS } = await import('../../server/api/fx.mjs');
+    assert.deepEqual([...GIFTS_PAUSED].sort(), [...(server.GIFTS_PAUSED as Set<string>)].sort());
+    const animated = (id: string) => id in FX_VIDEOS.gift || !!giftShowOf(id);
+    const standard = new Set(['g1', 'g2', 'g3', 'g4']);
+    assert.deepEqual([...GIFTS_PAUSED].sort(), GIFTS.filter((g) => !animated(g.id) && !standard.has(g.id)).map((g) => g.id).sort());
+  });
+
   test('her hediyenin adı, fiyatı, kategorisi ve SVIP sınırı', () => {
     const app = GIFTS.map((g) => ({ id: g.id, name: g.name, price: g.price, cat: g.cat, minSvip: g.minSvip ?? 0 }));
     assert.deepEqual([...(server.GIFTS as Map<string, ServerGift>).values()], app);

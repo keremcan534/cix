@@ -19,7 +19,7 @@
 // ahead. A higher noble tier runs at the same time as a lower one; a lower one can't be bought over a higher one.
 // Feature 'shop' (features.mjs ROUTES) stops buys and the old-app spend; reads, equip and looks stay open.
 import { HttpError, REF, UUID, auth, claimRef, clientIp, db, env, int, limit, once, readJson, text, tx, userId } from './core.mjs';
-import { FREE_MICFX, MAX_AHEAD_DAYS, PAID_ONLY, SHOP, SLOTS, labelOf, vipLevelOf } from './catalog.mjs';
+import { FREE_MICFX, MAX_AHEAD_DAYS, PAID_ONLY, SHOP, SHOP_PAUSED, SLOTS, labelOf, vipLevelOf } from './catalog.mjs';
 import { live } from './live-settings.mjs';
 // live.mjs imports rooms.mjs, which imports this file; the functions are only used inside handlers.
 import { roomPacket, roomService } from './live.mjs';
@@ -150,10 +150,13 @@ const boughtWith = async (uid, ref) =>
     )
   ).rowCount > 0;
 
-/** What may be bought now: the catalog minus the live shop_hidden set; special IDs only once SHOP_SPECIAL_IDS=1. */
+/**
+ * What may be bought now: the catalog minus the live shop_hidden set and the items no longer sold (catalog.mjs
+ * SHOP_PAUSED); special IDs only once SHOP_SPECIAL_IDS=1.
+ */
 export function sellable(sku) {
   const item = typeof sku === 'string' ? SHOP.get(sku) : undefined;
-  if (!item || live().shopHidden.has(sku)) return null;
+  if (!item || live().shopHidden.has(sku) || SHOP_PAUSED.has(sku)) return null;
   if (item.kind === 'specialId' && env.SHOP_SPECIAL_IDS !== '1') return null;
   return item;
 }
@@ -405,7 +408,7 @@ export const economyRoutes = {
     if (!why) throw new HttpError(400, 'Harcama nedeni gerekli');
     const item = itemOfReason(why);
     if (!item || n < item.price || (item.kind === 'specialId' && env.SHOP_SPECIAL_IDS !== '1')) throw updateRequired();
-    if (live().shopHidden.has(item.sku)) throw new HttpError(409, 'Bu ürün artık satışta değil');
+    if (live().shopHidden.has(item.sku) || SHOP_PAUSED.has(item.sku)) throw new HttpError(409, 'Bu ürün artık satışta değil');
     const r = await once(u.id, 'coin', ref, (c) => buyInTx(c, u.id, item, ref, n, 'bridge'));
     if (r.replay && !(await boughtWith(u.id, ref))) throw new HttpError(409, 'Geçersiz istek kimliği');
     if (!r.replay) void announceLook(u.id);

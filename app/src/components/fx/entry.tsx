@@ -12,7 +12,9 @@ import { Animated, Easing, StyleSheet, View, useWindowDimensions } from 'react-n
 import { Text } from '@/components/text';
 import { Photo } from '@/components/photo';
 
-export type EntryFx = 'sparkle' | 'thunder' | 'dragon' | 'comet' | 'vip' | 'bond';
+// The video entries (Çarşı › Giriş efekti) play their clip full screen (components/fx/video-fx, server/api/fx.mjs
+// FX_VIDEOS.entry); this banner and its look are what shows over it, and alone where the clip can't play.
+export type EntryFx = 'sparkle' | 'thunder' | 'dragon' | 'comet' | 'vip' | 'bond' | 'roket' | 'ayicik' | 'panda' | 'tac' | 'tekboynuz' | 'anka' | 'gemi' | 'saray' | 'otomobil' | 'aslan';
 /** `ride` is the ride's emoji (also used in the text); `rideArt` its picture, drawn instead when there is one. */
 export type EntryShow = {
   name: string;
@@ -35,6 +37,16 @@ export const ENTRY_LOOKS: Record<EntryFx, Look> = {
   comet: { colors: ['#080F1E', '#12304A', '#0A8F95'], particle: ['#CFFAFE', '#FFFFFF', '#13D9DF'], mark: '🌠', creature: '☄️' },
   vip: { colors: ['#3B2A12', '#8A5A1C', '#C98A2E'], particle: ['#FDE68A', '#FFFFFF', '#F6BD60'], mark: '' },
   bond: { colors: ['#3A0A22', '#A3134A', '#FF6F91'], particle: ['#FFC1D3', '#FFFFFF', '#F6BD60'], mark: '' },
+  roket: { colors: ['#0B1E3A', '#1D4ED8', '#38BDF8'], particle: ['#FDE68A', '#FFFFFF', '#38BDF8'], mark: '🚀', creature: '🚀' },
+  ayicik: { colors: ['#4A2414', '#A0522D', '#FF6F91'], particle: ['#FFC1D3', '#FFFFFF', '#F6BD60'], mark: '💗', creature: '🧸' },
+  panda: { colors: ['#111827', '#374151', '#9CA3AF'], particle: ['#FFFFFF', '#BBF7D0', '#F6BD60'], mark: '🎋', creature: '🐼' },
+  tac: { colors: ['#3B2A12', '#8A5A1C', '#F6BD60'], particle: ['#FDE68A', '#FFFFFF', '#F6BD60'], mark: '💎', creature: '👑' },
+  tekboynuz: { colors: ['#2E1065', '#7C3AED', '#F0ABFC'], particle: ['#F5D0FE', '#FFFFFF', '#A5F3FC'], mark: '🌈', creature: '🦄' },
+  anka: { colors: ['#450A0A', '#C2410C', '#F59E0B'], particle: ['#FDE047', '#F97316', '#FFFFFF'], mark: '🔥', creature: '🦅' },
+  gemi: { colors: ['#0C2340', '#1E3A5F', '#F6BD60'], particle: ['#FDE68A', '#FFFFFF', '#93C5FD'], mark: '⚓', creature: '⛵' },
+  saray: { colors: ['#1E1B4B', '#4C1D95', '#C4B5FD'], particle: ['#E0E7FF', '#FFFFFF', '#A5F3FC'], mark: '💎', creature: '🏰' },
+  otomobil: { colors: ['#1C1408', '#8A5A1C', '#F6BD60'], particle: ['#FDE68A', '#FFFFFF', '#F6BD60'], mark: '✨', creature: '🏎️' },
+  aslan: { colors: ['#3B2A12', '#B45309', '#F6BD60'], particle: ['#FDE68A', '#FFFFFF', '#FB923C'], mark: '👑', creature: '🦁' },
 };
 const TOTAL_MS = 3200;
 const BURST = 12;

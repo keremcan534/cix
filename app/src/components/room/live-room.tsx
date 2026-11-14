@@ -228,7 +228,7 @@ const offlineBlocked = () => {
 
 // Bots send what the emoji panel's Emoji tab has (the animated faces).
 const BOT_REACTIONS = ['duygu-kahkaha', 'duygu-asik', 'duygu-alkis', 'duygu-alev', 'duygu-havali', 'duygu-parti', 'duygu-kalbim', 'duygu-super', 'duygu-afalladim', 'duygu-yerlere-yattim'].map(stickerToken);
-const BOT_ENTRY_FX: EntryFx[] = ['sparkle', 'thunder', 'comet', 'dragon', 'vip'];
+const BOT_ENTRY_FX: EntryFx[] = ['dragon', 'aslan', 'otomobil', 'anka', 'gemi', 'tekboynuz', 'vip'];
 const NO_BONDS: RoomBond[] = [];
 /** Someone's entry show in a server room, from their own shop look (lib/room-entrance entryPlanOf); null: none. */
 function entryShowOf(look: Look | undefined, name: string, avatar: string): EntryShow | null {

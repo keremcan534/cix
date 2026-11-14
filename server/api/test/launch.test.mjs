@@ -188,7 +188,7 @@ describe('Hediyeler ve sıralama', () => {
   test('katalog herkese açık; fiyatı sunucu belirler; tekrar istek bir kez; SVIP sınırı; sıralamalar', async () => {
     const [cs, cat] = await call('GET', '/api/catalog');
     assert.equal(cs, 200);
-    assert.ok(cat.gifts.length > 50 && cat.counts.includes(250) && cat.packs[0].productId === 'coins_1000');
+    assert.ok(cat.gifts.length > 20 && cat.counts.includes(250) && cat.packs[0].productId === 'coins_1000');
     // The test server allows free test packs and has no store keys: the app offers no real payment.
     assert.deepEqual(cat.purchases, { testTopup: true, stores: { android: false, ios: false } });
 

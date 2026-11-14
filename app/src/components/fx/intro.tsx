@@ -3,7 +3,7 @@
 // Then:
 //   - the heart beats twice and rises;
 //   - the S and the C arrive white-hot, turn gold, then settle into the mark's two colors (turquoise and coral);
-//   - the rest of "Similar Club" opens out from them;
+//   - the rest of "Similar Club" opens out from them in the same colors: "Similar" all turquoise, "Club" all coral;
 //   - a gold hairline draws, a sweep of light passes, and the whole opening lifts away.
 // A tap skips it. "Animasyonları azalt" and the phone's own reduce-motion setting turn it off.
 import { LinearGradient } from 'expo-linear-gradient';
@@ -27,7 +27,8 @@ const EXIT = 380;
 const FAILSAFE = TOTAL + EXIT + 1500;
 const NATIVE = Platform.OS !== 'web';
 
-const TURQUOISE = colors.primaryText;
+// The mark's own two colors, whatever the app's theme: the theme's primary turned pink, the wordmark stays as the logo.
+const TURQUOISE = '#13D9DF';
 const CORAL = colors.pink;
 const GOLD = colors.gold;
 const PEARL = '#FFF8EC';
@@ -169,12 +170,12 @@ function Stage({ t, exit, onSkip }: { t: Animated.Value; exit: Animated.Value; o
             <Capital ch="S" color={TURQUOISE} size={size} t={t} appear={capIn} scale={capScale} gold={gold} brand={brand} halos={halos} shift={spread.s} onLayout={measure('s')} />
             {'imilar'.split('').map((ch, i, all) => (
               // Left behind as the S travels out: from the middle outwards.
-              <Letter key={i} ch={ch} size={size} t={t} from={1150 + (all.length - 1 - i) * 45} />
+              <Letter key={i} ch={ch} color={TURQUOISE} size={size} t={t} from={1150 + (all.length - 1 - i) * 45} />
             ))}
             <View style={{ width: size * 0.24 }} />
             <Capital ch="C" color={CORAL} size={size} t={t} appear={capIn} scale={capScale} gold={gold} brand={brand} halos={halos} shift={spread.c} onLayout={measure('c')} />
             {'lub'.split('').map((ch, i) => (
-              <Letter key={i} ch={ch} size={size} t={t} from={1180 + i * 55} />
+              <Letter key={i} ch={ch} color={CORAL} size={size} t={t} from={1180 + i * 55} />
             ))}
           </View>
         </Layer>
@@ -292,8 +293,8 @@ function Capital({
   );
 }
 
-function Letter({ ch, size, t, from }: { ch: string; size: number; t: Animated.Value; from: number }) {
-  const type = { fontSize: size, lineHeight: Math.round(size * 1.25), fontWeight: '800' as const, letterSpacing: -0.5, color: '#FFFFFF' };
+function Letter({ ch, color, size, t, from }: { ch: string; color: string; size: number; t: Animated.Value; from: number }) {
+  const type = { fontSize: size, lineHeight: Math.round(size * 1.25), fontWeight: '800' as const, letterSpacing: -0.5, color };
   return (
     <Animated.View style={{ opacity: at(t, [from, from + 260], [0, 1], out), transform: [{ translateY: at(t, [from, from + 260], [size * 0.22, 0], out) }] }}>
       <Text style={type}>{ch}</Text>

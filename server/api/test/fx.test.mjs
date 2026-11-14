@@ -124,3 +124,24 @@ describe('hediye videoları sunucudan', () => {
     await setLive({ gifts_hidden: null });
   });
 });
+
+describe('animasyonu olmayan hediyeler şimdilik raftan kalktı', () => {
+  test('katalog onları listelemez; videosu olan ve dört standart hediye kalır; eski uygulamadan gönderim geçer', async () => {
+    const { GIFTS, GIFTS_PAUSED } = await import('../catalog.mjs');
+    const { gifts } = await catalog();
+    const listed = new Set(gifts.map((g) => g.id));
+    for (const id of GIFTS_PAUSED) assert.ok(!listed.has(id), `${id} listede`);
+    for (const id of ['g1', 'g2', 'g3', 'g4', ...Object.keys(FX_VIDEOS.gift)]) assert.ok(listed.has(id), `${id} listede değil`);
+    // Nothing with a video is paused, and every id is a real gift.
+    for (const id of GIFTS_PAUSED) {
+      assert.ok(GIFTS.has(id), id);
+      assert.ok(!(id in FX_VIDEOS.gift), id);
+    }
+    // An older app still showing one: the send goes through (it isn't a gift hidden in Canlı ayarlar).
+    const a = await h.account('Eski Uygulama');
+    const b = await h.account('Alıcı');
+    await ok(call('POST', '/api/wallet/test-topup', { amount: 1000, ref: `t-${Date.now()}` }, a.session));
+    const [st] = await call('POST', '/api/gifts/send', { to: b.user.id, giftId: 'g5', count: 1, ref: `p-${Date.now()}` }, a.session);
+    assert.equal(st, 200);
+  });
+});

@@ -74,6 +74,29 @@ const GIFT_ROWS = [
 ];
 
 export const GIFTS = new Map(GIFT_ROWS.map(([id, name, price, cat, minSvip = 0]) => [id, { id, name, price, cat, minSvip }]));
+/**
+ * Off the shelf for now (the owner, 14 Nov): the gifts with no animation of their own (no video in fx.mjs, no show in
+ * the app's data/gift-shows), except the four standard gifts the price list keeps (Gül, Kalp, Kahve, Pasta). GET
+ * /api/catalog leaves them out, so every app's shelf drops them, older ones too; a send from an older app still goes
+ * through (unlike a gift hidden in Canlı ayarlar). The same list as app/src/data/gifts-paused.ts; taking an id out of
+ * both brings the gift back.
+ */
+/**
+ * Shop items no longer sold (the owner, 14 Nov): the entry effects with no animation of their own, only the drawn
+ * banner. Left out of the shop list and refused as a purchase (economy.mjs sellable); whoever owns one keeps wearing
+ * it until it runs out. The same list as the app's COSMETICS `retired`. SHOP_PAUSED in .env replaces it (comma
+ * separated; empty sells them all again, as the tests' server does: test/harness.mjs).
+ */
+export const SHOP_PAUSED_DEFAULT = ['en-sparkle', 'en-thunder', 'en-comet'];
+export const SHOP_PAUSED = new Set(
+  process.env.SHOP_PAUSED === undefined ? SHOP_PAUSED_DEFAULT : process.env.SHOP_PAUSED.split(',').map((x) => x.trim()).filter(Boolean),
+);
+export const GIFTS_PAUSED = new Set([
+  ...['g5', 'g7', 'g8', 'h1', 'h3', 'h4', 'h5', 'h6', 'h7', 'h8', 'h9', 'h10', 'h11'],
+  ...['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p9', 'p10'],
+  ...['c1', 'c2', 'c4', 'c5', 'c7', 'c9', 'c10', 'c11', 'c12'],
+  ...['v1', 'v2', 'v3', 'v4', 'v5'],
+]);
 
 /** Gift counts the panel offers; any other count is refused. */
 export const GIFT_COUNTS = [1, 5, 10, 25, 50, 100, 250];
@@ -158,6 +181,16 @@ const SHOP_ROWS = [
   ['en-thunder', 'entry', 'Şimşek', 600, 30, 0],
   ['en-comet', 'entry', 'Kuyruklu Yıldız', 1_200, 30, 0],
   ['en-dragon', 'entry', 'Ejderha', 3_000, 30, 7],
+  ['en-roket', 'entry', 'Roket', 2_000, 30, 0],
+  ['en-ayicik', 'entry', 'Tatlı Ayıcık', 2_500, 30, 0],
+  ['en-panda', 'entry', 'Sevimli Panda', 3_000, 30, 0],
+  ['en-tac', 'entry', 'Kraliyet Tacı', 4_000, 30, 0],
+  ['en-tekboynuz', 'entry', 'Efsanevi Tek Boynuz', 4_000, 30, 0],
+  ['en-anka', 'entry', 'Anka Kuşu', 5_000, 30, 0],
+  ['en-gemi', 'entry', 'Altın Gemi', 6_000, 30, 0],
+  ['en-saray', 'entry', 'Kristal Saray', 7_000, 30, 0],
+  ['en-otomobil', 'entry', 'Altın Süper Otomobil', 8_000, 30, 0],
+  ['en-aslan', 'entry', 'Altın Aslan', 10_000, 30, 0],
   ['rd-scooter', 'ride', 'Scooter', 250, 7, 0],
   ['rd-sport', 'ride', 'Spor Araba', 1_200, 30, 0],
   ['rd-jet', 'ride', 'Özel Jet', 5_000, 30, 9],

@@ -12,7 +12,16 @@ export type Cosmetic = {
   color?: readonly [string, string];
   minVip?: number;
   /** Code-drawn animation (components/fx): frame styles and entry styles. */
-  fx?: 'pulse' | 'orbit' | 'aurora' | 'flame' | 'crown' | 'sparkle' | 'thunder' | 'dragon' | 'comet';
+  fx?:
+    | 'pulse' | 'orbit' | 'aurora' | 'flame' | 'crown' | 'sparkle' | 'thunder' | 'dragon' | 'comet'
+    // Video entries (components/fx/entry EntryFx): their clip is the gift's (server/api/fx.mjs FX_VIDEOS.entry).
+    | 'roket' | 'ayicik' | 'panda' | 'tac' | 'tekboynuz' | 'anka' | 'gemi' | 'saray' | 'otomobil' | 'aslan';
+  /**
+   * No longer sold (the owner, 14 Nov: entry effects with no animation of their own, only the drawn banner). The
+   * shop shows it only to someone who owns it, who can still wear it until it runs out; the server refuses a new
+   * purchase (server/api/catalog.mjs SHOP_PAUSED, the same list).
+   */
+  retired?: true;
 };
 
 export const COSMETIC_KINDS: { kind: CosmeticKind; label: string; emoji: string }[] = [
@@ -39,10 +48,21 @@ export const COSMETICS: Cosmetic[] = [
   { id: 'fr-crown-gold', kind: 'frame', name: 'Kraliyet Kanatları', emoji: '🪽', price: 9_000, days: null, color: ['#F6BD60', '#13D9DF'], minVip: 4 },
   { id: 'fr-wing-coral', kind: 'frame', name: 'Melek Kalp · Pembe', emoji: '💞', price: 3_000, days: 30, color: ['#FF6576', '#F6BD60'] },
   { id: 'fr-wing-sky', kind: 'frame', name: 'Melek Kalp · Turkuaz', emoji: '💙', price: 3_000, days: 30, color: ['#13D9DF', '#F6BD60'] },
-  { id: 'en-sparkle', kind: 'entry', name: 'Işıltı', emoji: '✨', price: 200, days: 7, color: ['#0B3B4A', '#087A80'], fx: 'sparkle' },
-  { id: 'en-thunder', kind: 'entry', name: 'Şimşek', emoji: '⚡', price: 600, days: 30, color: ['#172554', '#1D4ED8'], fx: 'thunder' },
-  { id: 'en-comet', kind: 'entry', name: 'Kuyruklu Yıldız', emoji: '☄️', price: 1_200, days: 30, color: ['#080F1E', '#12304A'], fx: 'comet' },
+  { id: 'en-sparkle', kind: 'entry', name: 'Işıltı', emoji: '✨', price: 200, days: 7, color: ['#0B3B4A', '#087A80'], fx: 'sparkle', retired: true },
+  { id: 'en-thunder', kind: 'entry', name: 'Şimşek', emoji: '⚡', price: 600, days: 30, color: ['#172554', '#1D4ED8'], fx: 'thunder', retired: true },
+  { id: 'en-comet', kind: 'entry', name: 'Kuyruklu Yıldız', emoji: '☄️', price: 1_200, days: 30, color: ['#080F1E', '#12304A'], fx: 'comet', retired: true },
   { id: 'en-dragon', kind: 'entry', name: 'Ejderha', emoji: '🐉', price: 3_000, days: 30, color: ['#450A0A', '#B91C1C'], minVip: 7, fx: 'dragon' },
+  // Video entries: the gift clips, played full screen as their owner comes in (server/api/fx.mjs FX_VIDEOS.entry).
+  { id: 'en-roket', kind: 'entry', name: 'Roket', emoji: '🚀', price: 2_000, days: 30, color: ['#0B1E3A', '#1D4ED8'], fx: 'roket' },
+  { id: 'en-ayicik', kind: 'entry', name: 'Tatlı Ayıcık', emoji: '🧸', price: 2_500, days: 30, color: ['#4A2414', '#A0522D'], fx: 'ayicik' },
+  { id: 'en-panda', kind: 'entry', name: 'Sevimli Panda', emoji: '🐼', price: 3_000, days: 30, color: ['#111827', '#374151'], fx: 'panda' },
+  { id: 'en-tac', kind: 'entry', name: 'Kraliyet Tacı', emoji: '👑', price: 4_000, days: 30, color: ['#3B2A12', '#8A5A1C'], fx: 'tac' },
+  { id: 'en-tekboynuz', kind: 'entry', name: 'Efsanevi Tek Boynuz', emoji: '🦄', price: 4_000, days: 30, color: ['#2E1065', '#7C3AED'], fx: 'tekboynuz' },
+  { id: 'en-anka', kind: 'entry', name: 'Anka Kuşu', emoji: '🔥', price: 5_000, days: 30, color: ['#450A0A', '#C2410C'], fx: 'anka' },
+  { id: 'en-gemi', kind: 'entry', name: 'Altın Gemi', emoji: '⛵', price: 6_000, days: 30, color: ['#0C2340', '#8A5A1C'], fx: 'gemi' },
+  { id: 'en-saray', kind: 'entry', name: 'Kristal Saray', emoji: '🏰', price: 7_000, days: 30, color: ['#1E1B4B', '#6D28D9'], fx: 'saray' },
+  { id: 'en-otomobil', kind: 'entry', name: 'Altın Süper Otomobil', emoji: '🏎️', price: 8_000, days: 30, color: ['#1C1408', '#8A5A1C'], fx: 'otomobil' },
+  { id: 'en-aslan', kind: 'entry', name: 'Altın Aslan', emoji: '🦁', price: 10_000, days: 30, color: ['#3B2A12', '#B45309'], fx: 'aslan' },
   { id: 'rd-scooter', kind: 'ride', name: 'Scooter', emoji: '🛵', price: 250, days: 7 },
   { id: 'rd-sport', kind: 'ride', name: 'Spor Araba', emoji: '🏎️', price: 1_200, days: 30 },
   { id: 'rd-jet', kind: 'ride', name: 'Özel Jet', emoji: '🛩️', price: 5_000, days: 30, minVip: 9 },

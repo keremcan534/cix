@@ -14,6 +14,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSyncExternalStore } from 'react';
 
+import { GIFTS_PAUSED } from '@/data/gifts-paused';
 import { RULES, type Rules } from '@/data/rules';
 import { selfExchangeRate } from '@/lib/coins-bank';
 import { parseFxList, type FxVideo } from '@/lib/fx-videos-core';
@@ -114,13 +115,13 @@ let current: LiveCatalog | null = null;
 let fetchedAt = 0;
 
 /**
- * The gift shelf: the compiled gifts (names, art, prices) the server still lists, in the compiled order. Without
- * a server list, or when none of them would be left, the whole compiled list: the app never hides every gift.
+ * The gift shelf: the compiled gifts (names, art, prices) the server still lists, in the compiled order, without the
+ * ones off the shelf for now (data/gifts-paused; an older server still lists them). When none of them would be left,
+ * the whole compiled list: the app never hides every gift.
  */
 export function visibleGifts<G extends { id: string }>(compiled: G[], c: LiveCatalog | null = current): G[] {
-  if (!c?.giftIds) return compiled;
-  const listed = new Set(c.giftIds);
-  const shown = compiled.filter((g) => listed.has(g.id));
+  const listed = c?.giftIds ? new Set(c.giftIds) : null;
+  const shown = compiled.filter((g) => !GIFTS_PAUSED.has(g.id) && (!listed || listed.has(g.id)));
   return shown.length ? shown : compiled;
 }
 

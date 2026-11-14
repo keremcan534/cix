@@ -46,6 +46,8 @@ const SHELVES: { key: Shelf; label: string; icon?: keyof typeof Ionicons.glyphMa
   { key: 'fav', label: 'Favoriler', icon: 'star' },
   { key: 'bag', label: 'Çantam', icon: 'bag-handle' },
 ];
+/** The shelves that are a gift category: one with no gift left on it (all off the shelf for now) isn't shown. */
+const CATEGORY_SHELVES = new Set<Shelf>(['hot', 'couple', 'gameplay', 'privilege']);
 /** One neutral line that explains the shelf; no countdowns, no "spend more" nudges. */
 const SHELF_NOTE: Record<Shelf, string> = {
   hot: 'En çok gönderilen hediyeler.',
@@ -312,7 +314,7 @@ export function GiftSheet({
 
         {/* What: shelves */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, flexShrink: 0 }} contentContainerStyle={g.shelves}>
-          {SHELVES.filter((s) => luckyShelf || s.key !== 'lucky').map((s) => {
+          {SHELVES.filter((s) => (s.key === 'lucky' ? luckyShelf : !CATEGORY_SHELVES.has(s.key) || shown.some((g) => (g.cat ?? 'hot') === s.key))).map((s) => {
             const on = shelf === s.key;
             const n = s.key === 'bag' ? Object.values(bag).filter((x) => x > 0).length : 0;
             return (
