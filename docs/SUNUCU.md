@@ -94,7 +94,7 @@ Mağazada satılan her şeyin (çerçeve, giriş efekti, binek, sohbet balonu, �
 | `GET /api/economy` | Kendi ürünlerim (kalan gün), giydiklerim, rütbem, VIP seviyem, ödül jetonum, mağaza listesi ve son alımlarım. |
 | `POST /api/shop/buy` `{sku, price, ref}` | Satın al. Aynı `ref` aynı sonucu döner (`replay: true`), ikinci kez ödetmez. |
 | `POST /api/shop/equip` `{slot, sku \| null}` | Giy ya da çıkar; yalnız geçerli bir ürün giyilir. |
-| `GET /api/looks?ids=a,b` | Başkalarının giydikleri (en çok 50 kişi); oda ve profil bunu gösterir. |
+| `GET /api/looks?ids=a,b` | Başkalarının giydikleri, VIP düzeyi, konuşma halkasının rengi (cinsiyet) ve profil fotoğrafı (`avatarUrl`; en çok 50 kişi); oda ve profil bunu gösterir. Biri odadayken çerçeve takar ya da çıkarır, ürün alır, fotoğrafını, adını ya da cinsiyet görünürlüğünü değiştirirse, sunucu bulunduğu her ses odasına yeni görünümü `{type: 'look', user, look}` ile hemen duyurur (`economy.mjs` `announceLook`); yeni ad LiveKit adı da olur. Telefonlar mikrofonu ve Balkon'u odadan çıkıp girmeden yeniler. |
 | `GET /api/admin/economy/user?id=` | Yalnız yönetici: bir hesabın bütün ürünleri (geçerli, bitmiş, geri alınmış), ödül jetonu ve iade incelemeleri. |
 | `POST /api/admin/economy/grant` `{userId, sku, days?, reason, ref}` | Yalnız yönetici: ücretsiz ürün verir (fiyat 0); denetim kaydına yazılır. |
 | `POST /api/admin/economy/revoke` `{id, reason}` | Yalnız yönetici: bir satırı geri alır (`destek`); denetim kaydına yazılır. |

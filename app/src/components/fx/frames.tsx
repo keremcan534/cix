@@ -40,8 +40,11 @@ function useLoop(ms: number, still?: boolean, rest = 0) {
 const ID = { inputRange: [0, 1], outputRange: [0, 1] };
 const shifted = (v: Animated.Value, phase: number): Animated.AnimatedInterpolation<number> => Animated.modulo(Animated.add(v, phase), 1).interpolate(ID);
 
-export function AnimatedFrame({ fx, size, still, children }: { fx: FrameFx; size: number; still?: boolean; children: ReactNode }) {
+/** `headroom`: how far (px) the floating crown may rise above the box (a seat: the gap to the row above). */
+export function AnimatedFrame({ fx, size, still, headroom, children }: { fx: FrameFx; size: number; still?: boolean; headroom?: number; children: ReactNode }) {
   const look = FRAME_LOOKS[fx];
+  // The crown floats a little above the ring and bobs by a twentieth of the box: both within the headroom.
+  const crownLift = headroom === undefined ? size * 0.3 : Math.max(0, Math.min(size * 0.3, headroom - size * 0.05));
   const ring = Math.max(3, Math.round(size * 0.075));
   const spin = useLoop(look.spinMs, still);
   const breathe = useLoop(2000, still, 0.5);
@@ -192,7 +195,7 @@ export function AnimatedFrame({ fx, size, still, children }: { fx: FrameFx; size
           pointerEvents="none"
           style={{
             position: 'absolute',
-            top: -size * 0.3,
+            top: -crownLift,
             transform: [{ translateY: wave(breatheI).interpolate({ inputRange: [0, 1], outputRange: [0, -size * 0.05] }) }, { rotate: wave(breatheI).interpolate({ inputRange: [0, 1], outputRange: ['-6deg', '6deg'] }) }],
           }}
         >

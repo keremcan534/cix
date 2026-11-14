@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Image, Pressable, StyleSheet, View, type HostInstance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -21,10 +21,11 @@ import type { SeatColorId } from '@/data/seat-colors';
 import { Gloss, Shine, useSpringPress } from '@/components/fx/surface';
 import { Photo } from '@/components/photo';
 import { RoleMark, type StaffMark } from '@/components/room/role-mark';
-import { VOICE_RING, VoiceWave, waveTint } from '@/components/room/voice-wave';
+import { VOICE_RING, VoiceWave } from '@/components/room/voice-wave';
 import { BondBubble, BondChip, BondLink } from '@/components/room/room-bonds';
 import type { RoomBond } from '@/data/bonds';
 import { nameLine, nameSize } from '@/lib/seat-fit';
+import { ringReach, seatRoom } from '@/lib/seat-cell';
 import { levelsLive, voiceLevel } from '@/lib/live/voice-level';
 import { RollingNumber } from '@/components/fx/rolling-number';
 import { BounceBadge } from '@/components/fx/bounce-badge';
@@ -139,8 +140,10 @@ export function Seat({
   // The room's word wins (its looks, null: hidden); else what this phone knows of them.
   const g = gender !== undefined ? gender : user?.showGender === false ? null : user?.gender;
   const voice = g ? VOICE_RING[g] : VOICE_RING.none;
-  const ring = waveTint(wave, voice);
   const size = avatarSize ?? (host ? 60 : 48);
+  // The frame's picture and the speaking ring keep to this seat's cell (lib/seat-cell): off the name, the next seats
+  // and the row above, the same for every frame and wave. One object per size, so the framed photo isn't redrawn.
+  const room = useMemo(() => seatRoom(size, slotWidth), [size, slotWidth]);
   // Small faces: a smaller icon and no badge by the name. The name grows a little with the face (lib/seat-fit, which
   // sizes the stage by the same numbers) and may be as wide as the seat's slot.
   const small = size < 46;
@@ -171,13 +174,14 @@ export function Seat({
           { opacity: appear, transform: [{ translateY: appear.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }, { scale: appear.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }] },
         ]}
       >
-        <Animated.View ref={anchorRef} collapsable={false} style={[{ width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center', transform: [{ scale: press.scale }] }, speaking && { boxShadow: `0 0 18px ${ring}A6` }]}>
-          {speaking && <VoiceWave wave={wave} size={size} color={voice} level={level} still={still} />}
+        <Animated.View ref={anchorRef} collapsable={false} style={{ width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center', transform: [{ scale: press.scale }] }}>
+          {/* Behind the photo and its frame, round the face: the same ring for every speaker (components/room/voice-wave). */}
+          {speaking && <VoiceWave wave={wave} size={size} color={voice} level={level} still={still} reach={ringReach(size, room)} />}
           {user && !mini && (vipLevel > 0 || frameId) ? (
-            <FramedAvatar uri={user.avatar} size={size} vipLevel={vipLevel} frameId={frameId} />
+            <FramedAvatar uri={user.avatar} size={size} vipLevel={vipLevel} frameId={frameId} room={room} />
           ) : user ? (
             <>
-              <Photo uri={user.avatar} kind="face" style={{ width: size, height: size, borderRadius: size / 2, borderWidth: 2, borderColor: speaking ? ring : 'transparent' }} />
+              <Photo uri={user.avatar} kind="face" style={{ width: size, height: size, borderRadius: size / 2 }} />
               {hostFrame !== undefined && (
                 <Image
                   source={hostFrame}

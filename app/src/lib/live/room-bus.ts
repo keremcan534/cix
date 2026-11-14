@@ -16,7 +16,8 @@
 //    when the room's game table changed (server/api/room-games.mjs): "read it again" (lib/live/room-table); what
 //    happened to the Patron koltuğu (server/api/boss-seat.mjs: who sat, took it, whose time ended), for the chat;
 //    and that the room closed for lack of staff (server/api/room-autoclose.mjs: parseServerClosed, which the voice
-//    engine turns into the session's end with its reason);
+//    engine turns into the session's end with its reason); and someone's new look (server/api/economy.mjs
+//    announceLook: a frame worn or taken off, a new photo), with the look itself, which lib/live/looks keeps;
 //  - the room's state the server keeps on LiveKit: the room metadata (server/api/rooms.mjs pushRoomMeta: locked
 //    mics, the layout, the mic count, the mic queue and who waits in it, the room's music: server/api/music.mjs, the shared YouTube screen:
 //    server/api/room-video.mjs),
@@ -25,6 +26,7 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react';
 
 import { isSeatColor, type SeatColorId } from '@/data/seat-colors';
+import type { Look } from '@/lib/live/looks';
 import type { BossNews } from '@/lib/patron-seat';
 import { parseMove, type Move } from '@/lib/room-moves';
 
@@ -101,6 +103,7 @@ const inviteListeners = new Set<(roomId: string, news: InviteNews) => void>();
 const pollListeners = new Set<(roomId: string) => void>();
 const tableListeners = new Set<(roomId: string) => void>();
 const bossListeners = new Set<(roomId: string, news: BossNews) => void>();
+const lookListeners = new Set<(roomId: string, user: string, look: Look) => void>();
 // Gift announcements already shown (a reliable packet can come twice around a reconnect).
 const seenGifts: number[] = [];
 // The same for paid Hareketli (their own ids: a room_animations row, not a gift_events one).
@@ -243,6 +246,9 @@ export function reportSignal(roomId: string, from: string | null, raw: unknown) 
     // The Patron koltuğu changed hands (server/api/boss-seat.mjs): a chat line; the room read follows its 'room' packet.
     const boss = parseServerBoss(raw);
     if (boss) return bossListeners.forEach((l) => l(roomId, boss));
+    // Someone's look changed (server/api/economy.mjs announceLook): their mic and Balkon face are drawn with it now.
+    const look = parseServerLook(raw);
+    if (look) return lookListeners.forEach((l) => l(roomId, look.user, look.look));
     if (isServerBag(raw)) {
       const p = raw as Record<string, unknown>;
       const news: BagNews = { id: typeof p.id === 'number' && Number.isSafeInteger(p.id) ? p.id : null, drawn: p.drawn === true };
@@ -351,6 +357,33 @@ export function parseServerBoss(raw: unknown): BossNews | null {
 }
 
 /**
+ * The server's look packet: `{ type: 'look', user, look }` (server/api/economy.mjs announceLook), the look as GET
+ * /api/looks answers it. Each worn item is an id or null; an odd field is left out rather than taken.
+ */
+export function parseServerLook(raw: unknown): { user: string; look: Look } | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const m = raw as Record<string, unknown>;
+  if (m.type !== 'look' || typeof m.user !== 'string' || !/^[0-9a-f-]{36}$/i.test(m.user) || !m.look || typeof m.look !== 'object') return null;
+  const l = m.look as Record<string, unknown>;
+  const id = (v: unknown) => (typeof v === 'string' && /^[A-Za-z0-9_.-]{1,40}$/.test(v) ? v : null);
+  const look: Look = {
+    frame: id(l.frame),
+    entry: id(l.entry),
+    ride: id(l.ride),
+    bubble: id(l.bubble),
+    specialId: id(l.specialId),
+    micfx: id(l.micfx),
+    wave: id(l.wave),
+    noble: Number.isInteger(l.noble) ? (l.noble as number) : null,
+    vipLevel: Number.isInteger(l.vipLevel) && (l.vipLevel as number) >= 0 ? (l.vipLevel as number) : 0,
+    gender: l.gender === 'Kadın' || l.gender === 'Erkek' ? l.gender : null,
+  };
+  // A photo only as an https address (as the server keeps it); none (null) when they took theirs off.
+  if (l.avatarUrl === null || (typeof l.avatarUrl === 'string' && /^https:\/\/\S{1,490}$/.test(l.avatarUrl))) look.avatarUrl = l.avatarUrl;
+  return { user: m.user, look };
+}
+
+/**
  * The server's notice that the room closed because its owner and admins were away (server/api/room-autoclose.mjs:
  * `{ type: 'closed', reason: 'no_staff', minutes }`), as the words the ended session shows; null for anything else.
  */
@@ -426,6 +459,12 @@ export function onServerBoss(roomId: string, fn: (news: BossNews) => void) {
   const l = (r: string, news: BossNews) => r === roomId && fn(news);
   bossListeners.add(l);
   return () => void bossListeners.delete(l);
+}
+/** The server says someone in this room looks different now (`user`: their server id); returns the unsubscribe. */
+export function onServerLook(roomId: string, fn: (user: string, look: Look) => void) {
+  const l = (r: string, user: string, look: Look) => r === roomId && fn(user, look);
+  lookListeners.add(l);
+  return () => void lookListeners.delete(l);
 }
 /** What the server says happened to the room's Patron koltuğu, while `on` (the room screen's chat line). */
 export function useBossNews(roomId: string, on: boolean, fn: (news: BossNews) => void) {

@@ -16,7 +16,7 @@ import { CATEGORIES } from './contact-filter.mjs';
 import { withSignIn } from './auth.mjs';
 import { notify } from './push.mjs';
 import { autoFromReports } from './sanctions.mjs';
-import { looksOf, revokeAllForDelete, statusOf } from './economy.mjs';
+import { announceLook, looksOf, revokeAllForDelete, statusOf } from './economy.mjs';
 import { svipLevel, vipLevelOf } from './catalog.mjs';
 import { familyOf, leaveFamily } from './families.mjs';
 import { dropFromQueues } from './music.mjs';
@@ -231,6 +231,9 @@ export const socialRoutes = {
       const r = await db.query(`UPDATE users SET ${keys.map((k, i) => `${k} = $${i + 2}`).join(', ')} WHERE id = $1 RETURNING *`, [u.id, ...keys.map((k) => set[k])]);
       // The photo it replaced leaves the storage (only one this person uploaded).
       if (set.avatar_url !== undefined && u.avatar_url && u.avatar_url !== set.avatar_url) removeFiles([u.avatar_url], u.id);
+      // A new photo, name or gender: the room they are in shows it on their mic and in the Balkon now.
+      const renamed = set.name !== undefined && set.name !== u.name;
+      if (renamed || (set.avatar_url !== undefined && set.avatar_url !== u.avatar_url) || (set.gender !== undefined && set.gender !== u.gender)) void announceLook(u.id, renamed ? set.name : undefined);
       return { user: await withSignIn(r.rows[0]) };
     } catch (e) {
       if (e.code === '23505') throw new HttpError(409, 'Bu kullanıcı adı alınmış');

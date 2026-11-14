@@ -27,8 +27,10 @@ const KIND_NAME: Record<PanelKind, string> = { sabit: 'Sabit', vip: 'VIP' };
  * In rooms (`onAnimate`) the Hareketli tabs come from the central animation catalog, so catalog changes show
  * up without an app update.
  * `onClose`: the phone's back button closes the panel (not the screen); hosts also close it on a touch above it.
+ * `fill`: the panel fills the box it is given (a room lays it over its chat, components/room/fit-stage) and its lists
+ * scroll inside it; otherwise it is as tall as its content, its lists at most four rows.
  */
-export function EmojiPanel({ onPick, hint, onAnimate, onClose }: { onPick: (e: string) => void; hint?: string; onAnimate?: (animationId: string) => void; onClose?: () => void }) {
+export function EmojiPanel({ onPick, hint, onAnimate, onClose, fill }: { onPick: (e: string) => void; hint?: string; onAnimate?: (animationId: string) => void; onClose?: () => void; fill?: boolean }) {
   const close = useRef(onClose);
   useEffect(() => {
     close.current = onClose;
@@ -169,8 +171,9 @@ export function EmojiPanel({ onPick, hint, onAnimate, onClose }: { onPick: (e: s
     );
   };
 
+  const list = fill ? styles.fillScroll : styles.stickerScroll;
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, fill && styles.fillWrap]}>
       {hint && <Text style={styles.hint}>{hint}</Text>}
       <View style={styles.kinds} accessibilityRole="tablist">
         {(['sabit', 'vip'] as const).map((k) => (
@@ -179,7 +182,7 @@ export function EmojiPanel({ onPick, hint, onAnimate, onClose }: { onPick: (e: s
           </Pressable>
         ))}
       </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingHorizontal: 8 }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, flexShrink: 0 }} contentContainerStyle={{ gap: 6, paddingHorizontal: 8 }}>
         {tabs
           .filter((x) => x.kind === kind)
           .map((x) => {
@@ -204,9 +207,9 @@ export function EmojiPanel({ onPick, hint, onAnimate, onClose }: { onPick: (e: s
           })}
       </ScrollView>
       {(tab.id === 'animated' || tab.id === 'animated-free') && onAnimate ? (
-        <View style={{ paddingHorizontal: 8, gap: 6 }}>
+        <View style={[{ paddingHorizontal: 8, gap: 6 }, fill && { flex: 1 }]}>
           {micFxList.length > 0 && <Text style={styles.sub}>🎙️ Mikrofon efektim · konuşurken koltuğunda kendiliğinden oynar</Text>}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 6 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, flexShrink: 0 }} contentContainerStyle={{ gap: 6 }}>
             {micFxList.map((a) => {
               const owned = ownedAnims.has(a.animation_id);
               const on = micFx === a.animation_id;
@@ -228,11 +231,13 @@ export function EmojiPanel({ onPick, hint, onAnimate, onClose }: { onPick: (e: s
               );
             })}
           </ScrollView>
-          <View style={styles.grid}>{catalog.filter((a) => sendable(a) && a.is_free === !paidAnim).map(animCell)}</View>
+          <ScrollView style={list} nestedScrollEnabled>
+            <View style={styles.grid}>{catalog.filter((a) => sendable(a) && a.is_free === !paidAnim).map(animCell)}</View>
+          </ScrollView>
         </View>
       ) : tab.id === 'emoji' ? (
         // The faces first, then Müzik and (in a room) Hamle; it scrolls inside the panel, so the room's mics stay.
-        <ScrollView style={styles.stickerScroll} nestedScrollEnabled>
+        <ScrollView style={list} nestedScrollEnabled>
           {emojiTabPacks(room).map((p, i) => (
             <View key={p.id}>
               {i > 0 && <Text style={styles.section}>{p.name}</Text>}
@@ -241,14 +246,14 @@ export function EmojiPanel({ onPick, hint, onAnimate, onClose }: { onPick: (e: s
           ))}
         </ScrollView>
       ) : tab.id === 'fav' ? (
-        <ScrollView style={styles.stickerScroll} nestedScrollEnabled>
+        <ScrollView style={list} nestedScrollEnabled>
           <View style={styles.grid}>
             {favs.length === 0 && <Text style={styles.empty}>Kullandıkça en sevdiklerin burada toplanır.</Text>}
             {favs.map(favCell)}
           </View>
         </ScrollView>
       ) : pack ? (
-        <ScrollView style={styles.stickerScroll} nestedScrollEnabled>
+        <ScrollView style={list} nestedScrollEnabled>
           <View style={[styles.grid, locked && { opacity: 0.4 }]}>{pack.stickers.map((x) => (pack.roomOnly ? moveCell(x) : stickerCell(x)))}</View>
         </ScrollView>
       ) : null}
@@ -288,6 +293,9 @@ const useStyles = makeStyles(({ colors, semantic, dark }) => ({
   moveName: { color: colors.text, fontSize: 11, fontWeight: '600', textAlign: 'center' },
   // Four rows and a part of the fifth, so it shows there is more.
   stickerScroll: { maxHeight: 236 },
+  // Over a room's chat: the panel is the chat's height and its list takes what the tabs leave.
+  fillWrap: { flex: 1 },
+  fillScroll: { flex: 1 },
   section: { color: colors.textDim, fontSize: 11, fontWeight: '700', paddingHorizontal: 12, paddingTop: 4 },
   empty: { color: colors.textDim, padding: 12 },
   sub: { color: colors.textDim, fontSize: 11, fontWeight: '700' },

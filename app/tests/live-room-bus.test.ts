@@ -10,6 +10,7 @@ import {
   getLivePeers,
   onServerBag,
   onServerBoss,
+  onServerLook,
   onServerSeat,
   onSignal,
   parseRoomMeta,
@@ -19,6 +20,7 @@ import {
   parseServerClosed,
   parseServerFx,
   parseServerGift,
+  parseServerLook,
   parseServerLucky,
   parseSignal,
   reportPeers,
@@ -256,4 +258,31 @@ test('soru-cevap: soru ve seçim telefondan gelir; biçimi bozuk olan atılır',
   assert.equal((parseSignal({ t: 'q', id: 'q1', text: 'a'.repeat(500) }) as { text: string }).text.length, 200);
   assert.deepEqual(parseSignal({ t: 'qpick', id: 'q123' }), { t: 'qpick', id: 'q123' });
   assert.equal(parseSignal({ t: 'qpick' }), null);
+});
+
+test('görünüm: sunucunun paketi o odada okunur; telefondan gelen, başka oda ve bozuk alanlar alınmaz', () => {
+  const user = 'aaaaaaaa-0000-4000-8000-000000000007';
+  const look = { frame: 'fr-wing-sky', entry: null, ride: null, bubble: null, specialId: null, micfx: null, wave: 'wv-gold', noble: 2, vipLevel: 5, gender: 'Kadın', avatarUrl: 'https://depo.test/avatar/a.jpg' };
+  assert.deepEqual(parseServerLook({ type: 'look', user, look }), { user, look });
+  // An older server sends no photo: none is taken; a photo taken off is null.
+  const { avatarUrl: _a, ...old } = look;
+  assert.equal('avatarUrl' in (parseServerLook({ type: 'look', user, look: old })?.look ?? {}), false);
+  assert.equal(parseServerLook({ type: 'look', user, look: { ...look, avatarUrl: null } })?.look.avatarUrl, null);
+  // Odd fields are read as nothing, never taken as they came.
+  const odd = parseServerLook({ type: 'look', user, look: { ...look, frame: '<b>x</b>', vipLevel: -3, gender: 'x', avatarUrl: 'http://evil.test/a.jpg' } })?.look;
+  assert.equal(odd?.frame, null);
+  assert.equal(odd?.vipLevel, 0);
+  assert.equal(odd?.gender, null);
+  assert.equal('avatarUrl' in (odd ?? {}), false);
+  assert.equal(parseServerLook({ type: 'look', user: 'kim', look }), null);
+  assert.equal(parseServerLook({ type: 'look', user }), null);
+
+  const got: string[] = [];
+  const off = onServerLook('oda-g', (u, l) => got.push(`${u}:${l.frame}`));
+  reportSignal('oda-g', 'u-x', { type: 'look', user, look }); // from a phone: dropped
+  reportSignal('oda-h', null, { type: 'look', user, look }); // another room
+  reportSignal('oda-g', null, { type: 'look', user, look });
+  off();
+  reportSignal('oda-g', null, { type: 'look', user, look: { ...look, frame: null } }); // after leaving
+  assert.deepEqual(got, [`${user}:fr-wing-sky`]);
 });

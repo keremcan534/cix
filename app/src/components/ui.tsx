@@ -12,6 +12,7 @@ import { AnimatedFrame, FRAME_LOOKS, type FrameFx } from '@/components/fx/frames
 import { goBack } from '@/lib/nav';
 import { pressHaptic, tapHaptic } from '@/lib/haptics';
 import { ArtFrame, frameArtOf } from '@/components/fx/frame-art';
+import type { SeatRoom } from '@/lib/seat-cell';
 import { useSettings } from '@/store';
 import { fonts, makeStyles, useTheme } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
@@ -288,7 +289,8 @@ function FaceImage({ uri, size, style }: { uri?: string; size: number; style: ob
 /** Avatar with the nobility (VIP) frame color, if any. */
 // Memoized: props are plain values and settings come from their own context, so rows re-render only when they change.
 export const FramedAvatar = memo(FramedAvatarBase);
-function FramedAvatarBase({ uri, size = 44, vipLevel = 0, frameId, online, artScale }: { uri: string; size?: number; vipLevel?: number; frameId?: string; online?: boolean; /** How far illustrated frames may spread (see ArtFrame). */ artScale?: number }) {
+// `room`: a room seat's cell around the avatar (lib/seat-cell): the frame keeps inside it, off the name and the next seats.
+function FramedAvatarBase({ uri, size = 44, vipLevel = 0, frameId, online, artScale, room }: { uri: string; size?: number; vipLevel?: number; frameId?: string; online?: boolean; /** How far illustrated frames may spread (see ArtFrame). */ artScale?: number; room?: SeatRoom }) {
   const settings = useSettings();
   const { colors } = useTheme();
   const tier = vipTier(vipLevel);
@@ -296,7 +298,7 @@ function FramedAvatarBase({ uri, size = 44, vipLevel = 0, frameId, online, artSc
   const art = frameArtOf(frame?.id);
   if (art) {
     return (
-      <ArtFrame art={art} size={size} still={settings.reduceMotion} maxScale={artScale}>
+      <ArtFrame art={art} size={size} still={settings.reduceMotion} maxScale={artScale} room={room}>
         <FaceImage uri={uri} size={size} style={{ width: '100%', height: '100%' }} />
       </ArtFrame>
     );
@@ -304,7 +306,7 @@ function FramedAvatarBase({ uri, size = 44, vipLevel = 0, frameId, online, artSc
   if (frame?.fx && frame.fx in FRAME_LOOKS) {
     return (
       <View style={{ width: size, height: size }}>
-        <AnimatedFrame fx={frame.fx as FrameFx} size={size} still={settings.reduceMotion}>
+        <AnimatedFrame fx={frame.fx as FrameFx} size={size} still={settings.reduceMotion} headroom={room?.top}>
           <FaceImage uri={uri} size={size} style={{ width: '100%', height: '100%' }} />
         </AnimatedFrame>
         {tier && <Art name={tier.art} size={size * 0.38} style={{ position: 'absolute', top: -size * 0.14, right: -size * 0.07 }} />}
