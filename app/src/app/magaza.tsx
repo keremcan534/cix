@@ -42,7 +42,8 @@ export default function StoreScreen() {
       rideArt: c.kind === 'ride' ? storeArtOf(c.id) : undefined,
     });
   };
-  const items = COSMETICS.filter((c) => c.kind === tab);
+  // An item no longer sold shows only to its owner, who can still wear it until it runs out.
+  const items = COSMETICS.filter((c) => c.kind === tab && (!c.retired || inventory.has(c.id)));
   // Read once per preview: a clip not on the phone yet starts downloading and the drawn banner plays this time.
   const [previewMedia, setPreviewMedia] = useState<ReturnType<typeof entryVideoOf>>(null);
 

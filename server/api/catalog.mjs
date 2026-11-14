@@ -81,6 +81,16 @@ export const GIFTS = new Map(GIFT_ROWS.map(([id, name, price, cat, minSvip = 0])
  * through (unlike a gift hidden in Canlı ayarlar). The same list as app/src/data/gifts-paused.ts; taking an id out of
  * both brings the gift back.
  */
+/**
+ * Shop items no longer sold (the owner, 14 Nov): the entry effects with no animation of their own, only the drawn
+ * banner. Left out of the shop list and refused as a purchase (economy.mjs sellable); whoever owns one keeps wearing
+ * it until it runs out. The same list as the app's COSMETICS `retired`. SHOP_PAUSED in .env replaces it (comma
+ * separated; empty sells them all again, as the tests' server does: test/harness.mjs).
+ */
+export const SHOP_PAUSED_DEFAULT = ['en-sparkle', 'en-thunder', 'en-comet'];
+export const SHOP_PAUSED = new Set(
+  process.env.SHOP_PAUSED === undefined ? SHOP_PAUSED_DEFAULT : process.env.SHOP_PAUSED.split(',').map((x) => x.trim()).filter(Boolean),
+);
 export const GIFTS_PAUSED = new Set([
   ...['g5', 'g7', 'g8', 'h1', 'h3', 'h4', 'h5', 'h6', 'h7', 'h8', 'h9', 'h10', 'h11'],
   ...['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p9', 'p10'],

@@ -16,6 +16,12 @@ export type Cosmetic = {
     | 'pulse' | 'orbit' | 'aurora' | 'flame' | 'crown' | 'sparkle' | 'thunder' | 'dragon' | 'comet'
     // Video entries (components/fx/entry EntryFx): their clip is the gift's (server/api/fx.mjs FX_VIDEOS.entry).
     | 'roket' | 'ayicik' | 'panda' | 'tac' | 'tekboynuz' | 'anka' | 'gemi' | 'saray' | 'otomobil' | 'aslan';
+  /**
+   * No longer sold (the owner, 14 Nov: entry effects with no animation of their own, only the drawn banner). The
+   * shop shows it only to someone who owns it, who can still wear it until it runs out; the server refuses a new
+   * purchase (server/api/catalog.mjs SHOP_PAUSED, the same list).
+   */
+  retired?: true;
 };
 
 export const COSMETIC_KINDS: { kind: CosmeticKind; label: string; emoji: string }[] = [
@@ -42,9 +48,9 @@ export const COSMETICS: Cosmetic[] = [
   { id: 'fr-crown-gold', kind: 'frame', name: 'Kraliyet Kanatları', emoji: '🪽', price: 9_000, days: null, color: ['#F6BD60', '#13D9DF'], minVip: 4 },
   { id: 'fr-wing-coral', kind: 'frame', name: 'Melek Kalp · Pembe', emoji: '💞', price: 3_000, days: 30, color: ['#FF6576', '#F6BD60'] },
   { id: 'fr-wing-sky', kind: 'frame', name: 'Melek Kalp · Turkuaz', emoji: '💙', price: 3_000, days: 30, color: ['#13D9DF', '#F6BD60'] },
-  { id: 'en-sparkle', kind: 'entry', name: 'Işıltı', emoji: '✨', price: 200, days: 7, color: ['#0B3B4A', '#087A80'], fx: 'sparkle' },
-  { id: 'en-thunder', kind: 'entry', name: 'Şimşek', emoji: '⚡', price: 600, days: 30, color: ['#172554', '#1D4ED8'], fx: 'thunder' },
-  { id: 'en-comet', kind: 'entry', name: 'Kuyruklu Yıldız', emoji: '☄️', price: 1_200, days: 30, color: ['#080F1E', '#12304A'], fx: 'comet' },
+  { id: 'en-sparkle', kind: 'entry', name: 'Işıltı', emoji: '✨', price: 200, days: 7, color: ['#0B3B4A', '#087A80'], fx: 'sparkle', retired: true },
+  { id: 'en-thunder', kind: 'entry', name: 'Şimşek', emoji: '⚡', price: 600, days: 30, color: ['#172554', '#1D4ED8'], fx: 'thunder', retired: true },
+  { id: 'en-comet', kind: 'entry', name: 'Kuyruklu Yıldız', emoji: '☄️', price: 1_200, days: 30, color: ['#080F1E', '#12304A'], fx: 'comet', retired: true },
   { id: 'en-dragon', kind: 'entry', name: 'Ejderha', emoji: '🐉', price: 3_000, days: 30, color: ['#450A0A', '#B91C1C'], minVip: 7, fx: 'dragon' },
   // Video entries: the gift clips, played full screen as their owner comes in (server/api/fx.mjs FX_VIDEOS.entry).
   { id: 'en-roket', kind: 'entry', name: 'Roket', emoji: '🚀', price: 2_000, days: 30, color: ['#0B1E3A', '#1D4ED8'], fx: 'roket' },
