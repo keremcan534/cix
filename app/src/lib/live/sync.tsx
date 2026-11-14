@@ -16,6 +16,7 @@ import { loadBlocks, loadFollowing } from '@/lib/live/blocks';
 import { checkNewFollowers } from '@/lib/live/follows';
 import { checkRoomInvites } from '@/lib/live/room-social';
 import { lineOpen, onLine, startLiveLine } from '@/lib/live/live-line';
+import { visitLineNotice } from '@/lib/live/visitors';
 import { pollMessages } from '@/lib/live/messages';
 import { loadPrivacy } from '@/lib/live/privacy';
 import { refreshSpendLimit } from '@/lib/live/spend-limit';
@@ -134,6 +135,13 @@ export function LiveSync() {
     const stopLine = startLiveLine();
     const offLine = onLine((e) => {
       if (e.type === 'call' || e.type === 'message_read') return;
+      // Someone opened my profile (the server tells at most once a day per visitor): the counts and a notice.
+      if (e.type === 'visit') {
+        void visitLineNotice(typeof e.from === 'string' ? e.from : null)
+          .then((n) => alive && appRef.current.notify(n))
+          .catch(() => {});
+        return;
+      }
       if (e.type === 'follow' || e.type === 'reconnected') resumed = true;
       if (e.type === 'room_invite' || e.type === 'reconnected') invitesDue = true;
       void run();

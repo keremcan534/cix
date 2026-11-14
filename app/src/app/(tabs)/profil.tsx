@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router, type Href } from 'expo-router';
-import { useState } from 'react';
+import { router, useLocalSearchParams, type Href } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -87,7 +87,17 @@ export default function ProfileScreen() {
     return demoTies[side].map(({ id }) => { const u = userById(id); return { id: u.id, name: u.name, avatarUrl: u.avatar || null }; });
   };
   const visitors = useProfileVisitors();
-  const [visitorsOpen, setVisitorsOpen] = useState(false);
+  // A visit notice (lib/push-target, lib/live/sync) opens the visitors here; the mark is taken off so the next one does too.
+  const { ziyaretciler } = useLocalSearchParams<{ ziyaretciler?: string }>();
+  const [visitorsOpen, setVisitorsOpen] = useState(!!ziyaretciler);
+  const [askedVisitors, setAskedVisitors] = useState(ziyaretciler);
+  if (ziyaretciler !== askedVisitors) {
+    setAskedVisitors(ziyaretciler);
+    if (ziyaretciler) setVisitorsOpen(true);
+  }
+  useEffect(() => {
+    if (ziyaretciler) router.setParams({ ziyaretciler: undefined });
+  }, [ziyaretciler]);
   const completion = myCompletion(me, live);
   // My public id: the one others see on my profile (data/profile displayId of my server id); none until known.
   const serverId = server.stats?.serverId ?? myServerId();
@@ -150,23 +160,8 @@ export default function ProfileScreen() {
           <Stat n={followers} label="Takipçiler" onPress={() => setList('followers')} />
           <Stat n={followingCount} label="Takip" onPress={() => setList('following')} />
           <Stat n={friendCount} label="Arkadaşlar" onPress={() => router.push({ pathname: '/(tabs)/mesajlar', params: { tab: 'friends' } })} />
-          <Stat
-            n={visitors.count}
-            label="Ziyaretçiler"
-            dot={(visitors.count ?? 0) > 0}
-            onPress={() =>
-              visitors.unlocked
-                ? setVisitorsOpen(true)
-                : showAlert(
-                    'Ziyaretçiler',
-                    `${visitors.count ? `Son 7 günde profiline ${visitors.count} kişi baktı. ` : ''}Kimlerin baktığını görmek VIP ayrıcalığıdır.`,
-                    [
-                      { text: 'Kapat', style: 'cancel' },
-                      { text: "VIP'e bak", onPress: () => router.push({ pathname: '/vip', params: { tab: 'vip' } }) },
-                    ],
-                  )
-            }
-          />
+          {/* Open to everyone: without the Abonelik the visits show blurred (components/visitors-sheet). */}
+          <Stat n={visitors.count} label="Ziyaretçiler" dot={(visitors.count ?? 0) > 0} onPress={() => setVisitorsOpen(true)} />
         </View>
 
         <View style={styles.card}>
@@ -278,7 +273,7 @@ export default function ProfileScreen() {
         </Pressable>
       </ScrollView>
       <FollowListSheet visible={list !== null} {...MY_LISTS[list ?? 'followers']} load={() => loadList(list ?? 'followers')} onClose={() => setList(null)} />
-      <VisitorsSheet visible={visitorsOpen} rows={visitors.rows} count={visitors.count} onClose={() => setVisitorsOpen(false)} />
+      <VisitorsSheet visible={visitorsOpen} rows={visitors.rows} count={visitors.count} unlocked={visitors.unlocked} onClose={() => setVisitorsOpen(false)} />
     </SafeAreaView>
   );
 }

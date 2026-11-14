@@ -125,19 +125,10 @@ export default function MessagesScreen() {
   const partyCover = live ? (lastRoom?.cover ?? '') : (lastRoom?.cover ?? (lastRoomId ? myRoom.cover : POPULAR_ROOM.cover));
   const openParty = () => (lastRoomId && (!live || lastRoom) ? router.push(`/oda/${lastRoomId}`) : router.push('/(tabs)'));
 
+  // Open to everyone: without the Abonelik the visits show blurred and the sheet offers it (components/visitors-sheet).
   const openVisitors = () => {
-    if (visitors.unlocked) {
-      setVisitorsSeen(true);
-      setVisitorsOpen(true);
-      return;
-    }
-    showAlert('VIP ayrıcalığı', 'Profilini kimlerin ziyaret ettiğini görmek için VIP olman gerekiyor.', [
-      { text: 'Vazgeç', style: 'cancel' },
-      {
-        text: "VIP'e geç",
-        onPress: () => router.push({ pathname: '/vip', params: { tab: 'vip' } }),
-      },
-    ]);
+    setVisitorsSeen(true);
+    setVisitorsOpen(true);
   };
 
   const markAllRead = () => {
@@ -212,7 +203,7 @@ export default function MessagesScreen() {
             subtitle="Birlikte konuşacak insanlar seni bekliyor"
             onPress={() => router.push('/aile')}
           />
-          {/* Only shown when someone came; with VIP the sheet lists them. */}
+          {/* Only shown when someone came; the sheet lists them (blurred without the Abonelik). */}
           {visitorCount > 0 && (
             <>
               <View style={styles.sep} />
@@ -302,7 +293,7 @@ export default function MessagesScreen() {
       )}
 
       <ActionSheet visible={menuOpen} options={menuOptions} onClose={() => setMenuOpen(false)} />
-      <VisitorsSheet visible={visitorsOpen} rows={visitors.rows} count={visitors.count} onClose={() => setVisitorsOpen(false)} />
+      <VisitorsSheet visible={visitorsOpen} rows={visitors.rows} count={visitors.count} unlocked={visitors.unlocked} onClose={() => setVisitorsOpen(false)} />
       <TeamInbox visible={teamOpen} onClose={() => setTeamOpen(false)} onUnread={setTeamNew} />
     </SafeAreaView>
   );

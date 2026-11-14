@@ -274,6 +274,23 @@ export async function voiceAccess(name, u, password) {
   if (room.owner === u.id && !already) void roomOpened(room.id, room.owner);
 }
 
+/**
+ * Oda üyeleri, $1 the room: its owner (rank 3), Süper Yöneticiler (2), Yöneticiler (1) and members (0), each once.
+ * The staff are the room's members whether or not they ever joined (they lead the card's row and the list), so the
+ * card's count, its row, the full list (room-members.mjs) and the member cap all count these same people.
+ */
+export const ROOM_PEOPLE = `SELECT r.owner AS user_id, 3 AS rank FROM rooms r WHERE r.id = $1
+    UNION ALL
+    SELECT a.user_id, CASE WHEN a.super THEN 2 ELSE 1 END FROM room_admins a
+     WHERE a.room_id = $1 AND a.user_id <> (SELECT owner FROM rooms WHERE id = $1)
+    UNION ALL
+    SELECT m.user_id, 0 FROM room_members m
+     WHERE m.room_id = $1 AND m.status = 'member' AND m.user_id <> (SELECT owner FROM rooms WHERE id = $1)
+       AND NOT EXISTS (SELECT 1 FROM room_admins a WHERE a.room_id = m.room_id AND a.user_id = m.user_id)`;
+/** How many people the room has (ROOM_PEOPLE without deleted accounts): "Oda üyeleri (n / cap)". */
+const peopleCount = async (roomId) =>
+  (await db.query(`SELECT count(*)::int AS n FROM (${ROOM_PEOPLE}) p JOIN users u ON u.id = p.user_id WHERE u.deleted_at IS NULL`, [roomId])).rows[0].n;
+
 /** Members who stayed away longer than the room allows (rules.autoRemoveDays) are no longer members; staff stay. */
 async function purgeMembers(room) {
   const days = rulesOf(room.rules).autoRemoveDays;
@@ -612,30 +629,42 @@ export const roomRoutes = {
   },
 
   /**
-   * The room's members (Oda üyeleri), how many it may have, my own membership ('owner' | 'member' | 'pending' |
-   * null) and, for whoever answers members (rules.manageMembers), who asked to join.
+   * The room card's Oda üyeleri: `total` how many people the room has (ROOM_PEOPLE: its owner and staff with its
+   * members, as the full list counts them), `members` the first of them for the card's row (staff first, then
+   * who joined first), how many it may have, my own membership ('owner' | 'admin' | 'member' | 'pending' | null;
+   * 'admin' for a Yönetici or Süper Yönetici, who are members as staff) and, for whoever answers members
+   * (rules.manageMembers), who asked to join.
    */
   async 'GET /api/rooms/members'(req, url) {
     const me = await auth(req);
     const room = await roomRow(url.searchParams.get('room'));
     await purgeMembers(room);
     const rules = rulesOf(room.rules);
-    const canManage = mayManageMembers(rules, await rankOf(room, me.id));
-    const r = await db.query(
-      `SELECT m.user_id, m.status, m.created_at, u.name, u.avatar_url FROM room_members m JOIN users u ON u.id = m.user_id
-        WHERE m.room_id = $1 AND u.deleted_at IS NULL ORDER BY m.created_at, m.user_id LIMIT 1000`,
+    const rank = await rankOf(room, me.id);
+    const canManage = mayManageMembers(rules, rank);
+    const people = await db.query(
+      `SELECT p.user_id, p.rank, m.created_at, u.name, u.avatar_url
+         FROM (${ROOM_PEOPLE}) p JOIN users u ON u.id = p.user_id
+         LEFT JOIN room_members m ON m.room_id = $1 AND m.user_id = p.user_id AND m.status = 'member'
+        WHERE u.deleted_at IS NULL
+        ORDER BY p.rank DESC, m.created_at NULLS FIRST, p.user_id LIMIT 100`,
       [room.id],
     );
-    const person = (x) => ({ id: x.user_id, name: x.name, avatarUrl: x.avatar_url ?? null, since: x.created_at });
-    const members = r.rows.filter((x) => x.status === 'member');
+    const asked = await db.query(
+      `SELECT m.user_id, m.status, m.created_at, u.name, u.avatar_url FROM room_members m JOIN users u ON u.id = m.user_id
+        WHERE m.room_id = $1 AND u.deleted_at IS NULL AND (m.user_id = $2 OR ($3 AND m.status = 'pending'))
+        ORDER BY m.created_at, m.user_id LIMIT 1000`,
+      [room.id, me.id, canManage],
+    );
+    const person = (x) => ({ id: x.user_id, name: x.name, avatarUrl: x.avatar_url ?? null, since: x.created_at ?? null });
     return {
-      members: members.map(person),
-      total: members.length,
+      members: people.rows.map(person),
+      total: await peopleCount(room.id),
       cap: memberCap(roomLevel(room.owner_room_xp ?? 0)),
-      mine: room.owner === me.id ? 'owner' : (r.rows.find((x) => x.user_id === me.id)?.status ?? null),
+      mine: rank === OWNER ? 'owner' : rank > 0 ? 'admin' : (asked.rows.find((x) => x.user_id === me.id)?.status ?? null),
       joinMode: rules.joinMode,
       canManage,
-      pending: canManage ? r.rows.filter((x) => x.status === 'pending').map(person) : [],
+      pending: canManage ? asked.rows.filter((x) => x.status === 'pending').map(person) : [],
     };
   },
 
@@ -654,9 +683,9 @@ export const roomRoutes = {
     if (rules.joinMode === 'closed') throw new HttpError(403, 'Bu oda şu an üye almıyor');
     await purgeMembers(room);
     if (rules.joinMode === 'open') {
-      const n = Number((await db.query("SELECT count(*) AS n FROM room_members WHERE room_id = $1 AND status = 'member'", [room.id])).rows[0].n);
+      // The cap counts what the card shows: the staff with the members.
       const cap = memberCap(roomLevel(room.owner_room_xp ?? 0));
-      if (n >= cap) throw new HttpError(403, `Üye kapasitesi dolu (${cap.toLocaleString('tr-TR')})`);
+      if ((await peopleCount(room.id)) >= cap) throw new HttpError(403, `Üye kapasitesi dolu (${cap.toLocaleString('tr-TR')})`);
     }
     const status = rules.joinMode === 'open' ? 'member' : 'pending';
     await db.query(
@@ -691,9 +720,8 @@ export const roomRoutes = {
       await db.query('DELETE FROM room_members WHERE room_id = $1 AND user_id = $2', [room.id, target]);
       return { status: null };
     }
-    const n = Number((await db.query("SELECT count(*) AS n FROM room_members WHERE room_id = $1 AND status = 'member'", [room.id])).rows[0].n);
     const cap = memberCap(roomLevel(room.owner_room_xp ?? 0));
-    if (n >= cap) throw new HttpError(403, `Üye kapasitesi dolu (${cap.toLocaleString('tr-TR')})`);
+    if ((await peopleCount(room.id)) >= cap) throw new HttpError(403, `Üye kapasitesi dolu (${cap.toLocaleString('tr-TR')})`);
     await db.query("UPDATE room_members SET status = 'member', created_at = now(), seen_at = now() WHERE room_id = $1 AND user_id = $2", [room.id, target]);
     await refreshRoomVoices(room.id, target);
     return { status: 'member' };

@@ -1,9 +1,10 @@
 /// <reference types="node" />
-// Oda katkı sıralaması (lib/room-contrib): ranking, my place, the demo room's sample lists and the texts.
+// Oda katkı sıralaması (lib/room-contrib): ranking, my place, the demo room's sample lists, the texts and the
+// podium's layout on phones and tablets.
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { contribAmount, demoBoard, emptyNote, placeOf, pointsRule, rankScores, resetNote, totalsBy } from '@/lib/room-contrib';
+import { PODIUM_MAX, contribAmount, demoBoard, emptyNote, placeOf, podiumLayout, pointsRule, rankScores, resetNote, totalsBy } from '@/lib/room-contrib';
 
 const PEOPLE = ['u1', 'u2', 'u3', 'u4', 'u5', 'u6', 'u7', 'u8', 'u9', 'u10', 'u11', 'u12'];
 
@@ -78,5 +79,25 @@ describe('Katkı sıralaması', () => {
     assert.equal(contribAmount(999_999), '999.999');
     assert.equal(contribAmount(1_250_000), '1,25 Mn');
     assert.equal(contribAmount(12_340_000), '12,3 Mn');
+  });
+
+  test('kürsü ekrana sığar: telefonda tam genişlik, tablette ortada; herkes kendi basamağında', () => {
+    // The picture's numbers as components/RoomArt gives them (katki-kursu.png, 1080 × 362).
+    const art = { aspect: 1080 / 362, top: { 1: 0.14, 2: 0.34, 3: 0.5 } } as const;
+    const phone = podiumLayout(390, art);
+    assert.deepEqual(phone, { stage: 358, steps: 120, face: { 1: 79, 2: 61, 3: 61 }, stand: { 1: 103, 2: 79, 3: 60 } });
+    // The winner stands highest, the 2nd above the 3rd: the picture's steps.
+    assert.ok(phone.stand[1]! > phone.stand[2]! && phone.stand[2]! > phone.stand[3]!);
+    assert.deepEqual([podiumLayout(800, art).stage, podiumLayout(800, art).steps], [PODIUM_MAX, 161], 'tablet: en çok 480, ortada');
+    for (const width of [300, 320, 360, 390, 412, 600, 800, 1280]) {
+      const p = podiumLayout(width, art);
+      assert.ok(p.stage <= width - 32 && p.stage <= PODIUM_MAX, `${width}: kenarlara taşmaz`);
+      assert.equal(p.steps, Math.round(p.stage / art.aspect), `${width}: resim oranı korunur`);
+      // A laurel is 1.5 × the photo: it stays in its own third, over its own step.
+      for (const place of [1, 2, 3] as const) assert.ok(p.face[place] * 1.5 <= p.stage / 3 + 1, `${width}: ${place}. çelenk kendi basamağında`);
+    }
+    // No picture: drawn steps, nothing measured from a picture.
+    assert.deepEqual(podiumLayout(390, null).stand, { 1: undefined, 2: undefined, 3: undefined });
+    assert.equal(podiumLayout(390, null).steps, 0);
   });
 });

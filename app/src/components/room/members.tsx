@@ -27,6 +27,7 @@ import {
   isStaffRole,
   joinButton,
   lastSeenText,
+  memberStrip,
   sortMemberRows,
   type JoinMode,
   type MemberFilter,
@@ -104,6 +105,7 @@ export type RoomMembersProps = {
   joinMode: JoinMode;
   /** The room's members (local ids). A server room: as many as the card's row needs. */
   members: string[];
+  /** How many people the room has: its owner and staff with its members, as the full list counts them. */
   memberTotal: number;
   /** Who asked to join (local ids), for whoever answers them. */
   applications: string[];
@@ -132,9 +134,8 @@ export function RoomMembersSection(p: RoomMembersProps) {
   // Read when the list opens, so "son giriş" is counted from then.
   const [now, setNow] = useState(() => Date.now());
   const cap = memberLimit(p.level);
-  // The row: the room's staff first, then its members, each once; the bubble after it counts the members it left out.
-  const strip = [...new Set([...p.staffIds, ...p.members])].slice(0, STRIP);
-  const extra = Math.max(0, p.memberTotal - strip.filter((id) => p.members.includes(id)).length);
+  // The row: the room's staff first, then its members, each once; the bubble after it counts the people it left out.
+  const { row: strip, more: extra } = memberStrip(p.staffIds, p.members, p.memberTotal, STRIP);
   const join = joinButton(p.joinMode, p.memberTotal, cap);
   const pendingCount = p.canManage ? p.applications.length : 0;
   const show = () => {
@@ -219,6 +220,13 @@ export function RoomMembersSection(p: RoomMembersProps) {
           </Pressable>
         </View>
       )}
+      {/* A Yönetici is counted and listed with the members: nothing to join, and the owner is who takes the rank back. */}
+      {p.membership === 'staff' && (
+        <View style={styles.state}>
+          <Ionicons name="shield-checkmark" size={20} color={colors.green} />
+          <Text style={[styles.stateTitle, { flex: 1 }]}>Yönetici olarak bu odanın üyesisin</Text>
+        </View>
+      )}
 
       <FollowLine roomId={p.roomId} title={p.title} owner={p.owner} />
 
@@ -264,7 +272,7 @@ function MemberListSheet(p: RoomMembersProps & { visible: boolean; onClose: () =
   const rows = p.live ? server.rows : filter === 'pending' ? localPending : filterMemberRows(local, filter);
   const filters = FILTERS.filter((f) => f.key !== 'pending' || p.canManage);
   // Sample rooms count more members than the sample people there are to list.
-  const unlisted = !p.live && filter === 'all' ? Math.max(0, p.memberTotal - p.members.length) : 0;
+  const unlisted = !p.live && filter === 'all' ? Math.max(0, p.memberTotal - local.length) : 0;
 
   const remove = (row: MemberRow) =>
     showAlert('Üyelikten çıkar', `${row.name} oda üyeliğinden çıkarılsın mı?`, [

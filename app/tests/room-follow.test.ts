@@ -18,10 +18,13 @@ import {
   isStaffRole,
   joinButton,
   lastSeenText,
+  memberStrip,
+  membershipOf,
   myRoomMark,
   myRoomRows,
   putRoomFollow,
   roomFollowOf,
+  roomPeopleCount,
   sortMemberRows,
   subscribeRoomFollow,
   toggledFollow,
@@ -102,6 +105,25 @@ describe('Üyelik düğmesi', () => {
     assert.equal(demoJoinMode({ micPermission: 'members' }), 'apply');
     assert.equal(demoJoinMode({ password: '1234' }), 'apply');
     assert.equal(demoJoinMode({ roomType: 'private' }), 'apply');
+  });
+
+  test('yönetici yetkili olarak üyedir: katıl ya da ayrıl düğmesi yok; bilinmeyen yanıt üye değil sayılır', () => {
+    assert.deepEqual(['owner', 'admin', 'member', 'pending', null, 'yeni'].map(membershipOf), ['owner', 'staff', 'member', 'pending', 'none', 'none']);
+  });
+});
+
+describe('Oda üyeleri sayısı', () => {
+  test('kartta sahip ve yöneticiler de sayılır, her kişi bir kez (Güncelleme 5: "0 / 5.000" iki kişi varken)', () => {
+    // The client's card: the owner and a Yönetici, nobody joined: 2, not 0, and no "+" bubble after the two faces.
+    assert.deepEqual(memberStrip(['me', 'kerem'], ['me', 'kerem'], 2, 12), { row: ['me', 'kerem'], more: 0 });
+    // An older server (or a slow read) with only the members in the list still draws the staff first.
+    assert.deepEqual(memberStrip(['me', 'kerem'], [], 2, 12), { row: ['me', 'kerem'], more: 0 });
+    // More people than the row: the bubble is the rest of the count.
+    const many = Array.from({ length: 30 }, (_, i) => `u${i}`);
+    assert.deepEqual(memberStrip(['h', 'a1'], ['h', 'a1', ...many], 32, 12), { row: ['h', 'a1', ...many.slice(0, 10)], more: 20 });
+    // My own demo room: the staff and the members, each once.
+    assert.equal(roomPeopleCount(['me', 'u3'], ['me', 'u3', 'u5']), 3);
+    assert.equal(roomPeopleCount(['me'], ['me']), 1);
   });
 });
 
