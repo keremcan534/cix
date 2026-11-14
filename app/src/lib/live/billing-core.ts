@@ -277,7 +277,11 @@ export function createBilling<U>(d: BillingDeps<U>) {
     else d.onLate?.(o);
   };
 
-  const onPurchase = (p: StorePurchase) => void settle(p).then((o) => deliver(p.productId, o));
+  // Play sends every purchase to every listener: a subscription is the VIP screen's (lib/live/vip), not a pack.
+  const onPurchase = (p: StorePurchase) => {
+    if (/^vip_/.test(p.productId)) return;
+    void settle(p).then((o) => deliver(p.productId, o));
+  };
 
   /** Play says this pack is already owned: an earlier purchase was never consumed. It is verified now. */
   async function recover(productId: string): Promise<Outcome> {

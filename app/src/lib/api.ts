@@ -26,10 +26,12 @@ import type { XoxMove, XoxState } from '@/lib/room-games/xox';
 
 /**
  * wealthXp: Cömertlik points, charmXp: Yankı points, only in GET /api/me (the server's counts, server/api/wheel.mjs
- * wealthPoints and wallet.mjs charmPoints).
+ * wealthPoints and wallet.mjs charmPoints). vipSubUntil: the Abonelik's end while it runs, else null (server/api/vip.mjs;
+ * missing from an older server).
  */
 export type ServerUser = {
   id: string; name: string; coins: number; diamonds: number; gameCoins: number; createdAt: string; phone?: string | null; svipXp?: number; wealthXp?: number; charmXp?: number; paidGames?: boolean;
+  vipSubUntil?: string | null;
   // Only in GET/PATCH /api/me and the sign-in and add-address answers; wallet answers leave them out.
   email?: string | null; identities?: string[]; phoneVerified?: boolean;
 };
@@ -445,6 +447,8 @@ export type CatalogBody = {
   gifts: CatalogGift[];
   counts: number[];
   packs: CatalogPack[];
+  /** Abonelik's store products (server/api/vip.mjs); missing from an older server. */
+  vipPlans?: { productId: string; days: number }[];
   svipXp: number[];
   purchases?: { testTopup: boolean; stores: { android: boolean; ios: boolean } };
   campaign?: CatalogCampaign | null;
@@ -473,6 +477,13 @@ export const agencyRankings = (period: 'day' | 'week' | 'month') =>
  *  first-buy gift, `campaignBonus` a campaign's extra coins (missing from an older server). */
 export const verifyPurchase = (proof: StoreProof) =>
   call<{ user: ServerUser; replay: boolean; coins: number; bonus: number; campaignBonus?: number }>('POST', '/api/wallet/purchase', proof);
+
+/** Abonelik (server/api/vip.mjs): the server checks the store's subscription (or, on a test server, gives the plan's days)
+ *  and answers with its end. `replay`: this purchase was already counted. */
+export const subscribeVip = (proof: StoreProof) => call<{ user: ServerUser; replay: boolean; until: string | null; days: number }>('POST', '/api/vip/subscribe', proof);
+export type VipSubscription = { platform: 'android' | 'ios' | 'test'; productId: string; until: string; autoRenewing: boolean | null; test: boolean };
+/** My subscription as the server has it: its end (null when none runs) and the store subscriptions that run now. */
+export const vipStatus = () => call<{ until: string | null; autoRenewing: boolean; subscriptions: VipSubscription[]; plans: { productId: string; days: number }[] }>('GET', '/api/vip');
 
 /** A paid Hareketli in a server room (server/api/room-fx.mjs): the server's price, then it tells the room itself. */
 export const roomAnimation = (room: string, animationId: string, ref = newRef()) =>

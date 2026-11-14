@@ -12,6 +12,7 @@ import { SignInAgain, countContactRefusal } from '@/lib/api';
 import { onContactRefusal } from '@/lib/contact-filter';
 import { liveMode, liveSignIn, message, refreshEarnings, refreshWallet } from '@/lib/live';
 import { resumePurchases } from '@/lib/live/billing';
+import { resumeVip } from '@/lib/live/vip';
 import { loadBlocks, loadFollowing } from '@/lib/live/blocks';
 import { checkNewFollowers } from '@/lib/live/follows';
 import { checkRoomInvites } from '@/lib/live/room-social';
@@ -69,8 +70,9 @@ export function LiveSync() {
           signedIn = true;
           // Calls ring and messages arrive while the app is closed (lib/push; off until the build has Firebase).
           void startPush();
-          // A Play purchase whose server answer was lost last time is verified now.
+          // A Play purchase whose server answer was lost last time is verified now (coin packs and the Abonelik).
           resumePurchases();
+          resumeVip();
           // Follows and blocks are kept on the server; one failing leaves this phone's list as it is.
           void loadFollowing()
             .then((ids) => alive && appRef.current.takeServerSocial({ following: ids }))

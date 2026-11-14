@@ -19,6 +19,9 @@ import { Avatar, LevelChips } from '@/components/ui';
 import { saveExtras } from '@/lib/api';
 import { liveMode, message, myServerId } from '@/lib/live';
 import { loadPublicProfile } from '@/lib/live/profile';
+import { buyVip, openPlaySubscriptions, openVipShop, useVipShop } from '@/lib/live/vip';
+import { vipProductOf } from '@/lib/live/vip-core';
+import { featureOff } from '@/lib/remote-control';
 
 type Tab = 'svip' | 'vip' | 'noble';
 const GOLD = '#F5D7A1';
@@ -199,14 +202,48 @@ function Vip() {
   const p = VIP_PLANS.find((x) => x.days === plan)!;
   const store = Platform.OS === 'ios' ? 'App Store' : 'Google Play';
   const perkPages = Math.ceil(VIP_PERKS.length / 4);
-  const buy = () =>
-    showAlert('VIP satın al', `VIP ${p.label} · ${p.tl} TL (${store}). Onaylıyor musun?`, [
-      { text: 'Vazgeç', style: 'cancel' },
-      { text: 'Satın al', onPress: () => buyVipPlan(p.days) && showAlert('VIP aktif 🎉', `${p.days} gün eklendi.`) },
-    ]);
-  // Live mode: what others see is the server's (server/api/profiles.mjs, VIP by SVIP level or Rütbe there), so the switches
-  // start from it and a change goes there first; the server says no without VIP.
   const live = liveMode();
+  // Live mode: the subscription is the server's (lib/live/vip): free on a test server, through Google Play otherwise;
+  // the days left above come from the server's answer. The demo adds the days here.
+  const sale = useVipShop();
+  const [buying, setBuying] = useState(false);
+  useEffect(() => {
+    if (live) void openVipShop();
+  }, [live]);
+  const buyLive = () => {
+    if (buying) return;
+    // The store purchase switch (FEATURES_OFF / Canlı ayarlar 'purchases') stops subscriptions too, server and app.
+    if (featureOff('purchases')) return showAlert('Abonelik kapalı', 'Mağaza satın alımları şu an geçici olarak kapalı. Kısa süre içinde yeniden açılacak; hesabın güvende.');
+    if (sale.mode !== 'test' && sale.mode !== 'play') return showAlert('Abonelik', sale.notice ?? 'Abonelik planları hazırlanıyor…');
+    const run = () => {
+      setBuying(true);
+      buyVip(vipProductOf(p.days))
+        .then((a) => a && showAlert(a.title, a.body))
+        .finally(() => setBuying(false));
+    };
+    if (sale.mode === 'test')
+      return showAlert('VIP satın al', `VIP ${p.label} · Test sürümü: ücretsiz, gerçek ödeme alınmaz. ${p.days} gün eklensin mi?`, [
+        { text: 'Vazgeç', style: 'cancel' },
+        { text: 'Ekle', onPress: run },
+      ]);
+    // A Play subscription that renews on its own would be charged next to a second plan: it is changed in Play.
+    if (sale.renewing?.platform === 'android')
+      return showAlert('Aboneliğin zaten açık', "Planını değiştirmek ya da aboneliği iptal etmek için Google Play › Abonelikler'i aç.", [
+        { text: 'Vazgeç', style: 'cancel' },
+        { text: "Google Play'i aç", onPress: () => openPlaySubscriptions(sale.renewing?.productId) },
+      ]);
+    // Google Play's own sheet shows the price and asks.
+    run();
+  };
+  const buy = () =>
+    live
+      ? buyLive()
+      : showAlert('VIP satın al', `VIP ${p.label} · ${p.tl} TL (${store}). Onaylıyor musun?`, [
+          { text: 'Vazgeç', style: 'cancel' },
+          { text: 'Satın al', onPress: () => buyVipPlan(p.days) && showAlert('VIP aktif 🎉', `${p.days} gün eklendi.`) },
+        ]);
+  // Live mode: what others see is the server's (server/api/profiles.mjs, VIP 1+ by SVIP level or Rütbe, or the Abonelik
+  // there), so the switches start from it and a change goes there first; the server says no without either.
   useEffect(() => {
     const id = myServerId();
     if (!live || !id) return;
@@ -243,6 +280,11 @@ function Vip() {
   return (
     <ScrollView contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: 40 }}>
       {vipDays > 0 && <Text style={[styles.cardText, { color: gold, textAlign: 'center' }]}>👑 VIP aktif · {vipDays} gün kaldı</Text>}
+      {live && sale.renewing?.platform === 'android' && (
+        <Text style={[styles.legalLink, { textAlign: 'center' }]} onPress={() => openPlaySubscriptions(sale.renewing?.productId)} accessibilityRole="link">
+          Aboneliği Google Play&apos;de yönet
+        </Text>
+      )}
       <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
         {VIP_PLANS.map((x) => (
           <Pressable key={x.days} onPress={() => setPlan(x.days)} style={[styles.plan, plan === x.days && styles.planOn]} accessibilityLabel={`VIP ${x.label}, ${x.tl} TL`}>
@@ -256,7 +298,8 @@ function Vip() {
           </Pressable>
         ))}
       </View>
-      <BuyButton onPress={buy} />
+      <BuyButton onPress={buy} busy={buying} />
+      {live && sale.mode === 'test' && <Text style={[styles.note, { textAlign: 'center', marginTop: 0 }]}>Test sürümü · abonelik ücretsiz, gerçek ödeme alınmaz</Text>}
 
       <Text style={[styles.h1, { marginTop: 8 }]}>VIP Ayrıcalıkları ({p.label})</Text>
       <View style={styles.box}>
@@ -361,7 +404,7 @@ function Vip() {
         </Text>
         .
       </Text>
-      <BuyButton onPress={buy} />
+      <BuyButton onPress={buy} busy={buying} />
     </ScrollView>
   );
 }
@@ -379,12 +422,12 @@ function CompareCell({ value, style, vip }: { value: string | boolean; style: ob
   return <Text style={[styles.td, style, vip && { color: gold, fontWeight: '700' }]}>{value}</Text>;
 }
 
-function BuyButton({ onPress }: { onPress: () => void }) {
+function BuyButton({ onPress, busy }: { onPress: () => void; busy?: boolean }) {
   const styles = useStyles();
   return (
-    <Pressable onPress={onPress} accessibilityRole="button">
-      <LinearGradient colors={['#FDE7C7', '#F5C189']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.buyBtn}>
-        <Text style={{ color: '#3B2A12', fontWeight: '900', fontSize: 18 }}>VIP Satın Al</Text>
+    <Pressable onPress={onPress} disabled={busy} accessibilityRole="button" accessibilityState={{ busy: !!busy }}>
+      <LinearGradient colors={['#FDE7C7', '#F5C189']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.buyBtn, busy && { opacity: 0.7 }]}>
+        <Text style={{ color: '#3B2A12', fontWeight: '900', fontSize: 18 }}>{busy ? 'İşleniyor…' : 'VIP Satın Al'}</Text>
       </LinearGradient>
     </Pressable>
   );

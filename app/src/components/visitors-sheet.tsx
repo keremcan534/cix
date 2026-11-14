@@ -1,6 +1,6 @@
 // "Profilimi Kimler Ziyaret Etti": the people who opened my profile in the last 7 days, newest first. Open to
-// everyone; who they were is a VIP right (the Abonelik's "Profiline bakanları gör"). Without it each visit shows
-// blurred, with when it was and how many times, and the sheet asks to subscribe. A blurred row has nothing behind it
+// everyone; who they were is the Abonelik's right ("Profiline bakanları gör"; VIP 1–10 and Rütbe don't open it).
+// Without it each visit shows blurred, with when it was and how many times, and the sheet asks to subscribe. A blurred row has nothing behind it
 // to uncover: the server sends no one's id, name or photo without the right (server/api/social.mjs), and the demo
 // drops them the same way.
 // One sheet for Mesajlar's "Profil ziyaretçilerin" row and the Ben tab's Ziyaretçiler count; a tap on a person opens
@@ -9,6 +9,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
+import { useEffect, useRef } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -17,19 +18,27 @@ import { Avatar, Button, VipBadge } from '@/components/ui';
 import { PROFILE_VISITORS } from '@/data/messages-ui';
 import { userById } from '@/data/mock';
 import { liveMode } from '@/lib/live';
-import { useVisitors } from '@/lib/live/visitors';
+import { refreshVisitors, useVisitors } from '@/lib/live/visitors';
 import { demoVisitorRows, hiddenVisitorRows, hideVisitorRows, liveVisitorRows, type VisitorRow } from '@/lib/visitor-rows';
 import { useApp } from '@/store';
 import { SCRIM, makeStyles, useTheme } from '@/theme';
 
 /**
  * My visitors for the screens: `count` how many (null until the server answers), `rows` the visits (blurred ones,
- * `hidden`, without VIP), `unlocked` whether I may see who (VIP: the server decides in a live build; the demo
- * follows its own Abonelik).
+ * `hidden`, without the Abonelik), `unlocked` whether I may see who: in a live build the server decides by my
+ * subscription (it names visitors only then; the list is read again when the subscription starts or ends), the demo
+ * follows its own Abonelik.
  */
 export function useProfileVisitors(): { count: number | null; rows: VisitorRow[]; unlocked: boolean } {
   const { blocked, vipDays } = useApp();
   const server = useVisitors();
+  const subscribed = vipDays > 0;
+  const was = useRef(subscribed);
+  useEffect(() => {
+    if (was.current === subscribed) return;
+    was.current = subscribed;
+    if (liveMode()) void refreshVisitors(true);
+  }, [subscribed]);
   if (liveMode()) {
     const list = server?.visitors ?? null;
     return { count: server?.count ?? null, rows: list ? liveVisitorRows(list) : hiddenVisitorRows(server?.hidden ?? []), unlocked: !!list };

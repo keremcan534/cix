@@ -33,6 +33,7 @@ import { block as serverBlock, follow } from '@/lib/api';
 import { bindWallet, forgetLiveAccount, liveEquip, liveMode, liveSpend, myServerId, rememberUser, toLocal, toServer } from '@/lib/live';
 import { forgetSeen, hideDms, markLiveRead } from '@/lib/live/messages';
 import { noteSpent, serverLimitBlock } from '@/lib/live/spend-limit';
+import { daysLeft, liveUntil } from '@/lib/live/vip-core';
 import { applyThread, markSent, type ServerDm, type ThreadSync } from '@/lib/dm-thread';
 import type { CallsFrom, DmFrom } from '@/data/privacy';
 import { ThemeScope, type Appearance, type Scheme } from '@/theme';
@@ -235,7 +236,11 @@ type AppState = {
   nobleTier: number;
   nobleDays: number;
   buyNoble: (tier: number) => boolean;
+  /** Days left of the Abonelik: the server's (vipSubUntil) in a live build, the demo's own count otherwise. */
   vipDays: number;
+  /** Live build: when the Abonelik ends (ISO, from the server), null when none runs; always null in the demo. */
+  vipSubUntil: string | null;
+  /** The demo's purchase; a live build buys through lib/live/vip. */
   buyVipPlan: (days: number) => boolean;
   // central role & permission center (demo state)
   rbac: RbacState;
@@ -604,9 +609,13 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   const [nobleTier, setNobleTier] = useState(s.nobleTier ?? 0);
   const [nobleDays, setNobleDays] = useState(s.nobleDays ?? 0);
   const [vipDays, setVipDays] = useState(s.vipDays ?? 0);
+  // Live mode: the Abonelik is the server's (server/api/vip.mjs); days bought on the phone before don't count there.
+  const [vipSubUntil, setVipSubUntil] = useState<string | null>(s.vipSubUntil ?? null);
+  const subUntil = liveMode() ? liveUntil(vipSubUntil) : null;
+  const vipDaysLeft = liveMode() ? daysLeft(subUntil) : vipDays;
   const [rbac, setRbac] = useState<RbacState>(INITIAL_RBAC);
   const svipLevel = svipLevelOf(svipXp);
-  const vipLevel = Math.min(15, Math.max(svipLevel, nobleTier * 3, vipDays > 0 ? 1 : 0));
+  const vipLevel = Math.min(15, Math.max(svipLevel, nobleTier * 3, vipDaysLeft > 0 ? 1 : 0));
   const [agencyId, setAgencyId] = useState<string | null>(s.agencyId ?? null);
   const [agencyRole, setAgencyRole] = useState<AgencyRole | null>(s.agencyRole ?? null);
   const [pendingAgency, setPendingAgency] = useState<string | null>(null);
@@ -652,7 +661,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     loggedIn, me, coins, gameCoins, spentTotal, wealthXp, paidGames, ledger: ledger.slice(0, 100), spentDay: { date: today(), amount: spentToday },
     inventory: [...inventory], equipped, emojiPacks: [...emojiPacks], recentEmojis, settings, notifications: notifications.slice(0, 50),
     myRoom, isHost, diamonds, diamondLocks, totalDiamonds, charmXp, weekly, earnings: earnings.slice(0, 50), withdrawals, stats, giftWall,
-    claimedTasks: [...claimedTasks], checkInDay, checkInDate, svipXp, firstBuys: [...firstBuys], nobleTier, nobleDays, vipDays,
+    claimedTasks: [...claimedTasks], checkInDay, checkInDate, svipXp, firstBuys: [...firstBuys], nobleTier, nobleDays, vipDays, vipSubUntil,
     agencyId, agencyRole, ownedAgency, familyRole, familyId, fanClubs, recentRooms,
     serverId, following: [...following], blocked: [...blocked], conversations: conversations.map((c) => (c.messages.length > MAX_SAVED_MESSAGES ? { ...c, messages: c.messages.slice(-MAX_SAVED_MESSAGES) } : c)), followerInvites, starter, safetyLog, ownedAnims: [...ownedAnims], micFx,
     ...(parked && { parked }),
@@ -769,6 +778,8 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       if (switched && loggedIn) return forgetAccount();
     }
     if (isFiniteNumber(u.svipXp)) setSvipXp(u.svipXp);
+    // The Abonelik's end: every account answer of a newer server carries it (null when none runs).
+    if (u.vipSubUntil !== undefined) setVipSubUntil(typeof u.vipSubUntil === 'string' ? u.vipSubUntil : null);
     // Wallet answers carry no e-mail: only an answer that has the field changes it.
     if (u.email !== undefined) setEmail(u.email ?? null);
     if (u.phone !== undefined) {
@@ -1083,9 +1094,10 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     },
     rbac,
     updateRbac: (fn) => setRbac((s) => fn(s)),
-    vipDays,
+    vipDays: vipDaysLeft,
+    vipSubUntil: subUntil,
     buyVipPlan: (days) => {
-      // Paid through the store (TRY), so no coins are spent; the receipt is verified on the server.
+      // Demo only (no server, no store): the days are added here. A live build buys through lib/live/vip.
       const plan = VIP_PLANS.find((p) => p.days === days);
       if (!plan) return false;
       setVipDays((d) => d + days);

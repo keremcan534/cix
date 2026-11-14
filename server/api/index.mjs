@@ -11,7 +11,7 @@
 // audit view for disputes: jeton.mjs.
 // Withdrawals (para çekme): withdraw.mjs. Store refunds read from Google Play: refunds.mjs.
 // Sign-in and sessions: auth.mjs (e-mail codes: mail.mjs; WhatsApp phone check: whatsapp.mjs). Push: push.mjs.
-// Gifts, catalog, rankings: gifts.mjs. Store purchases: purchases.mjs. Uploads: media.mjs. Voice token and presence: live.mjs. Profiles, follows, blocks, reports
+// Gifts, catalog, rankings: gifts.mjs. Store purchases: purchases.mjs; the VIP subscription (Abonelik): vip.mjs. Uploads: media.mjs. Voice token and presence: live.mjs. Profiles, follows, blocks, reports
 // and account deletion: social.mjs (levels, extras, album and Vitrin of a profile: profiles.mjs). Direct messages:
 // messages.mjs. Rooms: rooms.mjs (mic invites, polls, follower invites: room-social.mjs). Staff: admin.mjs.
 // Gizlilik, who may reach me and Arkadaşlarım: privacy.mjs. Call history, heart levels and the call task: call-log.mjs.
@@ -100,6 +100,7 @@ import { whatsappRoutes } from './whatsapp.mjs';
 import { closeLines, lineRoutes, openLine } from './live-line.mjs';
 import { withdrawRoutes } from './withdraw.mjs';
 import { refundSyncRoutes, startRefundSync, stopRefundSync } from './refunds.mjs';
+import { refreshOwnSubscription, startVipRecheck, stopVipRecheck, vipRoutes } from './vip.mjs';
 import { referralRoutes } from './referrals.mjs';
 
 const PORT = Number(env.API_PORT ?? 7890);
@@ -187,11 +188,13 @@ const walletRoutes = {
    * wealthXp: the Cömertlik points the server counts (wheel.mjs wealthPoints), so the app gates games with the same
    * value; charmXp: the Yankı points (wallet.mjs charmPoints), which open posting in Anlar. paidGames: whether the
    * coin games are open to this account (wheel.mjs paidGamesOpen); the app hides them when it says false. On the
-   * test server an admin account is topped up first (fillTestAdmin).
+   * test server an admin account is topped up first (fillTestAdmin). vipSubUntil: the Abonelik's end (vip.mjs), after
+   * reading my own Google subscription again when it is about to end or has ended.
    */
   async 'GET /api/me'(req) {
     const u = await auth(req);
-    if (await fillTestAdmin(u)) Object.assign(u, (await db.query('SELECT * FROM users WHERE id = $1', [u.id])).rows[0]);
+    const filled = await fillTestAdmin(u);
+    if ((await refreshOwnSubscription(u)) || filled) Object.assign(u, (await db.query('SELECT * FROM users WHERE id = $1', [u.id])).rows[0]);
     return { user: { ...(await withSignIn(u)), wealthXp: await wealthPoints(db, u.id), charmXp: await charmPoints(db, u.id), paidGames: paidGamesOpen(u) } };
   },
 
@@ -305,6 +308,7 @@ const routes = {
   ...familyRoutes,
   ...familyMoreRoutes,
   ...purchaseRoutes,
+  ...vipRoutes,
   ...mediaRoutes,
   ...liveRoutes,
   ...socialRoutes,
@@ -458,6 +462,7 @@ function shutdown(signal) {
   closeLines();
   stopFinanceSync();
   stopRefundSync();
+  stopVipRecheck();
   stopBondSweep();
   stopSanctionSweep();
   stopLiveSync();
@@ -485,6 +490,7 @@ await refreshLive();
 server.listen(PORT, '127.0.0.1', () => console.log(`api on 127.0.0.1:${PORT} version ${VERSION}${TEST_TOPUP ? ' (test top-up on)' : ''}`));
 startFinanceSync();
 startRefundSync();
+startVipRecheck();
 startBondSweep();
 startSanctionSweep();
 startLiveSync();

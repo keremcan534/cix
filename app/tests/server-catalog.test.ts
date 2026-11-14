@@ -12,7 +12,8 @@ import { GIFTS } from '@/data/mock';
 import { RULES } from '@/data/rules';
 import { SEAT_COLORS } from '@/data/seat-colors';
 import { convertDiamonds, diamondValueTl, exchangeOwnDiamonds, selfExchangeRate, wholesaleQuote } from '@/lib/coins-bank';
-import { NOBLE_DAYS, NOBLE_TIERS, RECHARGE_PACKS, SVIP_LEVELS } from '@/data/status';
+import { NOBLE_DAYS, NOBLE_TIERS, RECHARGE_PACKS, SVIP_LEVELS, VIP_PLANS } from '@/data/status';
+import { vipProductOf } from '@/lib/live/vip-core';
 // Plain JavaScript module of the server; TypeScript reads it through allowJs.
 import * as server from '../../server/api/catalog.mjs';
 import * as family from '../../server/api/family-rules.mjs';
@@ -69,6 +70,14 @@ describe('Sunucu kataloğu uygulamayla aynı', () => {
     const sheet = fs.readFileSync(path.join(import.meta.dirname, '..', 'src/components/room/gift-sheet.tsx'), 'utf8');
     const counts = /const COUNTS = \[([\d,\s]+)\]/.exec(sheet)?.[1].split(',').map(Number);
     assert.deepEqual(server.GIFT_COUNTS, counts);
+  });
+
+  test('Abonelik planları: gün, fiyat ve mağaza ürün kimlikleri', () => {
+    type ServerSub = { days: number; tl: number; productId: string };
+    assert.deepEqual(
+      (server.VIP_SUBS as ServerSub[]).map((p) => [p.days, p.tl, p.productId]),
+      VIP_PLANS.map((p) => [p.days, p.tl, vipProductOf(p.days)]),
+    );
   });
 
   test('jeton paketleri, ilk alım hediyesi ve mağaza ürün kimlikleri', () => {

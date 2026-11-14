@@ -3,16 +3,19 @@
 // minutes (default 60, 0 = off) once GOOGLE_SERVICE_ACCOUNT is set, and each one runs the same refund as the
 // admin's button (jeton.mjs refundPurchase): coins and still-locked diamonds back, agency commission reversed.
 //
-//   POST /api/admin/purchases/voided-sync (admin) → { checked, refunded, unknown }   (one round now)
+//   POST /api/admin/purchases/voided-sync (admin) → { checked, refunded, unknown, failed, subscriptionsEnded }   (one round now)
 //   GET  /api/admin/purchases?q=          (admin) → { purchases, googleSync }   (find one to refund by hand)
 //
 // A purchase already refunded is skipped, so reading the same voided purchase twice changes nothing. The
 // cursor (store_refund_sync) is the newest voided time seen, read again with a day of overlap; Google keeps 30
 // days, the first round reads them all. A voided purchase we never credited (refused, another app) is counted as unknown and left alone.
+// The list includes subscriptions (type 1): a refunded or revoked Abonelik ends now, for good (vip.mjs), counted in
+// `subscriptionsEnded`.
 import { HttpError, UUID, auth, db, env, sha, tx } from './core.mjs';
 import { PACK_BY_PRODUCT } from './catalog.mjs';
 import { refundPurchase } from './jeton.mjs';
 import { googleAccessToken, googleAppUrl } from './purchases.mjs';
+import { endVoidedSubscription } from './vip.mjs';
 
 const EVERY_MIN = Number(env.GOOGLE_VOIDED_POLL_MIN ?? 60);
 const DAYS_BACK = 30;
@@ -24,7 +27,8 @@ async function voidedSince(startMs) {
   const out = [];
   let token = '';
   for (let page = 0; page < MAX_PAGES; page++) {
-    const q = new URLSearchParams({ startTime: String(startMs), endTime: String(Date.now()), maxResults: '1000', ...(token && { token }) });
+    // type 1: subscriptions too. Their renewals share one purchase token, so coin packs are matched by orderId first.
+    const q = new URLSearchParams({ startTime: String(startMs), endTime: String(Date.now()), maxResults: '1000', type: '1', ...(token && { token }) });
     const r = await fetch(`${googleAppUrl()}/purchases/voidedpurchases?${q}`, { headers, signal: AbortSignal.timeout(15_000) });
     if (!r.ok) throw new Error(`google voided ${r.status}`);
     const j = await r.json();
@@ -50,6 +54,7 @@ export async function syncVoidedOnce() {
     const list = await voidedSince(start);
     let refunded = 0;
     let unknown = 0;
+    let subscriptionsEnded = 0;
     let newest = cursor;
     let failedAt = Infinity; // the oldest void that failed: the cursor stays behind it, so the next round tries it again
     let failed = 0;
@@ -61,7 +66,9 @@ export async function syncVoidedOnce() {
         const keys = [v.orderId, v.purchaseToken && `token-${sha(v.purchaseToken)}`].filter((k) => typeof k === 'string' && k);
         const p = keys.length ? (await db.query("SELECT id, status FROM purchases WHERE platform = 'android' AND transaction_id = ANY($1::text[]) ORDER BY id LIMIT 1", [keys])).rows[0] : null;
         if (!p) {
-          unknown++;
+          const ended = await endVoidedSubscription(v.purchaseToken);
+          if (ended === null) unknown++;
+          else if (ended) subscriptionsEnded++;
           continue;
         }
         if (p.status === 'refunded') continue;
@@ -80,7 +87,7 @@ export async function syncVoidedOnce() {
     }
     const next = failed ? Math.max(cursor, Math.min(newest, failedAt)) : newest;
     await db.query("UPDATE store_refund_sync SET cursor_ms = $1, last_ok_at = now(), last_error = $2 WHERE store = 'google'", [next, lastError]);
-    return { checked: list.length, refunded, unknown, failed };
+    return { checked: list.length, refunded, unknown, failed, subscriptionsEnded };
   } catch (e) {
     await db.query("UPDATE store_refund_sync SET last_error = $1 WHERE store = 'google'", [String(e.message ?? e).slice(0, 500)]).catch(() => {});
     throw e;

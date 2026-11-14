@@ -97,7 +97,16 @@ export const selfUser = (u) => ({
   role: u.role,
   phone: u.phone ?? null,
   svipXp: Number(u.svip_xp ?? 0),
+  // Abonelik's end while it runs (vip.mjs), else null.
+  vipSubUntil: subUntil(u),
 });
+/** When the person's VIP subscription ends (ISO), or null when it isn't running now (users.vip_sub_until, vip.mjs). */
+export function subUntil(u, now = Date.now()) {
+  const t = u?.vip_sub_until ? new Date(u.vip_sub_until).getTime() : NaN;
+  return t > now ? new Date(t).toISOString() : null;
+}
+/** Whether the person's VIP subscription runs now: Profiline bakanlar, Seviyeleri gizle. */
+export const subActive = (u, now = Date.now()) => subUntil(u, now) !== null;
 /** What anyone may see about a person: never balances, birth date or role, nor a gender they chose to hide. */
 export const profileOf = (u) => ({
   username: u.username ?? null,

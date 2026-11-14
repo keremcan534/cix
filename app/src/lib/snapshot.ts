@@ -47,6 +47,8 @@ export type Snapshot = {
   nobleTier: number;
   nobleDays: number;
   vipDays: number;
+  /** Live mode: the Abonelik's end as the server last said (ISO), or null. */
+  vipSubUntil?: string | null;
   agencyId: string | null;
   agencyRole: AgencyRole | null;
   ownedAgency: OwnedAgency | null;
@@ -81,7 +83,7 @@ const SNAPSHOT_SPEC: Record<keyof Snapshot, Kind> = {
   notifications: 'objects', myRoom: 'object', isHost: 'boolean', diamonds: 'number', totalDiamonds: 'number', charmXp: 'number',
   weekly: 'numbers', earnings: 'objects', diamondLocks: 'objects', withdrawals: 'objects', stats: 'object', giftWall: 'object', claimedTasks: 'strings',
   checkInDay: 'number', checkInDate: 'string', svipXp: 'number', firstBuys: 'strings', nobleTier: 'number', nobleDays: 'number',
-  vipDays: 'number', agencyId: 'string?', agencyRole: 'string?', ownedAgency: 'object?', familyRole: 'string?', familyId: 'string?',
+  vipDays: 'number', vipSubUntil: 'string?', agencyId: 'string?', agencyRole: 'string?', ownedAgency: 'object?', familyRole: 'string?', familyId: 'string?',
   fanClubs: 'object', recentRooms: 'strings', following: 'strings', blocked: 'strings', conversations: 'objects',
   followerInvites: 'object', starter: 'object', safetyLog: 'objects', ownedAnims: 'strings', micFx: 'string?', serverId: 'string?',
   parked: 'object?',
