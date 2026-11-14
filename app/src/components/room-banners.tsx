@@ -229,7 +229,24 @@ function BoardCard({ s }: { s: BoardSlide }) {
           <View style={styles.podium}>
             {podium.map((r, i) => {
               const rank = i === 1 ? 1 : i === 0 ? 2 : 3;
-              if (!r) return <View key={`empty${rank}`} style={styles.place} />;
+              // A place nobody holds yet still shows as a place, so one name never floats alone in an empty row.
+              if (!r)
+                return (
+                  <View key={`empty${rank}`} style={styles.place} accessible accessibilityLabel={`${rank}. sıra boş`}>
+                    <View>
+                      <View style={styles.emptyFace}>
+                        <Ionicons name="person" size={16} color="rgba(255,255,255,0.45)" />
+                      </View>
+                      <View style={styles.rank}>
+                        <Text style={styles.rankText}>{rank}</Text>
+                      </View>
+                    </View>
+                    <Text style={[styles.name, styles.emptyText]} numberOfLines={1}>
+                      Sıra boş
+                    </Text>
+                    <Text style={[styles.scoreText, styles.emptyText]}>—</Text>
+                  </View>
+                );
               return (
                 <View key={r.id} style={styles.place} accessible accessibilityLabel={`${rank}. ${r.name}, ${short(r.score)}`}>
                   <View>
@@ -299,5 +316,18 @@ const useStyles = makeStyles(({ colors }) => ({
   name: { color: '#fff', fontSize: 12, fontWeight: '700', maxWidth: '92%' },
   score: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   scoreText: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  // An empty place: the second and third places' size, a dashed dim ring, dim words.
+  emptyFace: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(255,255,255,0.35)',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  emptyText: { color: 'rgba(255,255,255,0.5)' },
   none: { flex: 1, color: 'rgba(255,255,255,0.75)', fontSize: 13, textAlign: 'center', textAlignVertical: 'center', paddingTop: 30 },
 }));

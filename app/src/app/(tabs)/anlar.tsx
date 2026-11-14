@@ -44,6 +44,8 @@ import { PostSkeleton, Skeletons } from '@/components/fx/skeleton';
 
 const TABS = ['Arkadaşlar', 'Önerilen', 'Son'] as const;
 type Tab = (typeof TABS)[number];
+/** Width of a post's photo column: the 50 px photo plus room for an illustrated frame round it. */
+const AVATAR_COL = 64;
 type FeedMoment = Moment & { topicId?: string };
 
 const INITIAL: FeedMoment[] = [...EXTRA_MOMENTS, ...MOMENTS].map((m) => ({ ...m, topicId: MOMENT_TOPIC_OF[m.id] }));
@@ -653,16 +655,19 @@ function TopicStrip({ topic, onTopic, showViews = true }: { topic: string | null
               end={{ x: 1, y: 1 }}
               style={[styles.topic, topic === t.id && styles.topicActive, topic && topic !== t.id && { opacity: 0.55 }]}
             >
-              <Text style={styles.topicTitle} numberOfLines={1}>
-                # {t.title}
-              </Text>
-              {showViews && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Ionicons name="eye-outline" size={12} color="rgba(255,255,255,0.8)" />
-                  <Text style={styles.topicViews}>{t.views}</Text>
-                </View>
-              )}
-              {t.art ? <Art name={t.art} size={34} style={styles.topicArt} /> : <Text style={styles.topicEmoji}>{t.emoji}</Text>}
+              {/* Title on the left, the topic's picture big on the right: neither runs into the other. */}
+              <View style={styles.topicText}>
+                <Text style={styles.topicTitle} numberOfLines={2}>
+                  # {t.title}
+                </Text>
+                {showViews && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Ionicons name="eye-outline" size={12} color="rgba(255,255,255,0.8)" />
+                    <Text style={styles.topicViews}>{t.views}</Text>
+                  </View>
+                )}
+              </View>
+              {t.art ? <Art name={t.art} size={52} /> : <Text style={styles.topicEmoji}>{t.emoji}</Text>}
             </LinearGradient>
           </Pressable>
         ))}
@@ -731,8 +736,10 @@ function MomentCard({
   return (
     <View style={styles.card}>
       <View style={styles.row}>
-        <Pressable onPress={openProfile}>
-          <FramedAvatar uri={author.avatar} size={50} vipLevel={svip} frameId={frameId} online={!svip && author.online} />
+        {/* Every post's photo sits in the same column, and an illustrated frame stays inside it: it never reaches the
+            screen's edge or the name, and the names of framed and plain posts line up. */}
+        <Pressable onPress={openProfile} style={styles.avatarCol}>
+          <FramedAvatar uri={author.avatar} size={50} vipLevel={svip} frameId={frameId} online={!svip && author.online} artScale={AVATAR_COL / 50} />
           {svip > 0 && (
             <LinearGradient colors={['#F0468E', '#FF6576']} style={styles.svipTag}>
               <Text style={styles.svipText}>VIP {svip}</Text>
@@ -1026,19 +1033,32 @@ const useStyles = makeStyles(({ colors, lift, dark, edge }) => ({
   badge: { position: 'absolute', top: -4, right: -6, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: colors.red, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
   badgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
   topics: { gap: 10, paddingHorizontal: 16, paddingVertical: 10 },
-  topic: { width: 168, height: 72, borderRadius: 14, padding: 10, justifyContent: 'space-between', overflow: 'hidden', borderWidth: 2, borderColor: 'transparent' },
+  topic: {
+    width: 168,
+    height: 72,
+    borderRadius: 14,
+    paddingLeft: 10,
+    paddingRight: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
   topicActive: { borderColor: colors.text },
-  topicTitle: { color: '#fff', fontWeight: '800', fontSize: 14, maxWidth: 148 },
+  topicText: { flex: 1, gap: 4 },
+  topicTitle: { color: '#fff', fontWeight: '800', fontSize: 14, lineHeight: 18 },
   topicViews: { color: 'rgba(255,255,255,0.8)', fontSize: 12 },
-  topicEmoji: { position: 'absolute', right: 8, bottom: 4, fontSize: 28, opacity: 0.85 },
-  // Under the title's line, beside the views: it never covers the name.
-  topicArt: { position: 'absolute', right: 6, bottom: 2 },
+  topicEmoji: { fontSize: 34, lineHeight: 42 },
   topicFilter: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 4, backgroundColor: colors.card, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, ...lift },
   empty: { alignItems: 'center', gap: 10, padding: 32 },
   emptyBtn: { backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 18, paddingVertical: 10 },
   card: { paddingHorizontal: 16, paddingVertical: 14, gap: 8 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  svipTag: { position: 'absolute', bottom: -6, left: 5, right: 5, alignItems: 'center', borderRadius: 6, paddingVertical: 1 },
+  avatarCol: { width: AVATAR_COL, alignItems: 'center' },
+  // About as wide as the 40 px it had under the bare photo.
+  svipTag: { position: 'absolute', bottom: -6, left: (AVATAR_COL - 40) / 2, right: (AVATAR_COL - 40) / 2, alignItems: 'center', borderRadius: 6, paddingVertical: 1 },
   svipText: { color: '#fff', fontSize: 9, fontWeight: '900' },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   name: { color: colors.text, fontWeight: '800', fontSize: 15, maxWidth: 150 },
@@ -1047,7 +1067,8 @@ const useStyles = makeStyles(({ colors, lift, dark, edge }) => ({
   hiBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: 'rgba(255,101,118,0.45)', backgroundColor: 'rgba(255,101,118,0.12)' },
   hiBtnDone: { borderColor: 'transparent', backgroundColor: colors.cardAlt },
   hiText: { color: colors.pink, fontWeight: '700', fontSize: 13 },
-  body: { paddingLeft: 60, gap: 10 },
+  // Under the name: the photo column and the row's 10 px gap.
+  body: { paddingLeft: AVATAR_COL + 10, gap: 10 },
   text: { color: colors.text, fontSize: 15, lineHeight: 21 },
   image: { width: '78%', aspectRatio: 0.78, borderRadius: 12, backgroundColor: colors.card },
   actions: { flexDirection: 'row', alignItems: 'center', gap: 22, paddingTop: 2 },

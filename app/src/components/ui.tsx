@@ -330,40 +330,49 @@ function FramedAvatarBase({ uri, size = 44, vipLevel = 0, frameId, online, artSc
   );
 }
 
+/** A level chip's size: 'sm' in lists and chats, 'md' under the Profil tab's big name, 'lg' on its own. */
+export type ChipSize = 'sm' | 'md' | 'lg';
+/** Per size: the chip's height and side padding, the picture's dot and the number's size. */
+const CHIP: Record<ChipSize, { height: number; left: number; right: number; dot: number; glyph: number; text: number }> = {
+  sm: { height: 20, left: 2, right: 8, dot: 15, glyph: 10, text: 12 },
+  md: { height: 25, left: 2, right: 9, dot: 19, glyph: 12, text: 14 },
+  lg: { height: 30, left: 4, right: 12, dot: 22, glyph: 13, text: 15 },
+};
+
 /** Cömertlik Seviyesi badge: the level group's colors and symbol plus the level number. */
-export function WealthBadge({ level, size = 'sm' }: { level: number; size?: 'sm' | 'lg' }) {
+export function WealthBadge({ level, size = 'sm' }: { level: number; size?: ChipSize }) {
   return <TierBadge tier={wealthTier(level)} level={level} size={size} label={`Cömertlik seviyesi ${level}`} />;
 }
 /** Yankı Seviyesi badge (same shape, its own colors and symbols). */
-export function CharmBadge({ level, size = 'sm' }: { level: number; size?: 'sm' | 'lg' }) {
+export function CharmBadge({ level, size = 'sm' }: { level: number; size?: ChipSize }) {
   return <TierBadge tier={charmTier(level)} level={level} size={size} label={`Yankı seviyesi ${level}`} />;
 }
-function TierBadge({ tier: t, level, size, label }: { tier: LevelTier; level: number; size: 'sm' | 'lg'; label: string }) {
+function TierBadge({ tier: t, level, size, label }: { tier: LevelTier; level: number; size: ChipSize; label: string }) {
   const styles = useStyles();
-  const lg = size === 'lg';
+  const c = CHIP[size];
   return (
     <LinearGradient
       colors={t.colors}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
-      style={[styles.wealthBadge, lg && { height: 30, paddingLeft: 4, paddingRight: 12, borderRadius: 15 }]}
+      style={[styles.wealthBadge, { height: c.height, paddingLeft: c.left, paddingRight: c.right, borderRadius: c.height / 2 }]}
       accessibilityLabel={`${label}, ${t.name}`}
     >
-      <View style={[styles.wealthDot, lg && { width: 22, height: 22, borderRadius: 11 }]}>
+      <View style={[styles.wealthDot, { width: c.dot, height: c.dot, borderRadius: c.dot / 2 }]}>
         {/* The group's picture fills the dot (the art keeps its own margin); the Ionicons glyph is the fallback. */}
-        {t.art ? <Art name={t.art} size={lg ? 22 : 15} /> : <Ionicons name={t.icon} size={lg ? 13 : 10} color={t.colors[1]} />}
+        {t.art ? <Art name={t.art} size={c.dot} /> : <Ionicons name={t.icon} size={c.glyph} color={t.colors[1]} />}
       </View>
-      <Text style={[styles.wealthNum, { color: t.ink }, lg && { fontSize: 15 }]}>{level}</Text>
+      <Text style={[styles.wealthNum, { color: t.ink, fontSize: c.text }]}>{level}</Text>
     </LinearGradient>
   );
 }
 
 /** Wealth / charm level chips (separate from VIP). */
-export function LevelChips({ wealth, charm, hideWealth, hideCharm }: { wealth: number; charm: number; hideWealth?: boolean; hideCharm?: boolean }) {
+export function LevelChips({ wealth, charm, hideWealth, hideCharm, size = 'sm' }: { wealth: number; charm: number; hideWealth?: boolean; hideCharm?: boolean; size?: ChipSize }) {
   return (
     <View style={{ flexDirection: 'row', gap: 6 }}>
-      {!hideWealth && <WealthBadge level={wealth} />}
-      {!hideCharm && <CharmBadge level={charm} />}
+      {!hideWealth && <WealthBadge level={wealth} size={size} />}
+      {!hideCharm && <CharmBadge level={charm} size={size} />}
     </View>
   );
 }

@@ -357,12 +357,13 @@ function QuickStrip({ coins, checkedInToday }: { coins: number; checkedInToday: 
 }
 
 function CategoryBar({ cat, onCat, countryArt: flag, onCountry }: { cat: RoomTab; onCat: (c: RoomTab) => void; countryArt: ArtName | null; onCountry: () => void }) {
-  const { colors, gradientDeep, surface, dark } = useTheme();
+  const { colors, gradientDeep, dark } = useTheme();
   const styles = useStyles();
   return (
     <View style={styles.catBar}>
-      <View style={{ flex: 1 }}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 20, paddingLeft: 16, paddingRight: 28 }}>
+      {/* The strip ends cleanly at its own edge: no shade over it, which on a bright photo read as a dark box. */}
+      <View style={{ flex: 1, overflow: 'hidden' }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 20, paddingLeft: 16, paddingRight: 16 }}>
           {ROOM_TABS.map((c) => (
             <Pressable key={c} onPress={() => onCat(c)} style={{ alignItems: 'center' }}>
               <Text style={[styles.catText, c === cat && styles.catTextActive]}>{c}</Text>
@@ -370,14 +371,6 @@ function CategoryBar({ cat, onCat, countryArt: flag, onCountry }: { cat: RoomTab
             </Pressable>
           ))}
         </ScrollView>
-        {/* A soft fade over the photo backdrop, never a solid block: it starts clear and stays see-through. */}
-        <LinearGradient
-          colors={[`rgba(${surface.veil},0)`, `rgba(${surface.veil},0.35)`, `rgba(${surface.veil},0.7)`]}
-          locations={[0, 0.55, 1]}
-          start={{ x: 0, y: 0.5 }}
-          end={{ x: 1, y: 0.5 }}
-          style={styles.catFade}
-        />
       </View>
       <Pressable onPress={() => router.push('/aile')} hitSlop={6} accessibilityLabel="Aile kur / katıl">
         <LinearGradient colors={gradientDeep} style={styles.catIcon}>
@@ -749,7 +742,6 @@ const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark, edge
   shelfText: { color: colors.text, fontSize: 11, fontWeight: '700' },
   // category bar
   catBar: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  catFade: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 40, pointerEvents: 'none' },
   catText: { color: colors.textDim, fontSize: 17, lineHeight: 24, fontFamily: fonts.displayBold },
   catTextActive: { color: colors.text, fontSize: 19, lineHeight: 26, fontFamily: fonts.display },
   catIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
