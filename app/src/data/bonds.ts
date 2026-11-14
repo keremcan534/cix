@@ -98,25 +98,40 @@ export function bubbleBondOf(list: RoomBond[], uid: string | undefined) {
   return mine.sort((x, y) => Number(y.kind === 'cift') - Number(x.kind === 'cift') || y.level - x.level)[0] ?? null;
 }
 
-export type JointState = { seen: ReadonlySet<string>; present: ReadonlySet<string> };
+/** `announced`: pairs shown this visit; `complete`: pairs that had both people in the room at the last call. */
+export type JointState = { announced: ReadonlySet<string>; complete: ReadonlySet<string> };
+/** How close together the two of a pair must come in for it to be a joint entrance (they came in "at the same time"). */
+export const JOINT_WINDOW_MS = 20_000;
 /**
- * Lv8 joint entrance: the pairs to announce now (both in the room) and the state for the next call. The first
- * call (`prev` null, as I come in) announces only my own pairs, since the others were here before me. Later a
- * pair is announced when it completes because one of the two came in since the last call (`prev.present`), not
- * when an old pair just reaches Lv8. Each pair once per visit.
+ * Lv8 joint entrance: the pairs to announce now and the state for the next call. Only a pair that came into the room
+ * together: both arrived within JOINT_WINDOW_MS of each other (`arrivals`: when each came in; someone missing from
+ * it was in the room before anything was known), the later of them no earlier than I came in (`since`). So a pair
+ * that was already inside is no news to someone coming in later, and someone joining their partner who has been in
+ * the room a while gets their own entrance only. A pair is looked at when it becomes complete (not while it stays
+ * complete, so a bond reaching Lv8 inside the room is no entrance), and announced at most once per visit.
  */
-export function jointEntries(list: RoomBond[], present: ReadonlySet<string>, prev: JointState | null): { show: RoomBond[]; state: JointState } {
-  const seen = new Set(prev?.seen ?? []);
+export function jointEntries(
+  list: RoomBond[],
+  present: ReadonlySet<string>,
+  arrivals: ReadonlyMap<string, number>,
+  since: number,
+  prev: JointState | null,
+): { show: RoomBond[]; state: JointState } {
+  const announced = new Set(prev?.announced ?? []);
+  const complete = new Set<string>();
   const show: RoomBond[] = [];
   for (const r of list) {
-    if (!hasReward(r.level, 'giris') || !present.has(r.a) || !present.has(r.b)) continue;
+    if (!present.has(r.a) || !present.has(r.b)) continue;
     const k = roomBondKey(r);
-    if (seen.has(k)) continue;
-    seen.add(k);
-    const arrived = prev ? !prev.present.has(r.a) || !prev.present.has(r.b) : r.a === 'me' || r.b === 'me';
-    if (arrived) show.push(r);
+    complete.add(k);
+    if (prev?.complete.has(k) || announced.has(k) || !hasReward(r.level, 'giris')) continue;
+    const ta = arrivals.get(r.a);
+    const tb = arrivals.get(r.b);
+    if (ta === undefined || tb === undefined || Math.abs(ta - tb) > JOINT_WINDOW_MS || Math.max(ta, tb) < since) continue;
+    announced.add(k);
+    show.push(r);
   }
-  return { show, state: { seen, present } };
+  return { show, state: { announced, complete } };
 }
 
 /** Offline demo: the bonds of the people in a room (each person's demo bonds, partners anywhere). */

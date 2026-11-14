@@ -5,15 +5,20 @@
 //
 //   GET /api/live   (Bearer)  → text/event-stream: "data: {"type":"message","from":"…"}" lines, a comment
 //                               every LIVE_BEAT_MS (20 s) so idle connections stay open and dead ones are found.
+//   GET /api/live?wins=1      the same, and the wins announced to everyone (lineWin): an app that shows them asks.
 //
 // Server-Sent Events: plain HTTP, no extra package, and Caddy passes the stream through as it is written. An event
 // says only what changed (its type and ids, never a message's text or a name): the phone reads the thing itself
 // through the usual routes, with their usual checks, so a line can't show anyone anything they couldn't read.
+// One kind is different: a win announced to everyone ('win', lineWin) carries what its banner shows, since it is
+// public by design and a read by every phone after every win would cost far more than the line itself.
 // The lines live in this process's memory (one API process). The polls stay: they cover a line that is down.
 import { auth, limit } from './core.mjs';
 
 /** Open lines by user id. A phone that reconnects before its old line is noticed gone has two for a moment. */
 const lines = new Map();
+/** The lines that asked for the wins (an older app would take each one for "read everything again"). */
+const winLines = new WeakSet();
 const MAX_PER_USER = 3;
 const BEAT_MS = Number(process.env.LIVE_BEAT_MS) >= 50 ? Number(process.env.LIVE_BEAT_MS) : 20_000;
 
@@ -21,6 +26,7 @@ const BEAT_MS = Number(process.env.LIVE_BEAT_MS) >= 50 ? Number(process.env.LIVE
 export async function openLine(req, res) {
   const me = await auth(req);
   const id = String(me.id);
+  if (new URL(req.url ?? '/', 'http://line').searchParams.get('wins') === '1') winLines.add(res);
   // no-transform: nothing on the way (Caddy's compression) may hold the events back to pack them.
   res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-store, no-transform', 'X-Accel-Buffering': 'no' });
   res.write('retry: 3000\n: ok\n\n');
@@ -58,6 +64,41 @@ export function line(userIds, type, data = {}) {
   const event = `data: ${JSON.stringify({ ...facts(data), type })}\n\n`;
   for (const uid of new Set(userIds.map(String))) {
     for (const res of lines.get(uid) ?? []) {
+      try {
+        res.write(event);
+      } catch {
+        // A line that just broke: its 'close' removes it.
+      }
+    }
+  }
+}
+
+const clip = (v, n) => (typeof v === 'string' && v ? v.slice(0, n) : null);
+const whole = (v) => (Number.isSafeInteger(v) && v >= 0 ? v : 0);
+/**
+ * A win told to everyone with the app open (a Şanslı send's reward, lucky.mjs): every line that asked for wins gets
+ * the banner's words, but not the winner's own lines (their phone showed it already) nor anyone in a block either
+ * way with them (`skip`). Without `uid` and `name` the winner hid their name ("Bir kullanıcı"). Never throws.
+ */
+export function lineWin(win, skip = new Set()) {
+  if (!lines.size) return;
+  const event = `data: ${JSON.stringify({
+    type: 'win',
+    id: whole(win.id),
+    uid: clip(win.uid, 64),
+    name: clip(win.name, 60),
+    avatar: clip(win.avatar, 500),
+    gift: clip(win.gift, 30) ?? 'Şanslı hediye',
+    emoji: clip(win.emoji, 8),
+    mult: whole(win.mult),
+    coins: whole(win.coins),
+    wins: Math.max(1, whole(win.wins)),
+    room: clip(win.room, 80),
+  })}\n\n`;
+  for (const [uid, mine] of lines) {
+    if (skip.has(uid)) continue;
+    for (const res of mine) {
+      if (!winLines.has(res)) continue;
       try {
         res.write(event);
       } catch {

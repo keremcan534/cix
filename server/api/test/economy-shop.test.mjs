@@ -294,6 +294,33 @@ describe('Giyme ve görünüm', () => {
     await ok(call('PATCH', '/api/me/extras', { genderHidden: true }, u.session));
     assert.equal((await looks(other.session, u.user.id))[u.user.id].gender, null, 'gizli cinsiyet söylenmez');
   });
+
+  test('yeni hesabın adı ve fotoğrafı da gelir (odada mikrofonda görünsün); engelleyeninki gelmez', async () => {
+    // A brand-new account: nothing bought, nobody has opened its profile; the room knows it only by id and name.
+    const fresh = await signUp('Yeni Gelen');
+    const photo = `https://cdn.example.com/avatar/${fresh.user.id}/${rnd(6)}.jpg`;
+    await ok(call('PATCH', '/api/me', { avatarUrl: photo }, fresh.session));
+    // The one asking wears an entry effect (a room's owner, say): each look is its own account's, never the asker's.
+    const viewer = await person('Odadaki', 1000);
+    await ok(buy(viewer.session, 'en-sparkle', 200));
+    const plain = await signUp('Fotoğrafsız');
+    const seen = await looks(viewer.session, fresh.user.id, plain.user.id, viewer.user.id);
+    assert.equal(seen[fresh.user.id].name, 'Yeni Gelen');
+    assert.equal(seen[fresh.user.id].avatarUrl, photo);
+    assert.deepEqual([seen[fresh.user.id].frame, seen[fresh.user.id].entry, seen[fresh.user.id].ride], [null, null, null]);
+    assert.deepEqual([seen[plain.user.id].name, seen[plain.user.id].avatarUrl, seen[plain.user.id].entry], ['Fotoğrafsız', null, null]);
+    assert.equal(seen[viewer.user.id].entry, 'en-sparkle');
+    // A new photo is what the next read says.
+    const next = `https://cdn.example.com/avatar/${fresh.user.id}/${rnd(6)}.jpg`;
+    await ok(call('PATCH', '/api/me', { avatarUrl: next }, fresh.session));
+    assert.equal((await looks(viewer.session, fresh.user.id))[fresh.user.id].avatarUrl, next);
+    // Someone who blocked me: their look stays (it is on their mic anyway), their name and photo don't come.
+    await ok(call('POST', '/api/block', { to: viewer.user.id }, fresh.session));
+    const blocked = (await looks(viewer.session, fresh.user.id))[fresh.user.id];
+    assert.equal(blocked.name, undefined);
+    assert.equal(blocked.avatarUrl, undefined);
+    assert.equal((await looks(fresh.session, viewer.user.id))[viewer.user.id].name, 'Odadaki', 'engelleyen, engellediğini görür');
+  });
 });
 
 describe('Ödül jetonları sadece mağazada', () => {

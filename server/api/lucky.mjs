@@ -2,7 +2,7 @@
 //
 //   GET  /api/lucky                                          → { version, gifts, announceFrom, share, counts, needLevel,
 //                                                               allowed, minAge, gameCoins, mine }
-//   POST /api/lucky/send { giftId, to: [ids], count, room?, ref } → { send, user, replay }
+//   POST /api/lucky/send { giftId, to: [ids], count, room?, ref, named? } → { send, user, replay }
 //   GET  /api/admin/lucky                                    → { config, version, updatedAt, stats, recent, winners } (admins)
 //   POST /api/admin/lucky/config { config, version }         → { config, version, updatedAt }                       (admins)
 //
@@ -16,6 +16,8 @@
 // while the rewards paid today across the platform plus its top reward would pass the daily limit.
 // The odds a send was drawn with are stored on it; an admin's later edit never changes an old result. Every
 // edit is audited (sanction_audit_logs, action lucky_config).
+// A win is announced to everyone with the app open (live-line.mjs lineWin, the banner on top of every room) from the
+// live setting lucky_announce_min_coins up (0: every win); with the sender's name only when the send says `named`.
 import crypto from 'node:crypto';
 
 import { recordIncome } from './agency-lib.mjs';
@@ -25,6 +27,8 @@ import { HttpError, REF, ageOf, auth, blockedBetween, db, limit, readJson, selfU
 import { ROOM, announceGift, liveKitRoom } from './gifts.mjs';
 import { DEFAULT_CONFIG, MIN_AGE, ODDS_TOTAL, SHARE, checkConfig, drawMult, maxMult } from './lucky-rules.mjs';
 import { announceRoom } from './live.mjs';
+import { lineWin } from './live-line.mjs';
+import { live } from './live-settings.mjs';
 import { scorePkGift } from './pk.mjs';
 import { roomLevel } from './rooms.mjs';
 import { announceBoss, bossGift } from './boss-seat.mjs';
@@ -66,6 +70,40 @@ async function admin(req) {
   const u = await auth(req);
   if (u.role !== 'admin') throw new HttpError(403, 'Yönetici hesabı gerekli');
   return u;
+}
+
+/**
+ * Tells everyone with the app open about a send's win (live-line.mjs lineWin): the banner on top of every room. The
+ * sender's name and photo only when they said so (`named`: Ayarlar › "Kazançlarımda adım görünsün"; an older app
+ * doesn't say, and its wins go out as "Bir kullanıcı"). Nobody in a block either way with them hears of it. Best
+ * effort: the send is done and paid by now, so a failure here only loses the banner.
+ */
+async function announceWin(me, row, gift, lkRoom, named) {
+  try {
+    const roomId = lkRoom?.slice(4);
+    const [room, blocks] = await Promise.all([
+      roomId ? db.query('SELECT title FROM rooms WHERE id = $1', [roomId]) : null,
+      db.query('SELECT blocker, blocked FROM blocks WHERE blocker = $1 OR blocked = $1', [me.id]),
+    ]);
+    const skip = new Set([String(me.id), ...blocks.rows.map((x) => String(x.blocker === me.id ? x.blocked : x.blocker))]);
+    lineWin(
+      {
+        id: Number(row.id),
+        uid: named ? me.id : null,
+        name: named ? me.name : null,
+        avatar: named ? me.avatar_url : null,
+        gift: gift.name,
+        emoji: gift.emoji,
+        mult: Number(row.best_mult),
+        coins: Number(row.payout),
+        wins: row.draws.filter((m) => m > 0).length,
+        room: room?.rows[0]?.title ?? null,
+      },
+      skip,
+    );
+  } catch (e) {
+    console.error('win announce', String(e?.message ?? e).slice(0, 200));
+  }
 }
 
 export const luckyRoutes = {
@@ -211,6 +249,8 @@ export const luckyRoutes = {
       // Patron koltuğu: a Şanslı send counts like any gift in the room.
       await announceBoss(lkRoom.slice(4), boss);
     }
+    // Every room hears of a win, from the live setting's floor up (Canlı ayarlar › Kazanç duyurusu).
+    if (Number(row.payout) > 0 && Number(row.payout) >= live().luckyAnnounceMinCoins) await announceWin(me, row, gift, lkRoom, b.named === true);
     return answer(row, false);
   },
 

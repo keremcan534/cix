@@ -85,7 +85,7 @@ import { useRoomLook } from '@/components/room/decor';
 import { StageLayout } from '@/components/room/stage-layout';
 import { FitStage } from '@/components/room/fit-stage';
 import { useRoomBonds } from '@/components/room/room-bonds';
-import { BOND_KINDS, bondTint, bubbleBondOf, jointEntries, micLinkOf, type JointState, type RoomBond } from '@/data/bonds';
+import { BOND_KINDS, bondTint, bubbleBondOf, jointEntries, micLinkOf, roomBondKey, type JointState, type RoomBond } from '@/data/bonds';
 import { Avatar } from '@/components/ui';
 import { AGENCIES } from '@/data/agency';
 import { BOSS_SEAT_MIN_LEVEL, COSMETICS, MUSIC_CATALOG, STANDARD_EMOJI, STICKER_PACKS, adminCapacity, cosmeticById, djCapacity, memberLimit, micCapacity, roomCode, roomLevel, roomTypeInfo, ROOM_LEVEL_REWARDS, type RoomTheme, type Track } from '@/data/catalog';
@@ -97,6 +97,7 @@ import * as api from '@/lib/api';
 import { isLiveRoom, isLockedRoom, liveGift, liveMode, liveRoomAnimation, message as errorText, myServerId, putRoomAnswer, refreshServerRoom, rememberUser, toLocal, toServer, updateServerRoom } from '@/lib/live';
 import { liveBackpackGift } from '@/lib/live/backpack';
 import { useLiveRoomSync } from '@/lib/live/room';
+import { useRoomTop } from '@/lib/live/room-contrib';
 import { onServerRoom, sendSignal, useBossNews, useLivePeers, type LuckySignal, type RoomSignal } from '@/lib/live/room-bus';
 import { answerLiveCrossPk, refreshRoomPkSoon, useIncomingCrossPk, useRoomPkSync } from '@/lib/live/pk';
 import { useOwnerStats } from '@/lib/live/owner-stats';
@@ -121,6 +122,8 @@ import { refreshCasino } from '@/lib/live/casino';
 import { useTableNews } from '@/lib/live/room-table';
 import { isTableGame } from '@/components/games/room-tables';
 import { announceWin, roomTitleOf } from '@/lib/broadcast';
+import { emptyEntryLine, pushEntry, shiftEntry, type EntryItem, type EntryLine } from '@/lib/entry-queue';
+import { entranceView, entryPlanOf } from '@/lib/room-entrance';
 import { getLucky, luckyGift, luckyPkPoints, sendLuckyBatch, type LuckyRecord } from '@/lib/lucky';
 import { liveLuckySend, refreshLucky } from '@/lib/live/lucky';
 import { getPk, markPkSeen, modeLabel, pkPointsFor, recordGift, reportMismatch, teamOf, usePk } from '@/lib/pk';
@@ -227,15 +230,11 @@ const offlineBlocked = () => {
 const BOT_REACTIONS = ['duygu-kahkaha', 'duygu-asik', 'duygu-alkis', 'duygu-alev', 'duygu-havali', 'duygu-parti', 'duygu-kalbim', 'duygu-super', 'duygu-afalladim', 'duygu-yerlere-yattim'].map(stickerToken);
 const BOT_ENTRY_FX: EntryFx[] = ['sparkle', 'thunder', 'comet', 'dragon', 'vip'];
 const NO_BONDS: RoomBond[] = [];
-/** Someone's entry show in a server room, from their shop look (entry effect, ride, noble rank); null: none. */
+/** Someone's entry show in a server room, from their own shop look (lib/room-entrance entryPlanOf); null: none. */
 function entryShowOf(look: Look | undefined, name: string, avatar: string): EntryShow | null {
-  if (!look) return null;
-  const entryItem = cosmeticById(look.entry ?? undefined);
-  const ride = cosmeticById(look.ride ?? undefined);
-  const noble = look.noble ? nobleInfo(look.noble) : undefined;
-  if (!entryItem && !ride && !noble) return null;
-  const tier = vipTier(look.vipLevel);
-  return { name, avatar, fx: (entryItem?.fx as EntryFx | undefined) ?? 'vip', ride: ride?.emoji, rideArt: storeArtOf(ride?.id), colors: entryItem ? undefined : (tier?.color ?? gradient), badge: noble?.emoji };
+  const plan = entryPlanOf(look);
+  if (!plan) return null;
+  return { name, avatar, fx: plan.fx, ride: plan.ride, rideArt: storeArtOf(plan.rideId), colors: plan.tint === undefined ? undefined : (plan.tint ?? gradient), badge: plan.badge };
 }
 // What another phone may put over its seat: a sticker of a known pack, or a standard emoji an older app's panel had
 // (no free text, no unknown art).
@@ -519,8 +518,14 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const [inboxOpen, setInboxOpen] = useState(false);
   const inboxUnread = useInboxUnread();
   const [speaking, setSpeaking] = useState<Set<string>>(new Set());
-  // Entry effects on screen: mine when I join, then other people's (one at a time).
-  const [entry, setEntry] = useState<EntryShow | null>(() => (invisible || !entryOn || !entryInfo ? null : entryInfo.show));
+  // Entry banners on screen, one at a time (lib/entry-queue): mine when I come in, then the entrances I see while I'm
+  // here, each with the entering person's own look (or a bonded pair's joint banner), never mine.
+  const [entries, setEntries] = useState<EntryLine<EntryShow>>(() => emptyEntryLine(invisible || !entryOn || !entryInfo ? null : { id: 'mine', who: ['me'], show: entryInfo.show }));
+  const queueEntry = (item: EntryItem<EntryShow>) => setEntries((l) => pushEntry(l, item));
+  // When each person came in (a server room: the voice server's clock; the demo: this phone's), for the joint entrance.
+  // A mutable map kept in state (never replaced), filled by the join handlers.
+  const [arrivals] = useState(() => new Map<string, number>());
+  const [openedAt] = useState(() => Date.now());
   const [messages, setMessages] = useState<ChatMsg[]>(() => [
     // Every entry, on my own screen only: the community rules first.
     { id: 'w', system: true, notice: true, text: ROOM_RULES_NOTICE },
@@ -1002,19 +1007,24 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // Server room: people, mics, talking rings, chat lines and gifts come from the other phones (lib/live/room).
   // Server room: who switched their own mic off, from the voice connection (drawn like my own mic-off badge).
   const peersMicOff = useLiveRoomSync(id, real && unlocked, mySeat >= 0 ? mySeat : null, {
-    onJoin: (uid, name) => {
-      addMsg({ system: true, text: `${name} odaya girdi` });
-      // Their entry effect and ride (their shop look from the server), once it is read.
+    onJoin: (uid, name, j) => {
+      arrivals.set(uid, j.at);
+      // Only an entrance I saw (lib/room-entrance): nothing for the people already inside when I came; the line again
+      // for someone back; their own entry effect (their shop look from the server, whatever their or my role in the
+      // room) for a new entrance only.
+      const v = entranceView(j, { blocked: blocked.has(uid), effectsOn: entryOn });
+      if (v.line) addMsg({ system: true, text: `${name} odaya girdi` });
       const sid = toServer(uid);
-      if (!entryOn || !sid) return;
+      if (!v.effect || !sid) return;
       void loadLooks([sid]).then(() => {
         const show = entryShowOf(lookOf(sid), name, userById(uid).avatar);
-        if (!show) return;
-        if (entry) setEntryQueue((q) => [...q, show].slice(-3));
-        else setEntry(show);
+        if (show) queueEntry({ id: `in:${uid}:${j.at}`, who: [uid], show });
       });
     },
-    onLeave: (_uid, name) => addMsg({ system: true, text: `${name} odadan ayrıldı` }),
+    onLeave: (uid, name) => {
+      arrivals.delete(uid);
+      addMsg({ system: true, text: `${name} odadan ayrıldı` });
+    },
     setSpeaking: (ids) => setSpeaking((prev) => (prev.size === ids.size && [...ids].every((u) => prev.has(u)) ? prev : ids)),
     onSignal: (from, msg: RoomSignal) => {
       if (blocked.has(from)) return;
@@ -1134,37 +1144,36 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // Bağlar in the room: Lv4 mic line, Lv8 joint entrance, Lv10 chat bubble (components/room/room-bonds).
   const roomBondsNow = useRoomBonds(live.members, real);
   const roomBonds = roomBondsNow ?? NO_BONDS;
-  const [entryQueue, setEntryQueue] = useState<EntryShow[]>([]);
   const [joint, setJoint] = useState<{ list: RoomBond[] | null; state: JointState | null }>({ list: null, state: null });
-  if (roomBondsNow && joint.list !== roomBondsNow) {
-    // Derived transition: a new answer about the room's bonds; announce pairs that just came in together.
-    const r = jointEntries(roomBondsNow, new Set(live.members), joint.state);
+  // When I came in: a server room's by the voice server's clock (0 until connected), the demo's by this phone's.
+  const since = real ? roomMeta.meJoinedAt : openedAt;
+  if (roomBondsNow && joint.list !== roomBondsNow && since > 0) {
+    // Derived transition: a new answer about the room's bonds; announce pairs that just came in together (after
+    // each one's own entrance banner, lib/entry-queue).
+    const r = jointEntries(roomBondsNow, new Set(live.members), new Map([...arrivals, ['me', since]]), since, joint.state);
     setJoint({ list: roomBondsNow, state: r.state });
-    const shows = invisible || !entryOn ? [] : r.show.filter((b) => !blocked.has(b.a) && !blocked.has(b.b)).map((b) => jointShowOf(b, app.me.avatar));
-    if (shows.length) {
-      if (entry) setEntryQueue((q) => [...q, ...shows].slice(-3));
-      else {
-        setEntry(shows[0]);
-        if (shows.length > 1) setEntryQueue((q) => [...q, ...shows.slice(1)].slice(-3));
-      }
+    if (!invisible && entryOn) {
+      for (const b of r.show) if (!blocked.has(b.a) && !blocked.has(b.b)) queueEntry({ id: `bond:${roomBondKey(b)}`, who: [b.a, b.b], show: jointShowOf(b, app.me.avatar) });
     }
   }
   // Entries keep their own lane: an arrival shows as it happens, it never waits behind gifts. Only an entry's
   // full-screen video (Ejderha) shares the stage: decided once as the entry begins, it plays when the stage is free
   // (else the entry shows its drawn banner), and while it plays the stage's next effect waits for it.
-  const [entryLook, setEntryLook] = useState<{ entry: EntryShow | null; media: ReturnType<typeof entryVideoOf> }>({ entry: null, media: null });
-  if (entryLook.entry !== entry) setEntryLook({ entry, media: entry && !settings.reduceMotion && !fxStage.now && !fxStage.next.length ? entryVideoOf(entry.fx) : null });
-  const entryMedia = entryLook.entry === entry ? entryLook.media : null;
+  const entryNow = entries.now;
+  const [entryLook, setEntryLook] = useState<{ entry: EntryItem<EntryShow> | null; media: ReturnType<typeof entryVideoOf> }>({ entry: null, media: null });
+  if (entryLook.entry !== entryNow)
+    setEntryLook({ entry: entryNow, media: entryNow && !settings.reduceMotion && !fxStage.now && !fxStage.next.length ? entryVideoOf(entryNow.show.fx) : null });
+  const entryMedia = entryLook.entry === entryNow ? entryLook.media : null;
   useLayoutEffect(() => {
     entryVideoOn.current = !!entryMedia;
   }, [entryMedia]);
   const nextEntry = () => {
-    setEntry(entryQueue[0] ?? null);
-    setEntryQueue((q) => q.slice(1));
+    setEntries(shiftEntry);
     // A gift that waited for the entry's video takes the stage now.
     const t = nowMs();
-    setFxStage((s) => resumeCue(s, t));
-  };  // Taking a video seat turns the camera on (after the permission prompt on phones).
+    setFxStage((st) => resumeCue(st, t));
+  };
+  // Taking a video seat turns the camera on (after the permission prompt on phones).
   useEffect(() => {
     if (!camAllowed || getMedia().call) return;
     let live = true;
@@ -1696,12 +1705,14 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         if (isOwn && room.members.length >= myRoom.limit) return;
         const guest = newGuest(id);
         if (!joinPresence(id, guest, { eventId: `join:${guest}` }).ok) return;
+        arrivals.set(guest, Date.now());
         const g = userById(guest);
         addMsg({ system: true, text: `${g.name} odaya girdi${isOwn && myRoom.joinSounds ? ' 🔔' : ''}` });
         // Some joiners own an entry effect; show it if nothing else is playing.
         if (visibleRef.current && entryOn && Math.random() < 0.4) {
           const ride = Math.random() < 0.3 ? pick(BOT_RIDES) : undefined;
-          setEntry((cur) => cur ?? { name: g.name, avatar: g.avatar, fx: pick(BOT_ENTRY_FX), ride: ride?.emoji, rideArt: storeArtOf(ride?.id), badge: g.vip ? 'VIP' : undefined });
+          const show: EntryShow = { name: g.name, avatar: g.avatar, fx: pick(BOT_ENTRY_FX), ride: ride?.emoji, rideArt: storeArtOf(ride?.id), badge: g.vip ? 'VIP' : undefined };
+          setEntries((l) => (l.now ? l : pushEntry(l, { id: `in:${guest}`, who: [guest], show })));
         }
         gainXp(5);
         setGoal((gl) => (gl && gl.kind === 'join' ? { ...gl, progress: gl.progress + 1 } : gl));
@@ -2812,7 +2823,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       return false;
     }
     try {
-      const { records } = await liveLuckySend(giftId, toIds, count, id);
+      // A win is announced in every room; with my name only when I let it (Ayarlar › Gizlilik).
+      const { records } = await liveLuckySend(giftId, toIds, count, id, settings.luckyAnnounce);
       if (records.length) showLuckySend(records, toIds, count, null, spec, viaWheel);
       return records.length > 0;
     } catch (e) {
@@ -3004,7 +3016,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     // Some friends come right away (a demo stand-in for them opening the card).
     setTimeout(() => {
       if (Math.random() < 0.5 || getRoom(id)?.members.includes(uid)) return;
-      if (joinPresence(id, uid, { eventId: `share:${uid}:${msgId()}` }).ok) addMsg({ system: true, text: `📨 ${userById(uid).name} davetinle odaya girdi` });
+      if (!joinPresence(id, uid, { eventId: `share:${uid}:${msgId()}` }).ok) return;
+      arrivals.set(uid, Date.now());
+      addMsg({ system: true, text: `📨 ${userById(uid).name} davetinle odaya girdi` });
     }, 2500);
   };
   // A server room: the server counts the followers, sends the notices and keeps the 24 hours (server/api/room-social.mjs).
@@ -3058,7 +3072,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             .slice(0, 2)
             .forEach((uid, i) =>
               setTimeout(() => {
-                if (joinPresence(id, uid, { eventId: `followers:${uid}:${msgId()}` }).ok) addMsg({ system: true, text: `📨 ${userById(uid).name} takipçi davetiyle odaya girdi` });
+                if (!joinPresence(id, uid, { eventId: `followers:${uid}:${msgId()}` }).ok) return;
+                arrivals.set(uid, Date.now());
+                addMsg({ system: true, text: `📨 ${userById(uid).name} takipçi davetiyle odaya girdi` });
               }, 3000 * (i + 1)),
             );
         },
@@ -3228,7 +3244,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         : level >= 5
           ? { label: `${otherFamily.emoji} ${otherFamily.name}`, href: '/aile' as const }
           : null;
-  const top3 = ranking.slice(0, 3).map(([uid]) => uid);
+  // Next to the trophy: a server room's top three of today's Cömertlik as the server counts it (the board's own list),
+  // the same on every phone whenever it came in; the demo's from this visit's gifts.
+  const serverTop = useRoomTop(id, real && unlocked, giftLog[0]?.id);
+  const top3 = real ? serverTop : ranking.slice(0, 3).map(([uid]) => uid);
 
   // Mic invites I sent: announce each answer once (accepted, declined, no answer, no free mic left).
   // Invites answered before this visit (the presence server keeps them) are taken as already announced.
@@ -3379,8 +3398,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       setFxStage(emptyStage<StagePlay>());
       setLuckyFx(null);
       setCombo(null);
-      setEntry(null);
-      setEntryQueue([]);
+      setEntries(emptyEntryLine());
       if (game) setGameMin(true);
     }
   }
@@ -4350,14 +4368,14 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       {luckyFx && <LuckyResult key={luckyFx[0].txId} records={luckyFx} still={settings.effectsOff || settings.reduceMotion} onDone={() => setLuckyFx(null)} />}
       {/* Platform-wide win announcements (every room shows every win). */}
       {visible && <WinBanner top={110} still={settings.reduceMotion} />}
-      {entry &&
+      {entries.now &&
         (entryMedia ? (
           // A video entry (Ejderha): the name banner over the full-screen clip, which ends the turn.
-          <VideoFx key={`${entry.name}-${entry.fx}-${entry.avatar}`} media={entryMedia} muted={fxMuted} onDone={nextEntry}>
-            <EntryEffect show={entry} />
+          <VideoFx key={entries.now.id} media={entryMedia} muted={fxMuted} onDone={nextEntry}>
+            <EntryEffect show={entries.now.show} />
           </VideoFx>
         ) : (
-          <EntryEffect key={`${entry.name}-${entry.fx}-${entry.avatar}`} show={entry} still={settings.reduceMotion} onDone={nextEntry} />
+          <EntryEffect key={entries.now.id} show={entries.now.show} still={settings.reduceMotion} onDone={nextEntry} />
         ))}
     </View>
   );

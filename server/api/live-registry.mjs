@@ -109,6 +109,8 @@ export function defaultsOf(e = process.env) {
     ...Object.fromEntries(Object.entries(EVENT_RULES).map(([k, x]) => [k, x.default])),
     // Every reminder on: 1 hour and 15 minutes before, and at the start.
     event_reminders_off: [],
+    // Every Şanslı win is announced in every room (the owner's wish, Güncelleme 5).
+    lucky_announce_min_coins: 0,
   };
 }
 const CASINO_TOP = CASINO_STAKES.wide[CASINO_STAKES.wide.length - 1];
@@ -351,6 +353,30 @@ const roomEntries = () =>
       },
     ]),
   );
+
+/**
+ * Kazanç duyurusu (lucky.mjs, live-line.mjs lineWin): from how many coins a Şanslı win is announced to everyone with
+ * the app open (the banner on top of every room). 0: every win; a floor keeps a busy evening's small wins from
+ * crowding the banner.
+ */
+const WINS = 'Kazanç duyurusu';
+const winEntries = () => {
+  const bounds = { min: 0, max: 10_000_000, step: 10 };
+  return {
+    lucky_announce_min_coins: {
+      field: 'luckyAnnounceMinCoins',
+      group: WINS,
+      label: 'Şanslı kazancı: en az',
+      help: 'Şanslı hediyeden en az bu kadar jeton kazanılınca bütün odalarda üstte bir bantla herkese duyurulur (adını gizleyen "Bir kullanıcı" olarak görünür). 0: her kazanç duyurulur.',
+      type: 'int',
+      bounds,
+      parse: (v) => wholeOf(v, bounds, 'Şanslı kazancı duyurusu', ' jeton'),
+      big: () => false,
+      impact: (before, after) =>
+        after === 0 ? 'Şanslı hediyede her kazanç bütün odalarda duyurulur.' : `Şanslı hediyede ${fmt(after)} jeton ve üstü kazançlar bütün odalarda duyurulur (şu an: ${before === 0 ? 'her kazanç' : `${fmt(before)} jeton ve üstü`}).`,
+    },
+  };
+};
 
 const freezeDeep = (o) => (o && typeof o === 'object' ? Object.freeze(Object.values(o).forEach(freezeDeep) ?? o) : o);
 export const DEFAULTS = freezeDeep(defaultsOf());
@@ -750,6 +776,7 @@ export const REGISTRY = {
   ...decorEntries(),
   ...roomEntries(),
   ...eventEntries(),
+  ...winEntries(),
 };
 for (const k of Object.keys(REGISTRY)) REGISTRY[k].default = DEFAULTS[k];
 freezeDeep(REGISTRY);
@@ -803,7 +830,7 @@ const readOnlySet = (xs) => {
  *     heartVideo, backpackCallTask, rewardsOff: Set, welcomeCoins, inviteCoins, inviteDailyCap, casinoOff: Set, casinoOpen: Set, casinoMaxBet,
  *     casinoDailyRounds, roomDecorOff: Set, roomBgCustomPrice, roomBgCustomDays, roomStaffAwayMinutes, bossSeatCoins,
  *     bossSeatMinutes, eventMinRoomLevel, eventMinLead, eventMaxMinutes, eventMaxCapacity, eventGrace, eventStrikeLimit,
- *     eventBlockDays, eventRemindersOff: Set, invalid }
+ *     eventBlockDays, eventRemindersOff: Set, luckyAnnounceMinCoins, invalid }
  */
 export function snapshotOf(rows = [], e = process.env, { v = 0 } = {}) {
   const d = defaultsOf(e);
@@ -849,6 +876,7 @@ export function snapshotOf(rows = [], e = process.env, { v = 0 } = {}) {
     ...Object.fromEntries(Object.entries(ROOM_AMOUNTS).map(([k, x]) => [x.field, val(k)])),
     ...Object.fromEntries(Object.entries(EVENT_RULES).map(([k, x]) => [x.field, val(k)])),
     eventRemindersOff: readOnlySet(val('event_reminders_off')),
+    luckyAnnounceMinCoins: val('lucky_announce_min_coins'),
     invalid: Object.freeze([...invalid]),
   });
 }
