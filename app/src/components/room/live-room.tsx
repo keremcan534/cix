@@ -228,6 +228,8 @@ const offlineBlocked = () => {
 
 // Bots send what the emoji panel's Emoji tab has (the animated faces).
 const BOT_REACTIONS = ['duygu-kahkaha', 'duygu-asik', 'duygu-alkis', 'duygu-alev', 'duygu-havali', 'duygu-parti', 'duygu-kalbim', 'duygu-super', 'duygu-afalladim', 'duygu-yerlere-yattim'].map(stickerToken);
+/** How long after the room appears my own entrance plays (see the entries' state). */
+const MY_ENTRY_DELAY_MS = 1000;
 const BOT_ENTRY_FX: EntryFx[] = ['dragon', 'aslan', 'otomobil', 'anka', 'gemi', 'tekboynuz', 'vip'];
 const NO_BONDS: RoomBond[] = [];
 /** Someone's entry show in a server room, from their own shop look (lib/room-entrance entryPlanOf); null: none. */
@@ -522,7 +524,17 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const [speaking, setSpeaking] = useState<Set<string>>(new Set());
   // Entry banners on screen, one at a time (lib/entry-queue): mine when I come in, then the entrances I see while I'm
   // here, each with the entering person's own look (or a bonded pair's joint banner), never mine.
-  const [entries, setEntries] = useState<EntryLine<EntryShow>>(() => emptyEntryLine(invisible || !entryOn || !entryInfo ? null : { id: 'mine', who: ['me'], show: entryInfo.show }));
+  const [entries, setEntries] = useState<EntryLine<EntryShow>>(() => emptyEntryLine());
+  // My own entrance plays once the room has settled on the screen: its first second is the busiest (the stage, the
+  // voice connection, the people's looks), and an entry video started then froze the opening and showed up halfway.
+  useEffect(() => {
+    if (invisible || !entryOn || !entryInfo) return;
+    const show = entryInfo.show;
+    const t = setTimeout(() => setEntries((l) => pushEntry(l, { id: 'mine', who: ['me'], show })), MY_ENTRY_DELAY_MS);
+    return () => clearTimeout(t);
+    // Once, as I come in.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const queueEntry = (item: EntryItem<EntryShow>) => setEntries((l) => pushEntry(l, item));
   // When each person came in (a server room: the voice server's clock; the demo: this phone's), for the joint entrance.
   // A mutable map kept in state (never replaced), filled by the join handlers.
