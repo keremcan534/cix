@@ -77,6 +77,7 @@ export function sessionStatus(s: RoomSession, invited = false): { text: string; 
     return { text: block ? MIC_BLOCK_LABEL[block] : 'Mikrofonun açık', tone: 'warn', icon: 'mic-off' };
   }
   if (s.seated) return { text: 'Mikrofonun kapalı', tone: 'calm', icon: 'mic-off' };
+  if (s.soundOff) return { text: 'Oda sesi kapalı', tone: 'calm', icon: 'volume-mute' };
   return { text: 'Dinliyorsun', tone: 'live', icon: 'headset' };
 }
 
@@ -196,9 +197,9 @@ export function MiniRoom({ session }: { session: RoomSession }) {
           {/* A room cover (rounded square with a live edge), so it never reads as a person's avatar. */}
           <View style={[s.coverWrap, { borderColor: TONE[st.tone] }]}>
             <Photo uri={session.cover} kind="cover" seed={session.roomId} style={s.cover} />
-            {!ended && hearing(session) && (
-              <View style={s.coverBadge}>
-                <Ionicons name="volume-high" size={10} color={semantic.liveInk} />
+            {!ended && (hearing(session) || session.soundOff) && (
+              <View style={[s.coverBadge, session.soundOff && s.coverBadgeOff]}>
+                <Ionicons name={session.soundOff ? 'volume-mute' : 'volume-high'} size={10} color={session.soundOff ? '#FCA5A5' : semantic.liveInk} />
               </View>
             )}
           </View>
@@ -486,6 +487,7 @@ const s = StyleSheet.create({
   coverWrap: { width: 44, height: 44, borderRadius: radius.md, borderWidth: 2, padding: 1 },
   cover: { width: '100%', height: '100%', borderRadius: radius.sm },
   coverBadge: { position: 'absolute', right: -4, bottom: -4, width: 18, height: 18, borderRadius: 9, backgroundColor: semantic.live, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.card },
+  coverBadgeOff: { backgroundColor: colors.cardAlt },
   miniTitle: { color: colors.text, fontWeight: '800', fontSize: 13 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   speakers: { flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: colors.cardAlt, borderRadius: radius.pill, paddingHorizontal: 5, paddingVertical: 1 },

@@ -54,7 +54,7 @@ import { PersonCard } from '@/components/room/person-card';
 import { insertMention, mentionPicks, mentionQuery, mentions, stripMentions } from '@/lib/room-mention';
 import { EntryEffect, type EntryFx, type EntryShow } from '@/components/fx/entry';
 import { storeArtOf } from '@/components/StoreArt';
-import { ArtText, ROOM_ICON_ART } from '@/components/RoomArt';
+import { ROOM_ICON_ART } from '@/components/RoomArt';
 import { gameArtOf, gameHueOf } from '@/components/GameArt';
 import { Art, artSource } from '@/components/Art';
 import { AnimLayer } from '@/components/fx/anim-layer';
@@ -159,7 +159,7 @@ import { kindOf, mergeFeed, type FeedMsg } from '@/lib/chat-feed';
 import { blockedFeature } from '@/lib/remote-control';
 import { ALL_FEATURES, applyServerStage, applyServerVideo, changeLayout, layoutById, modeById, seedStage, setClassicCapacity, setStageInfo, slotStates, stagePermission, useStages, type PlaybackState, type StageInfo } from '@/lib/room-modes';
 import { shareVideo, videoPlayback } from '@/lib/live/room-video';
-import { MIC_BLOCK_LABEL, endRoom, getSession, micBlock, micSending, reportRoomState, setMicWant, setNoiseSuppression, setPlaybackVolume, setRoomCamera, useRoomSession, type MicBlock } from '@/lib/room-session';
+import { MIC_BLOCK_LABEL, endRoom, getSession, micBlock, micSending, reportRoomState, setMicWant, setPlaybackVolume, setRoomCamera, setRoomSound, useRoomSession, type MicBlock } from '@/lib/room-session';
 import { shareLink } from '@/lib/links';
 import { balconyOnly, canInviteFollowers, defaultMicQueue, followerCount, knownFollowers, roomInviteText, seatAccess } from '@/lib/room-invites';
 import { demoJoinMode } from '@/lib/room-follow';
@@ -413,10 +413,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const stageDeny = stagePermission(id, 'me');
   const canStage = stageDeny === null;
   const [layoutsOpen, setLayoutsOpen] = useState(false);
-  // "Mikrofon denoise" (menu): the voice engine captures the mic with or without the phone's noise suppression.
-  useEffect(() => setNoiseSuppression(settings.micDenoise), [settings.micDenoise]);
-  // "Oda sesini kapat" / "Konuşma sesi" (Ses ayarları): how loud the others play on this phone.
-  useEffect(() => setPlaybackVolume(settings.roomMuted ? 0 : settings.voiceVolume), [settings.roomMuted, settings.voiceVolume]);
+  // "Konuşma sesi" (Efektler ve ses): how loud the others play on this phone. "Oda sesi" (on or off) is this visit's
+  // own, kept by the session (lib/room-session soundOff), so it comes back on when the room is entered again.
+  useEffect(() => setPlaybackVolume(settings.voiceVolume), [settings.voiceVolume]);
   // My own room keeps its layout across app restarts (saved with the room settings).
   const stageLayoutId = stage?.layoutId ?? null;
   useEffect(() => {
@@ -744,8 +743,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // --- Mic/camera arbitration with one-to-one calls (Hemen Tanış spec §3–4, lib/media) -----------------
   const media = useMedia();
   const callActive = !!media.call;
+  // "Oda sesi" off for this visit: nothing the room plays is heard here (voices, music, the shared screen, effects).
+  const soundOff = !!session?.soundOff;
   // The video gifts and entries play their sound unless the room's sound or gift sounds are off, or a call is on.
-  const fxMuted = settings.roomMuted || !settings.giftSounds || callActive;
+  const fxMuted = soundOff || !settings.giftSounds || callActive;
   useEffect(() => {
     reportRoom({ roomId: id, title, seated: amSeated, micOn: amSeated && micOn, camOn: amSeated && camOn });
   }, [id, title, amSeated, micOn, camOn]);
@@ -891,7 +892,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const canControlMusic = real ? myRole !== 'member' || djIds.includes('me') : canFunctions;
   // A server room's music, as the room metadata has it, played on this phone at the room's clock.
   const liveMusic = real ? (liveState?.music ?? null) : null;
-  const nowMusic = useRoomMusicPlayer(liveMusic, real && musicEnabled && !callActive, musicVolume);
+  const nowMusic = useRoomMusicPlayer(liveMusic, real && musicEnabled && !callActive && !soundOff, musicVolume);
   const shownMusic: MusicState = real
     ? {
         queue: nowMusic && liveMusic ? liveMusic.tracks.slice(nowMusic.index).map((t) => ({ id: t.key, title: t.title, artist: t.byName || 'Oda müziği', seconds: t.seconds })) : [],
@@ -3034,7 +3035,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     {
       title: 'Benim ayarlarım',
       rows: [
-        { key: 'effects', label: 'Efektler ve ses', value: settings.roomMuted ? 'Oda sesi kapalı' : settings.effectsOff ? 'Efektler kapalı' : 'Açık', onPress: fromSettings(() => setPanel('effects')) },
+        { key: 'effects', label: 'Efektler ve ses', value: soundOff ? 'Oda sesi kapalı' : settings.effectsOff ? 'Efektler kapalı' : 'Açık', onPress: fromSettings(() => setPanel('effects')) },
         { key: 'msg', label: 'Mesaj ayarları', hint: 'Sohbette giriş, hediye ve bot mesajları', onPress: fromSettings(() => setPanel('msgSettings')) },
         { key: 'decor', label: 'Süsler', hint: 'Çerçeve, giriş efekti ve sohbet balonu (Mağaza)', onPress: () => (menuReturn.current.push('settings'), router.push('/magaza')) },
       ],
@@ -3481,13 +3482,6 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                     <Text style={styles.callBannerGo}>Dön</Text>
                   </Pressable>
                 )}
-                {settings.roomMuted && (
-                  <View style={styles.mutedRow}>
-                    <ArtText art={ROOM_ICON_ART.soundOff} size={18} style={styles.mutedChip}>
-                      Oda sesi senin için kapalı · Ses ayarlarından açabilirsin
-                    </ArtText>
-                  </View>
-                )}
                 {myQueuePos !== null && (
                   <View style={[styles.queueChipRow, { backgroundColor: 'rgba(255,95,162,0.35)' }]}>
                     <Art name="oda-konusmaci-kuyrugu-el-kaldir" size={18} />
@@ -3529,6 +3523,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                     offline={offline}
                     onChanged={(text) => addMsg({ system: true, text: `${ME.name}: ${text}` })}
                     share={real ? shareScreen : undefined}
+                    soundOff={soundOff}
                   />
                 )}
               </>
@@ -3646,7 +3641,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                 ) : (
                   <MicBtn state={myQueuePos !== null ? 'queued' : 'hand'} queuePos={myQueuePos ?? undefined} onPress={raiseHand} />
                 )}
-                {!typing && <RoomSoundBtn muted={settings.roomMuted} onPress={() => setSetting('roomMuted', !settings.roomMuted)} />}
+                {!typing && <RoomSoundBtn muted={soundOff} onPress={() => setRoomSound(soundOff)} />}
               </View>
             )}
             {!typing && (
@@ -4059,6 +4054,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         onClose={closePanel}
         settings={settings}
         set={setSetting}
+        soundOff={soundOff}
+        setSoundOff={(off) => setRoomSound(!off)}
         isOwner={isOwn || (real && myRank === 3)}
         roomFx={{ giftEffects: roomGiftFx }}
         setRoomFx={real ? (p) => saveLook(p, p.giftEffects ? 'Odada hediye efektlerini açtı' : 'Odada hediye efektlerini kapattı') : updateMyRoom}
@@ -4262,8 +4259,6 @@ const styles = StyleSheet.create({
   mentionChip: { flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: 160, paddingLeft: 3, paddingRight: 10, paddingVertical: 3, borderRadius: 999, backgroundColor: 'rgba(15,23,42,0.85)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
   mentionName: { color: colors.text, fontSize: 13, fontWeight: '700', flexShrink: 1 },
   micGroup: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  mutedRow: { alignSelf: 'center', marginTop: 4, paddingHorizontal: 12 },
-  mutedChip: { color: colors.gold, fontSize: 12, textAlign: 'center' },
   queueChip: { color: '#fff', fontSize: 12, backgroundColor: 'rgba(255,95,162,0.35)', marginHorizontal: 12, marginTop: 6, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, overflow: 'hidden' },
   queueChipRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginHorizontal: 12, marginTop: 6, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6 },
   queueChipText: { color: '#fff', fontSize: 12, flexShrink: 1 },

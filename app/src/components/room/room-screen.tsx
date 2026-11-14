@@ -37,6 +37,7 @@ export function RoomScreen({
   offline,
   onChanged,
   share,
+  soundOff = false,
 }: {
   roomId: string;
   playback: PlaybackState | null;
@@ -51,6 +52,8 @@ export function RoomScreen({
   onChanged: (text: string) => void;
   /** Server room: a room-wide change goes to every phone (lib/live/room-video); null closes the screen. */
   share?: (playback: PlaybackState | null) => void;
+  /** "Oda sesi" is off on this phone: the video plays on without its sound, whatever this viewer's own mute says. */
+  soundOff?: boolean;
 }) {
   const [linkOpen, setLinkOpen] = useState(false);
   const [link, setLink] = useState('');
@@ -134,7 +137,7 @@ export function RoomScreen({
           <YouTubePlayer
             playback={playback}
             hold={hold}
-            muted={muted}
+            muted={muted || soundOff}
             onReport={(r) => {
               if (r.errorCode !== undefined) setLocalError(ytErrorText(r.errorCode));
               reportPlayer(roomId, 'me', { videoId: playback.videoId, ...r });
