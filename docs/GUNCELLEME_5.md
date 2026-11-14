@@ -7,7 +7,9 @@ Sahibin gönderdiği "güncelleme 5" belgesinin 19 maddesi, "hediyeler standart 
 **Sahibin kararları (bu güncellemede):**
 - Mikrofonu tamamen ham bırakan seçenek olsun: Efektler ve ses › "Ham mikrofon (şarkı modu)".
 - Oda sahibi ve yöneticiler üye kontenjanından yer tutmasın.
-- Abonelik sunucuya bağlansın; ziyaretçileri yalnız aboneler görsün.
+- Abonelik sunucuya bağlansın; ziyaretçileri yalnız aboneler görsün. Yapıldı: satın alma, yenileme ve iade sunucuda (`server/api/vip.mjs`, `POST /api/vip/subscribe`, `GET /api/vip`); test APK'larında test aboneliği alınır. Ziyaretçiler ve ziyaret bildirimi yalnız aktif abonelikle açılır; "Seviyeleri gizle" abonelikle de açılır.
+  - **Sahibin yapacağı:** Google Play Console › Gelir elde etme › Abonelikler'de `vip_7d` (haftalık, 145 TL), `vip_30d` (aylık, 285 TL), `vip_90d` (3 aylık, 599 TL) ürünleri; her birinde tek, kendiliğinden yenilenen temel plan. Ayrıntı: `docs/SUNUCU.md` › Abonelik.
+  - **Henüz yalnız telefonda olan abonelik ayrıcalıkları:** arama indirimi, günlük ücretsiz eşleşme, altın renkli isim, VIP madalyası, ek giriş ödülü, Hoş Geldin Kutusu.
 
 ## Maddeler
 
