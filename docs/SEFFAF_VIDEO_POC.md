@@ -6,6 +6,10 @@ Bu belge, odanın üstünde arkası görünen (şeffaf) video oynatma denemesini
 POC'nin amacı yalnızca **ölçmek**: hangi telefonda, hangi çözünürlük/FPS ile, aynı anda kaç video akıcı oynuyor.
 Canlı oda, hediye sistemi ve oda sesi **değişmedi**; deneme yalnızca yöneticilere açık bir test panelinden yapılır.
 
+> **Şimdiki durum:** yöntem D canlı odada kullanılıyor (videolu hediyeler ve Ejderha girişi, `app/src/components/fx/video-fx.tsx`).
+> Klipler uygulamaya gömülmez: sunucudan iner ve telefonda saklanır (`server/api/fx.mjs`, `app/src/lib/fx-videos.ts`;
+> ayrıntı `docs/SUNUCU.md` › `GET /api/fx/<ad>.mp4`). Böylece her yeni hediye videosu APK'yı ve OTA güncellemelerini büyütmez.
+
 ## 1. Biçim (stacked top/bottom)
 
 | | |

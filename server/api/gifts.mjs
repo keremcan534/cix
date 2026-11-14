@@ -1,6 +1,6 @@
 // Gifts at the server's price, and the rankings they feed.
 //
-//   GET  /api/catalog                                             → { gifts, counts, packs, svipXp, purchases, campaign, exchange, v }
+//   GET  /api/catalog                                             → { gifts, counts, packs, svipXp, purchases, campaign, exchange, fx, v }
 //   POST /api/gifts/send  { to, giftId, count, room?, place?, ref } → { user, replay, total }  (place: chat|moment|profile|family)
 //   GET  /api/rankings?board=wealth|charm|agency&period=day|week|month → { rows }  (agency: rows carry agency, not user)
 //
@@ -20,6 +20,7 @@ import { recordIncome } from './agency-lib.mjs';
 import { addBondCoins } from './bonds.mjs';
 import { HttpError, auth, blockedBetween, claimRef, db, int, once, readJson, userId } from './core.mjs';
 import { EXCHANGE, GIFTS, GIFT_COUNTS, PACKS, SVIP_XP, svipLevel } from './catalog.mjs';
+import { fxCatalog } from './fx.mjs';
 import { live } from './live-settings.mjs';
 import { scorePkGift } from './pk.mjs';
 import { notify } from './push.mjs';
@@ -91,6 +92,8 @@ export const giftRoutes = {
       // Only while it runs by the server's clock; a purchase gets it by the store's purchase time (purchases.mjs).
       campaign: c && Date.parse(c.startsAt) <= now && now < Date.parse(c.endsAt) ? { percent: c.percent, startsAt: c.startsAt, endsAt: c.endsAt, label: c.label } : null,
       exchange: { usdTry: s.usdTry, minDiamonds: EXCHANGE.minDiamonds },
+      // The gift and entry videos the phones download and keep (fx.mjs); an older app ignores it.
+      fx: fxCatalog(s.giftsHidden),
       v: s.v,
     };
   },

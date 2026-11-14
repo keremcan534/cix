@@ -52,6 +52,7 @@ import { EXCHANGE, SHOP, SVIP_XP, exchangeCoins } from './catalog.mjs';
 import { financeSyncRoutes, startFinanceSync, stopFinanceSync } from './finance-sync.mjs';
 import { FILE_PATH, HttpError, RawText, allow, auth, claimRef, clientIp, db, env, filesOut, int, migrate, once, readJson, sha, tx, userId } from './core.mjs';
 import { giftRoutes } from './gifts.mjs';
+import { FX_PATH, sendFx } from './fx.mjs';
 import { jetonRoutes } from './jeton.mjs';
 import { liveRoutes } from './live.mjs';
 import { luckyRoutes } from './lucky.mjs';
@@ -397,6 +398,19 @@ const server = http.createServer(async (req, res) => {
       await sendFile(req, res, key);
     } catch (e) {
       console.error('file', e?.code ?? e?.name);
+      if (res.headersSent) res.destroy();
+      else res.writeHead(500).end(JSON.stringify({ error: 'Sunucu hatası' }));
+    }
+    return;
+  }
+
+  // A gift or entry video (fx.mjs): the same per-address limit as stored files; a phone fetches each clip once.
+  if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname.startsWith(FX_PATH)) {
+    if (!allow(`ip-file:${clientIp(req)}`, RATE_FILES)) return void res.writeHead(429).end(JSON.stringify({ error: 'Çok fazla istek, biraz bekle' }));
+    try {
+      sendFx(req, res, url.pathname.slice(FX_PATH.length));
+    } catch (e) {
+      console.error('fx', e?.code ?? e?.name);
       if (res.headersSent) res.destroy();
       else res.writeHead(500).end(JSON.stringify({ error: 'Sunucu hatası' }));
     }
