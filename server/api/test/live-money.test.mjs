@@ -9,7 +9,7 @@ import { after, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 
-import { EXCHANGE, GIFTS, PACKS, exchangeCoins } from '../catalog.mjs';
+import { EXCHANGE, GIFTS, GIFTS_PAUSED, PACKS, exchangeCoins } from '../catalog.mjs';
 import { eventsOf } from '../finance-sync.mjs';
 import { campaignRef } from '../live-registry.mjs';
 import { fakeStores } from './fake-stores.mjs';
@@ -88,7 +88,8 @@ describe('Canlı ayarlar para uçlarında', () => {
   test('başlangıç: katalog derlenmiş değerlerle, kur ve sürüm bilgisiyle', async () => {
     admin = await h.account('Yönetici', 'admin');
     const cat = await catalog();
-    assert.equal(cat.gifts.length, GIFTS.size);
+    // Gifts off the shelf for now aren't listed (catalog.mjs GIFTS_PAUSED).
+    assert.equal(cat.gifts.length, GIFTS.size - GIFTS_PAUSED.size);
     assert.equal(cat.packs.length, PACKS.length);
     assert.deepEqual(cat.exchange, { usdTry: EXCHANGE.usdTry, minDiamonds: EXCHANGE.minDiamonds });
     assert.equal(cat.campaign, null);
@@ -107,7 +108,7 @@ describe('Canlı ayarlar para uçlarında', () => {
     const cat = await catalog();
     assert.equal(cat.v, saved.v);
     assert.ok(!cat.gifts.some((g) => g.id === 'g2'), 'gizli hediye katalogda yok');
-    assert.equal(cat.gifts.length, GIFTS.size - 1);
+    assert.equal(cat.gifts.length, GIFTS.size - GIFTS_PAUSED.size - 1);
 
     const [sb, rb] = [await balance(s.user.id), await balance(r.user.id)];
     const [st, j] = await call('POST', '/api/gifts/send', { to: r.user.id, giftId: 'g2', count: 1, ref: rnd(8) }, s.session);

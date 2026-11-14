@@ -74,6 +74,19 @@ const GIFT_ROWS = [
 ];
 
 export const GIFTS = new Map(GIFT_ROWS.map(([id, name, price, cat, minSvip = 0]) => [id, { id, name, price, cat, minSvip }]));
+/**
+ * Off the shelf for now (the owner, 14 Nov): the gifts with no animation of their own (no video in fx.mjs, no show in
+ * the app's data/gift-shows), except the four standard gifts the price list keeps (Gül, Kalp, Kahve, Pasta). GET
+ * /api/catalog leaves them out, so every app's shelf drops them, older ones too; a send from an older app still goes
+ * through (unlike a gift hidden in Canlı ayarlar). The same list as app/src/data/gifts-paused.ts; taking an id out of
+ * both brings the gift back.
+ */
+export const GIFTS_PAUSED = new Set([
+  ...['g5', 'g7', 'g8', 'h1', 'h3', 'h4', 'h5', 'h6', 'h7', 'h8', 'h9', 'h10', 'h11'],
+  ...['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p9', 'p10'],
+  ...['c1', 'c2', 'c4', 'c5', 'c7', 'c9', 'c10', 'c11', 'c12'],
+  ...['v1', 'v2', 'v3', 'v4', 'v5'],
+]);
 
 /** Gift counts the panel offers; any other count is refused. */
 export const GIFT_COUNTS = [1, 5, 10, 25, 50, 100, 250];

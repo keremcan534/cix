@@ -19,7 +19,7 @@
 import { recordIncome } from './agency-lib.mjs';
 import { addBondCoins } from './bonds.mjs';
 import { HttpError, auth, blockedBetween, claimRef, db, int, once, readJson, userId } from './core.mjs';
-import { EXCHANGE, GIFTS, GIFT_COUNTS, PACKS, SVIP_XP, VIP_SUBS, svipLevel } from './catalog.mjs';
+import { EXCHANGE, GIFTS, GIFTS_PAUSED, GIFT_COUNTS, PACKS, SVIP_XP, VIP_SUBS, svipLevel } from './catalog.mjs';
 import { fxCatalog } from './fx.mjs';
 import { live } from './live-settings.mjs';
 import { scorePkGift } from './pk.mjs';
@@ -83,7 +83,8 @@ export const giftRoutes = {
     const now = Date.now();
     const c = s.campaign;
     return {
-      gifts: [...GIFTS.values()].filter((g) => !s.giftsHidden.has(g.id)),
+      // Off the shelf for now (catalog.mjs GIFTS_PAUSED): left out, so older apps drop them too.
+      gifts: [...GIFTS.values()].filter((g) => !s.giftsHidden.has(g.id) && !GIFTS_PAUSED.has(g.id)),
       counts: GIFT_COUNTS,
       packs: PACKS.filter((p) => !s.packsHidden.has(p.id)).map(({ id, productId, coins, firstBonus }) => ({ id, productId, coins, firstBonus })),
       // Abonelik's store products (vip.mjs), sold through the same stores as the packs (`purchases`).
