@@ -12,13 +12,13 @@
 // sheet opens; the server takes the gifts out when it sends them. The demo keeps its sample stock on this phone.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
 import { Avatar, Button } from '@/components/ui';
-import { GIFTS, userById, type Gift, type GiftCat } from '@/data/mock';
+import { GIFTS, userById, type Gift } from '@/data/mock';
 import { LUCKY_RECIPIENT_SHARE, pct } from '@/data/rules';
 import { bagCounts, bagLabel, bagNeed as needOf, bagShort as shortOf } from '@/lib/backpack';
 import { gamblingLevelOk } from '@/lib/games';
@@ -34,9 +34,8 @@ import { Icon3D } from '@/components/Icon3D';
 import { GiftArt, MUSIC_BADGE } from '@/components/GiftArt';
 import { RollingNumber } from '@/components/fx/rolling-number';
 import { useRoomSheetSpace, useSheetMax } from '@/lib/sheet-space';
+import { shelfGifts, type PriceSort, type Shelf } from '@/lib/gift-shelves';
 
-type Shelf = GiftCat | 'lucky' | 'fav' | 'bag';
-type PriceSort = 'default' | 'asc' | 'desc';
 
 const SHELVES: { key: Shelf; label: string; icon?: keyof typeof Ionicons.glyphMap }[] = [
   { key: 'hot', label: 'Popüler' },
@@ -77,16 +76,6 @@ const backpackStock: Record<string, number> = { g1: 7, g3: 2, p3: 3, g2: 1 };
 const fmt = (n: number) => n.toLocaleString('tr-TR');
 const levelOf = (spent: number) => LEVEL_XP.filter((x) => spent >= x).length;
 const isLocked = (g: Gift, svip: number) => (g.minSvip ?? 0) > svip;
-
-/** `shown`: the gifts the server still offers (visibleGifts); `inBag`: what the backpack may send (bagGifts). */
-function shelfGifts(shown: Gift[], shelf: Shelf, sort: PriceSort, favs: Set<string>, bag: Record<string, number>, inBag: Gift[]) {
-  if (shelf === 'lucky') return [];
-  if (shelf === 'fav') return shown.filter((g) => favs.has(g.id));
-  if (shelf === 'bag') return inBag.filter((g) => (bag[g.id] ?? 0) > 0);
-  const list = shown.filter((g) => (g.cat ?? 'hot') === shelf);
-  if (sort !== 'default') list.sort((a, b) => (sort === 'asc' ? a.price - b.price : b.price - a.price));
-  return list;
-}
 
 export function GiftSheet({
   visible,
@@ -129,6 +118,9 @@ export function GiftSheet({
   const catalog = useLiveCatalog();
   const shown = visibleGifts(GIFTS, catalog);
   const inBag = bagGifts(GIFTS, catalog);
+  // The gifts with a video (server/api/fx.mjs): Popüler lists them all, a video gift of another shelf after its own.
+  const fxList = catalog?.fx;
+  const videoGifts = useMemo(() => new Set((fxList ?? []).filter((x) => x.kind === 'gift').map((x) => x.id)), [fxList]);
   // Şanslı is a game of chance: no shelf below the gambling level. Live: the server draws and pays (lib/live/lucky).
   const luckyShelf = gamblingLevelOk(wealthLevel);
   // Live: the packages, odds and today's limit as the server has them, read each time the sheet opens.
@@ -168,7 +160,7 @@ export function GiftSheet({
   const pickedListeners = roomAll ? [] : targets.filter((id) => !micIds.includes(id));
   const lg = lucky.config.gifts.find((x) => x.id === luckyId) ?? lucky.config.gifts[0];
   const isLucky = shelf === 'lucky' && !!lg;
-  const list = shelfGifts(shown, shelf, sort, favs, bag, inBag);
+  const list = shelfGifts(shown, shelf, sort, favs, bag, inBag, videoGifts);
   // A pick from Çantam may be a gift off the shelf for now (Kalp from the call task).
   const gift = (sel.bag ? inBag : shown).find((g) => g.id === sel.id) ?? shown[0];
   // An empty shelf (bag, favorites, no Lucky packages) keeps the last pick in state; never send it from here.
@@ -190,7 +182,7 @@ export function GiftSheet({
   const pickShelf = (s: Shelf) => {
     tapHaptic();
     setShelf(s);
-    const l = shelfGifts(shown, s, sort, favs, bag, inBag);
+    const l = shelfGifts(shown, s, sort, favs, bag, inBag, videoGifts);
     const keep = l.some((g) => g.id === sel.id) && sel.bag === (s === 'bag');
     if (!keep && l[0]) setSel({ id: l[0].id, bag: s === 'bag' });
   };
@@ -285,6 +277,34 @@ export function GiftSheet({
         <Text style={g.sortText}>{sort === 'asc' ? 'Ucuzdan' : sort === 'desc' ? 'Pahalıdan' : 'Fiyat'}</Text>
       </Pressable>
     ) : null;
+  const balanceBtn = (
+    <Pressable onPress={goWallet} style={[g.balance, compact && g.balanceCompact]} accessibilityRole="button" accessibilityLabel={`Bakiye ${fmt(coins)} jeton, jeton yükle`}>
+      <Icon3D name="coin" size={compact ? 18 : 20} />
+      <RollingNumber value={coins} style={g.balanceText} />
+      <Ionicons name="add-circle" size={18} color={semantic.money} />
+    </Pressable>
+  );
+  const closeBtn = (
+    <Pressable onPress={onClose} hitSlop={10} style={g.close} accessibilityRole="button" accessibilityLabel="Hediye panelini kapat">
+      <Ionicons name="close" size={22} color={colors.text} />
+    </Pressable>
+  );
+  const whoList =
+    roomIds.length === 0 ? (
+      <Text style={g.dim}>Odada hediye gönderebileceğin kimse yok.</Text>
+    ) : (
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={g.whoRow}>
+        {seated.map(({ id, seat }) => (
+          <PersonPick key={id} uri={userById(id).avatar} tag={String(seat)} on={targets.includes(id)} label={`${seat}. mikrofon, ${userById(id).name}`} onPress={() => togglePerson(id)} />
+        ))}
+        {pickedListeners.map((id) => (
+          <PersonPick key={id} uri={userById(id).avatar} tag="🎧" on label={`Dinleyici, ${userById(id).name}`} onPress={() => togglePerson(id)} />
+        ))}
+        <View style={g.groupGap} />
+        <GroupPick icon="home" on={roomAll} label={`Odadaki herkes: mikrofondakiler ve dinleyiciler, ${roomIds.length} kişi`} onPress={() => pickGroup(roomIds, roomAll)} />
+        {micIds.length > 0 && <GroupPick icon="mic" on={micAll} label={`Mikrofondaki herkes, ${micIds.length} kişi`} onPress={() => pickGroup(micIds, micAll)} />}
+      </ScrollView>
+    );
   // Compact: the total is in the button; a notice only for Şanslı (its odds) or when something is wrong.
   const noticeShown = !compact || isLucky || footer.tone !== 'info';
 
@@ -294,54 +314,42 @@ export function GiftSheet({
       <View style={[g.sheet, { maxHeight, paddingBottom: padBottom }]}>
         {!compact && <View style={g.handle} />}
 
-        {/* Header: title, quiet gift level, balance, explicit close */}
-        <View style={[g.header, compact && { paddingTop: space.sm }]}>
-          <View style={{ flex: 1, gap: 4 }}>
-            <Text style={g.title}>Hediye gönder</Text>
-            {!compact && (
-            <View style={g.levelRow} accessibilityLabel={`Hediye seviyen ${level}`}>
-              <Text style={g.levelText} numberOfLines={1}>
-                Hediye seviyen:{'\u00A0'}
-                {level}
-              </Text>
-              <View style={g.levelTrack}>
-                <View style={[g.levelFill, { width: `${Math.round(progress * 100)}%` }]} />
+        {/* Header: title, quiet gift level, balance, explicit close (compact: the balance and close sit by the people) */}
+        {!compact && (
+          <View style={g.header}>
+            <View style={{ flex: 1, gap: 4 }}>
+              <Text style={g.title}>Hediye gönder</Text>
+              <View style={g.levelRow} accessibilityLabel={`Hediye seviyen ${level}`}>
+                <Text style={g.levelText} numberOfLines={1}>
+                  Hediye seviyen:{'\u00A0'}
+                  {level}
+                </Text>
+                <View style={g.levelTrack}>
+                  <View style={[g.levelFill, { width: `${Math.round(progress * 100)}%` }]} />
+                </View>
               </View>
             </View>
-            )}
+            {balanceBtn}
+            {closeBtn}
           </View>
-          <Pressable onPress={goWallet} style={g.balance} accessibilityRole="button" accessibilityLabel={`Bakiye ${fmt(coins)} jeton, jeton yükle`}>
-            <Icon3D name="coin" size={20} />
-            <RollingNumber value={coins} style={g.balanceText} />
-            <Ionicons name="add-circle" size={18} color={semantic.money} />
-          </Pressable>
-          <Pressable onPress={onClose} hitSlop={10} style={g.close} accessibilityRole="button" accessibilityLabel="Kapat">
-            <Ionicons name="close" size={22} color={colors.text} />
-          </Pressable>
-        </View>
+        )}
 
         {/* Who */}
-        <View style={[g.section, compact && { paddingBottom: space.sm }]}>
+        <View style={[g.section, compact && g.sectionCompact]}>
           {!compact && (
             <Text style={g.label}>
               Kime
               {targets.length ? ` · ${roomAll && listeners.length ? 'odadaki herkes · ' : micAll ? 'mikrofondaki herkes · ' : ''}${targets.length} kişi` : ''}
             </Text>
           )}
-          {roomIds.length === 0 ? (
-            <Text style={g.dim}>Odada hediye gönderebileceğin kimse yok.</Text>
+          {compact ? (
+            <View style={g.whoBar}>
+              <View style={{ flex: 1, minWidth: 0 }}>{whoList}</View>
+              {balanceBtn}
+              {closeBtn}
+            </View>
           ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={g.whoRow}>
-              {seated.map(({ id, seat }) => (
-                <PersonPick key={id} uri={userById(id).avatar} tag={String(seat)} on={targets.includes(id)} label={`${seat}. mikrofon, ${userById(id).name}`} onPress={() => togglePerson(id)} />
-              ))}
-              {pickedListeners.map((id) => (
-                <PersonPick key={id} uri={userById(id).avatar} tag="🎧" on label={`Dinleyici, ${userById(id).name}`} onPress={() => togglePerson(id)} />
-              ))}
-              <View style={g.groupGap} />
-              <GroupPick icon="home" on={roomAll} label={`Odadaki herkes: mikrofondakiler ve dinleyiciler, ${roomIds.length} kişi`} onPress={() => pickGroup(roomIds, roomAll)} />
-              {micIds.length > 0 && <GroupPick icon="mic" on={micAll} label={`Mikrofondaki herkes, ${micIds.length} kişi`} onPress={() => pickGroup(micIds, micAll)} />}
-            </ScrollView>
+            whoList
           )}
         </View>
 
@@ -412,6 +420,7 @@ export function GiftSheet({
             list.map((it) => (
               <GiftTile
                 key={it.id}
+                compact={compact}
                 gift={it}
                 selected={sel.id === it.id && sel.bag === (shelf === 'bag')}
                 favorite={favs.has(it.id)}
@@ -599,6 +608,7 @@ function LuckyShelf({ gifts, selected, view, history, version, onPick }: { gifts
 }
 
 function GiftTile({
+  compact,
   gift,
   selected,
   favorite,
@@ -607,6 +617,8 @@ function GiftTile({
   onPress,
   onLongPress,
 }: {
+  /** Over the room (the sheet stops at the Balkon line): five to a row, one line of name, so two rows and more show. */
+  compact?: boolean;
   gift: Gift;
   selected: boolean;
   favorite: boolean;
@@ -619,10 +631,10 @@ function GiftTile({
   const badge = locked ? null : gift.badge === '3D' || gift.badge === 'music' ? gift.badge : null;
   const a11y = `${gift.name}, ${stock !== undefined ? `ücretsiz, ${stock} adet` : `${fmt(gift.price)} jeton`}${locked ? `, VIP ${gift.minSvip} gerekli` : ''}${favorite ? ', favori' : ''}`;
   return (
-    <Pressable onPress={onPress} onLongPress={onLongPress} delayLongPress={350} style={g.tileWrap} accessibilityRole="button" accessibilityState={{ selected }} accessibilityLabel={a11y} accessibilityHint="Uzun bas: favorilere ekle veya çıkar">
-      <View style={[g.tile, selected && g.tileOn]}>
-        <GiftArt giftId={gift.id} emoji={gift.emoji} size={42} style={locked && { opacity: 0.4 }} textStyle={[g.tileArt, locked && { opacity: 0.4 }]} />
-        <Text style={[g.tileName, locked && { color: colors.textDim }]} numberOfLines={2}>
+    <Pressable onPress={onPress} onLongPress={onLongPress} delayLongPress={350} style={[g.tileWrap, compact && g.tileWrapCompact]} accessibilityRole="button" accessibilityState={{ selected }} accessibilityLabel={a11y} accessibilityHint="Uzun bas: favorilere ekle veya çıkar">
+      <View style={[g.tile, compact && g.tileCompact, selected && g.tileOn]}>
+        <GiftArt giftId={gift.id} emoji={gift.emoji} size={compact ? 34 : 42} style={locked && { opacity: 0.4 }} textStyle={[g.tileArt, compact && g.tileArtCompact, locked && { opacity: 0.4 }]} />
+        <Text style={[g.tileName, compact && g.tileSmallText, locked && { color: colors.textDim }]} numberOfLines={compact ? 1 : 2}>
           {gift.name}
         </Text>
         {locked ? (
@@ -631,11 +643,13 @@ function GiftTile({
             <Text style={g.lockText}>VIP {gift.minSvip}</Text>
           </View>
         ) : stock !== undefined ? (
-          <Text style={[g.tilePrice, { color: semantic.success }]}>Ücretsiz · {stock}</Text>
+          <Text style={[g.tilePrice, compact && g.tileSmallText, { color: semantic.success }]} numberOfLines={1}>
+            Ücretsiz · {stock}
+          </Text>
         ) : (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-            <Icon3D name="coin" size={13} />
-            <Text style={g.tilePrice}>{fmt(gift.price)}</Text>
+            <Icon3D name="coin" size={compact ? 11 : 13} />
+            <Text style={[g.tilePrice, compact && g.tileSmallText]}>{fmt(gift.price)}</Text>
           </View>
         )}
         {badge === 'music' ? (
@@ -646,7 +660,7 @@ function GiftTile({
           </View>
         ) : null}
         {favorite && <Ionicons name="star" size={12} color={colors.gold} style={g.favMark} />}
-        {selected && <Ionicons name="checkmark-circle" size={18} color={colors.primaryText} style={g.check} />}
+        {selected && <Ionicons name="checkmark-circle" size={compact ? 16 : 18} color={colors.primaryText} style={[g.check, compact && g.checkCompact]} />}
       </View>
     </Pressable>
   );
@@ -667,6 +681,10 @@ const g = StyleSheet.create({
   balanceText: { color: semantic.money, fontWeight: '800', fontSize: type.body, fontVariant: ['tabular-nums'] },
   close: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center' },
   section: { paddingHorizontal: space.lg, gap: space.sm, paddingBottom: space.md },
+  // Compact: no header above; the people share their row with the balance and the close button.
+  sectionCompact: { paddingTop: space.md, paddingBottom: space.sm, paddingRight: space.md },
+  whoBar: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  balanceCompact: { height: 32, paddingHorizontal: space.sm },
   label: { color: colors.text, fontSize: type.body, fontWeight: '700' },
   dim: { color: colors.textDim, fontSize: type.caption, lineHeight: 17 },
   whoRow: { gap: 10, alignItems: 'flex-start', paddingRight: space.sm },
@@ -715,6 +733,12 @@ const g = StyleSheet.create({
   musicBadge: { position: 'absolute', top: 3, right: 3, width: 20, height: 20 },
   favMark: { position: 'absolute', top: 5, left: 6 },
   check: { position: 'absolute', bottom: 34, right: 4 },
+  // Compact (over the room): five to a row, a smaller picture and one line of name.
+  tileWrapCompact: { width: '20%', padding: 3 },
+  tileCompact: { paddingTop: space.sm, paddingBottom: 6, paddingHorizontal: 2, gap: 1 },
+  tileArtCompact: { fontSize: 28, lineHeight: 34 },
+  tileSmallText: { fontSize: 11 },
+  checkCompact: { bottom: 26, right: 2 },
   footer: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, paddingHorizontal: space.lg, paddingTop: space.md, gap: space.sm },
   summary: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   summaryArt: { fontSize: 28 },
