@@ -95,12 +95,12 @@ describe('Kişisel bilgiler', () => {
 
 describe('Vitrin', () => {
   test('sunucunun cevabı uygulamanın adlarıyla; bilinmeyen kimlik ve hediye dışarıda', () => {
-    const v = showcaseView({ gifts: [{ id: 'g1', count: 10 }, { id: 'lk1', count: 3 }], rides: ['rd-scooter', 'rd-yok'], entries: ['en-aslan', 'en-sparkle'], medals: ['md1', 'md99'], titles: ['t2'] });
+    const v = showcaseView({ gifts: [{ id: 'g1', count: 10 }, { id: 'lk1', count: 3 }], rides: ['rd-scooter', 'rd-yok'], entries: ['en-dragon', 'en-sparkle'], medals: ['md1', 'md99'], titles: ['t2'] });
     assert.deepEqual(v.medals.map((m) => m.id), ['md1']);
     assert.deepEqual(v.titles.map((t) => t.id), ['t2']);
     assert.deepEqual(v.rides, [{ id: 'rd-scooter', emoji: '🛵', name: 'Scooter' }]);
     // Işıltı is out of the shop: not on the Vitrin either.
-    assert.deepEqual(v.entries.map((e) => e.id), ['en-aslan']);
+    assert.deepEqual(v.entries.map((e) => e.id), ['en-dragon']);
     assert.equal(v.giftWall.length, GIFTS.length);
     assert.equal(v.giftWall.find((g) => g.id === 'g1')?.count, 10);
     assert.equal(v.giftWall.reduce((s, g) => s + g.count, 0), 10, 'katalog dışı hediye duvarda yok');

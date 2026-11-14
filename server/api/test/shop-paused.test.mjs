@@ -20,7 +20,7 @@ describe('animasyonu olmayan giriş efektleri satıştan kalktı', () => {
     await ok(call('POST', '/api/wallet/test-topup', { amount: 5000, ref: rnd(8) }, u.session), 'jeton');
     const shop = (await ok(call('GET', '/api/economy', null, u.session), 'mağaza')).shop;
     for (const sku of SHOP_PAUSED_DEFAULT) assert.ok(!shop.some((x) => x.sku === sku), `${sku} mağazada`);
-    for (const sku of ['en-dragon', 'en-aslan', 'en-roket']) assert.ok(shop.some((x) => x.sku === sku), `${sku} mağazada yok`);
+    assert.deepEqual(shop.filter((x) => x.kind === 'entry').map((x) => x.sku), ['en-dragon'], 'satışta yalnız Ejderha');
 
     const before = (await ok(call('GET', '/api/me', null, u.session), 'bakiye')).user.coins;
     const [st, j] = await call('POST', '/api/shop/buy', { sku: 'en-sparkle', price: 200, ref: rnd(8) }, u.session);

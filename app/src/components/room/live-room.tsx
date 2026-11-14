@@ -230,7 +230,7 @@ const offlineBlocked = () => {
 const BOT_REACTIONS = ['duygu-kahkaha', 'duygu-asik', 'duygu-alkis', 'duygu-alev', 'duygu-havali', 'duygu-parti', 'duygu-kalbim', 'duygu-super', 'duygu-afalladim', 'duygu-yerlere-yattim'].map(stickerToken);
 /** How long after the room appears my own entrance plays (see the entries' state). */
 const MY_ENTRY_DELAY_MS = 1000;
-const BOT_ENTRY_FX: EntryFx[] = ['dragon', 'aslan', 'otomobil', 'anka', 'gemi', 'tekboynuz', 'vip'];
+const BOT_ENTRY_FX: EntryFx[] = ['dragon', 'vip'];
 const NO_BONDS: RoomBond[] = [];
 /** Someone's entry show in a server room, from their own shop look (lib/room-entrance entryPlanOf); null: none. */
 function entryShowOf(look: Look | undefined, name: string, avatar: string): EntryShow | null {

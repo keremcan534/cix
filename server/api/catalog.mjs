@@ -83,11 +83,14 @@ export const GIFTS = new Map(GIFT_ROWS.map(([id, name, price, cat, minSvip = 0])
  */
 /**
  * Shop items no longer sold (the owner, 14 Nov): the entry effects with no animation of their own, only the drawn
- * banner. Left out of the shop list and refused as a purchase (economy.mjs sellable); whoever owns one keeps wearing
+ * banner, and the gift clips that were sold as entries for a few hours (entries are not to be the gifts). Left out of the shop list and refused as a purchase (economy.mjs sellable); whoever owns one keeps wearing
  * it until it runs out. The same list as the app's COSMETICS `retired`. SHOP_PAUSED in .env replaces it (comma
  * separated; empty sells them all again, as the tests' server does: test/harness.mjs).
  */
-export const SHOP_PAUSED_DEFAULT = ['en-sparkle', 'en-thunder', 'en-comet'];
+export const SHOP_PAUSED_DEFAULT = [
+  ...['en-sparkle', 'en-thunder', 'en-comet'],
+  ...['en-roket', 'en-ayicik', 'en-panda', 'en-tac', 'en-tekboynuz', 'en-anka', 'en-gemi', 'en-saray', 'en-otomobil', 'en-aslan'],
+];
 export const SHOP_PAUSED = new Set(
   process.env.SHOP_PAUSED === undefined ? SHOP_PAUSED_DEFAULT : process.env.SHOP_PAUSED.split(',').map((x) => x.trim()).filter(Boolean),
 );
