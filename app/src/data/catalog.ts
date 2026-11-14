@@ -396,6 +396,40 @@ export const STICKER_PACKS: StickerPack[] = [
       st('kostum-aslan', 'Aslan', '🦁'),
     ],
   },
+  {
+    // The penguin mascot, animated (the designer's 24 animations, 14 Nov). Each sticker moves from a sheet of frames
+    // (components/sprite-sticker), on every phone and on the web.
+    id: 'penguen',
+    name: 'Penguen',
+    price: 150,
+    animated: true,
+    stickers: [
+      st('penguen-kahkaha', 'Kahkaha', '😂'),
+      st('penguen-yerlere-yatarak-gulme', 'Yerlere Yatarak Gülme', '🤣'),
+      st('penguen-aglama', 'Ağlama', '😢'),
+      st('penguen-hickirarak-aglama', 'Hıçkırarak Ağlama', '😭'),
+      st('penguen-kizgin', 'Kızgın', '😡'),
+      st('penguen-asik', 'Aşık', '😍'),
+      st('penguen-opucuk', 'Öpücük', '😘'),
+      st('penguen-masum-bakis', 'Masum Bakış', '🥺'),
+      st('penguen-saskin', 'Şaşkın', '😮'),
+      st('penguen-utanma', 'Utanma', '😳'),
+      st('penguen-uyku', 'Uyku', '😴'),
+      st('penguen-goz-devirme', 'Göz Devirme', '🙄'),
+      st('penguen-dans', 'Dans', '💃'),
+      st('penguen-alkis', 'Alkış', '👏'),
+      st('penguen-kalp', 'Kalp', '❤️'),
+      st('penguen-sevgi', 'Sevgi', '🥰'),
+      st('penguen-onay', 'Onay', '👍'),
+      st('penguen-begenmeme', 'Beğenmeme', '👎'),
+      st('penguen-selam', 'Selam', '👋'),
+      st('penguen-sessiz-ol', 'Sessiz Ol', '🤫'),
+      st('penguen-sarki-soyle', 'Şarkı Söyle', '🎤'),
+      st('penguen-kutlama', 'Kutlama', '🎉'),
+      st('penguen-sarilma', 'Sarılma', '🤗'),
+      st('penguen-cosku', 'Coşku', '🤩'),
+    ],
+  },
 ];
 export const ALL_STICKERS: Sticker[] = STICKER_PACKS.flatMap((p) => p.stickers);
 export const stickerById = (id: string) => ALL_STICKERS.find((s) => s.id === id);
