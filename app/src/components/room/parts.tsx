@@ -389,6 +389,27 @@ export function SeatReaction({ emoji, art, size, still, pre, badge, badgeAt = 0,
   );
 }
 
+/**
+ * A chat line while typing in the room (components/room/chat-feed): the writer and the text on one short line, so a
+ * few of the last ones fit between the Balkon bar and the field over the keyboard.
+ */
+function CompactLine({ msg }: { msg: ChatMsg }) {
+  const g = msg.gift;
+  const [who, text, tone] = msg.bot
+    ? ['BOT', msg.text, colors.textDim]
+    : g
+      ? [userById(g.fromId).name, `→ ${g.toIds.length > 1 ? `${g.toIds.length} kişiye` : userById(g.toIds[0]).name} ${g.name}${g.count > 1 ? ` ×${g.count}` : ''}${g.lucky ? ' · Şanslı' : ''}`, colors.gold]
+      : msg.system
+        ? [msg.notice ? 'SimilarClub' : null, msg.text, colors.gold]
+        : [userById(msg.userId!).name, messagePreview(msg.text), msg.userId === 'me' ? colors.gold : '#FFC2DC'];
+  return (
+    <Text style={[styles.compactLine, msg.system && !msg.notice && { color: '#B9C7DE' }]} numberOfLines={1}>
+      {who ? <Text style={[styles.compactWho, { color: tone }]}>{who}: </Text> : null}
+      {text}
+    </Text>
+  );
+}
+
 export function ChatLine({
   msg,
   bubbleId,
@@ -399,6 +420,7 @@ export function ChatLine({
   mentionNames,
   myName,
   onPerson,
+  compact,
 }: {
   msg: ChatMsg;
   bubbleId?: string;
@@ -414,7 +436,10 @@ export function ChatLine({
   myName?: string;
   /** A tap on the writer's photo or name (their person card). */
   onPerson?: (uid: string) => void;
+  /** While typing: one short line (CompactLine). */
+  compact?: boolean;
 }) {
+  if (compact) return <CompactLine msg={msg} />;
   if (msg.bot) {
     return (
       <View style={styles.botMsg}>
@@ -736,6 +761,8 @@ const styles = StyleSheet.create({
   chatMention: { alignSelf: 'flex-start', borderRadius: 16, borderTopLeftRadius: 6, borderWidth: 1.5, borderColor: colors.gold, padding: 1, boxShadow: `0 0 12px ${colors.gold}55` },
   chatMentionTag: { color: '#1B1405', backgroundColor: colors.gold, fontFamily: fonts.displayBold, fontSize: 10, lineHeight: 14, paddingHorizontal: 6, borderRadius: 7, overflow: 'hidden' },
   chatText: { color: '#fff', fontSize: 14, lineHeight: 19 },
+  compactLine: { color: '#fff', fontSize: 13, lineHeight: 17 },
+  compactWho: { fontWeight: '800' },
   // Dark glass: keeps white text readable over the stage, with a lit top edge.
   chatGlass: { backgroundColor: 'rgba(12,22,40,0.62)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)', borderTopColor: 'rgba(255,255,255,0.16)' },
   round: { width: BAR_BTN, height: BAR_BTN, borderRadius: BAR_BTN / 2, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },

@@ -41,6 +41,7 @@ import type { JoinMode, Membership } from '@/lib/room-follow';
 import { defaultMicQueue } from '@/lib/room-invites';
 import { BOSS_SEAT_DEFAULTS, bossHeadline, bossRules, type BossCfg, type BossMode } from '@/lib/patron-seat';
 import type { Result } from '@/lib/room-presence';
+import { useSheetMax } from '@/lib/sheet-space';
 import type { MyRoom } from '@/store';
 import { SCRIM, colors, edge, gradient } from '@/theme';
 import { Photo } from '@/components/photo';
@@ -53,16 +54,17 @@ const compact = (n: number) => (n >= 1_000_000 ? `${(n / 1_000_000).toFixed(2)}m
 
 // --- Generic sheets -------------------------------------------------------------
 // The modal is edge to edge on Android: the sheet rises above the keyboard as a whole and keeps its last row
-// clear of the navigation bar.
+// clear of the navigation bar. Over a room a sheet stops at the Balkon line (lib/sheet-space): its body scrolls.
 const useSheetBottom = () => Math.max(30, useSafeAreaInsets().bottom + 8);
 
 function BottomSheet({ visible, onClose, title, children }: { visible: boolean; onClose: () => void; title: string; children: React.ReactNode }) {
   const paddingBottom = useSheetBottom();
+  const maxHeight = useSheetMax(0.8);
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoid style={{ flex: 1 }}>
         <Pressable style={styles.backdrop} onPress={onClose} />
-        <View style={[styles.sheet, { paddingBottom }]}>
+        <View style={[styles.sheet, { maxHeight, paddingBottom }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
             <Text style={[styles.sheetTitle, { flex: 1 }]}>{title}</Text>
             <Pressable onPress={onClose} hitSlop={10} accessibilityLabel="Kapat">
@@ -96,11 +98,12 @@ export function ChoiceSheet<T extends string | number>({
   onClose: () => void;
 }) {
   const paddingBottom = useSheetBottom();
+  const maxHeight = useSheetMax(0.8);
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoid style={{ flex: 1 }}>
         <Pressable style={styles.backdrop} onPress={onClose} />
-        <View style={[styles.sheet, { paddingHorizontal: 0, paddingBottom }]}>
+        <View style={[styles.sheet, { maxHeight, paddingHorizontal: 0, paddingBottom }]}>
           {title && <Text style={[styles.sheetTitle, { textAlign: 'center', paddingHorizontal: 16 }]}>{title}</Text>}
           {desc && <Text style={[styles.dim, { textAlign: 'center', paddingHorizontal: 20, marginBottom: 8 }]}>{desc}</Text>}
           <ScrollView>
@@ -311,6 +314,7 @@ export function RoomInfoSheet({
   const textEditor = owner || canEditText;
   const lookEditor = !!look?.available && look.canEdit;
   const paddingBottom = useSheetBottom();
+  const maxHeight = useSheetMax(0.82);
   const editText = (which: 'title' | 'bulletin') => {
     setDraft(which === 'title' ? title : announcement);
     setSub(which);
@@ -319,7 +323,7 @@ export function RoomInfoSheet({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} />
-      <View style={[styles.sheet, { maxHeight: '82%', paddingTop: 18, paddingBottom }]}>
+      <View style={[styles.sheet, { maxHeight, paddingTop: 18, paddingBottom }]}>
         <ScrollView contentContainerStyle={{ gap: 16, paddingBottom: 8 }}>
           <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
             <Pressable onPress={() => lookEditor && setSub('cover')} accessibilityLabel="Oda kapağı">
@@ -1230,6 +1234,7 @@ export function BossSeatSheet({
   onProfile?: (uid: string) => void;
 }) {
   const paddingBottom = useSheetBottom();
+  const maxHeight = useSheetMax(0.8);
   const [rules, setRules] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -1245,7 +1250,7 @@ export function BossSeatSheet({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} />
-      <View style={[styles.sheet, { paddingBottom, gap: 12 }]}>
+      <View style={[styles.sheet, { maxHeight, paddingBottom, gap: 12 }]}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <Pressable onPress={() => setRules((v) => !v)} hitSlop={10} accessibilityRole="button" accessibilityLabel={rules ? 'Kuralları gizle' : 'Patron koltuğu nasıl işler?'}>
             <Ionicons name={rules ? 'help-circle' : 'help-circle-outline'} size={24} color={colors.textDim} />
@@ -1255,36 +1260,37 @@ export function BossSeatSheet({
             <Ionicons name="close" size={22} color={colors.textDim} />
           </Pressable>
         </View>
-        <View style={{ alignItems: 'center', gap: 8 }}>
-          <LinearGradient colors={['#FDE68A', '#B45309']} style={styles.bossRing}>
-            {u ? (
-              <Photo uri={u.avatar} kind="face" style={{ width: 62, height: 62, borderRadius: 31 }} />
-            ) : (
-              <View style={styles.bossEmpty}>
-                <Image source={ROOM_ICON_ART.bossSeat} style={{ width: 46, height: 46 }} />
-              </View>
-            )}
-          </LinearGradient>
-          <Text style={styles.bossTitle} accessibilityRole="header">
-            {head.title}
-          </Text>
-          <Text style={[styles.dim, { textAlign: 'center', fontSize: 14, lineHeight: 20 }]}>{head.text}</Text>
-        </View>
-        {rules && (
-          <View style={styles.bossRules}>
-            <Text style={styles.cardLabel}>{mode === 'invite' ? 'Davet modu' : 'Otomatik mod'}</Text>
-            {bossRules(mode, cfg, holdSeconds).map((line, i) => (
-              <Text key={i} style={styles.dim}>
-                {i + 1}. {line}
-              </Text>
-            ))}
+        {/* The seat, its rules and the people to seat scroll in one list; the buttons under it stay in sight. */}
+        <ScrollView contentContainerStyle={{ gap: 12 }}>
+          <View style={{ alignItems: 'center', gap: 8 }}>
+            <LinearGradient colors={['#FDE68A', '#B45309']} style={styles.bossRing}>
+              {u ? (
+                <Photo uri={u.avatar} kind="face" style={{ width: 62, height: 62, borderRadius: 31 }} />
+              ) : (
+                <View style={styles.bossEmpty}>
+                  <Image source={ROOM_ICON_ART.bossSeat} style={{ width: 46, height: 46 }} />
+                </View>
+              )}
+            </LinearGradient>
+            <Text style={styles.bossTitle} accessibilityRole="header">
+              {head.title}
+            </Text>
+            <Text style={[styles.dim, { textAlign: 'center', fontSize: 14, lineHeight: 20 }]}>{head.text}</Text>
           </View>
-        )}
-        {picks && onSeat && (
-          <View style={{ gap: 4 }}>
-            <Text style={styles.cardLabel}>Koltuğa oturt</Text>
-            {picks.length === 0 && <Text style={styles.dim}>Odada oturtulacak kimse yok.</Text>}
-            <ScrollView style={{ maxHeight: 220 }}>
+          {rules && (
+            <View style={styles.bossRules}>
+              <Text style={styles.cardLabel}>{mode === 'invite' ? 'Davet modu' : 'Otomatik mod'}</Text>
+              {bossRules(mode, cfg, holdSeconds).map((line, i) => (
+                <Text key={i} style={styles.dim}>
+                  {i + 1}. {line}
+                </Text>
+              ))}
+            </View>
+          )}
+          {picks && onSeat && (
+            <View style={{ gap: 4 }}>
+              <Text style={styles.cardLabel}>Koltuğa oturt</Text>
+              {picks.length === 0 && <Text style={styles.dim}>Odada oturtulacak kimse yok.</Text>}
               {picks.map((p) => (
                 <Pressable key={p.id} style={styles.listRow} onPress={() => onSeat(p.id)} accessibilityRole="button" accessibilityLabel={`${p.name} kişisini patron koltuğuna oturt`}>
                   <Avatar uri={p.avatar} size={34} />
@@ -1294,9 +1300,9 @@ export function BossSeatSheet({
                   <Ionicons name="arrow-up-circle-outline" size={22} color={colors.gold} />
                 </Pressable>
               ))}
-            </ScrollView>
-          </View>
-        )}
+            </View>
+          )}
+        </ScrollView>
         {onSitBack && <SheetButton label="Patron koltuğuna otur" icon="arrow-up-circle-outline" onPress={onSitBack} />}
         {/* A gift moves the seat only in Otomatik mode: to sit, to take it, or to stay longer. */}
         {mode === 'auto' && <SheetButton label="Hediye gönder" icon="gift" onPress={onGift} primary />}
@@ -1319,7 +1325,8 @@ function SheetButton({ label, icon, onPress, primary, danger }: { label: string;
 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: SCRIM },
-  sheet: { backgroundColor: '#24232B', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, paddingBottom: 30, maxHeight: '80%', ...edge.sheet },
+  // maxHeight from lib/sheet-space (useSheetMax), set by each sheet.
+  sheet: { backgroundColor: '#24232B', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, paddingBottom: 30, ...edge.sheet },
   sheetTitle: { color: '#fff', fontWeight: '800', fontSize: 17, marginBottom: 4 },
   dim: { color: colors.textDim, fontSize: 13, lineHeight: 18 },
   tiny: { color: '#fff', fontSize: 12, marginTop: 4, maxWidth: 70 },

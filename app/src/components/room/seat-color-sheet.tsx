@@ -15,6 +15,7 @@ import { showAlert } from '@/lib/alert';
 import * as api from '@/lib/api';
 import { refusalTitle } from '@/lib/contact-filter';
 import { liveSetSeatColor, message as errorText } from '@/lib/live';
+import { useSheetMax } from '@/lib/sheet-space';
 import { SCRIM, makeStyles, radius, space } from '@/theme';
 
 const fmt = (n: number) => n.toLocaleString('tr-TR');
@@ -33,6 +34,8 @@ type Props = {
 export function SeatColorSheet({ visible, onClose, room, current, onDone }: Props) {
   const s = useStyles();
   const paddingBottom = useSheetBottom();
+  // It stops at the room's Balkon line (lib/sheet-space): the colors scroll under the hint.
+  const maxHeight = useSheetMax(0.86);
   const [owned, setOwned] = useState<SeatColorId[] | null>(null);
   const [busy, setBusy] = useState<SeatColorId | null>(null);
   const [picked, setPicked] = useState<SeatColorId | null>(null);
@@ -83,7 +86,7 @@ export function SeatColorSheet({ visible, onClose, room, current, onDone }: Prop
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={s.scrim} onPress={onClose} accessibilityLabel="Kapat" />
-      <View style={[s.sheet, { paddingBottom }]}>
+      <View style={[s.sheet, { maxHeight, paddingBottom }]}>
         <View style={s.grip} />
         <View style={s.head}>
           <Text style={s.title}>Koltuk rengi</Text>
@@ -142,7 +145,6 @@ const useStyles = makeStyles(({ colors, semantic, edge, ink }) => ({
     borderTopRightRadius: radius.xl,
     paddingHorizontal: space.lg,
     paddingTop: space.sm,
-    maxHeight: '86%',
     ...edge.sheet,
   },
   grip: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: ink(0.18), marginBottom: space.sm },

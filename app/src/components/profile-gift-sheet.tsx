@@ -14,6 +14,7 @@ import { Icon3D } from '@/components/Icon3D';
 import { Text } from '@/components/text';
 import { Button } from '@/components/ui';
 import { GIFTS, type Gift } from '@/data/mock';
+import { useSheetMax } from '@/lib/sheet-space';
 import { SCRIM, makeStyles, radius, space, type, useTheme } from '@/theme';
 import { RollingNumber } from '@/components/fx/rolling-number';
 
@@ -42,6 +43,9 @@ export function ProfileGiftSheet({
   const { colors, semantic } = useTheme();
   const s = useStyles();
   const { bottom } = useSafeAreaInsets();
+  // Over a room (a chat in the room's messages) it stops at the Balkon line (lib/sheet-space): the grid scrolls,
+  // the button stays.
+  const maxHeight = useSheetMax(0.8);
   const [picked, setPicked] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const gift = gifts.find((g) => g.id === picked) ?? null;
@@ -76,7 +80,7 @@ export function ProfileGiftSheet({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
       <Pressable style={s.scrim} onPress={close} accessibilityLabel="Hediye panelini kapat" />
-      <View style={[s.sheet, { paddingBottom: Math.max(space.lg, bottom + 8) }]}>
+      <View style={[s.sheet, { maxHeight, paddingBottom: Math.max(space.lg, bottom + 8) }]}>
         <View style={s.header}>
           <Text style={s.title} numberOfLines={2}>
             {name} kişisine hediye
@@ -141,7 +145,7 @@ export function ProfileGiftSheet({
 
 const useStyles = makeStyles(({ colors, semantic, dark, ink, edge }) => ({
   scrim: { flex: 1, backgroundColor: SCRIM },
-  sheet: { maxHeight: '80%', backgroundColor: colors.card, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, paddingTop: space.lg, ...edge.sheet },
+  sheet: { backgroundColor: colors.card, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, paddingTop: space.lg, ...edge.sheet },
   header: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingHorizontal: space.lg, paddingBottom: space.md },
   title: { flex: 1, color: colors.text, fontSize: type.title, fontWeight: '800' },
   balance: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(251,191,36,0.12)', borderRadius: radius.pill, paddingHorizontal: space.md, height: 36 },

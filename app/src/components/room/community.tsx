@@ -13,6 +13,7 @@ import { CONTACT_TITLE, contactRefusal } from '@/lib/contact-filter';
 import { denoiseLine, type DenoiseLine } from '@/lib/mic-denoise';
 import { followerInviteLeft, formatWait } from '@/lib/room-invites';
 import { engineInfo } from '@/lib/room-session';
+import { useSheetMax } from '@/lib/sheet-space';
 import type { Settings } from '@/store';
 import { colors, semantic } from '@/theme';
 import { aiDenoiseAvailable, aiDenoiseStatus } from '../../../modules/similar-denoise';
@@ -23,14 +24,17 @@ export type RoomEvent = { id: string; title: string; desc: string; when: string;
 export type Question = { id: string; userId: string; text: string; picked: boolean };
 export type ModLog = { id: string; time: string; actor: string; action: string; target: string; reason: string };
 
-function Sheet({ visible, onClose, title, art, children }: { visible: boolean; onClose: () => void; title: string; art?: number; children: React.ReactNode }) {
+/** `foot`: the sheet's main action (a start or send button, a composer), under the list. Over a room the sheet stops
+ *  at the Balkon line (lib/sheet-space): the list scrolls, the title and the foot stay in sight. */
+function Sheet({ visible, onClose, title, art, children, foot }: { visible: boolean; onClose: () => void; title: string; art?: number; children: React.ReactNode; foot?: React.ReactNode }) {
   const paddingBottom = useSheetBottom();
+  const maxHeight = useSheetMax(0.8);
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       {/* The modal does not shrink for the keyboard (edge to edge): the sheet rises above it as a whole. */}
       <KeyboardAvoid style={{ flex: 1 }}>
         <Pressable style={roomStyles.scrim} onPress={onClose} />
-        <View style={[roomStyles.sheet, { maxHeight: '80%', paddingBottom }]}>
+        <View style={[roomStyles.sheet, { maxHeight, paddingBottom }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
             {art && <Image source={art} style={{ width: 30, height: 30, marginRight: 8 }} />}
             <Text style={[roomStyles.sheetTitle, { flex: 1, marginBottom: 0 }]}>{title}</Text>
@@ -41,6 +45,7 @@ function Sheet({ visible, onClose, title, art, children }: { visible: boolean; o
           <ScrollView contentContainerStyle={{ gap: 10, paddingBottom: 10 }} keyboardShouldPersistTaps="handled">
             {children}
           </ScrollView>
+          {foot && <View style={{ gap: 10, paddingBottom: 10 }}>{foot}</View>}
         </View>
       </KeyboardAvoid>
     </Modal>
@@ -105,7 +110,7 @@ export function PollCreate({ visible, onClose, onCreate }: { visible: boolean; o
     setOpts(['', '']);
   };
   return (
-    <Sheet visible={visible} onClose={onClose} title="Anket oluştur" art={ROOM_ICON_ART.poll}>
+    <Sheet visible={visible} onClose={onClose} title="Anket oluştur" art={ROOM_ICON_ART.poll} foot={<GradientButton title="Başlat" icon="stats-chart" onPress={create} />}>
       <TextInput value={q} onChangeText={setQ} placeholder="Soru" placeholderTextColor={colors.textDim} style={styles.input} />
       {opts.map((o, i) => (
         <TextInput key={i} value={o} onChangeText={(t) => setOpts((l) => l.map((x, j) => (j === i ? t : x)))} placeholder={`Seçenek ${i + 1}`} placeholderTextColor={colors.textDim} style={styles.input} />
@@ -129,7 +134,6 @@ export function PollCreate({ visible, onClose, onCreate }: { visible: boolean; o
         <Text style={{ color: '#fff', flex: 1 }}>Sonuçları anlık göster</Text>
         <Switch value={live} onValueChange={setLive} />
       </View>
-      <GradientButton title="Başlat" icon="stats-chart" onPress={create} />
     </Sheet>
   );
 }
@@ -160,7 +164,13 @@ export function GoalCreate({ visible, onClose, onCreate }: { visible: boolean; o
   const [target, setTarget] = useState(10);
   const titles: Record<Goal['kind'], string> = { join: 'Yeni katılımcı', like: 'Geçerli beğeni', event: 'Etkinliğe katılım' };
   return (
-    <Sheet visible={visible} onClose={onClose} title="Topluluk hedefi" art={ROOM_ICON_ART.goal}>
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      title="Topluluk hedefi"
+      art={ROOM_ICON_ART.goal}
+      foot={<GradientButton title="Hedefi başlat (10 dk)" icon="flag" onPress={() => onCreate({ title: `${target} ${titles[kind]}`, kind, target, endsIn: 600, paid: false })} />}
+    >
       <Text style={styles.dim}>Hedefler ücretli hediye gerektirmez. Hediye temelli hedefler açıkça &quot;ücretli&quot; olarak işaretlenir.</Text>
       <Chips
         items={[
@@ -180,7 +190,6 @@ export function GoalCreate({ visible, onClose, onCreate }: { visible: boolean; o
         value={target}
         onChange={setTarget}
       />
-      <GradientButton title="Hedefi başlat (10 dk)" icon="flag" onPress={() => onCreate({ title: `${target} ${titles[kind]}`, kind, target, endsIn: 600, paid: false })} />
     </Sheet>
   );
 }
@@ -209,8 +218,16 @@ export function EventsSheet({
   const [desc, setDesc] = useState('');
   const [when, setWhen] = useState('Bugün 21:00');
   const [type, setType] = useState('Sohbet');
+  const create = () => {
+    if (title.trim().length < 3) return showAlert('Etkinlik adı gerekli');
+    const refusal = contactRefusal([title.trim(), desc.trim()], 'room.event');
+    if (refusal) return showAlert(CONTACT_TITLE, refusal);
+    onCreate({ title: title.trim(), desc: desc.trim(), when, type });
+    setTitle('');
+    setDesc('');
+  };
   return (
-    <Sheet visible={visible} onClose={onClose} title="Oda etkinlikleri" art={ROOM_ICON_ART.activity}>
+    <Sheet visible={visible} onClose={onClose} title="Oda etkinlikleri" art={ROOM_ICON_ART.activity} foot={canManage && <GradientButton title="Etkinlik oluştur" icon="calendar" onPress={create} />}>
       {events.length === 0 && <Text style={styles.dim}>Planlanmış etkinlik yok.</Text>}
       {events.map((e) => (
         <View key={e.id} style={[styles.card, e.cancelled && { opacity: 0.5 }]}>
@@ -263,18 +280,6 @@ export function EventsSheet({
             value={type}
             onChange={setType}
           />
-          <GradientButton
-            title="Etkinlik oluştur"
-            icon="calendar"
-            onPress={() => {
-              if (title.trim().length < 3) return showAlert('Etkinlik adı gerekli');
-              const refusal = contactRefusal([title.trim(), desc.trim()], 'room.event');
-              if (refusal) return showAlert(CONTACT_TITLE, refusal);
-              onCreate({ title: title.trim(), desc: desc.trim(), when, type });
-              setTitle('');
-              setDesc('');
-            }}
-          />
         </>
       )}
     </Sheet>
@@ -284,8 +289,26 @@ export function EventsSheet({
 // --- Q&A ----------------------------------------------------------------------------
 export function QuestionsSheet({ visible, onClose, questions, canManage, onAsk, onPick }: { visible: boolean; onClose: () => void; questions: Question[]; canManage: boolean; onAsk: (t: string) => void; onPick: (id: string) => void }) {
   const [text, setText] = useState('');
+  const ask = () => {
+    if (text.trim().length < 3) return;
+    const refusal = contactRefusal(text.trim(), 'room.question');
+    if (refusal) return showAlert(CONTACT_TITLE, refusal);
+    onAsk(text.trim());
+    setText('');
+  };
   return (
-    <Sheet visible={visible} onClose={onClose} title="Sorular" art={ROOM_ICON_ART.questions}>
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      title="Sorular"
+      art={ROOM_ICON_ART.questions}
+      foot={
+        <>
+          <TextInput value={text} onChangeText={setText} placeholder="Sorunu yaz" placeholderTextColor={colors.textDim} style={styles.input} />
+          <GradientButton small title="Soru gönder" onPress={ask} />
+        </>
+      }
+    >
       {questions.length === 0 && <Text style={styles.dim}>Henüz soru yok.</Text>}
       {questions.map((q) => (
         <View key={q.id} style={[styles.row, q.picked && styles.picked]}>
@@ -302,18 +325,6 @@ export function QuestionsSheet({ visible, onClose, questions, canManage, onAsk, 
           {q.picked && <Text style={{ color: colors.gold, fontWeight: '800' }}>🎤</Text>}
         </View>
       ))}
-      <TextInput value={text} onChangeText={setText} placeholder="Sorunu yaz" placeholderTextColor={colors.textDim} style={styles.input} />
-      <GradientButton
-        small
-        title="Soru gönder"
-        onPress={() => {
-          if (text.trim().length < 3) return;
-          const refusal = contactRefusal(text.trim(), 'room.question');
-          if (refusal) return showAlert(CONTACT_TITLE, refusal);
-          onAsk(text.trim());
-          setText('');
-        }}
-      />
     </Sheet>
   );
 }

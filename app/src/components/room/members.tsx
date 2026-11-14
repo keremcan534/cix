@@ -35,6 +35,7 @@ import {
   type MemberRow,
   type Membership,
 } from '@/lib/room-follow';
+import { useSheetMax, useSheetMin } from '@/lib/sheet-space';
 import { SCRIM, colors, edge, semantic } from '@/theme';
 
 /** Avatars on the card's row. */
@@ -251,6 +252,9 @@ const FILTERS: { key: MemberFilter; label: string; empty: string }[] = [
 function MemberListSheet(p: RoomMembersProps & { visible: boolean; onClose: () => void; now: number; cap: number; onProfile: (id: string) => void }) {
   const [filter, setFilter] = useState<MemberFilter>('all');
   const { bottom } = useSafeAreaInsets();
+  // Over a room it stops at the Balkon line (lib/sheet-space): the list shrinks and scrolls, the filters stay.
+  const maxHeight = useSheetMax(0.8);
+  const minHeight = useSheetMin(300);
   const server = useServerMemberList(p.roomId, p.live && p.visible, filter, p.refreshKey);
 
   // The demo's rows: the room's staff and members from the sample people, who is in the room from its own model.
@@ -285,7 +289,7 @@ function MemberListSheet(p: RoomMembersProps & { visible: boolean; onClose: () =
   return (
     <Modal visible={p.visible} transparent animationType="slide" onRequestClose={p.onClose}>
       <Pressable style={styles.backdrop} onPress={p.onClose} accessibilityLabel="Üye listesini kapat" />
-      <View style={[styles.sheet, { paddingBottom: Math.max(24, bottom + 8) }]}>
+      <View style={[styles.sheet, { maxHeight, minHeight, paddingBottom: Math.max(24, bottom + 8) }]}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <Text style={[styles.sheetTitle, { flex: 1 }]}>
             Oda üyeleri ({p.memberTotal.toLocaleString('tr-TR')} / {p.cap.toLocaleString('tr-TR')})
@@ -297,7 +301,7 @@ function MemberListSheet(p: RoomMembersProps & { visible: boolean; onClose: () =
         <Text style={styles.dim}>
           Üye kontenjanı {p.memberJoined.toLocaleString('tr-TR')} / {p.cap.toLocaleString('tr-TR')} · oda sahibi ve yöneticiler kontenjana sayılmaz.
         </Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.chips} accessibilityRole="tablist">
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, flexShrink: 0 }} contentContainerStyle={styles.chips} accessibilityRole="tablist">
           {filters.map((f) => {
             const on = f.key === filter;
             const n = counts?.[f.key];
@@ -326,7 +330,7 @@ function MemberListSheet(p: RoomMembersProps & { visible: boolean; onClose: () =
           <FlatList
             data={rows}
             keyExtractor={(r) => r.id}
-            style={{ flexGrow: 0 }}
+            style={{ flexGrow: 0, flexShrink: 1 }}
             contentContainerStyle={{ paddingBottom: 4 }}
             keyboardShouldPersistTaps="handled"
             onEndReached={p.live && server.hasMore ? server.more : undefined}
@@ -427,7 +431,8 @@ function MemberLine({
 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: SCRIM },
-  sheet: { backgroundColor: '#24232B', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, maxHeight: '80%', minHeight: 300, gap: 10, ...edge.sheet },
+  // maxHeight and minHeight from lib/sheet-space, set by the sheet.
+  sheet: { backgroundColor: '#24232B', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, gap: 10, ...edge.sheet },
   sheetTitle: { color: '#fff', fontWeight: '800', fontSize: 17 },
   h2: { color: '#fff', fontWeight: '800', fontSize: 17 },
   dim: { color: colors.textDim, fontSize: 13, lineHeight: 18 },

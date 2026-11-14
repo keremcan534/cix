@@ -38,6 +38,7 @@ import {
   type TeamDraft,
   type TeamId,
 } from '@/lib/pk';
+import { useSheetMax } from '@/lib/sheet-space';
 import { showAlert } from '@/lib/alert';
 import { SCRIM, colors, edge, semantic } from '@/theme';
 import { Photo } from '@/components/photo';
@@ -146,13 +147,15 @@ export function PkSetupSheet({ visible, roomId, starterId, micUsers, offline, on
   // However many are on the mics (none too): people who take a mic during the PK join it.
   const canStart = !offline && !busy && !modeOff && (mode === 'solo' || method === 'manual' || (!!draft && !draftStale));
   const paddingBottom = useSheetBottom(16);
+  // Over a room it stops at the Balkon line (lib/sheet-space): the choices scroll, the start button stays under them.
+  const maxHeight = useSheetMax(0.86);
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       {/* The modal does not shrink for the keyboard (edge to edge): the sheet rises above it as a whole. */}
       <KeyboardAvoid style={{ flex: 1 }}>
         <Pressable style={st.backdrop} onPress={onClose} accessibilityLabel="Kapat" />
-        <View style={[st.sheet, { paddingBottom }]}>
+        <View style={[st.sheet, { maxHeight, paddingBottom }]}>
           <View style={st.head}>
             <Text style={st.title}>PK başlat</Text>
             <Pressable onPress={onClose} hitSlop={8} accessibilityLabel="PK panelini kapat">
@@ -207,9 +210,6 @@ export function PkSetupSheet({ visible, roomId, starterId, micUsers, offline, on
                 <Text style={st.dim}>
                   Her kişi aldığı hediyelerin {live ? 'jeton değeriyle' : 'PK puanıyla'} yarışır; en yüksek puan kazanır. PK sırasında mikrofona geçen kişi de o andan itibaren katılır; mikrofondan inen kişinin puanı kalır.
                 </Text>
-                <Pressable style={[st.primary, !canStart && st.disabled]} disabled={!canStart} onPress={startSolo} accessibilityLabel="Normal PK başlat">
-                  <Text style={st.primaryText}>{busy ? 'Başlatılıyor…' : `Normal PK’yı başlat · ${duration} dk`}</Text>
-                </Pressable>
               </>
             )}
 
@@ -283,9 +283,6 @@ export function PkSetupSheet({ visible, roomId, starterId, micUsers, offline, on
                 <Text style={st.dim}>
                   Takım başına en fazla {config.teamMax} kişi · PK sırasında mikrofona geçen kişi, kişi sayısı az olan takıma girer (eşitse rastgele) · hediyeyi alan kişi ve takımı puan kazanır
                 </Text>
-                <Pressable style={[st.primary, !canStart && st.disabled]} disabled={!canStart} onPress={startTeam} accessibilityLabel="Takımları onayla ve başlat">
-                  <Text style={st.primaryText}>{busy ? 'Başlatılıyor…' : `Takımları onayla ve başlat · ${duration} dk`}</Text>
-                </Pressable>
               </>
             )}
 
@@ -332,6 +329,16 @@ export function PkSetupSheet({ visible, roomId, starterId, micUsers, offline, on
               </>
             )}
           </ScrollView>
+          {tab === 'room' &&
+            (mode === 'solo' ? (
+              <Pressable style={[st.primary, !canStart && st.disabled]} disabled={!canStart} onPress={startSolo} accessibilityLabel="Normal PK başlat">
+                <Text style={st.primaryText}>{busy ? 'Başlatılıyor…' : `Normal PK’yı başlat · ${duration} dk`}</Text>
+              </Pressable>
+            ) : (
+              <Pressable style={[st.primary, !canStart && st.disabled]} disabled={!canStart} onPress={startTeam} accessibilityLabel="Takımları onayla ve başlat">
+                <Text style={st.primaryText}>{busy ? 'Başlatılıyor…' : `Takımları onayla ve başlat · ${duration} dk`}</Text>
+              </Pressable>
+            ))}
         </View>
       </KeyboardAvoid>
     </Modal>
@@ -707,7 +714,7 @@ export function CrossPkInvitePrompt({ invite, busy, onAnswer }: { invite: Incomi
 
 const st = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: SCRIM },
-  sheet: { maxHeight: '86%', backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, gap: 12, ...edge.sheet },
+  sheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, gap: 12, ...edge.sheet },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   title: { color: colors.text, fontWeight: '900', fontSize: 18, flexShrink: 1 },
   seg: { flexDirection: 'row', backgroundColor: colors.cardAlt, borderRadius: 999, padding: 4 },

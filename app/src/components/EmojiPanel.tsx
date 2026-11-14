@@ -207,7 +207,7 @@ export function EmojiPanel({ onPick, hint, onAnimate, onClose, fill }: { onPick:
           })}
       </ScrollView>
       {(tab.id === 'animated' || tab.id === 'animated-free') && onAnimate ? (
-        <View style={[{ paddingHorizontal: 8, gap: 6 }, fill && { flex: 1 }]}>
+        <View style={[{ paddingHorizontal: 8, gap: 6 }, fill ? { flex: 1 } : { flexShrink: 1 }]}>
           {micFxList.length > 0 && <Text style={styles.sub}>🎙️ Mikrofon efektim · konuşurken koltuğunda kendiliğinden oynar</Text>}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, flexShrink: 0 }} contentContainerStyle={{ gap: 6 }}>
             {micFxList.map((a) => {
@@ -281,7 +281,7 @@ const useStyles = makeStyles(({ colors, semantic, dark }) => ({
   kindText: { color: colors.text, fontSize: 12, fontWeight: '700' },
   kindTextOn: { color: '#fff' },
   // Light: a hairline and a soft upward shadow so the white panel lifts off the paper behind it.
-  wrap: { backgroundColor: colors.card, borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingTop: 10, paddingBottom: 6, ...(dark ? null : { borderWidth: StyleSheet.hairlineWidth, borderBottomWidth: 0, borderColor: 'rgba(42,21,32,0.08)', boxShadow: '0 -4px 16px rgba(64,20,40,0.06)' }) },
+  wrap: { flexShrink: 1, backgroundColor: colors.card, borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingTop: 10, paddingBottom: 6, ...(dark ? null : { borderWidth: StyleSheet.hairlineWidth, borderBottomWidth: 0, borderColor: 'rgba(42,21,32,0.08)', boxShadow: '0 -4px 16px rgba(64,20,40,0.06)' }) },
   tab: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999 },
   tabIcon: { width: 18, height: 18 },
   tabActive: { backgroundColor: colors.cardAlt },
@@ -291,8 +291,9 @@ const useStyles = makeStyles(({ colors, semantic, dark }) => ({
   moveCell: { width: '33.33%', alignItems: 'center', gap: 4, paddingVertical: 8, paddingHorizontal: 4 },
   moveArrow: { position: 'absolute', bottom: -2, width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: semantic.action },
   moveName: { color: colors.text, fontSize: 11, fontWeight: '600', textAlign: 'center' },
-  // Four rows and a part of the fifth, so it shows there is more.
-  stickerScroll: { maxHeight: 236 },
+  // Four rows and a part of the fifth, so it shows there is more; less in a short sheet (a chat over the room stops at its
+  // Balkon line): the panel gives way, not the message field under it.
+  stickerScroll: { maxHeight: 236, flexShrink: 1 },
   // Over a room's chat: the panel is the chat's height and its list takes what the tabs leave.
   fillWrap: { flex: 1 },
   fillScroll: { flex: 1 },

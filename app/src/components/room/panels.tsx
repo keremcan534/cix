@@ -13,18 +13,22 @@ import { MUSIC_CATALOG, type Track } from '@/data/catalog';
 import { userById } from '@/data/mock';
 import { goBack } from '@/lib/nav';
 import { showAlert } from '@/lib/alert';
+import { useSheetMax } from '@/lib/sheet-space';
 import { colors, semantic } from '@/theme';
 
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
-function Sheet({ visible, onClose, title, art, children, tall }: { visible: boolean; onClose: () => void; title: string; art?: number; children: React.ReactNode; tall?: boolean }) {
+/** `foot`: the sheet's main button, under the body. Over a room the sheet stops at the Balkon line
+ *  (lib/sheet-space): the body scrolls, the title and the foot stay in sight. */
+function Sheet({ visible, onClose, title, art, children, foot, tall }: { visible: boolean; onClose: () => void; title: string; art?: number; children: React.ReactNode; foot?: React.ReactNode; tall?: boolean }) {
   const paddingBottom = useSheetBottom();
+  const maxHeight = useSheetMax(tall ? 0.85 : 0.7);
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       {/* The modal does not shrink for the keyboard (edge to edge): the sheet rises above it as a whole. */}
       <KeyboardAvoid style={{ flex: 1 }}>
         <Pressable style={roomStyles.scrim} onPress={onClose} />
-        <View style={[roomStyles.sheet, { maxHeight: tall ? '85%' : '70%', paddingBottom }]}>
+        <View style={[roomStyles.sheet, { maxHeight, paddingBottom }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
             {art && <Image source={art} style={{ width: 30, height: 30, marginRight: 8 }} />}
             <Text style={[roomStyles.sheetTitle, { flex: 1, marginBottom: 0 }]}>{title}</Text>
@@ -32,7 +36,8 @@ function Sheet({ visible, onClose, title, art, children, tall }: { visible: bool
               <Ionicons name="close" size={22} color={colors.textDim} />
             </Pressable>
           </View>
-          {children}
+          <ScrollView keyboardShouldPersistTaps="handled">{children}</ScrollView>
+          {foot}
         </View>
       </KeyboardAvoid>
     </Modal>
@@ -168,7 +173,7 @@ export function MusicSheet({
   };
   return (
     <Sheet visible={visible} onClose={onClose} title="Oda müziği" art={ROOM_ICON_ART.music} tall>
-      <ScrollView contentContainerStyle={{ gap: 10, paddingBottom: 10 }} keyboardShouldPersistTaps="handled">
+      <View style={{ gap: 10, paddingBottom: 10 }}>
         {canControl && (
           <View style={styles.row}>
             <Text style={{ color: '#fff', flex: 1 }}>Ortak müzik</Text>
@@ -236,7 +241,7 @@ export function MusicSheet({
           <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>Kendi uygulamasında aç</Text>
         </Pressable>
         <Text style={styles.dim}>Spotify/YouTube sesi uygulama üzerinden yeniden yayınlanmaz; bağlantı ilgili platformun oynatıcısında açılır.</Text>
-      </ScrollView>
+      </View>
     </Sheet>
   );
 }
@@ -246,7 +251,13 @@ export function EnvelopeSendModal({ visible, onClose, onSend, coins }: { visible
   const [amount, setAmount] = useState(100);
   const [count, setCount] = useState(5);
   return (
-    <Sheet visible={visible} onClose={onClose} title="Oda zarfı dağıt" art={ROOM_ICON_ART.envelope}>
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      title="Oda zarfı dağıt"
+      art={ROOM_ICON_ART.envelope}
+      foot={<GradientButton title={`Dağıt · 🪙 ${amount}`} icon="gift" onPress={() => onSend(amount, count)} style={{ opacity: coins < amount ? 0.5 : 1 }} />}
+    >
       <Text style={styles.dim}>Zarftaki jetonlar odadaki ilk {count} kişiye rastgele paylaştırılır. Tüm transferler cüzdan defterine yazılır.</Text>
       <Text style={styles.label}>Toplam</Text>
       <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -264,7 +275,6 @@ export function EnvelopeSendModal({ visible, onClose, onSend, coins }: { visible
           </Pressable>
         ))}
       </View>
-      <GradientButton title={`Dağıt · 🪙 ${amount}`} icon="gift" onPress={() => onSend(amount, count)} style={{ opacity: coins < amount ? 0.5 : 1 }} />
     </Sheet>
   );
 }
@@ -285,7 +295,13 @@ export function DiceModal({ visible, onClose, onPlay, playsLeft }: { visible: bo
   const [bet, setBet] = useState(10);
   const [result, setResult] = useState<{ me: number; them: number; opponent: string } | null>(null);
   return (
-    <Sheet visible={visible} onClose={onClose} title="Zar Düellosu" art={ROOM_ICON_ART.diceDuel}>
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      title="Zar Düellosu"
+      art={ROOM_ICON_ART.diceDuel}
+      foot={<GradientButton title={`At · 🪙 ${bet}`} icon="dice" onPress={() => setResult(onPlay(bet))} style={{ opacity: playsLeft ? 1 : 0.4 }} />}
+    >
       <Text style={styles.dim}>Odadaki rastgele biriyle zar at; rakibinden en az 3 fazla atarsan bahsinin 2,4 katı oyun bakiyene yazılır (yalnızca oyunlarda kullanılır). Oyunlarda oynanan jetonun %60&apos;ı kasaya kalır, %40&apos;ı kazananlara dağılır. 18+ · Günlük {playsLeft} hak kaldı. Sonuç sunucuda belirlenir.</Text>
       <View style={{ flexDirection: 'row', gap: 8, marginVertical: 12 }}>
         {[10, 50, 100].map((n) => (
@@ -307,7 +323,6 @@ export function DiceModal({ visible, onClose, onPlay, playsLeft }: { visible: bo
           </View>
         </View>
       )}
-      <GradientButton title={`At · 🪙 ${bet}`} icon="dice" onPress={() => setResult(onPlay(bet))} style={{ opacity: playsLeft ? 1 : 0.4 }} />
     </Sheet>
   );
 }

@@ -9,9 +9,11 @@ import { FlatList, Modal, Pressable, StyleSheet, View, useWindowDimensions } fro
 import { Text, TextInput } from '@/components/text';
 import { Art } from '@/components/Art';
 import { Icon3D } from '@/components/Icon3D';
+import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { ROLE_RANK, useSheetBottom, type RoomRole } from '@/components/room/parts';
 import { userById } from '@/data/mock';
 import type { MicInvite, RoomLive, RoomView } from '@/lib/room-presence';
+import { useSheetMax } from '@/lib/sheet-space';
 import { SCRIM, colors, edge, semantic } from '@/theme';
 import { Photo } from '@/components/photo';
 
@@ -109,120 +111,133 @@ export function ParticipantsSheet({
   };
   // Android modals draw edge to edge: the last row stays above the navigation bar.
   const paddingBottom = useSheetBottom(24);
+  // Over a room the sheet reaches the Balkon line at most (lib/sheet-space): the list takes what the head leaves.
+  const height = useSheetMax(0.78);
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
-      <Pressable style={s.backdrop} onPress={close} accessibilityLabel="Kapat" />
-      <View style={[s.sheet, { paddingBottom }]}>
-        <View style={s.handle} />
-        <View style={s.head}>
-          <Icon3D name={inviteSeat !== null ? 'userAdd' : 'group'} size={34} />
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={s.title} accessibilityRole="header">
-              {inviteSeat !== null ? `${inviteSeat + 1}. mikrofona davet et` : 'Odadaki Kullanıcılar'}
-            </Text>
-            <Text style={s.sub} accessibilityLabel={`${view.total} kişi, ${view.mic} mikrofonda, ${view.balcony} balkonda`}>
-              {fmt(view.total)} kişi · {fmt(view.mic)} mikrofonda · {fmt(view.balcony)} balkonda
-            </Text>
-          </View>
-          <Pressable onPress={close} hitSlop={8} style={s.closeBtn} accessibilityLabel="Kapat">
-            <Ionicons name="close" size={22} color={colors.textDim} />
-          </Pressable>
-        </View>
-        {offline && (
-          <View style={s.notice}>
-            <Ionicons name="cloud-offline-outline" size={16} color={colors.gold} />
-            <Text style={[s.dim, { flex: 1, color: '#FDE7C2' }]}>Bağlantı yok: liste son alınan durumu gösteriyor; işlemler bağlantı dönünce yapılabilir.</Text>
-          </View>
-        )}
-        {hiddenMe && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Art name="oda-gizli-giris" size={18} />
-            <Text style={[s.dim, { flex: 1 }]}>Gizli girişle Balkon’dasın: diğerlerinin listesinde ve sayısında görünmüyorsun.</Text>
-          </View>
-        )}
-        <View style={s.tabs} accessibilityRole="tablist">
-          {(
-            [
-              ['balcony', 'Balkon', view.balcony],
-              ['mic', 'Mikrofonda', view.mic],
-              ['all', 'Tümü', view.total],
-            ] as const
-          ).map(([k, l, n]) => (
-            <Pressable key={k} onPress={() => setTab(k)} style={[s.tab, tab === k && s.tabOn]} accessibilityRole="tab" aria-selected={tab === k}>
-              <Text style={[s.tabText, tab === k && { color: semantic.actionInk }]}>
-                {l} {fmt(n)}
+      {/* The modal does not shrink for the keyboard (edge to edge): the sheet rises above it as a whole, so the
+          search stays in sight while typing. */}
+      <KeyboardAvoid style={{ flex: 1 }}>
+        <Pressable style={s.backdrop} onPress={close} accessibilityLabel="Kapat" />
+        <View style={[s.sheet, { height, paddingBottom }]}>
+          <View style={s.handle} />
+          <View style={s.head}>
+            <Icon3D name={inviteSeat !== null ? 'userAdd' : 'group'} size={34} />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={s.title} accessibilityRole="header">
+                {inviteSeat !== null ? `${inviteSeat + 1}. mikrofona davet et` : 'Odadaki Kullanıcılar'}
               </Text>
+              <Text style={s.sub} accessibilityLabel={`${view.total} kişi, ${view.mic} mikrofonda, ${view.balcony} balkonda`}>
+                {fmt(view.total)} kişi · {fmt(view.mic)} mikrofonda · {fmt(view.balcony)} balkonda
+              </Text>
+            </View>
+            <Pressable onPress={close} hitSlop={8} style={s.closeBtn} accessibilityLabel="Kapat">
+              <Ionicons name="close" size={22} color={colors.textDim} />
             </Pressable>
-          ))}
-        </View>
-        <View style={s.search}>
-          <Ionicons name="search" size={16} color={colors.textDim} />
-          <TextInput value={query} onChangeText={setQuery} placeholder="İsimle ara" placeholderTextColor={colors.textDim} style={s.searchInput} accessibilityLabel="Kullanıcı ara" />
-        </View>
-        <FlatList
-          data={list}
-          keyExtractor={(u) => u}
-          initialNumToRender={14}
-          windowSize={7}
-          keyboardShouldPersistTaps="handled"
-          ListEmptyComponent={<Text style={[s.dim, { textAlign: 'center', paddingVertical: 24 }]}>{q ? 'Aramaya uyan kimse yok.' : tab === 'balcony' ? 'Balkon boş: odadaki herkes mikrofonda.' : tab === 'mic' ? 'Mikrofonda kimse yok.' : 'Oda boş.'}</Text>}
-          renderItem={({ item: uid }) => {
-            const u = userById(uid);
-            const role = roleOf(uid);
-            const seat = seatOf(uid);
-            const onBoss = room.boss === uid && seat < 0;
-            const onMic = seat >= 0 || onBoss;
-            const me = uid === 'me';
-            const status = [
-              onBoss ? 'Patron koltuğu' : onMic ? `${seat + 1}. mikrofon` : 'Balkon',
-              onMic && room.micMuted.includes(uid) ? 'mikrofonu kapatıldı' : '',
-              pending.has(uid) ? 'davet bekliyor' : '',
-              blocked.has(uid) ? 'engelledin' : '',
-            ]
-              .filter(Boolean)
-              .join(' · ');
-            const canInvite = canManage && !onMic && !me && !pending.has(uid);
-            const expanded = open === uid;
-            return (
-              <View style={[s.row, expanded && s.rowOpen]}>
-                <Pressable style={s.rowMain} onPress={() => setOpen(expanded ? null : uid)} accessibilityRole="button" accessibilityLabel={`${me ? 'Sen' : u.name}, ${status}. İşlemler`} aria-expanded={expanded}>
-                  <Photo uri={u.avatar} kind="face" style={[s.av, blocked.has(uid) && { opacity: 0.45 }]} />
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={s.name} numberOfLines={1}>
-                      {me ? 'Sen' : u.name}
-                      {role === 'owner' ? ' · Oda sahibi' : role === 'admin' ? ' 🛡️' : ''}
-                    </Text>
-                    <Text style={s.dim} numberOfLines={1}>
-                      {status}
-                    </Text>
-                  </View>
-                  {inviteSeat !== null && canInvite ? (
-                    <Pressable style={[s.inviteBtn, offline && { opacity: 0.45 }]} disabled={offline} onPress={() => actions.invite(uid)} accessibilityLabel={`${u.name} kişisini mikrofona davet et`}>
-                      <Text style={s.inviteText}>Davet et</Text>
-                    </Pressable>
-                  ) : (
-                    !me && <Ionicons name={expanded ? 'chevron-up' : 'ellipsis-horizontal'} size={18} color={colors.textDim} />
+          </View>
+          <View style={s.tabs} accessibilityRole="tablist">
+            {(
+              [
+                ['balcony', 'Balkon', view.balcony],
+                ['mic', 'Mikrofonda', view.mic],
+                ['all', 'Tümü', view.total],
+              ] as const
+            ).map(([k, l, n]) => (
+              <Pressable key={k} onPress={() => setTab(k)} style={[s.tab, tab === k && s.tabOn]} accessibilityRole="tab" aria-selected={tab === k}>
+                <Text style={[s.tabText, tab === k && { color: semantic.actionInk }]}>
+                  {l} {fmt(n)}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          <View style={s.search}>
+            <Ionicons name="search" size={16} color={colors.textDim} />
+            <TextInput value={query} onChangeText={setQuery} placeholder="İsimle ara" placeholderTextColor={colors.textDim} style={s.searchInput} accessibilityLabel="Kullanıcı ara" />
+          </View>
+          <FlatList
+            data={list}
+            keyExtractor={(u) => u}
+            initialNumToRender={14}
+            windowSize={7}
+            keyboardShouldPersistTaps="handled"
+            // The notes scroll with the list: a short sheet keeps its rows for the people.
+            ListHeaderComponent={
+              offline || hiddenMe ? (
+                <View style={{ gap: 10, paddingBottom: 10 }}>
+                  {offline && (
+                    <View style={s.notice}>
+                      <Ionicons name="cloud-offline-outline" size={16} color={colors.gold} />
+                      <Text style={[s.dim, { flex: 1, color: '#FDE7C2' }]}>Bağlantı yok: liste son alınan durumu gösteriyor; işlemler bağlantı dönünce yapılabilir.</Text>
+                    </View>
                   )}
-                </Pressable>
-                {expanded && !me && (
-                  <View style={s.actions}>
-                    {canInvite && <Action icon="mic-outline" label="Mikrofona davet et" disabled={offline} onPress={() => actions.invite(uid)} />}
-                    {onMic && outranks(uid) && (
-                      <Action icon={room.micMuted.includes(uid) ? 'mic-outline' : 'mic-off-outline'} label={room.micMuted.includes(uid) ? 'Mikrofonunu aç' : 'Mikrofonunu sustur'} disabled={offline} onPress={() => actions.micMute(uid, !room.micMuted.includes(uid))} />
+                  {hiddenMe && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Art name="oda-gizli-giris" size={18} />
+                      <Text style={[s.dim, { flex: 1 }]}>Gizli girişle Balkon’dasın: diğerlerinin listesinde ve sayısında görünmüyorsun.</Text>
+                    </View>
+                  )}
+                </View>
+              ) : undefined
+            }
+            ListEmptyComponent={<Text style={[s.dim, { textAlign: 'center', paddingVertical: 24 }]}>{q ? 'Aramaya uyan kimse yok.' : tab === 'balcony' ? 'Balkon boş: odadaki herkes mikrofonda.' : tab === 'mic' ? 'Mikrofonda kimse yok.' : 'Oda boş.'}</Text>}
+            renderItem={({ item: uid }) => {
+              const u = userById(uid);
+              const role = roleOf(uid);
+              const seat = seatOf(uid);
+              const onBoss = room.boss === uid && seat < 0;
+              const onMic = seat >= 0 || onBoss;
+              const me = uid === 'me';
+              const status = [
+                onBoss ? 'Patron koltuğu' : onMic ? `${seat + 1}. mikrofon` : 'Balkon',
+                onMic && room.micMuted.includes(uid) ? 'mikrofonu kapatıldı' : '',
+                pending.has(uid) ? 'davet bekliyor' : '',
+                blocked.has(uid) ? 'engelledin' : '',
+              ]
+                .filter(Boolean)
+                .join(' · ');
+              const canInvite = canManage && !onMic && !me && !pending.has(uid);
+              const expanded = open === uid;
+              return (
+                <View style={[s.row, expanded && s.rowOpen]}>
+                  <Pressable style={s.rowMain} onPress={() => setOpen(expanded ? null : uid)} accessibilityRole="button" accessibilityLabel={`${me ? 'Sen' : u.name}, ${status}. İşlemler`} aria-expanded={expanded}>
+                    <Photo uri={u.avatar} kind="face" style={[s.av, blocked.has(uid) && { opacity: 0.45 }]} />
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={s.name} numberOfLines={1}>
+                        {me ? 'Sen' : u.name}
+                        {role === 'owner' ? ' · Oda sahibi' : role === 'admin' ? ' 🛡️' : ''}
+                      </Text>
+                      <Text style={s.dim} numberOfLines={1}>
+                        {status}
+                      </Text>
+                    </View>
+                    {inviteSeat !== null && canInvite ? (
+                      <Pressable style={[s.inviteBtn, offline && { opacity: 0.45 }]} disabled={offline} onPress={() => actions.invite(uid)} accessibilityLabel={`${u.name} kişisini mikrofona davet et`}>
+                        <Text style={s.inviteText}>Davet et</Text>
+                      </Pressable>
+                    ) : (
+                      !me && <Ionicons name={expanded ? 'chevron-up' : 'ellipsis-horizontal'} size={18} color={colors.textDim} />
                     )}
-                    <Action icon="person-circle-outline" label="Profil" onPress={() => actions.profile(uid)} />
-                    <Action icon="gift-outline" label="Hediye gönder" disabled={offline} onPress={() => actions.gift(uid)} />
-                    {outranks(uid) && <Action icon="exit-outline" label="Odadan çıkar" danger disabled={offline} onPress={() => actions.kick(uid)} />}
-                    <Action icon="ban-outline" label={blocked.has(uid) ? 'Engeli kaldır' : 'Engelle'} onPress={() => actions.block(uid)} />
-                    <Action icon="flag-outline" label="Şikâyet et" onPress={() => actions.report(uid)} />
-                  </View>
-                )}
-              </View>
-            );
-          }}
-        />
-      </View>
+                  </Pressable>
+                  {expanded && !me && (
+                    <View style={s.actions}>
+                      {canInvite && <Action icon="mic-outline" label="Mikrofona davet et" disabled={offline} onPress={() => actions.invite(uid)} />}
+                      {onMic && outranks(uid) && (
+                        <Action icon={room.micMuted.includes(uid) ? 'mic-outline' : 'mic-off-outline'} label={room.micMuted.includes(uid) ? 'Mikrofonunu aç' : 'Mikrofonunu sustur'} disabled={offline} onPress={() => actions.micMute(uid, !room.micMuted.includes(uid))} />
+                      )}
+                      <Action icon="person-circle-outline" label="Profil" onPress={() => actions.profile(uid)} />
+                      <Action icon="gift-outline" label="Hediye gönder" disabled={offline} onPress={() => actions.gift(uid)} />
+                      {outranks(uid) && <Action icon="exit-outline" label="Odadan çıkar" danger disabled={offline} onPress={() => actions.kick(uid)} />}
+                      <Action icon="ban-outline" label={blocked.has(uid) ? 'Engeli kaldır' : 'Engelle'} onPress={() => actions.block(uid)} />
+                      <Action icon="flag-outline" label="Şikâyet et" onPress={() => actions.report(uid)} />
+                    </View>
+                  )}
+                </View>
+              );
+            }}
+          />
+        </View>
+      </KeyboardAvoid>
     </Modal>
   );
 }
@@ -277,7 +292,8 @@ const s = StyleSheet.create({
   totalText: { color: semantic.actionInk, fontWeight: '900', fontSize: 14, fontVariant: ['tabular-nums'] },
   dim: { color: colors.textDim, fontSize: 12, lineHeight: 17 },
   backdrop: { flex: 1, backgroundColor: SCRIM },
-  sheet: { height: '78%', backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 24, gap: 10, ...edge.sheet },
+  // Its height from lib/sheet-space (useSheetMax), set by the sheet.
+  sheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 24, gap: 10, ...edge.sheet },
   handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border },
   head: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   title: { color: colors.text, fontWeight: '900', fontSize: 18 },
