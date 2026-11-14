@@ -729,7 +729,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // The demo's application to a sample room, accepted a moment later unless it is taken back first.
   const demoApproval = useRef<ReturnType<typeof setTimeout> | null>(null);
   // A server room's members (server/api/rooms.mjs): read when the room opens and again after each change.
-  const [serverMembers, setServerMembers] = useState<{ ids: string[]; total: number; canManage: boolean } | null>(null);
+  const [serverMembers, setServerMembers] = useState<{ ids: string[]; total: number; joined: number; canManage: boolean } | null>(null);
   // The room owner's family (their profile: server/api families.mjs familyOf), read when the room card opens.
   const [ownerFamily, setOwnerFamily] = useState<{ id: string; name: string } | null>(null);
   const hostServerId = real ? toServer(hostId) : null;
@@ -753,7 +753,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       (r) => {
         r.members.forEach((m) => rememberUser(m));
         r.pending.forEach((m) => rememberUser(m));
-        setServerMembers({ ids: r.members.map((m) => toLocal(m.id)), total: r.total, canManage: r.canManage });
+        setServerMembers({ ids: r.members.map((m) => toLocal(m.id)), total: r.total, joined: r.joined ?? r.total, canManage: r.canManage });
         setMemberApps(r.pending.map((m) => toLocal(m.id)));
         setMembership(membershipOf(r.mine));
       },
@@ -3225,6 +3225,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     : real
       ? (serverMembers?.total ?? 0)
       : Math.min(memberLimit(level), Math.round(base!.listeners * 1.8)) + (membership === 'member' ? 1 : 0);
+  // The members the cap counts: the owner and staff take no member's place (server/api/rooms.mjs memberCount).
+  const memberJoined = isOwn ? myRoom.memberIds.filter((m) => m !== hostId && !superIds.includes(m) && !adminIds.includes(m)).length : real ? (serverMembers?.joined ?? 0) : memberTotal;
   const ownFamily = FAMILIES.find((f) => f.id === familyId);
   const ownAgencyName = agencyId === 'own' ? ownedAgency?.name : AGENCIES.find((a) => a.id === agencyId)?.name;
   const otherFamily = FAMILIES[(Number(id.replace(/\D/g, '')) || 0) % FAMILIES.length];
@@ -3926,6 +3928,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         clan={clan}
         members={roomMembers}
         memberTotal={memberTotal}
+        memberJoined={memberJoined}
         applications={memberApps}
         canManageMembers={isOwn || (real && !!serverMembers?.canManage)}
         autoRemoveDays={isOwn ? myRoom.autoRemoveDays : (liveRules?.autoRemoveDays ?? 0)}
@@ -3939,7 +3942,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         onLeave={leaveMembers}
         onApprove={(uid) => {
           if (real) return memberCall('Onaylanamadı', () => api.answerRoomMember(id, toServer(uid) ?? '', true), `🏠 ${userById(uid).name} oda üyesi oldu`);
-          if (memberTotal >= memberLimit(level)) return showAlert('Üye kapasitesi dolu', `Lv.${level} oda en fazla ${memberLimit(level)} üye alabilir.`);
+          if (memberJoined >= memberLimit(level)) return showAlert('Üye kapasitesi dolu', `Lv.${level} oda en fazla ${memberLimit(level)} üye alabilir.`);
           setMemberApps((l) => l.filter((x) => x !== uid));
           updateMyRoom({ memberIds: [...myRoom.memberIds, uid] });
           addMsg({ system: true, text: `🏠 ${userById(uid).name} oda üyesi oldu` });

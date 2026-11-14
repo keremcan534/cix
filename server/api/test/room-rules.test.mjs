@@ -169,7 +169,7 @@ describe('Oda üyeleri', () => {
     assert.equal((await ok(call('GET', `/api/rooms/members?room=${room}`, null, owner.session), 'son')).total, 2, 'sahip ve yönetici kalır');
   });
 
-  test('oda üyeleri sayısı listedekilerle aynı: sahip ve yöneticiler sayılır; kapasite de onları sayar', async () => {
+  test('oda üyeleri sayısı listedekilerle aynı: sahip ve yöneticiler sayılır; kapasite yalnız üyeleri sayar', async () => {
     // The client's card: the owner and a Yönetici, nobody joined yet. It read "Oda üyeleri (0 / 5.000)".
     const owner = await signUp('Sayı Sahibi');
     const admin = await signUp('Sayı Yöneticisi');
@@ -186,19 +186,26 @@ describe('Oda üyeleri', () => {
     const fan = await signUp('Sayı Takipçisi');
     await ok(call('POST', '/api/rooms/follow', { room }, fan.session), 'takip');
     assert.equal((await ok(call('GET', `/api/rooms/members?room=${room}`, null, fan.session), 'takipçi okur')).total, 2);
-    // The cap (50 at Lv.1) counts the same people: 48 members fill it with the owner and the admin.
-    await h.sql.query(
-      `WITH made AS (INSERT INTO users (name) SELECT 'Dolu ' || g FROM generate_series(1, 48) g RETURNING id)
-       INSERT INTO room_members (room_id, user_id, status) SELECT $1, id, 'member' FROM made`,
-      [room],
-    );
-    assert.equal((await ok(call('GET', `/api/rooms/members?room=${room}`, null, owner.session), 'dolu')).total, 50);
+    // The cap (50 at Lv.1) counts the members only: the owner and the admin take no member's place.
+    const fill = (n) =>
+      h.sql.query(
+        `WITH made AS (INSERT INTO users (name) SELECT 'Dolu ' || g FROM generate_series(1, $2::int) g RETURNING id)
+         INSERT INTO room_members (room_id, user_id, status) SELECT $1, id, 'member' FROM made`,
+        [room, n],
+      );
+    await fill(48);
+    let full = await ok(call('GET', `/api/rooms/members?room=${room}`, null, owner.session), 'yarı dolu');
+    assert.deepEqual([full.total, full.joined, full.cap], [50, 48, 50], 'sahip ve yönetici listede ama kontenjanda değil');
+    await fill(2);
+    full = await ok(call('GET', `/api/rooms/members?room=${room}`, null, owner.session), 'dolu');
+    assert.deepEqual([full.total, full.joined], [52, 50]);
     const [st, j] = await call('POST', '/api/rooms/members/join', { room }, fan.session);
     assert.deepEqual([st, j.error], [403, 'Üye kapasitesi dolu (50)']);
     // A deleted account isn't counted.
     const gone = (await h.sql.query("SELECT user_id FROM room_members WHERE room_id = $1 AND user_id <> $2 LIMIT 1", [room, admin.user.id])).rows[0].user_id;
     await h.sql.query('UPDATE users SET deleted_at = now() WHERE id = $1', [gone]);
-    assert.equal((await ok(call('GET', `/api/rooms/members?room=${room}`, null, owner.session), 'silinen')).total, 49);
+    full = await ok(call('GET', `/api/rooms/members?room=${room}`, null, owner.session), 'silinen');
+    assert.deepEqual([full.total, full.joined], [51, 49]);
     assert.deepEqual(await ok(call('POST', '/api/rooms/members/join', { room }, fan.session), 'yer açıldı'), { status: 'member' });
   });
 

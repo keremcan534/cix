@@ -226,6 +226,7 @@ export function RoomInfoSheet({
   clan,
   members,
   memberTotal,
+  memberJoined,
   applications,
   canManageMembers,
   autoRemoveDays,
@@ -265,6 +266,8 @@ export function RoomInfoSheet({
   clan: { label: string; href: Href; art?: number } | null;
   members: string[];
   memberTotal: number;
+  /** The members the cap counts (the owner and staff left out). */
+  memberJoined: number;
   applications: string[];
   canManageMembers: boolean;
   autoRemoveDays: number;
@@ -391,6 +394,7 @@ export function RoomInfoSheet({
             joinMode={joinMode}
             members={members}
             memberTotal={memberTotal}
+            memberJoined={memberJoined}
             applications={applications}
             canManage={canManageMembers}
             autoRemoveDays={autoRemoveDays}

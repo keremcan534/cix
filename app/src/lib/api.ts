@@ -617,7 +617,7 @@ export type RoomMember = UserCard & { since: string | null };
  * The room card's Oda üyeleri: `total` counts the owner and staff with the members (as the full list does), `members`
  * the first of them, staff first. `mine` 'admin': I'm a Yönetici or Süper Yönetici, a member as staff.
  */
-export type RoomMembers = { members: RoomMember[]; total: number; cap: number; mine: 'owner' | 'admin' | 'member' | 'pending' | null; joinMode: RoomRules['joinMode']; canManage: boolean; pending: RoomMember[] };
+export type RoomMembers = { members: RoomMember[]; total: number; joined?: number; cap: number; mine: 'owner' | 'admin' | 'member' | 'pending' | null; joinMode: RoomRules['joinMode']; canManage: boolean; pending: RoomMember[] };
 /** `image`: a photo in the chat (its storage address), null for text only. */
 export type DirectMessage = { id: number; from: string; to: string; text: string; image?: string | null; event?: SharedEvent; createdAt: string; readAt: string | null };
 /** An event sent in a message (Etkinlik Merkezi "Arkadaşına gönder"); older servers never send it. */

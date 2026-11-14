@@ -277,7 +277,8 @@ export async function voiceAccess(name, u, password) {
 /**
  * Oda üyeleri, $1 the room: its owner (rank 3), Süper Yöneticiler (2), Yöneticiler (1) and members (0), each once.
  * The staff are the room's members whether or not they ever joined (they lead the card's row and the list), so the
- * card's count, its row, the full list (room-members.mjs) and the member cap all count these same people.
+ * card's count, its row and the full list (room-members.mjs) count these same people. The member cap counts only
+ * the members (rank 0): the owner and staff take no member's place (memberCount).
  */
 export const ROOM_PEOPLE = `SELECT r.owner AS user_id, 3 AS rank FROM rooms r WHERE r.id = $1
     UNION ALL
@@ -290,6 +291,9 @@ export const ROOM_PEOPLE = `SELECT r.owner AS user_id, 3 AS rank FROM rooms r WH
 /** How many people the room has (ROOM_PEOPLE without deleted accounts): "Oda üyeleri (n / cap)". */
 const peopleCount = async (roomId) =>
   (await db.query(`SELECT count(*)::int AS n FROM (${ROOM_PEOPLE}) p JOIN users u ON u.id = p.user_id WHERE u.deleted_at IS NULL`, [roomId])).rows[0].n;
+/** How many of them are members and not the owner or staff: what the member cap counts. */
+const memberCount = async (roomId) =>
+  (await db.query(`SELECT count(*)::int AS n FROM (${ROOM_PEOPLE}) p JOIN users u ON u.id = p.user_id WHERE u.deleted_at IS NULL AND p.rank = 0`, [roomId])).rows[0].n;
 
 /** Members who stayed away longer than the room allows (rules.autoRemoveDays) are no longer members; staff stay. */
 async function purgeMembers(room) {
@@ -660,6 +664,8 @@ export const roomRoutes = {
     return {
       members: people.rows.map(person),
       total: await peopleCount(room.id),
+      // The members the cap counts (the owner and staff left out); an older app compares `total` with the cap.
+      joined: await memberCount(room.id),
       cap: memberCap(roomLevel(room.owner_room_xp ?? 0)),
       mine: rank === OWNER ? 'owner' : rank > 0 ? 'admin' : (asked.rows.find((x) => x.user_id === me.id)?.status ?? null),
       joinMode: rules.joinMode,
@@ -683,9 +689,9 @@ export const roomRoutes = {
     if (rules.joinMode === 'closed') throw new HttpError(403, 'Bu oda şu an üye almıyor');
     await purgeMembers(room);
     if (rules.joinMode === 'open') {
-      // The cap counts what the card shows: the staff with the members.
+      // The cap counts the members only: the owner and staff take no member's place.
       const cap = memberCap(roomLevel(room.owner_room_xp ?? 0));
-      if ((await peopleCount(room.id)) >= cap) throw new HttpError(403, `Üye kapasitesi dolu (${cap.toLocaleString('tr-TR')})`);
+      if ((await memberCount(room.id)) >= cap) throw new HttpError(403, `Üye kapasitesi dolu (${cap.toLocaleString('tr-TR')})`);
     }
     const status = rules.joinMode === 'open' ? 'member' : 'pending';
     await db.query(
@@ -721,7 +727,7 @@ export const roomRoutes = {
       return { status: null };
     }
     const cap = memberCap(roomLevel(room.owner_room_xp ?? 0));
-    if ((await peopleCount(room.id)) >= cap) throw new HttpError(403, `Üye kapasitesi dolu (${cap.toLocaleString('tr-TR')})`);
+    if ((await memberCount(room.id)) >= cap) throw new HttpError(403, `Üye kapasitesi dolu (${cap.toLocaleString('tr-TR')})`);
     await db.query("UPDATE room_members SET status = 'member', created_at = now(), seen_at = now() WHERE room_id = $1 AND user_id = $2", [room.id, target]);
     await refreshRoomVoices(room.id, target);
     return { status: 'member' };

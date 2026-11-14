@@ -107,6 +107,8 @@ export type RoomMembersProps = {
   members: string[];
   /** How many people the room has: its owner and staff with its members, as the full list counts them. */
   memberTotal: number;
+  /** The members the cap counts: the owner and staff take no member's place. */
+  memberJoined: number;
   /** Who asked to join (local ids), for whoever answers them. */
   applications: string[];
   canManage: boolean;
@@ -136,7 +138,7 @@ export function RoomMembersSection(p: RoomMembersProps) {
   const cap = memberLimit(p.level);
   // The row: the room's staff first, then its members, each once; the bubble after it counts the people it left out.
   const { row: strip, more: extra } = memberStrip(p.staffIds, p.members, p.memberTotal, STRIP);
-  const join = joinButton(p.joinMode, p.memberTotal, cap);
+  const join = joinButton(p.joinMode, p.memberJoined, cap);
   const pendingCount = p.canManage ? p.applications.length : 0;
   const show = () => {
     setNow(Date.now());
@@ -292,6 +294,9 @@ function MemberListSheet(p: RoomMembersProps & { visible: boolean; onClose: () =
             <Ionicons name="close" size={22} color={colors.textDim} />
           </Pressable>
         </View>
+        <Text style={styles.dim}>
+          Üye kontenjanı {p.memberJoined.toLocaleString('tr-TR')} / {p.cap.toLocaleString('tr-TR')} · oda sahibi ve yöneticiler kontenjana sayılmaz.
+        </Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.chips} accessibilityRole="tablist">
           {filters.map((f) => {
             const on = f.key === filter;
