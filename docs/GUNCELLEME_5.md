@@ -57,6 +57,8 @@ Videolar artık uygulamaya gömülmez. `server/api/fx/` içinden verilir; telefo
 
 **7–14 nasıl hazırlandı (14 Kasım):** teslim edilen MP4'lerden kesildi (SVGA'lar kullanılmadı). Nesne yapay zekâ maskesiyle (rembg isnet), parıltı ve ışık parlaklıkla korunur; karanlığa kararan kareler maskede de saydamlaşır. Sahneli olanlarda (Aslan, Gemi, Otomobil) yalnız çok parlak ışıklar kalır, gökyüzü ve şehir gider; Kristal Saray'ı model kesemedi, ışıklı bir sahne olarak parlaklığıyla (luma) saydamlaştırıldı. İlk karedeki tek karelik kapak görüntüsü ve sondaki boş siyah saniyeler kesildi, ses de aynı yerden kesilip sonda 0,3 sn kısılır. Biçim öncekilerle aynı: 540×960 görünür, 20 fps, AAC ses, `server/api/fx/`.
 
+**Pırlanta Yüzük'ün yeni videosu (14 Kasım):** Gönderilen "kling_yuzuk_test.svga" Pırlanta Yüzük'ün videosu oldu (`server/api/fx/pirlanta-yuzuk.mp4`, `app/scripts/svga-to-fx.py` ile çevrildi; ayrıntı `docs/SEFFAF_VIDEO_POC.md` › SVGA'dan). Ses eski yüzük klibinden alındı. Video sunucudan indiği için yeni APK gerekmez; telefonlar yeni sürümü kendiliğinden indirir.
+
 **Penguen çıkartma paketi (14 Kasım):** 24 hareketli penguen, mağazada 150 jeton (`pack-penguen`). Her çıkartma bir kare tablosu (WebP) ve durağan bir resim; telefon ve web aynı oynatır (`app/src/components/sprite-sticker.tsx`). Panelde durağan, sohbette bir kez, mikrofonda döngüde oynar.
 
 ## Oda iki parça (14 Kasım)
