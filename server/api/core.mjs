@@ -31,7 +31,7 @@ export function same(a, b) {
 // --- Migrations: every .sql file in ./migrations once, in name order ----------------------------------------
 export async function migrate() {
   await db.query('CREATE TABLE IF NOT EXISTS schema_migrations (name text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())');
-  const dir = path.join(path.dirname(new URL(import.meta.url).pathname), 'migrations');
+  const dir = path.join(import.meta.dirname, 'migrations');
   for (const name of fs.readdirSync(dir).filter((f) => f.endsWith('.sql')).sort()) {
     const done = await db.query('SELECT 1 FROM schema_migrations WHERE name = $1', [name]);
     if (done.rowCount) continue;

@@ -98,6 +98,7 @@ import { BOT_LINES, GIFTS, ME, USERS, isServerId, roomById, userById, type Gift 
 import * as api from '@/lib/api';
 import { isLiveRoom, isLockedRoom, liveGift, liveMode, liveRoomAnimation, message as errorText, myServerId, putRoomAnswer, refreshServerRoom, rememberUser, toLocal, toServer, updateServerRoom } from '@/lib/live';
 import { liveBackpackGift } from '@/lib/live/backpack';
+import { giftById, refreshLiveCatalog } from '@/lib/live/catalog-live';
 import { useLiveRoomSync } from '@/lib/live/room';
 import { useRoomTop } from '@/lib/live/room-contrib';
 import { onServerLook, onServerRoom, sendSignal, useBossNews, useLivePeers, type LuckySignal, type RoomSignal } from '@/lib/live/room-bus';
@@ -192,6 +193,14 @@ const BOT_TIPS = [
 const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
 const rollDie = () => 1 + Math.floor(Math.random() * 6);
 const msgId = () => String(Date.now() + Math.random());
+/** A gift id this phone's catalog doesn't know: the catalog is read again for it at most once a minute. */
+const unknownGifts = new Map<string, number>();
+const unknownGiftOnce = (id: string) => {
+  const at = Date.now();
+  if (at - (unknownGifts.get(id) ?? -Infinity) < 60_000) return false;
+  unknownGifts.set(id, at);
+  return true;
+};
 const nowMs = () => Date.now();
 const reactionKey = () => Date.now() + Math.random();
 /** A server room's slow mode: one chat line per 10 seconds for everyone but its staff (server/api/room-rules.mjs). */
@@ -1112,8 +1121,13 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       }
       const to = msg.to.map((t) => (t === myServerId() ? 'me' : t));
       if (msg.t === 'lucky') return showLuckyFrom(from, to, msg);
-      const gift = GIFTS.find((g) => g.id === msg.giftId);
+      const gift = giftById(msg.giftId);
       if (gift) showGift(from, to, gift, msg.count);
+      // An admin's gift newer than this phone's catalog (Yönetim › Hediyeler): read it again, then draw this one.
+      else if (unknownGiftOnce(msg.giftId)) void refreshLiveCatalog().then(() => {
+        const g = giftById(msg.giftId);
+        if (g && visibleRef.current) showGift(from, to, g, msg.count);
+      });
     },
     onServerSeat: (seat) => {
       if (seat !== null && seat === acceptedSeat.current) {
@@ -2732,7 +2746,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   };
   /** The wheel's next send of a coin gift, to whoever of its people is still in the room; true when all got it. */
   const giftAgain = async (spec: ComboSpec) => {
-    const gift = GIFTS.find((g) => g.id === spec.giftId);
+    const gift = giftById(spec.giftId);
     const toIds = stillHere(spec.to);
     if (!gift || !toIds.length || offlineBlocked() || blockedFeature('gifts')) {
       stopCombo(spec);
@@ -2968,7 +2982,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       q.more = 0;
     }
   };
-  const comboGift = combo ? (combo.lucky ? luckyGift(combo.giftId) : GIFTS.find((g) => g.id === combo.giftId)) : undefined;
+  const comboGift = combo ? (combo.lucky ? luckyGift(combo.giftId) : giftById(combo.giftId)) : undefined;
 
   const sendEnvelope = (amount: number, count: number) => {
     setPanel(null);

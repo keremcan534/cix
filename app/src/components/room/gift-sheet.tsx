@@ -23,7 +23,7 @@ import { LUCKY_RECIPIENT_SHARE, pct } from '@/data/rules';
 import { bagCounts, bagLabel, bagNeed as needOf, bagShort as shortOf } from '@/lib/backpack';
 import { gamblingLevelOk } from '@/lib/games';
 import { pressHaptic, tapHaptic } from '@/lib/haptics';
-import { bagGifts, useLiveCatalog, visibleGifts } from '@/lib/live/catalog-live';
+import { bagGifts, giftShelf, useLiveCatalog } from '@/lib/live/catalog-live';
 import { liveMode } from '@/lib/live';
 import { refreshBackpack, useBackpack } from '@/lib/live/backpack';
 import { refreshLucky } from '@/lib/live/lucky';
@@ -78,7 +78,7 @@ const fmt = (n: number) => n.toLocaleString('tr-TR');
 const levelOf = (spent: number) => LEVEL_XP.filter((x) => spent >= x).length;
 const isLocked = (g: Gift, svip: number) => (g.minSvip ?? 0) > svip;
 
-/** `shown`: the gifts the server still offers (visibleGifts); `inBag`: what the backpack may send (bagGifts). */
+/** `shown`: the gifts the server still offers (giftShelf); `inBag`: what the backpack may send (bagGifts). */
 function shelfGifts(shown: Gift[], shelf: Shelf, sort: PriceSort, favs: Set<string>, bag: Record<string, number>, inBag: Gift[]) {
   if (shelf === 'lucky') return [];
   if (shelf === 'fav') return shown.filter((g) => favs.has(g.id));
@@ -127,7 +127,8 @@ export function GiftSheet({
   const padBottom = Math.max(compact ? space.sm : space.lg, navBar + 8);
   const lucky = useLucky();
   const catalog = useLiveCatalog();
-  const shown = visibleGifts(GIFTS, catalog);
+  // The admins' gifts (Yönetim › Hediyeler) lead their shelves; then the compiled ones the server still lists.
+  const shown = giftShelf(catalog);
   const inBag = bagGifts(GIFTS, catalog);
   // Şanslı is a game of chance: no shelf below the gambling level. Live: the server draws and pays (lib/live/lucky).
   const luckyShelf = gamblingLevelOk(wealthLevel);

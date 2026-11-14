@@ -30,6 +30,7 @@ export const NOT_EXPORTED = {
   staff_roles: 'platform roles, set by staff',
   staff_assignments: 'staff roles in agencies, set by staff',
   live_settings: 'platform settings, set by staff',
+  custom_gifts: 'the gift catalog, kept by staff (which admin added or changed a gift)',
   lucky_config: 'platform settings, set by staff',
   agency_settings: 'platform settings, set by staff',
   agency_appeals: 'an agency’s own records',

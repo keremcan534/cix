@@ -1,12 +1,15 @@
 // Produced gift visuals (docs/GORSEL_URETIM_LISTESI.md §1, all 60 delivered): transparent PNGs,
 // 192 px for lists, chat and flights, 512 px for the full-screen send animation. Keyed by gift id
 // (GIFTS and the Lucky packages), so an admin renaming a gift or editing its emoji keeps its image.
-// A gift with no image (a new catalog entry) keeps its emoji until one is delivered.
-import { Image, type ImageStyle, type StyleProp, type TextStyle } from 'react-native';
+// A gift with no image (a new catalog entry) keeps its emoji until one is delivered. An admin's gift (Yönetim ›
+// Hediyeler) is drawn from the icon address the server's catalog gives (lib/live/catalog-live remoteIconOf), one
+// file for both sizes; the phone keeps it in its image cache.
+import { Image, type ImageSourcePropType, type ImageStyle, type StyleProp, type TextStyle } from 'react-native';
 
 import { Text } from '@/components/text';
+import { remoteIconOf } from '@/lib/live/catalog-live';
 
-type Art = { sm: number; lg: number };
+type Art = { sm: ImageSourcePropType; lg: ImageSourcePropType };
 const ART: Record<string, Art> = {
   g1: { sm: require('../../assets/gifts/192/hediye-gul.png'), lg: require('../../assets/gifts/512/hediye-gul.png') },
   g2: { sm: require('../../assets/gifts/192/hediye-kalp.png'), lg: require('../../assets/gifts/512/hediye-kalp.png') },
@@ -85,8 +88,23 @@ const LUCKY_DEFAULT: Art = { sm: require('../../assets/gifts/192/lucky-yeni-luck
 /** Corner badge on gift tiles whose effect plays music. */
 export const MUSIC_BADGE = require('../../assets/gifts/192/hediye-rozet-muzikli-hediye-rozeti.png');
 
-/** The image for a catalog gift (GIFTS or Lucky package id), if it has been produced. */
-export const giftArtOf = (giftId?: string): Art | undefined => (giftId ? (ART[giftId] ?? (giftId.startsWith('lk') ? LUCKY_DEFAULT : undefined)) : undefined);
+/** One source object per icon address, so an image isn't handed a new source on every render. */
+const remoteArt = new Map<string, Art>();
+function remoteArtOf(giftId: string): Art | undefined {
+  const uri = remoteIconOf(giftId);
+  if (!uri) return undefined;
+  let art = remoteArt.get(uri);
+  if (!art) {
+    const source = { uri };
+    art = { sm: source, lg: source };
+    remoteArt.set(uri, art);
+  }
+  return art;
+}
+
+/** The image for a catalog gift (GIFTS or Lucky package id, or an admin's gift's icon), if there is one. */
+export const giftArtOf = (giftId?: string): Art | undefined =>
+  giftId ? (ART[giftId] ?? (giftId.startsWith('lk') ? LUCKY_DEFAULT : undefined) ?? remoteArtOf(giftId)) : undefined;
 /** Picks the file for the size it is drawn at (192 px covers up to ~64 pt on 3x screens). */
 export const giftSource = (art: Art, size: number) => (size > 64 ? art.lg : art.sm);
 

@@ -12,7 +12,7 @@ import { callPrice } from '@/data/economy';
 import { GIFTS, userById, type Gift } from '@/data/mock';
 import { goBack } from '@/lib/nav';
 import { showAlert } from '@/lib/alert';
-import { useLiveCatalog, visibleGifts } from '@/lib/live/catalog-live';
+import { giftShelf, useLiveCatalog } from '@/lib/live/catalog-live';
 import { checkInteraction } from '@/lib/interaction';
 import { beginCall, endCall } from '@/lib/media';
 import { useApp } from '@/store';
@@ -37,7 +37,7 @@ function CallScreen() {
   const price = video ? callPrice(user) : Math.round(callPrice(user) / 2);
   const { coins, spendCoins, bump, recordGift, me, blocked, following } = useApp();
   // The call's one-tap gift: Kahve, or the first plain gift still offered when Canlı ayarlar hid it.
-  const shownGifts = visibleGifts(GIFTS, useLiveCatalog());
+  const shownGifts = giftShelf(useLiveCatalog());
   const callGift = shownGifts.includes(GIFTS[2]) ? GIFTS[2] : (shownGifts.find((g) => !g.minSvip && (g.cat ?? 'hot') === 'hot') ?? shownGifts[0]);
 
   const [phase, setPhase] = useState<Phase>('ringing');

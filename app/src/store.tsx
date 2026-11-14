@@ -27,7 +27,8 @@ import { ME_DEFAULT, parkAccount, readSnapshot, unparkAccount, type Snapshot } f
 import { setGameVolume } from '@/lib/game-sound';
 import { setHapticsEnabled } from '@/lib/haptics';
 import { setNoiseSuppression, setRawMic } from '@/lib/room-session';
-import { CONVERSATIONS, GIFTS, ME, isServerId, type Conversation, type EventShareCard, type RoomInviteCard, type User } from '@/data/mock';
+import { CONVERSATIONS, ME, isServerId, type Conversation, type EventShareCard, type RoomInviteCard, type User } from '@/data/mock';
+import { giftById } from '@/lib/live/catalog-live';
 import type { ServerEarnings, ServerUser } from '@/lib/api';
 import { block as serverBlock, follow } from '@/lib/api';
 import { bindWallet, forgetLiveAccount, liveEquip, liveMode, liveSpend, myServerId, rememberUser, toLocal, toServer } from '@/lib/live';
@@ -855,7 +856,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     setDiamondLocks(() =>
       e.locks.map((l): DiamondLock => {
         if (l.from) rememberUser(l.from);
-        const x = fromServerLock(l, (id) => GIFTS.find((g) => g.id === id));
+        const x = fromServerLock(l, (id) => giftById(id));
         return x.fromId ? { ...x, fromId: toLocal(x.fromId) } : x;
       }),
     );

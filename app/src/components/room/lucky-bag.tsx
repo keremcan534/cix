@@ -14,11 +14,11 @@ import { ROOM_ICON_ART } from '@/components/RoomArt';
 import { useSheetBottom, roomStyles } from '@/components/room/parts';
 import { Text } from '@/components/text';
 import { Avatar } from '@/components/ui';
-import { GIFTS, type Gift } from '@/data/mock';
+import { type Gift } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import * as api from '@/lib/api';
 import { message } from '@/lib/live';
-import { useLiveCatalog, visibleGifts } from '@/lib/live/catalog-live';
+import { giftById, giftShelf, useLiveCatalog } from '@/lib/live/catalog-live';
 import { bagResult, dropBag, type Bag, type BagDrop, type BagGot, type BagGrab, type BagRules } from '@/lib/live/lucky-bags';
 import { tapHaptic } from '@/lib/haptics';
 import { useSheetMax } from '@/lib/sheet-space';
@@ -31,7 +31,7 @@ const mmss = (ms: number) => {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 };
 const delayName = (s: number) => (s === 0 ? 'Hemen' : `${Math.round(s / 60)} dk sonra`);
-const giftOf = (id: string | null) => GIFTS.find((g) => g.id === id);
+const giftOf = (id: string | null) => giftById(id);
 /** "1.000 jeton" or "Pasta ×10". */
 export const bagWhat = (b: Pick<Bag, 'kind' | 'giftId' | 'units' | 'coins'>) => (b.kind === 'coins' ? `${fmt(b.coins)} jeton` : `${giftOf(b.giftId)?.name ?? 'Hediye'} ×${fmt(b.units)}`);
 
@@ -55,7 +55,7 @@ export function LuckyBagSheet({ visible, room, rules, coins, svipLevel, onClose,
   const paddingBottom = useSheetBottom();
   // Over a room it stops at the Balkon line (lib/sheet-space): the choices scroll, the total and Gönder stay.
   const maxHeight = useSheetMax(0.88);
-  const gifts = visibleGifts(GIFTS, useLiveCatalog()).filter((g) => (g.minSvip ?? 0) <= svipLevel && g.price > 0);
+  const gifts = giftShelf(useLiveCatalog()).filter((g) => (g.minSvip ?? 0) <= svipLevel && g.price > 0);
   const [kind, setKind] = useState<'coins' | 'gift'>('coins');
   const [amount, setAmount] = useState(rules.coins[0]);
   const [coinPackets, setCoinPackets] = useState(rules.coinPackets[0]);

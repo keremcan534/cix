@@ -136,6 +136,28 @@ export function fxMedia(kind: FxKind, id: string): FxMedia | null {
   return null;
 }
 
+/**
+ * Yönetim › Hediyeler's preview of a gift's clip at `url` (this server's /api/fx/… address), which a gift not on the
+ * shelves yet has in no list: downloaded once into the cache (never the clip folder, which sync() keeps to the list).
+ */
+export async function previewFx(url: string, ms: number): Promise<FxMedia | null> {
+  const name = fxFileName({ kind: 'gift', id: 'onizleme', url, bytes: 1, ms });
+  if (!BASE || !FileSystem.cacheDirectory || !name) return null;
+  const dir = `${FileSystem.cacheDirectory}fx-preview/`;
+  const file = `${dir}${name}`;
+  try {
+    if (!(await FileSystem.getInfoAsync(file)).exists) {
+      await FileSystem.makeDirectoryAsync(dir, { intermediates: true }).catch(() => {});
+      const r = await FileSystem.downloadAsync(`${BASE}${url}`, `${file}.part`);
+      if (r.status !== 200) return null;
+      await FileSystem.moveAsync({ from: `${file}.part`, to: file });
+    }
+    return { uri: file, ms };
+  } catch {
+    return null;
+  }
+}
+
 /** Downloads one clip now if it's missing (the admins' preview); resolves with it, or null when it couldn't come. */
 export async function fetchFxNow(kind: FxKind, id: string): Promise<FxMedia | null> {
   const v = state.list.find((x) => x.kind === kind && x.id === id);

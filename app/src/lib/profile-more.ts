@@ -4,6 +4,7 @@
 // answers and catches mistakes before a save. Pure, for node --test (tests/profile-more.test.ts).
 import { COSMETICS } from '@/data/catalog';
 import { GIFTS, type Gift } from '@/data/mock';
+import { liveCatalog } from '@/lib/live/catalog-live';
 import { MEDALS, NO_EXTRAS, PERSONALITY_TAGS, TITLES, type Medal, type ProfileExtras, type Title } from '@/data/profile';
 import type { ServerExtras, Showcase } from '@/lib/api';
 import { CONTACT_MESSAGE, checkText, contactRefusal } from '@/lib/contact-filter';
@@ -126,6 +127,7 @@ export function showcaseView(s: Showcase): ShowcaseView {
     titles: TITLES.filter((t) => s.titles.includes(t.id)),
     rides: shopItems(s.rides),
     entries: shopItems(s.entries),
-    giftWall: GIFTS.map((g) => ({ ...g, count: got.get(g.id) ?? 0 })),
+    // The admins' gifts this phone's catalog lists come after the compiled ones (server/api/custom-gifts.mjs).
+    giftWall: [...GIFTS, ...(liveCatalog()?.remote ?? [])].map((g) => ({ ...g, count: got.get(g.id) ?? 0 })),
   };
 }

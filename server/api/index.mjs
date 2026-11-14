@@ -11,7 +11,7 @@
 // audit view for disputes: jeton.mjs.
 // Withdrawals (para çekme): withdraw.mjs. Store refunds read from Google Play: refunds.mjs.
 // Sign-in and sessions: auth.mjs (e-mail codes: mail.mjs; WhatsApp phone check: whatsapp.mjs). Push: push.mjs.
-// Gifts, catalog, rankings: gifts.mjs. Store purchases: purchases.mjs; the VIP subscription (Abonelik): vip.mjs. Uploads: media.mjs. Voice token and presence: live.mjs. Profiles, follows, blocks, reports
+// Gifts, catalog, rankings: gifts.mjs. The admins' own gifts (Yönetim › Hediyeler): custom-gifts.mjs. Store purchases: purchases.mjs; the VIP subscription (Abonelik): vip.mjs. Uploads: media.mjs. Voice token and presence: live.mjs. Profiles, follows, blocks, reports
 // and account deletion: social.mjs (levels, extras, album and Vitrin of a profile: profiles.mjs). Direct messages:
 // messages.mjs. Rooms: rooms.mjs (mic invites, polls, follower invites: room-social.mjs). Staff: admin.mjs.
 // Gizlilik, who may reach me and Arkadaşlarım: privacy.mjs. Call history, heart levels and the call task: call-log.mjs.
@@ -52,6 +52,7 @@ import { EXCHANGE, SHOP, SVIP_XP, exchangeCoins } from './catalog.mjs';
 import { financeSyncRoutes, startFinanceSync, stopFinanceSync } from './finance-sync.mjs';
 import { FILE_PATH, HttpError, RawText, allow, auth, claimRef, clientIp, db, env, filesOut, int, migrate, once, readJson, sha, tx, userId } from './core.mjs';
 import { giftRoutes } from './gifts.mjs';
+import { customGiftRoutes, refreshCustomGifts, sendCustomFx, startCustomGifts, stopCustomGifts } from './custom-gifts.mjs';
 import { FX_PATH, sendFx } from './fx.mjs';
 import { jetonRoutes } from './jeton.mjs';
 import { liveRoutes } from './live.mjs';
@@ -296,6 +297,7 @@ const routes = {
   ...whatsappRoutes,
   ...pushRoutes,
   ...giftRoutes,
+  ...customGiftRoutes,
   ...backpackRoutes,
   ...pkRoutes,
   ...crossPkRoutes,
@@ -408,11 +410,14 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // A gift or entry video (fx.mjs): the same per-address limit as stored files; a phone fetches each clip once.
+  // A gift or entry video (fx.mjs; an admin's gift's, g/<id>.mp4, from the storage: custom-gifts.mjs): the same
+  // per-address limit as stored files; a phone fetches each clip once.
   if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname.startsWith(FX_PATH)) {
     if (!allow(`ip-file:${clientIp(req)}`, RATE_FILES)) return void res.writeHead(429).end(JSON.stringify({ error: 'Çok fazla istek, biraz bekle' }));
+    const name = url.pathname.slice(FX_PATH.length);
     try {
-      sendFx(req, res, url.pathname.slice(FX_PATH.length));
+      if (name.startsWith('g/')) await sendCustomFx(req, res, name.slice(2));
+      else sendFx(req, res, name);
     } catch (e) {
       console.error('fx', e?.code ?? e?.name);
       if (res.headersSent) res.destroy();
@@ -473,6 +478,7 @@ function shutdown(signal) {
   stopEventSweep();
   stopBossSweep();
   stopStaffSweep();
+  stopCustomGifts();
   server.close();
   const started = Date.now();
   const wait = setInterval(async () => {
@@ -487,6 +493,7 @@ process.on('SIGINT', () => shutdown('SIGINT'));
 
 await migrate();
 await refreshLive();
+await refreshCustomGifts();
 server.listen(PORT, '127.0.0.1', () => console.log(`api on 127.0.0.1:${PORT} version ${VERSION}${TEST_TOPUP ? ' (test top-up on)' : ''}`));
 startFinanceSync();
 startRefundSync();
@@ -501,3 +508,4 @@ startDecorSweep();
 startEventSweep();
 startBossSweep();
 startStaffSweep();
+startCustomGifts();

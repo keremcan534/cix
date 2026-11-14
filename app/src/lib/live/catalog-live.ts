@@ -6,15 +6,21 @@
 //
 // The compiled values stay the fallback: no saved copy, an older server, or anything malformed gives the whole
 // compiled gift list, RULES and no campaign; the app never hides every gift. The server checks every gift,
-// purchase and exchange again; this only keeps the screens honest before anyone taps. Prices are not live: names,
+// purchase and exchange again; this only keeps the screens honest before anyone taps. The compiled gifts' names,
 // art and prices stay in data/mock.
 //
-// Screens: useLiveCatalog() re-renders when it changes; visibleGifts(GIFTS, cat), liveRules(cat) and
-// activeCampaign(Date.now(), cat) read it (without `cat`, the current copy outside React).
+// The admins' own gifts (Yönetim › Hediyeler, server/api/custom-gifts.mjs) come only from here: the catalog lists them
+// with `custom: true`, their name, price, shelf, VIP level, emoji and icon address (`remote`), and their videos in
+// `fx`. giftShelf() puts them first on their shelves, giftById() finds them, components/GiftArt draws their icon.
+// An older app's copy of this file knows only the compiled gifts and skips them.
+//
+// Screens: useLiveCatalog() re-renders when it changes; giftShelf(cat) (or visibleGifts(list, cat) for a fixed list),
+// liveRules(cat) and activeCampaign(Date.now(), cat) read it (without `cat`, the current copy outside React).
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSyncExternalStore } from 'react';
 
 import { GIFTS_PAUSED } from '@/data/gifts-paused';
+import { GIFTS, type Gift, type GiftCat } from '@/data/mock';
 import { RULES, type Rules } from '@/data/rules';
 import { selfExchangeRate } from '@/lib/coins-bank';
 import { parseFxList, type FxVideo } from '@/lib/fx-videos-core';
@@ -32,6 +38,8 @@ export const RATE_MAX = 75;
 const GIFT_ID = /^[A-Za-z0-9_-]{1,32}$/;
 
 export type LiveCampaign = { percent: number; startsAt: string; endsAt: string; label: string };
+/** An admin's gift (server/api/custom-gifts.mjs): drawn from its icon address, sent at the price the server says. */
+export type RemoteGift = Gift & { icon: string; custom: true };
 export type LiveCatalog = {
   /** The server's live settings version; 0 from an older server. */
   v: number;
@@ -45,6 +53,8 @@ export type LiveCatalog = {
   usdTry: number | null;
   /** The videos the server hands out (server/api/fx.mjs); null when it didn't say (an older server). */
   fx: FxVideo[] | null;
+  /** The admins' gifts the server lists, in its order; [] from an older server. */
+  remote: RemoteGift[];
 };
 
 // --- Reading the server's answer, without trusting it ----------------------------------------------------
@@ -71,6 +81,38 @@ function campaignOf(raw: unknown): LiveCampaign | null {
   return { percent, startsAt: new Date(start).toISOString(), endsAt: new Date(end).toISOString(), label };
 }
 
+const CATS: readonly GiftCat[] = ['hot', 'couple', 'gameplay', 'privilege'];
+const COMPILED_IDS = new Set(GIFTS.map((g) => g.id));
+/** Nothing the server lists is near these; anything past them is a mistake, not a gift to show. */
+const REMOTE_MAX = 200;
+const PRICE_MAX = 10_000_000;
+const ICON_URL = /^https?:\/\/[^\s"'<>\\]{1,600}$/;
+
+/**
+ * The admins' gifts in the server's list (entries with custom: true), in its order. An entry that is malformed, has a
+ * compiled gift's id (the compiled one wins) or comes twice is left out; never thrown.
+ */
+export function parseRemoteGifts(list: unknown): RemoteGift[] {
+  if (!Array.isArray(list)) return [];
+  const out: RemoteGift[] = [];
+  const seen = new Set<string>();
+  for (const x of list) {
+    const g = obj(x);
+    if (g.custom !== true || typeof g.id !== 'string' || !GIFT_ID.test(g.id) || COMPILED_IDS.has(g.id) || seen.has(g.id)) continue;
+    const name = typeof g.name === 'string' ? g.name.replace(/\s+/g, ' ').trim().slice(0, 40) : '';
+    const price = g.price;
+    const cat = CATS.find((c) => c === g.cat);
+    if (!name || !cat || typeof price !== 'number' || !Number.isSafeInteger(price) || price < 1 || price > PRICE_MAX) continue;
+    if (typeof g.icon !== 'string' || !ICON_URL.test(g.icon)) continue;
+    const svip = typeof g.minSvip === 'number' && Number.isInteger(g.minSvip) && g.minSvip > 0 && g.minSvip <= 15 ? g.minSvip : 0;
+    const emoji = typeof g.emoji === 'string' && g.emoji.trim() && g.emoji.length <= 16 ? g.emoji.trim() : '🎁';
+    seen.add(g.id);
+    out.push({ id: g.id, name, emoji, price, cat, ...(svip ? { minSvip: svip } : {}), icon: g.icon, custom: true });
+    if (out.length >= REMOTE_MAX) break;
+  }
+  return out;
+}
+
 /** GET /api/catalog as the live catalog; anything malformed is left out (the compiled value is used), never thrown. */
 export function parseLiveCatalog(raw: unknown): LiveCatalog {
   const r = obj(raw);
@@ -82,6 +124,7 @@ export function parseLiveCatalog(raw: unknown): LiveCatalog {
     campaign: campaignOf(r.campaign),
     usdTry: validRate(rate) ? rate : null,
     fx: parseFxList(r.fx),
+    remote: parseRemoteGifts(r.gifts),
   };
 }
 
@@ -104,6 +147,7 @@ export function parseSavedLiveCatalog(raw: string | null): { catalog: LiveCatalo
       campaign: campaignOf(r.campaign),
       usdTry: validRate(r.usdTry) ? r.usdTry : null,
       fx: parseFxList(r.fx),
+      remote: parseRemoteGifts(r.remote),
     },
     // A copy an older app saved, before the videos were listed, counts as old: the next poll reads the catalog again.
     fetchedAt: 'fx' in r && typeof r.fetchedAt === 'number' && Number.isFinite(r.fetchedAt) ? r.fetchedAt : 0,
@@ -134,6 +178,29 @@ export function bagGifts<G extends { id: string }>(compiled: G[], c: LiveCatalog
   const listed = c?.giftIds ? new Set(c.giftIds) : null;
   return compiled.filter((g) => !listed || listed.has(g.id) || GIFTS_PAUSED.has(g.id));
 }
+
+let shelfMemo: { c: LiveCatalog | null; gifts: Gift[] } | null = null;
+/**
+ * Every gift that may be sent now: the admins' gifts the server lists (first, in its order: they lead their shelves),
+ * then the compiled ones visibleGifts leaves. The same array until the catalog changes.
+ */
+export function giftShelf(c: LiveCatalog | null = current): Gift[] {
+  if (shelfMemo?.c !== c) shelfMemo = { c, gifts: [...(c?.remote ?? []), ...visibleGifts(GIFTS, c)] };
+  return shelfMemo.gifts;
+}
+
+/**
+ * A gift by id, to draw a gift that arrives (a room's announcement, a combo, a history line): a compiled one, or an
+ * admin's this phone's catalog lists. Undefined for one it doesn't know (an admin's gift newer than the copy here:
+ * read the catalog again, refreshLiveCatalog).
+ */
+export function giftById(id: string | null | undefined, c: LiveCatalog | null = current): Gift | undefined {
+  if (!id) return undefined;
+  return GIFTS.find((g) => g.id === id) ?? c?.remote.find((g) => g.id === id);
+}
+
+/** An admin's gift's icon address (components/GiftArt), or undefined. */
+export const remoteIconOf = (id: string, c: LiveCatalog | null = current): string | undefined => c?.remote.find((g) => g.id === id)?.icon;
 
 let rulesMemo: { rate: number; rules: Rules } | null = null;
 /** The rules with the server's Çevir rate (lib/coins-bank selfExchangeRate / exchangeOwnDiamonds); RULES when
@@ -241,7 +308,7 @@ export const liveCatalogStale = (now = Date.now()) => !current || now - fetchedA
 /** The server named its current Çevir rate (409 rate_changed): the screens show it before the catalog is read again. */
 export function noteLiveRate(usdTry: unknown) {
   if (!validRate(usdTry)) return;
-  publish({ ...(current ?? { v: 0, giftIds: null, packs: [], campaign: null, fx: null }), usdTry });
+  publish({ ...(current ?? { v: 0, giftIds: null, packs: [], campaign: null, fx: null, remote: [] }), usdTry });
 }
 
 const subscribe = (l: () => void) => {

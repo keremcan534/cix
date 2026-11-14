@@ -5,7 +5,7 @@
 // replace .env's.
 //
 //   GET /api/config (public, cacheable 30 s) → { minVersion, updateUrl, notice, featuresOff, v, signIn, verify }
-//     v: the live settings' version; the app reloads the catalog when it changes.
+//     v: the live settings' version plus the admins' gifts' (custom-gifts.mjs); the app reloads the catalog when it changes.
 //
 //   APP_MIN_VERSION  e.g. 1.0.3: older apps show a blocking "Güncelleme gerekli" screen
 //   APP_UPDATE_URL   where that screen sends people (store page or APK download), https only
@@ -17,6 +17,7 @@
 // ROUTES; reads stay open so balances and history still show. The admin routes are in none, so a switch can't
 // lock the owner out. assertOn() is for code that needs to check a feature inside a handler.
 import { HttpError, env } from './core.mjs';
+import { customGiftsRev } from './custom-gifts.mjs';
 import { FEATURES, OFF_MESSAGE, configOf, listOf } from './live-registry.mjs';
 import { live } from './live-settings.mjs';
 import { mailProvidersOf } from './mail.mjs';
@@ -114,6 +115,6 @@ export const configRoutes = {
   async 'GET /api/config'() {
     const s = live();
     // .env's switched-off features first, in .env's order, then the live ones.
-    return { minVersion: s.minVersion, updateUrl: CONFIG.updateUrl, notice: s.notice, featuresOff: [...new Set([...CONFIG.featuresOff, ...s.featuresOff])], v: s.v, ...signInOf(env, s.otpPerHour) };
+    return { minVersion: s.minVersion, updateUrl: CONFIG.updateUrl, notice: s.notice, featuresOff: [...new Set([...CONFIG.featuresOff, ...s.featuresOff])], v: s.v + customGiftsRev(), ...signInOf(env, s.otpPerHour) };
   },
 };

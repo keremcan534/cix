@@ -70,13 +70,13 @@ Sınırı: nesneyle aynı parlaklıkta, tamamen opak bir parıltı bloğu (Krali
 Boynuz'un arkasındaki ışık) maskede nesneden ayrılamaz. Bunlar için en iyisi kaynağın arka plansız (saydam ProRes 4444,
 alfa WebM ya da PNG dizisi) ya da tam siyah zeminli halidir; o zaman `alpha-stack.sh` ile yığılıp bununla cilalanır.
 
-### SVGA'dan: `app/scripts/svga-to-fx.py`
+### SVGA'dan: `server/api/tools/svga-to-fx.py`
 
 Sektörde hediye ve giriş efektleri çoğunlukla SVGA olarak gelir. Uygulamada SVGA oynatıcı yok; SVGA bu betikle
 uygulamanın biçimine çevrilir (Python 3, numpy, Pillow, ffmpeg):
 
 ```bash
-python3 app/scripts/svga-to-fx.py yuzuk.svga server/api/fx/pirlanta-yuzuk.mp4 --despill green --audio eski-yuzuk.mp4
+python3 server/api/tools/svga-to-fx.py yuzuk.svga server/api/fx/pirlanta-yuzuk.mp4 --despill green --audio eski-yuzuk.mp4
 ```
 
 - **Okuma:** SVGA 2.x okunur (zlib ile sıkıştırılmış protobuf). Her kare, içindeki resimler yerleşimleri, dönüşümleri

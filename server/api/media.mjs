@@ -1,7 +1,7 @@
 // Photo and video uploads go straight from the phone to S3-compatible storage (Cloudflare R2, Backblaze B2,
 // AWS S3…); the API only hands out a short-lived signed address, so big files never pass through it.
 //
-//   POST /api/media/upload-url { kind: 'avatar' | 'moment' | 'dm' | 'album' | 'notice' | 'music' | 'ticket' | 'roombg' | 'roomcover' | 'eventcover', contentType, size } → { uploadUrl, headers, publicUrl, expiresIn }
+//   POST /api/media/upload-url { kind: 'avatar' | 'moment' | 'dm' | 'album' | 'notice' | 'music' | 'ticket' | 'roombg' | 'roomcover' | 'eventcover' | 'gifticon' | 'giftvideo' | 'giftsource', contentType, size } → { uploadUrl, headers, publicUrl, expiresIn }
 //
 // The app PUTs the file to uploadUrl with exactly `headers` (type and size are signed, so a different file
 // is refused by the storage), then saves publicUrl (e.g. PATCH /api/me { avatarUrl }).
@@ -25,12 +25,13 @@
 // room-decor.mjs, are for people who have an open room (a cover also for its Süper Yönetici); each stays while the
 // room or its owner's decoration holds it.
 import crypto from 'node:crypto';
+import fs from 'node:fs';
 import { Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
 import { FILE_PATH, HttpError, auth, db, env, limit, readJson, servedFiles } from './core.mjs';
 
-const TYPES = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/heic': 'heic', 'video/mp4': 'mp4' };
+const TYPES = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/heic': 'heic', 'video/mp4': 'mp4', 'video/webm': 'webm', 'video/quicktime': 'mov', 'application/x-svga': 'svga' };
 // What phones call the usual music files (the app names a file's type from its ending when the phone doesn't).
 const AUDIO = { 'audio/mpeg': 'mp3', 'audio/mp3': 'mp3', 'audio/mp4': 'm4a', 'audio/x-m4a': 'm4a', 'audio/m4a': 'm4a', 'audio/aac': 'aac', 'audio/ogg': 'ogg', 'audio/flac': 'flac', 'audio/wav': 'wav', 'audio/x-wav': 'wav' };
 const KINDS = {
@@ -52,7 +53,15 @@ const KINDS = {
   roomcover: { types: ['image/jpeg', 'image/png', 'image/webp'], max: 2 * 1024 * 1024, may: mayChangeCover, refused: 'Oda kapağını oda sahibi veya Süper Yönetici değiştirebilir' },
   // An event's cover (events.mjs), cut to 1280 × 720 on the phone: for owners of an open room, who apply for events.
   eventcover: { types: ['image/jpeg', 'image/png', 'image/webp'], max: 2 * 1024 * 1024, may: hasOpenRoom, refused: 'Etkinlik kapağını açık bir odası olan oda sahibi yükler' },
+  // Yönetim › Hediyeler (custom-gifts.mjs), admins only: a gift's icon (a transparent PNG or WebP), its ready stacked
+  // video, or a transparent source the server turns into one (a WebM, a ProRes .mov or an SVGA animation). The
+  // company's files, like a notice's picture.
+  gifticon: { types: ['image/png', 'image/webp'], max: 1024 * 1024, admin: true },
+  giftvideo: { types: ['video/mp4'], max: 12 * 1024 * 1024, admin: true },
+  giftsource: { types: ['video/webm', 'video/quicktime', 'application/x-svga'], max: 100 * 1024 * 1024, admin: true },
 };
+/** The largest file of a kind, in bytes (custom-gifts.mjs shows its limits from here). */
+export const kindMax = (kind) => KINDS[kind]?.max ?? 0;
 const EXPIRES = 10 * 60;
 
 /** Whether `uid` may keep a music library (music.mjs): they have a room, or run one or play in one. */
@@ -108,7 +117,7 @@ export function presign({ method, url, region, accessKey, secretKey, expires, he
   return `${u.origin}${path}?${qs}&X-Amz-Signature=${signature}`;
 }
 
-const storageOn = () => !!(env.S3_ENDPOINT && env.S3_BUCKET && env.S3_KEY && env.S3_SECRET && env.S3_PUBLIC_URL);
+export const storageOn = () => !!(env.S3_ENDPOINT && env.S3_BUCKET && env.S3_KEY && env.S3_SECRET && env.S3_PUBLIC_URL);
 /**
  * The storage's API address: S3_ENDPOINT without a trailing slash, and without the bucket's name when it was left
  * at the end (Cloudflare's "S3 API" line shows it there). Kept, it would put every file one folder too deep, where
@@ -130,7 +139,7 @@ const signed = (method, key, query = {}) =>
     expires: 60,
     query,
   });
-const FILE_KEY = /^(avatar|moment|dm|album|notice|music|ticket|roombg|roomcover|eventcover)\/[0-9a-f-]{36}\/[A-Za-z0-9._-]{1,80}$/;
+const FILE_KEY = /^(avatar|moment|dm|album|notice|music|ticket|roombg|roomcover|eventcover|gifticon|giftvideo|giftsource)\/[0-9a-f-]{36}\/[A-Za-z0-9._-]{1,80}$/;
 
 /** The storage key of one of our files from its public address (kind/<uploader>/<name>), else null. With
  *  `owner`, only a file that person uploaded. */
@@ -141,9 +150,73 @@ export function keyOf(url, owner) {
   if (!FILE_KEY.test(key)) return null;
   return owner && key.split('/')[1] !== owner ? null : key;
 }
+/** The address a stored key is kept under in the database (S3_PUBLIC_URL/<key>; phones get it at this server). */
+export const storedUrl = (key) => `${String(env.S3_PUBLIC_URL ?? '').replace(/\/+$/, '')}/${key}`;
+const megabytes = (n) => (n / 1024 / 1024).toLocaleString('tr-TR', { maximumFractionDigits: 1 });
+const unreachable = () => new HttpError(502, 'Depoya şu an ulaşılamıyor, biraz sonra tekrar dene');
+
+/**
+ * A stored file's bytes, read with a signed request (custom-gifts.mjs checks an icon or a video this way): a file
+ * that isn't there is a 400, one over `max` bytes a 400 before it is read, a storage that can't be reached a 502.
+ */
+export async function readStored(key, max) {
+  let res;
+  try {
+    res = await fetch(signed('GET', key), { signal: AbortSignal.timeout(30_000) });
+  } catch (e) {
+    console.error('storage read failed', e?.cause?.code ?? e?.name);
+    throw unreachable();
+  }
+  const length = Number(res.headers.get('content-length') ?? NaN);
+  if (!res.ok || length > max) await res.body?.cancel().catch(() => {});
+  if (res.status === 404) throw new HttpError(400, 'Dosya yüklenmemiş, tekrar dene');
+  if (!res.ok) {
+    console.error('storage read', res.status);
+    throw unreachable();
+  }
+  if (length > max) throw new HttpError(400, `Dosya en fazla ${megabytes(max)} MB olabilir`);
+  const buf = Buffer.from(await res.arrayBuffer());
+  if (buf.length > max) throw new HttpError(400, `Dosya en fazla ${megabytes(max)} MB olabilir`);
+  return buf;
+}
+
+/** A stored file written to `file` on this machine as it comes (a big video never sits in memory); throws past `max` bytes. */
+export async function downloadStored(key, file, max) {
+  const res = await fetch(signed('GET', key), { signal: AbortSignal.timeout(180_000) });
+  if (!res.ok || !res.body) {
+    await res.body?.cancel().catch(() => {});
+    throw new Error(`storage read ${res.status}`);
+  }
+  let n = 0;
+  const guard = new Transform({
+    transform(chunk, _enc, done) {
+      n += chunk.length;
+      done(n > max ? new Error('larger than allowed') : null, chunk);
+    },
+  });
+  await pipeline(Readable.fromWeb(res.body), guard, fs.createWriteStream(file));
+  return n;
+}
+
+/** Puts `body` (a Buffer) in the storage under `key` with a signed PUT; resolves with its stored address. */
+export async function writeStored(key, body, type) {
+  const url = presign({
+    method: 'PUT',
+    url: `${endpointOf()}/${env.S3_BUCKET}/${key}`,
+    region: env.S3_REGION ?? 'auto',
+    accessKey: env.S3_KEY,
+    secretKey: env.S3_SECRET,
+    expires: 60,
+    headers: { 'content-length': String(body.length) },
+  });
+  const res = await fetch(url, { method: 'PUT', headers: { 'content-type': type }, body, signal: AbortSignal.timeout(120_000) });
+  await res.body?.cancel().catch(() => {});
+  if (!res.ok) throw new Error(`storage write ${res.status}`);
+  return storedUrl(key);
+}
 
 /** What a stored file is sent as: by its ending (which the upload route chose), never by what its uploader said. */
-const SENT_AS = { jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp', heic: 'image/heic', mp4: 'video/mp4', mp3: 'audio/mpeg', m4a: 'audio/mp4', aac: 'audio/aac', ogg: 'audio/ogg', flac: 'audio/flac', wav: 'audio/wav' };
+const SENT_AS = { jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp', heic: 'image/heic', mp4: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime', mp3: 'audio/mpeg', m4a: 'audio/mp4', aac: 'audio/aac', ogg: 'audio/ogg', flac: 'audio/flac', wav: 'audio/wav' };
 
 /** Passes on exactly `n` bytes; more or fewer is an error, so an answer never holds other bytes than it announced. */
 const exactly = (n) => {
@@ -230,6 +303,13 @@ async function deleteKeys(keys) {
     // A room's own background and its card picture stay while they are in use (room-decor.mjs clears the row first).
     if (key.startsWith('roombg/') && (await db.query('SELECT 1 FROM room_decor WHERE position($1 in custom_url) > 0 LIMIT 1', [key])).rowCount) continue;
     if (key.startsWith('roomcover/') && (await db.query('SELECT 1 FROM rooms WHERE position($1 in cover_url) > 0 LIMIT 1', [key])).rowCount) continue;
+    // A gift's icon, video or source stays while a gift that isn't deleted holds it (custom-gifts.mjs clears it first).
+    if (
+      key.startsWith('gift') &&
+      (await db.query("SELECT 1 FROM custom_gifts WHERE deleted_at IS NULL AND position($1 in icon_url || ' ' || coalesce(video_url, '') || ' ' || coalesce(job_source, '')) > 0 LIMIT 1", [key]))
+        .rowCount
+    )
+      continue;
     const res = await fetch(signed('DELETE', key), { method: 'DELETE', signal: AbortSignal.timeout(10_000) });
     // 404: already gone, which is what was wanted.
     if (!res.ok && res.status !== 404) console.error('storage delete', res.status);
