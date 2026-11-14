@@ -2,11 +2,13 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
 import { router, type Href } from 'expo-router';
 import * as ScreenCapture from 'expo-screen-capture';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import { Keyboard, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions, type HostInstance } from 'react-native';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { useKeyboardOpen } from '@/lib/keyboard-open';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { sheetSpace, steadyBox, steadyNext } from '@/lib/room-split';
+import { RoomSheetSpace } from '@/lib/sheet-space';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
 import { ActionSheet, type SheetOption } from '@/components/ActionSheet';
@@ -559,11 +561,20 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     setChatRefused(null);
   };
   const [emojiOpen, setEmojiOpen] = useState(false);
-  // Typing in the room chat: the keyboard is up for this field (not for a sheet's field over the room). The
-  // window does not shrink on edge-to-edge Android, so the stage folds away and the chat takes its place;
-  // otherwise the seats keep their height and the chat is squeezed down to its tabs.
+  // Typing in the room chat: the keyboard is up for this field (not for a sheet's field over the room). The room is
+  // two parts (lib/room-split): the keyboard takes its room from the chat alone, whose last lines stay in sight between
+  // the Balkon bar and the field; the header, the mics and the Balkon bar don't move.
   const [inputFocused, setInputFocused] = useState(false);
   const typing = useKeyboardOpen() && inputFocused;
+  // The room measured with no keyboard up (lib/room-split): its height between the status and navigation bars, the
+  // header, the controls under the chat, and the Balkon line inside the stage part. The mics are sized from these and
+  // a sheet over the room rises at most to the line (lib/sheet-space).
+  const insets = useSafeAreaInsets();
+  const [roomH, setRoomH] = useState(0);
+  const [headerH, setHeaderH] = useState(0);
+  const [controlsH, setControlsH] = useState(0);
+  const [balkonLine, setBalkonLine] = useState(0);
+  const sheetRoom = sheetSpace(roomH, insets.bottom, headerH, balkonLine);
   // Seat emoji reactions currently playing, by user id.
   const [reactions, setReactions] = useState<Record<string, SeatReactionData>>({});
   const [giftOpen, setGiftOpen] = useState(false);
@@ -2617,6 +2628,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     ),
     [equipped.bubble, bubbleOf, retrySend, roomBonds, myName, roomNames, openPerson],
   );
+  const renderTyping = useCallback(({ item }: { item: ChatMsg }) => <ChatLine msg={item} compact />, []);
   // @bahset: "@" in the line offers the people on the mics and the balcony; a pick (or the card's Bahset) writes "@Name ".
   const inputRef = useRef<ComponentRef<typeof TextInput>>(null);
   const mention = (uid: string) => {
@@ -3604,13 +3616,23 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // every room tick. Session, audio and timers live in hooks above and keep running.
   if (!full) return <View style={{ flex: 1, backgroundColor: colors.bg }}>{gamePanel}</View>;
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+    <RoomRoot sheetSpace={sheetRoom}>
       <StageBackdrop theme={theme} background={look.stage} freeId={look.freeId} />
       {real && <EventThemeLayer event={centreEvents?.running ?? null} />}
 
       <SafeAreaView style={{ flex: 1 }}>
-        <KeyboardAvoid style={{ flex: 1 }}>
-          <View style={styles.header}>
+        {/* Only for this room's own field: a sheet's keyboard leaves the room behind it as it is. Its frame is the room
+            between the system bars and doesn't change with the keyboard (the window doesn't shrink edge to edge; were
+            it to, the taller height is kept while a keyboard is up). */}
+        <KeyboardAvoid
+          style={{ flex: 1 }}
+          enabled={inputFocused}
+          onLayout={(e) => {
+            const h = Math.round(e.nativeEvent.layout.height);
+            setRoomH((old) => steadyNext(old, h, Keyboard.isVisible()));
+          }}
+        >
+          <View style={styles.header} onLayout={(e) => setHeaderH(Math.round(e.nativeEvent.layout.height))}>
             <Pressable onPress={() => setPanel('info')} accessibilityLabel="Oda kartı" hitSlop={4}>
               <Avatar uri={userById(hostId).avatar} size={36} />
             </Pressable>
@@ -3676,16 +3698,18 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             </Pressable>
           </View>
 
-          {/* Stage: boards and mics over the Balkon bar and the chat. The stage doesn't scroll: its mics are sized for
-              the height the chat leaves them and the chat takes the rest (components/room/fit-stage). The emoji panel
-              lies over the chat in its place, so the mics stay exactly where they were (the emoji plays on your mic);
-              a touch on the stage closes the panel (as does the back button). */}
+          {/* Stage: boards and mics over the Balkon bar and the chat, the room's top part. The stage doesn't scroll: its
+              mics are sized for the height the chat leaves them in the room with no keyboard up, and the chat takes the
+              rest (components/room/fit-stage). The keyboard, the emoji panel and the notes over the controls all stay
+              under the Balkon bar: the mics never move for them (the emoji plays on your mic); a touch on the stage
+              closes the panel (as does the back button). */}
           <FitStage
             fit={stageFit}
             calm={calmFit}
             pkTop={pk?.kind === 'cross' ? <PkBoard pk={pk} viewerRoomId={id} canManage={canManage && !offline} /> : null}
-            frozen={typing}
-            freeStyle={strip ? { flexGrow: 0, flexShrink: 1 } : { flexGrow: 0, flexShrink: 100, minHeight: 120 }}
+            box={steadyBox(roomH, headerH, controlsH)}
+            floor={strip ? 0 : 120}
+            onLine={setBalkonLine}
             guess={Math.round(win.height * 0.34)}
             onTouchStart={emojiOpen ? () => setEmojiOpen(false) : undefined}
             top={
@@ -3749,19 +3773,17 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             }
             seats={stageSeats}
             balcony={
-              !typing && (
-                <BalconyBar
-                  view={view}
-                  stale={offline}
-                  onOpen={() => {
-                    setInviteSeat(null);
-                    setPeopleOpen(true);
-                  }}
-                />
-              )
+              <BalconyBar
+                view={view}
+                stale={offline}
+                onOpen={() => {
+                  setInviteSeat(null);
+                  setPeopleOpen(true);
+                }}
+              />
             }
             chat={(onBasis) => (
-              <ChatFeed messages={messages} visible={visibleInAll} renderItem={renderChat} screenHeight={win.height} fill={typing} onLarge={setSeatsSmall} onBasis={onBasis} hidden={emojiOpen && !typing} onTouch={emojiOpen ? () => setEmojiOpen(false) : undefined} sideRoom={wheelShown ? WHEEL_ROOM : 0} />
+              <ChatFeed messages={messages} visible={visibleInAll} renderItem={renderChat} renderTyping={renderTyping} screenHeight={win.height} fill={typing} onLarge={setSeatsSmall} onBasis={onBasis} hidden={emojiOpen && !typing} onTouch={emojiOpen ? () => setEmojiOpen(false) : undefined} sideRoom={wheelShown ? WHEEL_ROOM : 0} />
             )}
             overlay={
               emojiOpen && (
@@ -3819,7 +3841,13 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           )}
           {/* While typing only the field and a send button stay, so the field is wide; the `&&` slots keep the
               field in the same place in the tree, so it keeps its focus and the keyboard stays up. */}
-          <View style={styles.bottom}>
+          <View
+            style={[styles.bottom, typing && { paddingVertical: 4 }]}
+            onLayout={(e) => {
+              // The controls as they are with no keyboard up (the field and a send button while typing).
+              if (!typing) setControlsH(Math.round(e.nativeEvent.layout.height));
+            }}
+          >
             {!typing && <RoundBtn label="Menü" icon="ellipsis-horizontal" onPress={() => (setPanel('menu'), void refreshCasino())} />}
             <View style={styles.inputWrap}>
               <Pressable
@@ -4420,7 +4448,16 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         ) : (
           <EntryEffect key={entries.now.id} show={entries.now.show} still={settings.reduceMotion} onDone={nextEntry} />
         ))}
-    </View>
+    </RoomRoot>
+  );
+}
+
+/** The open room's root. A sheet opened over the room rises at most to its Balkon line (lib/sheet-space). */
+function RoomRoot({ sheetSpace: space, children }: { sheetSpace: number | null; children: ReactNode }) {
+  return (
+    <RoomSheetSpace.Provider value={space}>
+      <View style={{ flex: 1, backgroundColor: colors.bg }}>{children}</View>
+    </RoomSheetSpace.Provider>
   );
 }
 

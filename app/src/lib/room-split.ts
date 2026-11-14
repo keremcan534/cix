@@ -24,13 +24,28 @@ export const steadyNext = (old: number, measured: number, keyboardUp: boolean) =
  */
 export const steadyBox = (roomH: number, headerH: number, controlsH: number) => (roomH > 0 && headerH > 0 && controlsH > 0 ? Math.max(0, roomH - headerH - controlsH) : 0);
 
+/** Under the mics, inside the stage. */
+export const STAGE_PAD = 4;
+
 /**
- * The stage's height: what it holds (boards and mics as drawn), at most what leaves the chat its least under the
- * Balkon bar; past that it scrolls. `floor`: a stage that is never made shorter than this (a team PK's arena), as
- * long as it holds that much.
+ * The mics' sizes on the stage: as they are in the room with no boards and no PK (`calm`; `fit` when there's no PK),
+ * kept while the boards and banners, a PK's board and the points under the names take what the chat can give (down
+ * to its least); only past that do the faces get smaller. `fit(height, like)` sizes them for a height, in `like`'s
+ * columns with faces at most its size (lib/seat-fit). `box`: the room's steady share (steadyBox), so a keyboard,
+ * the emoji panel or a note over the controls never comes into it.
  */
-export function stageHeight(holds: number, box: number, bar: number, floor = 0) {
-  const most = Math.max(0, box - bar - CHAT_LEAST);
+export function fitMics<F>(fit: (height: number, like?: F) => F, calm: ((height: number) => F) | null | undefined, box: number, bar: number, basis: number, boards: number): F {
+  const base = box - bar - basis - STAGE_PAD;
+  return fit(base - boards + Math.max(0, basis - CHAT_LEAST), (calm ?? fit)(base));
+}
+
+/**
+ * The stage's height: what it holds (boards and mics as drawn), at most what leaves the chat `leave` under the
+ * Balkon bar (its least for fitted mics, which are sized for the rest anyway; its chosen height for a stage that
+ * isn't fitted, a team PK's arena); past that it scrolls. `floor`: never shorter than this while it holds that much.
+ */
+export function stageHeight(holds: number, box: number, bar: number, leave = CHAT_LEAST, floor = 0) {
+  const most = Math.max(0, box - bar - Math.max(leave, CHAT_LEAST));
   return Math.round(Math.max(Math.min(holds, most), Math.min(holds, floor)));
 }
 

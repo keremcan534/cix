@@ -33,6 +33,7 @@ import { SCRIM, colors, edge, radius, semantic, space, type } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
 import { GiftArt, MUSIC_BADGE } from '@/components/GiftArt';
 import { RollingNumber } from '@/components/fx/rolling-number';
+import { useRoomSheetSpace, useSheetMax } from '@/lib/sheet-space';
 
 type Shelf = GiftCat | 'lucky' | 'fav' | 'bag';
 type PriceSort = 'default' | 'asc' | 'desc';
@@ -61,6 +62,8 @@ const SHELF_NOTE: Record<Shelf, string> = {
 /** Live: only the server's rewards fill the backpack (today the call task). */
 const LIVE_BAG_NOTE = 'Görev ödüllerin. Gönderirken jeton harcanmaz.';
 const COUNTS = [1, 5, 10, 25, 50, 100, 250];
+/** Over a room leaving the sheet less than this (every phone), the compact layout. */
+const COMPACT_UNDER = 600;
 const COUNT_LABELS: Record<number, string> = { 5: 'Selam', 25: 'Alkış', 100: 'Coşku', 250: 'Şölen' };
 /** Sender gift level: Lv(n+1) needs LEVEL_XP[n] coins spent in total. */
 const LEVEL_XP = [0, 870, 5_000, 20_000, 60_000, 150_000, 400_000, 1_000_000, 2_500_000, 6_000_000];
@@ -114,6 +117,14 @@ export function GiftSheet({
   const { svipLevel, spentTotal, me, spendBlock, wealthLevel } = useApp();
   // Android modals draw edge to edge: the Gönder row must sit above the navigation bar.
   const { bottom: navBar } = useSafeAreaInsets();
+  // Over the room the sheet rises at most to the Balkon line (lib/sheet-space), so the mics stay in sight while a gift
+  // is picked. On a phone that is under half the screen: the sheet is laid out compactly there (no handle or level
+  // line, the people without their heading, a shelf note only where it explains something, the total in the button
+  // and a notice only for Şanslı or when something is wrong).
+  const roomSpace = useRoomSheetSpace();
+  const compact = roomSpace !== null && roomSpace < COMPACT_UNDER;
+  const maxHeight = useSheetMax(0.82);
+  const padBottom = Math.max(compact ? space.sm : space.lg, navBar + 8);
   const lucky = useLucky();
   const shown = visibleGifts(GIFTS, useLiveCatalog());
   // Şanslı is a game of chance: no shelf below the gambling level. Live: the server draws and pays (lib/live/lucky).
@@ -259,16 +270,32 @@ export function GiftSheet({
               ? { tone: 'lock' as const, text: overLimit, cta: 'Günlük limiti aşıyor', disabled: true }
             : { tone: 'info' as const, text: `Gönderimden sonra kalan bakiye: ${fmt(coins - total)} jeton`, cta: `Gönder · ${fmt(total)}`, variant: 'money' as const };
 
+  const sortBtn =
+    shelf !== 'fav' && shelf !== 'bag' && shelf !== 'lucky' ? (
+      <Pressable
+        onPress={() => setSort((x) => (x === 'default' ? 'asc' : x === 'asc' ? 'desc' : 'default'))}
+        style={[g.sortBtn, compact && g.sortBtnBar]}
+        accessibilityRole="button"
+        accessibilityLabel={`Fiyata göre sırala: ${sort === 'asc' ? 'artan' : sort === 'desc' ? 'azalan' : 'varsayılan'}`}
+      >
+        <Ionicons name={sort === 'asc' ? 'arrow-up' : sort === 'desc' ? 'arrow-down' : 'swap-vertical'} size={14} color={colors.primaryText} />
+        <Text style={g.sortText}>{sort === 'asc' ? 'Ucuzdan' : sort === 'desc' ? 'Pahalıdan' : 'Fiyat'}</Text>
+      </Pressable>
+    ) : null;
+  // Compact: the total is in the button; a notice only for Şanslı (its odds) or when something is wrong.
+  const noticeShown = !compact || isLucky || footer.tone !== 'info';
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={g.scrim} onPress={onClose} accessibilityLabel="Hediye panelini kapat" />
-      <View style={[g.sheet, { paddingBottom: Math.max(space.lg, navBar + 8) }]}>
-        <View style={g.handle} />
+      <View style={[g.sheet, { maxHeight, paddingBottom: padBottom }]}>
+        {!compact && <View style={g.handle} />}
 
         {/* Header: title, quiet gift level, balance, explicit close */}
-        <View style={g.header}>
+        <View style={[g.header, compact && { paddingTop: space.sm }]}>
           <View style={{ flex: 1, gap: 4 }}>
             <Text style={g.title}>Hediye gönder</Text>
+            {!compact && (
             <View style={g.levelRow} accessibilityLabel={`Hediye seviyen ${level}`}>
               <Text style={g.levelText} numberOfLines={1}>
                 Hediye seviyen:{'\u00A0'}
@@ -278,6 +305,7 @@ export function GiftSheet({
                 <View style={[g.levelFill, { width: `${Math.round(progress * 100)}%` }]} />
               </View>
             </View>
+            )}
           </View>
           <Pressable onPress={goWallet} style={g.balance} accessibilityRole="button" accessibilityLabel={`Bakiye ${fmt(coins)} jeton, jeton yükle`}>
             <Icon3D name="coin" size={20} />
@@ -290,11 +318,13 @@ export function GiftSheet({
         </View>
 
         {/* Who */}
-        <View style={g.section}>
-          <Text style={g.label}>
-            Kime
-            {targets.length ? ` · ${roomAll && listeners.length ? 'odadaki herkes · ' : micAll ? 'mikrofondaki herkes · ' : ''}${targets.length} kişi` : ''}
-          </Text>
+        <View style={[g.section, compact && { paddingBottom: space.sm }]}>
+          {!compact && (
+            <Text style={g.label}>
+              Kime
+              {targets.length ? ` · ${roomAll && listeners.length ? 'odadaki herkes · ' : micAll ? 'mikrofondaki herkes · ' : ''}${targets.length} kişi` : ''}
+            </Text>
+          )}
           {roomIds.length === 0 ? (
             <Text style={g.dim}>Odada hediye gönderebileceğin kimse yok.</Text>
           ) : (
@@ -312,8 +342,9 @@ export function GiftSheet({
           )}
         </View>
 
-        {/* What: shelves */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, flexShrink: 0 }} contentContainerStyle={g.shelves}>
+        {/* What: shelves (compact: the price sort at their end, as the shelf notes are left out) */}
+        <View style={g.shelfBar}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={g.shelves}>
           {SHELVES.filter((s) => (s.key === 'lucky' ? luckyShelf : !CATEGORY_SHELVES.has(s.key) || shown.some((g) => (g.cat ?? 'hot') === s.key))).map((s) => {
             const on = shelf === s.key;
             const n = s.key === 'bag' ? Object.values(bag).filter((x) => x > 0).length : 0;
@@ -328,6 +359,10 @@ export function GiftSheet({
             );
           })}
         </ScrollView>
+        {compact && sortBtn}
+        </View>
+        {/* Compact: only the Şanslı note, which carries the disclaimer. */}
+        {(!compact || shelf === 'lucky') && (
         <View style={g.noteRow}>
           {/* The Şanslı note carries the disclaimer: always shown in full. */}
           <Text style={[g.dim, { flex: 1 }]} numberOfLines={shelf === 'lucky' ? undefined : 2}>
@@ -339,22 +374,13 @@ export function GiftSheet({
               <Text style={g.sortText}>{luckyView === 'odds' ? 'Geçmişim' : 'Olasılıklar'}</Text>
             </Pressable>
           )}
-          {shelf !== 'fav' && shelf !== 'bag' && shelf !== 'lucky' && (
-            <Pressable
-              onPress={() => setSort((x) => (x === 'default' ? 'asc' : x === 'asc' ? 'desc' : 'default'))}
-              style={g.sortBtn}
-              accessibilityRole="button"
-              accessibilityLabel={`Fiyata göre sırala: ${sort === 'asc' ? 'artan' : sort === 'desc' ? 'azalan' : 'varsayılan'}`}
-            >
-              <Ionicons name={sort === 'asc' ? 'arrow-up' : sort === 'desc' ? 'arrow-down' : 'swap-vertical'} size={14} color={colors.primaryText} />
-              <Text style={g.sortText}>{sort === 'asc' ? 'Ucuzdan' : sort === 'desc' ? 'Pahalıdan' : 'Fiyat'}</Text>
-            </Pressable>
-          )}
+          {!compact && sortBtn}
         </View>
+        )}
 
         {/* What: grid */}
         {/* Keyed by shelf: each shelf opens at its top, not at the previous shelf's scroll offset. */}
-        <ScrollView key={shelf} style={g.gridScroll} contentContainerStyle={g.grid}>
+        <ScrollView key={shelf} style={[g.gridScroll, compact && { minHeight: 96 }]} contentContainerStyle={g.grid}>
           {isLucky ? (
             <LuckyShelf
               gifts={lucky.config.gifts}
@@ -399,7 +425,8 @@ export function GiftSheet({
         </ScrollView>
 
         {/* How much + one action */}
-        <View style={g.footer}>
+        <View style={[g.footer, compact && { paddingTop: space.sm }]}>
+          {!compact && (
           <View style={g.summary}>
             <GiftArt giftId={isLucky ? lg.id : gift.id} emoji={isLucky ? lg.emoji : gift.emoji} size={36} textStyle={g.summaryArt} />
             <View style={{ flex: 1, minWidth: 0 }}>
@@ -419,11 +446,14 @@ export function GiftSheet({
               </View>
             </View>
           </View>
+          )}
 
+          {noticeShown && (
           <View style={[g.notice, footer.tone === 'warn' && g.noticeWarn, footer.tone === 'lock' && g.noticeLock]}>
             <Ionicons name={footer.tone === 'warn' ? 'alert-circle' : footer.tone === 'lock' ? 'lock-closed' : 'information-circle'} size={16} color={footer.tone === 'info' ? colors.textDim : colors.gold} />
             <Text style={[g.dim, { flex: 1 }, footer.tone !== 'info' && { color: '#FDE68A' }]}>{footer.text}</Text>
           </View>
+          )}
 
           <View style={g.actions}>
             <Pressable onPress={() => setCountOpen((o) => !o)} style={g.countBtn} accessibilityRole="button" accessibilityLabel={`Adet ${count}, değiştir`}>
@@ -443,7 +473,8 @@ export function GiftSheet({
         {countOpen && (
           <>
             <Pressable style={StyleSheet.absoluteFill} onPress={() => setCountOpen(false)} accessibilityLabel="Adet seçimini kapat" />
-            <View style={g.countPopup}>
+            {/* Just over the ×N button, whatever the navigation bar under the sheet. */}
+            <View style={[g.countPopup, { bottom: padBottom + 60 }, compact && g.countPopupWide]}>
               {COUNTS.map((n) => (
                 <Pressable
                   key={n}
@@ -452,7 +483,7 @@ export function GiftSheet({
                     setCount(n);
                     setCountOpen(false);
                   }}
-                  style={[g.countOption, count === n && { backgroundColor: semantic.tonal }]}
+                  style={[g.countOption, compact && g.countOptionHalf, count === n && { backgroundColor: semantic.tonal }]}
                   accessibilityRole="button"
                   accessibilityState={{ selected: count === n }}
                 >
@@ -620,7 +651,7 @@ function GiftTile({
 
 const g = StyleSheet.create({
   scrim: { flex: 1, backgroundColor: SCRIM },
-  sheet: { backgroundColor: colors.card, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, paddingBottom: space.lg, maxHeight: '82%', ...edge.sheet },
+  sheet: { backgroundColor: colors.card, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, paddingBottom: space.lg, ...edge.sheet },
   handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border, marginTop: space.sm },
   header: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingHorizontal: space.lg, paddingTop: space.md, paddingBottom: space.sm },
   title: { color: colors.text, fontSize: type.title, fontWeight: '800' },
@@ -655,6 +686,7 @@ const g = StyleSheet.create({
   person: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 40, paddingLeft: 6, paddingRight: space.md, borderRadius: radius.pill, backgroundColor: colors.cardAlt, borderWidth: 1, borderColor: colors.border, maxWidth: 160 },
   personOn: { backgroundColor: colors.primary, borderColor: colors.primary },
   personText: { color: colors.textDim, fontSize: type.body, fontWeight: '700', flexShrink: 1 },
+  shelfBar: { flexDirection: 'row', alignItems: 'center' },
   shelves: { gap: space.sm, paddingHorizontal: space.lg, paddingBottom: space.sm, alignItems: 'center' },
   shelf: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 36, paddingHorizontal: space.md, borderRadius: radius.pill, backgroundColor: colors.cardAlt },
   shelfOn: { backgroundColor: colors.primary },
@@ -662,6 +694,8 @@ const g = StyleSheet.create({
   noteRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingHorizontal: space.lg, minHeight: 32 },
   sortBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 32, paddingHorizontal: space.sm },
   sortText: { color: colors.primaryText, fontSize: type.caption, fontWeight: '700' },
+  // Compact: at the shelves' end, level with them.
+  sortBtnBar: { paddingRight: space.lg, marginBottom: space.sm },
   gridScroll: { flexGrow: 0, flexShrink: 1, minHeight: 180 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: space.md, paddingBottom: space.sm },
   tileWrap: { width: '25%', padding: 4 },
@@ -690,7 +724,10 @@ const g = StyleSheet.create({
   actions: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   countBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 52, paddingHorizontal: space.md, borderRadius: radius.pill, backgroundColor: colors.cardAlt },
   countText: { color: colors.text, fontWeight: '800', fontSize: type.bodyL, fontVariant: ['tabular-nums'] },
-  countPopup: { position: 'absolute', left: space.lg, bottom: 84, backgroundColor: colors.cardAlt, borderRadius: radius.lg, paddingVertical: 6, minWidth: 200, borderWidth: 1, borderColor: colors.border },
+  countPopup: { position: 'absolute', left: space.lg, backgroundColor: colors.cardAlt, borderRadius: radius.lg, paddingVertical: 6, minWidth: 200, borderWidth: 1, borderColor: colors.border },
   countOption: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.lg, minHeight: 44 },
+  // Compact: two columns, so the list stays inside the shorter sheet (Android takes no touch outside it).
+  countPopupWide: { flexDirection: 'row', flexWrap: 'wrap', width: 300 },
+  countOptionHalf: { width: '50%', paddingHorizontal: space.md },
   countOptionN: { color: colors.text, fontWeight: '800', fontSize: type.body, width: 52, fontVariant: ['tabular-nums'] },
 });

@@ -6,7 +6,8 @@
 // stage needs more (banners, boards), it scrolls before the chat gives up any of its chosen height. The tab
 // at the handle's right is the room's Küçült / Büyüt: Küçült turns the mics into a short strip and the chat takes
 // all the room below it; Büyüt brings the mics back to their size and the chat to the size it had.
-// While typing the chat keeps only a strip above the keyboard and the mics stay in view.
+// While typing, the keyboard takes its room from the chat alone (lib/room-split): the last lines stay in sight between
+// the Balkon bar and the field, with no handle and no tabs, and the mics above never move.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { Animated, FlatList, PanResponder, Pressable, StyleSheet, View, type ListRenderItem } from 'react-native';
@@ -33,6 +34,7 @@ export function ChatFeed({
   messages,
   visible,
   renderItem,
+  renderTyping,
   screenHeight,
   fill,
   onLarge,
@@ -45,9 +47,11 @@ export function ChatFeed({
   /** filter for the Tümü tab only (personal message settings) */
   visible: (m: FeedMsg) => boolean;
   renderItem: ListRenderItem<FeedMsg>;
+  /** While typing: one short line per message, so a few fit over the field. */
+  renderTyping?: ListRenderItem<FeedMsg>;
   /** The window height the chosen share is taken of. */
   screenHeight: number;
-  /** Typing: the chat takes what the mics leave above the keyboard (at least a strip), with no handle. */
+  /** Typing: the chat keeps what is left between the Balkon bar and the field over the keyboard, with no handle or tabs. */
   fill: boolean;
   /** The chat became large (the mics go small) or back to normal. */
   onLarge?: (large: boolean) => void;
@@ -93,22 +97,24 @@ export function ChatFeed({
     [messages, visible],
   );
   return (
-    <Animated.View onTouchStart={onTouch} style={[{ marginHorizontal: 12 }, fill ? s.typing : large ? s.grow : { flexBasis: height.value, flexGrow: 1, flexShrink: 1, minHeight: 96 }, hidden && { display: 'none' }]}>
+    <Animated.View onTouchStart={onTouch} style={[{ marginHorizontal: 12 }, fill ? s.typing : large ? s.grow : { flexBasis: height.value, flexGrow: 1, flexShrink: 1, minHeight: 0 }, hidden && { display: 'none' }]}>
       {!fill && (
         <View>
           <Handle height={height} />
           <FoldTab height={height} />
         </View>
       )}
-      <View style={[s.tabs, !fill && { paddingTop: 0 }]} accessibilityRole="tablist">
-        {TABS.map(([k, l]) => (
-          <Pressable key={k} onPress={() => setTab(k)} hitSlop={{ top: 8, bottom: 8 }} style={[s.tab, tab === k && s.tabOn]} accessibilityRole="tab" aria-selected={tab === k} accessibilityLabel={`${l} mesajları`}>
-            <Text style={[s.tabText, tab === k && s.tabTextOn]}>{l}</Text>
-          </Pressable>
-        ))}
-      </View>
+      {!fill && (
+        <View style={[s.tabs, { paddingTop: 0 }]} accessibilityRole="tablist">
+          {TABS.map(([k, l]) => (
+            <Pressable key={k} onPress={() => setTab(k)} hitSlop={{ top: 8, bottom: 8 }} style={[s.tab, tab === k && s.tabOn]} accessibilityRole="tab" aria-selected={tab === k} accessibilityLabel={`${l} mesajları`}>
+              <Text style={[s.tabText, tab === k && s.tabTextOn]}>{l}</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
       {TABS.map(([k]) => (
-        <FeedList key={k} data={data[k]} active={tab === k} empty={EMPTY[k]} renderItem={renderItem} sideRoom={sideRoom} />
+        <FeedList key={k} data={data[k]} active={tab === k} empty={EMPTY[k]} renderItem={fill && renderTyping ? renderTyping : renderItem} tight={fill} sideRoom={sideRoom} />
       ))}
     </Animated.View>
   );
@@ -217,7 +223,7 @@ function FoldTab({ height }: { height: ChatHeight }) {
   );
 }
 
-function FeedList({ data, active, empty, renderItem, sideRoom }: { data: FeedMsg[]; active: boolean; empty: string; renderItem: ListRenderItem<FeedMsg>; sideRoom: number }) {
+function FeedList({ data, active, empty, renderItem, tight, sideRoom }: { data: FeedMsg[]; active: boolean; empty: string; renderItem: ListRenderItem<FeedMsg>; tight: boolean; sideRoom: number }) {
   const ref = useRef<FlatList<FeedMsg>>(null);
   const [away, setAway] = useState(false);
   const [unread, setUnread] = useState(0);
@@ -243,7 +249,7 @@ function FeedList({ data, active, empty, renderItem, sideRoom }: { data: FeedMsg
           // inverted list turned around (scale -1), so a right padding would end up on the left, with the lines
           // running under the button.
           style={sideRoom ? { marginRight: sideRoom } : undefined}
-          contentContainerStyle={{ gap: 6, paddingVertical: 8 }}
+          contentContainerStyle={tight ? { gap: 2, paddingVertical: 2 } : { gap: 6, paddingVertical: 8 }}
           initialNumToRender={16}
           windowSize={9}
           scrollEventThrottle={100}
@@ -280,10 +286,10 @@ const s = StyleSheet.create({
   tabText: { color: colors.text, fontWeight: '700', fontSize: 13 },
   tabTextOn: { color: semantic.actionInk, fontWeight: '900' },
   hidden: { display: 'none' },
-  // Typing: at least a strip of chat; it grows into whatever the mics leave above the keyboard.
-  typing: { flexGrow: 1, flexShrink: 1, flexBasis: 88, minHeight: 88 },
+  // Typing: whatever is left between the Balkon bar and the field over the keyboard (on a short phone, a line or two).
+  typing: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minHeight: 0 },
   // Küçült: everything the mic strip leaves.
-  grow: { flexGrow: 1, flexShrink: 1, flexBasis: 160, minHeight: 120 },
+  grow: { flexGrow: 1, flexShrink: 1, flexBasis: 160, minHeight: 0 },
   handle: { height: 22, alignItems: 'center', justifyContent: 'center' },
   grip: { width: 44, height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.38)' },
   fold: { position: 'absolute', right: 0, top: 0, height: 22, flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 9, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
