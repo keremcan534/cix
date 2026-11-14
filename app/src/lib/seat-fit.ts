@@ -17,6 +17,8 @@ const SIDE = 14;
 const BOSS_H = 98;
 /** The points pill under a name while a PK runs. */
 const PK_ROOM = 24;
+/** The Patron seat with its points pill while a PK runs (its holder is on a mic for the PK too). */
+const bossHeight = (o: FitOpts) => BOSS_H + (o.pk ? PK_ROOM : 0);
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 
@@ -63,7 +65,7 @@ function gridAt(guests: number, w: number, cols: number, face: number, o: FitOpt
   const rows = Math.ceil(guests / cols);
   // Beside the Patron seat the host is at most the boss seat's ring; alone on its row a little bigger than the rest.
   const host = o.boss ? Math.min(hostFaceOf(face), 70) : hostFaceOf(face);
-  const top = o.boss ? Math.max(BOSS_H, seatHeight(host, o.pk)) : seatHeight(host, o.pk);
+  const top = o.boss ? Math.max(bossHeight(o), seatHeight(host, o.pk)) : seatHeight(host, o.pk);
   return { cols, slot: gridSlot(w, cols, face), face, host, height: 8 + top + rows * (ROW_GAP + seatHeight(face, o.pk)) };
 }
 
@@ -149,7 +151,7 @@ export function layoutSizes(plan: LayoutPlan, face: number) {
 
 /** The layout's height with mic faces of `face` px (the Patron seat's row above it included). */
 export function layoutHeight(s: LayoutSchema, plan: LayoutPlan, face: number, o: FitOpts = {}): number {
-  const boss = o.boss ? BOSS_H + 6 : 0;
+  const boss = o.boss ? bossHeight(o) + 6 : 0;
   if (plan.sided) {
     // The big video and the side column (60 px seats, 38 px faces) as StageLayout draws them; rows under it as usual.
     const side = s.slots.filter((x) => x.area === 'side');

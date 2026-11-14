@@ -99,8 +99,7 @@ export default function PkAdmin() {
             </Card>
             <Card style={{ gap: 8 }}>
               <Text style={s.title}>Takımlar</Text>
-              <Text style={s.label}>Takım başına en az</Text>
-              <Chips value={config.teamMin} options={[1, 2, 3].map((n) => [n, String(n)] as [number, string])} onChange={(v) => updateConfig({ teamMin: v })} />
+              <Text style={s.dim}>PK, mikrofonda kaç kişi olursa olsun başlar; takımlar boş da başlayabilir. Sonradan mikrofona geçen, kişi sayısı az olan takıma girer.</Text>
               <Text style={s.label}>Takım başına en fazla</Text>
               <Chips value={config.teamMax} options={[3, 4, 6, 8, 10].map((n) => [n, String(n)] as [number, string])} onChange={(v) => updateConfig({ teamMax: v })} />
               <Text style={s.label}>Takım adları</Text>

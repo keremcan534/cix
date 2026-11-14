@@ -4,9 +4,35 @@
 import { afterEach, beforeEach, describe, mock, test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { applyServerPk, computeCrowns, drawTeams, drawTeamsFrom, finishNow, getPk, invitableRooms, inviteCrossPk, pkOfRoom, pkPointsFor, recordGift, resetPk, revokeGift, serverPkSession, setInviteScenario, startRoomPk, type PkSession } from '@/lib/pk';
+import {
+  applyServerPk,
+  computeCrowns,
+  drawTeams,
+  drawTeamsFrom,
+  finishNow,
+  getPk,
+  invitableRooms,
+  inviteCrossPk,
+  joinRoomPk,
+  latecomerTeam,
+  pkOfRoom,
+  pkPillBox,
+  pkPointsFor,
+  pkPointsText,
+  recordGift,
+  resetPk,
+  revokeGift,
+  serverPkSession,
+  setInviteScenario,
+  shortPoints,
+  startRoomPk,
+  textWidth,
+  type PkSession,
+} from '@/lib/pk';
 import type { ServerPk } from '@/lib/api';
+import { ROOM_LAYOUTS } from '@/data/room-layouts';
 import { join, leave, leaveSeat, resetPresence, seedRoom, setBoss, takeSeat } from '@/lib/room-presence';
+import { fitGrid, layoutPlan } from '@/lib/seat-fit';
 
 const R = 'pk-room';
 const PREP_MS = 5_000;
@@ -36,14 +62,30 @@ describe('Başlatma', () => {
     assert.deepEqual([r.pk.teams[0].members, r.pk.teams[1].members], [[], []]);
   });
 
-  test('Normal PK için en az 2 mikrofon kullanıcısı; üye PK başlatamaz; odada tek PK', () => {
+  test('kişi sayısı önemsiz: mikrofonda tek kişi varken de Normal PK başlar; üye PK başlatamaz; odada tek PK', () => {
     room(1);
-    assert.equal(startRoomPk({ roomId: R, starterId: 'host', durationMin: 15, mode: 'solo' }).ok, false);
+    const one = startRoomPk({ roomId: R, starterId: 'host', durationMin: 15, mode: 'solo' });
+    assert.ok(one.ok);
+    assert.deepEqual(one.pk.participants, ['host']);
+    resetPk();
     resetPresence();
     room(3);
     assert.equal(startRoomPk({ roomId: R, starterId: 'fan1', durationMin: 15, mode: 'solo' }).ok, false);
     assert.equal(startRoomPk({ roomId: R, starterId: 'admin', durationMin: 15, mode: 'solo' }).ok, true);
     assert.equal(startRoomPk({ roomId: R, starterId: 'host', durationMin: 15, mode: 'solo' }).ok, false);
+  });
+
+  test('mikrofonda kimse yokken de Normal ve Takım PK başlar; takımlar boş başlayabilir', () => {
+    seedRoom(R, { ownerId: 'host', adminIds: ['admin'], seats: [], capacity: 15, total: 4, regulars: ['host', 'admin', 'fan1', 'fan2'] });
+    const solo = startRoomPk({ roomId: R, starterId: 'host', durationMin: 15, mode: 'solo' });
+    assert.ok(solo.ok);
+    assert.deepEqual(solo.pk.participants, []);
+    resetPk();
+    const d = drawTeamsFrom(R, []);
+    assert.deepEqual([d.draft.red, d.draft.blue, d.draft.out], [[], [], []]);
+    const team = startRoomPk({ roomId: R, starterId: 'host', durationMin: 15, mode: 'team', draftId: d.draft.id });
+    assert.ok(team.ok);
+    assert.deepEqual(team.pk.teams.map((t) => t.members), [[], []]);
   });
 
   test('yalnız 15/30/60/120 dakika', () => {
@@ -102,13 +144,16 @@ describe('Takım dağıtımı (sunucu)', () => {
     assert.equal(startRoomPk({ roomId: R, starterId: 'host', durationMin: 15, mode: 'team', draftId: d.draft.id }).ok, false);
   });
 
-  test('manuel: aynı kişi iki takımda olamaz, mikrofonda olmayan seçilemez, takım boş kalamaz', () => {
+  test('manuel: aynı kişi iki takımda olamaz, mikrofonda olmayan seçilemez; takım boş başlayabilir', () => {
     room(4);
     const base = { roomId: R, starterId: 'host', durationMin: 15, mode: 'team' as const };
     assert.equal(startRoomPk({ ...base, red: ['host', 'p1'], blue: ['p1'] }).ok, false);
     assert.equal(startRoomPk({ ...base, red: ['host'], blue: ['fan1'] }).ok, false);
-    assert.equal(startRoomPk({ ...base, red: ['host', 'admin'], blue: [] }).ok, false);
     assert.equal(startRoomPk({ ...base, red: ['host', 'admin', 'p1'], blue: ['p2'] }).ok, true, 'dengesiz ama kurallara uygun');
+    resetPk();
+    const empty = startRoomPk({ ...base, red: ['host', 'admin'], blue: [] });
+    assert.ok(empty.ok, 'Mavi boş başlar, sonradan gelen ona girer');
+    assert.deepEqual(empty.pk.out, ['p1', 'p2'], 'seçilmeyenler dışarıda kalır');
   });
 });
 
@@ -159,13 +204,53 @@ describe('Puanlama', () => {
     assert.equal(pk().points.p1, 200);
   });
 
-  test('Takım PK: takımlar sabit; sonradan mikrofona geçen kişi takımsız kalır ve puan almaz', () => {
-    room(4);
-    startRoomPk({ roomId: R, starterId: 'host', durationMin: 15, mode: 'team', red: ['host', 'admin'], blue: ['p1', 'p2'] });
+  test('Takım PK: sonradan mikrofona geçen kişi az kişili takıma girer ve puanı takımına yazılır', () => {
+    room(3);
+    startRoomPk({ roomId: R, starterId: 'host', durationMin: 15, mode: 'team', red: ['host', 'admin'], blue: ['p1'] });
     activate();
     takeSeat(R, 'spare1', 8);
-    assert.equal(gift('spare1').r.ok, false);
-    assert.equal(pk().teams[0].score + pk().teams[1].score, 0);
+    assert.deepEqual(joinRoomPk(R, 'spare1'), { ok: true, changed: true });
+    assert.deepEqual(pk().teams[1].members, ['p1', 'spare1'], 'Mavi az kişili');
+    assert.deepEqual(joinRoomPk(R, 'spare1'), { ok: true, changed: false }, 'ikinci kez değişmez');
+    assert.ok(gift('spare1', 300).r.ok);
+    assert.equal(pk().teams[1].score, 300);
+  });
+
+  test('Takım PK: katılma isteği gelmeden hediye alan mikrofondaki kişi önce takıma girer; dışarıda bırakılan girmez', () => {
+    room(4);
+    // Manual split: p2 is on a mic and left out of both teams.
+    startRoomPk({ roomId: R, starterId: 'host', durationMin: 15, mode: 'team', red: ['host'], blue: ['admin', 'p1'] });
+    assert.deepEqual(pk().out, ['p2']);
+    activate();
+    takeSeat(R, 'spare1', 9);
+    assert.equal(gift('spare1', 200).r.ok, true);
+    assert.deepEqual(pk().teams[0].members, ['host', 'spare1']);
+    assert.equal(gift('p2', 500).r.ok, false);
+    assert.deepEqual(joinRoomPk(R, 'p2'), { ok: true, changed: false });
+    assert.ok(!pk().teams.some((t) => t.members.includes('p2')));
+    assert.deepEqual(joinRoomPk(R, 'fan2'), { ok: false, reason: 'PK’ya katılmak için mikrofonda olmalısın.' }, 'Balkon’daki katılamaz');
+  });
+
+  test('takımlar doluysa sonradan gelen PK dışında kalır', () => {
+    room(15, 20);
+    const d = drawTeams(R, 'host');
+    assert.ok(d.ok);
+    assert.equal(d.draft.out.length, 0);
+    startRoomPk({ roomId: R, starterId: 'host', durationMin: 15, mode: 'team', draftId: d.draft.id });
+    takeSeat(R, 'spare1', 15);
+    assert.deepEqual(joinRoomPk(R, 'spare1'), { ok: true, changed: true }, '16. kişi 7 kişilik takıma');
+    takeSeat(R, 'spare2', 16);
+    assert.deepEqual(joinRoomPk(R, 'spare2'), { ok: true, changed: false }, '8 + 8: yer yok');
+    assert.deepEqual(pk().teams.map((t) => t.members.length), [8, 8]);
+  });
+
+  test('sonradan gelenin takımı: az kişili olan, eşitse rastgele, ikisi de doluysa yok', () => {
+    assert.equal(latecomerTeam(3, 2, 8), 'blue');
+    assert.equal(latecomerTeam(0, 1, 8), 'red');
+    assert.equal(latecomerTeam(8, 7, 8), 'blue');
+    assert.equal(latecomerTeam(2, 2, 8, () => 0.2), 'red');
+    assert.equal(latecomerTeam(2, 2, 8, () => 0.7), 'blue');
+    assert.equal(latecomerTeam(8, 8, 8), null);
   });
 
   test('takım toplamı her zaman üyelerin geçerli puanlarının toplamına eşit', () => {
@@ -455,9 +540,64 @@ describe('Sunucu PK’sı (canlı mod): herkes aynı skoru ve sonucu görür', (
   test('canlı odada takımlar ekrandaki mikrofon listesinden karıştırılır', () => {
     const r = drawTeamsFrom('srv-room', ['me', 'u-a', 'u-b', 'u-c']);
     assert.ok(r.ok);
-    if (!r.ok) return;
     assert.equal(r.draft.red.length, 2);
     assert.equal(r.draft.blue.length, 2);
     assert.deepEqual([...r.draft.red, ...r.draft.blue].sort(), ['me', 'u-a', 'u-b', 'u-c']);
+  });
+
+  test('Takım PK: dışarıda bırakılanlar sunucudan gelir (eski sunucu göndermez)', () => {
+    const team = { mode: 'team' as const, red: ['u-me'], blue: ['u-a'] };
+    assert.deepEqual(serverPkSession(base({ ...team, out: ['u-b', 'u-me'] }), local, 0, T0 + 1).out, ['u-b', 'me']);
+    assert.equal(serverPkSession(base(team), local, 0, T0 + 1).out, undefined);
+    assert.equal(serverPkSession(base({ out: ['u-b'] }), local, 0, T0 + 1).out, undefined, 'Normal PK’da dışarıda yok');
+  });
+});
+
+describe('Koltuk altındaki PK puanı her mikrofon düzeninde okunur', () => {
+  test('kısa yazım: B ve Mn, aşağı yuvarlanır (kimse olduğundan fazla görünmez)', () => {
+    assert.equal(shortPoints(0), '0');
+    assert.equal(shortPoints(940), '940');
+    assert.equal(shortPoints(1_000), '1B');
+    assert.equal(shortPoints(1_099), '1B');
+    assert.equal(shortPoints(16_450), '16,4B');
+    assert.equal(shortPoints(16_450, false), '16B');
+    assert.equal(shortPoints(61_990), '61,9B');
+    assert.equal(shortPoints(123_456), '123B');
+    assert.equal(shortPoints(999_999), '999B');
+    assert.equal(shortPoints(1_250_000), '1,2Mn');
+    assert.equal(shortPoints(2_500_000_000), '2,5Mr');
+  });
+
+  test('yer varsa tam sayı, yoksa kısa yazım; hediye simgesi yalnız tam sayının yanına sığdığında', () => {
+    const pill = (value: number, width: number, scale = 1) => {
+      const box = pkPillBox(width, scale);
+      return `${box.icon ? '🎁' : ''}${pkPointsText(value, box.room, box.size * scale)}`;
+    };
+    // 30 mikrofon, 390 px (ekran görüntüsü): koltuk 57 px.
+    assert.equal(pill(16_450, 57), '16.450');
+    assert.equal(pill(1_234_567, 57), '1,2Mn');
+    // Telefonun yazısı büyütülmüşse kısa yazıma geçer, yine kesilmez.
+    assert.equal(pill(123_456, 57, 1.15), '123B');
+    // 15 mikrofon, 390 px: koltuk 66 px.
+    assert.equal(pill(61_990, 66), '🎁61.990');
+    assert.equal(pill(169_990, 66), '🎁169B');
+    // Takım arenası ve geniş koltuklar.
+    assert.equal(pill(123_456, 80), '🎁123.456');
+  });
+
+  test('her düzende, her telefonda ve yazı büyütmede puan koltuğun içinde kalır', () => {
+    const widths = new Set<number>([56, 60, 64, 80, 96]);
+    for (const phone of [320, 360, 390, 412, 430])
+      for (const l of ROOM_LAYOUTS) for (const pkRoom of [false, true]) widths.add(layoutPlan(l.layoutSchema, phone, pkRoom).micW);
+    for (const phone of [320, 360, 390, 412]) for (const mics of [4, 10, 15]) for (const h of [200, 300, 420]) widths.add(fitGrid(mics - 1, phone, h).slot);
+    assert.ok(Math.min(...widths) <= 42, `en dar koltuk ${Math.min(...widths)} px`);
+    for (const width of widths)
+      for (const scale of [1, 1.15])
+        for (const value of [0, 7, 940, 9_999, 16_450, 61_990, 123_456, 999_999, 1_250_000, 9_999_999]) {
+          const box = pkPillBox(width, scale);
+          const text = pkPointsText(value, box.room, box.size * scale);
+          const drawn = 2 + 2 * box.pad + (box.icon ? box.size + 2 : 0) + textWidth(text, box.size * scale);
+          assert.ok(drawn <= width - 2, `${width} px, ${scale}x, ${value}: "${text}" ${drawn.toFixed(1)} px`);
+        }
   });
 });

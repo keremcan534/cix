@@ -7,14 +7,15 @@
 // The PK is read on entering the room, when the server announces a change ({ type: 'pk' } on the room's voice
 // connection; for a cross-room PK also a gift scored in the other room), after a gift is announced while a PK
 // runs, when the invite, the countdown and the time run out, and every few seconds as a fallback (a packet can be
-// missed around a reconnect).
+// missed around a reconnect). On a mic while the room's PK runs and not in it yet (I came after the start), this
+// phone asks the server to let me join (useRoomPkJoin): the server checks my mic and picks my team.
 import { useEffect, useState, useSyncExternalStore } from 'react';
 
 import type { Room } from '@/data/mock';
 import * as api from '@/lib/api';
 import { message, once, rememberUser, roomOf, toLocal, toServer } from '@/lib/live';
 import { onServerPk, onSignal } from '@/lib/live/room-bus';
-import { applyServerCrossPk, applyServerPk, markPkSeen, pkOfRoom, serverCrossSession, serverPkSession, type PkSession, type StartResult } from '@/lib/pk';
+import { applyServerCrossPk, applyServerPk, inRoomPk, markPkSeen, pkOfRoom, serverCrossSession, serverPkSession, type PkSession, type StartResult } from '@/lib/pk';
 
 /** PKs this phone saw running: an ended one it never saw (I came in later) gets no result screen. */
 const watched = new Set<string>();
@@ -182,7 +183,8 @@ export function refreshRoomPkSoon(roomId: string, ms = 400) {
   );
 }
 
-export type LivePkStart = { roomId: string; durationMin: number } & ({ mode: 'solo'; participants: string[] } | { mode: 'team'; red: string[]; blue: string[] });
+/** Takım PK: `out` the people on a mic the starter leaves out of both teams (they don't join later). */
+export type LivePkStart = { roomId: string; durationMin: number } & ({ mode: 'solo'; participants: string[] } | { mode: 'team'; red: string[]; blue: string[]; out: string[] });
 
 /** Starts the room's PK on the server (owner and admins; the server checks it and who is on a mic). */
 export async function startLivePk(o: LivePkStart): Promise<StartResult> {
@@ -193,9 +195,11 @@ export async function startLivePk(o: LivePkStart): Promise<StartResult> {
   const people = o.mode === 'solo' ? [server(o.participants)] : [server(o.red), server(o.blue)];
   if (people.some((x) => x === null)) return { ok: false, reason: 'Mikrofondakilerden biri bulunamadı. Odaya yeniden girip tekrar dene.' };
   const [a, b] = people as string[][];
+  // Someone left out whom this phone can't name to the server only misses being kept out: they may join later.
+  const out = o.mode === 'team' ? o.out.map(toServer).filter((x): x is string => x !== null) : [];
   try {
     const r = await once(`pk:${o.roomId}`, (ref) =>
-      api.startServerPk(o.mode === 'solo' ? { room: o.roomId, mode: 'solo', durationMin: o.durationMin, participants: a, ref } : { room: o.roomId, mode: 'team', durationMin: o.durationMin, red: a, blue: b, ref }),
+      api.startServerPk(o.mode === 'solo' ? { room: o.roomId, mode: 'solo', durationMin: o.durationMin, participants: a, ref } : { room: o.roomId, mode: 'team', durationMin: o.durationMin, red: a, blue: b, out, ref }),
     );
     next(o.roomId);
     const pk = apply(o.roomId, r);
@@ -218,6 +222,56 @@ export async function cancelLivePk(roomId: string): Promise<{ ok: true } | { ok:
     void refreshRoomPk(roomId).catch(() => {});
     return { ok: false, reason: message(e) };
   }
+}
+
+/** I'm on a mic while the room's PK runs: I join it (the server checks my mic and picks my team). */
+export async function joinLivePk(roomId: string): Promise<{ ok: true } | { ok: false; reason: string; status?: number }> {
+  try {
+    const r = await api.joinServerPk(roomId);
+    next(roomId);
+    apply(roomId, r);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, reason: message(e), status: e instanceof api.ApiError ? e.status : undefined };
+  }
+}
+
+/** A team's size on the server (server/api/pk.mjs TEAM_MAX). */
+const SERVER_TEAM_MAX = 8;
+/** When to ask: my seat can reach the server a moment after I sit down, so a refusal is tried again a few times. */
+const JOIN_WAITS = [800, 3_000, 8_000, 20_000];
+
+/**
+ * In a server room: while its PK runs (or counts down) and I'm on a mic but not in it (I took the mic after the start,
+ * or the starter's phone didn't have me yet), this phone asks the server to let me join; the server checks my mic and
+ * picks my team. Not for someone the starter left out, nor while both teams are full. Asked again when my mic or the
+ * PK changes.
+ */
+export function useRoomPkJoin(roomId: string, enabled: boolean, pk: PkSession | null, seated: boolean) {
+  const open = pk && pk.id.startsWith('SPK-') && (pk.status === 'prep' || pk.status === 'active') ? pk : null;
+  const full = open?.mode === 'team' && open.teams.every((t) => t.members.length >= SERVER_TEAM_MAX);
+  const wants = !!open && seated && !inRoomPk(open, 'me') && !open.out?.includes('me') && !full;
+  const pkId = open?.id;
+  useEffect(() => {
+    if (!enabled || !wants) return;
+    let on = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const attempt = (i: number) => {
+      timer = setTimeout(
+        () =>
+          void joinLivePk(roomId).then((r) => {
+            // Joined: the PK as read now has me, which ends this. No PK any more (404): nothing to join.
+            if (on && !r.ok && r.status !== 404 && i + 1 < JOIN_WAITS.length) attempt(i + 1);
+          }),
+        JOIN_WAITS[i],
+      );
+    };
+    attempt(0);
+    return () => {
+      on = false;
+      clearTimeout(timer);
+    };
+  }, [roomId, enabled, wants, pkId]);
 }
 
 const OPEN_POLL_MS = 10_000;

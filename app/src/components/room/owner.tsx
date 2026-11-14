@@ -13,7 +13,7 @@ import { ArtText, ROOM_ICON_ART, ROOM_THEME_ART, ROOM_TYPE_ART, roomLevelArt } f
 import type { ModLog } from '@/components/room/community';
 import type { RoomLook } from '@/components/room/decor';
 import { RoomMembersSection } from '@/components/room/members';
-import { SeatReaction, type SeatReactionData } from '@/components/room/parts';
+import { PkPoints, SeatReaction, type SeatReactionData } from '@/components/room/parts';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { Avatar } from '@/components/ui';
 import {
@@ -1121,6 +1121,7 @@ export function BossSeat({
   reaction,
   still,
   anchor,
+  pkPoints,
 }: {
   userId: string | null;
   speaking: boolean;
@@ -1132,6 +1133,8 @@ export function BossSeat({
   still?: boolean;
   /** The ring's view, for what flies to or from this seat (measured like the numbered mics). */
   anchor?: (v: HostInstance | null) => void;
+  /** A PK runs and the holder is in it (a speaking seat): their points under the name, like on any mic. */
+  pkPoints?: number;
 }) {
   const u = userId ? userById(userId) : null;
   if (mini) {
@@ -1172,6 +1175,7 @@ export function BossSeat({
       <Text style={{ color: '#fff', fontSize: 12, maxWidth: 90 }} numberOfLines={1}>
         {u ? (userId === 'me' ? 'Sen' : u.name) : 'Patron Koltuğu'}
       </Text>
+      {u && pkPoints !== undefined && <PkPoints value={pkPoints} still={still} width={96} />}
     </Pressable>
   );
 }

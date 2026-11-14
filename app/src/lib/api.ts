@@ -656,6 +656,8 @@ export type ServerPk = {
   participants: string[];
   red: string[];
   blue: string[];
+  /** Takım PK: on a mic at the start but left out of both teams; they don't join later. An older server sends none. */
+  out?: string[];
   startAt: string;
   endAt: string;
   /** Points per sender → recipient (team: the recipient's team). */
@@ -663,9 +665,13 @@ export type ServerPk = {
   people: UserCard[];
 };
 export type ServerPkAnswer = { pk: ServerPk | null; now: string };
-export type ServerPkStart = { room: string; mode: 'solo'; durationMin: number; participants: string[]; ref: string } | { room: string; mode: 'team'; durationMin: number; red: string[]; blue: string[]; ref: string };
+export type ServerPkStart =
+  | { room: string; mode: 'solo'; durationMin: number; participants: string[]; ref: string }
+  | { room: string; mode: 'team'; durationMin: number; red: string[]; blue: string[]; out: string[]; ref: string };
 export const roomPk = (room: string) => call<ServerPkAnswer>('GET', `/api/rooms/pk?room=${encodeURIComponent(room)}`);
 export const startServerPk = (body: ServerPkStart) => call<ServerPkAnswer>('POST', '/api/rooms/pk', body);
+/** I'm on a mic while the room's PK runs: I join it (the server checks my mic and picks my team). */
+export const joinServerPk = (room: string) => call<ServerPkAnswer>('POST', '/api/rooms/pk/join', { room });
 export const cancelServerPk = (room: string) => call<ServerPkAnswer>('POST', '/api/rooms/pk/cancel', { room });
 /** `password` (4–32 characters, optional): only people who type it get into the room's voice. */
 export const createRoom = (title: string, announcement = '', roomType = 'free', password?: string) =>
