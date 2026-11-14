@@ -5,7 +5,7 @@
 // Never takes touches; it ends itself when the clip ends, or after a safety timeout when the player can't start.
 // Phones with the module only: the web build and an older APK keep the code-drawn effects (giftVideoOf /
 // entryVideoOf say null there), and so does a phone that hasn't downloaded that clip yet.
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/text';
@@ -34,21 +34,45 @@ export function FxVideoSync() {
   return null;
 }
 
+/** A clip whose player hasn't got ready by then is given up on (the next effect comes). */
+const START_TIMEOUT_MS = 6000;
+
 export function VideoFx({ media, muted = true, onDone, children }: { media: FxMedia; muted?: boolean; onDone: () => void; children?: ReactNode }) {
   const done = useRef(onDone);
   useEffect(() => {
     done.current = onDone;
   });
-  // A player that never starts or ends still lets the next effect come.
-  const safety = fxSafetyMs(media.ms);
+  // The clip waits, paused on its first frame, until its player is ready and the screen has drawn two more frames,
+  // then plays from the start with its banner. Started as soon as it was ready, a clip opening on a busy screen (a
+  // room coming up) ran on unseen while the phone was stuck and showed up halfway through.
+  const [playing, setPlaying] = useState(false);
+  const live = useRef(true);
+  useEffect(
+    () => () => {
+      live.current = false;
+    },
+    [],
+  );
+  const ready = () => requestAnimationFrame(() => requestAnimationFrame(() => live.current && setPlaying(true)));
+  // A player that never gets ready, or never ends, still lets the next effect come.
+  const safety = playing ? fxSafetyMs(media.ms) : START_TIMEOUT_MS;
   useEffect(() => {
     const t = setTimeout(() => done.current(), safety);
     return () => clearTimeout(t);
   }, [safety]);
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      <AlphaVideoView source={media.uri} muted={muted} style={StyleSheet.absoluteFill} pointerEvents="none" onEnd={() => done.current()} onError={() => done.current()} />
-      {children}
+      <AlphaVideoView
+        source={media.uri}
+        paused={!playing}
+        muted={muted}
+        style={StyleSheet.absoluteFill}
+        pointerEvents="none"
+        onReady={ready}
+        onEnd={() => done.current()}
+        onError={() => done.current()}
+      />
+      {playing && children}
     </View>
   );
 }
