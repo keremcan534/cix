@@ -11,6 +11,19 @@ En pahalı 12 hediye odada **tam ekran gösteri** olarak oynar. Oda kararır, ar
 - Efektler kapalıysa, "hareketi azalt" açıksa ya da oda sahibi hediye efektlerini kapattıysa gösteri oynamaz (hediyenin kendisi her zaman gider). "Az veri" açıksa ışıltı yarıya iner, huzmeler kapanır.
 - Yönetici ekranı: **Animasyon kataloğu › Büyük hediyeler** sekmesinde her gösteri "▶ Test oynat" ile para harcamadan izlenir; kaç parçanın geldiği de yazar.
 
+## Sıra
+
+Ekranın ortasındaki efektler **sırayla** oynar: hediye videosu, büyük hediye gösterisi, öteki hediyelerin ortada beliren resmi ve tam ekran Hareketli. Gelen sıraya girer; oynayan sonuna kadar oynar, sonra sıradaki başlar. Yeni gelen oynayanı kesmez. Kendi gönderdiğin hediye de aynı sıraya girer.
+
+- Hediyenin koltuğa uçuşu ve sohbet satırı sıra beklemez, hemen görünür.
+- Sıra uzamaz:
+  - Aynı kişi aynı hediyeyi, o hediye sırada beklerken yine gönderirse ayrı ayrı oynamaz. Bekleyenle birleşir ve bir kez "×N" oynar. Çarkla 10 kez atılan hediye: ilki oynar, sonra bir kez "×9".
+  - Sunucu odasında birden çok kişiye atılan hediye kişi kişi duyurulur. Arkadan gelen alıcılar oynayan efekte katılır ("3 kişi"); aynı gönderim iki kez oynamaz.
+  - En çok 6 efekt ve toplam 24 saniyelik oynatma bekler. Fazlası gelirse bekleyenlerden en düşük değerlisi (eşitse en eskisi) düşer.
+  - Videosu ya da gösterisi olmayan hediyenin ortadaki resmi en çok 6 saniye bekler; daha geç kalırsa gösterilmez (uçuşu ve sohbet satırı zaten görünmüştür).
+- Giriş efektleri sıraya girmez, kişi girdiği an görünür. Yalnızca tam ekran giriş videosu (Ejderha) sahneyi paylaşır: sahne boşsa video oynar, değilse giriş şeridi çizimle gösterilir; video oynarken sıradaki hediye onu bekler.
+- Kod: `app/src/lib/fx-queue.ts` (kurallar) ve `app/tests/fx-queue.test.ts`; oda `app/src/components/room/live-room.tsx` içinde oynatır.
+
 ## Kod nerede
 
 | Dosya | Görevi |

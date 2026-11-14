@@ -10,7 +10,7 @@ Kullanıcı Uğurlu kategorisinden bir hediye gönderir. Sunucu yayımlanmış o
 |---|---|
 | `src/lib/lucky.ts` | Sunucunun yerine geçen katman: paketler, olasılıklar, çekiliş, ödül rezervi, kayıtlar, denetim. |
 | `src/components/room/gift-sheet.tsx` | Hediye paneli › **🍀 Uğurlu** rafı: paketler, tam olasılık tablosu, Geçmişim. |
-| `src/components/room/lucky-combo.tsx` | Sağ alttaki tekrar çarkı: çember etrafında dolan çizgi, basınca aynı hediyeyi aynı kişilere tekrar gönderir (×1, ×2, ×3 …). |
+| `src/components/room/gift-combo.tsx` | Sağ alttaki tekrar çarkı (Şanslı ve öteki bütün hediyeler): çember etrafında dolan çizgi, basınca aynı hediyeyi aynı kişilere tekrar gönderir (×1, ×2, ×3 …). |
 | `src/lib/broadcast.ts`, `src/components/fx/win-banner.tsx` | Tüm odalara kazanç duyurusu: üst ortada ışıltılı bant, sırayla gösterilir. |
 | `src/components/room/lucky-result.tsx` | Odadaki sonuç kartı (çarpan + ödül veya "ödül çıkmadı"). Dokunmaları engellemez, mikrofona dokunmaz. |
 | `src/app/oda/[id].tsx` | `sendLuckyGift`: alıcının hediye kaydı, PK puanı, sohbet bildirimi. |
@@ -27,6 +27,10 @@ Kullanıcı Uğurlu kategorisinden bir hediye gönderir. Sunucu yayımlanmış o
   1. Panelde fiyat, her çarpanın olasılığı ve ödülü gösterilir.
   2. **Onay yok:** Hiçbir hediye onay sormaz; tek dokunuşla gönderilir.
   3. Gönderimden sonra sağ altta o hediyeye ait çark çıkar. Çevresindeki çizgi 5 saniyede tamamlanır; bu sürede çarka basmak aynı hediyeyi aynı kişilere tekrar gönderir ve sayaç ×1, ×2, ×3 diye ilerler. Her basış çizgiyi baştan başlatır, çizgi kapanınca çark kaybolur.
+     - Aynı çark Şanslı olmayan hediyelerde de çıkar (Çantam'dan gönderilenler hariç). Her tekrar normal gönderim gibi sunucuya gider, fiyatı sunucu belirler.
+     - Önceki gönderim yoldayken basılanlar onu bekler ve sırayla gider (en çok 10 basış bekler); sayaç gerçekten gidenleri sayar.
+     - Bir gönderim gidemezse (jeton yetmedi, günlük limit, kişiler odadan çıktı) her zamanki uyarı bir kez çıkar ve çark kapanır. Bazı kişilere gidip bazılarına gidemezse de çark kapanır.
+     - Tekrarlar sohbete ayrı satır yazmaz; sayacı çark gösterir.
   4. Sunucu sırayla şunları yapar: aynı işlem mi diye bakar, paketi kontrol eder, jetonu düşer, çeker, ödülü yazar, kaydeder.
 - **Alıcılar:** Tek kişiye, seçilen kişilere veya "Tümü" ile mikrofondaki herkese gönderilebilir. Adet seçilebilir (×1, ×10, ×66 …); her hediye için ayrı çekiliş yapılır (ayrı işlem kimliği). Bakiye bir yerde biterse kalan hediyeler gönderilmez ve sohbette yazılır.
 - **Tekrar eden istek:** Aynı işlem kimliği gelirse ilk sonuç döner. İkinci kez jeton düşülmez, ödül verilmez.

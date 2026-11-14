@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
 import { router, type Href } from 'expo-router';
 import * as ScreenCapture from 'expo-screen-capture';
-import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
 import { Keyboard, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions, type HostInstance } from 'react-native';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { useKeyboardOpen } from '@/lib/keyboard-open';
@@ -46,7 +46,7 @@ import { ContribBoard } from '@/components/room/contrib-board';
 import { RoomFollowHeart } from '@/components/room/members';
 import { BossSeat, BossSeatSheet, RoomInfoSheet, RoomSettingsScreen, type BossPick, type GiftLogRow, type SettingsSection } from '@/components/room/owner';
 import { GiftSheet } from '@/components/room/gift-sheet';
-import { LuckyCombo } from '@/components/room/lucky-combo';
+import { GiftCombo } from '@/components/room/gift-combo';
 import { LuckyResult } from '@/components/room/lucky-result';
 import { LuckyBagCard, LuckyBagFloat, LuckyBagRain, LuckyBagSheet, bagWhat, type BagOutcome } from '@/components/room/lucky-bag';
 import { SeatMenu, type Rect, type SeatMenuItem } from '@/components/room/seat-menu';
@@ -57,12 +57,15 @@ import { storeArtOf } from '@/components/StoreArt';
 import { ArtText, ROOM_ICON_ART } from '@/components/RoomArt';
 import { gameArtOf, gameHueOf } from '@/components/GameArt';
 import { Art, artSource } from '@/components/Art';
-import { AnimLayer } from '@/components/fx/anim-layer';
+import { AnimLayer, type FullscreenAnim } from '@/components/fx/anim-layer';
+import { AnimPlay } from '@/components/fx/anim-player';
 import { WinBanner } from '@/components/fx/win-banner';
 import { GiftFlights, type Flight, type Point } from '@/components/fx/gift-flight';
-import { GiftShowFx, type GiftShowPlay } from '@/components/fx/gift-show';
+import { GiftShowFx } from '@/components/fx/gift-show';
 import { GiftVideoFx, VideoFx, entryVideoOf, giftVideoOf } from '@/components/fx/video-fx';
-import { giftShowOf } from '@/data/gift-shows';
+import { giftShowOf, type GiftShow } from '@/data/gift-shows';
+import type { Animation } from '@/data/animations';
+import { ROOM, addCue, cueCount, cueTo, emptyStage, endCue, resumeCue, type Cue, type Stage } from '@/lib/fx-queue';
 import { SalonArt, salonArt } from '@/components/games/fx/salon-art';
 import { GamePanel, type OpenGame } from '@/components/games/game-panel';
 import type { CasinoGame } from '@/data/games';
@@ -190,6 +193,20 @@ const reactionKey = () => Date.now() + Math.random();
 const SLOW_MS = 10_000;
 /** Room the chat leaves on its right for the Rüzgâr Gülü shortcut (styles.wheelBtn: 46 wide disc, 10 from the edge). */
 const WHEEL_ROOM = 62;
+/** What a stage cue (lib/fx-queue) draws: a gift's video, a big gift's show, the other gifts' pop, a full-screen Hareketli. */
+type StagePlay =
+  | { kind: 'video'; gift: Gift; media: NonNullable<ReturnType<typeof giftVideoOf>> }
+  | { kind: 'show'; gift: Gift; show: GiftShow }
+  | { kind: 'pop'; gift: Gift }
+  | { kind: 'anim'; anim: Animation; origin: Point | null };
+/** How long they play, for the stage's backlog bound: the gift clips are 5 s; the pop is parts' GiftAnimation. */
+const VIDEO_MS = 5_000;
+const POP_MS = 2_500;
+/** The repeat wheel's send (components/room/gift-combo): this gift, this count, to each of these people. */
+type ComboSpec = { lucky: boolean; giftId: string; to: string[]; each: number };
+const sameCombo = (a: ComboSpec, b: ComboSpec) => a.lucky === b.lucky && a.giftId === b.giftId && a.each === b.each && a.to.join() === b.to.join();
+/** Taps on the wheel while its send is on the way wait for it; past this many more, a tap is not kept. */
+const COMBO_MORE = 10;
 /** SimilarClub's own community rules, the first line of the chat on every entry (my screen only). */
 const ROOM_RULES_NOTICE =
   "SimilarClub'a hoş geldin! Müstehcen, şiddet içeren, kumar ya da yasa dışı ticaretle ilgili içerik ve 18 yaş altına yönelik her türlü zararlı paylaşım yasaktır. Kurala aykırı bir şey görürsen kişinin kartından şikâyet et; ekibimiz en kısa sürede inceler. İyi sohbetler!";
@@ -533,13 +550,49 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const [reactions, setReactions] = useState<Record<string, SeatReactionData>>({});
   const [giftOpen, setGiftOpen] = useState(false);
   const [giftTo, setGiftTo] = useState<string | null>(null);
-  const [giftFx, setGiftFx] = useState<GiftShowPlay | null>(null);
-  /** The big effect for a gift: who sent it to whom goes on the full-screen show's banner. */
-  const playGiftFx = (gift: Gift, fromName: string, toIds: string[], count: number) =>
-    setGiftFx({ key: `${Date.now()}-${gift.id}`, gift, fromName, toText: toIds.length > 1 ? `${toIds.length} kişi` : toIds[0] === 'me' ? ME.name : userById(toIds[0]).name, count });
+  // The stage (lib/fx-queue): gift videos, big gift shows, the other gifts' pop and full-screen Hareketli take the
+  // middle of the screen one at a time, in the order they came, each to its end; mine wait in the same line.
+  const [fxStage, setFxStage] = useState<Stage<StagePlay>>(emptyStage);
+  // An entry's full-screen video holds the stage while it plays (set with the entry below; read by these handlers).
+  const entryVideoOn = useRef(false);
+  const pushFx = (cue: Omit<Cue<StagePlay>, 'key' | 'last'>) => {
+    const next = { ...cue, key: `fx-${msgId()}`, last: nowMs() };
+    const held = entryVideoOn.current;
+    setFxStage((s) => addCue(s, next, held));
+  };
+  const endFx = (key: string) => {
+    const t = nowMs();
+    const held = entryVideoOn.current;
+    setFxStage((s) => endCue(s, key, t, held));
+  };
+  /** The big effect for a gift (`from` sent `count` to each of `toIds`): its banner says who sent it to whom. */
+  const playGiftFx = (gift: Gift, from: string, toIds: string[], count: number) => {
+    const media = giftVideoOf(gift.id);
+    const show = giftShowOf(gift.id);
+    pushFx({
+      from,
+      what: gift.id,
+      to: Object.fromEntries(toIds.map((u) => [u, count])),
+      each: count,
+      price: gift.price,
+      ms: media ? VIDEO_MS : (show?.durationMs ?? POP_MS),
+      small: !media && !show,
+      payload: media ? { kind: 'video', gift, media } : show ? { kind: 'show', gift, show } : { kind: 'pop', gift },
+    });
+  };
+  /** A full-screen Hareketli (fx/anim-layer) waits in the same line as the gifts (not one due after the room went away). */
+  const playAnimFx = ({ anim, origin, from }: FullscreenAnim) => {
+    if (visibleRef.current) pushFx({ from, what: anim.animation_id, to: { [ROOM]: 1 }, each: 1, price: anim.coin_price, ms: anim.duration_ms, payload: { kind: 'anim', anim, origin } });
+  };
   const [luckyFx, setLuckyFx] = useState<LuckyRecord[] | null>(null);
-  // Lucky combo wheel: same gift, same people, same count, one tap per repeat (×1, ×2, ×3 …).
-  const [combo, setCombo] = useState<{ giftId: string; to: string[]; each: number; count: number; key: number } | null>(null);
+  // The repeat wheel (components/room/gift-combo): after a send from the gift sheet, the same gift to the same people
+  // with the same count, one tap per repeat (×1, ×2, ×3 …), Şanslı or not.
+  const [combo, setCombo] = useState<(ComboSpec & { count: number; key: number }) | null>(null);
+  // Read by the send handlers, which may answer a while after the tap (server rooms).
+  const comboRef = useRef(combo);
+  useEffect(() => {
+    comboRef.current = combo;
+  }, [combo]);
   const gameCatalog = useGames();
   const [game, setGame] = useState<OpenGame | null>(null);
   const [gameMin, setGameMin] = useState(false);
@@ -1095,9 +1148,21 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       }
     }
   }
+  // Entries keep their own lane: an arrival shows as it happens, it never waits behind gifts. Only an entry's
+  // full-screen video (Ejderha) shares the stage: decided once as the entry begins, it plays when the stage is free
+  // (else the entry shows its drawn banner), and while it plays the stage's next effect waits for it.
+  const [entryLook, setEntryLook] = useState<{ entry: EntryShow | null; media: ReturnType<typeof entryVideoOf> }>({ entry: null, media: null });
+  if (entryLook.entry !== entry) setEntryLook({ entry, media: entry && !settings.reduceMotion && !fxStage.now && !fxStage.next.length ? entryVideoOf(entry.fx) : null });
+  const entryMedia = entryLook.entry === entry ? entryLook.media : null;
+  useLayoutEffect(() => {
+    entryVideoOn.current = !!entryMedia;
+  }, [entryMedia]);
   const nextEntry = () => {
     setEntry(entryQueue[0] ?? null);
     setEntryQueue((q) => q.slice(1));
+    // A gift that waited for the entry's video takes the stage now.
+    const t = nowMs();
+    setFxStage((s) => resumeCue(s, t));
   };  // Taking a video seat turns the camera on (after the permission prompt on phones).
   useEffect(() => {
     if (!camAllowed || getMedia().call) return;
@@ -1693,7 +1758,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       addContrib(from.id, gift.price);
       logGift(from.id, 'me', gift, 1);
       flyGift(gift.emoji, 1, ['me'], { x: 36, y: win.height * 0.72 }, gift.id);
-      if (gift.price >= 50 && showFx(gift.price) && visibleRef.current) playGiftFx(gift, from.name, ['me'], 1);
+      if (gift.price >= 50 && showFx(gift.price) && visibleRef.current) playGiftFx(gift, from.id, ['me'], 1);
       addMsg({ id: `gift:${tx}`, system: true, text: `🎁 ${from.name} sana ${gift.emoji} ${gift.name} gönderdi! (+${gift.price} 💎)`, gift: { fromId: from.id, toIds: ['me'], emoji: gift.emoji, name: gift.name, count: 1, giftId: gift.id } });
       scorePk(tx, from.id, 'me', gift.id, gift.price);
     }, 6000);
@@ -2527,10 +2592,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           mentionQ,
         );
 
-  /** True when at least one recipient got the gift. */
-  const deliverGifts = (gift: Gift, toIds: string[], count: number): boolean => {
+  /** How many of the recipients got the gift. `quiet`: a repeat the wheel counts, so no chat line of its own. */
+  const deliverGifts = (gift: Gift, toIds: string[], count: number, quiet = false): number => {
     // Demo rooms only: a live build never pays the demo's people (spendCoins would take real server coins).
-    if (liveMode()) return false;
+    if (liveMode()) return 0;
     const each = gift.price * count;
     // Each recipient is a separate, individually recorded transaction; stop charging once the balance
     // or the daily spending limit runs out, and remember which of the two it was.
@@ -2549,7 +2614,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           { text: 'Vazgeç', style: 'cancel' },
           { text: 'Jeton yükle', onPress: () => router.push('/cuzdan') },
         ]);
-      return false;
+      return 0;
     }
     successHaptic();
     const total = each * delivered.length;
@@ -2560,32 +2625,42 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     bump('giftsSent', count * delivered.length);
     addContrib('me', total);
     if (!isOwn) addFanPoints(hostId, Math.ceil(total / 10), `Hediye gönderdin (${total} jeton)`);
-    if (showFx(gift.price)) playGiftFx(gift, ME.name, delivered.map((r) => r.userId), count);
+    if (showFx(gift.price)) playGiftFx(gift, 'me', delivered.map((r) => r.userId), count);
     // From the gift button (bottom right) to each recipient's seat.
     flyGift(gift.emoji, count, delivered.map((r) => r.userId), { x: win.width - 60, y: win.height - 48 }, gift.id);
     const sendId = msgId();
     delivered.forEach((r) => scorePk(`GT-${sendId}-${r.userId}`, 'me', r.userId, gift.id, each));
-    addMsg({
-      id: `gift:GT-${sendId}`,
-      system: true,
-      text: `🎁 ${ME.name}, ${delivered.length > 1 ? `${delivered.length} kişiye` : `${userById(delivered[0].userId).name} kişisine`} ${gift.emoji} ${gift.name} x${count} gönderdi!`,
-      gift: { fromId: 'me', toIds: delivered.map((r) => r.userId), emoji: gift.emoji, name: gift.name, count, giftId: gift.id },
-    });
+    const all = delivered.length === toIds.length;
+    if (!(quiet && all))
+      addMsg({
+        id: `gift:GT-${sendId}`,
+        system: true,
+        text: `🎁 ${ME.name}, ${delivered.length > 1 ? `${delivered.length} kişiye` : `${userById(delivered[0].userId).name} kişisine`} ${gift.emoji} ${gift.name} x${count} gönderdi!`,
+        gift: { fromId: 'me', toIds: delivered.map((r) => r.userId), emoji: gift.emoji, name: gift.name, count, giftId: gift.id },
+      });
     // Only a partial delivery opens the results panel; a normal send shows no extra message.
-    if (delivered.length < toIds.length) {
+    if (!all) {
       setGiftResults({ rows: results, reason });
       setPanel('results');
     }
-    return true;
+    return delivered.length;
   };
 
   // Product rule: gifts never ask for confirmation; one tap sends.
-  // `fromBag`: a free gift from Çantam (the gift sheet passes it at price 0).
+  // `fromBag`: a free gift from Çantam (the gift sheet passes it at price 0). A coin gift that reached everyone opens
+  // the repeat wheel (Çantam's are free and counted, so they don't get one).
   const sendGift = (gift: Gift, toIds: string[], count: number, fromBag = false) => {
     setGiftOpen(false);
+    const spec: ComboSpec = { lucky: false, giftId: gift.id, to: toIds, each: count };
+    const quiet = !fromBag && comboRepeat(spec);
+    const after = (n: number) => {
+      if (fromBag) return;
+      if (n === toIds.length) countCombo(spec, false);
+      else stopCombo(spec);
+    };
     if (offlineBlocked() || blockedFeature('gifts')) return false;
     if (real) {
-      void deliverLiveGifts(gift, toIds, count, fromBag);
+      void deliverLiveGifts(gift, toIds, count, fromBag, quiet).then(after);
       return true;
     }
     // Live mode: a sample room's people are not real, and real coins never go to them (no spendCoins here).
@@ -2593,7 +2668,23 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       showAlert('Hediye gönderilemedi', 'Bu örnek odada hediye gönderilemez. Hediyeleri gerçek odalarda gönderebilirsin.');
       return false;
     }
-    return deliverGifts(gift, toIds, count);
+    const n = deliverGifts(gift, toIds, count, quiet);
+    after(n);
+    return n > 0;
+  };
+  /** The wheel's next send of a coin gift, to whoever of its people is still in the room; true when all got it. */
+  const giftAgain = async (spec: ComboSpec) => {
+    const gift = GIFTS.find((g) => g.id === spec.giftId);
+    const toIds = stillHere(spec.to);
+    if (!gift || !toIds.length || offlineBlocked() || blockedFeature('gifts')) {
+      stopCombo(spec);
+      if (gift && !toIds.length) showAlert('Hediye gönderilemedi', 'Seçtiğin kişiler artık odada değil.');
+      return false;
+    }
+    const n = real ? await deliverLiveGifts(gift, toIds, spec.each, false, true) : deliverGifts(gift, toIds, spec.each, true);
+    if (n === toIds.length) countCombo(spec, true);
+    else stopCombo(spec);
+    return n === toIds.length;
   };
 
   // Server room: each gift is paid on the server (its price, my real balance; the recipient's diamonds and
@@ -2601,7 +2692,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // (server/api/gifts.mjs); this phone draws its own gift once the server said it was paid. From Çantam
   // (server/api/backpack.mjs) no coins move: the server takes the gifts out of the backpack, and the room draws it at
   // the catalog's price, as the other phones do.
-  const deliverLiveGifts = async (sheetGift: Gift, toIds: string[], count: number, fromBag = false) => {
+  const deliverLiveGifts = async (sheetGift: Gift, toIds: string[], count: number, fromBag = false, quiet = false): Promise<number> => {
     const gift = fromBag ? (GIFTS.find((g) => g.id === sheetGift.id) ?? sheetGift) : sheetGift;
     const sent: string[] = [];
     let error: string | null = null;
@@ -2623,17 +2714,20 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     }
     if (!sent.length) {
       errorHaptic();
-      if (fromBag) return showAlert('Hediye gönderilemedi', error ?? 'Gönderilemedi.');
-      return showAlert('Hediye gönderilemedi', error ?? 'Gönderilemedi.', [
-        { text: 'Tamam', style: 'cancel' },
-        { text: 'Jeton yükle', onPress: () => router.push('/cuzdan') },
-      ]);
+      if (fromBag) showAlert('Hediye gönderilemedi', error ?? 'Gönderilemedi.');
+      else
+        showAlert('Hediye gönderilemedi', error ?? 'Gönderilemedi.', [
+          { text: 'Tamam', style: 'cancel' },
+          { text: 'Jeton yükle', onPress: () => router.push('/cuzdan') },
+        ]);
+      return 0;
     }
     successHaptic();
-    showGift('me', sent, gift, count);
+    showGift('me', sent, gift, count, quiet && !error);
     sent.forEach((uid) => app.recordGift(uid, gift.id, count));
     bump('giftsSent', count * sent.length);
     if (error) showAlert('Bazı hediyeler gönderilemedi', `${sent.length} kişiye gitti. ${error}`);
+    return sent.length;
   };
   /** A Lucky send another phone made (the server announced it): the gift lines, the flight and a big win. */
   const showLuckyFrom = (from: string, toIds: string[], s: LuckySignal) => {
@@ -2652,14 +2746,16 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     // The sender may hide their name on wins (Ayarlar), and the server doesn't know it: the line names no one.
     if (s.bigWin > 0) addMsg({ system: true, kind: 'gift', text: `🎉 Şanslı hediyeden ×${s.best.toLocaleString('tr-TR')} kazanıldı!` });
   };
-  /** A gift line, the seat flight and the big effect (mine or one another phone announced). */
-  const showGift = (from: string, toIds: string[], gift: Gift, count: number) => {
+  /** A gift line, the seat flight and the big effect (mine or one another phone announced). `quiet`: no chat line
+   *  (a repeat of mine the wheel counts). */
+  const showGift = (from: string, toIds: string[], gift: Gift, count: number, quiet = false) => {
     const fromName = from === 'me' ? ME.name : userById(from).name;
     toIds.forEach((to) => logGift(from, to, gift, count));
     addContrib(from, gift.price * count * toIds.length);
-    if (showFx(gift.price) && visibleRef.current) playGiftFx(gift, fromName, toIds, count);
+    if (showFx(gift.price) && visibleRef.current) playGiftFx(gift, from, toIds, count);
     const origin = from === 'me' ? { x: win.width - 60, y: win.height - 48 } : { x: 36, y: win.height * 0.72 };
     flyGift(gift.emoji, count, toIds, origin, gift.id);
+    if (quiet) return;
     const toText = toIds.length > 1 ? `${toIds.length} kişiye` : toIds[0] === 'me' ? 'sana' : `${userById(toIds[0]).name} kişisine`;
     addMsg({ system: true, text: `🎁 ${fromName}, ${toText} ${gift.emoji} ${gift.name} x${count} gönderdi!`, gift: { fromId: from, toIds, emoji: gift.emoji, name: gift.name, count, giftId: gift.id } });
   };
@@ -2667,22 +2763,24 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // Lucky: `count` gifts to each person picked, one draw per gift; no send cap beyond the balance.
   // Server room: the server takes the price, gives each recipient their 20 % as diamonds, draws and pays the rewards
   // in game coins, then tells the room (server/api/lucky.mjs). Offline demo: lib/lucky plays it on this phone.
-  const sendLuckyGift = (giftId: string, picked: string[], count = 1) => {
+  // `viaWheel`: a repeat from the wheel (its stored list). True (or resolves true) when every gift went out.
+  const sendLuckyGift = (giftId: string, picked: string[], count = 1, viaWheel = false): boolean | Promise<boolean> => {
     setGiftOpen(false);
-    if (offlineBlocked()) return;
+    const spec: ComboSpec = { lucky: true, giftId, to: picked, each: count };
+    if (offlineBlocked()) return false;
     // Live mode: a sample room's people are not real, and real coins never go to them.
     if (liveMode() && !real) {
-      setCombo(null);
-      return showAlert('Şanslı hediye gönderilemedi', 'Bu örnek odada hediye gönderilemez. Hediyeleri gerçek odalarda gönderebilirsin.');
+      stopCombo(spec);
+      showAlert('Şanslı hediye gönderilemedi', 'Bu örnek odada hediye gönderilemez. Hediyeleri gerçek odalarda gönderebilirsin.');
+      return false;
     }
-    // The combo wheel repeats a stored list: drop anyone who has left the room since (never charge for them).
-    const inRoom = new Set([...seatedOthers, ...audience.map((u) => u.id)]);
-    const toIds = picked.filter((t) => inRoom.has(t));
+    const toIds = stillHere(picked);
     if (!toIds.length) {
-      setCombo(null);
-      return showAlert('Şanslı hediye gönderilemedi', 'Seçtiğin kişiler artık odada değil.');
+      stopCombo(spec);
+      showAlert('Şanslı hediye gönderilemedi', 'Seçtiğin kişiler artık odada değil.');
+      return false;
     }
-    if (real) return void deliverLiveLucky(giftId, toIds, count);
+    if (real) return deliverLiveLucky(spec, toIds, viaWheel);
     // One wallet charge (and at most one reward and one refund row) for the whole send; each gift still draws apart.
     const { records, error } = sendLuckyBatch(
       { userId: 'me', userAge: app.me.age, roomId: id, giftId, to: toIds.map((t) => ({ id: t, name: userById(t).name })), count },
@@ -2690,41 +2788,46 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     );
     if (!records.length) {
       errorHaptic();
-      setCombo(null);
-      return showAlert('Şanslı hediye gönderilemedi', error ?? 'Gönderilemedi.');
+      stopCombo(spec);
+      showAlert('Şanslı hediye gönderilemedi', error ?? 'Gönderilemedi.');
+      return false;
     }
     // PK scores the recipient's 20 % share of the gift value, never the reward (the server does it in a server room).
     records.forEach((r) => scorePk(r.txId, 'me', r.toId, r.giftId, luckyPkPoints(r)));
     const spent = records.reduce((n, r) => n + r.price, 0);
     if (!isOwn) addFanPoints(hostId, Math.ceil(spent / 10), `Hediye gönderdin (${spent} jeton)`);
-    showLuckySend(records, toIds, count, error);
+    showLuckySend(records, toIds, count, error, spec, viaWheel);
+    return !error;
   };
-  const deliverLiveLucky = async (giftId: string, toIds: string[], count: number) => {
+  const deliverLiveLucky = async (spec: ComboSpec, toIds: string[], viaWheel: boolean) => {
+    const { giftId, each: count } = spec;
     const g = luckyGift(giftId);
     // The daily limit holds here too (the balance is the server's to check).
     const limited = g ? spendBlock(g.price * count * toIds.length) : null;
     if (limited && limited !== 'Yetersiz bakiye.') {
       errorHaptic();
-      setCombo(null);
-      return showAlert('Şanslı hediye gönderilemedi', limited);
+      stopCombo(spec);
+      showAlert('Şanslı hediye gönderilemedi', limited);
+      return false;
     }
     try {
       const { records } = await liveLuckySend(giftId, toIds, count, id);
-      if (records.length) showLuckySend(records, toIds, count, null);
+      if (records.length) showLuckySend(records, toIds, count, null, spec, viaWheel);
+      return records.length > 0;
     } catch (e) {
       errorHaptic();
-      setCombo(null);
+      stopCombo(spec);
       const text = errorText(e);
       showAlert('Şanslı hediye gönderilemedi', text, /Yetersiz/i.test(text) ? [{ text: 'Tamam', style: 'cancel' }, { text: 'Jeton yükle', onPress: () => router.push('/cuzdan') }] : undefined);
       // A closed package or the day's limit: the sheet shows it from now on.
       void refreshLucky().catch(() => {});
+      return false;
     }
   };
   /** What a Lucky send I made shows: the gift lines, the flight, the results and the win news. */
-  const showLuckySend = (records: LuckyRecord[], toIds: string[], count: number, error: string | null) => {
+  const showLuckySend = (records: LuckyRecord[], toIds: string[], count: number, error: string | null, spec: ComboSpec, viaWheel: boolean) => {
     const cfg = getLucky().config;
     const first = records[0];
-    const giftId = first.giftId;
     const spent = records.reduce((n, r) => n + r.price, 0);
     const reward = records.reduce((n, r) => n + r.reward, 0);
     const best = records.reduce((a, b) => (b.mult > a.mult ? b : a), first);
@@ -2738,7 +2841,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     addContrib('me', spent);
     flyGift(first.emoji, count, sentTo, { x: win.width - 60, y: win.height - 48 }, first.giftId);
     // Combo repeats don't add a chat line each time; the wheel shows the count.
-    const repeat = combo?.giftId === giftId && combo.to.join() === toIds.join() && combo.each === count;
+    const repeat = comboRepeat(spec);
     if (!repeat)
       addMsg({
         id: `gift:${first.txId}`,
@@ -2759,11 +2862,54 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         text: settings.luckyAnnounce ? `🎉 ${ME.name} Şanslı hediyeden ×${best.mult.toLocaleString('tr-TR')} kazandı! +${reward.toLocaleString('tr-TR')} jeton` : `🎉 Bir kullanıcı Şanslı hediyeden ×${best.mult.toLocaleString('tr-TR')} kazandı!`,
       });
     setLuckyFx(records);
-    // Restarts the combo wheel's timer: the time of this send's last draw.
-    const at = records[records.length - 1].ts;
-    setCombo((c) => (c && c.giftId === giftId && c.to.join() === toIds.join() && c.each === count ? { ...c, count: c.count + 1, key: at } : { giftId, to: toIds, each: count, count: 1, key: at }));
+    // Some gifts didn't go (the balance ran out): the wheel stops; else it counts this send.
+    if (error) stopCombo(spec);
+    else countCombo(spec, viaWheel);
   };
-  const comboGift = combo ? luckyGift(combo.giftId) : undefined;
+
+  // --- The repeat wheel (components/room/gift-combo) ------------------------------------------------------------
+  /** The wheel repeats a stored list: anyone who has left the room since is left out (never charged for). */
+  const stillHere = (ids: string[]) => {
+    const here = new Set(getRoom(id)?.members ?? []);
+    return ids.filter((u) => u !== 'me' && here.has(u) && !blocked.has(u));
+  };
+  /** A send of `spec` while the wheel is up for it: the wheel counts it (no chat line of its own). */
+  const comboRepeat = (spec: ComboSpec) => !!comboRef.current && sameCombo(comboRef.current, spec);
+  /** A send of `spec` reached everyone: the wheel counts it and its line starts again; one from the sheet opens it. */
+  const countCombo = (spec: ComboSpec, viaWheel: boolean) => {
+    const at = nowMs();
+    setCombo((c) => (c && sameCombo(c, spec) ? { ...c, count: c.count + 1, key: at } : viaWheel ? c : { ...spec, count: 1, key: at }));
+  };
+  /** A send of `spec` failed or reached only some: its wheel goes (the usual message already said why). */
+  const stopCombo = (spec: ComboSpec) => setCombo((c) => (c && sameCombo(c, spec) ? null : c));
+  // Taps go out one after another: one while the last send is on its way waits for it (server rooms), so the count
+  // follows what really went out and a failed send stops the wheel with a single message.
+  const comboTaps = useRef({ busy: false, more: 0 });
+  const tapCombo = () => {
+    if (!combo) return;
+    const q = comboTaps.current;
+    if (q.busy) {
+      q.more = Math.min(q.more + 1, COMBO_MORE);
+      return;
+    }
+    void runCombo({ lucky: combo.lucky, giftId: combo.giftId, to: combo.to, each: combo.each });
+  };
+  const runCombo = async (spec: ComboSpec) => {
+    const q = comboTaps.current;
+    q.busy = true;
+    try {
+      for (;;) {
+        const ok = await (spec.lucky ? sendLuckyGift(spec.giftId, spec.to, spec.each, true) : giftAgain(spec));
+        const c = comboRef.current;
+        if (!ok || !q.more || !c || !sameCombo(c, spec)) break;
+        q.more -= 1;
+      }
+    } finally {
+      q.busy = false;
+      q.more = 0;
+    }
+  };
+  const comboGift = combo ? (combo.lucky ? luckyGift(combo.giftId) : GIFTS.find((g) => g.id === combo.giftId)) : undefined;
 
   const sendEnvelope = (amount: number, count: number) => {
     setPanel(null);
@@ -3224,7 +3370,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       setPkSetup(false);
       setMoving(null);
       setFlights([]);
-      setGiftFx(null);
+      setFxStage(emptyStage<StagePlay>());
       setLuckyFx(null);
       setCombo(null);
       setEntry(null);
@@ -3378,6 +3524,26 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       onInvite={(name) => addMsg({ system: true, text: `🎮 ${ME.name} herkesi ${name} masasına davet ediyor! Katılmak için Menü › Oda Oyunları` })}
     />
   ) : null;
+
+  // The effect on the stage now (lib/fx-queue). More recipients of its send join its banner while it plays.
+  const cueNow = fxStage.now;
+  const stageFx = (() => {
+    if (!cueNow) return null;
+    const p = cueNow.payload;
+    const done = () => endFx(cueNow.key);
+    if (p.kind === 'anim') return <AnimPlay key={cueNow.key} anim={p.anim} origin={p.origin} screen={win} lite={settings.lowData} onDone={done} />;
+    const to = cueTo(cueNow);
+    const play = {
+      key: cueNow.key,
+      gift: p.gift,
+      fromName: cueNow.from === 'me' ? ME.name : userById(cueNow.from).name,
+      toText: to.length > 1 ? `${to.length} kişi` : to[0] === 'me' ? ME.name : to[0] ? userById(to[0]).name : '',
+      count: cueCount(cueNow),
+    };
+    if (p.kind === 'video') return <GiftVideoFx key={cueNow.key} media={p.media} fromName={play.fromName} toText={play.toText} giftName={p.gift.name} count={play.count} muted={fxMuted} onDone={done} />;
+    if (p.kind === 'show') return <GiftShowFx key={cueNow.key} show={p.show} play={play} lite={settings.lowData} onDone={done} />;
+    return <GiftAnimation key={cueNow.key} gift={p.gift} onDone={done} />;
+  })();
 
   if (!unlocked) return full ? <PasswordGate title={title} password={password} onPass={() => setUnlocked(true)} /> : null;
   // Minimized: the host hides this view, so drawing seats, chat and effects would be wasted work on
@@ -3665,12 +3831,12 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       </SafeAreaView>
 
       {envelope && <EnvelopeDrop from={envelope.from} seconds={envelope.seconds} onGrab={grabEnvelope} />}
-      {/* Over the Rüzgâr Gülü (or where it would be): the room's bags, one page each, with their times. */}
+      {/* Over the Rüzgâr Gülü or the repeat wheel (or where they would be): the room's bags, one page each, with their times. */}
       {real && bags.bags.length > 0 && (
         <LuckyBagFloat
           bags={bags.bags.filter((b) => !blocked.has(b.from.id))}
           now={bags.now}
-          bottom={wheelShown ? 222 : 150}
+          bottom={wheelShown || combo ? 222 : 150}
           still={settings.reduceMotion}
           onOpen={(b) => {
             setBagOutcome(null);
@@ -4099,6 +4265,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           lite={settings.lowData}
           off={settings.effectsOff}
           micEffect={{ animationId: app.micFx, active: settings.micAnim && amSeated && sending && !callActive, isSpeaking: () => speakingMe.current }}
+          onFullscreen={playAnimFx}
         />
       )}
       <PkSetupSheet key={pkSetup ? 'pk-open' : 'pk-closed'} visible={pkSetup} roomId={id} starterId="me" micUsers={view.micIds} offline={offline} onClose={() => (setPkSetup(false), backToMenu())} />
@@ -4164,33 +4331,17 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           <Text style={styles.wheelText}>Rüzgâr Gülü</Text>
         </Pressable>
       )}
-      {giftFx &&
-        (giftVideoOf(giftFx.gift.id) ? (
-          <GiftVideoFx
-            key={giftFx.key}
-            media={giftVideoOf(giftFx.gift.id)!}
-            fromName={giftFx.fromName}
-            toText={giftFx.toText}
-            giftName={giftFx.gift.name}
-            count={giftFx.count}
-            muted={fxMuted}
-            onDone={() => setGiftFx(null)}
-          />
-        ) : giftShowOf(giftFx.gift.id) ? (
-          <GiftShowFx key={giftFx.key} show={giftShowOf(giftFx.gift.id)!} play={giftFx} lite={settings.lowData} onDone={() => setGiftFx(null)} />
-        ) : (
-          <GiftAnimation key={giftFx.key} gift={giftFx.gift} onDone={() => setGiftFx(null)} />
-        ))}
+      {stageFx}
       {combo && comboGift && (
-        <LuckyCombo
-          key={`${combo.giftId}-${combo.to.join()}`}
+        <GiftCombo
+          key={`${combo.lucky ? 'lucky' : 'gift'}-${combo.giftId}-${combo.to.join()}-${combo.each}`}
           giftId={combo.giftId}
           emoji={comboGift.emoji}
           name={comboGift.name}
           price={comboGift.price * combo.each * combo.to.length}
           count={combo.count}
           restartKey={combo.key}
-          onPress={() => sendLuckyGift(combo.giftId, combo.to, combo.each)}
+          onPress={tapCombo}
           onExpire={() => setCombo(null)}
         />
       )}
@@ -4198,9 +4349,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       {/* Platform-wide win announcements (every room shows every win). */}
       {visible && <WinBanner top={110} still={settings.reduceMotion} />}
       {entry &&
-        (entryVideoOf(entry.fx) && !settings.reduceMotion ? (
+        (entryMedia ? (
           // A video entry (Ejderha): the name banner over the full-screen clip, which ends the turn.
-          <VideoFx key={`${entry.name}-${entry.fx}-${entry.avatar}`} media={entryVideoOf(entry.fx)!} muted={fxMuted} onDone={nextEntry}>
+          <VideoFx key={`${entry.name}-${entry.fx}-${entry.avatar}`} media={entryMedia} muted={fxMuted} onDone={nextEntry}>
             <EntryEffect show={entry} />
           </VideoFx>
         ) : (
