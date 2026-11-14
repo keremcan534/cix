@@ -178,7 +178,7 @@ describe('validate', () => {
     assert.deepEqual(validate('gifts_hidden', ['g3', 'g1']), ['g1', 'g3']);
     refused(() => validate('gifts_hidden', ['g999']), /bilinmeyen/);
     refused(() => validate('gifts_hidden', [1]), /bilinmeyen/);
-    assert.equal(validate('gifts_hidden', [...GIFTS.keys()]).length, 57);
+    assert.equal(validate('gifts_hidden', [...GIFTS.keys()]).length, 65);
     const eight = PACKS.slice(0, 8).map((p) => p.id);
     assert.deepEqual(validate('packs_hidden', eight), eight);
     refused(() => validate('packs_hidden', PACKS.map((p) => p.id)), /En az bir paket/);
