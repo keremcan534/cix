@@ -101,30 +101,30 @@ describe('Canlı ayarlar para uçlarında', () => {
     const r = await h.signUp('Alan');
     await ok(call('POST', '/api/wallet/test-topup', { amount: 10_000, ref: rnd(6) }, s.session));
     const ref = rnd(8);
-    const first = await ok(call('POST', '/api/gifts/send', { to: r.user.id, giftId: 'g2', count: 5, ref }, s.session));
-    assert.deepEqual([first.replay, first.total], [false, 250]);
+    const first = await ok(call('POST', '/api/gifts/send', { to: r.user.id, giftId: 'g6', count: 1, ref }, s.session));
+    assert.deepEqual([first.replay, first.total], [false, 1_999]);
 
-    const saved = await setLive({ gifts_hidden: ['g2'] });
+    const saved = await setLive({ gifts_hidden: ['g6'] });
     const cat = await catalog();
     assert.equal(cat.v, saved.v);
-    assert.ok(!cat.gifts.some((g) => g.id === 'g2'), 'gizli hediye katalogda yok');
+    assert.ok(!cat.gifts.some((g) => g.id === 'g6'), 'gizli hediye katalogda yok');
     assert.equal(cat.gifts.length, GIFTS.size - GIFTS_PAUSED.size - 1);
 
     const [sb, rb] = [await balance(s.user.id), await balance(r.user.id)];
-    const [st, j] = await call('POST', '/api/gifts/send', { to: r.user.id, giftId: 'g2', count: 1, ref: rnd(8) }, s.session);
+    const [st, j] = await call('POST', '/api/gifts/send', { to: r.user.id, giftId: 'g6', count: 1, ref: rnd(8) }, s.session);
     assert.equal(st, 400);
     assert.equal(j.error, 'Bu hediye artık yok');
     assert.deepEqual([await balance(s.user.id), await balance(r.user.id)], [sb, rb], 'hiçbir şey kımıldamadı');
 
     // The retry of the send that went through, even with another count in the body: its own total.
-    const again = await ok(call('POST', '/api/gifts/send', { to: r.user.id, giftId: 'g2', count: 10, ref }, s.session));
-    assert.deepEqual([again.replay, again.total], [true, 250]);
+    const again = await ok(call('POST', '/api/gifts/send', { to: r.user.id, giftId: 'g6', count: 10, ref }, s.session));
+    assert.deepEqual([again.replay, again.total], [true, 1_999]);
     assert.deepEqual(await balance(s.user.id), sb);
     assert.equal(Number((await q('SELECT count(*) FROM gift_events WHERE sender = $1', [s.user.id]))[0].count), 1);
 
     await setLive({ gifts_hidden: null });
-    assert.ok((await catalog()).gifts.some((g) => g.id === 'g2'));
-    await ok(call('POST', '/api/gifts/send', { to: r.user.id, giftId: 'g2', count: 1, ref: rnd(8) }, s.session));
+    assert.ok((await catalog()).gifts.some((g) => g.id === 'g6'));
+    await ok(call('POST', '/api/gifts/send', { to: r.user.id, giftId: 'g6', count: 1, ref: rnd(8) }, s.session));
   });
 
   test('Çevir canlı kurla: yükselen kur daha çok verir, düşen kur ekranda görüneni korur, tekrar ilk tutarı verir', async () => {

@@ -31,14 +31,21 @@ describe('Sunucu kataloğu uygulamayla aynı', () => {
     assert.deepEqual(COSMETICS.filter((c) => c.kind === 'entry' && !c.retired).map((c) => c.id), ['en-dragon']);
   });
 
-  test('şimdilik raftan kalkan hediyeler iki tarafta aynı: animasyonu olmayanlar, dört standart hariç', async () => {
+  test('şimdilik raftan kalkan hediyeler iki tarafta aynı: animasyonu olmayanların hepsi', async () => {
     const { GIFTS_PAUSED } = await import('@/data/gifts-paused');
     const { giftShowOf } = await import('@/data/gift-shows');
     const { FX_VIDEOS } = await import('../../server/api/fx.mjs');
     assert.deepEqual([...GIFTS_PAUSED].sort(), [...(server.GIFTS_PAUSED as Set<string>)].sort());
     const animated = (id: string) => id in FX_VIDEOS.gift || !!giftShowOf(id);
-    const standard = new Set(['g1', 'g2', 'g3', 'g4']);
-    assert.deepEqual([...GIFTS_PAUSED].sort(), GIFTS.filter((g) => !animated(g.id) && !standard.has(g.id)).map((g) => g.id).sort());
+    assert.deepEqual([...GIFTS_PAUSED].sort(), GIFTS.filter((g) => !animated(g.id)).map((g) => g.id).sort());
+  });
+
+  test('Popüler rafı videolu hediyelerle açılır: Roket, sonra yeni sekizi (panel Balkon çizgisinin altında iki satır gösterir)', async () => {
+    const { GIFTS_PAUSED } = await import('@/data/gifts-paused');
+    const hot = GIFTS.filter((g) => (g.cat ?? 'hot') === 'hot' && !GIFTS_PAUSED.has(g.id)).map((g) => g.id);
+    assert.deepEqual(hot.slice(0, 9), ['g6', 'h15', 'h16', 'h17', 'h18', 'h19', 'h20', 'h21', 'h22']);
+    // Bots and calls read the first gifts by place: they stay the cheap ones.
+    assert.deepEqual(GIFTS.slice(0, 6).map((g) => g.id), ['g1', 'g2', 'g3', 'g4', 'g5', 'g6']);
   });
 
   test('her hediyenin adı, fiyatı, kategorisi ve SVIP sınırı', () => {

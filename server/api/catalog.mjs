@@ -12,6 +12,14 @@ const GIFT_ROWS = [
   ['g4', 'Pasta', 200, 'hot'],
   ['g5', 'Taç', 500, 'hot'],
   ['g6', 'Roket', 1_999, 'hot'],
+  ['h15', 'Sevimli Panda', 5_999, 'hot'],
+  ['h16', 'Hazine Sandığı', 7_999, 'hot'],
+  ['h17', 'Efsanevi Tek Boynuz', 9_999, 'hot'],
+  ['h18', 'Anka Kuşu', 14_999, 'hot'],
+  ['h19', 'Altın Gemi', 19_999, 'hot'],
+  ['h20', 'Kristal Saray', 24_999, 'hot'],
+  ['h21', 'Altın Süper Otomobil', 29_999, 'hot'],
+  ['h22', 'Altın Aslan', 39_999, 'hot'],
   ['g7', 'Elmas', 4_950, 'hot'],
   ['g8', 'Şato', 19_999, 'hot'],
   ['h1', 'Oyun Zamanı', 7_777, 'hot'],
@@ -28,14 +36,6 @@ const GIFT_ROWS = [
   ['h12', 'Altın Kuğu', 99_950, 'hot'],
   ['h13', 'Tatlı Ayıcık', 2_999, 'hot'],
   ['h14', 'Kraliyet Tacı', 9_999, 'hot'],
-  ['h15', 'Sevimli Panda', 5_999, 'hot'],
-  ['h16', 'Hazine Sandığı', 7_999, 'hot'],
-  ['h17', 'Efsanevi Tek Boynuz', 9_999, 'hot'],
-  ['h18', 'Anka Kuşu', 14_999, 'hot'],
-  ['h19', 'Altın Gemi', 19_999, 'hot'],
-  ['h20', 'Kristal Saray', 24_999, 'hot'],
-  ['h21', 'Altın Süper Otomobil', 29_999, 'hot'],
-  ['h22', 'Altın Aslan', 39_999, 'hot'],
   ['p1', 'Kar Topu', 50, 'gameplay'],
   ['p2', 'Sulu Balon', 99, 'gameplay'],
   ['p3', 'Domates At', 200, 'gameplay'],
@@ -75,8 +75,8 @@ const GIFT_ROWS = [
 
 export const GIFTS = new Map(GIFT_ROWS.map(([id, name, price, cat, minSvip = 0]) => [id, { id, name, price, cat, minSvip }]));
 /**
- * Off the shelf for now (the owner, 14 Nov): the gifts with no animation of their own (no video in fx.mjs, no show in
- * the app's data/gift-shows), except the four standard gifts the price list keeps (Gül, Kalp, Kahve, Pasta). GET
+ * Off the shelf for now (the owner, 14 Nov): every gift with no animation of their own (no video in fx.mjs, no show in
+ * the app's data/gift-shows); the four standard ones (Gül, Kalp, Kahve, Pasta) went too, the same evening. GET
  * /api/catalog leaves them out, so every app's shelf drops them, older ones too; a send from an older app still goes
  * through (unlike a gift hidden in Canlı ayarlar). The same list as app/src/data/gifts-paused.ts; taking an id out of
  * both brings the gift back.
@@ -95,7 +95,7 @@ export const SHOP_PAUSED = new Set(
   process.env.SHOP_PAUSED === undefined ? SHOP_PAUSED_DEFAULT : process.env.SHOP_PAUSED.split(',').map((x) => x.trim()).filter(Boolean),
 );
 export const GIFTS_PAUSED = new Set([
-  ...['g5', 'g7', 'g8', 'h1', 'h3', 'h4', 'h5', 'h6', 'h7', 'h8', 'h9', 'h10', 'h11'],
+  ...['g1', 'g2', 'g3', 'g4', 'g5', 'g7', 'g8', 'h1', 'h3', 'h4', 'h5', 'h6', 'h7', 'h8', 'h9', 'h10', 'h11'],
   ...['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p9', 'p10'],
   ...['c1', 'c2', 'c4', 'c5', 'c7', 'c9', 'c10', 'c11', 'c12'],
   ...['v1', 'v2', 'v3', 'v4', 'v5'],
