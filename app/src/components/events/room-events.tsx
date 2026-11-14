@@ -15,6 +15,7 @@ import { Button } from '@/components/ui';
 import { showAlert } from '@/lib/alert';
 import * as api from '@/lib/api';
 import { elapsedText, lookOf, spanText, whenText } from '@/lib/events';
+import { useSheetMax } from '@/lib/sheet-space';
 import { useSettings } from '@/store';
 import { SCRIM, makeStyles, useTheme } from '@/theme';
 
@@ -146,6 +147,8 @@ export function RoomEventsSheet({ visible, onClose, data, roomId, isOwner }: { v
   const { colors } = useTheme();
   const styles = useStyles();
   const insets = useSafeAreaInsets();
+  // It stops at the room's Balkon line (lib/sheet-space): the list shrinks and scrolls, the buttons stay.
+  const maxHeight = useSheetMax(0.9);
   // Mounted only while open (live-room), so the times are as of opening.
   const [now] = useState(Date.now);
   const open = (id: number) => {
@@ -176,7 +179,7 @@ export function RoomEventsSheet({ visible, onClose, data, roomId, isOwner }: { v
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} />
-      <View style={[styles.sheet, { paddingBottom: insets.bottom + 16 }]}>
+      <View style={[styles.sheet, { maxHeight, paddingBottom: insets.bottom + 16 }]}>
         <View style={styles.head}>
           <Text style={styles.heading}>Oda etkinlikleri</Text>
           <Pressable onPress={onClose} hitSlop={10} accessibilityLabel="Kapat">

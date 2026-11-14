@@ -40,6 +40,7 @@ import {
   type RoomSession,
 } from '@/lib/room-session';
 import { saveRoom } from '@/lib/room-session-persist';
+import { useSheetMax } from '@/lib/sheet-space';
 import { SCRIM, colors, edge, radius, semantic, space, type } from '@/theme';
 import { Photo } from '@/components/photo';
 
@@ -418,6 +419,8 @@ export function SessionBanner({ session }: { session: RoomSession }) {
  */
 export function SessionTestSheet({ visible, session, onClose, onKickMe }: { visible: boolean; session: RoomSession; onClose: () => void; onKickMe: () => void }) {
   const online = useOnline();
+  // It stops at the room's Balkon line (lib/sheet-space): the numbers and the test buttons scroll.
+  const maxHeight = useSheetMax(0.82);
   const eng = engineInfo();
   const block = micBlock(session);
   const rows: [string, string][] = [
@@ -441,7 +444,7 @@ export function SessionTestSheet({ visible, session, onClose, onKickMe }: { visi
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={s.backdrop} onPress={onClose} accessibilityLabel="Kapat" />
-      <View style={[s.sheet, { maxHeight: '82%' }]}>
+      <View style={[s.sheet, { maxHeight }]}>
         <View style={s.handle} />
         <Text style={s.sheetTitle} accessibilityRole="header">
           Ses ve bağlantı testi

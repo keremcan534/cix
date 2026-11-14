@@ -6,7 +6,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/text';
 import { HeartBadge } from '@/components/heart-level';
@@ -18,6 +18,7 @@ import { userById } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import { liveMode, message, toServer } from '@/lib/live';
 import { followOnServer, loadPublicProfile } from '@/lib/live/profile';
+import { useSheetMax } from '@/lib/sheet-space';
 import { useApp } from '@/store';
 import { SCRIM, colors, edge } from '@/theme';
 
@@ -60,6 +61,8 @@ export function PersonCard({ uid, note, onClose, onGift, onMention, onReport, on
   const isFollowing = mine ? mine.isFollowing : following.has(uid);
   const isBlocked = blocked.has(uid);
   const paddingBottom = useSheetBottom(18);
+  // It stops at the room's Balkon line (lib/sheet-space): who they are scrolls, the buttons stay in sight.
+  const maxHeight = useSheetMax(0.9);
 
   const act = (fn: () => void) => () => {
     onClose();
@@ -88,7 +91,7 @@ export function PersonCard({ uid, note, onClose, onGift, onMention, onReport, on
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={s.backdrop} onPress={onClose} accessibilityLabel="Kapat" />
-      <View style={[s.sheet, { paddingBottom }]}>
+      <View style={[s.sheet, { maxHeight, paddingBottom }]}>
         <View style={s.handle} />
         <View style={s.head}>
           <Avatar uri={u.avatar} name={u.name} size={64} ring={u.vip} />
@@ -115,17 +118,19 @@ export function PersonCard({ uid, note, onClose, onGift, onMention, onReport, on
           </Pressable>
         </View>
 
-        <AffiliationPills user={u} />
-        {!!u.bio && (
-          <Text style={s.bio} numberOfLines={2}>
-            {u.bio}
-          </Text>
-        )}
-        {mine && (
-          <Text style={s.dim}>
-            <Text style={s.strong}>{fmt(mine.followers)}</Text> takipçi
-          </Text>
-        )}
+        <ScrollView contentContainerStyle={{ gap: 12 }}>
+          <AffiliationPills user={u} />
+          {!!u.bio && (
+            <Text style={s.bio} numberOfLines={2}>
+              {u.bio}
+            </Text>
+          )}
+          {mine && (
+            <Text style={s.dim}>
+              <Text style={s.strong}>{fmt(mine.followers)}</Text> takipçi
+            </Text>
+          )}
+        </ScrollView>
 
         <View style={s.actions}>
           <Action icon="gift" label="Hediye" tint={colors.gold} onPress={act(() => onGift(uid))} />

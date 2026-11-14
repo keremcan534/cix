@@ -9,6 +9,7 @@ import { Text } from '@/components/text';
 import { layoutSummary, type ModeId, type RoomLayout } from '@/data/room-layouts';
 import type { Result } from '@/lib/room-presence';
 import { enabledModes, layoutAccess, layoutsOf, modeById, type StageInfo } from '@/lib/room-modes';
+import { useSheetMax } from '@/lib/sheet-space';
 import { SCRIM, colors, edge, radius, semantic, space } from '@/theme';
 
 const GAP = 10;
@@ -93,6 +94,8 @@ export function LayoutPickerSheet({
   const [tab, setTab] = useState<ModeId>(modeId ?? 'audio');
   const [note, setNote] = useState<{ tone: 'ok' | 'warn' | 'err'; text: string } | null>(null);
   const [gridW, setGridW] = useState(0);
+  // Over a room it stops at the Balkon line (lib/sheet-space): the cards scroll under the tabs.
+  const maxHeight = useSheetMax(0.82);
   // Reopening starts on the room's current mode and without an old message.
   const [wasVisible, setWasVisible] = useState(visible);
   if (visible !== wasVisible) {
@@ -116,7 +119,7 @@ export function LayoutPickerSheet({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={st.backdrop} onPress={onClose} accessibilityLabel="Pencereyi kapat" />
-      <View style={st.sheet}>
+      <View style={[st.sheet, { maxHeight }]}>
         <View style={st.head}>
           <Text style={st.title} accessibilityRole="header">
             Sahne Düzeni
@@ -194,7 +197,7 @@ export function LayoutPickerSheet({
 
 const st = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: SCRIM },
-  sheet: { backgroundColor: colors.card, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, paddingHorizontal: space.lg, paddingTop: space.md, maxHeight: '82%', ...edge.sheet },
+  sheet: { backgroundColor: colors.card, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, paddingHorizontal: space.lg, paddingTop: space.md, ...edge.sheet },
   head: { alignItems: 'center', justifyContent: 'center', paddingVertical: space.sm },
   title: { color: colors.text, fontWeight: '800', fontSize: 17 },
   close: { position: 'absolute', right: 0, top: space.sm },

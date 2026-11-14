@@ -36,6 +36,7 @@ import {
   type QueueTrack,
   type RoomMusic,
 } from '@/lib/live/music';
+import { useSheetMax } from '@/lib/sheet-space';
 import { SCRIM, makeStyles, radius, space, useTheme } from '@/theme';
 
 /** This phone's volume when it comes back from silent and had none before. */
@@ -166,6 +167,9 @@ export function LiveMusicSheet({ visible, onClose, room, music, canPlay, enabled
   const s = useStyles();
   const t = useTheme();
   const paddingBottom = useSheetBottom();
+  // Over a room the sheet reaches the Balkon line at most (lib/sheet-space): the list takes what the player leaves.
+  const height = useSheetMax(0.78);
+  const maxHeight = useSheetMax(0.92);
   const [view, setView] = useState<'list' | 'library'>('list');
   const [query, setQuery] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
@@ -253,7 +257,7 @@ export function LiveMusicSheet({ visible, onClose, room, music, canPlay, enabled
     <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
       <KeyboardAvoid style={{ flex: 1 }}>
         <Pressable style={s.scrim} onPress={close} accessibilityLabel="Kapat" />
-        <View style={[s.sheet, { paddingBottom }]}>
+        <View style={[s.sheet, { height, maxHeight, paddingBottom }]}>
           <View style={s.grip} />
           {view === 'library' && may ? (
             <Library list={shown.list} onBack={() => setView('list')} onAdd={addTracks} />
@@ -756,8 +760,6 @@ const useStyles = makeStyles(({ colors, semantic, surface, edge, ink }) => ({
     borderTopRightRadius: radius.xl,
     paddingHorizontal: space.lg,
     paddingTop: space.sm,
-    height: '78%',
-    maxHeight: '92%',
     ...edge.sheet,
   },
   grip: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: ink(0.18), marginBottom: space.sm },

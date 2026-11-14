@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { salonArt } from '@/components/games/fx/salon-art';
 import { Text } from '@/components/text';
 import { tapHaptic } from '@/lib/haptics';
+import { useSheetMax } from '@/lib/sheet-space';
 import { SCRIM, edge } from '@/theme';
 
 /** The same two notes under every Oyun Salonu game. */
@@ -17,10 +18,12 @@ export const GAME_BALANCE_NOTE = 'Kazançlar oyun bakiyesine yazılır; bahisler
 export function GameInfoSheet({ visible, onClose, title, rules, children }: { visible: boolean; onClose: () => void; title: string; rules: string; /** The paytable, odds or anything else the game explains. */ children?: ReactNode }) {
   // Android modals draw edge to edge: the last line stays above the navigation bar.
   const { bottom } = useSafeAreaInsets();
+  // A game in a room: the sheet stops at the room's Balkon line (lib/sheet-space); the rules scroll.
+  const maxHeight = useSheetMax(0.78);
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={s.backdrop} onPress={onClose} accessibilityLabel="Kapat" />
-      <View style={[s.sheet, { paddingBottom: Math.max(24, bottom + 12) }]}>
+      <View style={[s.sheet, { maxHeight, paddingBottom: Math.max(24, bottom + 12) }]}>
         <View style={s.grip} />
         <View style={s.head}>
           <Text style={s.title} numberOfLines={1} accessibilityRole="header">
@@ -69,7 +72,7 @@ export function InfoButton({ onPress, tint = 'rgba(255,255,255,0.55)' }: { onPre
 
 const s = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: SCRIM },
-  sheet: { maxHeight: '78%', backgroundColor: '#111A30', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 18, paddingTop: 8, ...edge.sheet },
+  sheet: { backgroundColor: '#111A30', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 18, paddingTop: 8, ...edge.sheet },
   grip: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.25)', marginBottom: 8 },
   head: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 },
   title: { flex: 1, color: '#fff', fontSize: 18, fontWeight: '900' },
