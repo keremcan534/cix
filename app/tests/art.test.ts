@@ -48,8 +48,8 @@ describe('Görsel dosyaları', () => {
 
   test('her çıkartmanın görseli var, görseller birbirinin kopyası değil', () => {
     const reactionArt = read('components/ReactionArt.tsx');
-    // Pictures load with the file; animations (Duygular) only when drawn: `() => require(…)`.
-    const files = new Map([...reactionArt.matchAll(/^  '([^']+)': (?:\(\) => )?require\('([^']+)'\)/gm)].map((m) => [m[1], m[2]]));
+    // Pictures load with the file; animations (Duygular) only when drawn: `() => require(…)`; Penguen as a sheet of frames.
+    const files = new Map([...reactionArt.matchAll(/^  '([^']+)': (?:\(\) => |\{ sheet: )?require\('([^']+)'\)/gm)].map((m) => [m[1], m[2]]));
     const ids = ALL_STICKERS.map((x) => x.id);
     for (const id of ids) assert.ok(files.has(id), `${id}: görsel yok`);
     // Art that isn't a pick: what a Hamle plays on the mics (the three hands, the bang, the flying kiss, the die's faces).
@@ -107,7 +107,7 @@ describe('Emoji ve çıkartma paketleri', () => {
   test('eski paket kimlikleri korunuyor, satın alınanlar kaybolmuyor', () => {
     assert.deepEqual(
       STICKER_PACKS.map((p) => p.id),
-      ['basic', 'duygu', 'muzik', 'hamle', 'fun', 'love', 'animals', 'vip', 'anim', 'voice', 'tea', 'feels', 'party', 'costume'],
+      ['basic', 'duygu', 'muzik', 'hamle', 'fun', 'love', 'animals', 'vip', 'anim', 'voice', 'tea', 'feels', 'party', 'costume', 'penguen'],
     );
     assert.deepEqual(FREE_PACK_IDS, ['basic', 'duygu', 'muzik', 'hamle']);
   });
@@ -129,6 +129,42 @@ describe('Emoji ve çıkartma paketleri', () => {
     assert.equal(new Set(all).size, all.length, 'tekrar eden emoji');
     // Every emoji the old paid packs sold is now in the free standard set.
     for (const x of ALL_STICKERS) assert.ok(all.includes(x.emoji), `${x.name}: ${x.emoji}`);
+  });
+});
+
+describe('Penguen: kare kare oynayan çıkartmalar', () => {
+  /** A WebP's canvas size from its header (VP8X with alpha, VP8L lossless, VP8 lossy). */
+  const webpSize = (file: string) => {
+    const b = readFileSync(file);
+    assert.equal(b.toString('latin1', 0, 4) + b.toString('latin1', 8, 12), 'RIFFWEBP', file);
+    const chunk = b.toString('latin1', 12, 16);
+    if (chunk === 'VP8X') return { w: 1 + b.readUIntLE(24, 3), h: 1 + b.readUIntLE(27, 3) };
+    if (chunk === 'VP8L') {
+      const bits = b.readUInt32LE(21);
+      return { w: (bits & 0x3fff) + 1, h: ((bits >> 14) & 0x3fff) + 1 };
+    }
+    return { w: b.readUInt16LE(26) & 0x3fff, h: b.readUInt16LE(28) & 0x3fff };
+  };
+
+  test('her çıkartmanın kareleri ve durağan resmi var; karelerin düzeni dosyayla aynı', () => {
+    const art = read('components/ReactionArt.tsx');
+    const pack = STICKER_PACKS.find((p) => p.id === 'penguen')!;
+    assert.equal(pack.stickers.length, 24);
+    assert.ok(pack.animated && pack.price > 0);
+    const row = /^ {2}'(penguen-[a-z-]+)': \{ sheet: require\('([^']+)'\), still: require\('([^']+)'\), frames: (\d+), cols: (\d+), frameMs: (\d+)(?:, holds: \{ ([^}]*) \})? \},$/gm;
+    const rows = new Map([...art.replace(/\r\n/g, '\n').matchAll(row)].map((m) => [m[1], m]));
+    assert.deepEqual([...rows.keys()].sort(), pack.stickers.map((x) => x.id).sort());
+    for (const [id, m] of rows) {
+      const [frames, cols, frameMs] = [Number(m[4]), Number(m[5]), Number(m[6])];
+      // Frames of 192 px, each in a cell with a 2 px clear gutter all round (components/sprite-sticker).
+      assert.deepEqual(webpSize(resolve(SRC, 'components', m[2])), { w: cols * 196, h: Math.ceil(frames / cols) * 196 }, id);
+      assert.deepEqual(webpSize(resolve(SRC, 'components', m[3])), { w: 192, h: 192 }, id);
+      assert.ok(frames >= 2 && frameMs >= 40 && frameMs <= 250, id);
+      for (const h of (m[7] ?? '').split(',').filter(Boolean)) {
+        const [at, n] = h.split(':').map((x) => Number(x.trim()));
+        assert.ok(at >= 0 && at < frames && n >= 2, `${id}: ${h}`);
+      }
+    }
   });
 });
 

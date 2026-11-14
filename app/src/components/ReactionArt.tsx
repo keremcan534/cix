@@ -7,11 +7,13 @@
 // tepki-eglence-yerlere-yattim (= temel-kahkaha) and tepki-vip-kristal (= vip-elmas). Every other delivered sticker is
 // in a pack (Ses Odası, Çay Ocağı, Duygular+, Kutlama and Maskot Hayvanlar; the §21 VIP emojis in VIP), so none waits
 // for one. A new one goes into SRC below together with its pack (data/catalog, and server/api/catalog.mjs for a sold
-// pack).
+// pack). The Penguen pack moves on every phone and the web: each sticker is a sheet of frames and a still (SPRITES,
+// components/sprite-sticker), made from the designer's animated WebPs.
 import { Image, StyleSheet, View, type StyleProp, type TextStyle } from 'react-native';
 
 import { Text } from '@/components/text';
 import { LottieSticker, type StickerPlay } from '@/components/lottie-sticker';
+import { SpriteSticker, type SpriteArt } from '@/components/sprite-sticker';
 import { stickerById } from '@/data/catalog';
 import { bigEmojiSize, emojiOnlyCount, emojiRuns } from '@/lib/emoji-text';
 import { mentionRuns } from '@/lib/room-mention';
@@ -192,16 +194,44 @@ const ANIM: Record<string, () => object> = {
   'hamle-opucuk-sag': () => require('../../assets/reactions/duygu/duygu-opucuk.json'),
   'hamle-tkm': () => require('../../assets/reactions/duygu/hamle-tas.json'),
 };
-/** Whether a sticker moves (an animation, not a picture). */
-export const isAnimatedSticker = (id: string) => id in ANIM;
+/** The Penguen pack: a sheet of frames and a still per sticker (components/sprite-sticker). */
+const SPRITES: Record<string, SpriteArt> = {
+  'penguen-kahkaha': { sheet: require('../../assets/reactions/penguen/penguen-kahkaha-kareler.webp'), still: require('../../assets/reactions/penguen/penguen-kahkaha.webp'), frames: 9, cols: 3, frameMs: 120 },
+  'penguen-yerlere-yatarak-gulme': { sheet: require('../../assets/reactions/penguen/penguen-yerlere-yatarak-gulme-kareler.webp'), still: require('../../assets/reactions/penguen/penguen-yerlere-yatarak-gulme.webp'), frames: 9, cols: 3, frameMs: 120 },
+  'penguen-aglama': { sheet: require('../../assets/reactions/penguen/penguen-aglama-kareler.webp'), still: require('../../assets/reactions/penguen/penguen-aglama.webp'), frames: 9, cols: 3, frameMs: 140 },
+  'penguen-hickirarak-aglama': { sheet: require('../../assets/reactions/penguen/penguen-hickirarak-aglama-kareler.webp'), still: require('../../assets/reactions/penguen/penguen-hickirarak-aglama.webp'), frames: 9, cols: 3, frameMs: 130 },
+  'penguen-kizgin': { sheet: require('../../assets/reactions/penguen/penguen-kizgin-kareler.webp'), still: require('../../assets/reactions/penguen/penguen-kizgin.webp'), frames: 9, cols: 3, frameMs: 120 },
+  'penguen-asik': { sheet: require('../../assets/reactions/penguen/penguen-asik-kareler.webp'), still: require('../../assets/reactions/penguen/penguen-asik.webp'), frames: 9, cols: 3, frameMs: 130 },
+  'penguen-opucuk': { sheet: require('../../assets/reactions/penguen/penguen-opucuk-kareler.webp'), still: require('../../assets/reactions/penguen/penguen-opucuk.webp'), frames: 9, cols: 3, frameMs: 130 },
+  'penguen-masum-bakis': { sheet: require('../../assets/reactions/penguen/penguen-masum-bakis-kareler.webp'), still: require('../../assets/reactions/penguen/penguen-masum-bakis.webp'), frames: 9, cols: 3, frameMs: 140 },
+  'penguen-saskin': { sheet: require('../../assets/reactions/penguen/penguen-saskin-kareler.webp'), still: require('../../assets/reactions/penguen/penguen-saskin.webp'), frames: 18, cols: 5, frameMs: 90 },
+  'penguen-utanma': { sheet: require('../../assets/reactions/penguen/penguen-utanma-kareler.webp'), still: require('../../assets/reactions/penguen/penguen-utanma.webp'), frames: 16, cols: 4, frameMs: 90, holds: { 4: 2, 12: 2 } },
+  'penguen-uyku': { sheet: require('../../assets/reactions/penguen/penguen-uyku-kareler.webp'), still: require('../../assets/reactions/penguen/penguen-uyku.webp'), frames: 18, cols: 5, frameMs: 90 },
+  'penguen-goz-devirme': { sheet: require('../../assets/reactions/penguen/penguen-goz-devirme-kareler.webp'), still: require('../../assets/reactions/penguen/penguen-goz-devirme.webp'), frames: 16, cols: 4, frameMs: 90, holds: { 4: 2, 12: 2 } },
+  'penguen-dans': { sheet: require('../../assets/reactions/penguen/penguen-dans-kareler.webp'), still: require('../../assets/reactions/penguen/penguen-dans.webp'), frames: 18, cols: 5, frameMs: 90 },
+  'penguen-alkis': { sheet: require('../../assets/reactions/penguen/penguen-alkis-kareler.webp'), still: require('../../assets/reactions/penguen/penguen-alkis.webp'), frames: 18, cols: 5, frameMs: 90 },
+  'penguen-kalp': { sheet: require('../../assets/reactions/penguen/penguen-kalp-kareler.webp'), still: require('../../assets/reactions/penguen/penguen-kalp.webp'), frames: 18, cols: 5, frameMs: 90 },
+  'penguen-sevgi': { sheet: require('../../assets/reactions/penguen/penguen-sevgi-kareler.webp'), still: require('../../assets/reactions/penguen/penguen-sevgi.webp'), frames: 18, cols: 5, frameMs: 90 },
+  'penguen-onay': { sheet: require('../../assets/reactions/penguen/penguen-onay-kareler.webp'), still: require('../../assets/reactions/penguen/penguen-onay.webp'), frames: 24, cols: 5, frameMs: 85 },
+  'penguen-begenmeme': { sheet: require('../../assets/reactions/penguen/penguen-begenmeme-kareler.webp'), still: require('../../assets/reactions/penguen/penguen-begenmeme.webp'), frames: 22, cols: 5, frameMs: 85, holds: { 16: 2, 18: 2 } },
+  'penguen-selam': { sheet: require('../../assets/reactions/penguen/penguen-selam-kareler.webp'), still: require('../../assets/reactions/penguen/penguen-selam.webp'), frames: 24, cols: 5, frameMs: 85 },
+  'penguen-sessiz-ol': { sheet: require('../../assets/reactions/penguen/penguen-sessiz-ol-kareler.webp'), still: require('../../assets/reactions/penguen/penguen-sessiz-ol.webp'), frames: 24, cols: 5, frameMs: 85 },
+  'penguen-sarki-soyle': { sheet: require('../../assets/reactions/penguen/penguen-sarki-soyle-kareler.webp'), still: require('../../assets/reactions/penguen/penguen-sarki-soyle.webp'), frames: 24, cols: 5, frameMs: 85 },
+  'penguen-kutlama': { sheet: require('../../assets/reactions/penguen/penguen-kutlama-kareler.webp'), still: require('../../assets/reactions/penguen/penguen-kutlama.webp'), frames: 24, cols: 5, frameMs: 85 },
+  'penguen-sarilma': { sheet: require('../../assets/reactions/penguen/penguen-sarilma-kareler.webp'), still: require('../../assets/reactions/penguen/penguen-sarilma.webp'), frames: 20, cols: 5, frameMs: 85, holds: { 4: 2, 6: 2, 15: 3 } },
+  'penguen-cosku': { sheet: require('../../assets/reactions/penguen/penguen-cosku-kareler.webp'), still: require('../../assets/reactions/penguen/penguen-cosku.webp'), frames: 24, cols: 5, frameMs: 85 },
+};
+
+/** Whether a sticker moves (an animation or a sheet of frames, not a picture). */
+export const isAnimatedSticker = (id: string) => id in ANIM || id in SPRITES;
 
 export const REACTION_TAB_ANIMATED = require('../../assets/reactions/tepki-sekme-hareketli.png');
 export const EMOJI_PACKS_ICON = require('../../assets/reactions/magaza-emoji-paketleri.png');
 
-export const stickerArtOf = (id: string): number | undefined => SRC[id];
+export const stickerArtOf = (id: string): number | undefined => SRC[id] ?? SPRITES[id]?.still;
 
 /** The stickers of a stickers-only message (at most 3), or null for anything else. */
-export const stickersOf = (text: string) => matchStickers(text, (id) => id in SRC || id in ANIM);
+export const stickersOf = (text: string) => matchStickers(text, (id) => id in SRC || id in ANIM || id in SPRITES);
 
 /** Text for previews (inbox, notifications): sticker tokens become their names. */
 export const messagePreview = (text: string) => stickerText(text, (id) => stickerById(id)?.name);
@@ -224,6 +254,8 @@ function StickerFace({ id, size, play }: { id: string; size: number; play: Stick
   const src = SRC[id];
   // A catalog sticker, or one of the pictures a Hamle plays (lib/room-moves).
   const sticker = stickerById(id) ?? MOVE_ART[id];
+  const sprite = SPRITES[id];
+  if (sprite) return <SpriteSticker art={sprite} size={size} play={play} label={sticker?.name} />;
   const anim = ANIM[id];
   if (anim) return <LottieSticker source={anim()} size={size} play={play} label={sticker?.name} fallback={sticker?.emoji ?? '❔'} />;
   if (!src) return <Text style={{ fontSize: Math.round(size * 0.82), lineHeight: Math.round(size * 1.05) }}>{sticker?.emoji ?? '❔'}</Text>;

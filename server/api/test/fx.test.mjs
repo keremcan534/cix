@@ -44,7 +44,7 @@ describe('hediye videoları sunucudan', () => {
     assert.equal(mp4Duration(mp4(1, 90_000, 720_000)), 8000);
     assert.equal(mp4Duration(Buffer.from('bozuk dosya')), 0);
     assert.equal(mp4Duration(Buffer.alloc(0)), 0);
-    // The real clips: 5 s each, the dragon a little longer.
+    // The real clips: 5 to 9 s.
     for (const name of new Set([...Object.values(FX_VIDEOS.gift), ...Object.values(FX_VIDEOS.entry)])) {
       const ms = mp4Duration(fs.readFileSync(path.join(DIR, name)));
       assert.ok(ms >= 3000 && ms <= 12_000, `${name}: ${ms} ms`);

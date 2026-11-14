@@ -16,7 +16,20 @@ export const FX_PATH = '/api/fx/';
 const NAME = /^[a-z0-9-]{1,64}\.mp4$/;
 
 export const FX_VIDEOS = {
-  gift: { g6: 'roket.mp4', h13: 'tatli-ayicik.mp4', h14: 'kraliyet-taci.mp4', c13: 'pirlanta-yuzuk.mp4' },
+  gift: {
+    g6: 'roket.mp4',
+    h13: 'tatli-ayicik.mp4',
+    h14: 'kraliyet-taci.mp4',
+    c13: 'pirlanta-yuzuk.mp4',
+    h15: 'sevimli-panda.mp4',
+    h16: 'hazine-sandigi.mp4',
+    h17: 'efsanevi-tek-boynuz.mp4',
+    h18: 'anka-kusu.mp4',
+    h19: 'altin-gemi.mp4',
+    h20: 'kristal-saray.mp4',
+    h21: 'altin-super-otomobil.mp4',
+    h22: 'altin-aslan.mp4',
+  },
   entry: { dragon: 'ejderha.mp4' },
 };
 

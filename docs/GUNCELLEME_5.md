@@ -50,10 +50,14 @@ Videolar artık uygulamaya gömülmez. `server/api/fx/` içinden verilir; telefo
 | 6 | Pırlanta Yüzük | 30–50 | 6 sn | Videolu, uygulamada (19.999 jeton) |
 | 5 | Roket | 50–80 | 6 sn | Videolu, uygulamada (1.999 jeton) |
 | 6 | Kraliyet Tacı | 50–80 | 6 sn | Videolu, uygulamada (9.999 jeton) |
-| 7–14 | Sevimli Panda, Hazine Sandığı, Efsanevi Tek Boynuz, Anka Kuşu, Altın Gemi, Kristal Saray, Altın Süper Otomobil, Altın Aslan | 60–400 | 6–8 sn | Videolar Drive'da; dosyalar ve fiyatlar bekleniyor |
+| 7–14 | Sevimli Panda, Hazine Sandığı, Efsanevi Tek Boynuz, Anka Kuşu, Altın Gemi, Kristal Saray, Altın Süper Otomobil, Altın Aslan | 60–400 | 6–8 sn | Videolu, uygulamada (h15–h22): 5.999, 7.999, 9.999, 14.999, 19.999, 24.999, 29.999, 39.999 jeton |
 | 15–20 | Altın Ejderha, Kraliyet Jeti, Altın İmparatorluk, Kozmik Ejderha, Ebedi Taht, Tanrıların Mirası | 500–5.000 | 8–10 sn | Henüz üretilmedi |
 
-**Açık soru:** belgedeki "Elmas" sütunu bugünkü jeton fiyatlarıyla uyuşmuyor (Tatlı Ayıcık belgede 20–30, uygulamada 2.999 jeton). Fiyatlar netleşene kadar değiştirilmedi.
+**Açık soru:** belgedeki "Elmas" sütunu bugünkü jeton fiyatlarıyla uyuşmuyor (Tatlı Ayıcık belgede 20–30, uygulamada 2.999 jeton). 7–14'ün fiyatları belgedeki sırayla, elmas başına ~100 jeton alınarak kondu; sahip değiştirmek isterse `app/src/data/mock.ts` GIFTS ve `server/api/catalog.mjs` GIFT_ROWS birlikte değişir.
+
+**7–14 nasıl hazırlandı (14 Kasım):** teslim edilen MP4'lerden kesildi (SVGA'lar kullanılmadı). Nesne yapay zekâ maskesiyle (rembg isnet), parıltı ve ışık parlaklıkla korunur; karanlığa kararan kareler maskede de saydamlaşır. Sahneli olanlarda (Aslan, Gemi, Otomobil) yalnız çok parlak ışıklar kalır, gökyüzü ve şehir gider; Kristal Saray'ı model kesemedi, ışıklı bir sahne olarak parlaklığıyla (luma) saydamlaştırıldı. İlk karedeki tek karelik kapak görüntüsü ve sondaki boş siyah saniyeler kesildi, ses de aynı yerden kesilip sonda 0,3 sn kısılır. Biçim öncekilerle aynı: 540×960 görünür, 20 fps, AAC ses, `server/api/fx/`.
+
+**Penguen çıkartma paketi (14 Kasım):** 24 hareketli penguen, mağazada 150 jeton (`pack-penguen`). Her çıkartma bir kare tablosu (WebP) ve durağan bir resim; telefon ve web aynı oynatır (`app/src/components/sprite-sticker.tsx`). Panelde durağan, sohbette bir kez, mikrofonda döngüde oynar.
 
 ## Telefonda denenecekler
 

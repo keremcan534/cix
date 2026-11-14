@@ -342,6 +342,15 @@ export const GIFTS: Gift[] = [
   // Full-screen transparent videos with sound (components/fx/video-fx).
   { id: 'h13', name: 'Tatlı Ayıcık', emoji: '🧸', price: 2_999, cat: 'hot', badge: 'music' },
   { id: 'h14', name: 'Kraliyet Tacı', emoji: '👑', price: 9_999, cat: 'hot', badge: 'music' },
+  // The owner's "standart 1. parti" 7–14 (docs/GUNCELLEME_5.md), cheapest first; their videos come from the server.
+  { id: 'h15', name: 'Sevimli Panda', emoji: '🐼', price: 5_999, cat: 'hot', badge: 'music' },
+  { id: 'h16', name: 'Hazine Sandığı', emoji: '💰', price: 7_999, cat: 'hot', badge: 'music' },
+  { id: 'h17', name: 'Efsanevi Tek Boynuz', emoji: '🦄', price: 9_999, cat: 'hot', badge: 'music' },
+  { id: 'h18', name: 'Anka Kuşu', emoji: '🔥', price: 14_999, cat: 'hot', badge: 'music' },
+  { id: 'h19', name: 'Altın Gemi', emoji: '⛵', price: 19_999, cat: 'hot', badge: 'music' },
+  { id: 'h20', name: 'Kristal Saray', emoji: '🏰', price: 24_999, cat: 'hot', badge: 'music' },
+  { id: 'h21', name: 'Altın Süper Otomobil', emoji: '🏎️', price: 29_999, cat: 'hot', badge: 'music' },
+  { id: 'h22', name: 'Altın Aslan', emoji: '🦁', price: 39_999, cat: 'hot', badge: 'music' },
   // --- Gameplay: interactive "throw" gifts (fixed price, no random rewards) ---
   { id: 'p1', name: 'Kar Topu', emoji: '❄️', price: 50, cat: 'gameplay' },
   { id: 'p2', name: 'Sulu Balon', emoji: '🎈', price: 99, cat: 'gameplay' },
