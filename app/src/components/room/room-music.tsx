@@ -36,7 +36,7 @@ import {
   type QueueTrack,
   type RoomMusic,
 } from '@/lib/live/music';
-import { useSheetMax } from '@/lib/sheet-space';
+import { useRoomSheetSpace, useSheetMax } from '@/lib/sheet-space';
 import { SCRIM, makeStyles, radius, space, useTheme } from '@/theme';
 
 /** This phone's volume when it comes back from silent and had none before. */
@@ -170,6 +170,8 @@ export function LiveMusicSheet({ visible, onClose, room, music, canPlay, enabled
   // Over a room the sheet reaches the Balkon line at most (lib/sheet-space): the list takes what the player leaves.
   const height = useSheetMax(0.78);
   const maxHeight = useSheetMax(0.92);
+  const roomSpace = useRoomSheetSpace();
+  const compactPlayer = roomSpace !== null && roomSpace < 600;
   const [view, setView] = useState<'list' | 'library'>('list');
   const [query, setQuery] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
@@ -316,7 +318,7 @@ export function LiveMusicSheet({ visible, onClose, room, music, canPlay, enabled
                 }
               />
 
-              <Player music={shown} np={np} may={may} busy={busy} act={act} level={level} setLevel={setLevel} onMute={toggleMute} />
+              <Player music={shown} np={np} may={may} busy={busy} act={act} level={level} setLevel={setLevel} onMute={toggleMute} compact={compactPlayer} />
             </>
           )}
         </View>
@@ -421,6 +423,7 @@ function Player({
   level,
   setLevel,
   onMute,
+  compact,
 }: {
   music: RoomMusic;
   np: NowPlaying | null;
@@ -430,6 +433,8 @@ function Player({
   level: number;
   setLevel: (v: number) => void;
   onMute: () => void;
+  /** Over the room (the sheet stops at the Balkon line): three short rows. */
+  compact?: boolean;
 }) {
   const s = useStyles();
   const t = useTheme();
@@ -441,19 +446,100 @@ function Player({
   const spin = (a: string, icon: keyof typeof Ionicons.glyphMap, size: number, color: string) =>
     busy === a ? <ActivityIndicator size="small" color={color} /> : <Ionicons name={icon} size={size} color={color} />;
 
+  const repeatBtn = (
+    <Pressable
+      onPress={() => act({ action: 'repeat', mode: nextRepeat(music.repeat) })}
+      disabled={!!busy}
+      style={s.ctrl}
+      hitSlop={6}
+      accessibilityRole="button"
+      accessibilityLabel={`${REPEAT_LABEL[music.repeat]}. Değiştir`}
+    >
+      {spin('repeat', 'repeat', 22, repeatOn ? t.semantic.actionText : t.colors.textDim)}
+      {music.repeat === 'one' && busy !== 'repeat' && <Text style={s.repeatOne}>1</Text>}
+    </Pressable>
+  );
+  const prevBtn = (
+    <Pressable onPress={() => act({ action: 'prev' })} disabled={!!busy || !has} style={[s.ctrl, !has && s.off]} hitSlop={6} accessibilityRole="button" accessibilityLabel="Önceki parça">
+      {spin('prev', 'play-skip-back', 24, t.colors.text)}
+    </Pressable>
+  );
+  const playBtn = (
+    <Pressable
+      onPress={() => act({ action: np && !np.paused ? 'pause' : 'resume' })}
+      disabled={!!busy || !has}
+      style={[s.play, compact && s.playSmall, !has && s.off]}
+      accessibilityRole="button"
+      accessibilityLabel={np && !np.paused ? 'Duraklat' : 'Çal'}
+    >
+      {busy === 'pause' || busy === 'resume' ? (
+        <ActivityIndicator color={t.semantic.actionInk} />
+      ) : (
+        <Ionicons name={np && !np.paused ? 'pause' : 'play'} size={compact ? 22 : 26} color={t.semantic.actionInk} style={np && !np.paused ? undefined : { marginLeft: 3 }} />
+      )}
+    </Pressable>
+  );
+  const skipBtn = (
+    <Pressable onPress={() => act({ action: 'skip' })} disabled={!!busy || !np} style={[s.ctrl, !np && s.off]} hitSlop={6} accessibilityRole="button" accessibilityLabel="Sonraki parça">
+      {spin('skip', 'play-skip-forward', 24, t.colors.text)}
+    </Pressable>
+  );
+  const muteBtn = (
+    <Pressable onPress={onMute} hitSlop={8} accessibilityRole="button" accessibilityLabel={level > 0 ? 'Bu telefonda sesi kapat' : 'Bu telefonda sesi aç'}>
+      <Ionicons name={level === 0 ? 'volume-mute' : level < 0.4 ? 'volume-low' : level < 0.75 ? 'volume-medium' : 'volume-high'} size={20} color={level === 0 ? t.colors.textDim : t.colors.text} />
+    </Pressable>
+  );
+  const progress = (
+    <View style={[s.bar, compact && s.barInline]} accessibilityRole="progressbar" accessibilityValue={track ? { min: 0, max: track.seconds, now: Math.floor(pos) } : undefined}>
+      <View style={[s.barFill, { width: track ? `${Math.min(100, (pos / track.seconds) * 100)}%` : '0%' }]} />
+    </View>
+  );
+  const title = track ? track.title : has ? 'Şu an çalan yok' : 'Müzik yok';
+
+  // Over the room the sheet stops at the Balkon line: the player keeps to three short rows (the title with who
+  // added it, the progress between its times, the controls beside this phone's volume), so the list keeps its rows.
+  if (compact) {
+    return (
+      <View style={[s.player, s.playerCompact]}>
+        <Text style={[s.npTitle, !track && s.npIdle]} numberOfLines={1}>
+          {title}
+          {!!by && <Text style={s.npSubInline}> · {by}</Text>}
+        </Text>
+        <View style={s.timesInline}>
+          <Text style={s.time}>{mmss(pos)}</Text>
+          {progress}
+          <Text style={s.time}>{track ? mmss(track.seconds) : '0:00'}</Text>
+        </View>
+        <View style={s.controlsCompact}>
+          {may && (
+            <>
+              {repeatBtn}
+              {prevBtn}
+              {playBtn}
+              {skipBtn}
+            </>
+          )}
+          <View style={s.volumeInline}>
+            {muteBtn}
+            <VolumeSlider value={level} onChange={setLevel} />
+            {!may && <Text style={s.volumeNote}>Bu telefonda</Text>}
+          </View>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={s.player}>
       <Text style={[s.npTitle, !track && s.npIdle]} numberOfLines={1}>
-        {track ? track.title : has ? 'Şu an çalan yok' : 'Müzik yok'}
+        {title}
       </Text>
       {!!by && (
         <Text style={s.npSub} numberOfLines={1}>
           {by}
         </Text>
       )}
-      <View style={s.bar} accessibilityRole="progressbar" accessibilityValue={track ? { min: 0, max: track.seconds, now: Math.floor(pos) } : undefined}>
-        <View style={[s.barFill, { width: track ? `${Math.min(100, (pos / track.seconds) * 100)}%` : '0%' }]} />
-      </View>
+      {progress}
       <View style={s.times}>
         <Text style={s.time}>{mmss(pos)}</Text>
         <Text style={s.time}>{track ? mmss(track.seconds) : '0:00'}</Text>
@@ -461,50 +547,17 @@ function Player({
 
       {may && (
         <View style={s.controls}>
-          <Pressable
-            onPress={() => act({ action: 'repeat', mode: nextRepeat(music.repeat) })}
-            disabled={!!busy}
-            style={s.ctrl}
-            hitSlop={6}
-            accessibilityRole="button"
-            accessibilityLabel={`${REPEAT_LABEL[music.repeat]}. Değiştir`}
-          >
-            {spin('repeat', 'repeat', 22, repeatOn ? t.semantic.actionText : t.colors.textDim)}
-            {music.repeat === 'one' && busy !== 'repeat' && <Text style={s.repeatOne}>1</Text>}
-          </Pressable>
-          <Pressable onPress={() => act({ action: 'prev' })} disabled={!!busy || !has} style={[s.ctrl, !has && s.off]} hitSlop={6} accessibilityRole="button" accessibilityLabel="Önceki parça">
-            {spin('prev', 'play-skip-back', 24, t.colors.text)}
-          </Pressable>
-          <Pressable
-            onPress={() => act({ action: np && !np.paused ? 'pause' : 'resume' })}
-            disabled={!!busy || !has}
-            style={[s.play, !has && s.off]}
-            accessibilityRole="button"
-            accessibilityLabel={np && !np.paused ? 'Duraklat' : 'Çal'}
-          >
-            {busy === 'pause' || busy === 'resume' ? (
-              <ActivityIndicator color={t.semantic.actionInk} />
-            ) : (
-              <Ionicons name={np && !np.paused ? 'pause' : 'play'} size={26} color={t.semantic.actionInk} style={np && !np.paused ? undefined : { marginLeft: 3 }} />
-            )}
-          </Pressable>
-          <Pressable onPress={() => act({ action: 'skip' })} disabled={!!busy || !np} style={[s.ctrl, !np && s.off]} hitSlop={6} accessibilityRole="button" accessibilityLabel="Sonraki parça">
-            {spin('skip', 'play-skip-forward', 24, t.colors.text)}
-          </Pressable>
+          {repeatBtn}
+          {prevBtn}
+          {playBtn}
+          {skipBtn}
           {/* Balances the repeat button, so play stays in the middle. */}
           <View style={s.ctrl} />
         </View>
       )}
 
       <View style={s.volume}>
-        <Pressable
-          onPress={onMute}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel={level > 0 ? 'Bu telefonda sesi kapat' : 'Bu telefonda sesi aç'}
-        >
-          <Ionicons name={level === 0 ? 'volume-mute' : level < 0.4 ? 'volume-low' : level < 0.75 ? 'volume-medium' : 'volume-high'} size={20} color={level === 0 ? t.colors.textDim : t.colors.text} />
-        </Pressable>
+        {muteBtn}
         <VolumeSlider value={level} onChange={setLevel} />
         <Text style={s.volumeNote}>Bu telefonda</Text>
       </View>
@@ -803,6 +856,14 @@ const useStyles = makeStyles(({ colors, semantic, surface, edge, ink }) => ({
   off: { opacity: 0.35 },
   volume: { flexDirection: 'row', alignItems: 'center', gap: space.md, marginTop: space.sm, paddingVertical: space.xs },
   volumeNote: { color: colors.textDim, fontSize: 11 },
+  // Compact player (over the room): three short rows.
+  playerCompact: { paddingTop: space.sm },
+  npSubInline: { color: colors.textDim, fontSize: 12, fontWeight: '400' },
+  timesInline: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginTop: 6 },
+  barInline: { flex: 1, marginTop: 0 },
+  controlsCompact: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 2 },
+  playSmall: { width: 44, height: 44, borderRadius: 22 },
+  volumeInline: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: space.sm, marginLeft: space.sm },
   slider: { flex: 1, height: 28, justifyContent: 'center' },
   sliderTrack: { height: 4, borderRadius: 2, backgroundColor: ink(0.12), overflow: 'hidden' },
   sliderFill: { height: 4, backgroundColor: colors.textDim },

@@ -4046,6 +4046,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         onInvite={() => setPanel('invite')}
         live={real}
       />
+      {/* A full page over the room: the sheets it opens keep their own heights, the room isn't in sight behind it. */}
+      <RoomSheetSpace.Provider value={null}>
         <RoomSettingsScreen
           visible={panel === 'settings'}
           onClose={closePanel}
@@ -4097,6 +4099,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           onClassicMics={setClassicMics}
           bossCfg={bossCfg}
         />
+      </RoomSheetSpace.Provider>
       <BossSeatSheet
         visible={bossSheet && bossOn}
         onClose={() => setBossSheet(false)}

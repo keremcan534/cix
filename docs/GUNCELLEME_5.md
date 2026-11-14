@@ -76,8 +76,14 @@ Müşterinin videosunda klavye açılınca sohbet koltukların üstüne çıkıy
 - **Alttan açılan pencereler:** En fazla Balkon çizgisine kadar açılır (`app/src/lib/sheet-space.ts`). Oda bu çizgiyi ölçer, her alt pencere boyunu oradan alır ve içeriği kayar.
   - Emoji paneli de çizginin altında açılır.
   - Hediye penceresi orada sıkışık düzendedir: tutamak ve seviye satırı yok, raf notu yalnız Şanslı'da, toplam tutar düğmede, uyarı yalnız sorun varsa. Adet listesi iki sütundur.
-  - Oda dışında pencereler eski boylarında kalır.
-- **Oyun paneli** (Oyun Salonu oyunları) oyun alanı gerektirdiği için eskisi gibi ekranın üçte ikisini kaplar.
+  - Sınırlanan pencereler: hediye, kişi kartı, menü, Odadaki Kullanıcılar, üye listesi, Mesajlar (sohbet ve hediye dahil), katkı sıralaması, müzik, oda kartı, Patron koltuğu, düzen seçici, koltuk rengi, PK kurulumu, Şanslı çanta, anket/hedef/etkinlik/soru, paylaş, efektler, moderasyon ve seçenek pencereleri.
+  - Kısa pencerede başlık ve ana düğme sabit kalır, arası kayar.
+  - Müzik penceresinde oynatıcı üç kısa satıra iner, böylece listeye yer kalır.
+  - Mesajlar penceresinde emoji paneli açılınca panel küçülür, yazı alanı kesilmez.
+  - Oda dışında pencereler eski boylarında kalır. Tam sayfa açılan Oda ayarları içindeki pencereler de eski boylarındadır, çünkü arkada oda görünmez.
+- **Değişmeyenler:**
+  - Oyun paneli (Oyun Salonu oyunları) oyun alanı istediği için eskisi gibi ekranın üçte ikisini kaplar.
+  - Uygulama genelindeki yaptırım bildirimi de eski boyundadır.
 
 ## Telefonda denenecekler
 
