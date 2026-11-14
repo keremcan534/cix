@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
 import { EntryEffect, ENTRY_LOOKS, type EntryFx, type EntryShow } from '@/components/fx/entry';
+import { VideoFx, entryVideoOf } from '@/components/fx/video-fx';
 import { GlossButton, Halo, hueAt } from '@/components/fx/float';
 import { ArtFrame, frameArtOf } from '@/components/fx/frame-art';
 import { AnimatedFrame, type FrameFx } from '@/components/fx/frames';
@@ -31,7 +32,8 @@ export default function StoreScreen() {
   const [preview, setPreview] = useState<EntryShow | null>(null);
   const t = useTheme();
   const styles = useStyles();
-  const playPreview = (c: Cosmetic) =>
+  const playPreview = (c: Cosmetic) => {
+    setPreviewMedia(c.kind === 'entry' && !settings.reduceMotion ? entryVideoOf(c.fx as EntryFx | undefined) : null);
     setPreview({
       name: me.name,
       avatar: me.avatar,
@@ -39,7 +41,10 @@ export default function StoreScreen() {
       ride: c.kind === 'ride' ? c.emoji : undefined,
       rideArt: c.kind === 'ride' ? storeArtOf(c.id) : undefined,
     });
+  };
   const items = COSMETICS.filter((c) => c.kind === tab);
+  // Read once per preview: a clip not on the phone yet starts downloading and the drawn banner plays this time.
+  const [previewMedia, setPreviewMedia] = useState<ReturnType<typeof entryVideoOf>>(null);
 
   const buy = (c: Cosmetic) => {
     showAlert(`${c.emoji} ${c.name}`, `Fiyat: ${c.price.toLocaleString('tr-TR')} jeton · Süre: ${c.days ? `${c.days} gün` : 'kalıcı'}`, [
@@ -150,7 +155,15 @@ export default function StoreScreen() {
             })}
       </ScrollView>
       <Text style={styles.footer}>Kozmetik satın alımları komisyon programına dahil değildir.</Text>
-      {preview && <EntryEffect key={`${preview.fx}-${preview.ride}`} show={preview} still={settings.reduceMotion} top={140} onDone={() => setPreview(null)} />}
+      {preview &&
+        (previewMedia ? (
+          // A video entry plays its clip as in a room, with the name banner over it; the clip ends the preview.
+          <VideoFx key={`${preview.fx}-video`} media={previewMedia} muted={false} onDone={() => setPreview(null)}>
+            <EntryEffect show={preview} still top={140} />
+          </VideoFx>
+        ) : (
+          <EntryEffect key={`${preview.fx}-${preview.ride}`} show={preview} still={settings.reduceMotion} top={140} onDone={() => setPreview(null)} />
+        ))}
     </SafeAreaView>
   );
 }
