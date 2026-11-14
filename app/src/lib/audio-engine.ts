@@ -42,7 +42,7 @@ export interface AudioEngine {
   disconnect(): void;
   setPublishing(on: boolean): void;
   setRoute(route: AudioRoute): void;
-  /** "Mikrofon denoise": the phone's own noise suppression on the mic (engines without a real mic skip it). */
+  /** "Mikrofon denoise": the AI cleaning on the live mic, on top of the always-on noise suppression (engines without a real mic skip it). */
   setNoiseSuppression?(on: boolean): void;
   /** How loud the other people in the room play on this phone, 0 (room sound off) to 1. */
   setPlaybackVolume?(volume: number): void;

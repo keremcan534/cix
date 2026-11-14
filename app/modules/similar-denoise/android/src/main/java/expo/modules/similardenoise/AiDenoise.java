@@ -19,6 +19,8 @@ public final class AiDenoise implements InvocationHandler {
   private static final int FRAME = 480;
   private static volatile boolean enabled = false;
   private static boolean attached = false;
+  /** 10 ms frames cleaned since the app started: shows on the phone whether the cleaning really runs. */
+  private static volatile long frames = 0;
   private static AiDenoise instance;
 
   /** Used on WebRTC's audio thread only. */
@@ -36,6 +38,10 @@ public final class AiDenoise implements InvocationHandler {
 
   public static boolean isAttached() {
     return attached;
+  }
+
+  public static long frames() {
+    return frames;
   }
 
   private static boolean attach() {
@@ -82,7 +88,7 @@ public final class AiDenoise implements InvocationHandler {
     if (!enabled || broken || numFrames != FRAME || buffer == null || !buffer.isDirect() || buffer.capacity() < FRAME * 4) return;
     try {
       if (state == 0) state = Rnnoise.create();
-      if (state != 0) Rnnoise.process(state, buffer);
+      if (state != 0 && Rnnoise.process(state, buffer) >= 0) frames++;
     } catch (Throwable t) {
       // Never take the mic down: off for the rest of this run.
       broken = true;

@@ -26,6 +26,7 @@ import { isFiniteNumber, oneOf, withDefaults } from '@/lib/saved-state';
 import { ME_DEFAULT, parkAccount, readSnapshot, unparkAccount, type Snapshot } from '@/lib/snapshot';
 import { setGameVolume } from '@/lib/game-sound';
 import { setHapticsEnabled } from '@/lib/haptics';
+import { setNoiseSuppression } from '@/lib/room-session';
 import { CONVERSATIONS, GIFTS, ME, isServerId, type Conversation, type EventShareCard, type RoomInviteCard, type User } from '@/data/mock';
 import type { ServerEarnings, ServerUser } from '@/lib/api';
 import { block as serverBlock, follow } from '@/lib/api';
@@ -73,8 +74,7 @@ export type Settings = {
   notifyTypes: Record<NotifyType, boolean>;
   snoozeUntil: number; // epoch ms; 0 = not snoozed
   roomBot: boolean;
-  // personal room audio (affects only this user)
-  roomMuted: boolean;
+  // personal room audio (affects only this user). "Oda sesi" on/off is not saved: it belongs to one visit (lib/room-session).
   musicVolume: number; // 0..1
   /** Game sound effects, separate from voice chat; games never duck or mute voices. */
   gameVolume: number;
@@ -505,7 +505,6 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       lowData: false,
       notifyTypes: { live: true, invite: true, event: true, agency: true, fanclub: true, game: true, payment: true, system: true },
       snoozeUntil: 0,
-      roomMuted: false,
       musicVolume: 0.7,
       gameVolume: 0.4,
       voiceVolume: 1,
@@ -534,6 +533,8 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     setHapticsEnabled(settings.haptics);
     setGameVolume(settings.gameVolume);
   }, [settings]);
+  // "Mikrofon denoise" (Efektler ve ses): the AI cleaning on every mic this phone sends, rooms and 1v1 calls alike.
+  useEffect(() => setNoiseSuppression(settings.micDenoise), [settings.micDenoise]);
   // The demo starts with three sample notices about sample people and rooms. A live build starts empty, and
   // drops the samples once from a save made before (their ids are only ever used by these samples).
   const [notifications, setNotifications] = useState<Notice[]>(() =>
