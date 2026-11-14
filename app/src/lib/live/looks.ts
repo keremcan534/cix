@@ -73,7 +73,7 @@ export async function loadLooks(ids: string[], freshAfter = 0) {
   const now = Date.now();
   const wanted = [...new Set(ids)].filter((id) => /^[0-9a-f-]{36}$/.test(id));
   const waiting = wanted.map((id) => asking.get(id)).filter((p): p is Promise<void> => !!p);
-  const need = wanted.filter((id) => !asking.has(id) && (store.get(id)?.at ?? 0) <= Math.max(now - TTL, freshAfter - 1));
+  const need = wanted.filter((id) => !asking.has(id) && (store.get(id)?.at ?? 0) <= Math.max(now - TTL, freshAfter));
   for (let i = 0; i < need.length; i += 50) {
     const batch = need.slice(i, i + 50);
     const started = Date.now();
