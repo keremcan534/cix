@@ -126,10 +126,12 @@ function Svip() {
                     <Text style={styles.lockText}>Kilitli</Text>
                   </View>
                 )}
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Text style={styles.svipTitle}>VIP {l.level}</Text>
-                  {l.art ? <Art name={l.art} size={68} style={{ marginLeft: 'auto' }} /> : <Text style={{ fontSize: 54, marginLeft: 'auto' }}>{l.emoji}</Text>}
+                {/* The level's emblem, large, in the card's open middle; the title keeps the left and the progress and
+                    Yükle stay clear below it. */}
+                <View style={styles.svipEmblem} pointerEvents="none">
+                  {l.art ? <Art name={l.art} size={92} /> : <Text style={{ fontSize: 68 }}>{l.emoji}</Text>}
                 </View>
+                <Text style={styles.svipTitle}>VIP {l.level}</Text>
                 {isNext ? (
                   <>
                     <Text style={styles.cardText}>
@@ -537,6 +539,8 @@ const useStyles = makeStyles(({ colors, surface, ink, dark }) => {
     lockChip: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(22,14,18,0.55)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
     lockText: { color: '#fff', fontWeight: '800', fontSize: 12 },
     svipTitle: { color: GOLD, fontSize: 40, fontWeight: '900', fontStyle: 'italic' },
+    // Over the right three fifths, clear of the progress line and the Yükle button below (the bottom 70 px).
+    svipEmblem: { position: 'absolute', top: 8, bottom: 70, left: '38%', right: 8, alignItems: 'center', justifyContent: 'center' },
     cardText: { color: '#fff', fontSize: 14 },
     track: { height: 6, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 3, overflow: 'hidden' },
     loadBtn: { position: 'absolute', right: 16, bottom: 16, backgroundColor: '#FDE7C7', borderRadius: 999, paddingHorizontal: 22, paddingVertical: 8 },

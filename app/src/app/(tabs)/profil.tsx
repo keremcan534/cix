@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams, type Href } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -13,7 +13,8 @@ import { VisitorsSheet, useProfileVisitors } from '@/components/visitors-sheet';
 import { FollowListSheet, MY_LISTS } from '@/components/follow-list-sheet';
 import { FOLLOWS_ME, userById } from '@/data/mock';
 import { displayId } from '@/data/profile';
-import { nobleInfo } from '@/data/status';
+import { NOBLE_TIERS, SVIP_LEVELS, nobleInfo } from '@/data/status';
+import { Art } from '@/components/Art';
 import { confirmLogout, showAlert } from '@/lib/alert';
 import { copyText } from '@/lib/clipboard';
 import { useApp } from '@/store';
@@ -130,15 +131,16 @@ export default function ProfileScreen() {
             <FramedAvatar uri={me.avatar} size={78} vipLevel={vipLevel} frameId={equipped.frame} artScale={1.4} />
           </Pressable>
           <View style={{ flex: 1, gap: 5 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View style={styles.nameRow}>
               <Text style={styles.name} numberOfLines={2}>
                 {me.name}
               </Text>
               {me.verified && <VerifiedBadge size={16} />}
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-              <GenderChip user={me} owner />
-              <LevelChips wealth={wealthLevel} charm={charmLevel} />
+              {/* A size up here: under the big name the small chips' pictures were too small to read. */}
+              <GenderChip user={me} owner size="md" />
+              <LevelChips wealth={wealthLevel} charm={charmLevel} size="md" />
             </View>
             <AffiliationPills user={me} />
             {publicId !== null && (
@@ -176,9 +178,30 @@ export default function ProfileScreen() {
             <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
           </Pressable>
           <View style={{ flexDirection: 'row', gap: 8 }}>
-            <StatusCard title="VIP" sub={svipLevel ? `VIP ${svipLevel}` : 'Yok'} colors={['#D02E78', '#4A1630']} onPress={() => router.push({ pathname: '/vip', params: { tab: 'svip' } })} />
-            <StatusCard title="Abonelik" sub={vipDays > 0 ? `${vipDays} gün` : 'Yok'} colors={['#B7832E', '#4A3410']} onPress={() => router.push({ pathname: '/vip', params: { tab: 'vip' } })} />
-            <StatusCard title="Rütbe" sub={noble ? `${noble.emoji} ${noble.name}` : 'Henüz yok'} colors={['#7A2E4A', '#3A1A2E']} dot={!noble} onPress={() => router.push({ pathname: '/vip', params: { tab: 'noble' } })} />
+            {/* Each tile has its own picture: the VIP level's emblem, the subscription's crown, the rank's crest (the
+                first level's emblem and crest, dimmed, until there is one). */}
+            <StatusCard
+              title="VIP"
+              sub={svipLevel ? `VIP ${svipLevel}` : 'Yok'}
+              colors={['#D02E78', '#4A1630']}
+              icon={<Art name={SVIP_LEVELS[Math.max(0, Math.min(SVIP_LEVELS.length, svipLevel) - 1)].art} size={34} style={!svipLevel && { opacity: 0.6 }} />}
+              onPress={() => router.push({ pathname: '/vip', params: { tab: 'svip' } })}
+            />
+            <StatusCard
+              title="Abonelik"
+              sub={vipDays > 0 ? `${vipDays} gün` : 'Yok'}
+              colors={['#B7832E', '#4A3410']}
+              icon={<Icon3D name="crown" size={34} style={{ opacity: vipDays > 0 ? 1 : 0.9 }} />}
+              onPress={() => router.push({ pathname: '/vip', params: { tab: 'vip' } })}
+            />
+            <StatusCard
+              title="Rütbe"
+              sub={noble ? `${noble.emoji} ${noble.name}` : 'Henüz yok'}
+              colors={['#7A2E4A', '#3A1A2E']}
+              dot={!noble}
+              icon={<Art name={noble?.art ?? NOBLE_TIERS[0].art} size={34} style={!noble && { opacity: 0.6 }} />}
+              onPress={() => router.push({ pathname: '/vip', params: { tab: 'noble' } })}
+            />
           </View>
         </View>
 
@@ -295,8 +318,8 @@ function Group({ items }: { items: Item[] }) {
   );
 }
 
-/** Status tile; `sub` stays short (the crown art sits in the bottom-right corner). */
-function StatusCard({ title, sub, colors: c, dot, onPress }: { title: string; sub: string; colors: [string, string]; dot?: boolean; onPress: () => void }) {
+/** Status tile; `sub` stays short (its own picture sits in the bottom-right corner). */
+function StatusCard({ title, sub, colors: c, dot, icon, onPress }: { title: string; sub: string; colors: [string, string]; dot?: boolean; icon: ReactNode; onPress: () => void }) {
   const styles = useStyles();
   return (
     <Pressable style={{ flex: 1 }} onPress={onPress} accessibilityLabel={title}>
@@ -309,7 +332,9 @@ function StatusCard({ title, sub, colors: c, dot, onPress }: { title: string; su
         <Text style={styles.statusSub} numberOfLines={1}>
           {sub}
         </Text>
-        {title !== 'Rütbe' && <Icon3D name="crown" size={34} style={{ position: 'absolute', right: 6, bottom: 6, opacity: title === 'VIP' ? 1 : 0.9 }} />}
+        <View style={{ position: 'absolute', right: 6, bottom: 6 }} pointerEvents="none">
+          {icon}
+        </View>
       </LinearGradient>
     </Pressable>
   );
@@ -349,7 +374,10 @@ const useStyles = makeStyles(({ colors, semantic, lift, dark }) => ({
   top: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingTop: 16 },
   name: { color: colors.text, fontSize: 22, fontWeight: '800', flexShrink: 1 },
   id: { color: colors.textDim, fontSize: 13 },
-  completion: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.card, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, alignSelf: 'flex-start', ...lift },
+  // In the top-right corner beside the name line only (which keeps room for it), so the chips, the agency and
+  // Aile pills and the ID below use the whole width.
+  completion: { position: 'absolute', top: 16, right: 16, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.card, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, ...lift },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingRight: 104 },
   redDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.red },
   stats: { flexDirection: 'row', paddingHorizontal: 8 },
   statN: { color: colors.text, fontSize: 20, fontWeight: '800' },
@@ -362,7 +390,8 @@ const useStyles = makeStyles(({ colors, semantic, lift, dark }) => ({
   coinN: { color: colors.gold, fontWeight: '800', fontSize: 18, marginLeft: 'auto' },
   status: { borderRadius: 14, padding: 12, paddingRight: 10, height: 80, justifyContent: 'center', gap: 4, overflow: 'hidden' },
   statusTitle: { color: '#fff', fontSize: 18, fontWeight: '900' },
-  statusSub: { color: 'rgba(255,255,255,0.85)', fontSize: 12 },
+  // Short of the corner picture, so "Henüz yok" never runs under it.
+  statusSub: { color: 'rgba(255,255,255,0.85)', fontSize: 12, paddingRight: 26 },
   shortIcon: { width: 60, height: 60, borderRadius: 18, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center' },
   gameCard: { marginHorizontal: 16, backgroundColor: colors.card, borderRadius: 16, padding: 12, gap: 10, borderWidth: 1, borderColor: 'rgba(246,189,96,0.35)', ...(dark ? {} : { boxShadow: lift.boxShadow }) },
   gameHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },

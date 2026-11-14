@@ -343,7 +343,8 @@ function HubTile({ title, sub, art, tint, badge = 0, onPress }: { title: string;
       <PressableScale onPress={onPress} accessibilityRole="button" accessibilityLabel={badge > 0 ? `${title}, ${badge} yeni` : title}>
         <LinearGradient colors={tint} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hub}>
           <Gloss radius={16} strength={0.18} />
-          <Image source={art} style={{ width: 38, height: 38 }} resizeMode="contain" accessibilityIgnoresInvertColors />
+          {/* The picture fills the tile's top, down to its title. */}
+          <Image source={art} style={{ width: 56, height: 56 }} resizeMode="contain" accessibilityIgnoresInvertColors />
           <View style={{ gap: 1 }}>
             <Text style={styles.hubTitle} numberOfLines={2}>
               {title}
@@ -556,8 +557,8 @@ const useStyles = makeStyles(({ colors, lift, dark }) => ({
     paddingHorizontal: 4,
   },
   hubs: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingTop: 12 },
-  // Tall enough for a two-line title and a two-line note, so a third of a narrow phone cuts no word.
-  hub: { height: 132, borderRadius: 16, overflow: 'hidden', padding: 12, justifyContent: 'space-between' },
+  // Tall enough for the 56 px picture over a two-line title and a two-line note, so a third of a narrow phone cuts no word.
+  hub: { height: 146, borderRadius: 16, overflow: 'hidden', padding: 12, justifyContent: 'space-between' },
   hubTitle: { color: '#fff', fontSize: 14, lineHeight: 18, fontWeight: '800' },
   hubSub: { color: 'rgba(255,255,255,0.78)', fontSize: 11, lineHeight: 14 },
   hubBadge: { position: 'absolute', top: 8, right: 8 },

@@ -25,29 +25,32 @@ export const MALE_FILL = '#0369A1';
 /**
  * Profile spec §2-A: a hidden gender shows only the age to others; the owner still sees it, marked as hidden.
  * The gender is the symbol on its colour (female red, male blue), never the word. An age of 0 is an age nobody
- * entered yet (a new live account): it is left out, not shown as "0".
+ * entered yet (a new live account): it is left out, not shown as "0". `size` 'md' sits beside the 'md' level chips
+ * under the Profil tab's big name (components/ui LevelChips), at their height.
  */
-export function GenderChip({ user, owner }: { user: User; owner?: boolean }) {
+export function GenderChip({ user, owner, size = 'sm' }: { user: User; owner?: boolean; size?: 'sm' | 'md' }) {
   const styles = useStyles();
   const hidden = user.showGender === false;
   const age = user.age > 0 ? user.age : null;
+  const md = size === 'md';
+  const icon = md ? 13 : 12;
   if (!user.gender || (hidden && !owner)) {
     if (age === null) return null;
     return (
-      <View style={[styles.chip, styles.ageChip]} accessibilityLabel={`${age} yaş`}>
-        <Text style={[styles.chipText, styles.ageChipText]}>{age}</Text>
+      <View style={[styles.chip, styles.ageChip, md && styles.chipMd]} accessibilityLabel={`${age} yaş`}>
+        <Text style={[styles.chipText, styles.ageChipText, md && styles.chipTextMd]}>{age}</Text>
       </View>
     );
   }
   const female = user.gender === 'Kadın';
   return (
     <View
-      style={[styles.chip, { backgroundColor: female ? FEMALE_FILL : MALE_FILL }, hidden && styles.hiddenChip]}
+      style={[styles.chip, { backgroundColor: female ? FEMALE_FILL : MALE_FILL }, hidden && styles.hiddenChip, md && styles.chipMd]}
       accessibilityLabel={`${user.gender}${age === null ? '' : `, ${age} yaş`}${hidden ? ', gizli: yalnızca sen görüyorsun' : ''}`}
     >
-      <Ionicons name={female ? 'female' : 'male'} size={12} color="#fff" />
-      {age !== null && <Text style={styles.chipText}>{age}</Text>}
-      {hidden && <Ionicons name="eye-off" size={12} color="#fff" />}
+      <Ionicons name={female ? 'female' : 'male'} size={icon} color="#fff" />
+      {age !== null && <Text style={[styles.chipText, md && styles.chipTextMd]}>{age}</Text>}
+      {hidden && <Ionicons name="eye-off" size={icon} color="#fff" />}
     </View>
   );
 }
@@ -173,9 +176,12 @@ function Pill({ icon, emoji, label, a11y, href, empty }: { icon: keyof typeof Io
 
 const useStyles = makeStyles(({ colors }) => ({
   chip: { flexDirection: 'row', alignItems: 'center', gap: 3, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
+  // The 'md' level chips' height (components/ui CHIP md: 25 px, round ends).
+  chipMd: { height: 25, borderRadius: 13, paddingHorizontal: 9, paddingVertical: 0 },
   hiddenChip: { opacity: 0.6 },
   ageChip: { backgroundColor: colors.cardAlt },
   chipText: { color: '#fff', fontSize: 12, fontWeight: '800' },
+  chipTextMd: { fontSize: 14 },
   ageChipText: { color: colors.text },
   pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   pill: { flexDirection: 'row', alignItems: 'center', gap: 4, maxWidth: '100%', backgroundColor: colors.cardAlt, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 4 },
