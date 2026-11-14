@@ -13,13 +13,15 @@
 // Canlı ayarlar (live-settings.mjs): a hidden gift or pack is left out of the catalog, and a hidden gift is
 // refused (400 "Bu hediye artık yok", nothing moves; old apps still show it). The catalog also says which
 // campaign runs now, the Çevir rate and the settings' version (v), which the app compares with /api/config.
-// Prices stay compiled.
+// Prices stay compiled, except the admins' own gifts (Yönetim › Hediyeler, custom-gifts.mjs), which are listed and
+// sent here at the price saved there.
 // A gift sent in a server room is announced to the room's voice connection from here, after it is paid
 // (LiveKit SendData, so no phone can fake one); the phones draw only these, never a peer's own claim.
 import { recordIncome } from './agency-lib.mjs';
 import { addBondCoins } from './bonds.mjs';
 import { HttpError, auth, blockedBetween, claimRef, db, int, once, readJson, userId } from './core.mjs';
 import { EXCHANGE, GIFTS, GIFTS_PAUSED, GIFT_COUNTS, PACKS, SVIP_XP, VIP_SUBS, svipLevel } from './catalog.mjs';
+import { catalogGifts, customFx, customGiftsRev, giftOf } from './custom-gifts.mjs';
 import { fxCatalog } from './fx.mjs';
 import { live } from './live-settings.mjs';
 import { scorePkGift } from './pk.mjs';
@@ -83,8 +85,9 @@ export const giftRoutes = {
     const now = Date.now();
     const c = s.campaign;
     return {
-      // Off the shelf for now (catalog.mjs GIFTS_PAUSED): left out, so older apps drop them too.
-      gifts: [...GIFTS.values()].filter((g) => !s.giftsHidden.has(g.id) && !GIFTS_PAUSED.has(g.id)),
+      // The admins' gifts first (custom-gifts.mjs: with their icon; an older app skips them), then the compiled ones,
+      // without those off the shelf for now (catalog.mjs GIFTS_PAUSED): left out, so older apps drop them too.
+      gifts: [...catalogGifts(), ...[...GIFTS.values()].filter((g) => !s.giftsHidden.has(g.id) && !GIFTS_PAUSED.has(g.id))],
       counts: GIFT_COUNTS,
       packs: PACKS.filter((p) => !s.packsHidden.has(p.id)).map(({ id, productId, coins, firstBonus }) => ({ id, productId, coins, firstBonus })),
       // Abonelik's store products (vip.mjs), sold through the same stores as the packs (`purchases`).
@@ -95,9 +98,10 @@ export const giftRoutes = {
       // Only while it runs by the server's clock; a purchase gets it by the store's purchase time (purchases.mjs).
       campaign: c && Date.parse(c.startsAt) <= now && now < Date.parse(c.endsAt) ? { percent: c.percent, startsAt: c.startsAt, endsAt: c.endsAt, label: c.label } : null,
       exchange: { usdTry: s.usdTry, minDiamonds: EXCHANGE.minDiamonds },
-      // The gift and entry videos the phones download and keep (fx.mjs); an older app ignores it.
-      fx: fxCatalog(s.giftsHidden),
-      v: s.v,
+      // The gift and entry videos the phones download and keep (fx.mjs, and the admins' gifts'); an older app ignores it.
+      fx: [...fxCatalog(s.giftsHidden), ...customFx()],
+      // Grows with every live settings save and every change to the admins' gifts (as /api/config's).
+      v: s.v + customGiftsRev(),
     };
   },
 
@@ -106,7 +110,8 @@ export const giftRoutes = {
     // Read once: a gift that passed the check before a hide is committed; the next one is refused.
     const s = live();
     const b = await readJson(req);
-    const gift = GIFTS.get(b.giftId);
+    // A compiled gift or an admin's on the shelves (custom-gifts.mjs), at this server's price either way.
+    const gift = giftOf(b.giftId);
     if (!gift) throw new HttpError(400, 'Bu hediye artık yok');
     const count = int(b.count ?? 1, 1, 10_000);
     if (!count || !GIFT_COUNTS.includes(count)) throw new HttpError(400, `Adet ${GIFT_COUNTS.join(', ')} olabilir`);

@@ -7,7 +7,9 @@ export type FxKind = 'gift' | 'entry';
 export type FxVideo = { kind: FxKind; id: string; url: string; bytes: number; ms: number };
 
 const ID = /^[A-Za-z0-9_-]{1,32}$/;
-const URL_OF = /^\/api\/fx\/([a-z0-9-]{1,64})\.mp4\?v=([0-9a-f]{6,64})$/;
+// /api/fx/<name>.mp4 (a clip in server/api/fx) or /api/fx/g/<id>.mp4 (an admin's gift's, server/api/custom-gifts.mjs;
+// an older app's filter refuses that one, so it never downloads a clip for a gift it doesn't know).
+const URL_OF = /^\/api\/fx\/(g\/)?([a-z0-9-]{1,64})\.mp4\?v=([0-9a-f]{6,64})$/;
 /** Nothing the server lists is near this; a bigger number is a mistake, not a clip to download. */
 const MAX_BYTES = 64 * 1024 * 1024;
 const MAX_MS = 60_000;
@@ -33,10 +35,11 @@ export function parseFxList(raw: unknown): FxVideo[] | null {
   return out;
 }
 
-/** The file a clip is kept under: its name and its version, so a changed clip is a new file and the old one goes. */
+/** The file a clip is kept under: its name and its version, so a changed clip is a new file and the old one goes.
+ *  An admin's gift's clip starts with g- (no name in server/api/fx does). */
 export function fxFileName(v: FxVideo): string {
   const m = URL_OF.exec(v.url);
-  return m ? `${m[1]}-${m[2]}.mp4` : '';
+  return m ? `${m[1] ? 'g-' : ''}${m[2]}-${m[3]}.mp4` : '';
 }
 
 /**

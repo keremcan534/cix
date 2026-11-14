@@ -501,7 +501,11 @@ export const registerPush = (token: string, platform: 'ios' | 'android' | 'web',
 export const unregisterPush = (token: string) => call<{ registered: boolean }>('POST', '/api/push/unregister', { token });
 
 /** A signed address to PUT a photo or video to (with exactly `headers`); save `publicUrl` afterwards. */
-export const uploadUrl = (kind: 'avatar' | 'moment' | 'dm' | 'album' | 'notice' | 'music' | 'ticket' | 'roombg' | 'roomcover' | 'eventcover', contentType: string, size: number) =>
+export const uploadUrl = (
+  kind: 'avatar' | 'moment' | 'dm' | 'album' | 'notice' | 'music' | 'ticket' | 'roombg' | 'roomcover' | 'eventcover' | 'gifticon' | 'giftvideo' | 'giftsource',
+  contentType: string,
+  size: number,
+) =>
   call<{ uploadUrl: string; method: 'PUT'; headers: Record<string, string>; publicUrl: string; expiresIn: number }>('POST', '/api/media/upload-url', { kind, contentType, size });
 
 /**

@@ -14,7 +14,7 @@ import { ContactNote } from '@/components/contact-note';
 import { useReport } from '@/components/report-sheet';
 import { FramedAvatar, GradientButton, StateIcon, VerifiedBadge } from '@/components/ui';
 import { ProfileGiftSheet } from '@/components/profile-gift-sheet';
-import { GIFTS, MOMENTS, userById, type Gift, type Moment, type User } from '@/data/mock';
+import { MOMENTS, userById, type Gift, type Moment, type User } from '@/data/mock';
 import {
   AUTHOR_SVIP,
   EXTRA_MOMENTS,
@@ -31,7 +31,7 @@ import { showAlert } from '@/lib/alert';
 import { newRef } from '@/lib/api';
 import { contactRefusal } from '@/lib/contact-filter';
 import { liveGift, liveMode, message, toLocal } from '@/lib/live';
-import { useLiveCatalog, visibleGifts } from '@/lib/live/catalog-live';
+import { giftShelf, useLiveCatalog } from '@/lib/live/catalog-live';
 import * as live from '@/lib/live/moments';
 import { cityDistanceText } from '@/lib/live/distances';
 import type { PickedImage } from '@/lib/live/profile';
@@ -593,7 +593,7 @@ function ComposeBar({ me, onPress, lockedBelow }: { me: User; onPress: () => voi
  */
 function useMomentGift() {
   const { coins, svipLevel, spendCoins, spendBlock, recordGift, bump } = useApp();
-  const gifts = visibleGifts(GIFTS, useLiveCatalog());
+  const gifts = giftShelf(useLiveCatalog());
   const [to, setTo] = useState<User | null>(null);
   const toWallet = { text: 'Jeton yükle', onPress: () => router.push('/cuzdan') };
   const send = async (g: Gift): Promise<boolean> => {

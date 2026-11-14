@@ -13,8 +13,8 @@ import { FollowListSheet, MY_LISTS } from '@/components/follow-list-sheet';
 import { Avatar, Button, FramedAvatar, GradientButton, LevelChips, VerifiedBadge, VipBadge, VipTitle } from '@/components/ui';
 import { COSMETICS, FAN_LEVELS, cosmeticById, fanLevel, roomLevel, ROOM_LEVEL_ICONS } from '@/data/catalog';
 import { callPrice } from '@/data/economy';
-import { FOLLOWS_ME, GIFTS, INTERESTS, MOMENTS, ROOMS, userById, type Gift, type Moment, type Room, type User } from '@/data/mock';
-import { useLiveCatalog, visibleGifts } from '@/lib/live/catalog-live';
+import { FOLLOWS_ME, INTERESTS, MOMENTS, ROOMS, userById, type Gift, type Moment, type Room, type User } from '@/data/mock';
+import { giftShelf, useLiveCatalog } from '@/lib/live/catalog-live';
 import { privacyOf } from '@/data/privacy';
 import { countryArt } from '@/data/rooms-ui';
 import { COUNTRIES } from '@/data/social-ui';
@@ -89,7 +89,7 @@ export default function UserProfile() {
     coins, diamonds, wealthXp, charmXp, wealthLevel, charmLevel, vipDays, vipSubUntil, stats, logSafety, pendingAvatar, submitAvatar,
   } = useApp();
   // Gifts the owner hid in Canlı ayarlar are not offered here (the wall below still counts every gift).
-  const giftChoices = visibleGifts(GIFTS, useLiveCatalog());
+  const giftChoices = giftShelf(useLiveCatalog());
   const isMe = id === 'me';
   // Live mode: everything shown comes from the server or is left out; the demo's sample values stay in the demo.
   const live = liveMode();
@@ -1464,7 +1464,7 @@ function OnurTab({
         <Text style={[styles.sectionTitle, { color: colors.text, fontSize: 18 }]}>Hediye Koleksiyonu</Text>
         <View style={{ flex: 1 }} />
         <Text style={styles.meta}>
-          Toplanan <Text style={{ color: colors.text, fontWeight: '800' }}>{lit}</Text>/{GIFTS.length}
+          Toplanan <Text style={{ color: colors.text, fontWeight: '800' }}>{lit}</Text>/{giftWall.length}
         </Text>
       </View>
       <View style={styles.giftWall}>

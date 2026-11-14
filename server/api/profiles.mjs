@@ -26,6 +26,7 @@
 // eraseAccount; the album files with media.mjs removeUserFiles). Someone who blocked me can't be read.
 import { HttpError, auth, db, env, int, limit, publicText, readJson, subActive, tx, userId } from './core.mjs';
 import { GIFTS, vipLevelOf } from './catalog.mjs';
+import { customGiftIds } from './custom-gifts.mjs';
 import { LIVE, announceLook, statusOf } from './economy.mjs';
 import { topBoard } from './gifts.mjs';
 import { removeFiles, verifyUpload } from './media.mjs';
@@ -34,7 +35,8 @@ import { roomLevel } from './rooms.mjs';
 import { charmPointsOf } from './wallet.mjs';
 import { wealthPointsOf } from './wheel.mjs';
 
-const GIFT_IDS = [...GIFTS.keys()];
+/** The gifts a profile counts: the compiled ones and the admins' (Yönetim › Hediyeler) that aren't deleted. */
+const giftIds = () => [...GIFTS.keys(), ...customGiftIds()];
 const STAFF = { admin: 'admin', moderator: 'moderator' };
 /** How many friends $1 has: people they follow who follow them back (blocking ends both follows). */
 const FRIENDS = `SELECT count(*) FROM follows a JOIN follows b ON b.follower = a.followee AND b.followee = a.follower
@@ -140,7 +142,7 @@ export async function profileMore(u, self = false) {
     db.query(
       `SELECT (${FRIENDS}) AS friends,
               (SELECT coalesce(sum(count), 0) FROM gift_events WHERE recipient = $1 AND gift_id = ANY($2::text[])) AS gifts`,
-      [u.id, GIFT_IDS],
+      [u.id, giftIds()],
     ),
     db.query('SELECT * FROM profile_extras WHERE user_id = $1', [u.id]),
     photosOf(u.id),
@@ -227,7 +229,7 @@ export const profileRoutes = {
     const me = await auth(req);
     const u = await readable(me, userId(url.searchParams.get('id')));
     const [gifts, owned, friends] = await Promise.all([
-      db.query('SELECT gift_id, sum(count)::int AS n FROM gift_events WHERE recipient = $1 AND gift_id = ANY($2::text[]) GROUP BY gift_id ORDER BY n DESC, gift_id', [u.id, GIFT_IDS]),
+      db.query('SELECT gift_id, sum(count)::int AS n FROM gift_events WHERE recipient = $1 AND gift_id = ANY($2::text[]) GROUP BY gift_id ORDER BY n DESC, gift_id', [u.id, giftIds()]),
       db.query(
         `SELECT DISTINCT e.kind, e.sku FROM entitlements e
           WHERE e.user_id = $1 AND e.kind IN ('ride', 'entry') AND e.revoked_at IS NULL AND e.starts_at <= now() AND (e.ends_at IS NULL OR e.ends_at > now())

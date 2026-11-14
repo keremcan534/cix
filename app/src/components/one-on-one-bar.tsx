@@ -11,11 +11,11 @@ import { HeartGlyph, HeartLink } from '@/components/heart-level';
 import { ProfileGiftSheet } from '@/components/profile-gift-sheet';
 import { Text } from '@/components/text';
 import { intimacyOf } from '@/data/messages-ui';
-import { GIFTS, type Gift, type User } from '@/data/mock';
+import { type Gift, type User } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import { heartShare, heartTier, heartTitle, heartView, lvAt, nextLookText, type HeartView } from '@/lib/heart-tiers';
 import { liveGift, liveMode, message, toServer } from '@/lib/live';
-import { useLiveCatalog, visibleGifts } from '@/lib/live/catalog-live';
+import { giftShelf, useLiveCatalog } from '@/lib/live/catalog-live';
 import { loadPair, MODE_NAME, type CallGate, type CallMode, type Pair } from '@/lib/live/one-on-one';
 import { useApp } from '@/store';
 import { makeStyles, radius, useTheme } from '@/theme';
@@ -156,7 +156,7 @@ export function CallButtons({ userId, pair }: { userId: string; pair: Pair }) {
  */
 export function useChatGift(user: User, onSent: () => void) {
   const { coins, svipLevel, spendCoins, spendBlock, recordGift, bump, sendMessage } = useApp();
-  const gifts = visibleGifts(GIFTS, useLiveCatalog());
+  const gifts = giftShelf(useLiveCatalog());
   const [open, setOpen] = useState(false);
   const toWallet = { text: 'Jeton yükle', onPress: () => router.push('/cuzdan') };
   const send = async (g: Gift): Promise<boolean> => {

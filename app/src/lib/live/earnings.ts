@@ -7,7 +7,8 @@
 import { useEffect, useSyncExternalStore } from 'react';
 
 import * as api from '@/lib/api';
-import { GIFTS, serverUserKnown } from '@/data/mock';
+import { serverUserKnown } from '@/data/mock';
+import { giftById } from '@/lib/live/catalog-live';
 import { fromServerLock, type DiamondLock } from '@/lib/diamond-locks';
 import { toLedgerEntry, type LedgerEntry, type RawLedgerRow } from '@/lib/ledger-view';
 import { liveMode, loadProfile, message, myServerId, rememberUser, toLocal } from '@/lib/live';
@@ -35,7 +36,7 @@ const subscribe = (l: () => void) => {
   return () => listeners.delete(l);
 };
 
-const giftOf = (id: string) => GIFTS.find((g) => g.id === id);
+const giftOf = (id: string) => giftById(id);
 
 /** The server's totals and locks. A failed read keeps the last good numbers and says why. */
 export async function loadEarnings() {

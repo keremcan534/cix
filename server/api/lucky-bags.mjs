@@ -19,7 +19,8 @@
 // Putting coins in a bag never counts
 // for Cömertlik (wheel.mjs wealthPoints: "çantası"); reward coins ('odul') can't go in a bag (spendCoins 'paid').
 import { recordIncome } from './agency-lib.mjs';
-import { GIFTS, svipLevel } from './catalog.mjs';
+import { svipLevel } from './catalog.mjs';
+import { giftNameOf, giftOf } from './custom-gifts.mjs';
 import { HttpError, auth, blockedBetween, claimRef, db, env, int, limit, once, readJson, tx } from './core.mjs';
 import { announceGift, liveKitRoom, ROOM } from './gifts.mjs';
 import { live } from './live-settings.mjs';
@@ -95,7 +96,7 @@ export async function drawBags() {
       }
       // Every winner's row and the sender's (a gift's diamonds), in id order as gifts.mjs.
       await c.query('SELECT id FROM users WHERE id = ANY($1::uuid[]) ORDER BY id FOR UPDATE', [[b.sender, ...winners.map(([w]) => w)]]);
-      const label = b.kind === 'gift' ? (GIFTS.get(b.gift_id)?.name ?? 'Hediye') : null;
+      const label = b.kind === 'gift' ? (giftNameOf(b.gift_id) ?? 'Hediye') : null;
       let parts = b.parts;
       const paid = [];
       for (const [k, [who, units]] of winners.entries()) {
@@ -200,7 +201,8 @@ export const luckyBagRoutes = {
       if (!units || !BAG_RULES.coins.includes(units)) throw new HttpError(400, `Çantaya ${BAG_RULES.coins.map(fmt).join(', ')} jeton konabilir`);
       if (!packets || !BAG_RULES.coinPackets.includes(packets)) throw new HttpError(400, `Pay sayısı ${BAG_RULES.coinPackets.join(', ')} olabilir`);
     } else {
-      gift = GIFTS.get(b.giftId);
+      // A compiled gift or an admin's on the shelves (custom-gifts.mjs), at this server's price.
+      gift = giftOf(b.giftId);
       if (!gift || live().giftsHidden.has(gift.id)) throw new HttpError(400, 'Bu hediye artık yok');
       if (gift.minSvip && svipLevel(Number(u.svip_xp)) < gift.minSvip) throw new HttpError(403, `${gift.name} VIP ${gift.minSvip} ve üstü için`);
       units = int(b.count, 1, 10_000);

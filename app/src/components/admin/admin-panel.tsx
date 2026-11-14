@@ -3,8 +3,8 @@
 // and Yaptırımlar on the server's admin routes. Moderators get Destek and Yaptırımlar. Every money or account action asks first, then shows a short result and reloads
 // its list. Yaptırımlar shows only when the sanctions meta answers (sanction.view; a 403 hides it); one person's
 // sanctions open over the tabs, and custom sheets (apply, appeal decision, policy editor) over everything.
-// Canlı ayarlar shows only for admins whose GET /api/admin/live-settings answers (a 403 hides it); Şanslı hediyeler
-// (packages, odds, limits, sends) only for admins.
+// Canlı ayarlar shows only for admins whose GET /api/admin/live-settings answers (a 403 hides it); Hediyeler (the gifts
+// added without an app update, gifts-admin) and Şanslı hediyeler (packages, odds, limits, sends) only for admins.
 import { useState, type ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -29,6 +29,7 @@ import { SanctionUserScreen } from './sanction-user';
 import { SanctionsSection } from './sanctions';
 import { CasinoReportSection } from './casino-report';
 import { EventsAdminSection } from './events-admin';
+import { GiftsAdminSection } from './gifts-admin';
 import { SupportSection } from './support';
 import { TeamSection } from './team-notices';
 import { UsersSection } from './users';
@@ -38,6 +39,7 @@ const TABS: { key: Tab; label: string; count?: keyof Pending }[] = [
   { key: 'ozet', label: 'Özet' },
   { key: 'kullanici', label: 'Kullanıcılar' },
   { key: 'ayarlar', label: 'Canlı ayarlar' },
+  { key: 'hediye', label: 'Hediyeler' },
   { key: 'ugurlu', label: 'Şanslı hediyeler' },
   { key: 'oyun', label: 'Oyun Salonu' },
   { key: 'etkinlik', label: 'Etkinlikler' },
@@ -158,7 +160,7 @@ function PanelBody({
   const showLive = isAdmin && !moderator && (!!live.data?.view || !!live.error);
   const tabs = moderator
     ? TABS.filter((t) => t.key === 'yaptirim' || t.key === 'destek')
-    : TABS.filter((t) => (t.key !== 'yaptirim' || showSanctions) && (t.key !== 'ayarlar' || showLive) && (t.key !== 'ugurlu' || isAdmin) && (t.key !== 'oyun' || isAdmin) && (t.key !== 'etkinlik' || isAdmin) && (t.key !== 'duyuru' || isAdmin));
+    : TABS.filter((t) => (t.key !== 'yaptirim' || showSanctions) && (t.key !== 'ayarlar' || showLive) && (t.key !== 'hediye' || isAdmin) && (t.key !== 'ugurlu' || isAdmin) && (t.key !== 'oyun' || isAdmin) && (t.key !== 'etkinlik' || isAdmin) && (t.key !== 'duyuru' || isAdmin));
 
   const ctx: AdminCtx = {
     toast: (text) => setToast((t) => ({ text, n: (t?.n ?? 0) + 1 })),
@@ -217,6 +219,7 @@ function PanelBody({
           </View>
           <View style={{ flex: 1 }}>
             {tab === 'ayarlar' && <LiveSettingsSection load={live} />}
+            {tab === 'hediye' && <GiftsAdminSection />}
             {tab === 'ugurlu' && <LuckySection />}
             {tab === 'oyun' && <CasinoReportSection />}
             {tab === 'etkinlik' && <EventsAdminSection />}
