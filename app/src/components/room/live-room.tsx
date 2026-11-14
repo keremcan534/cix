@@ -381,7 +381,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // Entry effect from cosmetics (ride/entry) or VIP level.
   const entryInfo = useMemo(() => {
     const tier = vipTier(vipLevel);
-    const entryItem = cosmeticById(equipped.entry);
+    // One taken out of the shop (data/catalog `retired`) plays no more, even while it is still on.
+    const worn = cosmeticById(equipped.entry);
+    const entryItem = worn && !worn.retired ? worn : undefined;
     const ride = cosmeticById(equipped.ride);
     const noble = nobleInfo(nobleTier);
     if (!entryItem && !ride && !GATES.entryBanner(svipLevel, nobleTier)) return null;
