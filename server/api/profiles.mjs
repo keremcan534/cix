@@ -11,8 +11,8 @@
 // Levels: Cömertlik from the coins a person spent (wheel.mjs wealthPoints), Yankı from the diamonds others gave them
 // (wallet.mjs charmPoints), as levels only: the points would tell others what someone spends or earns. A list reads
 // them for everyone in it in a few queries, and keeps them a minute (LEVELS_CACHE_MS) so Ana Sayfa's refresh stays
-// cheap. "Seviyeyi Gizle" (hideWealth, hideCharm; a VIP right, VIP 1 and up by SVIP level or Rütbe) sends that level as
-// null, while the person has VIP.
+// cheap. "Seviyeyi Gizle" (hideWealth, hideCharm; a VIP right: VIP 1 and up by SVIP level or Rütbe, or the Abonelik
+// while it runs, vip.mjs) sends that level as null, while the person has it.
 // Friends are people who follow each other. The gift wall and the "Hediye" count are the gifts of the catalog this
 // person received (gift_events). Rides and entry effects are what they own in the shop now (economy.mjs). Medals
 // and titles are earned by the rules in profile-rules.mjs on these same records; nothing here is made up.
@@ -24,9 +24,9 @@
 // (Keşfet's men-see-women rule, 1v1 matching and who pays there, the agency streamer rule) and stops it going out to
 // other people (core.mjs profileOf, moments, families). Everything here goes with the account (social.mjs
 // eraseAccount; the album files with media.mjs removeUserFiles). Someone who blocked me can't be read.
-import { HttpError, auth, db, env, int, limit, publicText, readJson, tx, userId } from './core.mjs';
+import { HttpError, auth, db, env, int, limit, publicText, readJson, subActive, tx, userId } from './core.mjs';
 import { GIFTS, vipLevelOf } from './catalog.mjs';
-import { LIVE, statusOf } from './economy.mjs';
+import { LIVE, announceLook, statusOf } from './economy.mjs';
 import { topBoard } from './gifts.mjs';
 import { removeFiles, verifyUpload } from './media.mjs';
 import { ALBUM_MAX, CHARM_XP, COUNTRIES, EDUCATION, EXTRA_LIMITS as L, LANGUAGES, MEDAL_RULES, RELATIONSHIP, TAGS, TITLE_RULES, WEALTH_XP, ZODIACS, levelFrom } from './profile-rules.mjs';
@@ -97,18 +97,21 @@ export async function countriesOf(ids) {
   return Object.fromEntries(r.rows.map((x) => [x.user_id, x.country]));
 }
 
-/** Who of `ids` hides which level from others now: they chose to, and they have VIP (else it shows again). */
+/** Who may hide their levels: VIP 1 and up (SVIP level or Rütbe), or a running Abonelik. */
+const mayHideLevels = (u, nobleTier) => vipLevelOf(u.svip_xp, nobleTier) >= 1 || subActive(u);
+
+/** Who of `ids` hides which level from others now: they chose to, and they may (else it shows again). */
 async function hiddenOf(ids) {
   if (!ids.length) return {};
   const r = await db.query(
-    `SELECT x.user_id, x.hide_wealth, x.hide_charm, u.svip_xp,
+    `SELECT x.user_id, x.hide_wealth, x.hide_charm, u.svip_xp, u.vip_sub_until,
             (SELECT max(e.tier) FROM entitlements e WHERE e.user_id = x.user_id AND e.kind = 'noble' AND ${LIVE}) AS noble
        FROM profile_extras x JOIN users u ON u.id = x.user_id
       WHERE x.user_id = ANY($1::uuid[]) AND (x.hide_wealth OR x.hide_charm)`,
     [ids],
   );
   const out = {};
-  for (const x of r.rows) if (vipLevelOf(x.svip_xp, x.noble === null ? null : Number(x.noble)) >= 1) out[x.user_id] = { wealth: x.hide_wealth, charm: x.hide_charm };
+  for (const x of r.rows) if (mayHideLevels(x, x.noble === null ? null : Number(x.noble))) out[x.user_id] = { wealth: x.hide_wealth, charm: x.hide_charm };
   return out;
 }
 
@@ -261,8 +264,8 @@ export const profileRoutes = {
     for (const [k, col] of [['hideWealth', 'hide_wealth'], ['hideCharm', 'hide_charm']]) {
       if (b[k] === undefined) continue;
       if (typeof b[k] !== 'boolean') throw new HttpError(400, 'Geçersiz seviye görünürlüğü');
-      // Hiding is a VIP right (as Profil ziyaretçileri: VIP 1 and up); showing again is always allowed.
-      if (b[k] && vipLevelOf(u.svip_xp, (await statusOf(db, u.id)).noble?.tier) < 1) throw new HttpError(403, 'Seviyeleri gizlemek VIP ayrıcalığıdır');
+      // Hiding is a VIP right (VIP 1 and up, or the Abonelik); showing again is always allowed.
+      if (b[k] && !mayHideLevels(u, (await statusOf(db, u.id)).noble?.tier)) throw new HttpError(403, 'Seviyeleri gizlemek VIP ayrıcalığıdır');
       set[col] = b[k];
     }
     const keys = Object.keys(set);
@@ -278,6 +281,8 @@ export const profileRoutes = {
     });
     const r = await db.query('SELECT x.*, u.gender_hidden FROM users u LEFT JOIN profile_extras x ON x.user_id = u.id WHERE u.id = $1', [u.id]);
     const x = r.rows[0];
+    // A gender hidden or shown again recolors their speaking ring in the room they are in.
+    if (b.genderHidden !== undefined && b.genderHidden !== u.gender_hidden) void announceLook(u.id);
     return { extras: { ...extrasView(x.user_id ? x : null), genderHidden: x.gender_hidden, hideWealth: !!x.hide_wealth, hideCharm: !!x.hide_charm } };
   },
 

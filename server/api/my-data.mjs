@@ -5,20 +5,18 @@
 //
 // Every table that holds my personal data is read here, in one read-only snapshot: profile and sign-in, sessions and
 // devices, follows and blocks, the direct messages I sent and received, Anlar, gifts sent and received, Çantam, the wallet
-// (ledger, coin lots, diamond locks, purchases, Jeton Noktası transfers, withdrawals, shop items, paid 1v1 minutes),
+// (ledger, coin lots, diamond locks, purchases, VIP subscriptions, Jeton Noktası transfers, withdrawals, shop items, paid 1v1 minutes),
 // games, rooms, Etkinlik Merkezi (my events, places and the reminders sent to me), family, bonds, agency, visits, reports I made, sanctions on me and my appeals, support tickets, the
 // spending limit and Similar Ekibi notices written to me.
 // Other people appear only as I already see them in the app: their id and name where I deal with them (a message, a
 // gift, a follow). Never what is private to them or to the staff: who blocked or reported me, who visited my profile
-// without VIP (as GET /api/me/visitors), staff notes and which staff member acted, the room password, or the hashes,
+// without the Abonelik (as GET /api/me/visitors), staff notes and which staff member acted, the room password, or the hashes,
 // codes and risk flags kept to keep accounts safe. Short-lived records (sign-in codes, the match queue, who is in a
 // room right now) are not included; they are deleted within hours.
 // my-data-tables.mjs lists the tables read here and why the others that point at an account are not (the test holds
 // every such table to one of the two lists).
 // Kept for this: only when I last asked (data_exports, for the once-a-day limit); it goes with the account.
-import { HttpError, SANCTION_SELECT, auth, db, limit, profileOf, sanctionView } from './core.mjs';
-import { statusOf } from './economy.mjs';
-import { vipLevelOf } from './catalog.mjs';
+import { HttpError, SANCTION_SELECT, auth, db, limit, profileOf, sanctionView, subActive } from './core.mjs';
 import { spendLimitOf } from './spend-limit.mjs';
 import { ticketsOf } from './support.mjs';
 import { referralDataOf } from './referrals.mjs';
@@ -185,6 +183,18 @@ export async function exportOf(c, uid) {
       campaignBonus: num(x.campaign_bonus),
       status: x.status,
       sandbox: x.sandbox,
+      at: x.created_at,
+    })),
+    // Abonelik (vip.mjs): the store's order number, not the purchase token (that one only the store and this server use).
+    vipSubscriptions: await all('SELECT id, platform, product_id, order_id, expires_at, auto_renewing, state, test, created_at FROM vip_subscriptions WHERE user_id = $1 ORDER BY id', (x) => ({
+      id: num(x.id),
+      platform: x.platform,
+      productId: x.product_id,
+      orderId: x.order_id ?? null,
+      until: x.expires_at,
+      autoRenewing: x.auto_renewing,
+      state: x.state,
+      test: x.test,
       at: x.created_at,
     })),
     // Jeton Noktası: the reference, note and address only on transfers I made myself.
@@ -503,8 +513,8 @@ export async function exportOf(c, uid) {
     })),
   };
 
-  // Who opened my profile: as GET /api/me/visitors shows it (the count for everyone, the people with VIP).
-  const vip = vipLevelOf(u.svip_xp, (await statusOf(c, uid)).noble?.tier) >= 1;
+  // Who opened my profile: as GET /api/me/visitors shows it (the count for everyone, the people with the Abonelik).
+  const vip = subActive(u);
   const visitorRows = await all(
     `SELECT v.visitor_id, u.name, v.visits, v.last_at FROM profile_visits v JOIN users u ON u.id = v.visitor_id
       WHERE v.owner_id = $1 AND v.last_at > now() - interval '7 days' AND u.deleted_at IS NULL AND ${NOT_BLOCKED('v.visitor_id')} ORDER BY v.last_at DESC`,

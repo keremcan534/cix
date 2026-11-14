@@ -89,3 +89,32 @@ export function demoBoard({ roomId, side, period, people, session }: { roomId: s
   for (const [uid, coins] of now) sample.set(uid, (sample.get(uid) ?? 0) + coins);
   return rankScores(sample);
 }
+
+// --- The podium's layout ---------------------------------------------------------------------------------------
+export type PodiumPlace = 1 | 2 | 3;
+/** The steps' picture (components/RoomArt CONTRIB_PODIUM): width / height, and each step's top surface from its top (0–1). */
+export type PodiumArt = { aspect: number; top: Readonly<Record<PodiumPlace, number>> };
+/** The podium is never wider than this: on a tablet the three places stay together, in a phone's proportions. */
+export const PODIUM_MAX = 480;
+
+/**
+ * The podium in a row `width` wide with `pad` on each side: the stage (the three places side by side and centred,
+ * 2nd | 1st | 3rd in equal thirds, which is where the picture's steps are), the height of the steps' picture (0
+ * without one), each place's photo, and how much picture is under each place, from its step's top surface down, so
+ * each person stands on their own step. The photos shrink on a narrow phone, so a laurel (1.5 × the photo) stays in
+ * its own third.
+ */
+export function podiumLayout(width: number, art: PodiumArt | null, pad = 16) {
+  const stage = Math.max(0, Math.min(Math.floor(width - 2 * pad), PODIUM_MAX));
+  const steps = art && stage > 0 ? Math.round(stage / art.aspect) : 0;
+  const fit = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, Math.round(n)));
+  const first = fit(stage * 0.22, 48, 88);
+  const other = fit(stage * 0.17, 40, 68);
+  const stand = (place: PodiumPlace) => (art && steps > 0 ? Math.round(steps * (1 - art.top[place])) : undefined);
+  return {
+    stage,
+    steps,
+    face: { 1: first, 2: other, 3: other } as Record<PodiumPlace, number>,
+    stand: { 1: stand(1), 2: stand(2), 3: stand(3) } as Record<PodiumPlace, number | undefined>,
+  };
+}

@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 
 import { Text, TextInput } from '@/components/text';
@@ -10,9 +10,12 @@ import { Avatar, GradientButton } from '@/components/ui';
 import { userById, type User } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import { CONTACT_TITLE, contactRefusal } from '@/lib/contact-filter';
+import { denoiseLine, type DenoiseLine } from '@/lib/mic-denoise';
 import { followerInviteLeft, formatWait } from '@/lib/room-invites';
+import { engineInfo } from '@/lib/room-session';
 import type { Settings } from '@/store';
 import { colors, semantic } from '@/theme';
+import { aiDenoiseAvailable, aiDenoiseStatus } from '../../../modules/similar-denoise';
 
 export type Poll = { id: string; question: string; options: { text: string; votes: number }[]; myVote: number | null; endsIn: number; live: boolean; closed: boolean };
 export type Goal = { id: string; title: string; kind: 'join' | 'like' | 'event'; target: number; progress: number; endsIn: number; paid: boolean };
@@ -331,18 +334,26 @@ function Volume({ settings, set, k, label }: { settings: Settings; set: SetFn; k
   );
 }
 
-type ToggleKey = 'roomMuted' | 'micDenoise' | 'effectsOff' | 'giftFx' | 'bigGiftsOnly' | 'entryFx' | 'micAnim' | 'seatReactions' | 'reduceMotion' | 'lowData';
-function SoundToggle({ settings, set, k, label, hint, off = false }: { settings: Settings; set: SetFn; k: ToggleKey; label: string; hint?: string; off?: boolean }) {
+type ToggleKey = 'micDenoise' | 'micRaw' | 'effectsOff' | 'giftFx' | 'bigGiftsOnly' | 'entryFx' | 'micAnim' | 'seatReactions' | 'reduceMotion' | 'lowData';
+const NOTE_COLOR: Record<DenoiseLine['tone'], string> = { ok: semantic.live, wait: colors.textDim, bad: colors.gold };
+/** A switch with its name, what it does and, when there is one, how it stands on this phone right now. */
+function SwitchRow({ label, hint, note, value, onChange, off = false }: { label: string; hint?: string; note?: DenoiseLine | null; value: boolean; onChange: (v: boolean) => void; off?: boolean }) {
   return (
     <View style={[styles.row, off && { opacity: 0.45 }]}>
       <View style={{ flex: 1, gap: 2 }}>
         <Text style={{ color: '#fff' }}>{label}</Text>
         {hint ? <Text style={styles.dim}>{hint}</Text> : null}
+        {note ? <Text style={[styles.dim, { color: NOTE_COLOR[note.tone] }]}>{note.text}</Text> : null}
       </View>
-      <Switch value={settings[k]} disabled={off} onValueChange={(v) => set(k, v)} accessibilityLabel={label} />
+      <Switch value={value} disabled={off} onValueChange={onChange} accessibilityLabel={label} />
     </View>
   );
 }
+function SoundToggle({ settings, set, k, label, hint, note, off = false }: { settings: Settings; set: SetFn; k: ToggleKey; label: string; hint?: string; note?: DenoiseLine | null; off?: boolean }) {
+  return <SwitchRow label={label} hint={hint} note={note} value={settings[k]} onChange={(v) => set(k, v)} off={off} />;
+}
+// The AI noise cleaning is in Android builds only; elsewhere the voice engine's own suppression is all there is, always on.
+const AI_DENOISE = aiDenoiseAvailable();
 
 /** Efektler ve ses: what I hear in the room, how my mic sounds, and which room effects play (this phone only;
  *  gift payments and records never change). */
@@ -351,6 +362,8 @@ export function EffectsSheet({
   onClose,
   settings,
   set,
+  soundOff,
+  setSoundOff,
   isOwner,
   roomFx,
   setRoomFx,
@@ -359,19 +372,49 @@ export function EffectsSheet({
   onClose: () => void;
   settings: Settings;
   set: SetFn;
+  /** "Oda sesi" for this visit (lib/room-session), the same switch as the speaker button in the room's bar. */
+  soundOff: boolean;
+  setSoundOff: (off: boolean) => void;
   /** My own room (prototype): its gift effects can be switched off for everyone. */
   isOwner: boolean;
   roomFx: { giftEffects: boolean };
   setRoomFx: (p: Partial<{ giftEffects: boolean }>) => void;
 }) {
   const all = settings.effectsOff;
+  // Read each time the sheet opens or the switch moves: whether the AI cleaning really runs (real voice only).
+  const denoiseNote = useMemo(
+    () => (visible && AI_DENOISE && engineInfo().capabilities.realAudio ? denoiseLine(settings.micDenoise, aiDenoiseStatus()) : null),
+    [visible, settings.micDenoise],
+  );
   return (
     <Sheet visible={visible} onClose={onClose} title="Efektler ve ses" art={ROOM_ICON_ART.sound}>
       <Text style={styles.dim}>Yalnızca bu telefonda geçerlidir. Odadakilerin duyduğu, hediyeler ve kayıtlar aynı kalır.</Text>
       <Text style={styles.label}>Ses</Text>
-      <SoundToggle settings={settings} set={set} k="roomMuted" label="Oda sesini kapat" hint="Konuşanları duymazsın; mikrofonun açıksa seni duymaya devam ederler." />
+      <SwitchRow
+        label="Oda sesini kapat"
+        hint="Konuşanları ve odanın müziğini duymazsın; mikrofonun açıksa seni duymaya devam ederler. Odaya yeniden girince ses açık gelir."
+        value={soundOff}
+        onChange={setSoundOff}
+      />
       <Volume settings={settings} set={set} k="voiceVolume" label="Konuşma sesi" />
-      <SoundToggle settings={settings} set={set} k="micDenoise" label="Mikrofon denoise" hint="Arka plan gürültüsünü (fan, trafik, klavye) azaltır." />
+      {AI_DENOISE && (
+        <SoundToggle
+          settings={settings}
+          set={set}
+          k="micDenoise"
+          label="Mikrofon denoise"
+          hint="Arka plan gürültüsünü (fan, trafik, klavye) yapay zekâyla temizler. Ham mikrofon kapalıyken temel gürültü engelleme her zaman açıktır."
+          note={settings.micRaw ? null : denoiseNote}
+          off={settings.micRaw}
+        />
+      )}
+      <SoundToggle
+        settings={settings}
+        set={set}
+        k="micRaw"
+        label="Ham mikrofon (şarkı modu)"
+        hint="Gürültü engelleme, yankı giderme ve otomatik ses ayarı tamamen kapanır; sesin olduğu gibi gider. Kulaklık tak: yoksa odadakiler kendi seslerini yankı olarak duyar."
+      />
       <Text style={styles.label}>Efektler</Text>
       <SoundToggle settings={settings} set={set} k="effectsOff" label="Tüm efektleri kapat" hint="Aşağıdakilerin hepsini birden kapatır." />
       <Text style={styles.label}>Hediyeler</Text>

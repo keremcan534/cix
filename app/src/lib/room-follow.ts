@@ -53,8 +53,25 @@ export function myRoomRows(joined: readonly Room[], followed: readonly { room: R
 export const myRoomMark = (r: Pick<MyRoomRow, 'member' | 'followed'>) => (r.member && r.followed ? 'Üye · Takipte' : r.member ? 'Üye' : 'Takipte');
 
 // --- Membership ------------------------------------------------------------------------------------------------
-export type Membership = 'owner' | 'none' | 'pending' | 'member';
+/** 'staff': a Yönetici or Süper Yönetici, a member of the room as its staff (nothing to join or leave). */
+export type Membership = 'owner' | 'staff' | 'none' | 'pending' | 'member';
 export type JoinMode = 'open' | 'apply' | 'closed';
+/** My membership as the server says it (GET /api/rooms/members `mine`). */
+export const membershipOf = (mine: string | null | undefined): Membership =>
+  mine === 'owner' ? 'owner' : mine === 'admin' ? 'staff' : mine === 'member' ? 'member' : mine === 'pending' ? 'pending' : 'none';
+/**
+ * Oda üyeleri counts the room's people as its list shows them: the owner and staff with the members, each once
+ * (server/api/rooms.mjs ROOM_PEOPLE). The demo's own room counts its own the same way.
+ */
+export const roomPeopleCount = (staffIds: readonly string[], memberIds: readonly string[]) => new Set([...staffIds, ...memberIds]).size;
+/**
+ * The room card's row of faces: the staff first, then the members, each once, at most `max`; `more` is the rest of
+ * `total` (which counts the staff too), for the bubble after the row.
+ */
+export function memberStrip(staffIds: readonly string[], memberIds: readonly string[], total: number, max: number): { row: string[]; more: number } {
+  const row = [...new Set([...staffIds, ...memberIds])].slice(0, max);
+  return { row, more: Math.max(0, total - row.length) };
+}
 /** How a sample room takes members (the demo): a room that keeps its mics or its door to itself asks first. */
 export const demoJoinMode = (room: Pick<Room, 'micPermission' | 'password' | 'roomType'>): JoinMode =>
   room.micPermission === 'members' || !!room.password || room.roomType === 'private' ? 'apply' : 'open';

@@ -26,12 +26,14 @@ import { isFiniteNumber, oneOf, withDefaults } from '@/lib/saved-state';
 import { ME_DEFAULT, parkAccount, readSnapshot, unparkAccount, type Snapshot } from '@/lib/snapshot';
 import { setGameVolume } from '@/lib/game-sound';
 import { setHapticsEnabled } from '@/lib/haptics';
+import { setNoiseSuppression, setRawMic } from '@/lib/room-session';
 import { CONVERSATIONS, GIFTS, ME, isServerId, type Conversation, type EventShareCard, type RoomInviteCard, type User } from '@/data/mock';
 import type { ServerEarnings, ServerUser } from '@/lib/api';
 import { block as serverBlock, follow } from '@/lib/api';
 import { bindWallet, forgetLiveAccount, liveEquip, liveMode, liveSpend, myServerId, rememberUser, toLocal, toServer } from '@/lib/live';
 import { forgetSeen, hideDms, markLiveRead } from '@/lib/live/messages';
 import { noteSpent, serverLimitBlock } from '@/lib/live/spend-limit';
+import { daysLeft, liveUntil } from '@/lib/live/vip-core';
 import { applyThread, markSent, type ServerDm, type ThreadSync } from '@/lib/dm-thread';
 import type { CallsFrom, DmFrom } from '@/data/privacy';
 import { ThemeScope, type Appearance, type Scheme } from '@/theme';
@@ -73,8 +75,7 @@ export type Settings = {
   notifyTypes: Record<NotifyType, boolean>;
   snoozeUntil: number; // epoch ms; 0 = not snoozed
   roomBot: boolean;
-  // personal room audio (affects only this user)
-  roomMuted: boolean;
+  // personal room audio (affects only this user). "Oda sesi" on/off is not saved: it belongs to one visit (lib/room-session).
   musicVolume: number; // 0..1
   /** Game sound effects, separate from voice chat; games never duck or mute voices. */
   gameVolume: number;
@@ -88,6 +89,8 @@ export type Settings = {
   micAnim: boolean;
   seatReactions: boolean;
   micDenoise: boolean;
+  /** Ham mikrofon: no voice processing at all, for singing (lib/room-session setRawMic). */
+  micRaw: boolean;
   invitesFrom: 'everyone' | 'following' | 'nobody';
   dailySpendLimit: number; // coins; 0 = no limit
   /** My wins (Lucky, games) are announced in every room with my name (off: "Bir kullanıcı"). */
@@ -233,7 +236,11 @@ type AppState = {
   nobleTier: number;
   nobleDays: number;
   buyNoble: (tier: number) => boolean;
+  /** Days left of the Abonelik: the server's (vipSubUntil) in a live build, the demo's own count otherwise. */
   vipDays: number;
+  /** Live build: when the Abonelik ends (ISO, from the server), null when none runs; always null in the demo. */
+  vipSubUntil: string | null;
+  /** The demo's purchase; a live build buys through lib/live/vip. */
   buyVipPlan: (days: number) => boolean;
   // central role & permission center (demo state)
   rbac: RbacState;
@@ -505,12 +512,11 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       lowData: false,
       notifyTypes: { live: true, invite: true, event: true, agency: true, fanclub: true, game: true, payment: true, system: true },
       snoozeUntil: 0,
-      roomMuted: false,
       musicVolume: 0.7,
       gameVolume: 0.4,
       voiceVolume: 1,
       giftSounds: true,
-      bigGiftsOnly: false, micDenoise: true,
+      bigGiftsOnly: false, micDenoise: true, micRaw: false,
       giftFx: true,
       entryFx: true,
       micAnim: true,
@@ -534,6 +540,9 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     setHapticsEnabled(settings.haptics);
     setGameVolume(settings.gameVolume);
   }, [settings]);
+  // "Mikrofon denoise" (Efektler ve ses): the AI cleaning on every mic this phone sends, rooms and 1v1 calls alike.
+  useEffect(() => setNoiseSuppression(settings.micDenoise), [settings.micDenoise]);
+  useEffect(() => setRawMic(settings.micRaw), [settings.micRaw]);
   // The demo starts with three sample notices about sample people and rooms. A live build starts empty, and
   // drops the samples once from a save made before (their ids are only ever used by these samples).
   const [notifications, setNotifications] = useState<Notice[]>(() =>
@@ -600,9 +609,13 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   const [nobleTier, setNobleTier] = useState(s.nobleTier ?? 0);
   const [nobleDays, setNobleDays] = useState(s.nobleDays ?? 0);
   const [vipDays, setVipDays] = useState(s.vipDays ?? 0);
+  // Live mode: the Abonelik is the server's (server/api/vip.mjs); days bought on the phone before don't count there.
+  const [vipSubUntil, setVipSubUntil] = useState<string | null>(s.vipSubUntil ?? null);
+  const subUntil = liveMode() ? liveUntil(vipSubUntil) : null;
+  const vipDaysLeft = liveMode() ? daysLeft(subUntil) : vipDays;
   const [rbac, setRbac] = useState<RbacState>(INITIAL_RBAC);
   const svipLevel = svipLevelOf(svipXp);
-  const vipLevel = Math.min(15, Math.max(svipLevel, nobleTier * 3, vipDays > 0 ? 1 : 0));
+  const vipLevel = Math.min(15, Math.max(svipLevel, nobleTier * 3, vipDaysLeft > 0 ? 1 : 0));
   const [agencyId, setAgencyId] = useState<string | null>(s.agencyId ?? null);
   const [agencyRole, setAgencyRole] = useState<AgencyRole | null>(s.agencyRole ?? null);
   const [pendingAgency, setPendingAgency] = useState<string | null>(null);
@@ -648,7 +661,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     loggedIn, me, coins, gameCoins, spentTotal, wealthXp, paidGames, ledger: ledger.slice(0, 100), spentDay: { date: today(), amount: spentToday },
     inventory: [...inventory], equipped, emojiPacks: [...emojiPacks], recentEmojis, settings, notifications: notifications.slice(0, 50),
     myRoom, isHost, diamonds, diamondLocks, totalDiamonds, charmXp, weekly, earnings: earnings.slice(0, 50), withdrawals, stats, giftWall,
-    claimedTasks: [...claimedTasks], checkInDay, checkInDate, svipXp, firstBuys: [...firstBuys], nobleTier, nobleDays, vipDays,
+    claimedTasks: [...claimedTasks], checkInDay, checkInDate, svipXp, firstBuys: [...firstBuys], nobleTier, nobleDays, vipDays, vipSubUntil,
     agencyId, agencyRole, ownedAgency, familyRole, familyId, fanClubs, recentRooms,
     serverId, following: [...following], blocked: [...blocked], conversations: conversations.map((c) => (c.messages.length > MAX_SAVED_MESSAGES ? { ...c, messages: c.messages.slice(-MAX_SAVED_MESSAGES) } : c)), followerInvites, starter, safetyLog, ownedAnims: [...ownedAnims], micFx,
     ...(parked && { parked }),
@@ -765,6 +778,8 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       if (switched && loggedIn) return forgetAccount();
     }
     if (isFiniteNumber(u.svipXp)) setSvipXp(u.svipXp);
+    // The Abonelik's end: every account answer of a newer server carries it (null when none runs).
+    if (u.vipSubUntil !== undefined) setVipSubUntil(typeof u.vipSubUntil === 'string' ? u.vipSubUntil : null);
     // Wallet answers carry no e-mail: only an answer that has the field changes it.
     if (u.email !== undefined) setEmail(u.email ?? null);
     if (u.phone !== undefined) {
@@ -1079,9 +1094,10 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     },
     rbac,
     updateRbac: (fn) => setRbac((s) => fn(s)),
-    vipDays,
+    vipDays: vipDaysLeft,
+    vipSubUntil: subUntil,
     buyVipPlan: (days) => {
-      // Paid through the store (TRY), so no coins are spent; the receipt is verified on the server.
+      // Demo only (no server, no store): the days are added here. A live build buys through lib/live/vip.
       const plan = VIP_PLANS.find((p) => p.days === days);
       if (!plan) return false;
       setVipDays((d) => d + days);

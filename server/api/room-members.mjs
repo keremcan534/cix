@@ -18,7 +18,7 @@ import { HttpError, UUID, auth, blockedBetween, db, limit } from './core.mjs';
 import { rulesOf } from './room-rules.mjs';
 // rooms.mjs imports room-social.mjs, which imports rooms.mjs; their functions are only used inside handlers.
 import { inRoom } from './room-social.mjs';
-import { liveKitName, mayManageMembers, rankOf, roomRow } from './rooms.mjs';
+import { ROOM_PEOPLE, liveKitName, mayManageMembers, rankOf, roomRow } from './rooms.mjs';
 
 /** Rows per page (the app asks for the next one as the list is scrolled). */
 export const MEMBER_PAGE = 50;
@@ -26,19 +26,11 @@ const FILTERS = ['all', 'in', 'out', 'pending'];
 const ROLES = ['member', 'admin', 'super', 'owner'];
 
 /**
- * The room's people as the viewer may see them. $1 room, $2 who is in its voice now (uuid[]), $3 the viewer,
- * $4 the viewer is in the room or its staff, $5 the viewer manages the room's members.
+ * The room's people (rooms.mjs ROOM_PEOPLE, as the card counts them) as the viewer may see them. $1 room, $2 who is
+ * in its voice now (uuid[]), $3 the viewer, $4 the viewer is in the room or its staff, $5 the viewer manages the
+ * room's members.
  */
-const PEOPLE = `WITH people AS (
-    SELECT r.owner AS user_id, 3 AS rank FROM rooms r WHERE r.id = $1
-    UNION ALL
-    SELECT a.user_id, CASE WHEN a.super THEN 2 ELSE 1 END FROM room_admins a
-     WHERE a.room_id = $1 AND a.user_id <> (SELECT owner FROM rooms WHERE id = $1)
-    UNION ALL
-    SELECT m.user_id, 0 FROM room_members m
-     WHERE m.room_id = $1 AND m.status = 'member' AND m.user_id <> (SELECT owner FROM rooms WHERE id = $1)
-       AND NOT EXISTS (SELECT 1 FROM room_admins a WHERE a.room_id = m.room_id AND a.user_id = m.user_id)
-  ), shown AS (
+const PEOPLE = `WITH people AS (${ROOM_PEOPLE}), shown AS (
     SELECT p.user_id, p.rank, u.name, u.avatar_url, m.created_at AS since, m.seen_at,
            coalesce(ps.show_last_seen, true) AS shows_seen,
            (p.user_id = ANY($2::uuid[]) AND ($4 OR p.user_id = $3 OR coalesce(ps.show_current_room, true))) AS here

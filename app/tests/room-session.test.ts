@@ -23,6 +23,8 @@ import {
   engineInfo,
   getSession,
   hasOpener,
+  hearing,
+  holdForCall,
   leaveForRoom,
   micBlock,
   micSending,
@@ -40,6 +42,8 @@ import {
   setPersist,
   setMiniHidden,
   setEngine,
+  setPlaybackVolume,
+  setRoomSound,
   setRoute,
 } from '@/lib/room-session';
 
@@ -248,6 +252,70 @@ describe('Kesintiler ve ses çıkışı', () => {
     assert.equal(stats().route, 'bluetooth');
     setRoute('speaker');
     assert.equal(stats().route, 'speaker');
+  });
+});
+
+describe('Oda sesi: bu ziyarete ait', () => {
+  /** The voices' volume each time the session gives the engine one; the last one is what plays now. */
+  let volumes: number[] = [];
+  const playing = () => volumes.at(-1);
+  beforeEach(() => {
+    volumes = [];
+    const e = createSimulatedEngine(() => isOnline());
+    setEngine({ ...e, name: e.name, capabilities: e.capabilities, setPlaybackVolume: (v) => void volumes.push(v) });
+    setPlaybackVolume(0.6); // "Konuşma sesi" %60
+  });
+
+  test('yeni ziyaret oda sesi açık başlar; kapatınca sesler bu telefonda susar, mikrofonum gitmeye devam eder', () => {
+    talking();
+    assert.deepEqual([s().soundOff, playing(), hearing(s())], [false, 0.6, true]);
+    setRoomSound(false);
+    assert.deepEqual([s().soundOff, playing(), hearing(s())], [true, 0, false]);
+    assert.deepEqual([micSending(s()), stats().publishing], [true, true]);
+    setRoomSound(true);
+    assert.deepEqual([s().soundOff, playing(), hearing(s())], [false, 0.6, true]);
+  });
+
+  test('küçültmek, mini kartı gizlemek, arka plana geçmek aynı ziyarettir: oda sesi kapalı kalır', () => {
+    talking();
+    setRoomSound(false);
+    assert.equal(openRoom('r1', info), 'same');
+    setMiniHidden(true);
+    onAppState('background');
+    onAppState('active');
+    setPlaybackVolume(1);
+    assert.deepEqual([s().soundOff, playing()], [true, 0]);
+  });
+
+  test('odadan çıkıp dönmek, başka odaya geçmek, uygulamayı yeniden açıp dönmek yeni ziyarettir: oda sesi açık gelir', () => {
+    talking();
+    setRoomSound(false);
+    endRoom('left');
+    assert.equal(playing(), 0.6);
+    talking();
+    assert.deepEqual([s().soundOff, playing()], [false, 0.6]);
+
+    setRoomSound(false);
+    assert.equal(openRoom('r2', info), 'confirm');
+    confirmSwitch();
+    assert.deepEqual([s().roomId, s().soundOff, playing()], ['r2', false, 0.6]);
+
+    setRoomSound(false);
+    resetSession(); // the app was closed: nothing of the old visit is left in memory
+    openRoom('r2', { ...info, recovered: true });
+    assert.equal(s().soundOff, false);
+  });
+
+  test('bire bir görüşme odayı susturur; bitince oda sesi bu ziyaretteki ayarına döner', () => {
+    talking();
+    holdForCall(true);
+    assert.equal(playing(), 0);
+    holdForCall(false);
+    assert.equal(playing(), 0.6);
+    setRoomSound(false);
+    holdForCall(true);
+    holdForCall(false);
+    assert.equal(playing(), 0, 'kapattığım oda sesi görüşmeden sonra da kapalı');
   });
 });
 

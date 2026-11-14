@@ -216,6 +216,7 @@ function Body({
             {kit.get('room_decor_off') && <DecorCard kit={kit} />}
             {kit.get('room_staff_away_minutes') && <RoomsCard kit={kit} />}
             {kit.get('event_max_minutes') && <EventRulesCard kit={kit} />}
+            {kit.get('lucky_announce_min_coins') && <WinAnnounceCard kit={kit} />}
             <SmsCard kit={kit} />
             <VersionCard kit={kit} />
           </View>
@@ -1128,6 +1129,46 @@ function EventRulesCard({ kit }: { kit: Kit }) {
       <View style={s.row}>
         <Button title="Varsayılana dön" variant="ghost" small disabled={kit.locked || Object.keys(reset).length === 0} onPress={() => kit.open('Etkinlik sınırları varsayılana dönsün', () => reset, 'Geri dönüş')} style={{ flex: 1 }} />
         <Button title="Gözden geçir" variant="tonal" small disabled={kit.locked || !dirty || bad} onPress={() => kit.open('Etkinlik sınırları değişsin', () => changes)} style={{ flex: 1 }} />
+      </View>
+    </Card>
+  );
+}
+
+// --- Kazanç duyurusu -------------------------------------------------------------------------------------------
+/**
+ * Şanslı wins told to every room (server/api/lucky.mjs, live-line.mjs lineWin): from how many coins a win gets the
+ * banner on top of every room. 0 (the default): every win.
+ */
+function WinAnnounceCard({ kit }: { kit: Kit }) {
+  const s = useStyles();
+  const x = kit.get('lucky_announce_min_coins');
+  const current = numOf(x.effective);
+  const [text, setText] = useState(String(current));
+  const v = parseWhole(text);
+  const problem = wholeError(v, x.bounds as IntBounds, x.label, ' jeton');
+  const changed = v !== null && v !== current;
+  return (
+    <Card title="Kazanç duyurusu" footer={lastChange(x)} pill={<InvalidPill x={x} />}>
+      <Text style={s.hint}>Sunucu uygular, değişiklik hemen geçerli olur. Kazananın kendi telefonu her kazancı yine gösterir.</Text>
+      <Field label={x.label} value={text} onChange={setText} keyboard="numeric" max={8} hint={`Şu an ${valueText('lucky_announce_min_coins', x.effective)} · ${x.help}`} />
+      {changed && <Problem text={problem} />}
+      <View style={s.row}>
+        <Button
+          title="Her kazanç"
+          variant="ghost"
+          small
+          disabled={kit.locked || current === 0}
+          onPress={() => kit.open('Şanslı kazançlarının hepsi duyurulsun', () => ({ lucky_announce_min_coins: 0 }), 'Geri dönüş')}
+          style={{ flex: 1 }}
+        />
+        <Button
+          title="Gözden geçir"
+          variant="tonal"
+          small
+          disabled={kit.locked || !changed || !!problem}
+          onPress={() => v !== null && kit.open('Kazanç duyurusu sınırı değişsin', () => ({ lucky_announce_min_coins: v }))}
+          style={{ flex: 1 }}
+        />
       </View>
     </Card>
   );

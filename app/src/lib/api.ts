@@ -26,10 +26,12 @@ import type { XoxMove, XoxState } from '@/lib/room-games/xox';
 
 /**
  * wealthXp: Cömertlik points, charmXp: Yankı points, only in GET /api/me (the server's counts, server/api/wheel.mjs
- * wealthPoints and wallet.mjs charmPoints).
+ * wealthPoints and wallet.mjs charmPoints). vipSubUntil: the Abonelik's end while it runs, else null (server/api/vip.mjs;
+ * missing from an older server).
  */
 export type ServerUser = {
   id: string; name: string; coins: number; diamonds: number; gameCoins: number; createdAt: string; phone?: string | null; svipXp?: number; wealthXp?: number; charmXp?: number; paidGames?: boolean;
+  vipSubUntil?: string | null;
   // Only in GET/PATCH /api/me and the sign-in and add-address answers; wallet answers leave them out.
   email?: string | null; identities?: string[]; phoneVerified?: boolean;
 };
@@ -235,6 +237,8 @@ export async function retrySignIn(): Promise<boolean> {
 /** Any route of the API with this session (the agency panels go through lib/agency-net). */
 export const apiRequest = <T>(method: 'GET' | 'POST', path: string, body?: object) => call<T>(method, path, body);
 
+/** The live line, with the wins announced to everyone (server/api/live-line.mjs lineWin; lib/live/win-news). */
+const LIVE_LINE = '/api/live?wins=1';
 /**
  * Opens my live line (lib/live/live-line): a request that stays open while the server writes events into it.
  * Null when there is no server or no session yet. Not compressed, so each event comes through as it is written.
@@ -243,14 +247,14 @@ export async function openLiveLine(signal: AbortSignal): Promise<Response | null
   if (!BASE) return null;
   await restoreSession();
   if (!session) return null;
-  return fetch(`${BASE}/api/live`, { headers: { Authorization: `Bearer ${session}`, Accept: 'text/event-stream', 'Accept-Encoding': 'identity' }, signal });
+  return fetch(`${BASE}${LIVE_LINE}`, { headers: { Authorization: `Bearer ${session}`, Accept: 'text/event-stream', 'Accept-Encoding': 'identity' }, signal });
 }
 
 /** The live line's address and my session, for the line's second way of reading it (XMLHttpRequest). */
 export async function liveLineTarget(): Promise<{ url: string; token: string } | null> {
   if (!BASE) return null;
   await restoreSession();
-  return session ? { url: `${BASE}/api/live`, token: session } : null;
+  return session ? { url: `${BASE}${LIVE_LINE}`, token: session } : null;
 }
 /** Ayarlar › Bağlantı testi: the server sends a ping on my line; `open` is how many lines it has from me. */
 export const pingLiveLine = () => call<{ open: number }>('POST', '/api/live/ping', {});
@@ -443,6 +447,8 @@ export type CatalogBody = {
   gifts: CatalogGift[];
   counts: number[];
   packs: CatalogPack[];
+  /** Abonelik's store products (server/api/vip.mjs); missing from an older server. */
+  vipPlans?: { productId: string; days: number }[];
   svipXp: number[];
   purchases?: { testTopup: boolean; stores: { android: boolean; ios: boolean } };
   campaign?: CatalogCampaign | null;
@@ -471,6 +477,13 @@ export const agencyRankings = (period: 'day' | 'week' | 'month') =>
  *  first-buy gift, `campaignBonus` a campaign's extra coins (missing from an older server). */
 export const verifyPurchase = (proof: StoreProof) =>
   call<{ user: ServerUser; replay: boolean; coins: number; bonus: number; campaignBonus?: number }>('POST', '/api/wallet/purchase', proof);
+
+/** Abonelik (server/api/vip.mjs): the server checks the store's subscription (or, on a test server, gives the plan's days)
+ *  and answers with its end. `replay`: this purchase was already counted. */
+export const subscribeVip = (proof: StoreProof) => call<{ user: ServerUser; replay: boolean; until: string | null; days: number }>('POST', '/api/vip/subscribe', proof);
+export type VipSubscription = { platform: 'android' | 'ios' | 'test'; productId: string; until: string; autoRenewing: boolean | null; test: boolean };
+/** My subscription as the server has it: its end (null when none runs) and the store subscriptions that run now. */
+export const vipStatus = () => call<{ until: string | null; autoRenewing: boolean; subscriptions: VipSubscription[]; plans: { productId: string; days: number }[] }>('GET', '/api/vip');
 
 /** A paid Hareketli in a server room (server/api/room-fx.mjs): the server's price, then it tells the room itself. */
 export const roomAnimation = (room: string, animationId: string, ref = newRef()) =>
@@ -609,8 +622,13 @@ export type RoomRules = {
   slowMode: boolean;
   words: string[];
 };
-export type RoomMember = UserCard & { since: string };
-export type RoomMembers = { members: RoomMember[]; total: number; cap: number; mine: 'owner' | 'member' | 'pending' | null; joinMode: RoomRules['joinMode']; canManage: boolean; pending: RoomMember[] };
+/** `since`: when they joined (null for the owner and the staff, who are members without joining). */
+export type RoomMember = UserCard & { since: string | null };
+/**
+ * The room card's Oda üyeleri: `total` counts the owner and staff with the members (as the full list does), `members`
+ * the first of them, staff first. `mine` 'admin': I'm a Yönetici or Süper Yönetici, a member as staff.
+ */
+export type RoomMembers = { members: RoomMember[]; total: number; joined?: number; cap: number; mine: 'owner' | 'admin' | 'member' | 'pending' | null; joinMode: RoomRules['joinMode']; canManage: boolean; pending: RoomMember[] };
 /** `image`: a photo in the chat (its storage address), null for text only. */
 export type DirectMessage = { id: number; from: string; to: string; text: string; image?: string | null; event?: SharedEvent; createdAt: string; readAt: string | null };
 /** An event sent in a message (Etkinlik Merkezi "Arkadaşına gönder"); older servers never send it. */
@@ -628,8 +646,13 @@ export const userProfile = (id: string, visit = false) =>
   call<{ user: PublicUser } & Partial<ProfileTies>>('GET', `/api/user?id=${encodeURIComponent(id)}${visit ? '&visit=1' : ''}`).then((r) => ({ ...r.user, agency: r.agency ?? null, family: r.family ?? null }));
 /** Someone who opened my profile in the last 7 days. */
 export type ServerVisitor = { id: string; name: string; avatarUrl: string | null; visits: number; lastAt: string };
-/** Profil ziyaretçileri: how many came (everyone), and who (`visitors`, VIP only: null without it). */
-export const myVisitors = () => call<{ count: number; visitors: ServerVisitor[] | null }>('GET', '/api/me/visitors');
+/** A visit without who made it (no VIP): how many times and when, to the minute. */
+export type HiddenVisitor = { visits: number; lastAt: string };
+/**
+ * Profil ziyaretçileri: how many came, and who (`visitors`, VIP only: null without it). Without VIP, `hidden` has the
+ * same visits without anyone's id, name or photo (an older server leaves it out).
+ */
+export const myVisitors = () => call<{ count: number; visitors: ServerVisitor[] | null; hidden?: HiddenVisitor[] }>('GET', '/api/me/visitors');
 export const follow = (to: string, on: boolean) => call<{ following: boolean }>('POST', '/api/follow', { to, follow: on }).then((r) => r.following);
 /** Keşfet: real people, most recently active first, with how far each is from me by city (no location). */
 export type DiscoverUser = { id: string; name: string } & ServerProfile & { online: boolean; levels?: Levels; country?: string | null; distance?: CityDistance | null };
@@ -656,6 +679,8 @@ export type ServerPk = {
   participants: string[];
   red: string[];
   blue: string[];
+  /** Takım PK: on a mic at the start but left out of both teams; they don't join later. An older server sends none. */
+  out?: string[];
   startAt: string;
   endAt: string;
   /** Points per sender → recipient (team: the recipient's team). */
@@ -663,9 +688,13 @@ export type ServerPk = {
   people: UserCard[];
 };
 export type ServerPkAnswer = { pk: ServerPk | null; now: string };
-export type ServerPkStart = { room: string; mode: 'solo'; durationMin: number; participants: string[]; ref: string } | { room: string; mode: 'team'; durationMin: number; red: string[]; blue: string[]; ref: string };
+export type ServerPkStart =
+  | { room: string; mode: 'solo'; durationMin: number; participants: string[]; ref: string }
+  | { room: string; mode: 'team'; durationMin: number; red: string[]; blue: string[]; out: string[]; ref: string };
 export const roomPk = (room: string) => call<ServerPkAnswer>('GET', `/api/rooms/pk?room=${encodeURIComponent(room)}`);
 export const startServerPk = (body: ServerPkStart) => call<ServerPkAnswer>('POST', '/api/rooms/pk', body);
+/** I'm on a mic while the room's PK runs: I join it (the server checks my mic and picks my team). */
+export const joinServerPk = (room: string) => call<ServerPkAnswer>('POST', '/api/rooms/pk/join', { room });
 export const cancelServerPk = (room: string) => call<ServerPkAnswer>('POST', '/api/rooms/pk/cancel', { room });
 /** `password` (4–32 characters, optional): only people who type it get into the room's voice. */
 export const createRoom = (title: string, announcement = '', roomType = 'free', password?: string) =>
@@ -918,8 +947,9 @@ export type ServerLucky = {
   minAge: number; gameCoins: number; mine: ServerLuckySend[];
 };
 export const lucky = () => call<ServerLucky>('GET', '/api/lucky');
-export const luckySend = (giftId: string, to: string[], count: number, room?: string, ref = newRef()) =>
-  call<{ send: ServerLuckySend; user: ServerUser; replay: boolean }>('POST', '/api/lucky/send', { giftId, to, count, room, ref });
+/** `named`: a win may carry my name and photo to every room (Ayarlar › "Kazançlarımda adım görünsün"). */
+export const luckySend = (giftId: string, to: string[], count: number, room?: string, ref = newRef(), named = false) =>
+  call<{ send: ServerLuckySend; user: ServerUser; replay: boolean }>('POST', '/api/lucky/send', { giftId, to, count, room, ref, named });
 export type ServerLuckyConfig = { gifts: ServerLuckyGift[]; dailyPayoutLimit: number; announceFrom: number };
 export type ServerLuckyStats = { sends: number; spent: number; paid: number; shared: number };
 export type ServerLuckyAdminSend = ServerLuckySend & { sender: { id: string; name: string } };
@@ -1322,7 +1352,10 @@ export type LiveKey =
   | CasinoKey
   | DecorKey
   | RoomKey
-  | EventKey;
+  | EventKey
+  | WinKey;
+/** Kazanç duyurusu (server/api/live-registry.mjs): from how many coins a Şanslı win is announced in every room (0: every win). */
+export type WinKey = 'lucky_announce_min_coins';
 /** Odalar (server/api/live-registry.mjs, "Odalar"): when a room without its staff closes, and the Patron koltuğu's coins and minutes. */
 export type RoomKey = 'room_staff_away_minutes' | 'boss_seat_coins' | 'boss_seat_minutes';
 /** Etkinlik Merkezi (server/api/live-registry.mjs, "Etkinlikler"): who may apply, how far ahead, how long and big, the grace, strikes. */

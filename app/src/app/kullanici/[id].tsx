@@ -86,7 +86,7 @@ export default function UserProfile() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const {
     me, following, toggleFollow, takeServerSocial, blocked, toggleBlock, createTicket, fanClubs, addFanPoints, myRoom, notify, updateMe, spendCoins, spendBlock, bump, settings, vipLevel, svipLevel, equipped, inventory, giftWall: wallOf, recordGift,
-    coins, diamonds, wealthXp, charmXp, wealthLevel, charmLevel, vipDays, stats, logSafety, pendingAvatar, submitAvatar,
+    coins, diamonds, wealthXp, charmXp, wealthLevel, charmLevel, vipDays, vipSubUntil, stats, logSafety, pendingAvatar, submitAvatar,
   } = useApp();
   // Gifts the owner hid in Canlı ayarlar are not offered here (the wall below still counts every gift).
   const giftChoices = visibleGifts(GIFTS, useLiveCatalog());
@@ -210,7 +210,8 @@ export default function UserProfile() {
   const myAlbumCount = live ? livePhotos.length : (me.photos?.length ?? 0);
   const albumIdOf = (url: string) => livePhotos.find((p) => p.url === url)?.id;
   const [openedAt] = useState(() => Date.now());
-  const vipUntil = vipDays > 0 ? new Date(openedAt + vipDays * 86_400_000).toLocaleDateString('tr-TR') : null;
+  // Live mode: the Abonelik's end as the server has it; the demo counts its days from now.
+  const vipUntil = vipSubUntil ? new Date(vipSubUntil).toLocaleDateString('tr-TR') : vipDays > 0 && !live ? new Date(openedAt + vipDays * 86_400_000).toLocaleDateString('tr-TR') : null;
 
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [albumBusy, setAlbumBusy] = useState(false);

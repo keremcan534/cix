@@ -1,10 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Image, Pressable, StyleSheet, View, type HostInstance } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, Easing, Image, Pressable, StyleSheet, View, useWindowDimensions, type HostInstance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Text } from '@/components/text';
+import { MAX_FONT_SCALE, Text } from '@/components/text';
 import { Avatar, FramedAvatar, VerifiedBadge } from '@/components/ui';
 import { GiftArt, giftArtOf, giftSource } from '@/components/GiftArt';
 import { EmojiText, ReactionArt, StickerArt, isAnimatedSticker, messagePreview, stickersOf } from '@/components/ReactionArt';
@@ -21,10 +21,12 @@ import type { SeatColorId } from '@/data/seat-colors';
 import { Gloss, Shine, useSpringPress } from '@/components/fx/surface';
 import { Photo } from '@/components/photo';
 import { RoleMark, type StaffMark } from '@/components/room/role-mark';
-import { VOICE_RING, VoiceWave, waveTint } from '@/components/room/voice-wave';
+import { VOICE_RING, VoiceWave } from '@/components/room/voice-wave';
 import { BondBubble, BondChip, BondLink } from '@/components/room/room-bonds';
 import type { RoomBond } from '@/data/bonds';
 import { nameLine, nameSize } from '@/lib/seat-fit';
+import { ringReach, seatRoom } from '@/lib/seat-cell';
+import { PILL_GAP, pkPillBox, pkPointsText } from '@/lib/pk';
 import { levelsLive, voiceLevel } from '@/lib/live/voice-level';
 import { RollingNumber } from '@/components/fx/rolling-number';
 import { BounceBadge } from '@/components/fx/bounce-badge';
@@ -139,8 +141,10 @@ export function Seat({
   // The room's word wins (its looks, null: hidden); else what this phone knows of them.
   const g = gender !== undefined ? gender : user?.showGender === false ? null : user?.gender;
   const voice = g ? VOICE_RING[g] : VOICE_RING.none;
-  const ring = waveTint(wave, voice);
   const size = avatarSize ?? (host ? 60 : 48);
+  // The frame's picture and the speaking ring keep to this seat's cell (lib/seat-cell): off the name, the next seats
+  // and the row above, the same for every frame and wave. One object per size, so the framed photo isn't redrawn.
+  const room = useMemo(() => seatRoom(size, slotWidth), [size, slotWidth]);
   // Small faces: a smaller icon and no badge by the name. The name grows a little with the face (lib/seat-fit, which
   // sizes the stage by the same numbers) and may be as wide as the seat's slot.
   const small = size < 46;
@@ -171,13 +175,14 @@ export function Seat({
           { opacity: appear, transform: [{ translateY: appear.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }, { scale: appear.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }] },
         ]}
       >
-        <Animated.View ref={anchorRef} collapsable={false} style={[{ width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center', transform: [{ scale: press.scale }] }, speaking && { boxShadow: `0 0 18px ${ring}A6` }]}>
-          {speaking && <VoiceWave wave={wave} size={size} color={voice} level={level} still={still} />}
+        <Animated.View ref={anchorRef} collapsable={false} style={{ width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center', transform: [{ scale: press.scale }] }}>
+          {/* Behind the photo and its frame, round the face: the same ring for every speaker (components/room/voice-wave). */}
+          {speaking && <VoiceWave wave={wave} size={size} color={voice} level={level} still={still} reach={ringReach(size, room)} />}
           {user && !mini && (vipLevel > 0 || frameId) ? (
-            <FramedAvatar uri={user.avatar} size={size} vipLevel={vipLevel} frameId={frameId} />
+            <FramedAvatar uri={user.avatar} size={size} vipLevel={vipLevel} frameId={frameId} room={room} />
           ) : user ? (
             <>
-              <Photo uri={user.avatar} kind="face" style={{ width: size, height: size, borderRadius: size / 2, borderWidth: 2, borderColor: speaking ? ring : 'transparent' }} />
+              <Photo uri={user.avatar} kind="face" style={{ width: size, height: size, borderRadius: size / 2 }} />
               {hostFrame !== undefined && (
                 <Image
                   source={hostFrame}
@@ -231,7 +236,7 @@ export function Seat({
             {user?.verified && !small && <VerifiedBadge size={11} />}
           </View>
         )}
-        {user && pkPoints !== undefined && !mini && <PkPoints value={pkPoints} still={still} />}
+        {user && pkPoints !== undefined && !mini && <PkPoints value={pkPoints} still={still} width={slotWidth} />}
       </Animated.View>
       {user && bondLink && !mini && <BondLink bond={bondLink.bond} size={size} gap={bondLink.gap} />}
     </Pressable>
@@ -241,13 +246,18 @@ export function Seat({
 /** Big gifts get a stronger (still short) bump. */
 const BIG_PK_GIFT = 1_000;
 /**
- * PK points under a seat. When the value grows, the pill bumps once and a small "+N" rises and fades
- * (≈0.5 s, native driver only). Several gifts in a row just restart it, so a burst stays cheap.
+ * PK points under a seat, sized to the seat's `width` (lib/pk pkPillBox): the whole number while it fits, else its
+ * short form (16,4B), the gift icon where there is room for it, so it reads on every mic layout. When the value grows,
+ * the pill bumps once and a small "+N" rises and fades (≈0.5 s, native driver only). Several gifts in a row just
+ * restart it, so a burst stays cheap.
  */
-export function PkPoints({ value, still }: { value: number; still?: boolean }) {
+export function PkPoints({ value, still, width = 64 }: { value: number; still?: boolean; width?: number }) {
   const [shown, setShown] = useState(value);
   const [delta, setDelta] = useState<{ n: number; key: number } | null>(null);
   const [v] = useState(() => new Animated.Value(1));
+  // The phone's text size grows the number too (up to MAX_FONT_SCALE): the form is picked for the size it is drawn at.
+  const scale = Math.min(useWindowDimensions().fontScale || 1, MAX_FONT_SCALE);
+  const box = pkPillBox(width, scale);
   if (value !== shown) {
     // Derived transition: remember the increase for the "+N" bubble.
     setShown(value);
@@ -261,10 +271,11 @@ export function PkPoints({ value, still }: { value: number; still?: boolean }) {
   }, [delta, still, big, v]);
   return (
     <View style={styles.pkWrap}>
-      <Animated.View style={[styles.pkPill, big && styles.pkPillBig, { transform: [{ scale: v.interpolate({ inputRange: [0, 0.3, 1], outputRange: [1, big ? 1.35 : 1.18, 1] }) }] }]}>
-        <Text style={styles.pkText} numberOfLines={1}>
-          🎁 <RollingNumber value={value} duration={500} />
-        </Text>
+      <Animated.View
+        style={[styles.pkPill, { paddingHorizontal: box.pad, maxWidth: width - 2 }, big && styles.pkPillBig, { transform: [{ scale: v.interpolate({ inputRange: [0, 0.3, 1], outputRange: [1, big ? 1.35 : 1.18, 1] }) }] }]}
+      >
+        {box.icon && <Icon3D name="gift" size={box.size} />}
+        <RollingNumber value={value} duration={500} format={(n) => pkPointsText(n, box.room, box.size * scale)} numberOfLines={1} style={[styles.pkText, { fontSize: box.size, lineHeight: box.size + 4 }]} />
       </Animated.View>
       {delta && !still && (
         <Animated.Text
@@ -272,7 +283,7 @@ export function PkPoints({ value, still }: { value: number; still?: boolean }) {
           pointerEvents="none"
           style={[styles.pkDelta, big && { color: colors.gold, fontSize: 14 }, { opacity: v.interpolate({ inputRange: [0, 0.15, 0.8, 1], outputRange: [0, 1, 1, 0] }), transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [0, -18] }) }] }]}
         >
-          +{delta.n.toLocaleString('tr-TR')}
+          +{pkPointsText(delta.n, width - 12, (big ? 14 : 12) * scale)}
         </Animated.Text>
       )}
     </View>
@@ -696,7 +707,7 @@ const styles = StyleSheet.create({
   selfMutedBadge: { backgroundColor: '#475569' },
   invitedSeat: { borderColor: colors.gold, backgroundColor: 'rgba(246,189,96,0.12)' },
   pkWrap: { alignItems: 'center', marginTop: -1 },
-  pkPill: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(246,189,96,0.18)', borderColor: 'rgba(246,189,96,0.55)', borderWidth: 1, borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1, maxWidth: 76 },
+  pkPill: { flexDirection: 'row', alignItems: 'center', gap: PILL_GAP, backgroundColor: 'rgba(246,189,96,0.18)', borderColor: 'rgba(246,189,96,0.55)', borderWidth: 1, borderRadius: 999, paddingVertical: 1 },
   pkPillBig: { backgroundColor: 'rgba(246,189,96,0.3)' },
   pkText: { color: colors.gold, fontSize: 12, fontWeight: '800', fontVariant: ['tabular-nums'] },
   pkDelta: { position: 'absolute', top: -14, color: '#FDE7C2', fontWeight: '900', fontSize: 12 },

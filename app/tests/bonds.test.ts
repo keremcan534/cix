@@ -4,7 +4,7 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { BOND_KINDS, BOND_LEVELS, BOND_REWARDS, bondLevel, bondDays, bubbleBondOf, demoBondsOf, demoRoomBonds, jointEntries, micLinkOf, nextLevelAt, topBond, type RoomBond } from '@/data/bonds';
+import { BOND_KINDS, BOND_LEVELS, BOND_REWARDS, JOINT_WINDOW_MS, bondLevel, bondDays, bubbleBondOf, demoBondsOf, demoRoomBonds, jointEntries, micLinkOf, nextLevelAt, topBond, type RoomBond } from '@/data/bonds';
 // Plain JavaScript module of the server; TypeScript reads it through allowJs.
 import * as server from '../../server/api/bond-rules.mjs';
 
@@ -59,14 +59,44 @@ describe('Bağlar odada', () => {
     assert.equal(bubbleBondOf(list, 'u5')?.kind, 'kardes');
     assert.equal(bubbleBondOf(list, 'me'), null, 'Lv8 balon yok');
   });
-  test('birlikte giriş: ilk açılışta yalnızca benimki, sonra yeni gelen çift, her çift bir kez', () => {
-    const first = jointEntries(list, new Set(['me', 'u1', 'u4', 'u5']), null);
+  test('birlikte giriş: yalnız aynı anda gelen çift, benden önce içeride olan değil, her çift bir kez', () => {
+    const T = 1_000_000;
+    const s = 1000;
+    // I came in at T; my Çift (u1) 5 s before me: we came in together. u4 and u5 came in together a minute before me.
+    const arrivals = new Map([
+      ['me', T],
+      ['u1', T - 5 * s],
+      ['u4', T - 60 * s],
+      ['u5', T - 58 * s],
+    ]);
+    const first = jointEntries(list, new Set(['me', 'u1', 'u4', 'u5']), arrivals, T, null);
     assert.deepEqual(first.show.map((r) => r.b), ['u1'], 'u4-u5 benden önce odadaydı');
-    const later = jointEntries(list, new Set(['me', 'u1', 'u4', 'u5', 'u9']), first.state);
-    assert.deepEqual(later.show.map((r) => `${r.a}-${r.b}`), ['u4-u9']);
-    assert.deepEqual(jointEntries(list, new Set(['me', 'u1', 'u4', 'u5', 'u9']), later.state).show, []);
+    // u9 joins u4 (in the room for a while): u9's own entrance only, no joint one.
+    arrivals.set('u9', T + 30 * s);
+    const later = jointEntries(list, new Set(['me', 'u1', 'u4', 'u5', 'u9']), arrivals, T, first.state);
+    assert.deepEqual(later.show, [], 'eşi zaten odadaydı');
+    // u4 leaves and comes back with u9 (who also left): the two came in together.
+    const broken = jointEntries(list, new Set(['me', 'u1', 'u5']), arrivals, T, later.state);
+    arrivals.set('u4', T + 300 * s);
+    arrivals.set('u9', T + 312 * s);
+    const together = jointEntries(list, new Set(['me', 'u1', 'u4', 'u5', 'u9']), arrivals, T, broken.state);
+    assert.deepEqual(together.show.map((r) => `${r.a}-${r.b}`), ['u4-u9']);
+    assert.deepEqual(jointEntries(list, new Set(['me', 'u1', 'u4', 'u5', 'u9']), arrivals, T, together.state).show, [], 'bir kez');
+    // Once per visit, however often the two come in together again.
+    const out = jointEntries(list, new Set(['me', 'u1', 'u5']), arrivals, T, together.state);
+    arrivals.set('u4', T + 900 * s);
+    arrivals.set('u9', T + 901 * s);
+    assert.deepEqual(jointEntries(list, new Set(['me', 'u1', 'u4', 'u5', 'u9']), arrivals, T, out.state).show, [], 'aynı ziyarette ikinci kez yok');
+    // More than JOINT_WINDOW_MS apart is not "together"; someone not known to have come in (here before me) never is.
+    const pair: RoomBond[] = [{ a: 'u7', b: 'u8', kind: 'cift', level: 9 }];
+    const apart = new Map([['u7', T + 10 * s], ['u8', T + 10 * s + JOINT_WINDOW_MS + 1]]);
+    assert.deepEqual(jointEntries(pair, new Set(['me', 'u7', 'u8']), apart, T, null).show, []);
+    assert.deepEqual(jointEntries(pair, new Set(['me', 'u7', 'u8']), new Map([['u8', T + s]]), T, null).show, []);
+    assert.equal(jointEntries(pair, new Set(['me', 'u7', 'u8']), new Map([['u7', T], ['u8', T + JOINT_WINDOW_MS]]), T, null).show.length, 1);
     // A pair already in the room that only now reaches Lv8 is not an entrance.
-    const grown = jointEntries([{ a: 'u2', b: 'u3', kind: 'kanka', level: 8 }], new Set(['u2', 'u3']), { seen: new Set(), present: new Set(['u2', 'u3']) });
+    const low = jointEntries([{ a: 'u2', b: 'u3', kind: 'kanka', level: 7 }], new Set(['u2', 'u3']), new Map([['u2', T + s], ['u3', T + s]]), T, null);
+    assert.deepEqual(low.show, []);
+    const grown = jointEntries([{ a: 'u2', b: 'u3', kind: 'kanka', level: 8 }], new Set(['u2', 'u3']), new Map([['u2', T + s], ['u3', T + s]]), T, low.state);
     assert.deepEqual(grown.show, []);
   });
   test('demo odası bağları her seferinde aynı', () => {

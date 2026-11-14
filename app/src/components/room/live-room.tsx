@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
 import { router, type Href } from 'expo-router';
 import * as ScreenCapture from 'expo-screen-capture';
-import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
 import { Keyboard, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions, type HostInstance } from 'react-native';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { useKeyboardOpen } from '@/lib/keyboard-open';
@@ -46,7 +46,7 @@ import { ContribBoard } from '@/components/room/contrib-board';
 import { RoomFollowHeart } from '@/components/room/members';
 import { BossSeat, BossSeatSheet, RoomInfoSheet, RoomSettingsScreen, type BossPick, type GiftLogRow, type SettingsSection } from '@/components/room/owner';
 import { GiftSheet } from '@/components/room/gift-sheet';
-import { LuckyCombo } from '@/components/room/lucky-combo';
+import { GiftCombo } from '@/components/room/gift-combo';
 import { LuckyResult } from '@/components/room/lucky-result';
 import { LuckyBagCard, LuckyBagFloat, LuckyBagRain, LuckyBagSheet, bagWhat, type BagOutcome } from '@/components/room/lucky-bag';
 import { SeatMenu, type Rect, type SeatMenuItem } from '@/components/room/seat-menu';
@@ -54,21 +54,24 @@ import { PersonCard } from '@/components/room/person-card';
 import { insertMention, mentionPicks, mentionQuery, mentions, stripMentions } from '@/lib/room-mention';
 import { EntryEffect, type EntryFx, type EntryShow } from '@/components/fx/entry';
 import { storeArtOf } from '@/components/StoreArt';
-import { ArtText, ROOM_ICON_ART } from '@/components/RoomArt';
+import { ROOM_ICON_ART } from '@/components/RoomArt';
 import { gameArtOf, gameHueOf } from '@/components/GameArt';
 import { Art, artSource } from '@/components/Art';
-import { AnimLayer } from '@/components/fx/anim-layer';
+import { AnimLayer, type FullscreenAnim } from '@/components/fx/anim-layer';
+import { AnimPlay } from '@/components/fx/anim-player';
 import { WinBanner } from '@/components/fx/win-banner';
 import { GiftFlights, type Flight, type Point } from '@/components/fx/gift-flight';
-import { GiftShowFx, type GiftShowPlay } from '@/components/fx/gift-show';
+import { GiftShowFx } from '@/components/fx/gift-show';
 import { GiftVideoFx, VideoFx, entryVideoOf, giftVideoOf } from '@/components/fx/video-fx';
-import { giftShowOf } from '@/data/gift-shows';
+import { giftShowOf, type GiftShow } from '@/data/gift-shows';
+import type { Animation } from '@/data/animations';
+import { ROOM, addCue, cueCount, cueTo, emptyStage, endCue, resumeCue, type Cue, type Stage } from '@/lib/fx-queue';
 import { SalonArt, salonArt } from '@/components/games/fx/salon-art';
 import { GamePanel, type OpenGame } from '@/components/games/game-panel';
 import type { CasinoGame } from '@/data/games';
 import { BAR_BTN, ChatLine, GiftAnimation, MicBtn, REACTION_MS, RESULT_MS, RoomSoundBtn, RoundBtn, Seat, type ChatMsg, type RoomRole, type SeatReactionData } from '@/components/room/parts';
 import { type StaffMark } from '@/components/room/role-mark';
-import { CrossPkInvitePrompt, PkBoard, PkSetupSheet, SoloBoard, TeamArena, type ArenaSlot } from '@/components/room/pk';
+import { CrossPkInvitePrompt, PkBoard, PkSetupSheet, SoloPkPill, TeamArena, type ArenaSlot } from '@/components/room/pk';
 import { CrownScreen, PkResultScreen } from '@/components/room/pk-result';
 import { BalconyBar, MicInvitePrompt, ParticipantsSheet, type ParticipantActions } from '@/components/room/balcony';
 import { SessionBanner, SessionTestSheet, closeRoomScreen } from '@/components/room/session-ui';
@@ -82,7 +85,7 @@ import { useRoomLook } from '@/components/room/decor';
 import { StageLayout } from '@/components/room/stage-layout';
 import { FitStage } from '@/components/room/fit-stage';
 import { useRoomBonds } from '@/components/room/room-bonds';
-import { BOND_KINDS, bondTint, bubbleBondOf, jointEntries, micLinkOf, type JointState, type RoomBond } from '@/data/bonds';
+import { BOND_KINDS, bondTint, bubbleBondOf, jointEntries, micLinkOf, roomBondKey, type JointState, type RoomBond } from '@/data/bonds';
 import { Avatar } from '@/components/ui';
 import { AGENCIES } from '@/data/agency';
 import { BOSS_SEAT_MIN_LEVEL, COSMETICS, MUSIC_CATALOG, STANDARD_EMOJI, STICKER_PACKS, adminCapacity, cosmeticById, djCapacity, memberLimit, micCapacity, roomCode, roomLevel, roomTypeInfo, ROOM_LEVEL_REWARDS, type RoomTheme, type Track } from '@/data/catalog';
@@ -94,8 +97,9 @@ import * as api from '@/lib/api';
 import { isLiveRoom, isLockedRoom, liveGift, liveMode, liveRoomAnimation, message as errorText, myServerId, putRoomAnswer, refreshServerRoom, rememberUser, toLocal, toServer, updateServerRoom } from '@/lib/live';
 import { liveBackpackGift } from '@/lib/live/backpack';
 import { useLiveRoomSync } from '@/lib/live/room';
-import { onServerRoom, sendSignal, useBossNews, useLivePeers, type LuckySignal, type RoomSignal } from '@/lib/live/room-bus';
-import { answerLiveCrossPk, refreshRoomPkSoon, useIncomingCrossPk, useRoomPkSync } from '@/lib/live/pk';
+import { useRoomTop } from '@/lib/live/room-contrib';
+import { onServerLook, onServerRoom, sendSignal, useBossNews, useLivePeers, type LuckySignal, type RoomSignal } from '@/lib/live/room-bus';
+import { answerLiveCrossPk, refreshRoomPkSoon, useIncomingCrossPk, useRoomPkJoin, useRoomPkSync } from '@/lib/live/pk';
 import { useOwnerStats } from '@/lib/live/owner-stats';
 import { bagResult, grabCode, joinBag, useRoomBags, type Bag } from '@/lib/live/lucky-bags';
 import { banLeft, roomBan, roomQueue, roomSeat, roomSetAdmin, roomSetDj, roomUnban, useRoomStaff, type QueueAction, type SeatAction } from '@/lib/live/room-staff';
@@ -111,16 +115,18 @@ import { showAlert } from '@/lib/alert';
 import { checkText, messageRefusal, noteSent, refusalTitle } from '@/lib/contact-filter';
 import { ContactNote } from '@/components/contact-note';
 import { animById, getAnimations, isLive, isSentAnim, newAnimRequestId, playRoomAnim, sendAnimation, simulateRemoteSend, subscribeRoom } from '@/lib/animations';
-import { loadLooks, lookOf, useLooks, type Look } from '@/lib/live/looks';
+import { loadLooks, lookOf, putLook, useLooks, type Look } from '@/lib/live/looks';
 import { useRoomCams } from '@/lib/live/room-cams';
 import { casinoAccess, casinoVisible, playDuel, useGames } from '@/lib/games';
 import { refreshCasino } from '@/lib/live/casino';
 import { useTableNews } from '@/lib/live/room-table';
 import { isTableGame } from '@/components/games/room-tables';
 import { announceWin, roomTitleOf } from '@/lib/broadcast';
+import { emptyEntryLine, pushEntry, shiftEntry, type EntryItem, type EntryLine } from '@/lib/entry-queue';
+import { entranceView, entryPlanOf } from '@/lib/room-entrance';
 import { getLucky, luckyGift, luckyPkPoints, sendLuckyBatch, type LuckyRecord } from '@/lib/lucky';
 import { liveLuckySend, refreshLucky } from '@/lib/live/lucky';
-import { getPk, markPkSeen, modeLabel, pkPointsFor, recordGift, reportMismatch, teamOf, usePk } from '@/lib/pk';
+import { getPk, joinRoomPk, markPkSeen, modeLabel, pkPointsFor, recordGift, reportMismatch, teamOf, usePk } from '@/lib/pk';
 import {
   KICK_BAN_MIN,
   activeBans,
@@ -159,10 +165,10 @@ import { kindOf, mergeFeed, type FeedMsg } from '@/lib/chat-feed';
 import { blockedFeature } from '@/lib/remote-control';
 import { ALL_FEATURES, applyServerStage, applyServerVideo, changeLayout, layoutById, modeById, seedStage, setClassicCapacity, setStageInfo, slotStates, stagePermission, useStages, type PlaybackState, type StageInfo } from '@/lib/room-modes';
 import { shareVideo, videoPlayback } from '@/lib/live/room-video';
-import { MIC_BLOCK_LABEL, endRoom, getSession, micBlock, micSending, reportRoomState, setMicWant, setNoiseSuppression, setPlaybackVolume, setRoomCamera, useRoomSession, type MicBlock } from '@/lib/room-session';
+import { MIC_BLOCK_LABEL, endRoom, getSession, micBlock, micSending, reportRoomState, setMicWant, setPlaybackVolume, setRoomCamera, setRoomSound, useRoomSession, type MicBlock } from '@/lib/room-session';
 import { shareLink } from '@/lib/links';
 import { balconyOnly, canInviteFollowers, defaultMicQueue, followerCount, knownFollowers, roomInviteText, seatAccess } from '@/lib/room-invites';
-import { demoJoinMode } from '@/lib/room-follow';
+import { demoJoinMode, membershipOf, roomPeopleCount, type Membership } from '@/lib/room-follow';
 import { BUSY_DEVICES, getMedia, leaveRoom, reportRoom, useMedia } from '@/lib/media';
 import { errorHaptic, micHaptic, successHaptic, tapHaptic } from '@/lib/haptics';
 import { stickerIdOf, stickerToken } from '@/lib/stickers';
@@ -190,6 +196,20 @@ const reactionKey = () => Date.now() + Math.random();
 const SLOW_MS = 10_000;
 /** Room the chat leaves on its right for the Rüzgâr Gülü shortcut (styles.wheelBtn: 46 wide disc, 10 from the edge). */
 const WHEEL_ROOM = 62;
+/** What a stage cue (lib/fx-queue) draws: a gift's video, a big gift's show, the other gifts' pop, a full-screen Hareketli. */
+type StagePlay =
+  | { kind: 'video'; gift: Gift; media: NonNullable<ReturnType<typeof giftVideoOf>> }
+  | { kind: 'show'; gift: Gift; show: GiftShow }
+  | { kind: 'pop'; gift: Gift }
+  | { kind: 'anim'; anim: Animation; origin: Point | null };
+/** How long they play, for the stage's backlog bound: the gift clips are 5 s; the pop is parts' GiftAnimation. */
+const VIDEO_MS = 5_000;
+const POP_MS = 2_500;
+/** The repeat wheel's send (components/room/gift-combo): this gift, this count, to each of these people. */
+type ComboSpec = { lucky: boolean; giftId: string; to: string[]; each: number };
+const sameCombo = (a: ComboSpec, b: ComboSpec) => a.lucky === b.lucky && a.giftId === b.giftId && a.each === b.each && a.to.join() === b.to.join();
+/** Taps on the wheel while its send is on the way wait for it; past this many more, a tap is not kept. */
+const COMBO_MORE = 10;
 /** SimilarClub's own community rules, the first line of the chat on every entry (my screen only). */
 const ROOM_RULES_NOTICE =
   "SimilarClub'a hoş geldin! Müstehcen, şiddet içeren, kumar ya da yasa dışı ticaretle ilgili içerik ve 18 yaş altına yönelik her türlü zararlı paylaşım yasaktır. Kurala aykırı bir şey görürsen kişinin kartından şikâyet et; ekibimiz en kısa sürede inceler. İyi sohbetler!";
@@ -210,15 +230,11 @@ const offlineBlocked = () => {
 const BOT_REACTIONS = ['duygu-kahkaha', 'duygu-asik', 'duygu-alkis', 'duygu-alev', 'duygu-havali', 'duygu-parti', 'duygu-kalbim', 'duygu-super', 'duygu-afalladim', 'duygu-yerlere-yattim'].map(stickerToken);
 const BOT_ENTRY_FX: EntryFx[] = ['sparkle', 'thunder', 'comet', 'dragon', 'vip'];
 const NO_BONDS: RoomBond[] = [];
-/** Someone's entry show in a server room, from their shop look (entry effect, ride, noble rank); null: none. */
+/** Someone's entry show in a server room, from their own shop look (lib/room-entrance entryPlanOf); null: none. */
 function entryShowOf(look: Look | undefined, name: string, avatar: string): EntryShow | null {
-  if (!look) return null;
-  const entryItem = cosmeticById(look.entry ?? undefined);
-  const ride = cosmeticById(look.ride ?? undefined);
-  const noble = look.noble ? nobleInfo(look.noble) : undefined;
-  if (!entryItem && !ride && !noble) return null;
-  const tier = vipTier(look.vipLevel);
-  return { name, avatar, fx: (entryItem?.fx as EntryFx | undefined) ?? 'vip', ride: ride?.emoji, rideArt: storeArtOf(ride?.id), colors: entryItem ? undefined : (tier?.color ?? gradient), badge: noble?.emoji };
+  const plan = entryPlanOf(look);
+  if (!plan) return null;
+  return { name, avatar, fx: plan.fx, ride: plan.ride, rideArt: storeArtOf(plan.rideId), colors: plan.tint === undefined ? undefined : (plan.tint ?? gradient), badge: plan.badge };
 }
 // What another phone may put over its seat: a sticker of a known pack, or a standard emoji an older app's panel had
 // (no free text, no unknown art).
@@ -413,10 +429,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const stageDeny = stagePermission(id, 'me');
   const canStage = stageDeny === null;
   const [layoutsOpen, setLayoutsOpen] = useState(false);
-  // "Mikrofon denoise" (menu): the voice engine captures the mic with or without the phone's noise suppression.
-  useEffect(() => setNoiseSuppression(settings.micDenoise), [settings.micDenoise]);
-  // "Oda sesini kapat" / "Konuşma sesi" (Ses ayarları): how loud the others play on this phone.
-  useEffect(() => setPlaybackVolume(settings.roomMuted ? 0 : settings.voiceVolume), [settings.roomMuted, settings.voiceVolume]);
+  // "Konuşma sesi" (Efektler ve ses): how loud the others play on this phone. "Oda sesi" (on or off) is this visit's
+  // own, kept by the session (lib/room-session soundOff), so it comes back on when the room is entered again.
+  useEffect(() => setPlaybackVolume(settings.voiceVolume), [settings.voiceVolume]);
   // My own room keeps its layout across app restarts (saved with the room settings).
   const stageLayoutId = stage?.layoutId ?? null;
   useEffect(() => {
@@ -503,8 +518,14 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const [inboxOpen, setInboxOpen] = useState(false);
   const inboxUnread = useInboxUnread();
   const [speaking, setSpeaking] = useState<Set<string>>(new Set());
-  // Entry effects on screen: mine when I join, then other people's (one at a time).
-  const [entry, setEntry] = useState<EntryShow | null>(() => (invisible || !entryOn || !entryInfo ? null : entryInfo.show));
+  // Entry banners on screen, one at a time (lib/entry-queue): mine when I come in, then the entrances I see while I'm
+  // here, each with the entering person's own look (or a bonded pair's joint banner), never mine.
+  const [entries, setEntries] = useState<EntryLine<EntryShow>>(() => emptyEntryLine(invisible || !entryOn || !entryInfo ? null : { id: 'mine', who: ['me'], show: entryInfo.show }));
+  const queueEntry = (item: EntryItem<EntryShow>) => setEntries((l) => pushEntry(l, item));
+  // When each person came in (a server room: the voice server's clock; the demo: this phone's), for the joint entrance.
+  // A mutable map kept in state (never replaced), filled by the join handlers.
+  const [arrivals] = useState(() => new Map<string, number>());
+  const [openedAt] = useState(() => Date.now());
   const [messages, setMessages] = useState<ChatMsg[]>(() => [
     // Every entry, on my own screen only: the community rules first.
     { id: 'w', system: true, notice: true, text: ROOM_RULES_NOTICE },
@@ -533,13 +554,49 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const [reactions, setReactions] = useState<Record<string, SeatReactionData>>({});
   const [giftOpen, setGiftOpen] = useState(false);
   const [giftTo, setGiftTo] = useState<string | null>(null);
-  const [giftFx, setGiftFx] = useState<GiftShowPlay | null>(null);
-  /** The big effect for a gift: who sent it to whom goes on the full-screen show's banner. */
-  const playGiftFx = (gift: Gift, fromName: string, toIds: string[], count: number) =>
-    setGiftFx({ key: `${Date.now()}-${gift.id}`, gift, fromName, toText: toIds.length > 1 ? `${toIds.length} kişi` : toIds[0] === 'me' ? ME.name : userById(toIds[0]).name, count });
+  // The stage (lib/fx-queue): gift videos, big gift shows, the other gifts' pop and full-screen Hareketli take the
+  // middle of the screen one at a time, in the order they came, each to its end; mine wait in the same line.
+  const [fxStage, setFxStage] = useState<Stage<StagePlay>>(emptyStage);
+  // An entry's full-screen video holds the stage while it plays (set with the entry below; read by these handlers).
+  const entryVideoOn = useRef(false);
+  const pushFx = (cue: Omit<Cue<StagePlay>, 'key' | 'last'>) => {
+    const next = { ...cue, key: `fx-${msgId()}`, last: nowMs() };
+    const held = entryVideoOn.current;
+    setFxStage((s) => addCue(s, next, held));
+  };
+  const endFx = (key: string) => {
+    const t = nowMs();
+    const held = entryVideoOn.current;
+    setFxStage((s) => endCue(s, key, t, held));
+  };
+  /** The big effect for a gift (`from` sent `count` to each of `toIds`): its banner says who sent it to whom. */
+  const playGiftFx = (gift: Gift, from: string, toIds: string[], count: number) => {
+    const media = giftVideoOf(gift.id);
+    const show = giftShowOf(gift.id);
+    pushFx({
+      from,
+      what: gift.id,
+      to: Object.fromEntries(toIds.map((u) => [u, count])),
+      each: count,
+      price: gift.price,
+      ms: media ? VIDEO_MS : (show?.durationMs ?? POP_MS),
+      small: !media && !show,
+      payload: media ? { kind: 'video', gift, media } : show ? { kind: 'show', gift, show } : { kind: 'pop', gift },
+    });
+  };
+  /** A full-screen Hareketli (fx/anim-layer) waits in the same line as the gifts (not one due after the room went away). */
+  const playAnimFx = ({ anim, origin, from }: FullscreenAnim) => {
+    if (visibleRef.current) pushFx({ from, what: anim.animation_id, to: { [ROOM]: 1 }, each: 1, price: anim.coin_price, ms: anim.duration_ms, payload: { kind: 'anim', anim, origin } });
+  };
   const [luckyFx, setLuckyFx] = useState<LuckyRecord[] | null>(null);
-  // Lucky combo wheel: same gift, same people, same count, one tap per repeat (×1, ×2, ×3 …).
-  const [combo, setCombo] = useState<{ giftId: string; to: string[]; each: number; count: number; key: number } | null>(null);
+  // The repeat wheel (components/room/gift-combo): after a send from the gift sheet, the same gift to the same people
+  // with the same count, one tap per repeat (×1, ×2, ×3 …), Şanslı or not.
+  const [combo, setCombo] = useState<(ComboSpec & { count: number; key: number }) | null>(null);
+  // Read by the send handlers, which may answer a while after the tap (server rooms).
+  const comboRef = useRef(combo);
+  useEffect(() => {
+    comboRef.current = combo;
+  }, [combo]);
   const gameCatalog = useGames();
   const [game, setGame] = useState<OpenGame | null>(null);
   const [gameMin, setGameMin] = useState(false);
@@ -625,14 +682,17 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // the room, the sheet it was opened from opens again (kept when the room leaves the screen, used when it returns).
   const [reopenOnReturn, setReopenOnReturn] = useState<null | 'menu' | 'settings' | 'info'>(null);
   const teamPk = pk?.kind === 'room' && pk.mode === 'team' && pk.status !== 'invite' ? pk : null;
+  // Normal PK has no board over the mics: a small timer pill in the header (components/room/pk SoloPkPill).
+  const soloPk = pk?.kind === 'room' && pk.mode === 'solo' ? pk : null;
   const teamColorOf = (uid: string | null) => (uid && teamPk ? teamOf(teamPk, uid)?.color : undefined);
   // Mic 1 is the owner's crowned seat, except where the stage draws it as a plain mic (a team PK, or a layout with
   // no host slot: team rooms, Düğün). There anyone takes it like any other mic.
   const hostSeat = !teamPk && (!layout || layout.layoutSchema.slots.some((x) => x.index === 0 && x.host));
   /**
    * PK points under a seat, only for people in the PK: team members in Takım PK, everyone on a mic in Normal /
-   * cross PK. A server room's Normal PK scores only the people it started with (server/api/pk.mjs), so a mic taken
-   * after the start shows no count instead of a 0 that never moves.
+   * cross PK. A server room's Normal PK scores the people in it (server/api/pk.mjs): those it started with and
+   * everyone who took a mic since, whose phones join it at once (lib/live/pk useRoomPkJoin). Until then the seat
+   * shows no count instead of a 0 that doesn't move.
    */
   const pkPointsOf = (uid: string | null) => {
     if (!uid || !pk || pk.status === 'invite') return undefined;
@@ -667,12 +727,12 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     return rival ? { holder: rival, since: now - 60_000, until: now + 7 * 60_000, spent: contrib[rival] } : null;
   });
   const [bossSheet, setBossSheet] = useState(false);
-  const [membership, setMembership] = useState<'owner' | 'none' | 'pending' | 'member'>(isOwn ? 'owner' : 'none');
+  const [membership, setMembership] = useState<Membership>(isOwn ? 'owner' : 'none');
   const [memberApps, setMemberApps] = useState<string[]>(() => (isOwn ? ['u2', 'u9', 'u11'] : []));
   // The demo's application to a sample room, accepted a moment later unless it is taken back first.
   const demoApproval = useRef<ReturnType<typeof setTimeout> | null>(null);
   // A server room's members (server/api/rooms.mjs): read when the room opens and again after each change.
-  const [serverMembers, setServerMembers] = useState<{ ids: string[]; total: number; canManage: boolean } | null>(null);
+  const [serverMembers, setServerMembers] = useState<{ ids: string[]; total: number; joined: number; canManage: boolean } | null>(null);
   // The room owner's family (their profile: server/api families.mjs familyOf), read when the room card opens.
   const [ownerFamily, setOwnerFamily] = useState<{ id: string; name: string } | null>(null);
   const hostServerId = real ? toServer(hostId) : null;
@@ -696,9 +756,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       (r) => {
         r.members.forEach((m) => rememberUser(m));
         r.pending.forEach((m) => rememberUser(m));
-        setServerMembers({ ids: r.members.map((m) => toLocal(m.id)), total: r.total, canManage: r.canManage });
+        setServerMembers({ ids: r.members.map((m) => toLocal(m.id)), total: r.total, joined: r.joined ?? r.total, canManage: r.canManage });
         setMemberApps(r.pending.map((m) => toLocal(m.id)));
-        setMembership(r.mine === 'owner' ? 'owner' : r.mine === 'member' ? 'member' : r.mine === 'pending' ? 'pending' : 'none');
+        setMembership(membershipOf(r.mine));
       },
       () => {},
     );
@@ -744,8 +804,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // --- Mic/camera arbitration with one-to-one calls (Hemen Tanış spec §3–4, lib/media) -----------------
   const media = useMedia();
   const callActive = !!media.call;
+  // "Oda sesi" off for this visit: nothing the room plays is heard here (voices, music, the shared screen, effects).
+  const soundOff = !!session?.soundOff;
   // The video gifts and entries play their sound unless the room's sound or gift sounds are off, or a call is on.
-  const fxMuted = settings.roomMuted || !settings.giftSounds || callActive;
+  const fxMuted = soundOff || !settings.giftSounds || callActive;
   useEffect(() => {
     reportRoom({ roomId: id, title, seated: amSeated, micOn: amSeated && micOn, camOn: amSeated && camOn });
   }, [id, title, amSeated, micOn, camOn]);
@@ -883,6 +945,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const lookIds = real ? [...seatedOthers, ...audience.map((u) => u.id), ...(bossId && bossId !== 'me' ? [bossId] : [])].map((u) => toServer(u) ?? '').filter(Boolean) : [];
   const looksVersion = useLooks(lookIds, real);
   const lookFor = (uid: string): Look | undefined => (real && uid !== 'me' ? lookOf(toServer(uid)) : undefined);
+  // Someone here puts on or takes off a frame, buys an item or changes their photo: the server tells the room at once,
+  // and their mic and Balkon face are drawn with it (lib/live/looks), with no leaving and coming back.
+  useEffect(() => (real ? onServerLook(id, putLook) : undefined), [real, id]);
 
   const gameEntry = { from: 'room' as const, roomId: id, roomTitle: title };
   // Table seats: me, people on the mics, then listeners (the game's own lobby, separate from room seats).
@@ -891,7 +956,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const canControlMusic = real ? myRole !== 'member' || djIds.includes('me') : canFunctions;
   // A server room's music, as the room metadata has it, played on this phone at the room's clock.
   const liveMusic = real ? (liveState?.music ?? null) : null;
-  const nowMusic = useRoomMusicPlayer(liveMusic, real && musicEnabled && !callActive, musicVolume);
+  const nowMusic = useRoomMusicPlayer(liveMusic, real && musicEnabled && !callActive && !soundOff, musicVolume);
   const shownMusic: MusicState = real
     ? {
         queue: nowMusic && liveMusic ? liveMusic.tracks.slice(nowMusic.index).map((t) => ({ id: t.key, title: t.title, artist: t.byName || 'Oda müziği', seconds: t.seconds })) : [],
@@ -948,19 +1013,24 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // Server room: people, mics, talking rings, chat lines and gifts come from the other phones (lib/live/room).
   // Server room: who switched their own mic off, from the voice connection (drawn like my own mic-off badge).
   const peersMicOff = useLiveRoomSync(id, real && unlocked, mySeat >= 0 ? mySeat : null, {
-    onJoin: (uid, name) => {
-      addMsg({ system: true, text: `${name} odaya girdi` });
-      // Their entry effect and ride (their shop look from the server), once it is read.
+    onJoin: (uid, name, j) => {
+      arrivals.set(uid, j.at);
+      // Only an entrance I saw (lib/room-entrance): nothing for the people already inside when I came; the line again
+      // for someone back; their own entry effect (their shop look from the server, whatever their or my role in the
+      // room) for a new entrance only.
+      const v = entranceView(j, { blocked: blocked.has(uid), effectsOn: entryOn });
+      if (v.line) addMsg({ system: true, text: `${name} odaya girdi` });
       const sid = toServer(uid);
-      if (!entryOn || !sid) return;
+      if (!v.effect || !sid) return;
       void loadLooks([sid]).then(() => {
         const show = entryShowOf(lookOf(sid), name, userById(uid).avatar);
-        if (!show) return;
-        if (entry) setEntryQueue((q) => [...q, show].slice(-3));
-        else setEntry(show);
+        if (show) queueEntry({ id: `in:${uid}:${j.at}`, who: [uid], show });
       });
     },
-    onLeave: (_uid, name) => addMsg({ system: true, text: `${name} odadan ayrıldı` }),
+    onLeave: (uid, name) => {
+      arrivals.delete(uid);
+      addMsg({ system: true, text: `${name} odadan ayrıldı` });
+    },
     setSpeaking: (ids) => setSpeaking((prev) => (prev.size === ids.size && [...ids].every((u) => prev.has(u)) ? prev : ids)),
     onSignal: (from, msg: RoomSignal) => {
       if (blocked.has(from)) return;
@@ -1024,6 +1094,14 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   });
   // Oda içi PK in a server room: the server's PK, read into lib/pk (start, cancel, score and result are its).
   useRoomPkSync(id, real && unlocked, pk);
+  // On a mic while the room's PK runs and not in it yet (came after the start): this phone joins it (lib/live/pk).
+  useRoomPkJoin(id, real && unlocked && !offline, pk, amSeated);
+  // The demo plays the PK server here: everyone who takes a mic while the room's PK runs joins it the same way.
+  const micKey = view.micIds.join(',');
+  const demoPkId = !real && pk?.kind === 'room' ? pk.id : null;
+  useEffect(() => {
+    if (demoPkId) for (const uid of micKey.split(',').filter(Boolean)) joinRoomPk(id, uid);
+  }, [id, demoPkId, micKey]);
   // Odalar arası PK: another room's invite waits for this room's owner or an admin to answer (lib/live/pk).
   const incomingPk = useIncomingCrossPk(id);
   const [pkAnswering, setPkAnswering] = useState(false);
@@ -1080,25 +1158,36 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // Bağlar in the room: Lv4 mic line, Lv8 joint entrance, Lv10 chat bubble (components/room/room-bonds).
   const roomBondsNow = useRoomBonds(live.members, real);
   const roomBonds = roomBondsNow ?? NO_BONDS;
-  const [entryQueue, setEntryQueue] = useState<EntryShow[]>([]);
   const [joint, setJoint] = useState<{ list: RoomBond[] | null; state: JointState | null }>({ list: null, state: null });
-  if (roomBondsNow && joint.list !== roomBondsNow) {
-    // Derived transition: a new answer about the room's bonds; announce pairs that just came in together.
-    const r = jointEntries(roomBondsNow, new Set(live.members), joint.state);
+  // When I came in: a server room's by the voice server's clock (0 until connected), the demo's by this phone's.
+  const since = real ? roomMeta.meJoinedAt : openedAt;
+  if (roomBondsNow && joint.list !== roomBondsNow && since > 0) {
+    // Derived transition: a new answer about the room's bonds; announce pairs that just came in together (after
+    // each one's own entrance banner, lib/entry-queue).
+    const r = jointEntries(roomBondsNow, new Set(live.members), new Map([...arrivals, ['me', since]]), since, joint.state);
     setJoint({ list: roomBondsNow, state: r.state });
-    const shows = invisible || !entryOn ? [] : r.show.filter((b) => !blocked.has(b.a) && !blocked.has(b.b)).map((b) => jointShowOf(b, app.me.avatar));
-    if (shows.length) {
-      if (entry) setEntryQueue((q) => [...q, ...shows].slice(-3));
-      else {
-        setEntry(shows[0]);
-        if (shows.length > 1) setEntryQueue((q) => [...q, ...shows.slice(1)].slice(-3));
-      }
+    if (!invisible && entryOn) {
+      for (const b of r.show) if (!blocked.has(b.a) && !blocked.has(b.b)) queueEntry({ id: `bond:${roomBondKey(b)}`, who: [b.a, b.b], show: jointShowOf(b, app.me.avatar) });
     }
   }
+  // Entries keep their own lane: an arrival shows as it happens, it never waits behind gifts. Only an entry's
+  // full-screen video (Ejderha) shares the stage: decided once as the entry begins, it plays when the stage is free
+  // (else the entry shows its drawn banner), and while it plays the stage's next effect waits for it.
+  const entryNow = entries.now;
+  const [entryLook, setEntryLook] = useState<{ entry: EntryItem<EntryShow> | null; media: ReturnType<typeof entryVideoOf> }>({ entry: null, media: null });
+  if (entryLook.entry !== entryNow)
+    setEntryLook({ entry: entryNow, media: entryNow && !settings.reduceMotion && !fxStage.now && !fxStage.next.length ? entryVideoOf(entryNow.show.fx) : null });
+  const entryMedia = entryLook.entry === entryNow ? entryLook.media : null;
+  useLayoutEffect(() => {
+    entryVideoOn.current = !!entryMedia;
+  }, [entryMedia]);
   const nextEntry = () => {
-    setEntry(entryQueue[0] ?? null);
-    setEntryQueue((q) => q.slice(1));
-  };  // Taking a video seat turns the camera on (after the permission prompt on phones).
+    setEntries(shiftEntry);
+    // A gift that waited for the entry's video takes the stage now.
+    const t = nowMs();
+    setFxStage((st) => resumeCue(st, t));
+  };
+  // Taking a video seat turns the camera on (after the permission prompt on phones).
   useEffect(() => {
     if (!camAllowed || getMedia().call) return;
     let live = true;
@@ -1630,12 +1719,14 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         if (isOwn && room.members.length >= myRoom.limit) return;
         const guest = newGuest(id);
         if (!joinPresence(id, guest, { eventId: `join:${guest}` }).ok) return;
+        arrivals.set(guest, Date.now());
         const g = userById(guest);
         addMsg({ system: true, text: `${g.name} odaya girdi${isOwn && myRoom.joinSounds ? ' 🔔' : ''}` });
         // Some joiners own an entry effect; show it if nothing else is playing.
         if (visibleRef.current && entryOn && Math.random() < 0.4) {
           const ride = Math.random() < 0.3 ? pick(BOT_RIDES) : undefined;
-          setEntry((cur) => cur ?? { name: g.name, avatar: g.avatar, fx: pick(BOT_ENTRY_FX), ride: ride?.emoji, rideArt: storeArtOf(ride?.id), badge: g.vip ? 'VIP' : undefined });
+          const show: EntryShow = { name: g.name, avatar: g.avatar, fx: pick(BOT_ENTRY_FX), ride: ride?.emoji, rideArt: storeArtOf(ride?.id), badge: g.vip ? 'VIP' : undefined };
+          setEntries((l) => (l.now ? l : pushEntry(l, { id: `in:${guest}`, who: [guest], show })));
         }
         gainXp(5);
         setGoal((gl) => (gl && gl.kind === 'join' ? { ...gl, progress: gl.progress + 1 } : gl));
@@ -1693,7 +1784,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       addContrib(from.id, gift.price);
       logGift(from.id, 'me', gift, 1);
       flyGift(gift.emoji, 1, ['me'], { x: 36, y: win.height * 0.72 }, gift.id);
-      if (gift.price >= 50 && showFx(gift.price) && visibleRef.current) playGiftFx(gift, from.name, ['me'], 1);
+      if (gift.price >= 50 && showFx(gift.price) && visibleRef.current) playGiftFx(gift, from.id, ['me'], 1);
       addMsg({ id: `gift:${tx}`, system: true, text: `🎁 ${from.name} sana ${gift.emoji} ${gift.name} gönderdi! (+${gift.price} 💎)`, gift: { fromId: from.id, toIds: ['me'], emoji: gift.emoji, name: gift.name, count: 1, giftId: gift.id } });
       scorePk(tx, from.id, 'me', gift.id, gift.price);
     }, 6000);
@@ -2527,10 +2618,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           mentionQ,
         );
 
-  /** True when at least one recipient got the gift. */
-  const deliverGifts = (gift: Gift, toIds: string[], count: number): boolean => {
+  /** How many of the recipients got the gift. `quiet`: a repeat the wheel counts, so no chat line of its own. */
+  const deliverGifts = (gift: Gift, toIds: string[], count: number, quiet = false): number => {
     // Demo rooms only: a live build never pays the demo's people (spendCoins would take real server coins).
-    if (liveMode()) return false;
+    if (liveMode()) return 0;
     const each = gift.price * count;
     // Each recipient is a separate, individually recorded transaction; stop charging once the balance
     // or the daily spending limit runs out, and remember which of the two it was.
@@ -2549,7 +2640,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           { text: 'Vazgeç', style: 'cancel' },
           { text: 'Jeton yükle', onPress: () => router.push('/cuzdan') },
         ]);
-      return false;
+      return 0;
     }
     successHaptic();
     const total = each * delivered.length;
@@ -2560,32 +2651,42 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     bump('giftsSent', count * delivered.length);
     addContrib('me', total);
     if (!isOwn) addFanPoints(hostId, Math.ceil(total / 10), `Hediye gönderdin (${total} jeton)`);
-    if (showFx(gift.price)) playGiftFx(gift, ME.name, delivered.map((r) => r.userId), count);
+    if (showFx(gift.price)) playGiftFx(gift, 'me', delivered.map((r) => r.userId), count);
     // From the gift button (bottom right) to each recipient's seat.
     flyGift(gift.emoji, count, delivered.map((r) => r.userId), { x: win.width - 60, y: win.height - 48 }, gift.id);
     const sendId = msgId();
     delivered.forEach((r) => scorePk(`GT-${sendId}-${r.userId}`, 'me', r.userId, gift.id, each));
-    addMsg({
-      id: `gift:GT-${sendId}`,
-      system: true,
-      text: `🎁 ${ME.name}, ${delivered.length > 1 ? `${delivered.length} kişiye` : `${userById(delivered[0].userId).name} kişisine`} ${gift.emoji} ${gift.name} x${count} gönderdi!`,
-      gift: { fromId: 'me', toIds: delivered.map((r) => r.userId), emoji: gift.emoji, name: gift.name, count, giftId: gift.id },
-    });
+    const all = delivered.length === toIds.length;
+    if (!(quiet && all))
+      addMsg({
+        id: `gift:GT-${sendId}`,
+        system: true,
+        text: `🎁 ${ME.name}, ${delivered.length > 1 ? `${delivered.length} kişiye` : `${userById(delivered[0].userId).name} kişisine`} ${gift.emoji} ${gift.name} x${count} gönderdi!`,
+        gift: { fromId: 'me', toIds: delivered.map((r) => r.userId), emoji: gift.emoji, name: gift.name, count, giftId: gift.id },
+      });
     // Only a partial delivery opens the results panel; a normal send shows no extra message.
-    if (delivered.length < toIds.length) {
+    if (!all) {
       setGiftResults({ rows: results, reason });
       setPanel('results');
     }
-    return true;
+    return delivered.length;
   };
 
   // Product rule: gifts never ask for confirmation; one tap sends.
-  // `fromBag`: a free gift from Çantam (the gift sheet passes it at price 0).
+  // `fromBag`: a free gift from Çantam (the gift sheet passes it at price 0). A coin gift that reached everyone opens
+  // the repeat wheel (Çantam's are free and counted, so they don't get one).
   const sendGift = (gift: Gift, toIds: string[], count: number, fromBag = false) => {
     setGiftOpen(false);
+    const spec: ComboSpec = { lucky: false, giftId: gift.id, to: toIds, each: count };
+    const quiet = !fromBag && comboRepeat(spec);
+    const after = (n: number) => {
+      if (fromBag) return;
+      if (n === toIds.length) countCombo(spec, false);
+      else stopCombo(spec);
+    };
     if (offlineBlocked() || blockedFeature('gifts')) return false;
     if (real) {
-      void deliverLiveGifts(gift, toIds, count, fromBag);
+      void deliverLiveGifts(gift, toIds, count, fromBag, quiet).then(after);
       return true;
     }
     // Live mode: a sample room's people are not real, and real coins never go to them (no spendCoins here).
@@ -2593,7 +2694,23 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       showAlert('Hediye gönderilemedi', 'Bu örnek odada hediye gönderilemez. Hediyeleri gerçek odalarda gönderebilirsin.');
       return false;
     }
-    return deliverGifts(gift, toIds, count);
+    const n = deliverGifts(gift, toIds, count, quiet);
+    after(n);
+    return n > 0;
+  };
+  /** The wheel's next send of a coin gift, to whoever of its people is still in the room; true when all got it. */
+  const giftAgain = async (spec: ComboSpec) => {
+    const gift = GIFTS.find((g) => g.id === spec.giftId);
+    const toIds = stillHere(spec.to);
+    if (!gift || !toIds.length || offlineBlocked() || blockedFeature('gifts')) {
+      stopCombo(spec);
+      if (gift && !toIds.length) showAlert('Hediye gönderilemedi', 'Seçtiğin kişiler artık odada değil.');
+      return false;
+    }
+    const n = real ? await deliverLiveGifts(gift, toIds, spec.each, false, true) : deliverGifts(gift, toIds, spec.each, true);
+    if (n === toIds.length) countCombo(spec, true);
+    else stopCombo(spec);
+    return n === toIds.length;
   };
 
   // Server room: each gift is paid on the server (its price, my real balance; the recipient's diamonds and
@@ -2601,7 +2718,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // (server/api/gifts.mjs); this phone draws its own gift once the server said it was paid. From Çantam
   // (server/api/backpack.mjs) no coins move: the server takes the gifts out of the backpack, and the room draws it at
   // the catalog's price, as the other phones do.
-  const deliverLiveGifts = async (sheetGift: Gift, toIds: string[], count: number, fromBag = false) => {
+  const deliverLiveGifts = async (sheetGift: Gift, toIds: string[], count: number, fromBag = false, quiet = false): Promise<number> => {
     const gift = fromBag ? (GIFTS.find((g) => g.id === sheetGift.id) ?? sheetGift) : sheetGift;
     const sent: string[] = [];
     let error: string | null = null;
@@ -2623,17 +2740,20 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     }
     if (!sent.length) {
       errorHaptic();
-      if (fromBag) return showAlert('Hediye gönderilemedi', error ?? 'Gönderilemedi.');
-      return showAlert('Hediye gönderilemedi', error ?? 'Gönderilemedi.', [
-        { text: 'Tamam', style: 'cancel' },
-        { text: 'Jeton yükle', onPress: () => router.push('/cuzdan') },
-      ]);
+      if (fromBag) showAlert('Hediye gönderilemedi', error ?? 'Gönderilemedi.');
+      else
+        showAlert('Hediye gönderilemedi', error ?? 'Gönderilemedi.', [
+          { text: 'Tamam', style: 'cancel' },
+          { text: 'Jeton yükle', onPress: () => router.push('/cuzdan') },
+        ]);
+      return 0;
     }
     successHaptic();
-    showGift('me', sent, gift, count);
+    showGift('me', sent, gift, count, quiet && !error);
     sent.forEach((uid) => app.recordGift(uid, gift.id, count));
     bump('giftsSent', count * sent.length);
     if (error) showAlert('Bazı hediyeler gönderilemedi', `${sent.length} kişiye gitti. ${error}`);
+    return sent.length;
   };
   /** A Lucky send another phone made (the server announced it): the gift lines, the flight and a big win. */
   const showLuckyFrom = (from: string, toIds: string[], s: LuckySignal) => {
@@ -2652,14 +2772,16 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     // The sender may hide their name on wins (Ayarlar), and the server doesn't know it: the line names no one.
     if (s.bigWin > 0) addMsg({ system: true, kind: 'gift', text: `🎉 Şanslı hediyeden ×${s.best.toLocaleString('tr-TR')} kazanıldı!` });
   };
-  /** A gift line, the seat flight and the big effect (mine or one another phone announced). */
-  const showGift = (from: string, toIds: string[], gift: Gift, count: number) => {
+  /** A gift line, the seat flight and the big effect (mine or one another phone announced). `quiet`: no chat line
+   *  (a repeat of mine the wheel counts). */
+  const showGift = (from: string, toIds: string[], gift: Gift, count: number, quiet = false) => {
     const fromName = from === 'me' ? ME.name : userById(from).name;
     toIds.forEach((to) => logGift(from, to, gift, count));
     addContrib(from, gift.price * count * toIds.length);
-    if (showFx(gift.price) && visibleRef.current) playGiftFx(gift, fromName, toIds, count);
+    if (showFx(gift.price) && visibleRef.current) playGiftFx(gift, from, toIds, count);
     const origin = from === 'me' ? { x: win.width - 60, y: win.height - 48 } : { x: 36, y: win.height * 0.72 };
     flyGift(gift.emoji, count, toIds, origin, gift.id);
+    if (quiet) return;
     const toText = toIds.length > 1 ? `${toIds.length} kişiye` : toIds[0] === 'me' ? 'sana' : `${userById(toIds[0]).name} kişisine`;
     addMsg({ system: true, text: `🎁 ${fromName}, ${toText} ${gift.emoji} ${gift.name} x${count} gönderdi!`, gift: { fromId: from, toIds, emoji: gift.emoji, name: gift.name, count, giftId: gift.id } });
   };
@@ -2667,22 +2789,24 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // Lucky: `count` gifts to each person picked, one draw per gift; no send cap beyond the balance.
   // Server room: the server takes the price, gives each recipient their 20 % as diamonds, draws and pays the rewards
   // in game coins, then tells the room (server/api/lucky.mjs). Offline demo: lib/lucky plays it on this phone.
-  const sendLuckyGift = (giftId: string, picked: string[], count = 1) => {
+  // `viaWheel`: a repeat from the wheel (its stored list). True (or resolves true) when every gift went out.
+  const sendLuckyGift = (giftId: string, picked: string[], count = 1, viaWheel = false): boolean | Promise<boolean> => {
     setGiftOpen(false);
-    if (offlineBlocked()) return;
+    const spec: ComboSpec = { lucky: true, giftId, to: picked, each: count };
+    if (offlineBlocked()) return false;
     // Live mode: a sample room's people are not real, and real coins never go to them.
     if (liveMode() && !real) {
-      setCombo(null);
-      return showAlert('Şanslı hediye gönderilemedi', 'Bu örnek odada hediye gönderilemez. Hediyeleri gerçek odalarda gönderebilirsin.');
+      stopCombo(spec);
+      showAlert('Şanslı hediye gönderilemedi', 'Bu örnek odada hediye gönderilemez. Hediyeleri gerçek odalarda gönderebilirsin.');
+      return false;
     }
-    // The combo wheel repeats a stored list: drop anyone who has left the room since (never charge for them).
-    const inRoom = new Set([...seatedOthers, ...audience.map((u) => u.id)]);
-    const toIds = picked.filter((t) => inRoom.has(t));
+    const toIds = stillHere(picked);
     if (!toIds.length) {
-      setCombo(null);
-      return showAlert('Şanslı hediye gönderilemedi', 'Seçtiğin kişiler artık odada değil.');
+      stopCombo(spec);
+      showAlert('Şanslı hediye gönderilemedi', 'Seçtiğin kişiler artık odada değil.');
+      return false;
     }
-    if (real) return void deliverLiveLucky(giftId, toIds, count);
+    if (real) return deliverLiveLucky(spec, toIds, viaWheel);
     // One wallet charge (and at most one reward and one refund row) for the whole send; each gift still draws apart.
     const { records, error } = sendLuckyBatch(
       { userId: 'me', userAge: app.me.age, roomId: id, giftId, to: toIds.map((t) => ({ id: t, name: userById(t).name })), count },
@@ -2690,41 +2814,47 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     );
     if (!records.length) {
       errorHaptic();
-      setCombo(null);
-      return showAlert('Şanslı hediye gönderilemedi', error ?? 'Gönderilemedi.');
+      stopCombo(spec);
+      showAlert('Şanslı hediye gönderilemedi', error ?? 'Gönderilemedi.');
+      return false;
     }
     // PK scores the recipient's 20 % share of the gift value, never the reward (the server does it in a server room).
     records.forEach((r) => scorePk(r.txId, 'me', r.toId, r.giftId, luckyPkPoints(r)));
     const spent = records.reduce((n, r) => n + r.price, 0);
     if (!isOwn) addFanPoints(hostId, Math.ceil(spent / 10), `Hediye gönderdin (${spent} jeton)`);
-    showLuckySend(records, toIds, count, error);
+    showLuckySend(records, toIds, count, error, spec, viaWheel);
+    return !error;
   };
-  const deliverLiveLucky = async (giftId: string, toIds: string[], count: number) => {
+  const deliverLiveLucky = async (spec: ComboSpec, toIds: string[], viaWheel: boolean) => {
+    const { giftId, each: count } = spec;
     const g = luckyGift(giftId);
     // The daily limit holds here too (the balance is the server's to check).
     const limited = g ? spendBlock(g.price * count * toIds.length) : null;
     if (limited && limited !== 'Yetersiz bakiye.') {
       errorHaptic();
-      setCombo(null);
-      return showAlert('Şanslı hediye gönderilemedi', limited);
+      stopCombo(spec);
+      showAlert('Şanslı hediye gönderilemedi', limited);
+      return false;
     }
     try {
-      const { records } = await liveLuckySend(giftId, toIds, count, id);
-      if (records.length) showLuckySend(records, toIds, count, null);
+      // A win is announced in every room; with my name only when I let it (Ayarlar › Gizlilik).
+      const { records } = await liveLuckySend(giftId, toIds, count, id, settings.luckyAnnounce);
+      if (records.length) showLuckySend(records, toIds, count, null, spec, viaWheel);
+      return records.length > 0;
     } catch (e) {
       errorHaptic();
-      setCombo(null);
+      stopCombo(spec);
       const text = errorText(e);
       showAlert('Şanslı hediye gönderilemedi', text, /Yetersiz/i.test(text) ? [{ text: 'Tamam', style: 'cancel' }, { text: 'Jeton yükle', onPress: () => router.push('/cuzdan') }] : undefined);
       // A closed package or the day's limit: the sheet shows it from now on.
       void refreshLucky().catch(() => {});
+      return false;
     }
   };
   /** What a Lucky send I made shows: the gift lines, the flight, the results and the win news. */
-  const showLuckySend = (records: LuckyRecord[], toIds: string[], count: number, error: string | null) => {
+  const showLuckySend = (records: LuckyRecord[], toIds: string[], count: number, error: string | null, spec: ComboSpec, viaWheel: boolean) => {
     const cfg = getLucky().config;
     const first = records[0];
-    const giftId = first.giftId;
     const spent = records.reduce((n, r) => n + r.price, 0);
     const reward = records.reduce((n, r) => n + r.reward, 0);
     const best = records.reduce((a, b) => (b.mult > a.mult ? b : a), first);
@@ -2738,7 +2868,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     addContrib('me', spent);
     flyGift(first.emoji, count, sentTo, { x: win.width - 60, y: win.height - 48 }, first.giftId);
     // Combo repeats don't add a chat line each time; the wheel shows the count.
-    const repeat = combo?.giftId === giftId && combo.to.join() === toIds.join() && combo.each === count;
+    const repeat = comboRepeat(spec);
     if (!repeat)
       addMsg({
         id: `gift:${first.txId}`,
@@ -2759,11 +2889,54 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         text: settings.luckyAnnounce ? `🎉 ${ME.name} Şanslı hediyeden ×${best.mult.toLocaleString('tr-TR')} kazandı! +${reward.toLocaleString('tr-TR')} jeton` : `🎉 Bir kullanıcı Şanslı hediyeden ×${best.mult.toLocaleString('tr-TR')} kazandı!`,
       });
     setLuckyFx(records);
-    // Restarts the combo wheel's timer: the time of this send's last draw.
-    const at = records[records.length - 1].ts;
-    setCombo((c) => (c && c.giftId === giftId && c.to.join() === toIds.join() && c.each === count ? { ...c, count: c.count + 1, key: at } : { giftId, to: toIds, each: count, count: 1, key: at }));
+    // Some gifts didn't go (the balance ran out): the wheel stops; else it counts this send.
+    if (error) stopCombo(spec);
+    else countCombo(spec, viaWheel);
   };
-  const comboGift = combo ? luckyGift(combo.giftId) : undefined;
+
+  // --- The repeat wheel (components/room/gift-combo) ------------------------------------------------------------
+  /** The wheel repeats a stored list: anyone who has left the room since is left out (never charged for). */
+  const stillHere = (ids: string[]) => {
+    const here = new Set(getRoom(id)?.members ?? []);
+    return ids.filter((u) => u !== 'me' && here.has(u) && !blocked.has(u));
+  };
+  /** A send of `spec` while the wheel is up for it: the wheel counts it (no chat line of its own). */
+  const comboRepeat = (spec: ComboSpec) => !!comboRef.current && sameCombo(comboRef.current, spec);
+  /** A send of `spec` reached everyone: the wheel counts it and its line starts again; one from the sheet opens it. */
+  const countCombo = (spec: ComboSpec, viaWheel: boolean) => {
+    const at = nowMs();
+    setCombo((c) => (c && sameCombo(c, spec) ? { ...c, count: c.count + 1, key: at } : viaWheel ? c : { ...spec, count: 1, key: at }));
+  };
+  /** A send of `spec` failed or reached only some: its wheel goes (the usual message already said why). */
+  const stopCombo = (spec: ComboSpec) => setCombo((c) => (c && sameCombo(c, spec) ? null : c));
+  // Taps go out one after another: one while the last send is on its way waits for it (server rooms), so the count
+  // follows what really went out and a failed send stops the wheel with a single message.
+  const comboTaps = useRef({ busy: false, more: 0 });
+  const tapCombo = () => {
+    if (!combo) return;
+    const q = comboTaps.current;
+    if (q.busy) {
+      q.more = Math.min(q.more + 1, COMBO_MORE);
+      return;
+    }
+    void runCombo({ lucky: combo.lucky, giftId: combo.giftId, to: combo.to, each: combo.each });
+  };
+  const runCombo = async (spec: ComboSpec) => {
+    const q = comboTaps.current;
+    q.busy = true;
+    try {
+      for (;;) {
+        const ok = await (spec.lucky ? sendLuckyGift(spec.giftId, spec.to, spec.each, true) : giftAgain(spec));
+        const c = comboRef.current;
+        if (!ok || !q.more || !c || !sameCombo(c, spec)) break;
+        q.more -= 1;
+      }
+    } finally {
+      q.busy = false;
+      q.more = 0;
+    }
+  };
+  const comboGift = combo ? (combo.lucky ? luckyGift(combo.giftId) : GIFTS.find((g) => g.id === combo.giftId)) : undefined;
 
   const sendEnvelope = (amount: number, count: number) => {
     setPanel(null);
@@ -2857,7 +3030,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     // Some friends come right away (a demo stand-in for them opening the card).
     setTimeout(() => {
       if (Math.random() < 0.5 || getRoom(id)?.members.includes(uid)) return;
-      if (joinPresence(id, uid, { eventId: `share:${uid}:${msgId()}` }).ok) addMsg({ system: true, text: `📨 ${userById(uid).name} davetinle odaya girdi` });
+      if (!joinPresence(id, uid, { eventId: `share:${uid}:${msgId()}` }).ok) return;
+      arrivals.set(uid, Date.now());
+      addMsg({ system: true, text: `📨 ${userById(uid).name} davetinle odaya girdi` });
     }, 2500);
   };
   // A server room: the server counts the followers, sends the notices and keeps the 24 hours (server/api/room-social.mjs).
@@ -2911,7 +3086,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             .slice(0, 2)
             .forEach((uid, i) =>
               setTimeout(() => {
-                if (joinPresence(id, uid, { eventId: `followers:${uid}:${msgId()}` }).ok) addMsg({ system: true, text: `📨 ${userById(uid).name} takipçi davetiyle odaya girdi` });
+                if (!joinPresence(id, uid, { eventId: `followers:${uid}:${msgId()}` }).ok) return;
+                arrivals.set(uid, Date.now());
+                addMsg({ system: true, text: `📨 ${userById(uid).name} takipçi davetiyle odaya girdi` });
               }, 3000 * (i + 1)),
             );
         },
@@ -3034,7 +3211,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     {
       title: 'Benim ayarlarım',
       rows: [
-        { key: 'effects', label: 'Efektler ve ses', value: settings.roomMuted ? 'Oda sesi kapalı' : settings.effectsOff ? 'Efektler kapalı' : 'Açık', onPress: fromSettings(() => setPanel('effects')) },
+        { key: 'effects', label: 'Efektler ve ses', value: soundOff ? 'Oda sesi kapalı' : settings.effectsOff ? 'Efektler kapalı' : 'Açık', onPress: fromSettings(() => setPanel('effects')) },
         { key: 'msg', label: 'Mesaj ayarları', hint: 'Sohbette giriş, hediye ve bot mesajları', onPress: fromSettings(() => setPanel('msgSettings')) },
         { key: 'decor', label: 'Süsler', hint: 'Çerçeve, giriş efekti ve sohbet balonu (Mağaza)', onPress: () => (menuReturn.current.push('settings'), router.push('/magaza')) },
       ],
@@ -3054,9 +3231,16 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     { key: 'effects', label: 'Efekt ayarları', icon: 'sparkles-outline' as const, onPress: fromCard(() => setPanel('effects')) },
   ];
 
-  // Room card data (members, clan). A server room: its members as the server keeps them, never demo people.
+  // Room card data (members, clan). A server room: its members as the server keeps them, never demo people. The
+  // count is the room's people, its owner and staff with its members (the server's total; my own demo room's alike).
   const roomMembers = isOwn ? ['me', ...myRoom.memberIds] : real ? (serverMembers?.ids ?? []) : [...(membership === 'member' ? ['me'] : []), ...USERS.filter((u) => !kicked.has(u.id) && !blocked.has(u.id)).slice(0, 10).map((u) => u.id)];
-  const memberTotal = isOwn ? roomMembers.length : real ? (serverMembers?.total ?? 0) : Math.min(memberLimit(level), Math.round(base!.listeners * 1.8)) + (membership === 'member' ? 1 : 0);
+  const memberTotal = isOwn
+    ? roomPeopleCount([hostId, ...superIds, ...adminIds], roomMembers)
+    : real
+      ? (serverMembers?.total ?? 0)
+      : Math.min(memberLimit(level), Math.round(base!.listeners * 1.8)) + (membership === 'member' ? 1 : 0);
+  // The members the cap counts: the owner and staff take no member's place (server/api/rooms.mjs memberCount).
+  const memberJoined = isOwn ? myRoom.memberIds.filter((m) => m !== hostId && !superIds.includes(m) && !adminIds.includes(m)).length : real ? (serverMembers?.joined ?? 0) : memberTotal;
   const ownFamily = FAMILIES.find((f) => f.id === familyId);
   const ownAgencyName = agencyId === 'own' ? ownedAgency?.name : AGENCIES.find((a) => a.id === agencyId)?.name;
   const otherFamily = FAMILIES[(Number(id.replace(/\D/g, '')) || 0) % FAMILIES.length];
@@ -3076,7 +3260,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         : level >= 5
           ? { label: `${otherFamily.emoji} ${otherFamily.name}`, href: '/aile' as const }
           : null;
-  const top3 = ranking.slice(0, 3).map(([uid]) => uid);
+  // Next to the trophy: a server room's top three of today's Cömertlik as the server counts it (the board's own list),
+  // the same on every phone whenever it came in; the demo's from this visit's gifts.
+  const serverTop = useRoomTop(id, real && unlocked, giftLog[0]?.id);
+  const top3 = real ? serverTop : ranking.slice(0, 3).map(([uid]) => uid);
 
   // Mic invites I sent: announce each answer once (accepted, declined, no answer, no free mic left).
   // Invites answered before this visit (the presence server keeps them) are taken as already announced.
@@ -3224,11 +3411,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       setPkSetup(false);
       setMoving(null);
       setFlights([]);
-      setGiftFx(null);
+      setFxStage(emptyStage<StagePlay>());
       setLuckyFx(null);
       setCombo(null);
-      setEntry(null);
-      setEntryQueue([]);
+      setEntries(emptyEntryLine());
       if (game) setGameMin(true);
     }
   }
@@ -3336,7 +3522,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       <>
         {bossOn && (
           <View style={[styles.topRow, { marginTop: 6 }]}>
-            <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} reaction={bossReaction} still={settings.reduceMotion} anchor={bossAnchor} />
+            <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} reaction={bossReaction} still={settings.reduceMotion} anchor={bossAnchor} pkPoints={pkPointsOf(bossId)} />
           </View>
         )}
         <StageLayout layout={layout} width={win.width} face={f.face} seats={allSeats} pkRoom={theme === 'pk'} cameraOf={(uid) => (uid === 'me' ? camOn : !!camOf(uid))} videoOf={camOf} renderSeat={(i, slot, next) => renderSeat(i, { slot, next })} />
@@ -3347,7 +3533,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         {bossOn ? (
           <View style={styles.topRow}>
             {renderSeat(0, { host: true, compact: true, grid: { width: 96, size: f.host } })}
-            <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} reaction={bossReaction} still={settings.reduceMotion} anchor={bossAnchor} />
+            <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} reaction={bossReaction} still={settings.reduceMotion} anchor={bossAnchor} pkPoints={pkPointsOf(bossId)} />
           </View>
         ) : (
           <View style={styles.hostRow}>{renderSeat(0, { grid: { width: Math.max(96, f.host + 28), size: f.host } })}</View>
@@ -3379,6 +3565,26 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     />
   ) : null;
 
+  // The effect on the stage now (lib/fx-queue). More recipients of its send join its banner while it plays.
+  const cueNow = fxStage.now;
+  const stageFx = (() => {
+    if (!cueNow) return null;
+    const p = cueNow.payload;
+    const done = () => endFx(cueNow.key);
+    if (p.kind === 'anim') return <AnimPlay key={cueNow.key} anim={p.anim} origin={p.origin} screen={win} lite={settings.lowData} onDone={done} />;
+    const to = cueTo(cueNow);
+    const play = {
+      key: cueNow.key,
+      gift: p.gift,
+      fromName: cueNow.from === 'me' ? ME.name : userById(cueNow.from).name,
+      toText: to.length > 1 ? `${to.length} kişi` : to[0] === 'me' ? ME.name : to[0] ? userById(to[0]).name : '',
+      count: cueCount(cueNow),
+    };
+    if (p.kind === 'video') return <GiftVideoFx key={cueNow.key} media={p.media} fromName={play.fromName} toText={play.toText} giftName={p.gift.name} count={play.count} muted={fxMuted} onDone={done} />;
+    if (p.kind === 'show') return <GiftShowFx key={cueNow.key} show={p.show} play={play} lite={settings.lowData} onDone={done} />;
+    return <GiftAnimation key={cueNow.key} gift={p.gift} onDone={done} />;
+  })();
+
   if (!unlocked) return full ? <PasswordGate title={title} password={password} onPass={() => setUnlocked(true)} /> : null;
   // Minimized: the host hides this view, so drawing seats, chat and effects would be wasted work on
   // every room tick. Session, audio and timers live in hooks above and keep running.
@@ -3405,20 +3611,24 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                 </View>
                 {hostId !== 'me' && <RoomFollowHeart roomId={id} title={title} />}
               </Pressable>
-              <Pressable onPress={() => setPeopleOpen(true)} style={styles.subRow} accessibilityLabel={`${listeners} kişi, ${capacity} mikrofon. Odadaki kullanıcıları aç`}>
-                <Ionicons name="people" size={11} color={colors.textDim} />
-                <Text style={styles.sub}>{listeners}</Text>
-                <Ionicons name="mic" size={11} color={colors.textDim} style={{ marginLeft: 4 }} />
-                <Text style={styles.sub}>{capacity}</Text>
-                {invisible && <Ionicons name="eye-off" size={11} color={colors.textDim} style={{ marginLeft: 4 }} accessibilityLabel="Gizli giriş" />}
-                <Text style={[styles.sub, { flexShrink: 1, marginLeft: 2 }]} numberOfLines={1}>
-                  {' · '}
-                  {typeInfo.name}
-                  {layout ? ` · ${modeById(layout.modeId).name}` : ''}
-                  {agencyRoom ? ' · Ajans odası' : ''}
-                  {myRank === 3 ? ' · Sahibi' : myRank > 0 ? ` · ${rankLabel('me')}` : ''}
-                </Text>
-              </Pressable>
+              <View style={styles.subLine}>
+                {/* Normal PK: its timer pill leads the line; on a narrow phone the line's end gives way, not the pill. */}
+                {soloPk && <SoloPkPill pk={soloPk} canManage={canManage && !offline} />}
+                <Pressable onPress={() => setPeopleOpen(true)} style={[styles.subRow, styles.subShrink]} accessibilityLabel={`${listeners} kişi, ${capacity} mikrofon. Odadaki kullanıcıları aç`}>
+                  <Ionicons name="people" size={11} color={colors.textDim} />
+                  <Text style={styles.sub}>{listeners}</Text>
+                  <Ionicons name="mic" size={11} color={colors.textDim} style={{ marginLeft: 4 }} />
+                  <Text style={styles.sub}>{capacity}</Text>
+                  {invisible && <Ionicons name="eye-off" size={11} color={colors.textDim} style={{ marginLeft: 4 }} accessibilityLabel="Gizli giriş" />}
+                  <Text style={[styles.sub, { flexShrink: 1, marginLeft: 2 }]} numberOfLines={1}>
+                    {' · '}
+                    {typeInfo.name}
+                    {layout ? ` · ${modeById(layout.modeId).name}` : ''}
+                    {agencyRoom ? ' · Ajans odası' : ''}
+                    {myRank === 3 ? ' · Sahibi' : myRank > 0 ? ` · ${rankLabel('me')}` : ''}
+                  </Text>
+                </Pressable>
+              </View>
             </View>
             {canManage && (micQueue || queue.length > 0) && (
               <Pressable onPress={() => setPanel('requests')} accessibilityLabel={`Konuşma istekleri, ${queue.length} kişi`} hitSlop={6}>
@@ -3453,17 +3663,13 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           </View>
 
           {/* Stage: boards and mics over the Balkon bar and the chat. The stage doesn't scroll: its mics are sized for
-              the height the chat leaves them and the chat takes the rest (components/room/fit-stage). While the emoji
-              panel is open the chat steps aside and the mics take its place (the emoji plays on your mic); a touch on
-              the stage closes the panel (as does the back button). */}
+              the height the chat leaves them and the chat takes the rest (components/room/fit-stage). The emoji panel
+              lies over the chat in its place, so the mics stay exactly where they were (the emoji plays on your mic);
+              a touch on the stage closes the panel (as does the back button). */}
           <FitStage
             fit={stageFit}
             calm={calmFit}
-            pkTop={
-              pk && (pk.kind === 'cross' || pk.mode === 'solo' || pk.status === 'invite') ? (
-                pk.kind === 'room' && pk.mode === 'solo' ? <SoloBoard pk={pk} canManage={canManage && !offline} /> : <PkBoard pk={pk} viewerRoomId={id} canManage={canManage && !offline} />
-              ) : null
-            }
+            pkTop={pk?.kind === 'cross' ? <PkBoard pk={pk} viewerRoomId={id} canManage={canManage && !offline} /> : null}
             frozen={typing}
             freeStyle={strip ? { flexGrow: 0, flexShrink: 1 } : { flexGrow: 0, flexShrink: 100, minHeight: 120 }}
             guess={Math.round(win.height * 0.34)}
@@ -3480,13 +3686,6 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                     </Text>
                     <Text style={styles.callBannerGo}>Dön</Text>
                   </Pressable>
-                )}
-                {settings.roomMuted && (
-                  <View style={styles.mutedRow}>
-                    <ArtText art={ROOM_ICON_ART.soundOff} size={18} style={styles.mutedChip}>
-                      Oda sesi senin için kapalı · Ses ayarlarından açabilirsin
-                    </ArtText>
-                  </View>
                 )}
                 {myQueuePos !== null && (
                   <View style={[styles.queueChipRow, { backgroundColor: 'rgba(255,95,162,0.35)' }]}>
@@ -3529,6 +3728,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                     offline={offline}
                     onChanged={(text) => addMsg({ system: true, text: `${ME.name}: ${text}` })}
                     share={real ? shareScreen : undefined}
+                    soundOff={soundOff}
                   />
                 )}
               </>
@@ -3549,7 +3749,32 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             chat={(onBasis) => (
               <ChatFeed messages={messages} visible={visibleInAll} renderItem={renderChat} screenHeight={win.height} fill={typing} onLarge={setSeatsSmall} onBasis={onBasis} hidden={emojiOpen && !typing} onTouch={emojiOpen ? () => setEmojiOpen(false) : undefined} sideRoom={wheelShown ? WHEEL_ROOM : 0} />
             )}
-            chatHidden={emojiOpen && !typing}
+            overlay={
+              emojiOpen && (
+                <EmojiPanel
+                  fill
+                  onClose={() => setEmojiOpen(false)}
+                  onAnimate={sendAnim}
+                  hint={amSeated ? 'Seçtiğin emoji koltuğundaki avatarının üzerinde oynar.' : 'Koltukta değilsin: emoji mesajına eklenir. Mikrofona geçince avatarının üzerinde oynar.'}
+                  onPick={(e) => {
+                    // A Hamle pick does something (lib/room-moves); it is never a chat sticker.
+                    if (isMovePick(stickerIdOf(e))) {
+                      const move = moveOfPick(stickerIdOf(e));
+                      if (move) doMove(move);
+                      return setEmojiOpen(false);
+                    }
+                    if (amSeated) {
+                      tapHaptic();
+                      react('me', e);
+                      // Server room: the others see it over my seat too (lib/live/room-bus 'react').
+                      if (real) sendSignal({ t: 'react', emoji: e });
+                      setEmojiOpen(false);
+                    } else if (stickerIdOf(e)) send(e);
+                    else editDraft((d) => d + e);
+                  }}
+                />
+              )
+            }
           />
           {mentionNote && (
             <View key={mentionNote.n} style={styles.mentionNote} pointerEvents="none" accessibilityLiveRegion="polite">
@@ -3558,30 +3783,6 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                 {mentionNote.name} senden bahsetti
               </Text>
             </View>
-          )}
-
-          {emojiOpen && (
-            <EmojiPanel
-              onClose={() => setEmojiOpen(false)}
-              onAnimate={sendAnim}
-              hint={amSeated ? 'Seçtiğin emoji koltuğundaki avatarının üzerinde oynar.' : 'Koltukta değilsin: emoji mesajına eklenir. Mikrofona geçince avatarının üzerinde oynar.'}
-              onPick={(e) => {
-                // A Hamle pick does something (lib/room-moves); it is never a chat sticker.
-                if (isMovePick(stickerIdOf(e))) {
-                  const move = moveOfPick(stickerIdOf(e));
-                  if (move) doMove(move);
-                  return setEmojiOpen(false);
-                }
-                if (amSeated) {
-                  tapHaptic();
-                  react('me', e);
-                  // Server room: the others see it over my seat too (lib/live/room-bus 'react').
-                  if (real) sendSignal({ t: 'react', emoji: e });
-                  setEmojiOpen(false);
-                } else if (stickerIdOf(e)) send(e);
-                else editDraft((d) => d + e);
-              }}
-            />
           )}
           {chatMuted || voiceMuted ? (
             <View style={{ paddingHorizontal: 12, paddingBottom: 6, gap: 6 }}>
@@ -3607,7 +3808,15 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           <View style={styles.bottom}>
             {!typing && <RoundBtn label="Menü" icon="ellipsis-horizontal" onPress={() => (setPanel('menu'), void refreshCasino())} />}
             <View style={styles.inputWrap}>
-              <Pressable onPress={() => setEmojiOpen((v) => !v)} accessibilityLabel={amSeated ? 'Emoji gönder' : 'Emoji ekle'} hitSlop={8}>
+              <Pressable
+                onPress={() => {
+                  // The panel and the keyboard take turns in the chat's place, so the stage never has both under it.
+                  if (!emojiOpen) Keyboard.dismiss();
+                  setEmojiOpen((v) => !v);
+                }}
+                accessibilityLabel={amSeated ? 'Emoji gönder' : 'Emoji ekle'}
+                hitSlop={8}
+              >
                 <Ionicons name={emojiOpen ? 'close-circle' : 'happy-outline'} size={24} color={colors.textDim} />
               </Pressable>
               <TextInput
@@ -3616,7 +3825,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                 onChangeText={editDraft}
                 onSubmitEditing={() => send()}
                 submitBehavior="submit"
-                onFocus={() => setInputFocused(true)}
+                onFocus={() => {
+                  setInputFocused(true);
+                  setEmojiOpen(false);
+                }}
                 onBlur={() => setInputFocused(false)}
                 editable={!chatBlocked}
                 placeholder={chatBlocked ? 'Sohbete yazman kısıtlı' : 'Yaz…'}
@@ -3646,7 +3858,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                 ) : (
                   <MicBtn state={myQueuePos !== null ? 'queued' : 'hand'} queuePos={myQueuePos ?? undefined} onPress={raiseHand} />
                 )}
-                {!typing && <RoomSoundBtn muted={settings.roomMuted} onPress={() => setSetting('roomMuted', !settings.roomMuted)} />}
+                {!typing && <RoomSoundBtn muted={soundOff} onPress={() => setRoomSound(soundOff)} />}
               </View>
             )}
             {!typing && (
@@ -3665,12 +3877,12 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       </SafeAreaView>
 
       {envelope && <EnvelopeDrop from={envelope.from} seconds={envelope.seconds} onGrab={grabEnvelope} />}
-      {/* Over the Rüzgâr Gülü (or where it would be): the room's bags, one page each, with their times. */}
+      {/* Over the Rüzgâr Gülü or the repeat wheel (or where they would be): the room's bags, one page each, with their times. */}
       {real && bags.bags.length > 0 && (
         <LuckyBagFloat
           bags={bags.bags.filter((b) => !blocked.has(b.from.id))}
           now={bags.now}
-          bottom={wheelShown ? 222 : 150}
+          bottom={wheelShown || combo ? 222 : 150}
           still={settings.reduceMotion}
           onOpen={(b) => {
             setBagOutcome(null);
@@ -3742,6 +3954,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         clan={clan}
         members={roomMembers}
         memberTotal={memberTotal}
+        memberJoined={memberJoined}
         applications={memberApps}
         canManageMembers={isOwn || (real && !!serverMembers?.canManage)}
         autoRemoveDays={isOwn ? myRoom.autoRemoveDays : (liveRules?.autoRemoveDays ?? 0)}
@@ -3755,7 +3968,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         onLeave={leaveMembers}
         onApprove={(uid) => {
           if (real) return memberCall('Onaylanamadı', () => api.answerRoomMember(id, toServer(uid) ?? '', true), `🏠 ${userById(uid).name} oda üyesi oldu`);
-          if (roomMembers.length >= memberLimit(level)) return showAlert('Üye kapasitesi dolu', `Lv.${level} oda en fazla ${memberLimit(level)} üye alabilir.`);
+          if (memberJoined >= memberLimit(level)) return showAlert('Üye kapasitesi dolu', `Lv.${level} oda en fazla ${memberLimit(level)} üye alabilir.`);
           setMemberApps((l) => l.filter((x) => x !== uid));
           updateMyRoom({ memberIds: [...myRoom.memberIds, uid] });
           addMsg({ system: true, text: `🏠 ${userById(uid).name} oda üyesi oldu` });
@@ -4059,6 +4272,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         onClose={closePanel}
         settings={settings}
         set={setSetting}
+        soundOff={soundOff}
+        setSoundOff={(off) => setRoomSound(!off)}
         isOwner={isOwn || (real && myRank === 3)}
         roomFx={{ giftEffects: roomGiftFx }}
         setRoomFx={real ? (p) => saveLook(p, p.giftEffects ? 'Odada hediye efektlerini açtı' : 'Odada hediye efektlerini kapattı') : updateMyRoom}
@@ -4099,6 +4314,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           lite={settings.lowData}
           off={settings.effectsOff}
           micEffect={{ animationId: app.micFx, active: settings.micAnim && amSeated && sending && !callActive, isSpeaking: () => speakingMe.current }}
+          onFullscreen={playAnimFx}
         />
       )}
       <PkSetupSheet key={pkSetup ? 'pk-open' : 'pk-closed'} visible={pkSetup} roomId={id} starterId="me" micUsers={view.micIds} offline={offline} onClose={() => (setPkSetup(false), backToMenu())} />
@@ -4164,47 +4380,31 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           <Text style={styles.wheelText}>Rüzgâr Gülü</Text>
         </Pressable>
       )}
-      {giftFx &&
-        (giftVideoOf(giftFx.gift.id) ? (
-          <GiftVideoFx
-            key={giftFx.key}
-            media={giftVideoOf(giftFx.gift.id)!}
-            fromName={giftFx.fromName}
-            toText={giftFx.toText}
-            giftName={giftFx.gift.name}
-            count={giftFx.count}
-            muted={fxMuted}
-            onDone={() => setGiftFx(null)}
-          />
-        ) : giftShowOf(giftFx.gift.id) ? (
-          <GiftShowFx key={giftFx.key} show={giftShowOf(giftFx.gift.id)!} play={giftFx} lite={settings.lowData} onDone={() => setGiftFx(null)} />
-        ) : (
-          <GiftAnimation key={giftFx.key} gift={giftFx.gift} onDone={() => setGiftFx(null)} />
-        ))}
+      {stageFx}
       {combo && comboGift && (
-        <LuckyCombo
-          key={`${combo.giftId}-${combo.to.join()}`}
+        <GiftCombo
+          key={`${combo.lucky ? 'lucky' : 'gift'}-${combo.giftId}-${combo.to.join()}-${combo.each}`}
           giftId={combo.giftId}
           emoji={comboGift.emoji}
           name={comboGift.name}
           price={comboGift.price * combo.each * combo.to.length}
           count={combo.count}
           restartKey={combo.key}
-          onPress={() => sendLuckyGift(combo.giftId, combo.to, combo.each)}
+          onPress={tapCombo}
           onExpire={() => setCombo(null)}
         />
       )}
       {luckyFx && <LuckyResult key={luckyFx[0].txId} records={luckyFx} still={settings.effectsOff || settings.reduceMotion} onDone={() => setLuckyFx(null)} />}
       {/* Platform-wide win announcements (every room shows every win). */}
       {visible && <WinBanner top={110} still={settings.reduceMotion} />}
-      {entry &&
-        (entryVideoOf(entry.fx) && !settings.reduceMotion ? (
+      {entries.now &&
+        (entryMedia ? (
           // A video entry (Ejderha): the name banner over the full-screen clip, which ends the turn.
-          <VideoFx key={`${entry.name}-${entry.fx}-${entry.avatar}`} media={entryVideoOf(entry.fx)!} muted={fxMuted} onDone={nextEntry}>
-            <EntryEffect show={entry} />
+          <VideoFx key={entries.now.id} media={entryMedia} muted={fxMuted} onDone={nextEntry}>
+            <EntryEffect show={entries.now.show} />
           </VideoFx>
         ) : (
-          <EntryEffect key={`${entry.name}-${entry.fx}-${entry.avatar}`} show={entry} still={settings.reduceMotion} onDone={nextEntry} />
+          <EntryEffect key={entries.now.id} show={entries.now.show} still={settings.reduceMotion} onDone={nextEntry} />
         ))}
     </View>
   );
@@ -4215,6 +4415,8 @@ const styles = StyleSheet.create({
   title: { color: '#fff', fontSize: 15, fontWeight: '700', flexShrink: 1 },
   sub: { color: colors.textDim, fontSize: 12 },
   subRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  subLine: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  subShrink: { flexShrink: 1, minWidth: 0, overflow: 'hidden' },
   levelBadge: { backgroundColor: colors.primary, borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1, borderWidth: 1, borderColor: 'rgba(165,243,245,0.35)', boxShadow: '0 0 8px rgba(255,95,162,0.35)' },
   levelText: { color: '#fff', fontSize: 11, fontWeight: '800' },
   reqBadge: { position: 'absolute', top: -4, right: -6, backgroundColor: colors.red, borderRadius: 8, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center' },
@@ -4262,8 +4464,6 @@ const styles = StyleSheet.create({
   mentionChip: { flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: 160, paddingLeft: 3, paddingRight: 10, paddingVertical: 3, borderRadius: 999, backgroundColor: 'rgba(15,23,42,0.85)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
   mentionName: { color: colors.text, fontSize: 13, fontWeight: '700', flexShrink: 1 },
   micGroup: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  mutedRow: { alignSelf: 'center', marginTop: 4, paddingHorizontal: 12 },
-  mutedChip: { color: colors.gold, fontSize: 12, textAlign: 'center' },
   queueChip: { color: '#fff', fontSize: 12, backgroundColor: 'rgba(255,95,162,0.35)', marginHorizontal: 12, marginTop: 6, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, overflow: 'hidden' },
   queueChipRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginHorizontal: 12, marginTop: 6, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6 },
   queueChipText: { color: '#fff', fontSize: 12, flexShrink: 1 },

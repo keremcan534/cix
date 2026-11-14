@@ -94,6 +94,7 @@ Davranış:
 ## Gerçek zamanlı tutarlılık ve bağlantı
 
 - Katılımcılar benzersiz kullanıcı kimliğiyle tutulur; yeniden bağlanma ikinci kayıt oluşturmaz.
+- **Girişler** (`src/lib/room-entrance.ts`, `tests/room-entrance.test.ts`): sunucu odasında ses bağlantısı odadaki herkesi listeler. Odaya girdiğimde içeride olanlar için "odaya girdi" satırı ve giriş efekti gösterilmez; yalnız benden sonra girenler için (ses sunucusunun giriş saatine göre). Giriş efekti girenin kendi mağaza görünüşüdür (giriş efekti, binek, rütbe, VIP rengi; `GET /api/looks`): izleyenin ya da oda sahibi ve yöneticilerin efekti başkasının girişinde oynamaz, oda yetkisi bunu değiştirmez. Bağlantısı kopup bir dakika içinde dönen için satır yazılır, efekt oynamaz; benim bağlantım kopup dönünce de kimsenin efekti tekrar oynamaz. Efektler tek tek, giriş sırasıyla oynar; aynı giriş iki kez eklenmez (`src/lib/entry-queue.ts`). Bağlı çiftin birlikte girişi: [`BAGLAR.md`](BAGLAR.md).
 - Hediye olaylarının sohbet kimliği işlem kimliğinden gelir (`gift:<txId>`); aynı olay tekrar gelirse ikinci satır ve ikinci puan oluşmaz.
 - **Bağlantı kopması (test):** Menü › Oda Araçları › *Ses ve bağlantı testi* › *Ağ bağlantısını kes* bu cihazın bağlantısını, aynı yerden geri getirilene kadar keser (yeniden bağlanma kuralları: [`ODA_OTURUMU.md`](ODA_OTURUMU.md)). Bu sürede:
   - sayaçlar, listeler ve PK son alınan durumu gösterir (sunucu değişmeye devam eder);

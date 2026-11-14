@@ -5,7 +5,7 @@
 // The AudioEngine calls are synchronous while joining is not: connect() updates the counters at once and joins
 // in the background (token from our API, then the room). Every async step checks that the room is
 // still the current one, so leaving or switching rooms mid-join never leaves a second connection open.
-import { ConnectionState, DisconnectReason, Room, RoomEvent, Track, VideoPresets, type Participant } from 'livekit-client';
+import { ConnectionState, DisconnectReason, Room, RoomEvent, Track, VideoPresets, type LocalAudioTrack, type Participant } from 'livekit-client';
 
 import type { AudioEngine, EngineStats } from '@/lib/audio-engine';
 import type { TrackRef } from '@/lib/call-media';
@@ -13,7 +13,7 @@ import { bindLink, decodeSignal, encodeSignal, parseSeat, parseServerClosed, rep
 import { reportCams } from '@/lib/live/room-cams';
 import { reportLevel } from '@/lib/live/voice-level';
 import type { EngineEvent } from '@/lib/room-session';
-import { setAiDenoise } from '../../modules/similar-denoise';
+import { setAiDenoise, setPhoneNoiseSuppressor } from '../../modules/similar-denoise';
 
 export type LiveKitConfig = {
   /** wss:// address of the LiveKit server. */
@@ -36,6 +36,11 @@ export type LiveKitConfig = {
 
 /** LiveKit room names allow what the token service allows: letters, digits, _ and -. */
 const roomName = (roomId: string) => `oda-${roomId}`.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 64);
+/** A participant's join time (LiveKit's, whole seconds of the voice server's clock) in ms; 0 when there is none. */
+const joinedMs = (d: Date | undefined) => {
+  const t = d?.getTime() ?? 0;
+  return Number.isFinite(t) && t > 0 ? t : 0;
+};
 
 export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
   const s: EngineStats = { roomId: null, connects: 0, reconnects: 0, disconnects: 0, concurrent: 0, maxConcurrent: 0, publishing: false, publishStarts: 0, route: 'speaker' };
@@ -47,12 +52,21 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
   // My own `seat` writes the server hasn't echoed yet: their echo is not the owner or an admin moving me.
   let pendingSeats: { v: string; at: number }[] = [];
   const fail = (what: string, e: unknown) => cfg.onError?.(`${what}: ${e instanceof Error ? e.message : String(e)}`);
-  // "Mikrofon denoise": the mic is captured with these (WebRTC's own noise suppressor), and the AI denoise
-  // (modules/similar-denoise, RNNoise on Android) cleans it further; a change takes a new mic track (recapture).
+  // The mic is always captured with noise suppression, echo cancellation and gain control, as in a phone call. On
+  // Android that is the phone's own voice processing where it has one (often several mics; LiveKit's default since
+  // Android 10), WebRTC's otherwise. "Mikrofon denoise" adds the AI cleaning on top (modules/similar-denoise, RNNoise
+  // on Android): it is switched on the live mic, so a change takes no new mic track. The phone's own suppressor can't
+  // be switched while the mic records (WebRTC refuses), which is why it is no longer tied to the switch.
   let denoise = true;
-  const capture = () => ({ echoCancellation: true, noiseSuppression: denoise, autoGainControl: true });
-  let recapturing: Promise<void> | null = null;
-  // "Konuşma sesi" / "Oda sesini kapat": every remote voice plays at this volume (0..1), new ones too.
+  const CAPTURE = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+  // "Ham mikrofon" (singing): no noise suppression, echo cancellation or gain control at all, no AI cleaning and,
+  // where the phone lets it, its own noise suppressor off too (it can't change while the mic records: then it
+  // follows from the next room). The mic in use is captured again with it at once.
+  let raw = false;
+  const RAW = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
+  const capture = () => (raw ? RAW : CAPTURE);
+  let restarting: Promise<void> = Promise.resolve();
+  // "Konuşma sesi", or 0 while "Oda sesi" is off (lib/room-session): every remote voice plays at this volume, new ones too.
   let volume = 1;
   const applyVolume = (r: Room) =>
     r.remoteParticipants.forEach((p) => p.audioTrackPublications.forEach((pub) => (pub.track as { setVolume?: (v: number) => void } | undefined)?.setVolume?.(volume)));
@@ -68,8 +82,6 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
   };
   const setMic = (r: Room, on: boolean) => {
     if (r.state !== ConnectionState.Connected) return;
-    // A new mic track is on its way: the wanted state is put on it when it is ready.
-    if (recapturing) return void recapturing.then(() => room === r && setMic(r, s.publishing));
     // Voice muted by the server: asking LiveKit would only fail (and read as a missing phone permission).
     if (on && !grant(r).canPublish) return;
     r.localParticipant.setMicrophoneEnabled(on, on ? capture() : undefined).then(() => void (on && cfg.onMicStarted?.()), (e) => {
@@ -167,8 +179,9 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
   /** Everyone else in the room for the room screen (lib/live/room-bus). */
   const snapshot = (r: Room) => {
     if (room !== r || !s.roomId) return;
-    const peers = [...r.remoteParticipants.values()].map((p) => ({ identity: p.identity, name: p.name || 'Üye', seat: parseSeat(p.attributes?.seat), speaking: p.isSpeaking, micOn: p.isMicrophoneEnabled }));
-    reportPeers(s.roomId, peers, r.localParticipant.isSpeaking);
+    const peers = [...r.remoteParticipants.values()].map((p) => ({ identity: p.identity, name: p.name || 'Üye', seat: parseSeat(p.attributes?.seat), speaking: p.isSpeaking, micOn: p.isMicrophoneEnabled, joinedAt: joinedMs(p.joinedAt) }));
+    // My own join time is the voice server's once connected; before that LiveKit would make one up from this phone's clock.
+    reportPeers(s.roomId, peers, r.localParticipant.isSpeaking, r.state === ConnectionState.Connected ? joinedMs(r.localParticipant.joinedAt) : 0);
   };
   bindLink({
     setSeat(next) {
@@ -313,26 +326,20 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
       if (room) applyVolume(room);
     },
     setNoiseSuppression(on) {
-      // The AI denoise (RNNoise) cleans what the phone's own suppression leaves (traffic, keyboards, a TV).
-      setAiDenoise(on);
-      if (on === denoise) return;
+      // The AI denoise (RNNoise) cleans what the phone's own suppression leaves (fans, traffic, keyboards), at once.
       denoise = on;
+      setAiDenoise(on && !raw);
+    },
+    setRawMic(on) {
+      if (raw === on) return;
+      raw = on;
+      setAiDenoise(denoise && !on);
+      setPhoneNoiseSuppressor(!on);
       const r = room;
-      if (r) r.options.audioCaptureDefaults = capture();
-      // Constraints can't be changed on a live mic everywhere (the phone's WebRTC): the mic track is dropped and,
-      // when I'm speaking, taken again with the new setting. With no mic track yet, the next one uses it.
-      const track = r?.localParticipant.getTrackPublication(Track.Source.Microphone)?.track;
-      if (!r || !track || recapturing) return;
-      recapturing = r.localParticipant
-        .unpublishTrack(track, true)
-        .then(
-          () => {},
-          (e) => fail('Mikrofon', e),
-        )
-        .finally(() => {
-          recapturing = null;
-          if (room === r && s.publishing) setMic(r, true);
-        });
+      const track = r?.localParticipant.getTrackPublication(Track.Source.Microphone)?.track as LocalAudioTrack | undefined;
+      if (!r || !track) return;
+      // One capture after another: two quick switches never race over the mic.
+      restarting = restarting.then(() => (room === r ? track.restartTrack(capture()) : undefined)).catch((e) => fail('Mikrofon', e));
     },
     setRoute(route) {
       // The system picks the output device; the route is kept for the session's state only.

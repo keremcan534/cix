@@ -7,6 +7,7 @@ import { usePathname } from 'expo-router';
 import { useEffect } from 'react';
 import { AppState, StyleSheet, View } from 'react-native';
 
+import { FxVideoSync } from '@/components/fx/video-fx';
 import { LiveRoom } from '@/components/room/live-room';
 import { LeaveSheet } from '@/components/room/leave-sheet';
 import { EndedDialog, MiniRoom, RecoveryCard, SessionToast, SwitchDialog } from '@/components/room/session-ui';
@@ -64,6 +65,8 @@ export function RoomHost() {
       <LeaveSheet />
       <SwitchDialog />
       <SessionToast />
+      {/* The gift and entry videos are fetched while signed in, so they're on the phone before the first room. */}
+      <FxVideoSync />
     </ThemeScope>
   );
 }

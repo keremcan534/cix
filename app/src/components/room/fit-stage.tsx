@@ -5,19 +5,28 @@
 // scroll. While typing, the mics keep their size. A drag of the chat's handle redraws only this part, not the room.
 // A PK adds to the stage (its board over the mics, the points under the names) and the mics stay as they were:
 // the chat gives way for it. Only when the chat is at its least do the faces get smaller.
-import { useMemo, useState, type ReactNode } from 'react';
+// A panel opened from the bottom (the emoji panel: `overlay`) lies over the chat, in the chat's place: the mics keep
+// their sizes and places, nothing of the stage moves. So does the keyboard (`frozen`), also as it goes away.
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { LayoutAnimation, ScrollView, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
 
 import { easedChange, type Fitted } from '@/lib/seat-fit';
 import { useSettings } from '@/store';
 
-/** A real change of the mics' sizes (a banner came or went, the emoji panel, another layout) glides into place. */
+/** A real change of the mics' sizes (a banner came or went, another layout) glides into place. */
 const GLIDE = { duration: 260, update: { type: LayoutAnimation.Types.easeInEaseOut } };
 
 /** The chat's least height under the stage (chat-feed's normal minHeight). */
 const CHAT_LEAST = 96;
 /** Under the mics, inside the stage. */
 const PAD_BOTTOM = 4;
+/**
+ * A panel over the chat is at least this tall (two rows of the emoji panel); only when the chat is shorter (it gave
+ * way to many mics) does it come up over the Balkon bar and the stage's lowest edge.
+ */
+const OVERLAY_LEAST = 210;
+/** After the keyboard goes, the room is measured again: the mics wait that long before they may change. */
+const SETTLE_MS = 400;
 
 const same = (a: Fitted | null, b: Fitted) => !!a && a.face === b.face && a.cols === b.cols && a.height === b.height && a.slot === b.slot && a.host === b.host;
 
@@ -32,7 +41,7 @@ export function FitStage({
   seats,
   balcony,
   chat,
-  chatHidden,
+  overlay,
   onTouchStart,
 }: {
   /**
@@ -56,12 +65,14 @@ export function FitStage({
   balcony: ReactNode;
   /** The chat; it says how tall the person chose it (its basis): the stage leaves it at least that. */
   chat: (onBasis: (px: number) => void) => ReactNode;
-  /** The chat is out of sight (the emoji panel is open): the stage takes its place, mics centred in it. */
-  chatHidden?: boolean;
+  /** A panel opened from the bottom (the emoji panel): it lies over the chat and fills its place, the stage stays. */
+  overlay?: ReactNode;
   onTouchStart?: () => void;
 }) {
-  // Stage + Balkon + chat together (they split it), the Balkon, the boards, the mics as drawn, the chat's basis.
+  // Stage + Balkon + chat together (they split it), the stage as drawn, the Balkon, the boards, the mics as drawn,
+  // the chat's basis.
   const [box, setBox] = useState(0);
+  const [stageH, setStageH] = useState(0);
   const [bar, setBar] = useState(0);
   const [topH, setTopH] = useState(0);
   const [drawn, setDrawn] = useState(0);
@@ -69,18 +80,31 @@ export function FitStage({
   const [basis, setBasis] = useState(-1);
   const measure = (set: (n: number) => void) => (e: LayoutChangeEvent) => set(Math.round(e.nativeEvent.layout.height));
 
+  // The keyboard goes before the room is measured again without it: for a moment the stage would be fitted to the
+  // smaller room, its mics shrinking for a frame and growing back. They keep their sizes until it is measured.
+  const [settling, setSettling] = useState(false);
+  const [wasFrozen, setWasFrozen] = useState(frozen);
+  if (frozen !== wasFrozen) {
+    setWasFrozen(frozen);
+    setSettling(!frozen);
+  }
+  useEffect(() => {
+    if (!settling) return;
+    const t = setTimeout(() => setSettling(false), SETTLE_MS);
+    return () => clearTimeout(t);
+  }, [settling]);
+  const held = frozen || settling;
+
   const known = box > 0 && basis >= 0;
-  const chatH = chatHidden ? 0 : basis;
-  const least = chatHidden ? 0 : CHAT_LEAST;
-  const room = box - bar - chatH - topH - PAD_BOTTOM;
+  const room = box - bar - basis - topH - PAD_BOTTOM;
   // A PK: the mics as they are without it (the board's height given back), then as much of the chat as it can
   // give (down to its least) for the board and the points.
-  const next = !fit ? null : !known ? fit(guess) : calm ? fit(room + Math.max(0, chatH - least), calm(room + (pkTop ? pkH : 0))) : fit(room);
+  const next = !fit ? null : !known ? fit(guess) : calm ? fit(room + Math.max(0, basis - CHAT_LEAST), calm(room + (pkTop ? pkH : 0))) : fit(room);
   // The sizes the mics are drawn with: kept while typing, and replaced only when they change, so a drag of the
   // chat's handle doesn't draw every mic again for every pixel.
   const { reduceMotion } = useSettings();
   const [shown, setShown] = useState(next);
-  if (next && !frozen && !same(shown, next)) {
+  if (next && !held && !same(shown, next)) {
     if (shown && !reduceMotion && easedChange(shown, next)) LayoutAnimation.configureNext(GLIDE);
     setShown(next);
   }
@@ -88,30 +112,31 @@ export function FitStage({
   const seatsNode = useMemo(() => seats(fitted), [seats, fitted]);
   const chatNode = useMemo(() => chat((px) => setBasis(Math.round(px))), [chat]);
 
-  const needs = fitted && Math.max(0, Math.min(topH + Math.max(fitted.height, drawn) + PAD_BOTTOM, box - bar - least));
+  const needs = fitted && Math.max(0, Math.min(topH + Math.max(fitted.height, drawn) + PAD_BOTTOM, box - bar - CHAT_LEAST));
   const style: StyleProp<ViewStyle> = !fitted
     ? freeStyle
-    : frozen || !known
+    : held || !known
       ? { flexGrow: 0, flexShrink: 1 }
-      : chatHidden
-        ? { minHeight: needs || 0, flexGrow: 1, flexShrink: 1 }
-        : // The chat gives way first (it shrinks by its own height, the stage by a thousandth of it); the stage only
-          // when the chat is at its least (for a moment, while a panel opens below before it is measured again).
-          { height: needs || 0, flexGrow: 0, flexShrink: 0.001 };
+      : // The chat gives way first (it shrinks by its own height, the stage by a thousandth of it); the stage only
+        // when the chat is at its least (for a moment, while a banner comes in before it is measured again).
+        { height: needs || 0, flexGrow: 0, flexShrink: 0.001 };
+  // The panel takes the chat's place under the Balkon bar; on a short chat it comes up over the bar and the stage.
+  const overlayTop = Math.max(0, Math.min(stageH + bar, box - OVERLAY_LEAST));
   return (
     <View style={{ flex: 1 }} onLayout={measure(setBox)}>
-      <ScrollView style={style} onTouchStart={onTouchStart} contentContainerStyle={{ paddingBottom: PAD_BOTTOM, flexGrow: 1 }} showsVerticalScrollIndicator={false} alwaysBounceVertical={false}>
+      <ScrollView style={style} onLayout={measure(setStageH)} onTouchStart={onTouchStart} contentContainerStyle={{ paddingBottom: PAD_BOTTOM, flexGrow: 1 }} showsVerticalScrollIndicator={false} alwaysBounceVertical={false}>
         <View onLayout={measure(setTopH)}>
           {top}
           {!!pkTop && <View onLayout={measure(setPkH)}>{pkTop}</View>}
         </View>
-        {/* Centred when the stage is taller than they are (the chat out of sight); measured as they are, not as the room around them. */}
+        {/* Centred when the stage is taller than they are; measured as they are, not as the room around them. */}
         <View style={{ flexGrow: 1, justifyContent: 'center' }}>
           <View onLayout={measure(setDrawn)}>{seatsNode}</View>
         </View>
       </ScrollView>
       <View onLayout={measure(setBar)}>{balcony}</View>
       {chatNode}
+      {overlay ? <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, top: overlayTop }}>{overlay}</View> : null}
     </View>
   );
 }

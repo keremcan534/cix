@@ -4,7 +4,7 @@
 export const EXPORTED = [
   'users', 'auth_identities', 'sessions', 'device_accounts', 'push_tokens', 'follows', 'blocks', 'messages',
   'moments', 'moment_comments', 'moment_likes', 'moment_comment_likes', 'gift_events', 'ledger', 'coin_lots',
-  'diamond_locks', 'purchases', 'coin_transfers', 'withdrawals', 'entitlements', 'paid_events', 'income_events',
+  'diamond_locks', 'purchases', 'vip_subscriptions', 'coin_transfers', 'withdrawals', 'entitlements', 'paid_events', 'income_events',
   'spend_limits', 'calls', 'wheel_spins', 'lucky_sends', 'lucky_bags', 'lucky_bag_grabs', 'lucky_bag_entries',
   'rooms', 'room_admins', 'room_djs', 'room_members', 'room_bans', 'presence_log', 'room_animations', 'room_events',
   'room_event_going', 'music_tracks', 'families', 'family_members', 'family_requests', 'family_invites',

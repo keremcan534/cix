@@ -12,10 +12,13 @@ import { SignInAgain, countContactRefusal } from '@/lib/api';
 import { onContactRefusal } from '@/lib/contact-filter';
 import { liveMode, liveSignIn, message, refreshEarnings, refreshWallet } from '@/lib/live';
 import { resumePurchases } from '@/lib/live/billing';
+import { resumeVip } from '@/lib/live/vip';
 import { loadBlocks, loadFollowing } from '@/lib/live/blocks';
 import { checkNewFollowers } from '@/lib/live/follows';
 import { checkRoomInvites } from '@/lib/live/room-social';
 import { lineOpen, onLine, startLiveLine } from '@/lib/live/live-line';
+import { visitLineNotice } from '@/lib/live/visitors';
+import { takeWinEvent } from '@/lib/live/win-news';
 import { pollMessages } from '@/lib/live/messages';
 import { loadPrivacy } from '@/lib/live/privacy';
 import { refreshSpendLimit } from '@/lib/live/spend-limit';
@@ -67,8 +70,9 @@ export function LiveSync() {
           signedIn = true;
           // Calls ring and messages arrive while the app is closed (lib/push; off until the build has Firebase).
           void startPush();
-          // A Play purchase whose server answer was lost last time is verified now.
+          // A Play purchase whose server answer was lost last time is verified now (coin packs and the Abonelik).
           resumePurchases();
+          resumeVip();
           // Follows and blocks are kept on the server; one failing leaves this phone's list as it is.
           void loadFollowing()
             .then((ids) => alive && appRef.current.takeServerSocial({ following: ids }))
@@ -133,7 +137,16 @@ export function LiveSync() {
     // Calls and an open chat listen for their own events (lib/live/one-on-one, useLiveThread).
     const stopLine = startLiveLine();
     const offLine = onLine((e) => {
+      // Another person's win (lib/live/win-news): a banner in every room, nothing of mine to read again.
+      if (takeWinEvent(e)) return;
       if (e.type === 'call' || e.type === 'message_read') return;
+      // Someone opened my profile (the server tells at most once a day per visitor): the counts and a notice.
+      if (e.type === 'visit') {
+        void visitLineNotice(typeof e.from === 'string' ? e.from : null)
+          .then((n) => alive && appRef.current.notify(n))
+          .catch(() => {});
+        return;
+      }
       if (e.type === 'follow' || e.type === 'reconnected') resumed = true;
       if (e.type === 'room_invite' || e.type === 'reconnected') invitesDue = true;
       void run();

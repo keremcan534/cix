@@ -30,6 +30,8 @@ export const ROUTES = {
   'POST /api/backpack/send': ['gifts'],
   'POST /api/wallet/gift': ['gifts'],
   'POST /api/wallet/purchase': ['purchases'],
+  // Abonelik (vip.mjs) is bought through the same stores.
+  'POST /api/vip/subscribe': ['purchases'],
   'POST /api/wallet/test-topup': ['topup'],
   'POST /api/wallet/exchange': ['exchange'],
   'POST /api/jeton/transfer': ['jeton'],

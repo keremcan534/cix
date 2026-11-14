@@ -1,5 +1,5 @@
 // The live part of the server's catalog (GET /api/catalog, server/api/gifts.mjs, Canlı ayarlar): which gifts and
-// packs are still listed, a running campaign and the Çevir rate. Read when the server's settings version (`v` in
+// packs are still listed, a running campaign, the Çevir rate and the gift and entry videos to download (lib/fx-videos). Read when the server's settings version (`v` in
 // /api/config) changes and every few minutes while the app is open (lib/remote-control), and each time the
 // wallet opens (lib/live/billing reads the catalog through here). Kept on the phone, so the next start without
 // network still knows it.
@@ -16,6 +16,7 @@ import { useSyncExternalStore } from 'react';
 
 import { RULES, type Rules } from '@/data/rules';
 import { selfExchangeRate } from '@/lib/coins-bank';
+import { parseFxList, type FxVideo } from '@/lib/fx-videos-core';
 import { parseCatalog, type CatalogPack } from '@/lib/live/billing-core';
 
 const BASE = process.env.EXPO_PUBLIC_API_URL ?? '';
@@ -41,6 +42,8 @@ export type LiveCatalog = {
   campaign: LiveCampaign | null;
   /** The Çevir rate; null when missing or outside 40–75. */
   usdTry: number | null;
+  /** The videos the server hands out (server/api/fx.mjs); null when it didn't say (an older server). */
+  fx: FxVideo[] | null;
 };
 
 // --- Reading the server's answer, without trusting it ----------------------------------------------------
@@ -77,6 +80,7 @@ export function parseLiveCatalog(raw: unknown): LiveCatalog {
     packs: parseCatalog(r).packs,
     campaign: campaignOf(r.campaign),
     usdTry: validRate(rate) ? rate : null,
+    fx: parseFxList(r.fx),
   };
 }
 
@@ -98,8 +102,10 @@ export function parseSavedLiveCatalog(raw: string | null): { catalog: LiveCatalo
       packs: parseCatalog({ packs: r.packs }).packs,
       campaign: campaignOf(r.campaign),
       usdTry: validRate(r.usdTry) ? r.usdTry : null,
+      fx: parseFxList(r.fx),
     },
-    fetchedAt: typeof r.fetchedAt === 'number' && Number.isFinite(r.fetchedAt) ? r.fetchedAt : 0,
+    // A copy an older app saved, before the videos were listed, counts as old: the next poll reads the catalog again.
+    fetchedAt: 'fx' in r && typeof r.fetchedAt === 'number' && Number.isFinite(r.fetchedAt) ? r.fetchedAt : 0,
   };
 }
 
@@ -224,7 +230,7 @@ export const liveCatalogStale = (now = Date.now()) => !current || now - fetchedA
 /** The server named its current Çevir rate (409 rate_changed): the screens show it before the catalog is read again. */
 export function noteLiveRate(usdTry: unknown) {
   if (!validRate(usdTry)) return;
-  publish({ ...(current ?? { v: 0, giftIds: null, packs: [], campaign: null }), usdTry });
+  publish({ ...(current ?? { v: 0, giftIds: null, packs: [], campaign: null, fx: null }), usdTry });
 }
 
 const subscribe = (l: () => void) => {

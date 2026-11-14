@@ -82,6 +82,7 @@ describe('defaults are today', () => {
       event_strike_limit: 3,
       event_block_days: 14,
       event_reminders_off: [],
+      lucky_announce_min_coins: 0,
     });
     assert.equal(EXCHANGE.usdTry, 49.8);
     assert.equal(WITHDRAW.maxDiamonds, 5_000_000);
@@ -144,6 +145,7 @@ describe('defaults are today', () => {
       'event_strike_limit',
       'event_block_days',
       'event_reminders_off',
+      'lucky_announce_min_coins',
     ]);
     for (const k of ['need_level', 'need_points', 'min_age', 'lucky_min_age', 'diamonds_per_usd', 'coin_diamond_ratio', 'lock_hours', 'test_daily', 'allow_test_topup', 'gift_prices', 'pack_prices', 'pack_coins', 'product_ids', 'sms_provider', '__proto__', 'constructor', 'toString']) {
       assert.ok(!Object.hasOwn(REGISTRY, k), k);
@@ -361,6 +363,21 @@ describe('Odalar', () => {
     assert.equal(impactOf('boss_seat_minutes', 10, 15), 'Patron koltuğunda oturma ve uzatma 10 → 15 dakika.');
     const s = snapshotOf([{ key: 'boss_seat_coins', value: 40_000 }, { key: 'room_staff_away_minutes', value: 90 }]);
     assert.deepEqual([s.bossSeatCoins, s.bossSeatMinutes, s.roomStaffAwayMinutes, s.invalid], [40_000, 10, 5, ['room_staff_away_minutes']]);
+  });
+});
+
+describe('Kazanç duyurusu', () => {
+  test('Şanslı kazancı: 0 her kazanç, onluk jeton, ikinci onay yok', () => {
+    assert.equal(REGISTRY.lucky_announce_min_coins.group, 'Kazanç duyurusu');
+    assert.equal(DEFAULTS.lucky_announce_min_coins, 0);
+    assert.equal(validate('lucky_announce_min_coins', 0), 0);
+    assert.equal(validate('lucky_announce_min_coins', 1_000), 1_000);
+    for (const v of [-10, 15, 10_000_010, 2.5, '100']) refused(() => validate('lucky_announce_min_coins', v), /Şanslı kazancı duyurusu 0–10\.000\.000 jeton arasında, 10'in katı/);
+    assert.equal(isBig('lucky_announce_min_coins', 0, 1_000_000), false);
+    assert.equal(impactOf('lucky_announce_min_coins', 0, 500), 'Şanslı hediyede 500 jeton ve üstü kazançlar bütün odalarda duyurulur (şu an: her kazanç).');
+    assert.equal(impactOf('lucky_announce_min_coins', 500, 0), 'Şanslı hediyede her kazanç bütün odalarda duyurulur.');
+    assert.equal(snapshotOf([]).luckyAnnounceMinCoins, 0);
+    assert.equal(snapshotOf([{ key: 'lucky_announce_min_coins', value: 2_000 }]).luckyAnnounceMinCoins, 2_000);
   });
 });
 

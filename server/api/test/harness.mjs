@@ -50,6 +50,8 @@ export function startApi(extraEnv = {}) {
       // The test server tops admins up (test-admin.mjs); the tests' admins keep their own balances and levels.
       // test/test-admin.test.mjs turns it on.
       TEST_ADMIN_MAX: '0',
+      // The Abonelik's renewal check (vip.mjs) runs on its own only where a test sets it.
+      VIP_RECHECK_MIN: '0',
       ...extraEnv,
     };
     // PUBLIC_URL 'self': the address phones open stored files at is this API's own (core.mjs servedFiles).

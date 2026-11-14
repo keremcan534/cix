@@ -293,6 +293,8 @@ export function valueText(key: LiveKey, v: LiveValue, { stored = false, names = 
       return typeof v === 'number' ? `${fmtNum(v)} gün` : String(v);
     case 'event_reminders_off':
       return Array.isArray(v) && v.length ? `Kapalı: ${v.map((k) => REMINDER_LABEL[k as keyof typeof REMINDER_LABEL] ?? k).join(', ')}` : 'Hepsi açık';
+    case 'lucky_announce_min_coins':
+      return typeof v === 'number' ? (v === 0 ? 'Her kazanç' : `${fmtNum(v)} jeton ve üstü`) : String(v);
     default:
       return String(v);
   }

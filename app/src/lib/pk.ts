@@ -3,6 +3,8 @@
 //                  The room keeps its normal mic layout and there are no teams.
 //   - room / team  ("Takım PK"): one room split into Red and Blue; a gift scores for the recipient and their team.
 //   - cross        (always team): two rooms against each other; every valid gift in a room scores for that room.
+// A room PK starts with any number of people on the mics (none too), and whoever takes a mic while it runs joins it
+// (joinRoomPk): in Takım PK on the team with fewer people, unless the starter left them out.
 //
 // This file plays the PK server: it owns the clock (endAt), the team draw, the score, idempotent gift records,
 // the result and the crown relations. Clients only render. It reads who is on a mic from the presence server
@@ -29,7 +31,7 @@ export type PkConfig = {
   roomPkEnabled: boolean;
   crossPkEnabled: boolean;
   durations: Record<PkDuration, boolean>;
-  teamMin: number;
+  /** People a team holds; a team may start empty (latecomers fill it). */
   teamMax: number;
   inviteTimeoutSec: number;
   prepSeconds: number;
@@ -76,8 +78,10 @@ export type PkSession = {
   giftPoints: Record<string, number>;
   /** Team modes only; in Normal PK both teams stay empty and unused. */
   teams: [PkTeam, PkTeam];
-  /** Normal PK: everyone competing (mic users at start, then anyone who scores from a mic later). */
+  /** Normal PK: everyone competing (mic users at start, then everyone who took a mic since). */
   participants: string[];
+  /** Takım PK: on a mic at the start but left out of both teams by the starter; they don't join later. */
+  out?: string[];
   /** PK points received per person (valid gifts only). Cross-room PK keys them per room: see `pointKey`. */
   points: Record<string, number>;
   createdAt: number;
@@ -99,7 +103,6 @@ const DEFAULT_CONFIG: PkConfig = {
   roomPkEnabled: true,
   crossPkEnabled: true,
   durations: { 15: true, 30: true, 60: true, 120: true },
-  teamMin: 1,
   teamMax: 8,
   inviteTimeoutSec: 60,
   prepSeconds: 5,
@@ -152,6 +155,17 @@ const OPEN: PkStatus[] = ['invite', 'prep', 'active'];
 export const pkOfRoom = (roomId: string) => state.sessions.find((s) => OPEN.includes(s.status) && (s.roomId === roomId || s.opponentRoomId === roomId));
 export const lastPkOfRoom = (roomId: string) => state.sessions.find((s) => s.roomId === roomId || s.opponentRoomId === roomId);
 export const teamOf = (pk: PkSession, uid: string) => pk.teams.find((t) => t.members.includes(uid));
+/** In a room PK: competing (Normal PK) or on a team (Takım PK). */
+export const inRoomPk = (pk: PkSession, uid: string) => (pk.mode === 'solo' ? pk.participants.includes(uid) : !!teamOf(pk, uid));
+/**
+ * The team someone who takes a mic during a Takım PK joins: the one with fewer people, either one when even (the
+ * start's own draw rule), while it has room; null when both are full. The server (server/api/pk.mjs) picks the same.
+ */
+export function latecomerTeam(red: number, blue: number, max: number, rnd = Math.random): TeamId | null {
+  if (red >= max && blue >= max) return null;
+  if (red !== blue) return red < blue ? 'red' : 'blue';
+  return rnd() < 0.5 ? 'red' : 'blue';
+}
 /** Per-person points key. Across rooms the same person may receive gifts in both rooms; those stay apart. */
 export const pointKey = (pk: Pick<PkSession, 'kind'>, roomId: string, uid: string) => (pk.kind === 'cross' ? `${roomId}|${uid}` : uid);
 /** Points a person received in this PK, as seen from one room. */
@@ -198,19 +212,19 @@ function shuffle<T>(arr: T[]) {
   return a;
 }
 /**
- * Random teams from the people on a mic right now (server side). Sizes differ by at most one; with more
- * people than both teams can hold, the extra ones stay out of this PK. Calling it again reshuffles.
+ * Random teams from the people on a mic right now (server side), however many they are (none too: people who take a
+ * mic later fill the teams). Sizes differ by at most one; with more people than both teams can hold, the extra ones
+ * stay out of this PK. Calling it again reshuffles.
  */
 export function drawTeams(roomId: string, starterId: string): { ok: true; draft: TeamDraft } | { ok: false; reason: string } {
   if (roleOf(roomId, starterId) === 'member') return { ok: false, reason: 'Takımları oda sahibi veya yöneticiler oluşturabilir.' };
   return drawTeamsFrom(roomId, micUsersOf(roomId));
 }
 /** The same draw from a given list (a server room: the people its screen shows on a mic; the server checks them). */
-export function drawTeamsFrom(roomId: string, onMic: string[]): { ok: true; draft: TeamDraft } | { ok: false; reason: string } {
-  const { teamMin, teamMax } = state.config;
+export function drawTeamsFrom(roomId: string, onMic: string[]): { ok: true; draft: TeamDraft } {
+  const { teamMax } = state.config;
   const pool = shuffle(onMic);
   const take = pool.slice(0, teamMax * 2);
-  if (take.length < teamMin * 2) return { ok: false, reason: `Takım PK için mikrofonda en az ${teamMin * 2} kişi olmalı.` };
   const redSize = take.length % 2 === 0 ? take.length / 2 : Math.floor(take.length / 2) + (Math.random() < 0.5 ? 1 : 0);
   const draft: TeamDraft = { id: `TD-${rid()}`, roomId, red: take.slice(0, redSize), blue: take.slice(redSize), out: pool.slice(take.length), at: Date.now() };
   drafts.set(draft.id, draft);
@@ -223,9 +237,10 @@ export type StartOpts = { roomId: string; starterId: string; durationMin: number
   | { mode: 'team'; red: string[]; blue: string[] }
 );
 /**
- * Room PK. Normal: everyone on a mic competes. Team: from a server draw (draftId) or a manual split, both
- * validated against the people on a mic now; teams are fixed once it starts. A repeated request (same
- * requestId, e.g. a retry after a dropped connection) returns the PK it already started.
+ * Room PK, with any number of people on the mics (none too). Normal: everyone on a mic competes. Team: from a server
+ * draw (draftId) or a manual split, both validated against the people on a mic now; the people on a mic it leaves out
+ * (past the teams' size, or not picked) stay out. Whoever takes a mic later joins (joinRoomPk). A repeated request
+ * (same requestId, e.g. a retry after a dropped connection) returns the PK it already started.
  */
 export function startRoomPk(opts: StartOpts): StartResult {
   const { roomId, starterId, durationMin, requestId } = opts;
@@ -237,24 +252,24 @@ export function startRoomPk(opts: StartOpts): StartResult {
   let red: string[] = [];
   let blue: string[] = [];
   let participants: string[] = [];
-  if (opts.mode === 'solo') {
-    participants = onMic;
-    if (participants.length < 2) return { ok: false, reason: 'Normal PK için mikrofonda en az 2 kişi olmalı.' };
-  } else {
+  let out: string[] | undefined;
+  if (opts.mode === 'solo') participants = onMic;
+  else {
     if ('draftId' in opts) {
       const d = drafts.get(opts.draftId);
       if (!d || d.roomId !== roomId) return { ok: false, reason: 'Takım dağılımı bulunamadı. Takımları yeniden oluştur.' };
       red = d.red;
       blue = d.blue;
+      out = d.out;
     } else {
       red = [...new Set(opts.red)];
       blue = [...new Set(opts.blue)];
+      out = onMic.filter((u) => !red.includes(u) && !blue.includes(u));
     }
-    const { teamMin, teamMax } = state.config;
+    const { teamMax } = state.config;
     if (red.some((u) => blue.includes(u))) return { ok: false, reason: 'Bir kişi iki takımda birden olamaz.' };
     const gone = [...red, ...blue].filter((u) => !onMic.includes(u));
     if (gone.length) return { ok: false, reason: `${gone.map(nameOf).join(', ')} artık mikrofonda değil. Takımları yeniden oluştur.` };
-    if (red.length < teamMin || blue.length < teamMin) return { ok: false, reason: `Her takımda en az ${teamMin} kişi olmalı.` };
     if (red.length > teamMax || blue.length > teamMax) return { ok: false, reason: `Bir takımda en fazla ${teamMax} kişi olabilir.` };
     if ('draftId' in opts) drafts.delete(opts.draftId);
   }
@@ -269,6 +284,7 @@ export function startRoomPk(opts: StartOpts): StartResult {
     giftPoints: { ...state.config.giftPoints },
     teams: teams(roomId, roomId, red, blue),
     participants,
+    ...(out ? { out } : {}),
     points: {},
     createdAt: Date.now(),
     requestId,
@@ -278,6 +294,26 @@ export function startRoomPk(opts: StartOpts): StartResult {
   log(nameOf(starterId), opts.mode === 'solo' ? 'Normal PK başlattı' : 'Oda içi takım PK başlattı', roomTitle(roomId), `${durationMin} dk · ${opts.mode === 'solo' ? `${participants.length} kişi` : `${red.length}v${blue.length}`}`);
   begin(pk.id);
   return { ok: true, pk };
+}
+
+/**
+ * Someone on a mic while the room's PK runs (or prepares) joins it, as their phone asks the server to: Normal PK, one
+ * more competitor; Takım PK, the team latecomerTeam picks. Nothing changes for someone already in it, someone the
+ * starter left out, or when both teams are full. `changed`: they joined now.
+ */
+export function joinRoomPk(roomId: string, uid: string, rnd = Math.random): { ok: true; changed: boolean } | { ok: false; reason: string } {
+  const pk = pkOfRoom(roomId);
+  if (!pk || pk.kind !== 'room' || (pk.status !== 'prep' && pk.status !== 'active')) return { ok: false, reason: 'Odada devam eden PK yok.' };
+  if (inRoomPk(pk, uid) || pk.out?.includes(uid)) return { ok: true, changed: false };
+  if (!onMicNow(roomId, uid)) return { ok: false, reason: 'PK’ya katılmak için mikrofonda olmalısın.' };
+  if (pk.mode === 'solo') {
+    put({ ...pk, participants: [...pk.participants, uid] });
+    return { ok: true, changed: true };
+  }
+  const team = latecomerTeam(pk.teams[0].members.length, pk.teams[1].members.length, state.config.teamMax, rnd);
+  if (!team) return { ok: true, changed: false };
+  put({ ...pk, teams: pk.teams.map((t) => (t.id === team ? { ...t, members: [...t.members, uid] } : t)) as [PkTeam, PkTeam] });
+  return { ok: true, changed: true };
 }
 
 /** Cross-room PK: an invite the other room's manager must accept within the timeout. */
@@ -357,7 +393,7 @@ export type RecordResult = { ok: true; points: number; teamId?: TeamId } | { ok:
  * A gift that doesn't score is kept as a rejected record with the reason.
  */
 export function recordGift(roomId: string, txId: string, senderId: string, recipientId: string, giftId: string, coins: number): RecordResult {
-  const pk = pkOfRoom(roomId);
+  let pk = pkOfRoom(roomId);
   if (!pk) return { ok: false, reason: 'Odada aktif PK yok.' };
   if (pk.records.some((r) => r.txId === txId)) {
     emit({ duplicates: state.duplicates + 1 });
@@ -368,25 +404,27 @@ export function recordGift(roomId: string, txId: string, senderId: string, recip
   if (pk.status !== 'active' || !pk.startAt || !pk.endAt || now < pk.startAt || now >= pk.endAt) return { ok: false, reason: 'PK aktif değil; bu hediye skora eklenmez.' };
   const base = { txId, senderId, recipientId, giftId, coins, at: now };
   const reject = (reason: string, teamId?: TeamId): RecordResult => {
-    put({ ...pk, records: [...pk.records, { ...base, teamId, points: 0, status: 'Reddedildi', note: reason }] });
+    const cur = pkOfRoom(roomId)!;
+    put({ ...cur, records: [...cur.records, { ...base, teamId, points: 0, status: 'Reddedildi', note: reason }] });
     return { ok: false, reason };
   };
   let teamId: TeamId | undefined;
-  let participants = pk.participants;
   if (pk.kind === 'cross') teamId = pk.teams.find((t) => t.roomId === roomId)!.id;
   else {
     if (!onMicNow(roomId, recipientId)) return reject('Hediyeyi alan kişi o anda mikrofonda değildi; PK puanı yazılmaz.');
+    // Took a mic after the start and isn't in it yet: joins it now, as their phone would have asked.
+    if (joinRoomPk(roomId, recipientId).ok) pk = pkOfRoom(roomId)!;
     if (pk.mode === 'team') {
       teamId = teamOf(pk, recipientId)?.id;
       if (!teamId) return reject('Hediyeyi alan kişi bir takımda değil; skora eklenmez.');
-    } else if (!participants.includes(recipientId)) participants = [...participants, recipientId]; // joined a mic after the start
+    }
   }
   const points = pointsFor(pk.giftPoints, giftId, coins);
   if (points <= 0) return reject('Bu hediye PK puanı kazandırmıyor', teamId);
   const rec: PkRecord = { ...base, teamId, points, status: 'Doğrulandı' };
   const t = pk.teams.map((x) => (x.id === teamId ? { ...x, score: x.score + points } : x)) as [PkTeam, PkTeam];
   const key = pointKey(pk, roomId, recipientId);
-  put({ ...pk, teams: t, participants, points: { ...pk.points, [key]: (pk.points[key] ?? 0) + points }, records: [...pk.records, rec] });
+  put({ ...pk, teams: t, points: { ...pk.points, [key]: (pk.points[key] ?? 0) + points }, records: [...pk.records, rec] });
   return { ok: true, points, teamId };
 }
 
@@ -572,6 +610,7 @@ export function serverPkSession(v: ServerPk, toLocal: (id: string) => string, sk
     giftPoints: {},
     teams: [{ ...red, score: score('red') }, { ...blue, score: score('blue') }],
     participants: v.mode === 'solo' ? v.participants.map(toLocal) : [],
+    ...(v.mode === 'team' && v.out?.length ? { out: v.out.map(toLocal) } : {}),
     points,
     createdAt: startAt,
     startAt,
@@ -683,6 +722,46 @@ export function topSupporters(pk: PkSession, filter?: { teamId?: TeamId; recipie
 /** Normal PK live ranking. */
 export const liveRanking = (pk: PkSession) =>
   [...new Set([...pk.participants, ...Object.keys(pk.points)])].map((userId) => ({ userId, points: pk.points[userId] ?? 0 })).sort((a, b) => b.points - a.points);
+
+// --- Points pill under a seat --------------------------------------------------------------------
+/**
+ * A PK total in the app's short form (B = bin, Mn = milyon, Mr = milyar), cut down and never rounded up, so nobody
+ * shows more points than they have: 940, 16,4B (16.450), 999B, 1,2Mn. `decimal` false drops the decimal: 16B.
+ */
+export function shortPoints(n: number, decimal = true): string {
+  const v = Math.max(0, Math.floor(n));
+  if (v < 1000) return String(v);
+  const [unit, suffix] = v < 1e6 ? [1e3, 'B'] : v < 1e9 ? [1e6, 'Mn'] : [1e9, 'Mr'];
+  const tenths = Math.floor((v * 10) / unit);
+  const whole = Math.floor(tenths / 10);
+  return decimal && whole < 100 && tenths % 10 ? `${whole},${tenths % 10}${suffix}` : `${whole}${suffix}`;
+}
+
+/** Advances (em) in the pill's face, Plus Jakarta Sans ExtraBold; digits are tabular, 0.6 em each. */
+const ADVANCE: Record<string, number> = { '.': 0.41, ',': 0.39, B: 0.69, M: 0.91, n: 0.6, r: 0.45, '+': 0.68 };
+/** How wide `text` is drawn at `px` (the font size times the phone's text scale). */
+export const textWidth = (text: string, px: number) => [...text].reduce((w, ch) => w + (ADVANCE[ch] ?? 0.6) * px, 0);
+/** Between the gift icon and the number. */
+export const PILL_GAP = 2;
+
+export type PkPillBox = { size: number; pad: number; icon: boolean; room: number };
+/**
+ * The points pill under a seat `width` px wide, at the phone's text `scale`: its text size and side padding, whether
+ * the gift icon fits (only beside a whole 99.999: in a PK close scores must stay apart, so the number comes first),
+ * and the room the number has. The pill keeps a pixel free on each side, so it never runs under the next seat.
+ */
+export function pkPillBox(width: number, scale = 1): PkPillBox {
+  const size = width >= 80 ? 12 : width >= 50 ? 11 : width >= 44 ? 10 : 9;
+  const pad = size === 12 ? 6 : size === 11 ? 4 : 3;
+  const inner = width - 2 - 2 - 2 * pad;
+  const icon = textWidth('99.999', size * scale) + size + PILL_GAP <= inner;
+  return { size, pad, icon, room: icon ? inner - size - PILL_GAP : inner };
+}
+/** The longest form of `value` that fits `room` px at `px`: the whole number (16.450), then 16,4B, then 16B. */
+export function pkPointsText(value: number, room: number, px: number): string {
+  const forms = [Math.floor(Math.max(0, value)).toLocaleString('tr-TR'), shortPoints(value), shortPoints(value, false)];
+  return forms.find((s) => textWidth(s, px) <= room) ?? forms[2];
+}
 
 /** Test support. */
 export function resetPk() {

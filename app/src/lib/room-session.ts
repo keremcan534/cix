@@ -47,6 +47,12 @@ export type RoomSession = {
   appState: 'active' | 'background';
   /** The engine can't run audio in the background, so audio is paused until the app is back. */
   audioSuspended: boolean;
+  /**
+   * "Oda sesi" is off on this phone (the speaker button): the room's voices, music and sounds are silent here,
+   * my own mic keeps going out. It belongs to this visit: minimizing or the app going to the background keep it,
+   * a new visit (leaving, another room, the app opened again) starts with the sound on.
+   */
+  soundOff: boolean;
   reconnectAttempt: number;
   /** The voice connection was up at least once in this session. Until then a failure is "could not connect",
    *  never "the connection dropped", and nothing on screen is a stale copy of what was loaded. */
@@ -124,7 +130,7 @@ export function micBlock(s: RoomSession | null): MicBlock {
 }
 export const micSending = (s: RoomSession | null) => !!s && s.micWant && micBlock(s) === null;
 /** Audio from the room reaches the user's ears right now. */
-export const hearing = (s: RoomSession | null) => !!s && s.status === 'connected' && !s.audioSuspended && s.interruption === null;
+export const hearing = (s: RoomSession | null) => !!s && s.status === 'connected' && !s.audioSuspended && s.interruption === null && !s.soundOff;
 export const MIC_BLOCK_LABEL: Record<Exclude<MicBlock, null>, string> = {
   not_seated: 'Mikrofonda değilsin',
   sanctioned: 'Sesli susturma uygulandı',
@@ -152,11 +158,12 @@ export function connectionLine(s: RoomSession, offline: boolean): ConnectionLine
   if (s.status === 'reconnecting' || offline) return { text: `Bağlantı koptu · yeniden bağlanılıyor${attempt}. Sayılar ve liste son alınan durumu gösteriyor.`, bad: false, retry: s.status === 'reconnecting' };
   return null;
 }
-/** The engine always follows the session: one place decides whether the mic track is published. */
+/** The engine always follows the session: one place decides whether the mic track is published and how loud the room plays. */
 function syncEngine() {
   const s = state.session;
   engine.setPublishing(!!s && s.status !== 'ended' && micSending(s));
   if (s) engine.setRoute(s.route);
+  syncVolume();
 }
 
 // --- Open, switch, end -------------------------------------------------------------------------------
@@ -200,6 +207,7 @@ function start(roomId: string, info: { title: string; cover: string; via?: strin
     route: engine.stats().route,
     appState: 'active',
     audioSuspended: false,
+    soundOff: false,
     reconnectAttempt: 0,
     everConnected: false,
     miniHidden: false,
@@ -270,6 +278,12 @@ export function setMicWant(on: boolean) {
   const s = state.session;
   if (!s || s.status === 'ended' || s.micWant === on) return;
   patchSession({ micWant: on });
+}
+/** "Oda sesi" on or off for this visit (the speaker button, Efektler ve ses). */
+export function setRoomSound(on: boolean) {
+  const s = state.session;
+  if (!s || s.status === 'ended' || s.soundOff === !on) return;
+  patchSession({ soundOff: !on });
 }
 
 // --- Leave dialog, mini card ---------------------------------------------------------------------------
@@ -478,7 +492,9 @@ export const engineInfo = () => ({ name: engine.name, capabilities: engine.capab
 export function setEngine(next: AudioEngine) {
   engine = next;
   engine.setNoiseSuppression?.(denoise);
-  engine.setPlaybackVolume?.(callHold ? 0 : volume);
+  engine.setRawMic?.(rawMic);
+  played = -1;
+  syncVolume();
 }
 // "Mikrofon denoise" (settings.micDenoise): kept here so a new engine starts with it.
 let denoise = true;
@@ -486,11 +502,26 @@ export function setNoiseSuppression(on: boolean) {
   denoise = on;
   engine.setNoiseSuppression?.(on);
 }
-// "Oda sesini kapat" and "Konuşma sesi" (settings.roomMuted, voiceVolume): the voices in the room on this phone only.
+// "Ham mikrofon" (settings.micRaw): the mic without any voice processing, for singing; kept for a new engine too.
+let rawMic = false;
+export function setRawMic(on: boolean) {
+  rawMic = on;
+  engine.setRawMic?.(on);
+}
+// "Konuşma sesi" (settings.voiceVolume): how loud the room's voices play on this phone.
 let volume = 1;
 export function setPlaybackVolume(v: number) {
   volume = Math.max(0, Math.min(1, Number.isFinite(v) ? v : 1));
-  engine.setPlaybackVolume?.(callHold ? 0 : volume);
+  syncVolume();
+}
+/** The voices' volume the engine was last given (-1: none yet); given again only when it changes. */
+let played = -1;
+/** Silent during a 1v1 call and while this visit's room sound is off; otherwise "Konuşma sesi". */
+function syncVolume() {
+  const v = callHold || state.session?.soundOff ? 0 : volume;
+  if (v === played) return;
+  played = v;
+  engine.setPlaybackVolume?.(v);
 }
 /** My camera in the room (a Video layout's camera seat): the room screen decides when; only a real engine sends it. */
 export const setRoomCamera = (on: boolean) => engine.setCamera?.(on);
@@ -503,12 +534,14 @@ let callHold = false;
 export function holdForCall(on: boolean) {
   if (callHold === on) return;
   callHold = on;
-  engine.setPlaybackVolume?.(on ? 0 : volume);
+  syncVolume();
   const s = state.session;
   if (on && s && s.status !== 'ended' && s.micWant) patchSession({ micWant: false });
 }
 export function resetSession() {
   callHold = false;
+  volume = 1;
+  played = -1;
   stopTimers();
   pendingLeave = null;
   openers.clear();
