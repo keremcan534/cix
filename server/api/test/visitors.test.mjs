@@ -1,7 +1,8 @@
 // Profil ziyaretçileri (social.mjs): opening someone's profile from the profile screen (GET /api/user?visit=1) is a
-// visit; GET /api/me/visitors shows everyone their visits of the last 7 days and, with VIP, who made them (without
-// it the visits come without anything that names the visitor). The owner is told of a visit, at most once a day per
-// visitor, by name only with VIP. Against a real Postgres and a stand-in for Expo's push service.
+// visit; GET /api/me/visitors shows everyone their visits of the last 7 days and, with the Abonelik (the VIP
+// subscription, vip.mjs; bought here as a test purchase), who made them (without it the visits come without anything
+// that names the visitor). The owner is told of a visit, at most once a day per visitor, by name only with the
+// subscription. Against a real Postgres and a stand-in for Expo's push service.
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
@@ -39,7 +40,10 @@ const until = async (fn, ms = 3000) => {
 };
 const visit = (who, owner) => ok(call('GET', `/api/user?id=${owner.user.id}&visit=1`, null, who.session), 'profil');
 const visitors = (who) => ok(call('GET', '/api/me/visitors', null, who.session), 'ziyaretçiler');
-const vip = (u, xp = 500_000) => q('UPDATE users SET svip_xp = $2 WHERE id = $1', [u.user.id, xp]);
+/** The Abonelik, as the test APKs buy it (ALLOW_TEST_TOPUP=1): 7 days. */
+const subscribe = (u) => ok(call('POST', '/api/vip/subscribe', { platform: 'test', productId: 'vip_7d', transactionId: `t${rnd(8)}` }, u.session), 'abonelik');
+/** VIP 1–10 by SVIP points (Sessiz ziyaret is VIP 7). */
+const svip = (u, xp) => q('UPDATE users SET svip_xp = $2 WHERE id = $1', [u.user.id, xp]);
 const backdate = (owner, visitor, interval) =>
   q(`UPDATE profile_visits SET last_at = now() - interval '${interval}' WHERE owner_id = $1 AND visitor_id = $2`, [owner.user.id, visitor.user.id]);
 /** An account with a phone that takes pushes: its token. */
@@ -51,13 +55,13 @@ const withPhone = async (u) => {
 const pushesTo = (token) => pushed.filter((m) => m.to === token);
 
 describe('Profil ziyaretçileri', () => {
-  test('profil ekranından açılan profil ziyaret sayılır; liste herkese, kim olduğu VIP’e', async () => {
+  test('profil ekranından açılan profil ziyaret sayılır; liste herkese, kim olduğu aboneye', async () => {
     const a = await signUp('Ziyaretçi A');
     const b = await signUp('Profil B');
     await visit(a, b);
     const plain = await visitors(b);
     assert.equal(plain.count, 1);
-    assert.equal(plain.visitors, null, 'VIP değilken kim olduğu gelmez');
+    assert.equal(plain.visitors, null, 'abonelik yokken kim olduğu gelmez');
     // The visit is there, blurred: how many times and when (to the minute), nothing that names the visitor.
     assert.equal(plain.hidden.length, 1);
     assert.deepEqual(Object.keys(plain.hidden[0]).sort(), ['lastAt', 'visits']);
@@ -66,7 +70,7 @@ describe('Profil ziyaretçileri', () => {
     assert.ok(Date.now() - Date.parse(plain.hidden[0].lastAt) < 2 * 60_000);
     const raw = JSON.stringify(plain);
     assert.ok(!raw.includes(a.user.id) && !raw.includes('Ziyaretçi A'), 'kimlik hiçbir alanda yok');
-    await vip(b);
+    await subscribe(b);
     const shown = await visitors(b);
     assert.equal(shown.count, 1);
     assert.equal(shown.visitors.length, 1);
@@ -76,15 +80,22 @@ describe('Profil ziyaretçileri', () => {
     assert.deepEqual(shown.hidden, []);
   });
 
-  test('Rütbe de kimin baktığını açar', async () => {
+  test('VIP seviyesi ve Rütbe kimin baktığını açmaz, yalnız abonelik; abonelik bitince yine bulanık', async () => {
     const a = await signUp('Rütbe Ziyaretçi');
     const b = await signUp('Rütbe Sahibi');
     await visit(a, b);
+    await svip(b, 500_000);
     await q(
       "INSERT INTO entitlements (user_id, sku, kind, tier, price, ends_at, source, ref) VALUES ($1, 'noble-1', 'noble', 1, 0, now() + interval '30 days', 'admin', $2)",
       [b.user.id, `admin:${rnd(6)}`],
     );
+    const ranked = await visitors(b);
+    assert.equal(ranked.visitors, null, 'VIP 1 ve Rütbe ile bulanık');
+    assert.equal(ranked.hidden.length, 1);
+    await subscribe(b);
     assert.equal((await visitors(b)).visitors[0].id, a.user.id);
+    await q("UPDATE users SET vip_sub_until = now() - interval '1 second' WHERE id = $1", [b.user.id]);
+    assert.equal((await visitors(b)).visitors, null, 'abonelik bitti');
   });
 
   test('başka yerden açılan profil ve kendi profilin sayılmaz', async () => {
@@ -98,7 +109,7 @@ describe('Profil ziyaretçileri', () => {
   test('10 dakika içinde tekrar açmak bir kez sayılır, sonra artar; bir hafta sessizlikten sonra baştan başlar', async () => {
     const a = await signUp('Tekrar A');
     const b = await signUp('Tekrar B');
-    await vip(b);
+    await subscribe(b);
     await visit(a, b);
     await visit(a, b);
     assert.equal((await visitors(b)).visitors[0].visits, 1);
@@ -114,7 +125,7 @@ describe('Profil ziyaretçileri', () => {
   test('Sessiz ziyaret (VIP 7) iz bırakmaz', async () => {
     const a = await signUp('Sessiz A');
     const b = await signUp('Sessiz B');
-    await vip(a, 40_000_000);
+    await svip(a, 40_000_000);
     await visit(a, b);
     assert.equal((await visitors(b)).count, 0);
   });
@@ -123,7 +134,7 @@ describe('Profil ziyaretçileri', () => {
     const a = await signUp('Engel A');
     const b = await signUp('Engel B');
     const c = await signUp('Silinen C');
-    await vip(b);
+    await subscribe(b);
     await visit(a, b);
     await visit(c, b);
     assert.equal((await visitors(b)).count, 2);
@@ -152,8 +163,8 @@ describe('Ziyaret bildirimi', () => {
 
   test('abonelikle kimin baktığı yazar ve dokununca o kişi açılır', async () => {
     const a = await signUp('Açık Bakan');
-    const b = await signUp('VIP Sahibi');
-    await vip(b);
+    const b = await signUp('Abone Sahibi');
+    await subscribe(b);
     const phone = await withPhone(b);
     await visit(a, b);
     assert.ok(await until(() => pushesTo(phone).length === 1));
@@ -166,7 +177,7 @@ describe('Ziyaret bildirimi', () => {
     const a = await signUp('Sık Bakan');
     const c = await signUp('Başka Bakan');
     const b = await signUp('Günlük Sahip');
-    await vip(b);
+    await subscribe(b);
     const phone = await withPhone(b);
     await visit(a, b);
     assert.ok(await until(() => pushesTo(phone).length === 1));
@@ -189,8 +200,8 @@ describe('Ziyaret bildirimi', () => {
     const blocker = await signUp('Engelleyen Bakan');
     const last = await signUp('Son Bakan');
     const b = await signUp('Korunan Sahip');
-    await vip(silent, 40_000_000);
-    await vip(b);
+    await svip(silent, 40_000_000);
+    await subscribe(b);
     const phone = await withPhone(b);
     await ok(call('POST', '/api/block', { to: blocked.user.id, block: true }, b.session), 'sahip engeller');
     await ok(call('POST', '/api/block', { to: b.user.id, block: true }, blocker.session), 'bakan engeller');

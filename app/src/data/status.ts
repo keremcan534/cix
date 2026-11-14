@@ -65,7 +65,9 @@ export const hasNobleRight = (tier: number, name: string) => {
 };
 
 // --- VIP subscription (store subscription, priced in TRY) -------------------------------
-// `tl` is the store price and `was` the struck-through list price; the badge shows the saving.
+// `tl` is the store price and `was` the struck-through list price; the badge shows the saving. The store product is
+// `vip_<days>d` (server/api/catalog.mjs VIP_SUBS, which tests/server-catalog.test.ts keeps equal); a live build buys
+// it through the server (lib/live/vip).
 export const VIP_PLANS = [
   { days: 7, tl: 145, was: 299, label: '7 Gün' },
   { days: 30, tl: 285, was: 1_199, label: '1 Ay' },

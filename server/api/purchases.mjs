@@ -31,6 +31,8 @@
 // never gets them, even if verified later. Store sandbox purchases
 // get no campaign; test-store purchases do (to try it), inside the daily play-coin cap. A hidden pack
 // (packs_hidden) is only left out of the catalog: verifying one still credits it.
+//
+// The VIP subscription (Abonelik) goes through the same stores and helpers, with the same rules: vip.mjs.
 import crypto from 'node:crypto';
 
 import { HttpError, auth, db, env, readJson, selfUser, sha, tx } from './core.mjs';
@@ -128,7 +130,13 @@ function appleJwt() {
   return `${body}.${sig.toString('base64url')}`;
 }
 
-async function verifyApple(u, productId, transactionId) {
+/**
+ * A transaction of `productId` for `u`, read from the App Store Server API (production first, then sandbox), with
+ * the checks every App Store purchase gets: sandbox only with ALLOW_SANDBOX_PURCHASES=1, our app and this product,
+ * not revoked, and the account the app linked. Coin packs here; the VIP subscription (vip.mjs) reads its
+ * expiresDate and originalTransactionId off `info`.
+ */
+export async function appleTransaction(u, productId, transactionId) {
   if (!env.APPLE_IAP_KEY_ID || !env.APPLE_IAP_ISSUER_ID || !env.APPLE_IAP_PRIVATE_KEY) throw new HttpError(503, 'App Store ödemesi henüz ayarlı değil');
   if (typeof transactionId !== 'string' || !/^\d{1,30}$/.test(transactionId)) throw new HttpError(400, 'Geçersiz satın alma');
   const headers = { authorization: `Bearer ${appleJwt()}` };
@@ -149,6 +157,11 @@ async function verifyApple(u, productId, transactionId) {
   if (info.bundleId !== BUNDLE || info.productId !== productId) throw new HttpError(400, 'Satın alma bu ürüne ait değil');
   if (info.revocationDate) throw new HttpError(402, 'Bu satın alma iade edilmiş');
   if (info.appAccountToken && info.appAccountToken.toLowerCase() !== u.id) throw new HttpError(403, 'Bu satın alma başka bir hesaba ait');
+  return { info, sandbox };
+}
+
+async function verifyApple(u, productId, transactionId) {
+  const { info, sandbox } = await appleTransaction(u, productId, transactionId);
   return { sandbox, transactionId: String(info.transactionId), purchaseTime: Number(info.purchaseDate), finish: () => {} };
 }
 

@@ -1,7 +1,7 @@
 // Live mode (lib/live): Profil ziyaretçileri from the server (GET /api/me/visitors, server/api/social.mjs). The visits
-// of the last 7 days are for everyone; who made them comes only with VIP (`visitors` null without it, and `hidden`
-// has the visits without anyone's identity). The Ben tab and Mesajlar read it again each time they come to the front,
-// and so does a visit notice on the live line (lib/live/sync). Another account signed in on this phone starts from
+// of the last 7 days are for everyone; who made them comes only with the Abonelik (`visitors` null without it, and
+// `hidden` has the visits without anyone's identity). The Ben tab and Mesajlar read it again each time they come to the
+// front, and so does a visit notice on the live line (lib/live/sync) and a subscription that starts or ends. Another account signed in on this phone starts from
 // nothing. Without a server address nothing here runs.
 import { useIsFocused } from 'expo-router';
 import { useEffect, useSyncExternalStore } from 'react';

@@ -4,21 +4,21 @@
 //   DELETE /api/me                                        → { deleted: true }
 //   GET    /api/user?id=&visit=1                          → { user }  (public profile + counts (oneWay: Takipçi / Takip without friends) + relation; visit=1 from the profile screen records a visit;
 //                                                                       levels, friends, gifts, staff, extras and album: profiles.mjs)
-//   GET    /api/me/visitors                               → { count, visitors, hidden }  (last 7 days; who only with VIP,
-//                                                                       without it `hidden`: when, never who)
+//   GET    /api/me/visitors                               → { count, visitors, hidden }  (last 7 days; who only with the
+//                                                                       Abonelik, without it `hidden`: when, never who)
 //   POST   /api/follow  { to, follow }                    → { following }
 //   GET    /api/following · GET /api/followers            → { users }  (mine only; ?user= naming anyone else: 403)
 //   POST   /api/block   { to, block }                     → { blocked }
 //   GET    /api/blocks                                    → { users }
 //   POST   /api/report  { type, id, reason, note? }       → { reported: true, updated }
 //   POST   /api/contact/refusals { category, place }      → { counted: true, strikesLeft?, muted?, until? }  (a refusal the app made on its own)
-import { HttpError, ageOf, allow, assertClean, auth, blockedBetween, countRefusal, db, profileOf, publicText, readJson, selfUser, text, tx, userId } from './core.mjs';
+import { HttpError, ageOf, allow, assertClean, auth, blockedBetween, countRefusal, db, profileOf, publicText, readJson, selfUser, subActive, text, tx, userId } from './core.mjs';
 import { CATEGORIES } from './contact-filter.mjs';
 import { withSignIn } from './auth.mjs';
 import { notify } from './push.mjs';
 import { autoFromReports } from './sanctions.mjs';
-import { announceLook, looksOf, revokeAllForDelete, statusOf } from './economy.mjs';
-import { svipLevel, vipLevelOf } from './catalog.mjs';
+import { announceLook, looksOf, revokeAllForDelete } from './economy.mjs';
+import { svipLevel } from './catalog.mjs';
 import { familyOf, leaveFamily } from './families.mjs';
 import { dropFromQueues } from './music.mjs';
 import { removeFiles, removeUserFiles, verifyUpload } from './media.mjs';
@@ -73,10 +73,11 @@ const VISIT_NOTICE_BURST = 5;
 let visitsPrunedAt = 0;
 
 /**
- * Whether `user` may see who opened their profile: a VIP right (VIP 1 and up, by SVIP level or Rütbe; in the app the
- * Abonelik's "Profiline bakanları gör"). Without it they see that someone came and when, never who.
+ * Whether `user` (a users row) may see who opened their profile: the Abonelik's "Profiline bakanları gör", only while
+ * the subscription runs (vip.mjs; VIP 1–10 and Rütbe don't open it). Without it they see that someone came and when,
+ * never who.
  */
-export const seesVisitors = async (q, user) => vipLevelOf(user.svip_xp, (await statusOf(q, user.id)).noble?.tier) >= 1;
+export const seesVisitors = (user) => subActive(user);
 
 /**
  * `me` opened `owner`'s profile. A visit within 10 minutes of the last one counts once; after a week without one
@@ -112,9 +113,9 @@ async function recordVisit(owner, me) {
  */
 async function tellVisit(owner, visitor) {
   if (!allow(`visit-notice:${owner}`, VISIT_NOTICE_BURST)) return;
-  const u = (await db.query('SELECT id, svip_xp FROM users WHERE id = $1 AND deleted_at IS NULL', [owner])).rows[0];
+  const u = (await db.query('SELECT id, vip_sub_until FROM users WHERE id = $1 AND deleted_at IS NULL', [owner])).rows[0];
   if (!u) return;
-  if (await seesVisitors(db, u)) notify([owner], { title: 'Profil ziyareti', body: `${visitor.name} profiline baktı`, data: { type: 'visit', from: visitor.id } });
+  if (seesVisitors(u)) notify([owner], { title: 'Profil ziyareti', body: `${visitor.name} profiline baktı`, data: { type: 'visit', from: visitor.id } });
   else notify([owner], { title: 'Profil ziyareti', body: 'Biri profiline baktı. Kim olduğunu abonelikle görebilirsin.', data: { type: 'visit' } });
 }
 
@@ -341,7 +342,7 @@ export const socialRoutes = {
 
   /**
    * Profil ziyaretçileri: who opened my profile in the last 7 days, newest first, at most 100. The list is open to
-   * everyone; who they are is a VIP right (seesVisitors). With it, `visitors` names them; without it `visitors` is
+   * everyone; who they are is the Abonelik's right (seesVisitors). With it, `visitors` names them; without it `visitors` is
    * null (older apps show the count alone) and `hidden` has the same visits with only how many times and when (to
    * the minute): no id, name or photo, so the app's blurred rows can't be turned back into people. Blocked people
    * either way and deleted accounts are left out.
@@ -356,7 +357,7 @@ export const socialRoutes = {
         ORDER BY v.last_at DESC LIMIT 100`,
       [me.id],
     );
-    const vip = await seesVisitors(db, me);
+    const vip = seesVisitors(me);
     return {
       count: Number(r.rows[0]?.total ?? 0),
       visitors: vip ? r.rows.map((x) => ({ id: x.id, name: x.name, avatarUrl: x.avatar_url ?? null, visits: x.visits, lastAt: x.last_at })) : null,

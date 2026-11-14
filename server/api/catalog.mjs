@@ -1,6 +1,6 @@
-// What things cost, decided by the server: gifts, the gift counts the panel offers, coin packs (store
-// products) and the SVIP thresholds. Kept in step with the app (app/src/data/mock.ts GIFTS,
-// app/src/components/room/gift-sheet.tsx COUNTS, app/src/data/status.ts PACK_LIST and SVIP_LEVELS); the app
+// What things cost, decided by the server: gifts, the gift counts the panel offers, coin packs and the VIP
+// subscription plans (store products) and the SVIP thresholds. Kept in step with the app (app/src/data/mock.ts GIFTS,
+// app/src/components/room/gift-sheet.tsx COUNTS, app/src/data/status.ts PACK_LIST, VIP_PLANS and SVIP_LEVELS); the app
 // test tests/server-catalog.test.ts fails when they drift. Lucky gifts are not here: they wait for the legal
 // decision (docs/YAYIN_HAZIRLIGI.md, item 1).
 
@@ -83,6 +83,18 @@ export const PACKS = [
   { id: 'p9', coins: 1_000_000, tl: 23_599.99 },
 ].map((p) => ({ firstBonus: 0, ...p, productId: `coins_${p.coins}` }));
 export const PACK_BY_PRODUCT = new Map(PACKS.map((p) => [p.productId, p]));
+
+/**
+ * Abonelik (vip.mjs): the VIP subscription plans, store subscriptions priced in TRY that renew on their own. The
+ * store product id is `vip_<days>d` on both stores; a test purchase (ALLOW_TEST_TOPUP=1) gives `days`. In step with
+ * app/src/data/status.ts VIP_PLANS; tests/server-catalog.test.ts fails when they drift.
+ */
+export const VIP_SUBS = [
+  { days: 7, tl: 145 },
+  { days: 30, tl: 285 },
+  { days: 90, tl: 599 },
+].map((p) => ({ ...p, productId: `vip_${p.days}d` }));
+export const VIP_SUB_BY_PRODUCT = new Map(VIP_SUBS.map((p) => [p.productId, p]));
 
 /**
  * Diamonds → coins (Gelir > Çevir): a diamond's official value (5.000 💎 = 1 USD, at USD_TRY) priced like the
