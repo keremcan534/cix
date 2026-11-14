@@ -162,7 +162,7 @@ import { shareVideo, videoPlayback } from '@/lib/live/room-video';
 import { MIC_BLOCK_LABEL, endRoom, getSession, micBlock, micSending, reportRoomState, setMicWant, setNoiseSuppression, setPlaybackVolume, setRoomCamera, useRoomSession, type MicBlock } from '@/lib/room-session';
 import { shareLink } from '@/lib/links';
 import { balconyOnly, canInviteFollowers, defaultMicQueue, followerCount, knownFollowers, roomInviteText, seatAccess } from '@/lib/room-invites';
-import { demoJoinMode } from '@/lib/room-follow';
+import { demoJoinMode, membershipOf, roomPeopleCount, type Membership } from '@/lib/room-follow';
 import { BUSY_DEVICES, getMedia, leaveRoom, reportRoom, useMedia } from '@/lib/media';
 import { errorHaptic, micHaptic, successHaptic, tapHaptic } from '@/lib/haptics';
 import { stickerIdOf, stickerToken } from '@/lib/stickers';
@@ -667,7 +667,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     return rival ? { holder: rival, since: now - 60_000, until: now + 7 * 60_000, spent: contrib[rival] } : null;
   });
   const [bossSheet, setBossSheet] = useState(false);
-  const [membership, setMembership] = useState<'owner' | 'none' | 'pending' | 'member'>(isOwn ? 'owner' : 'none');
+  const [membership, setMembership] = useState<Membership>(isOwn ? 'owner' : 'none');
   const [memberApps, setMemberApps] = useState<string[]>(() => (isOwn ? ['u2', 'u9', 'u11'] : []));
   // The demo's application to a sample room, accepted a moment later unless it is taken back first.
   const demoApproval = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -698,7 +698,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         r.pending.forEach((m) => rememberUser(m));
         setServerMembers({ ids: r.members.map((m) => toLocal(m.id)), total: r.total, canManage: r.canManage });
         setMemberApps(r.pending.map((m) => toLocal(m.id)));
-        setMembership(r.mine === 'owner' ? 'owner' : r.mine === 'member' ? 'member' : r.mine === 'pending' ? 'pending' : 'none');
+        setMembership(membershipOf(r.mine));
       },
       () => {},
     );
@@ -3054,9 +3054,14 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     { key: 'effects', label: 'Efekt ayarları', icon: 'sparkles-outline' as const, onPress: fromCard(() => setPanel('effects')) },
   ];
 
-  // Room card data (members, clan). A server room: its members as the server keeps them, never demo people.
+  // Room card data (members, clan). A server room: its members as the server keeps them, never demo people. The
+  // count is the room's people, its owner and staff with its members (the server's total; my own demo room's alike).
   const roomMembers = isOwn ? ['me', ...myRoom.memberIds] : real ? (serverMembers?.ids ?? []) : [...(membership === 'member' ? ['me'] : []), ...USERS.filter((u) => !kicked.has(u.id) && !blocked.has(u.id)).slice(0, 10).map((u) => u.id)];
-  const memberTotal = isOwn ? roomMembers.length : real ? (serverMembers?.total ?? 0) : Math.min(memberLimit(level), Math.round(base!.listeners * 1.8)) + (membership === 'member' ? 1 : 0);
+  const memberTotal = isOwn
+    ? roomPeopleCount([hostId, ...superIds, ...adminIds], roomMembers)
+    : real
+      ? (serverMembers?.total ?? 0)
+      : Math.min(memberLimit(level), Math.round(base!.listeners * 1.8)) + (membership === 'member' ? 1 : 0);
   const ownFamily = FAMILIES.find((f) => f.id === familyId);
   const ownAgencyName = agencyId === 'own' ? ownedAgency?.name : AGENCIES.find((a) => a.id === agencyId)?.name;
   const otherFamily = FAMILIES[(Number(id.replace(/\D/g, '')) || 0) % FAMILIES.length];
@@ -3755,7 +3760,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         onLeave={leaveMembers}
         onApprove={(uid) => {
           if (real) return memberCall('Onaylanamadı', () => api.answerRoomMember(id, toServer(uid) ?? '', true), `🏠 ${userById(uid).name} oda üyesi oldu`);
-          if (roomMembers.length >= memberLimit(level)) return showAlert('Üye kapasitesi dolu', `Lv.${level} oda en fazla ${memberLimit(level)} üye alabilir.`);
+          if (memberTotal >= memberLimit(level)) return showAlert('Üye kapasitesi dolu', `Lv.${level} oda en fazla ${memberLimit(level)} üye alabilir.`);
           setMemberApps((l) => l.filter((x) => x !== uid));
           updateMyRoom({ memberIds: [...myRoom.memberIds, uid] });
           addMsg({ system: true, text: `🏠 ${userById(uid).name} oda üyesi oldu` });

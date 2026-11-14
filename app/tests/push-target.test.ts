@@ -20,4 +20,9 @@ describe('Bildirime dokununca açılan ekran', () => {
     assert.equal(pushTarget({ type: 'moment', id: '3' }), '/bildirimler');
     assert.equal(pushTarget(undefined), '/bildirimler');
   });
+
+  test('profil ziyareti: abonelikle bakan kişi, abonelik yoksa bulanık ziyaretçi listesi', () => {
+    assert.equal(pushTarget({ type: 'visit', from: 'u4' }), '/kullanici/u4');
+    assert.equal(pushTarget({ type: 'visit' }), '/(tabs)/profil?ziyaretciler=1');
+  });
 });

@@ -609,8 +609,13 @@ export type RoomRules = {
   slowMode: boolean;
   words: string[];
 };
-export type RoomMember = UserCard & { since: string };
-export type RoomMembers = { members: RoomMember[]; total: number; cap: number; mine: 'owner' | 'member' | 'pending' | null; joinMode: RoomRules['joinMode']; canManage: boolean; pending: RoomMember[] };
+/** `since`: when they joined (null for the owner and the staff, who are members without joining). */
+export type RoomMember = UserCard & { since: string | null };
+/**
+ * The room card's Oda üyeleri: `total` counts the owner and staff with the members (as the full list does), `members`
+ * the first of them, staff first. `mine` 'admin': I'm a Yönetici or Süper Yönetici, a member as staff.
+ */
+export type RoomMembers = { members: RoomMember[]; total: number; cap: number; mine: 'owner' | 'admin' | 'member' | 'pending' | null; joinMode: RoomRules['joinMode']; canManage: boolean; pending: RoomMember[] };
 /** `image`: a photo in the chat (its storage address), null for text only. */
 export type DirectMessage = { id: number; from: string; to: string; text: string; image?: string | null; event?: SharedEvent; createdAt: string; readAt: string | null };
 /** An event sent in a message (Etkinlik Merkezi "Arkadaşına gönder"); older servers never send it. */
@@ -628,8 +633,13 @@ export const userProfile = (id: string, visit = false) =>
   call<{ user: PublicUser } & Partial<ProfileTies>>('GET', `/api/user?id=${encodeURIComponent(id)}${visit ? '&visit=1' : ''}`).then((r) => ({ ...r.user, agency: r.agency ?? null, family: r.family ?? null }));
 /** Someone who opened my profile in the last 7 days. */
 export type ServerVisitor = { id: string; name: string; avatarUrl: string | null; visits: number; lastAt: string };
-/** Profil ziyaretçileri: how many came (everyone), and who (`visitors`, VIP only: null without it). */
-export const myVisitors = () => call<{ count: number; visitors: ServerVisitor[] | null }>('GET', '/api/me/visitors');
+/** A visit without who made it (no VIP): how many times and when, to the minute. */
+export type HiddenVisitor = { visits: number; lastAt: string };
+/**
+ * Profil ziyaretçileri: how many came, and who (`visitors`, VIP only: null without it). Without VIP, `hidden` has the
+ * same visits without anyone's id, name or photo (an older server leaves it out).
+ */
+export const myVisitors = () => call<{ count: number; visitors: ServerVisitor[] | null; hidden?: HiddenVisitor[] }>('GET', '/api/me/visitors');
 export const follow = (to: string, on: boolean) => call<{ following: boolean }>('POST', '/api/follow', { to, follow: on }).then((r) => r.following);
 /** Keşfet: real people, most recently active first, with how far each is from me by city (no location). */
 export type DiscoverUser = { id: string; name: string } & ServerProfile & { online: boolean; levels?: Levels; country?: string | null; distance?: CityDistance | null };

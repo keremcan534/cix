@@ -147,14 +147,17 @@ describe('Oda üyeleri', () => {
 
     await ok(update(owner.session, { id: room, rules: { joinMode: 'apply' } }), 'başvurulu');
     assert.deepEqual(await ok(call('POST', '/api/rooms/members/join', { room }, b.session), 'başvur'), { status: 'pending' });
+    // The count is the room's people: the owner and the admin with the one member (a pending request isn't one).
     let list = await ok(call('GET', `/api/rooms/members?room=${room}`, null, b.session), 'liste');
-    assert.deepEqual([list.mine, list.total, list.pending.length, list.canManage], ['pending', 1, 0, false]);
+    assert.deepEqual([list.mine, list.total, list.pending.length, list.canManage], ['pending', 3, 0, false]);
     assert.equal((await call('POST', '/api/rooms/members/answer', { room, user: b.user.id, accept: true }, a.session))[0], 403, 'üye cevaplayamaz');
     list = await ok(call('GET', `/api/rooms/members?room=${room}`, null, admin.session), 'yönetici listesi');
     assert.deepEqual(list.pending.map((p) => p.id), [b.user.id]);
+    assert.equal(list.mine, 'admin', 'yönetici üyeliğini yetkili olarak görür');
     await ok(call('POST', '/api/rooms/members/answer', { room, user: b.user.id, accept: true }, admin.session), 'onay');
     list = await ok(call('GET', `/api/rooms/members?room=${room}`, null, owner.session), 'sahip listesi');
-    assert.deepEqual([list.mine, list.total, list.cap], ['owner', 2, 50]);
+    assert.deepEqual([list.mine, list.total, list.cap], ['owner', 4, 50]);
+    assert.deepEqual(list.members.map((m) => m.id), [owner.user.id, admin.user.id, a.user.id, b.user.id], 'önce sahip ve yönetici, sonra üyeler');
 
     // Only the owner answers members now.
     await ok(update(owner.session, { id: room, rules: { joinMode: 'closed', manageMembers: 'owner' } }), 'kapalı');
@@ -163,7 +166,40 @@ describe('Oda üyeleri', () => {
     await ok(call('POST', '/api/rooms/members/remove', { room, user: a.user.id }, owner.session), 'çıkar');
     assert.equal((await call('POST', '/api/rooms/members/remove', { room, user: admin.user.id }, owner.session))[0], 403, 'yetkili çıkarılamaz');
     await ok(call('POST', '/api/rooms/members/leave', { room }, b.session), 'ayrıl');
-    assert.equal((await ok(call('GET', `/api/rooms/members?room=${room}`, null, owner.session), 'son')).total, 0);
+    assert.equal((await ok(call('GET', `/api/rooms/members?room=${room}`, null, owner.session), 'son')).total, 2, 'sahip ve yönetici kalır');
+  });
+
+  test('oda üyeleri sayısı listedekilerle aynı: sahip ve yöneticiler sayılır; kapasite de onları sayar', async () => {
+    // The client's card: the owner and a Yönetici, nobody joined yet. It read "Oda üyeleri (0 / 5.000)".
+    const owner = await signUp('Sayı Sahibi');
+    const admin = await signUp('Sayı Yöneticisi');
+    const room = await roomOf(owner);
+    await ok(call('POST', '/api/rooms/admin', { room, user: admin.user.id }, owner.session), 'yönetici');
+    const card = await ok(call('GET', `/api/rooms/members?room=${room}`, null, owner.session), 'kart');
+    assert.deepEqual([card.total, card.members.map((m) => m.id)], [2, [owner.user.id, admin.user.id]]);
+    const all = await ok(call('GET', `/api/rooms/members/list?room=${room}`, null, owner.session), 'tam liste');
+    assert.equal(all.counts.all, card.total, 'kart ile liste aynı sayar');
+    // An admin who had joined before is counted once.
+    await ok(call('POST', '/api/rooms/members/join', { room }, admin.session), 'yönetici üye olur');
+    assert.equal((await ok(call('GET', `/api/rooms/members?room=${room}`, null, owner.session), 'yine')).total, 2);
+    // Following the room is not membership: followers have their own count.
+    const fan = await signUp('Sayı Takipçisi');
+    await ok(call('POST', '/api/rooms/follow', { room }, fan.session), 'takip');
+    assert.equal((await ok(call('GET', `/api/rooms/members?room=${room}`, null, fan.session), 'takipçi okur')).total, 2);
+    // The cap (50 at Lv.1) counts the same people: 48 members fill it with the owner and the admin.
+    await h.sql.query(
+      `WITH made AS (INSERT INTO users (name) SELECT 'Dolu ' || g FROM generate_series(1, 48) g RETURNING id)
+       INSERT INTO room_members (room_id, user_id, status) SELECT $1, id, 'member' FROM made`,
+      [room],
+    );
+    assert.equal((await ok(call('GET', `/api/rooms/members?room=${room}`, null, owner.session), 'dolu')).total, 50);
+    const [st, j] = await call('POST', '/api/rooms/members/join', { room }, fan.session);
+    assert.deepEqual([st, j.error], [403, 'Üye kapasitesi dolu (50)']);
+    // A deleted account isn't counted.
+    const gone = (await h.sql.query("SELECT user_id FROM room_members WHERE room_id = $1 AND user_id <> $2 LIMIT 1", [room, admin.user.id])).rows[0].user_id;
+    await h.sql.query('UPDATE users SET deleted_at = now() WHERE id = $1', [gone]);
+    assert.equal((await ok(call('GET', `/api/rooms/members?room=${room}`, null, owner.session), 'silinen')).total, 49);
+    assert.deepEqual(await ok(call('POST', '/api/rooms/members/join', { room }, fan.session), 'yer açıldı'), { status: 'member' });
   });
 
   test('Özel oda: yalnızca yetkili ve üyeler, şifre varsa şifreyle; katılımcı limiti dolunca yetkili dışı giremez', async () => {

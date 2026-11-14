@@ -11,6 +11,10 @@ export function pushTarget(data: Record<string, unknown> | undefined): Href | nu
     case 'gift':
     case 'follow':
       return s('from') ? (`/kullanici/${s('from')}` as Href) : '/bildirimler';
+    // Someone opened my profile (server/api/social.mjs): with the Abonelik the notice names them and opens them;
+    // without it, it names nobody and opens my visitors (blurred) on the Ben tab.
+    case 'visit':
+      return s('from') ? (`/kullanici/${s('from')}` as Href) : ('/(tabs)/profil?ziyaretciler=1' as Href);
     case 'family_joined':
     case 'family_request':
     case 'family_invite':

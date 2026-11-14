@@ -4,7 +4,8 @@
 //   DELETE /api/me                                        → { deleted: true }
 //   GET    /api/user?id=&visit=1                          → { user }  (public profile + counts (oneWay: Takipçi / Takip without friends) + relation; visit=1 from the profile screen records a visit;
 //                                                                       levels, friends, gifts, staff, extras and album: profiles.mjs)
-//   GET    /api/me/visitors                               → { count, visitors }  (last 7 days; visitors only with VIP)
+//   GET    /api/me/visitors                               → { count, visitors, hidden }  (last 7 days; who only with VIP,
+//                                                                       without it `hidden`: when, never who)
 //   POST   /api/follow  { to, follow }                    → { following }
 //   GET    /api/following · GET /api/followers            → { users }  (mine only; ?user= naming anyone else: 403)
 //   POST   /api/block   { to, block }                     → { blocked }
@@ -67,27 +68,54 @@ async function liveUser(id) {
 
 /** "Sessiz ziyaret" (silent visit): from this VIP (SVIP) level on, opening a profile leaves no trace (app data/status). */
 export const SILENT_VISIT_SVIP = 7;
+/** At most this many visit notices a minute for one profile: many accounts opening it at once don't flood its phone. */
+const VISIT_NOTICE_BURST = 5;
 let visitsPrunedAt = 0;
 
 /**
+ * Whether `user` may see who opened their profile: a VIP right (VIP 1 and up, by SVIP level or Rütbe; in the app the
+ * Abonelik's "Profiline bakanları gör"). Without it they see that someone came and when, never who.
+ */
+export const seesVisitors = async (q, user) => vipLevelOf(user.svip_xp, (await statusOf(q, user.id)).noble?.tier) >= 1;
+
+/**
  * `me` opened `owner`'s profile. A visit within 10 minutes of the last one counts once; after a week without one
- * the count starts again. Not recorded with "Sessiz ziyaret". Once an hour, rows past the week (and a day) go.
+ * the count starts again. Not recorded with "Sessiz ziyaret" (so no notice either). The owner is told at most once a
+ * day for each visitor (profile_visits.notified_at, claimed in the same statement, so two opens at once tell once).
+ * Once an hour, rows past the week (and a day) go.
  */
 async function recordVisit(owner, me) {
   if (svipLevel(Number(me.svip_xp) || 0) >= SILENT_VISIT_SVIP) return;
-  await db.query(
-    `INSERT INTO profile_visits (owner_id, visitor_id) VALUES ($1, $2)
+  const r = await db.query(
+    `INSERT INTO profile_visits (owner_id, visitor_id, notified_at) VALUES ($1, $2, now())
      ON CONFLICT (owner_id, visitor_id) DO UPDATE SET
        visits = CASE WHEN profile_visits.last_at < now() - interval '7 days' THEN 1
                      WHEN profile_visits.last_at < now() - interval '10 minutes' THEN profile_visits.visits + 1
                      ELSE profile_visits.visits END,
-       last_at = now()`,
+       last_at = now(),
+       notified_at = CASE WHEN profile_visits.notified_at IS NULL OR profile_visits.notified_at <= now() - interval '1 day' THEN now()
+                          ELSE profile_visits.notified_at END
+     RETURNING notified_at = now() AS tell`,
     [owner, me.id],
   );
+  if (r.rows[0]?.tell) tellVisit(owner, me).catch((e) => console.error('visit notice', String(e).slice(0, 200)));
   if (Date.now() - visitsPrunedAt > 3_600_000) {
     visitsPrunedAt = Date.now();
     await db.query("DELETE FROM profile_visits WHERE last_at < now() - interval '8 days'").catch((e) => console.error('visits prune', e.message));
   }
+}
+
+/**
+ * Tells `owner` that `visitor` opened their profile: a push and the open app's live line. Who it was goes only to
+ * someone who may see their visitors (seesVisitors); anyone else hears that someone came, and nothing in the notice
+ * (its text or its data) names the visitor.
+ */
+async function tellVisit(owner, visitor) {
+  if (!allow(`visit-notice:${owner}`, VISIT_NOTICE_BURST)) return;
+  const u = (await db.query('SELECT id, svip_xp FROM users WHERE id = $1 AND deleted_at IS NULL', [owner])).rows[0];
+  if (!u) return;
+  if (await seesVisitors(db, u)) notify([owner], { title: 'Profil ziyareti', body: `${visitor.name} profiline baktı`, data: { type: 'visit', from: visitor.id } });
+  else notify([owner], { title: 'Profil ziyareti', body: 'Biri profiline baktı. Kim olduğunu abonelikle görebilirsin.', data: { type: 'visit' } });
 }
 
 /** The erasure of DELETE /api/me inside transaction `c`, for account `id` (its phone `phone`); also the admin's
@@ -309,9 +337,11 @@ export const socialRoutes = {
   },
 
   /**
-   * Profil ziyaretçileri: who opened my profile in the last 7 days. How many is for everyone; who they are is a VIP
-   * right (VIP 1 and up, by SVIP level or Rütbe), so without it `visitors` is null. Blocked people either way and deleted
-   * accounts are left out. Newest first, at most 100.
+   * Profil ziyaretçileri: who opened my profile in the last 7 days, newest first, at most 100. The list is open to
+   * everyone; who they are is a VIP right (seesVisitors). With it, `visitors` names them; without it `visitors` is
+   * null (older apps show the count alone) and `hidden` has the same visits with only how many times and when (to
+   * the minute): no id, name or photo, so the app's blurred rows can't be turned back into people. Blocked people
+   * either way and deleted accounts are left out.
    */
   async 'GET /api/me/visitors'(req) {
     const me = await auth(req);
@@ -323,10 +353,11 @@ export const socialRoutes = {
         ORDER BY v.last_at DESC LIMIT 100`,
       [me.id],
     );
-    const vip = vipLevelOf(me.svip_xp, (await statusOf(db, me.id)).noble?.tier) >= 1;
+    const vip = await seesVisitors(db, me);
     return {
       count: Number(r.rows[0]?.total ?? 0),
       visitors: vip ? r.rows.map((x) => ({ id: x.id, name: x.name, avatarUrl: x.avatar_url ?? null, visits: x.visits, lastAt: x.last_at })) : null,
+      hidden: vip ? [] : r.rows.map((x) => ({ visits: x.visits, lastAt: new Date(Math.floor(x.last_at.getTime() / 60_000) * 60_000) })),
     };
   },
 

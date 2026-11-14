@@ -29,6 +29,7 @@ import {
   demoBoard,
   emptyNote,
   placeOf,
+  podiumLayout,
   pointsRule,
   resetNote,
   totalsBy,
@@ -36,6 +37,7 @@ import {
   type ContribRow,
   type ContribSide,
   type MyPlace,
+  type PodiumPlace,
 } from '@/lib/room-contrib';
 import { youLabel } from '@/lib/tr';
 import { useApp } from '@/store';
@@ -46,12 +48,12 @@ const SIDE: Record<ContribSide, { accent: string; tint: string; art: ArtName; un
   sent: { accent: '#F6BD60', tint: 'rgba(246,189,96,0.16)', art: 'siralama-zenginler', unit: 'coin' },
   received: { accent: '#FF6576', tint: 'rgba(255,101,118,0.14)', art: 'siralama-yayincilar', unit: 'diamond' },
 };
-/** Gold, silver and bronze: the ring, the pedestal's light and the sizes of each podium place. */
+/** Gold, silver and bronze: the medal, the ring, and the light and height of a drawn step (when there is no picture). */
 const PLACE = {
-  1: { art: 'derece-1', ring: ['#FFE7A3', '#F6BD60', '#B7832E'], light: 'rgba(246,189,96,0.34)', face: 84, medal: 34, pedestal: 58 },
-  2: { art: 'derece-2', ring: ['#F8FAFC', '#CBD5E1', '#7C8BA1'], light: 'rgba(203,213,225,0.24)', face: 64, medal: 28, pedestal: 42 },
-  3: { art: 'derece-3', ring: ['#F6C9A0', '#CD7F32', '#7C4419'], light: 'rgba(205,127,50,0.28)', face: 64, medal: 28, pedestal: 32 },
-} as const satisfies Record<1 | 2 | 3, { art: ArtName; ring: readonly [string, string, string]; light: string; face: number; medal: number; pedestal: number }>;
+  1: { art: 'derece-1', ring: ['#FFE7A3', '#F6BD60', '#B7832E'], light: 'rgba(246,189,96,0.34)', pedestal: 58 },
+  2: { art: 'derece-2', ring: ['#F8FAFC', '#CBD5E1', '#7C8BA1'], light: 'rgba(203,213,225,0.24)', pedestal: 42 },
+  3: { art: 'derece-3', ring: ['#F6C9A0', '#CD7F32', '#7C4419'], light: 'rgba(205,127,50,0.28)', pedestal: 32 },
+} as const satisfies Record<PodiumPlace, { art: ArtName; ring: readonly [string, string, string]; light: string; pedestal: number }>;
 
 type Person = { name: string; avatar: string; frame?: string; vip: number };
 
@@ -124,12 +126,12 @@ export function ContribBoard({
     set(v);
   };
 
-  // The podium picture spans the three places; each place stands on its own step (RoomArt CONTRIB_PODIUM). Until the
-  // row is measured the window's width stands in for it (the sheet is as wide as the window).
+  // The podium picture spans the three places; each place stands on its own step (RoomArt CONTRIB_PODIUM). The
+  // picture gets its width and height outright: given only left and right, a bundled picture keeps its own 1080 px
+  // (React Native sizes it from the file first), which ran the steps off the sheet. Until the row is measured the
+  // window's width stands in for it (the sheet is as wide as the window).
   const [podiumW, setPodiumW] = useState<number | null>(null);
-  const stepsW = (podiumW ?? win.width) - 2 * space.md;
-  const stepsH = CONTRIB_PODIUM_ART !== undefined && stepsW > 0 ? Math.round(stepsW / CONTRIB_PODIUM.aspect) : 0;
-  const stand = (place: 1 | 2 | 3) => (stepsH ? Math.round(stepsH * (1 - CONTRIB_PODIUM.top[place])) : undefined);
+  const layout = podiumLayout(podiumW ?? win.width, CONTRIB_PODIUM_ART !== undefined ? CONTRIB_PODIUM : null, space.md);
 
   const head = (
     <>
@@ -151,21 +153,28 @@ export function ContribBoard({
         </View>
       ) : (
         <View style={s.podium} onLayout={(e) => setPodiumW(e.nativeEvent.layout.width)}>
-          {stepsH > 0 && <Image source={CONTRIB_PODIUM_ART} style={[s.steps, { height: stepsH }]} resizeMode="stretch" accessibilityIgnoresInvertColors />}
-          {([2, 1, 3] as const).map((place) => {
-            const row = rows[place - 1];
-            return (
-              <PodiumSpot
-                key={place}
-                place={place}
-                row={row}
-                who={row ? person(row.uid) : null}
-                unit={tone.unit}
-                stand={stand(place)}
-                onPress={row && open ? () => open(row.uid) : undefined}
-              />
-            );
-          })}
+          <View style={{ width: layout.stage }}>
+            {layout.steps > 0 && (
+              <Image source={CONTRIB_PODIUM_ART} style={[s.steps, { width: layout.stage, height: layout.steps }]} resizeMode="stretch" accessibilityIgnoresInvertColors />
+            )}
+            <View style={s.places}>
+              {([2, 1, 3] as const).map((place) => {
+                const row = rows[place - 1];
+                return (
+                  <PodiumSpot
+                    key={place}
+                    place={place}
+                    row={row}
+                    who={row ? person(row.uid) : null}
+                    unit={tone.unit}
+                    face={layout.face[place]}
+                    stand={layout.stand[place]}
+                    onPress={row && open ? () => open(row.uid) : undefined}
+                  />
+                );
+              })}
+            </View>
+          </View>
         </View>
       )}
     </>
@@ -284,12 +293,16 @@ function Face({ who, size, ring, wreath }: { who: Person; size: number; ring?: r
   );
 }
 
-/** One of the first three. `stand`: the height of its step in the podium picture; without it a gradient step is drawn. */
-function PodiumSpot({ place, row, who, unit, stand, onPress }: { place: 1 | 2 | 3; row?: ContribRow; who: Person | null; unit: 'coin' | 'diamond'; stand?: number; onPress?: () => void }) {
+/**
+ * One of the first three: `face` the photo's size, `stand` how much of the podium picture is under it (from its
+ * step's top surface down); without a picture a gradient step is drawn instead.
+ */
+function PodiumSpot({ place, row, who, unit, face, stand, onPress }: { place: PodiumPlace; row?: ContribRow; who: Person | null; unit: 'coin' | 'diamond'; face: number; stand?: number; onPress?: () => void }) {
   const s = useStyles();
   const { colors } = useTheme();
   const p = PLACE[place];
   const wreath = CONTRIB_WREATH_ART[place];
+  const medal = Math.round(face * 0.42);
   return (
     <Pressable
       onPress={onPress}
@@ -298,18 +311,18 @@ function PodiumSpot({ place, row, who, unit, stand, onPress }: { place: 1 | 2 | 
       accessibilityRole={onPress ? 'button' : undefined}
       accessibilityLabel={row && who ? `${place}. ${who.name}, ${contribAmount(row.score)} puan` : `${place}. sıra boş`}
     >
-      {place === 1 && <Icon3D name="crown" size={30} style={[s.crown, who && wreath !== undefined && s.crownOnWreath]} />}
-      <View style={{ width: p.face, height: p.face }}>
+      {place === 1 && <Icon3D name="crown" size={Math.round(face * 0.36)} style={[s.crown, who && wreath !== undefined && s.crownOnWreath]} />}
+      <View style={{ width: face, height: face }}>
         {who ? (
-          <Face who={who} size={p.face} ring={p.ring} wreath={wreath} />
+          <Face who={who} size={face} ring={p.ring} wreath={wreath} />
         ) : (
-          <View style={[s.emptyFace, { width: p.face, height: p.face, borderRadius: p.face / 2 }]}>
-            <Ionicons name="person-outline" size={Math.round(p.face * 0.36)} color={colors.textDim} />
+          <View style={[s.emptyFace, { width: face, height: face, borderRadius: face / 2 }]}>
+            <Ionicons name="person-outline" size={Math.round(face * 0.36)} color={colors.textDim} />
           </View>
         )}
-        <Art name={p.art} size={p.medal} style={[s.medal, { bottom: -p.medal / 2, left: (p.face - p.medal) / 2 }]} />
+        <Art name={p.art} size={medal} style={[s.medal, { bottom: -medal / 2, left: (face - medal) / 2 }]} />
       </View>
-      <Text style={[s.spotName, { marginTop: p.medal / 2 + 4 }, !who && s.dim]} numberOfLines={1}>
+      <Text style={[s.spotName, { marginTop: medal / 2 + 4 }, !who && s.dim]} numberOfLines={1}>
         {who ? (row?.uid === 'me' ? youLabel(who.name) : who.name) : 'Boş'}
       </Text>
       {row ? <Amount unit={unit} n={row.score} small /> : <View style={{ height: 18 }} />}
@@ -358,11 +371,12 @@ const useStyles = makeStyles(({ colors, ink, edge, surface }) => ({
   periodTextOn: { color: colors.text },
   rule: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: space.md, paddingHorizontal: space.lg },
   ruleText: { color: colors.textDim, fontSize: type.caption, flexShrink: 1, textAlign: 'center' },
-  podium: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: space.md, paddingTop: space.lg, marginBottom: space.sm },
+  podium: { alignItems: 'center', paddingTop: space.lg, marginBottom: space.sm },
+  places: { flexDirection: 'row', alignItems: 'flex-end' },
   spot: { flex: 1, alignItems: 'center', gap: 2 },
   crown: { marginBottom: -6, zIndex: 1 },
   crownOnWreath: { marginBottom: 2 },
-  steps: { position: 'absolute', left: space.md, right: space.md, bottom: 0 },
+  steps: { position: 'absolute', left: 0, bottom: 0 },
   ringFace: { flex: 1, borderWidth: 2, borderColor: colors.card },
   emptyFace: { alignItems: 'center', justifyContent: 'center', backgroundColor: ink(0.05), borderWidth: 1.5, borderStyle: 'dashed', borderColor: ink(0.16) },
   medal: { position: 'absolute' },
