@@ -71,7 +71,7 @@ import { GamePanel, type OpenGame } from '@/components/games/game-panel';
 import type { CasinoGame } from '@/data/games';
 import { BAR_BTN, ChatLine, GiftAnimation, MicBtn, REACTION_MS, RESULT_MS, RoomSoundBtn, RoundBtn, Seat, type ChatMsg, type RoomRole, type SeatReactionData } from '@/components/room/parts';
 import { type StaffMark } from '@/components/room/role-mark';
-import { CrossPkInvitePrompt, PkBoard, PkSetupSheet, SoloBoard, TeamArena, type ArenaSlot } from '@/components/room/pk';
+import { CrossPkInvitePrompt, PkBoard, PkSetupSheet, SoloPkPill, TeamArena, type ArenaSlot } from '@/components/room/pk';
 import { CrownScreen, PkResultScreen } from '@/components/room/pk-result';
 import { BalconyBar, MicInvitePrompt, ParticipantsSheet, type ParticipantActions } from '@/components/room/balcony';
 import { SessionBanner, SessionTestSheet, closeRoomScreen } from '@/components/room/session-ui';
@@ -99,7 +99,7 @@ import { liveBackpackGift } from '@/lib/live/backpack';
 import { useLiveRoomSync } from '@/lib/live/room';
 import { useRoomTop } from '@/lib/live/room-contrib';
 import { onServerLook, onServerRoom, sendSignal, useBossNews, useLivePeers, type LuckySignal, type RoomSignal } from '@/lib/live/room-bus';
-import { answerLiveCrossPk, refreshRoomPkSoon, useIncomingCrossPk, useRoomPkSync } from '@/lib/live/pk';
+import { answerLiveCrossPk, refreshRoomPkSoon, useIncomingCrossPk, useRoomPkJoin, useRoomPkSync } from '@/lib/live/pk';
 import { useOwnerStats } from '@/lib/live/owner-stats';
 import { bagResult, grabCode, joinBag, useRoomBags, type Bag } from '@/lib/live/lucky-bags';
 import { banLeft, roomBan, roomQueue, roomSeat, roomSetAdmin, roomSetDj, roomUnban, useRoomStaff, type QueueAction, type SeatAction } from '@/lib/live/room-staff';
@@ -126,7 +126,7 @@ import { emptyEntryLine, pushEntry, shiftEntry, type EntryItem, type EntryLine }
 import { entranceView, entryPlanOf } from '@/lib/room-entrance';
 import { getLucky, luckyGift, luckyPkPoints, sendLuckyBatch, type LuckyRecord } from '@/lib/lucky';
 import { liveLuckySend, refreshLucky } from '@/lib/live/lucky';
-import { getPk, markPkSeen, modeLabel, pkPointsFor, recordGift, reportMismatch, teamOf, usePk } from '@/lib/pk';
+import { getPk, joinRoomPk, markPkSeen, modeLabel, pkPointsFor, recordGift, reportMismatch, teamOf, usePk } from '@/lib/pk';
 import {
   KICK_BAN_MIN,
   activeBans,
@@ -682,14 +682,17 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // the room, the sheet it was opened from opens again (kept when the room leaves the screen, used when it returns).
   const [reopenOnReturn, setReopenOnReturn] = useState<null | 'menu' | 'settings' | 'info'>(null);
   const teamPk = pk?.kind === 'room' && pk.mode === 'team' && pk.status !== 'invite' ? pk : null;
+  // Normal PK has no board over the mics: a small timer pill in the header (components/room/pk SoloPkPill).
+  const soloPk = pk?.kind === 'room' && pk.mode === 'solo' ? pk : null;
   const teamColorOf = (uid: string | null) => (uid && teamPk ? teamOf(teamPk, uid)?.color : undefined);
   // Mic 1 is the owner's crowned seat, except where the stage draws it as a plain mic (a team PK, or a layout with
   // no host slot: team rooms, Düğün). There anyone takes it like any other mic.
   const hostSeat = !teamPk && (!layout || layout.layoutSchema.slots.some((x) => x.index === 0 && x.host));
   /**
    * PK points under a seat, only for people in the PK: team members in Takım PK, everyone on a mic in Normal /
-   * cross PK. A server room's Normal PK scores only the people it started with (server/api/pk.mjs), so a mic taken
-   * after the start shows no count instead of a 0 that never moves.
+   * cross PK. A server room's Normal PK scores the people in it (server/api/pk.mjs): those it started with and
+   * everyone who took a mic since, whose phones join it at once (lib/live/pk useRoomPkJoin). Until then the seat
+   * shows no count instead of a 0 that doesn't move.
    */
   const pkPointsOf = (uid: string | null) => {
     if (!uid || !pk || pk.status === 'invite') return undefined;
@@ -1091,6 +1094,14 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   });
   // Oda içi PK in a server room: the server's PK, read into lib/pk (start, cancel, score and result are its).
   useRoomPkSync(id, real && unlocked, pk);
+  // On a mic while the room's PK runs and not in it yet (came after the start): this phone joins it (lib/live/pk).
+  useRoomPkJoin(id, real && unlocked && !offline, pk, amSeated);
+  // The demo plays the PK server here: everyone who takes a mic while the room's PK runs joins it the same way.
+  const micKey = view.micIds.join(',');
+  const demoPkId = !real && pk?.kind === 'room' ? pk.id : null;
+  useEffect(() => {
+    if (demoPkId) for (const uid of micKey.split(',').filter(Boolean)) joinRoomPk(id, uid);
+  }, [id, demoPkId, micKey]);
   // Odalar arası PK: another room's invite waits for this room's owner or an admin to answer (lib/live/pk).
   const incomingPk = useIncomingCrossPk(id);
   const [pkAnswering, setPkAnswering] = useState(false);
@@ -3511,7 +3522,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       <>
         {bossOn && (
           <View style={[styles.topRow, { marginTop: 6 }]}>
-            <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} reaction={bossReaction} still={settings.reduceMotion} anchor={bossAnchor} />
+            <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} reaction={bossReaction} still={settings.reduceMotion} anchor={bossAnchor} pkPoints={pkPointsOf(bossId)} />
           </View>
         )}
         <StageLayout layout={layout} width={win.width} face={f.face} seats={allSeats} pkRoom={theme === 'pk'} cameraOf={(uid) => (uid === 'me' ? camOn : !!camOf(uid))} videoOf={camOf} renderSeat={(i, slot, next) => renderSeat(i, { slot, next })} />
@@ -3522,7 +3533,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         {bossOn ? (
           <View style={styles.topRow}>
             {renderSeat(0, { host: true, compact: true, grid: { width: 96, size: f.host } })}
-            <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} reaction={bossReaction} still={settings.reduceMotion} anchor={bossAnchor} />
+            <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} reaction={bossReaction} still={settings.reduceMotion} anchor={bossAnchor} pkPoints={pkPointsOf(bossId)} />
           </View>
         ) : (
           <View style={styles.hostRow}>{renderSeat(0, { grid: { width: Math.max(96, f.host + 28), size: f.host } })}</View>
@@ -3600,20 +3611,24 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                 </View>
                 {hostId !== 'me' && <RoomFollowHeart roomId={id} title={title} />}
               </Pressable>
-              <Pressable onPress={() => setPeopleOpen(true)} style={styles.subRow} accessibilityLabel={`${listeners} kişi, ${capacity} mikrofon. Odadaki kullanıcıları aç`}>
-                <Ionicons name="people" size={11} color={colors.textDim} />
-                <Text style={styles.sub}>{listeners}</Text>
-                <Ionicons name="mic" size={11} color={colors.textDim} style={{ marginLeft: 4 }} />
-                <Text style={styles.sub}>{capacity}</Text>
-                {invisible && <Ionicons name="eye-off" size={11} color={colors.textDim} style={{ marginLeft: 4 }} accessibilityLabel="Gizli giriş" />}
-                <Text style={[styles.sub, { flexShrink: 1, marginLeft: 2 }]} numberOfLines={1}>
-                  {' · '}
-                  {typeInfo.name}
-                  {layout ? ` · ${modeById(layout.modeId).name}` : ''}
-                  {agencyRoom ? ' · Ajans odası' : ''}
-                  {myRank === 3 ? ' · Sahibi' : myRank > 0 ? ` · ${rankLabel('me')}` : ''}
-                </Text>
-              </Pressable>
+              <View style={styles.subLine}>
+                {/* Normal PK: its timer pill leads the line; on a narrow phone the line's end gives way, not the pill. */}
+                {soloPk && <SoloPkPill pk={soloPk} canManage={canManage && !offline} />}
+                <Pressable onPress={() => setPeopleOpen(true)} style={[styles.subRow, styles.subShrink]} accessibilityLabel={`${listeners} kişi, ${capacity} mikrofon. Odadaki kullanıcıları aç`}>
+                  <Ionicons name="people" size={11} color={colors.textDim} />
+                  <Text style={styles.sub}>{listeners}</Text>
+                  <Ionicons name="mic" size={11} color={colors.textDim} style={{ marginLeft: 4 }} />
+                  <Text style={styles.sub}>{capacity}</Text>
+                  {invisible && <Ionicons name="eye-off" size={11} color={colors.textDim} style={{ marginLeft: 4 }} accessibilityLabel="Gizli giriş" />}
+                  <Text style={[styles.sub, { flexShrink: 1, marginLeft: 2 }]} numberOfLines={1}>
+                    {' · '}
+                    {typeInfo.name}
+                    {layout ? ` · ${modeById(layout.modeId).name}` : ''}
+                    {agencyRoom ? ' · Ajans odası' : ''}
+                    {myRank === 3 ? ' · Sahibi' : myRank > 0 ? ` · ${rankLabel('me')}` : ''}
+                  </Text>
+                </Pressable>
+              </View>
             </View>
             {canManage && (micQueue || queue.length > 0) && (
               <Pressable onPress={() => setPanel('requests')} accessibilityLabel={`Konuşma istekleri, ${queue.length} kişi`} hitSlop={6}>
@@ -3654,11 +3669,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           <FitStage
             fit={stageFit}
             calm={calmFit}
-            pkTop={
-              pk && (pk.kind === 'cross' || pk.mode === 'solo' || pk.status === 'invite') ? (
-                pk.kind === 'room' && pk.mode === 'solo' ? <SoloBoard pk={pk} canManage={canManage && !offline} /> : <PkBoard pk={pk} viewerRoomId={id} canManage={canManage && !offline} />
-              ) : null
-            }
+            pkTop={pk?.kind === 'cross' ? <PkBoard pk={pk} viewerRoomId={id} canManage={canManage && !offline} /> : null}
             frozen={typing}
             freeStyle={strip ? { flexGrow: 0, flexShrink: 1 } : { flexGrow: 0, flexShrink: 100, minHeight: 120 }}
             guess={Math.round(win.height * 0.34)}
@@ -4404,6 +4415,8 @@ const styles = StyleSheet.create({
   title: { color: '#fff', fontSize: 15, fontWeight: '700', flexShrink: 1 },
   sub: { color: colors.textDim, fontSize: 12 },
   subRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  subLine: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  subShrink: { flexShrink: 1, minWidth: 0, overflow: 'hidden' },
   levelBadge: { backgroundColor: colors.primary, borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1, borderWidth: 1, borderColor: 'rgba(165,243,245,0.35)', boxShadow: '0 0 8px rgba(255,95,162,0.35)' },
   levelText: { color: '#fff', fontSize: 11, fontWeight: '800' },
   reqBadge: { position: 'absolute', top: -4, right: -6, backgroundColor: colors.red, borderRadius: 8, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center' },

@@ -1,7 +1,8 @@
-// PK UI: setup sheet (Normal / Takım PK in this room, or a cross-room PK), the live boards (Normal PK
-// ranking strip, Takım PK arena, cross-room score bar) and the detail card. Everything here renders server
+// PK UI: setup sheet (Normal / Takım PK in this room, or a cross-room PK), the live boards (Normal PK timer
+// pill in the header, Takım PK arena, cross-room score bar) and the detail card. Everything here renders server
 // state from lib/pk; seats, microphones and membership stay with the room.
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
@@ -111,12 +112,16 @@ export function PkSetupSheet({ visible, roomId, starterId, micUsers, offline, on
   };
   const startSolo = () => (live ? void startLive({ roomId, durationMin: duration, mode: 'solo', participants: micUsers }) : done(startRoomPk({ roomId, starterId, durationMin: duration, mode: 'solo', requestId })));
   const startTeam = () => {
+    // The people this sheet showed and left out of both teams stay out; anyone who takes a mic later joins a team.
     if (method === 'random') {
       if (!draft) return;
-      if (live) return void startLive({ roomId, durationMin: duration, mode: 'team', red: draft.red, blue: draft.blue });
+      if (live) return void startLive({ roomId, durationMin: duration, mode: 'team', red: draft.red, blue: draft.blue, out: draft.out });
       return done(startRoomPk({ roomId, starterId, durationMin: duration, mode: 'team', draftId: draft.id, requestId }));
     }
-    const go = () => (live ? void startLive({ roomId, durationMin: duration, mode: 'team', red: manual.red, blue: manual.blue }) : done(startRoomPk({ roomId, starterId, durationMin: duration, mode: 'team', red: manual.red, blue: manual.blue, requestId })));
+    const go = () =>
+      live
+        ? void startLive({ roomId, durationMin: duration, mode: 'team', red: manual.red, blue: manual.blue, out: unassigned })
+        : done(startRoomPk({ roomId, starterId, durationMin: duration, mode: 'team', red: manual.red, blue: manual.blue, requestId }));
     if (!imbalance) return go();
     showAlert('Takımlar dengesiz', `${config.teamNames.red}: ${manual.red.length} kişi · ${config.teamNames.blue}: ${manual.blue.length} kişi. Yine de başlatılsın mı?`, [
       { text: 'Düzenle', style: 'cancel' },
@@ -138,7 +143,8 @@ export function PkSetupSheet({ visible, roomId, starterId, micUsers, offline, on
   const soloOff = !config.soloPkEnabled;
   const teamOff = !config.roomPkEnabled;
   const modeOff = mode === 'solo' ? soloOff : teamOff;
-  const canStart = !offline && !busy && !modeOff && (mode === 'solo' ? micUsers.length >= 2 : method === 'random' ? !!draft && !draftStale : manual.red.length >= config.teamMin && manual.blue.length >= config.teamMin);
+  // However many are on the mics (none too): people who take a mic during the PK join it.
+  const canStart = !offline && !busy && !modeOff && (mode === 'solo' || method === 'manual' || (!!draft && !draftStale));
   const paddingBottom = useSheetBottom(16);
 
   return (
@@ -189,15 +195,18 @@ export function PkSetupSheet({ visible, roomId, starterId, micUsers, offline, on
             {tab === 'room' && mode === 'solo' && (
               <>
                 <Text style={st.label}>Katılımcılar · mikrofondaki {micUsers.length} kişi</Text>
-                <View style={st.people}>
-                  {micUsers.map((u) => (
-                    <Person key={u} uid={u} />
-                  ))}
-                </View>
-                {micUsers.length < 2 && <Notice icon="information-circle-outline" text="Normal PK için mikrofonda en az 2 kişi olmalı." warn />}
-                <Text style={st.dim}>{live
-                    ? 'Her kişi aldığı hediyelerin jeton değeriyle yarışır; en yüksek puan kazanır. Katılımcılar başlarken sabitlenir: sonradan mikrofona geçen bu PK’ya katılmaz.'
-                    : 'Her kişi aldığı hediyelerin PK puanıyla yarışır; en yüksek puan kazanır. PK sırasında mikrofona geçen kişi o andan itibaren katılır, mikrofondan inen kişinin puanı kalır ama yeni puan almaz.'}</Text>
+                {micUsers.length > 0 ? (
+                  <View style={st.people}>
+                    {micUsers.map((u) => (
+                      <Person key={u} uid={u} />
+                    ))}
+                  </View>
+                ) : (
+                  <Notice icon="information-circle-outline" text="Mikrofonda henüz kimse yok. PK’yı yine de başlatabilirsin: mikrofona geçen herkes katılır." />
+                )}
+                <Text style={st.dim}>
+                  Her kişi aldığı hediyelerin {live ? 'jeton değeriyle' : 'PK puanıyla'} yarışır; en yüksek puan kazanır. PK sırasında mikrofona geçen kişi de o andan itibaren katılır; mikrofondan inen kişinin puanı kalır.
+                </Text>
                 <Pressable style={[st.primary, !canStart && st.disabled]} disabled={!canStart} onPress={startSolo} accessibilityLabel="Normal PK başlat">
                   <Text style={st.primaryText}>{busy ? 'Başlatılıyor…' : `Normal PK’yı başlat · ${duration} dk`}</Text>
                 </Pressable>
@@ -235,8 +244,12 @@ export function PkSetupSheet({ visible, roomId, starterId, micUsers, offline, on
                     </>
                   ) : (
                     <>
-                      <Text style={st.dim}>Mikrofondaki {micUsers.length} kişi sunucuda rastgele ve eşit sayıda iki takıma ayrılır (tek sayıda fark en fazla 1). Başlatmadan önce dağılımı görürsün.</Text>
-                      <Pressable style={[st.secondary, micUsers.length < config.teamMin * 2 && st.disabled]} disabled={micUsers.length < config.teamMin * 2} onPress={draw} accessibilityLabel="Takımları oluştur">
+                      <Text style={st.dim}>
+                        {micUsers.length
+                          ? `Mikrofondaki ${micUsers.length} kişi sunucuda rastgele ve eşit sayıda iki takıma ayrılır (tek sayıda fark en fazla 1). Başlatmadan önce dağılımı görürsün.`
+                          : 'Mikrofonda henüz kimse yok. Takımlar boş başlar; mikrofona geçen herkes bir takıma girer.'}
+                      </Text>
+                      <Pressable style={st.secondary} onPress={draw} accessibilityLabel="Takımları oluştur">
                         <Text style={st.secondaryText}>Takımları oluştur</Text>
                       </Pressable>
                     </>
@@ -268,7 +281,7 @@ export function PkSetupSheet({ visible, roomId, starterId, micUsers, offline, on
                   </>
                 )}
                 <Text style={st.dim}>
-                  Takım başına {config.teamMin}–{config.teamMax} kişi · PK başladıktan sonra takımlar sabittir · hediyeyi alan kişi ve takımı puan kazanır
+                  Takım başına en fazla {config.teamMax} kişi · PK sırasında mikrofona geçen kişi, kişi sayısı az olan takıma girer (eşitse rastgele) · hediyeyi alan kişi ve takımı puan kazanır
                 </Text>
                 <Pressable style={[st.primary, !canStart && st.disabled]} disabled={!canStart} onPress={startTeam} accessibilityLabel="Takımları onayla ve başlat">
                   <Text style={st.primaryText}>{busy ? 'Başlatılıyor…' : `Takımları onayla ve başlat · ${duration} dk`}</Text>
@@ -375,23 +388,32 @@ function TeamPreview({ red, blue, names, colors: c }: { red: string[]; blue: str
 // --- Live boards ----------------------------------------------------------------------------------
 const teamLabel = (pk: PkSession, t: PkTeam, viewerRoomId: string) => (pk.kind === 'cross' ? (t.roomId === viewerRoomId ? `${roomTitle(t.roomId)} (biz)` : roomTitle(t.roomId)) : t.name);
 
-/** Normal PK: one slim line (name, clock) so the stage stays as it is; points are under the names, the ranking in the detail card. */
-export function SoloBoard({ pk, canManage }: { pk: PkSession; canManage: boolean }) {
+/** The pill's clock: the countdown before it starts, the time left, then a short "result coming". */
+function pillClock(pk: Pick<PkSession, 'status' | 'startAt' | 'endAt'>, now: number) {
+  if (pk.status === 'prep') return `⏳ ${mmss((pk.startAt ?? now) - now)}`;
+  if (pk.status === 'active') return (pk.endAt ?? now) - now > 0 ? mmss((pk.endAt ?? now) - now) : 'Sonuç…';
+  return STATUS_LABEL[pk.status];
+}
+
+/**
+ * Normal PK: a small "PK 47:16" pill in the room's header instead of a row over the mics, so the stage keeps its
+ * height (the points are under the names). A tap opens the ranking; the staff can cancel there.
+ */
+export function SoloPkPill({ pk, canManage }: { pk: PkSession; canManage: boolean }) {
   const now = useNow(pk.status !== 'done' && pk.status !== 'cancelled');
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Pressable style={st.soloBar} onPress={() => setOpen(true)} accessibilityLabel={`Normal PK, ${clockText(pk, now)}. Sıralamayı aç`}>
-        <View style={[st.artRow, { flex: 1 }]}>
-          <Art name="pk-normal-pk" size={16} />
-          <Text style={[st.teamName, { color: colors.gold }]} numberOfLines={1}>
-            Normal PK
+      {/* Little reach upwards: the room's title (its card) is right above. */}
+      <Pressable onPress={() => setOpen(true)} hitSlop={{ top: 3, bottom: 8, left: 8, right: 8 }} style={st.pillAt} accessibilityRole="button" accessibilityLabel={`Normal PK, ${clockText(pk, now)}. Sıralamayı aç`}>
+        <LinearGradient colors={['#FF5FA2', '#B81F66']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={st.pill}>
+          <View style={st.pillMark}>
+            <Text style={st.pillMarkText}>PK</Text>
+          </View>
+          <Text style={st.pillClock} numberOfLines={1}>
+            {pillClock(pk, now)}
           </Text>
-        </View>
-        <View style={st.timer}>
-          <Text style={st.timerText}>{clockText(pk, now)}</Text>
-        </View>
-        <Text style={st.dim}>Sıralama ›</Text>
+        </LinearGradient>
       </Pressable>
       <PkDetail pk={pk} open={open} onClose={() => setOpen(false)} viewerRoomId={pk.roomId} canManage={canManage} />
     </>
@@ -734,7 +756,12 @@ const st = StyleSheet.create({
   track: { flexDirection: 'row', height: 22, borderRadius: 11, overflow: 'hidden' },
   score: { color: '#fff', fontWeight: '900', fontSize: 12, fontVariant: ['tabular-nums'] },
   boardBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  soloBar: { alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, maxWidth: 340, width: '86%', backgroundColor: 'rgba(22,14,18,0.72)', borderRadius: 999, paddingVertical: 5, paddingLeft: 10, paddingRight: 12, borderWidth: 1, borderColor: colors.border },
+  // The header's PK pill sits in the room's info line and overhangs it a little, so the header doesn't grow.
+  pillAt: { marginVertical: -3 },
+  pill: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 18, borderRadius: 9, paddingLeft: 2, paddingRight: 7, borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)' },
+  pillMark: { height: 14, borderRadius: 7, paddingHorizontal: 4, justifyContent: 'center', backgroundColor: '#FDE68A' },
+  pillMarkText: { color: '#5B0F33', fontSize: 9, lineHeight: 12, fontWeight: '900', fontStyle: 'italic', letterSpacing: 0.3 },
+  pillClock: { color: '#fff', fontSize: 11, lineHeight: 14, fontWeight: '900', fontVariant: ['tabular-nums'] },
   mini: { width: 20, height: 20, borderRadius: 10, marginRight: -4, borderWidth: 1, borderColor: colors.bg },
   arena: { marginHorizontal: 12, marginTop: 6, backgroundColor: 'rgba(22,14,18,0.78)', borderRadius: 16, padding: 8, gap: 8, borderWidth: 1, borderColor: colors.border },
   half: { flex: 1, minWidth: 0, borderRadius: 14, borderWidth: 1, paddingVertical: 6, paddingHorizontal: 4, gap: 6 },

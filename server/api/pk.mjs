@@ -1,20 +1,26 @@
 // Oda içi PK on the server, so everyone in the room sees the same PK, score and result.
 //
 //   GET  /api/rooms/pk?room=                                                   → { pk, now }
-//   POST /api/rooms/pk        { room, mode: solo|team, durationMin, participants? | red?, blue?, ref } → { pk, now }
+//   POST /api/rooms/pk        { room, mode: solo|team, durationMin, participants? | red?, blue?, out?, ref } → { pk, now }
+//   POST /api/rooms/pk/join   { room }                                         → { pk, now }
 //   POST /api/rooms/pk/cancel { room }                                         → { pk, now }
 //
-// Only the room's owner or a room admin starts or cancels one. Normal PK (solo): the people listed (2–20) compete
-// alone. Takım PK (team): Red against Blue, 1–8 each. Everyone listed must be on a mic now (their LiveKit `seat`
-// attribute; not checked when no voice server is set). Who competes is fixed at the start. A gift paid in the room
-// while it runs scores its coins for the recipient (and their team) once, in the gift's own transaction
-// (scorePkGift); gifts to someone who isn't competing, before the countdown ends or after the end don't score.
-// The PK's coins and diamonds are the gift's own: PK points never move money. A start or cancel is announced to
-// the room's voice connection ({ type: 'pk' }), and gifts are already announced, so the phones reload the PK.
+// Only the room's owner or a room admin starts or cancels one, with any number of people on the mics (none too).
+// Normal PK (solo): the people listed compete alone. Takım PK (team): Red against Blue, at most 8 each; `out`: people
+// on a mic whom the starter left out of both teams (not picked in a manual split, or past the teams' size). Everyone
+// listed must be on a mic now (their LiveKit `seat` attribute, or the room's Patron seat; not checked when no voice
+// server is set). Whoever takes a mic while it runs joins it from their own phone (join): in Normal PK as one more
+// competitor, in Takım PK on the team with fewer people (either one when even) while it has room; the people left
+// out at the start stay out. A team, once joined, is kept. A gift paid in the room while it runs scores its coins for
+// the recipient (and their team) once, in the gift's own transaction (scorePkGift); gifts to someone who isn't
+// competing, before the countdown ends or after the end don't score.
+// The PK's coins and diamonds are the gift's own: PK points never move money. A start, a join or a cancel is announced
+// to the room's voice connection ({ type: 'pk' }), and gifts are already announced, so the phones reload the PK.
 // `pk` is the room's running PK, or its last one for RESULT_MS after it ended (the result screen), else null.
 // Odalar arası PK is in pk-cross.mjs: the read here carries it as `cross`, a gift scores for it through
 // scorePkGift, and a room holds one PK at a time of either kind.
 import { HttpError, REF, UUID, auth, db, env, int, limit, readJson, tx } from './core.mjs';
+import { bossOf } from './boss-seat.mjs';
 import { roomService, voiceParticipants } from './live.mjs';
 import { crossBusy, crossForRoom, scoreCrossPkGift } from './pk-cross.mjs';
 
@@ -22,7 +28,8 @@ import { crossBusy, crossForRoom, scoreCrossPkGift } from './pk-cross.mjs';
 const PREP_MS = Number(env.PK_PREP_MS ?? 5_000);
 const RESULT_MS = 10 * 60_000;
 const DURATIONS = [15, 30, 60, 120];
-const SOLO_MAX = 20;
+/** Normal PK: everyone a room's mics (0–99) and its Patron seat can hold. */
+const SOLO_MAX = 101;
 const TEAM_MAX = 8;
 
 /** A room id from input: the server room's id or its LiveKit name (oda-<id>). */
@@ -31,10 +38,11 @@ const roomIdOf = (v) => {
   if (!UUID.test(s)) throw new HttpError(400, 'Geçersiz oda');
   return s;
 };
-const ids = (v, min, max, what) => {
+/** A list of user ids from input, none to `max` of them. */
+const ids = (v, max, what) => {
   const list = Array.isArray(v) ? [...new Set(v)] : [];
   if (list.length !== (Array.isArray(v) ? v.length : -1) || list.some((x) => typeof x !== 'string' || !UUID.test(x))) throw new HttpError(400, `Geçersiz ${what}`);
-  if (list.length < min || list.length > max) throw new HttpError(400, `${what} ${min}–${max} kişi olmalı`);
+  if (list.length > max) throw new HttpError(400, `${what} en fazla ${max} kişi olabilir`);
   return list;
 };
 
@@ -77,6 +85,7 @@ async function view(row) {
     participants: row.participants,
     red: row.red,
     blue: row.blue,
+    out: row.left_out,
     startAt: row.start_at.toISOString(),
     endAt: row.end_at.toISOString(),
     cancelled: row.status === 'cancelled',
@@ -86,8 +95,12 @@ async function view(row) {
 }
 const answer = async (row) => ({ pk: await view(row), now: new Date().toISOString() });
 
-/** Everyone listed must be on a mic in the room's voice connection now. */
-async function onMics(roomId, list) {
+/**
+ * Everyone listed must be on a mic in the room's voice connection now: a numbered mic, or the Patron seat (a speaking
+ * seat, boss-seat.mjs) while its holder is in the voice room.
+ */
+async function onMics(roomId, list, message = (names) => `${names} artık mikrofonda değil. Yeniden dene.`) {
+  if (!list.length) return;
   let here;
   try {
     here = await voiceParticipants(`oda-${roomId}`);
@@ -97,10 +110,13 @@ async function onMics(roomId, list) {
   }
   if (here === null) return; // no voice server (development and tests)
   const seated = new Set(here.filter((p) => p.seat !== null).map((p) => p.identity));
+  const room = (await db.query('SELECT boss_id, boss_until, rules FROM rooms WHERE id = $1', [roomId])).rows[0];
+  const boss = room ? bossOf(room).boss?.id : null;
+  if (boss && here.some((p) => p.identity === boss)) seated.add(boss);
   const gone = list.filter((u) => !seated.has(u));
   if (!gone.length) return;
   const names = (await db.query('SELECT name FROM users WHERE id = ANY($1::uuid[]) ORDER BY name', [gone])).rows.map((u) => u.name);
-  throw new HttpError(409, `${names.join(', ') || 'Seçilen kişiler'} artık mikrofonda değil. Yeniden dene.`);
+  throw new HttpError(409, message(names.join(', ') || 'Seçilen kişiler'));
 }
 
 /**
@@ -154,14 +170,19 @@ export const pkRoutes = {
     if (!mode) throw new HttpError(400, 'Geçersiz PK türü');
     const duration = int(b.durationMin, 15, 120);
     if (!DURATIONS.includes(duration)) throw new HttpError(400, 'Bu süre seçilemez. İzinli süreler: 15, 30, 60, 120 dakika.');
+    // Any number of people, none too: whoever takes a mic later joins (join below).
     let participants;
     let red = [];
     let blue = [];
-    if (mode === 'solo') participants = ids(b.participants, 2, SOLO_MAX, 'Normal PK');
+    let out = [];
+    if (mode === 'solo') participants = ids(b.participants, SOLO_MAX, 'Normal PK');
     else {
-      red = ids(b.red, 1, TEAM_MAX, 'Kırmızı Takım');
-      blue = ids(b.blue, 1, TEAM_MAX, 'Mavi Takım');
+      red = ids(b.red, TEAM_MAX, 'Kırmızı Takım');
+      blue = ids(b.blue, TEAM_MAX, 'Mavi Takım');
+      // Older apps send no `out`: nobody is left out.
+      out = b.out === undefined ? [] : ids(b.out, SOLO_MAX, 'PK dışı liste');
       if (red.some((u) => blue.includes(u))) throw new HttpError(400, 'Bir kişi iki takımda birden olamaz');
+      if (out.some((u) => red.includes(u) || blue.includes(u))) throw new HttpError(400, 'Takımdaki biri PK dışında bırakılamaz');
       participants = [...red, ...blue];
     }
     limit(`pkstart:${me.id}`, 10, 'Çok sık PK başlattın, biraz bekle');
@@ -176,10 +197,10 @@ export const pkRoutes = {
         await c.query('SELECT 1 FROM rooms WHERE id = $1 FOR UPDATE', [roomId]);
         if (await crossBusy(c, roomId)) throw new HttpError(409, 'Bu odada zaten devam eden bir PK var');
         const ins = await c.query(
-          `INSERT INTO room_pks (room_id, mode, started_by, ref, duration_min, participants, red, blue, start_at, end_at)
-           VALUES ($1, $2, $3, $4, $5::int, $6, $7, $8, now() + $9::int * interval '1 millisecond', now() + $9::int * interval '1 millisecond' + $5::int * interval '1 minute')
+          `INSERT INTO room_pks (room_id, mode, started_by, ref, duration_min, participants, red, blue, left_out, start_at, end_at)
+           VALUES ($1, $2, $3, $4, $5::int, $6, $7, $8, $10, now() + $9::int * interval '1 millisecond', now() + $9::int * interval '1 millisecond' + $5::int * interval '1 minute')
            RETURNING *`,
-          [roomId, mode, me.id, b.ref, duration, participants, red, blue, PREP_MS],
+          [roomId, mode, me.id, b.ref, duration, participants, red, blue, PREP_MS, out],
         );
         return ins.rows[0];
       });
@@ -191,6 +212,50 @@ export const pkRoutes = {
     }
     announce(roomId, row.id);
     return answer(row);
+  },
+
+  /**
+   * I took a mic while the room's PK runs (or was on one and am not in it): I join it. Normal PK: one more competitor.
+   * Takım PK: the team with fewer people, either one when even (the start's own draw rule), while it has room; with
+   * both teams full I stay out, as do the people the starter left out. Nothing changes for someone already in it.
+   */
+  async 'POST /api/rooms/pk/join'(req) {
+    const me = await auth(req);
+    const b = await readJson(req);
+    const roomId = roomIdOf(b.room);
+    limit(`pkjoin:${me.id}`, 20, 'Çok sık denedin, biraz bekle');
+    await closeEnded(roomId);
+    const open = async () => (await db.query("SELECT * FROM room_pks WHERE room_id = $1 AND status = 'active' AND end_at > now()", [roomId])).rows[0];
+    const pk = await open();
+    if (!pk) throw new HttpError(404, 'Odada devam eden PK yok');
+    if (pk.participants.includes(me.id) || pk.left_out.includes(me.id)) return answer(pk);
+    await onMics(roomId, [me.id], () => 'PK’ya katılmak için mikrofonda olmalısın');
+    // One statement, so two people joining at once can't both take the last place or unbalance the teams.
+    const r =
+      pk.mode === 'solo'
+        ? await db.query(
+            `UPDATE room_pks SET participants = array_append(participants, $2)
+              WHERE id = $1 AND status = 'active' AND end_at > now() AND NOT ($2 = ANY(participants)) AND NOT ($2 = ANY(left_out)) AND cardinality(participants) < $3
+              RETURNING *`,
+            [pk.id, me.id, SOLO_MAX],
+          )
+        : await db.query(
+            `UPDATE room_pks SET
+                red = CASE WHEN cardinality(red) < cardinality(blue) OR (cardinality(red) = cardinality(blue) AND $4) THEN array_append(red, $2) ELSE red END,
+                blue = CASE WHEN cardinality(red) < cardinality(blue) OR (cardinality(red) = cardinality(blue) AND $4) THEN blue ELSE array_append(blue, $2) END,
+                participants = array_append(participants, $2)
+              WHERE id = $1 AND status = 'active' AND end_at > now() AND NOT ($2 = ANY(participants)) AND NOT ($2 = ANY(left_out))
+                AND least(cardinality(red), cardinality(blue)) < $3
+              RETURNING *`,
+            [pk.id, me.id, TEAM_MAX, Math.random() < 0.5],
+          );
+    if (r.rowCount) {
+      announce(roomId, r.rows[0].id);
+      return answer(r.rows[0]);
+    }
+    const now = await open();
+    if (!now) throw new HttpError(404, 'Odada devam eden PK yok');
+    return answer(now);
   },
 
   async 'POST /api/rooms/pk/cancel'(req) {
