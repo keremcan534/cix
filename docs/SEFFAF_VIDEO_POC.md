@@ -63,11 +63,35 @@ python3 app/scripts/fx-polish.py kaynak.mp4 server/api/fx/ad.mp4 --strength 1
 `--strength`: 0 sisi bırakır (efekte ait yumuşak ışık: Kristal Saray'ın kuzey ışığı, Hazine Sandığı'nın parlaması),
 1 ince tabakaları alır, 2 yoğunları da (klibe gömülü bir arka plan: Altın Süper Otomobil). Renk yarısı değişmez, ses
 kopyalanır. Şu anki klipler: 2 → altin-super-otomobil, altin-gemi, efsanevi-tek-boynuz; 1 → altin-aslan, kraliyet-taci,
-roket, ejderha, anka-kusu; 0 → kristal-saray, hazine-sandigi, sevimli-panda, tatli-ayicik, pirlanta-yuzuk.
+roket, ejderha, anka-kusu; 0 → kristal-saray, hazine-sandigi, sevimli-panda, tatli-ayicik. pirlanta-yuzuk artık SVGA'dan
+gelir (aşağıda).
 
 Sınırı: nesneyle aynı parlaklıkta, tamamen opak bir parıltı bloğu (Kraliyet Tacı'nın, Altın Gemi'nin ve Efsanevi Tek
 Boynuz'un arkasındaki ışık) maskede nesneden ayrılamaz. Bunlar için en iyisi kaynağın arka plansız (saydam ProRes 4444,
 alfa WebM ya da PNG dizisi) ya da tam siyah zeminli halidir; o zaman `alpha-stack.sh` ile yığılıp bununla cilalanır.
+
+### SVGA'dan: `app/scripts/svga-to-fx.py`
+
+Sektörde hediye ve giriş efektleri çoğunlukla SVGA olarak gelir. Uygulamada SVGA oynatıcı yok; SVGA bu betikle
+uygulamanın biçimine çevrilir (Python 3, numpy, Pillow, ffmpeg):
+
+```bash
+python3 app/scripts/svga-to-fx.py yuzuk.svga server/api/fx/pirlanta-yuzuk.mp4 --despill green --audio eski-yuzuk.mp4
+```
+
+- **Okuma:** SVGA 2.x okunur (zlib ile sıkıştırılmış protobuf). Her kare, içindeki resimler yerleşimleri, dönüşümleri
+  ve saydamlıklarıyla çizilir. Kesme yolları, vektör şekilleri ve maskeler çizilmez; varsa sayısı yazılır.
+- **Yerleşim:** Görünen kısım (bütün kareler birlikte) 540×960 dikey karenin genişliğinin `--fill` kadarını (varsayılan
+  %60) kaplayacak şekilde büyütülür ve ortalanır.
+- **Giriş ve çıkış:** Başta 0,2 sn'de belirir, sonda 0,4 sn'de kaybolur.
+- **Kenarlar:** Saydam yerlerin altındaki renk çevreden doldurulur, kenara yabancı renk sızmaz.
+- **`--despill green`:** Yeşil perdeden kesilmiş resimlerde kenardaki yeşil sızıntıyı alır.
+- **Ses:** SVGA'nın kendi sesi varsa o kullanılır, yoksa `--audio` ile verilen dosyanın sesi; kısa bir kısılmayla
+  animasyonun boyuna kesilir.
+
+**Pırlanta Yüzük (14 Kasım):** "kling_yuzuk_test.svga". 640×360, 15 fps, 75 kare (5 sn), sessiz, yeşil perdeden kesilmiş.
+Kırmızı kadife kutu açılır, yüzük yükselip döner. `--despill green` ile çevrildi; ses eski yüzük klibinden alındı (o da 5
+sn ve aynı akışta: kutu ~1. saniyede açılır, yüzük ~2. saniyede görünür). Sonuç 489 KB.
 
 ### Test klipleri (`app/assets/video/alpha-test/`)
 
