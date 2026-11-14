@@ -1,8 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Image, Modal, Pressable, View } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
+import { useSheetMax } from '@/lib/sheet-space';
 import { SCRIM, makeStyles, useTheme } from '@/theme';
 
 type IconName = keyof typeof Ionicons.glyphMap;
@@ -16,10 +17,12 @@ export function ActionSheet({ visible, title, titleArt, options, onClose }: { vi
   const listed = options.some((o) => o.icon);
   // Android modals draw edge to edge: keep 'Vazgeç' above the navigation bar.
   const { bottom } = useSafeAreaInsets();
+  // Over a room it stops at the Balkon line (lib/sheet-space): a long list scrolls, the title and 'Vazgeç' stay.
+  const maxHeight = useSheetMax(0.9);
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} />
-      <View style={[styles.sheet, { paddingBottom: Math.max(34, bottom + 8) }]}>
+      <View style={[styles.sheet, { maxHeight, paddingBottom: Math.max(34, bottom + 8) }]}>
         {title &&
           (titleArt ? (
             <View style={styles.titleRow}>
@@ -29,22 +32,24 @@ export function ActionSheet({ visible, title, titleArt, options, onClose }: { vi
           ) : (
             <Text style={styles.title}>{title}</Text>
           ))}
-        {options.map((o) => (
-          <Pressable
-            key={o.label}
-            style={({ pressed }) => [styles.option, listed && styles.listed, pressed && { backgroundColor: colors.cardAlt }]}
-            accessibilityRole="button"
-            onPress={() => {
-              onClose();
-              o.onPress();
-            }}
-          >
-            {listed && (
-              <View style={styles.iconBox}>{o.icon && <Ionicons name={o.icon} size={20} color={o.destructive ? semantic.danger : colors.text} />}</View>
-            )}
-            <Text style={[styles.optionText, listed && styles.listedText, o.destructive && { color: semantic.danger }]}>{o.label}</Text>
-          </Pressable>
-        ))}
+        <ScrollView>
+          {options.map((o) => (
+            <Pressable
+              key={o.label}
+              style={({ pressed }) => [styles.option, listed && styles.listed, pressed && { backgroundColor: colors.cardAlt }]}
+              accessibilityRole="button"
+              onPress={() => {
+                onClose();
+                o.onPress();
+              }}
+            >
+              {listed && (
+                <View style={styles.iconBox}>{o.icon && <Ionicons name={o.icon} size={20} color={o.destructive ? semantic.danger : colors.text} />}</View>
+              )}
+              <Text style={[styles.optionText, listed && styles.listedText, o.destructive && { color: semantic.danger }]}>{o.label}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
         <Pressable style={[styles.option, { marginTop: 6 }]} onPress={onClose}>
           <Text style={[styles.optionText, { color: colors.textDim }]}>Vazgeç</Text>
         </Pressable>

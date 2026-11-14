@@ -39,6 +39,7 @@ import {
   type MyPlace,
   type PodiumPlace,
 } from '@/lib/room-contrib';
+import { useSheetMax } from '@/lib/sheet-space';
 import { youLabel } from '@/lib/tr';
 import { useApp } from '@/store';
 import { fonts, makeStyles, radius, space, type, useTheme } from '@/theme';
@@ -86,6 +87,9 @@ export function ContribBoard({
   const { me, blocked, equipped, vipLevel, settings } = useApp();
   const win = useWindowDimensions();
   const paddingBottom = useSheetBottom(16);
+  // Over a room the sheet reaches the Balkon line at most (lib/sheet-space): the podium and the list scroll
+  // between the tabs and my own place.
+  const height = useSheetMax(0.88);
   const [side, setSide] = useState<ContribSide>('sent');
   const [period, setPeriod] = useState<ContribPeriod>('day');
   const tone = SIDE[side];
@@ -183,7 +187,7 @@ export function ContribBoard({
   return (
     <Modal visible={visible} transparent animationType={still ? 'fade' : 'slide'} onRequestClose={onClose}>
       <Pressable style={s.scrim} onPress={onClose} accessibilityLabel="Kapat" />
-      <View style={[s.sheet, { height: Math.round(win.height * 0.88) }]} accessibilityViewIsModal>
+      <View style={[s.sheet, { height }]} accessibilityViewIsModal>
         <LinearGradient colors={[tone.tint, 'rgba(22,37,60,0)']} style={s.glow} pointerEvents="none" />
         <View style={s.handle} />
         <View style={s.tabs} accessibilityRole="tablist">

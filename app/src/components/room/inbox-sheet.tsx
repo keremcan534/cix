@@ -17,6 +17,7 @@ import { userById } from '@/data/mock';
 import { CallButtons } from '@/components/one-on-one-bar';
 import { callsAvailable, liveCalls, loadProfile } from '@/lib/live';
 import { isLiveUser } from '@/lib/live/messages';
+import { useSheetMax } from '@/lib/sheet-space';
 import { useApp } from '@/store';
 import { SCRIM, colors, semantic } from '@/theme';
 
@@ -36,6 +37,9 @@ export function InboxSheet({ visible, onClose }: { visible: boolean; onClose: ()
   };
   const user = openId ? userById(openId) : null;
   const { top } = useSafeAreaInsets();
+  // The list, and a chat lower still; over the room never above its Balkon line (lib/sheet-space).
+  const listHeight = useSheetMax(0.78);
+  const threadHeight = useSheetMax(0.6);
   // A real person's chat header shows the loaded profile (name, photo, city), drawn again once it arrives.
   const [, setLoaded] = useState(0);
   useEffect(() => {
@@ -55,7 +59,7 @@ export function InboxSheet({ visible, onClose }: { visible: boolean; onClose: ()
     <Modal visible={visible} transparent animationType="slide" onRequestClose={() => (openId ? setOpenId(null) : close())}>
       <KeyboardAvoid style={[s.root, { paddingTop: top + 8 }]}>
         <Pressable style={s.backdrop} onPress={close} accessibilityLabel="Kapat" />
-        <View style={[s.sheet, user && s.threadSheet]}>
+        <View style={[s.sheet, { height: user ? threadHeight : listHeight }]}>
           <View style={s.handle} />
           {user ? (
             <ChatThread
@@ -167,8 +171,8 @@ export function InboxSheet({ visible, onClose }: { visible: boolean; onClose: ()
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: SCRIM },
   backdrop: { flex: 1 },
+  // Its height from lib/sheet-space: the list, or a chat (the newest 5 messages) lower, the room in view above it.
   sheet: {
-    height: '78%',
     flexShrink: 1,
     backgroundColor: colors.card,
     borderTopLeftRadius: 24,
@@ -180,8 +184,6 @@ const s = StyleSheet.create({
     boxShadow: '0 -10px 30px rgba(0,0,0,0.45)',
     overflow: 'hidden',
   },
-  // A chat holds the newest 5 messages: a lower sheet, the room stays in view above it.
-  threadSheet: { height: '60%' },
   handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border, marginBottom: 6 },
   head: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border },
   name: { color: '#fff', fontWeight: '700', fontSize: 15 },

@@ -8,6 +8,7 @@ import { Text } from '@/components/text';
 import { FloatIcon, Halo, hueAt } from '@/components/fx/float';
 import { EdgeLight, PressableScale } from '@/components/fx/surface';
 import { icon3dSourceFor } from '@/components/Icon3D';
+import { useSheetMax } from '@/lib/sheet-space';
 import { SCRIM, colors, edge, fonts, semantic } from '@/theme';
 
 export type MenuItem = {
@@ -30,10 +31,12 @@ export type MenuSection = { title: string; variant: 'round' | 'tile' | 'tool'; i
 const SHEET = '#111B2E';
 
 export function RoomMenuSheet({ visible, onClose, sections }: { visible: boolean; onClose: () => void; sections: MenuSection[] }) {
+  // It stops at the room's Balkon line (lib/sheet-space): the sections scroll.
+  const maxHeight = useSheetMax(0.78);
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Menüyü kapat" />
-      <LinearGradient colors={['#1B2944', SHEET]} locations={[0, 0.35]} style={styles.sheet}>
+      <LinearGradient colors={['#1B2944', SHEET]} locations={[0, 0.35]} style={[styles.sheet, { maxHeight }]}>
         <EdgeLight inset={40} strength={0.35} />
         <View style={styles.handle} />
         <ScrollView contentContainerStyle={{ paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
@@ -125,7 +128,7 @@ function Badge({ badge }: { badge: MenuItem['badge'] }) {
 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: SCRIM },
-  sheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 12, paddingTop: 10, maxHeight: '78%', ...edge.sheet },
+  sheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 12, paddingTop: 10, ...edge.sheet },
   handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.22)', marginBottom: 10 },
   title: { color: '#fff', fontFamily: fonts.display, fontSize: 20, lineHeight: 26, marginLeft: 8, marginBottom: 2 },
   note: { color: colors.textDim, fontSize: 12, marginLeft: 8, marginBottom: 4 },

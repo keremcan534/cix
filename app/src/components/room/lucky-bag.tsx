@@ -21,6 +21,7 @@ import { message } from '@/lib/live';
 import { useLiveCatalog, visibleGifts } from '@/lib/live/catalog-live';
 import { bagResult, dropBag, type Bag, type BagDrop, type BagGot, type BagGrab, type BagRules } from '@/lib/live/lucky-bags';
 import { tapHaptic } from '@/lib/haptics';
+import { useSheetMax } from '@/lib/sheet-space';
 import { SCRIM, colors } from '@/theme';
 import { RollingNumber } from '@/components/fx/rolling-number';
 
@@ -52,6 +53,8 @@ function Chips<T extends number>({ values, value, onPick, label }: { values: T[]
 /** Drops a bag in the room. `onDropped` gets the bag the server stored. */
 export function LuckyBagSheet({ visible, room, rules, coins, svipLevel, onClose, onDropped }: { visible: boolean; room: string; rules: BagRules; coins: number; svipLevel: number; onClose: () => void; onDropped: (b: Bag) => void }) {
   const paddingBottom = useSheetBottom();
+  // Over a room it stops at the Balkon line (lib/sheet-space): the choices scroll, the total and Gönder stay.
+  const maxHeight = useSheetMax(0.88);
   const gifts = visibleGifts(GIFTS, useLiveCatalog()).filter((g) => (g.minSvip ?? 0) <= svipLevel && g.price > 0);
   const [kind, setKind] = useState<'coins' | 'gift'>('coins');
   const [amount, setAmount] = useState(rules.coins[0]);
@@ -95,7 +98,7 @@ export function LuckyBagSheet({ visible, room, rules, coins, svipLevel, onClose,
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={s.scrim} onPress={onClose} />
-      <View style={[roomStyles.sheet, s.sheet, { paddingBottom }]}>
+      <View style={[roomStyles.sheet, { maxHeight, paddingBottom }]}>
         <View style={s.head}>
           <Image source={ROOM_ICON_ART.envelope} style={{ width: 34, height: 34 }} />
           <View style={{ flex: 1 }}>
@@ -107,15 +110,15 @@ export function LuckyBagSheet({ visible, room, rules, coins, svipLevel, onClose,
           </Pressable>
         </View>
 
-        <View style={s.segment}>
-          {(['coins', 'gift'] as const).map((k) => (
-            <Pressable key={k} onPress={() => setKind(k)} style={[s.segItem, kind === k && s.segOn]} accessibilityRole="tab" accessibilityState={{ selected: kind === k }}>
-              <Text style={[s.segText, kind === k && s.segTextOn]}>{k === 'coins' ? 'Jeton' : 'Hediye'}</Text>
-            </Pressable>
-          ))}
-        </View>
-
-        <ScrollView style={{ flexGrow: 0 }} contentContainerStyle={{ paddingBottom: 6 }} showsVerticalScrollIndicator={false}>
+        {/* Jeton or Hediye scrolls with the choices it switches: a short sheet keeps its height for them. */}
+        <ScrollView style={{ flexGrow: 0, flexShrink: 1 }} contentContainerStyle={{ paddingBottom: 6 }} showsVerticalScrollIndicator={false}>
+          <View style={s.segment}>
+            {(['coins', 'gift'] as const).map((k) => (
+              <Pressable key={k} onPress={() => setKind(k)} style={[s.segItem, kind === k && s.segOn]} accessibilityRole="tab" accessibilityState={{ selected: kind === k }}>
+                <Text style={[s.segText, kind === k && s.segTextOn]}>{k === 'coins' ? 'Jeton' : 'Hediye'}</Text>
+              </Pressable>
+            ))}
+          </View>
           {kind === 'coins' ? (
             <>
               <Text style={s.label}>Çantadaki jeton</Text>
@@ -618,7 +621,6 @@ const GOLD = colors.gold;
 const s = StyleSheet.create({
   scrim: { flex: 1, backgroundColor: SCRIM },
   center: { alignItems: 'center', justifyContent: 'center', padding: 24 },
-  sheet: { maxHeight: '88%' },
   head: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
   title: { color: '#fff', fontSize: 17, fontWeight: '800' },
   sub: { color: colors.textDim, fontSize: 12, marginTop: 1 },
