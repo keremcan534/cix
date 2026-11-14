@@ -98,7 +98,7 @@ import { isLiveRoom, isLockedRoom, liveGift, liveMode, liveRoomAnimation, messag
 import { liveBackpackGift } from '@/lib/live/backpack';
 import { useLiveRoomSync } from '@/lib/live/room';
 import { useRoomTop } from '@/lib/live/room-contrib';
-import { onServerRoom, sendSignal, useBossNews, useLivePeers, type LuckySignal, type RoomSignal } from '@/lib/live/room-bus';
+import { onServerLook, onServerRoom, sendSignal, useBossNews, useLivePeers, type LuckySignal, type RoomSignal } from '@/lib/live/room-bus';
 import { answerLiveCrossPk, refreshRoomPkSoon, useIncomingCrossPk, useRoomPkSync } from '@/lib/live/pk';
 import { useOwnerStats } from '@/lib/live/owner-stats';
 import { bagResult, grabCode, joinBag, useRoomBags, type Bag } from '@/lib/live/lucky-bags';
@@ -115,7 +115,7 @@ import { showAlert } from '@/lib/alert';
 import { checkText, messageRefusal, noteSent, refusalTitle } from '@/lib/contact-filter';
 import { ContactNote } from '@/components/contact-note';
 import { animById, getAnimations, isLive, isSentAnim, newAnimRequestId, playRoomAnim, sendAnimation, simulateRemoteSend, subscribeRoom } from '@/lib/animations';
-import { loadLooks, lookOf, useLooks, type Look } from '@/lib/live/looks';
+import { loadLooks, lookOf, putLook, useLooks, type Look } from '@/lib/live/looks';
 import { useRoomCams } from '@/lib/live/room-cams';
 import { casinoAccess, casinoVisible, playDuel, useGames } from '@/lib/games';
 import { refreshCasino } from '@/lib/live/casino';
@@ -942,6 +942,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const lookIds = real ? [...seatedOthers, ...audience.map((u) => u.id), ...(bossId && bossId !== 'me' ? [bossId] : [])].map((u) => toServer(u) ?? '').filter(Boolean) : [];
   const looksVersion = useLooks(lookIds, real);
   const lookFor = (uid: string): Look | undefined => (real && uid !== 'me' ? lookOf(toServer(uid)) : undefined);
+  // Someone here puts on or takes off a frame, buys an item or changes their photo: the server tells the room at once,
+  // and their mic and Balkon face are drawn with it (lib/live/looks), with no leaving and coming back.
+  useEffect(() => (real ? onServerLook(id, putLook) : undefined), [real, id]);
 
   const gameEntry = { from: 'room' as const, roomId: id, roomTitle: title };
   // Table seats: me, people on the mics, then listeners (the game's own lobby, separate from room seats).
@@ -3645,9 +3648,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           </View>
 
           {/* Stage: boards and mics over the Balkon bar and the chat. The stage doesn't scroll: its mics are sized for
-              the height the chat leaves them and the chat takes the rest (components/room/fit-stage). While the emoji
-              panel is open the chat steps aside and the mics take its place (the emoji plays on your mic); a touch on
-              the stage closes the panel (as does the back button). */}
+              the height the chat leaves them and the chat takes the rest (components/room/fit-stage). The emoji panel
+              lies over the chat in its place, so the mics stay exactly where they were (the emoji plays on your mic);
+              a touch on the stage closes the panel (as does the back button). */}
           <FitStage
             fit={stageFit}
             calm={calmFit}
@@ -3735,7 +3738,32 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             chat={(onBasis) => (
               <ChatFeed messages={messages} visible={visibleInAll} renderItem={renderChat} screenHeight={win.height} fill={typing} onLarge={setSeatsSmall} onBasis={onBasis} hidden={emojiOpen && !typing} onTouch={emojiOpen ? () => setEmojiOpen(false) : undefined} sideRoom={wheelShown ? WHEEL_ROOM : 0} />
             )}
-            chatHidden={emojiOpen && !typing}
+            overlay={
+              emojiOpen && (
+                <EmojiPanel
+                  fill
+                  onClose={() => setEmojiOpen(false)}
+                  onAnimate={sendAnim}
+                  hint={amSeated ? 'Seçtiğin emoji koltuğundaki avatarının üzerinde oynar.' : 'Koltukta değilsin: emoji mesajına eklenir. Mikrofona geçince avatarının üzerinde oynar.'}
+                  onPick={(e) => {
+                    // A Hamle pick does something (lib/room-moves); it is never a chat sticker.
+                    if (isMovePick(stickerIdOf(e))) {
+                      const move = moveOfPick(stickerIdOf(e));
+                      if (move) doMove(move);
+                      return setEmojiOpen(false);
+                    }
+                    if (amSeated) {
+                      tapHaptic();
+                      react('me', e);
+                      // Server room: the others see it over my seat too (lib/live/room-bus 'react').
+                      if (real) sendSignal({ t: 'react', emoji: e });
+                      setEmojiOpen(false);
+                    } else if (stickerIdOf(e)) send(e);
+                    else editDraft((d) => d + e);
+                  }}
+                />
+              )
+            }
           />
           {mentionNote && (
             <View key={mentionNote.n} style={styles.mentionNote} pointerEvents="none" accessibilityLiveRegion="polite">
@@ -3744,30 +3772,6 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                 {mentionNote.name} senden bahsetti
               </Text>
             </View>
-          )}
-
-          {emojiOpen && (
-            <EmojiPanel
-              onClose={() => setEmojiOpen(false)}
-              onAnimate={sendAnim}
-              hint={amSeated ? 'Seçtiğin emoji koltuğundaki avatarının üzerinde oynar.' : 'Koltukta değilsin: emoji mesajına eklenir. Mikrofona geçince avatarının üzerinde oynar.'}
-              onPick={(e) => {
-                // A Hamle pick does something (lib/room-moves); it is never a chat sticker.
-                if (isMovePick(stickerIdOf(e))) {
-                  const move = moveOfPick(stickerIdOf(e));
-                  if (move) doMove(move);
-                  return setEmojiOpen(false);
-                }
-                if (amSeated) {
-                  tapHaptic();
-                  react('me', e);
-                  // Server room: the others see it over my seat too (lib/live/room-bus 'react').
-                  if (real) sendSignal({ t: 'react', emoji: e });
-                  setEmojiOpen(false);
-                } else if (stickerIdOf(e)) send(e);
-                else editDraft((d) => d + e);
-              }}
-            />
           )}
           {chatMuted || voiceMuted ? (
             <View style={{ paddingHorizontal: 12, paddingBottom: 6, gap: 6 }}>
@@ -3793,7 +3797,15 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           <View style={styles.bottom}>
             {!typing && <RoundBtn label="Menü" icon="ellipsis-horizontal" onPress={() => (setPanel('menu'), void refreshCasino())} />}
             <View style={styles.inputWrap}>
-              <Pressable onPress={() => setEmojiOpen((v) => !v)} accessibilityLabel={amSeated ? 'Emoji gönder' : 'Emoji ekle'} hitSlop={8}>
+              <Pressable
+                onPress={() => {
+                  // The panel and the keyboard take turns in the chat's place, so the stage never has both under it.
+                  if (!emojiOpen) Keyboard.dismiss();
+                  setEmojiOpen((v) => !v);
+                }}
+                accessibilityLabel={amSeated ? 'Emoji gönder' : 'Emoji ekle'}
+                hitSlop={8}
+              >
                 <Ionicons name={emojiOpen ? 'close-circle' : 'happy-outline'} size={24} color={colors.textDim} />
               </Pressable>
               <TextInput
@@ -3802,7 +3814,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                 onChangeText={editDraft}
                 onSubmitEditing={() => send()}
                 submitBehavior="submit"
-                onFocus={() => setInputFocused(true)}
+                onFocus={() => {
+                  setInputFocused(true);
+                  setEmojiOpen(false);
+                }}
                 onBlur={() => setInputFocused(false)}
                 editable={!chatBlocked}
                 placeholder={chatBlocked ? 'Sohbete yazman kısıtlı' : 'Yaz…'}

@@ -26,7 +26,7 @@
 // eraseAccount; the album files with media.mjs removeUserFiles). Someone who blocked me can't be read.
 import { HttpError, auth, db, env, int, limit, publicText, readJson, tx, userId } from './core.mjs';
 import { GIFTS, vipLevelOf } from './catalog.mjs';
-import { LIVE, statusOf } from './economy.mjs';
+import { LIVE, announceLook, statusOf } from './economy.mjs';
 import { topBoard } from './gifts.mjs';
 import { removeFiles, verifyUpload } from './media.mjs';
 import { ALBUM_MAX, CHARM_XP, COUNTRIES, EDUCATION, EXTRA_LIMITS as L, LANGUAGES, MEDAL_RULES, RELATIONSHIP, TAGS, TITLE_RULES, WEALTH_XP, ZODIACS, levelFrom } from './profile-rules.mjs';
@@ -278,6 +278,8 @@ export const profileRoutes = {
     });
     const r = await db.query('SELECT x.*, u.gender_hidden FROM users u LEFT JOIN profile_extras x ON x.user_id = u.id WHERE u.id = $1', [u.id]);
     const x = r.rows[0];
+    // A gender hidden or shown again recolors their speaking ring in the room they are in.
+    if (b.genderHidden !== undefined && b.genderHidden !== u.gender_hidden) void announceLook(u.id);
     return { extras: { ...extrasView(x.user_id ? x : null), genderHidden: x.gender_hidden, hideWealth: !!x.hide_wealth, hideCharm: !!x.hide_charm } };
   },
 

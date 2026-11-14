@@ -223,6 +223,8 @@ Görsel dosya satın almadan, lisans riski olmadan ve uygulama boyutunu büyütm
 | Ateş | Sıcak renkli hızlı halka, yükselen korlar |
 | Altın Taç (VIP 4) | Altın halka, kıvılcımlar, sallanan taç |
 
+**Koltukta çerçeve ve konuşma halkası** (`lib/seat-cell.ts`). Her koltuk kendi hücresinde kalır: yanda yuvanın kenarına, üstte sıra aralığına, altta ismin satırına kadar. Resimli çerçevelerin (kanatlar, taçlar, sarkan taşlar) ne kadar yayıldığı her resimden ölçülüdür (`data/frame-art.ts`); resim hücreye sığmazsa fotoğraf küçülür, çerçeve ismin, yandaki koltuğun ya da üst sıranın üstüne binmez. Konuşma halkası her dalga ve her çerçevede aynıdır: yüzün hemen dışında, fotoğrafın ve çerçevenin arkasında başlar, sesle en çok yüzün yedide biri kadar dışarı büyür; konuşanın kendi ekranında ve başkalarınınkinde aynı görünür.
+
 **Giriş efektleri** (`components/fx/entry.tsx`). Tek zaman çizelgesi (~3,2 sn):
 1. Bant kayarak gelir ve avatardan parçacıklar saçılır.
 2. Bant üzerinden ışık süpürmesi geçer.

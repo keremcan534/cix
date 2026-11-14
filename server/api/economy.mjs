@@ -21,6 +21,8 @@
 import { HttpError, REF, UUID, auth, claimRef, clientIp, db, env, int, limit, once, readJson, text, tx, userId } from './core.mjs';
 import { FREE_MICFX, MAX_AHEAD_DAYS, PAID_ONLY, SHOP, SLOTS, labelOf, vipLevelOf } from './catalog.mjs';
 import { live } from './live-settings.mjs';
+// live.mjs imports rooms.mjs, which imports this file; the functions are only used inside handlers.
+import { roomPacket, roomService } from './live.mjs';
 import { paidCoins, spendCoins } from './wallet.mjs';
 import { wealthPoints } from './wheel.mjs';
 
@@ -194,11 +196,14 @@ export async function economyOf(uid, q = db) {
   };
 }
 
-/** What others see of each person in `ids`: the worn items that are live, the highest live noble tier, the VIP level. */
+/**
+ * What others see of each person in `ids`: the worn items that are live, the highest live noble tier, the VIP level,
+ * the gender that colors their speaking ring and their photo (rooms draw their mic and Balkon face with it).
+ */
 export async function looksOf(ids, q = db) {
   if (!ids.length) return {};
   const r = await q.query(
-    `SELECT u.id, u.equipped, u.svip_xp, u.gender, u.gender_hidden,
+    `SELECT u.id, u.name, u.equipped, u.svip_xp, u.gender, u.gender_hidden, u.avatar_url,
             (SELECT max(e.tier) FROM entitlements e WHERE e.user_id = u.id AND e.kind = 'noble' AND ${LIVE}) AS noble,
             (SELECT coalesce(array_agg(e.kind || ':' || e.sku), '{}') FROM entitlements e WHERE e.user_id = u.id AND e.kind = ANY($2::text[]) AND ${LIVE}) AS owned
        FROM users u WHERE u.id = ANY($1::uuid[])`,
@@ -209,9 +214,40 @@ export async function looksOf(ids, q = db) {
     const worn = wornOf(x.equipped, (slot, sku) => x.owned.includes(`${slot}:${sku}`));
     const noble = x.noble === null ? null : Number(x.noble);
     // The gender colors their speaking ring in rooms (pink, blue); a hidden one is none, as on the profile.
-    out[x.id] = { ...Object.fromEntries(SLOTS.map((s) => [s, worn[s] ?? null])), noble, vipLevel: vipLevelOf(x.svip_xp, noble), gender: x.gender_hidden ? null : (x.gender ?? null) };
+    out[x.id] = {
+      ...Object.fromEntries(SLOTS.map((s) => [s, worn[s] ?? null])),
+      noble,
+      vipLevel: vipLevelOf(x.svip_xp, noble),
+      gender: x.gender_hidden ? null : (x.gender ?? null),
+      // Their name and photo: a room knows its people from the voice connection by id and name only, so someone no
+      // screen has read yet (a new account) would sit on a mic without their photo.
+      name: x.name,
+      avatarUrl: x.avatar_url ?? null,
+    };
   }
   return out;
+}
+
+/**
+ * The person's look changed (a frame worn or taken off, a bought item, a new photo, a new name): every voice room
+ * they are in now hears it at once, so the other phones there redraw their mic and Balkon face without anyone
+ * leaving and coming back (app lib/live/looks). The packet carries the look itself (what GET /api/looks would
+ * answer), so nobody has to ask; it comes from the server, so a phone can't fake anyone's look. A new name also
+ * becomes their LiveKit name, which the phones show. Best effort: never fails the caller.
+ */
+export async function announceLook(uid, name) {
+  try {
+    const rooms = (await db.query("SELECT DISTINCT room FROM room_presence WHERE identity = $1 AND room LIKE 'oda-%'", [uid])).rows.map((x) => x.room);
+    if (!rooms.length) return;
+    const look = (await looksOf([uid]))[uid];
+    if (!look) return;
+    for (const room of rooms) {
+      if (name) await roomService('UpdateParticipant', { room, identity: uid, name }, { roomAdmin: true, room }).catch((e) => console.error('livekit UpdateParticipant name', room, String(e).slice(0, 200)));
+      await roomPacket(room, { type: 'look', user: uid, look });
+    }
+  } catch (e) {
+    console.error('look news', uid, String(e).slice(0, 200));
+  }
 }
 
 // --- Refunds and account deletion --------------------------------------------------------------------------------
@@ -315,6 +351,8 @@ export const economyRoutes = {
     if (!item) throw new HttpError(400, 'Bu ürün artık satışta değil');
     const r = await once(u.id, 'coin', b.ref, (c) => buyInTx(c, u.id, item, b.ref, b.price, 'buy'));
     if (r.replay && !(await boughtWith(u.id, b.ref))) throw new HttpError(409, 'Geçersiz istek kimliği');
+    // A bought item is worn at once (and a noble rank or VIP can change the frame): the room the buyer is in sees it.
+    if (!r.replay) void announceLook(u.id);
     return { ...r, economy: await economyOf(u.id) };
   },
 
@@ -331,6 +369,8 @@ export const economyRoutes = {
       if (!owns) throw new HttpError(403, 'Bu ürün sende yok ya da süresi doldu');
       await db.query('UPDATE users SET equipped = equipped || jsonb_build_object($2::text, $3::text) WHERE id = $1', [u.id, slot, sku]);
     }
+    // Worn or taken off in the middle of a room: the others there see it now, not after leaving and coming back.
+    void announceLook(u.id);
     return { economy: await economyOf(u.id) };
   },
 
@@ -339,15 +379,14 @@ export const economyRoutes = {
     const ids = [...new Set(String(url.searchParams.get('ids') ?? '').split(',').map((x) => x.trim()).filter(Boolean))];
     if (ids.length > 50 || !ids.every((x) => UUID.test(x))) throw new HttpError(400, 'En çok 50 geçerli kullanıcı kimliği');
     const looks = await looksOf(ids);
-    // Their name and photo too: a room knows its people from the voice connection by id and name only, so someone no
-    // screen has read yet (a new account) would sit on a mic without their photo. Not of someone who blocked me, as
+    // Someone who blocked me: their look stays (it is on their mic anyway), their name and photo don't come, as
     // GET /api/user doesn't show them.
-    const faces = await db.query(
-      `SELECT u.id, u.name, u.avatar_url FROM users u
-        WHERE u.id = ANY($1::uuid[]) AND NOT EXISTS (SELECT 1 FROM blocks b WHERE b.blocker = u.id AND b.blocked = $2)`,
-      [ids, me.id],
-    );
-    for (const x of faces.rows) if (looks[x.id]) Object.assign(looks[x.id], { name: x.name, avatarUrl: x.avatar_url ?? null });
+    const hidden = await db.query('SELECT b.blocker FROM blocks b WHERE b.blocker = ANY($1::uuid[]) AND b.blocked = $2', [ids, me.id]);
+    for (const x of hidden.rows) {
+      if (!looks[x.blocker]) continue;
+      delete looks[x.blocker].name;
+      delete looks[x.blocker].avatarUrl;
+    }
     return { looks };
   },
 
@@ -369,6 +408,7 @@ export const economyRoutes = {
     if (live().shopHidden.has(item.sku)) throw new HttpError(409, 'Bu ürün artık satışta değil');
     const r = await once(u.id, 'coin', ref, (c) => buyInTx(c, u.id, item, ref, n, 'bridge'));
     if (r.replay && !(await boughtWith(u.id, ref))) throw new HttpError(409, 'Geçersiz istek kimliği');
+    if (!r.replay) void announceLook(u.id);
     return r;
   },
 
@@ -411,7 +451,7 @@ export const economyRoutes = {
     const reason = text(b.reason, 3, 300, 'Neden');
     if (!REF.test(b.ref ?? '')) throw new HttpError(400, 'Geçersiz istek kimliği');
     const ref = `admin:${b.ref}`;
-    return tx(async (c) => {
+    const out = await tx(async (c) => {
       const p = (await c.query('SELECT id FROM users WHERE id = $1 AND deleted_at IS NULL FOR UPDATE', [id])).rows[0];
       if (!p) throw new HttpError(404, 'Kullanıcı bulunamadı');
       const now = await dbNow(c);
@@ -421,6 +461,8 @@ export const economyRoutes = {
       await audit(c, a.id, 'economy.grant', id, { entitlement: eid, sku: item.sku, days, reason }, clientIp(req));
       return { replay: false, item: itemOf((await c.query('SELECT * FROM entitlements WHERE id = $1', [eid])).rows[0], now) };
     });
+    if (!out.replay) void announceLook(id);
+    return out;
   },
 
   /** Takes an item back (support): revoked_why 'destek'; the staff member's reason goes to the audit row. */
@@ -430,7 +472,7 @@ export const economyRoutes = {
     const id = int(b.id, 1, Number.MAX_SAFE_INTEGER);
     if (!id) throw new HttpError(400, 'Geçersiz kayıt');
     const reason = text(b.reason, 3, 300, 'Neden');
-    return tx(async (c) => {
+    const out = await tx(async (c) => {
       const e = (await c.query('SELECT * FROM entitlements WHERE id = $1 FOR UPDATE', [id])).rows[0];
       if (!e) throw new HttpError(404, 'Kayıt bulunamadı');
       if (e.revoked_at) throw new HttpError(409, 'Bu ürün zaten geri alınmış');
@@ -438,6 +480,9 @@ export const economyRoutes = {
       await audit(c, a.id, 'economy.revoke', e.user_id, { entitlement: id, sku: e.sku, reason }, clientIp(req));
       return { item: itemOf(r, await dbNow(c)) };
     });
+    // A worn item taken back leaves the person's look in the room they are in.
+    void announceLook(out.item.userId);
+    return out;
   },
 
   async 'GET /api/admin/economy/reviews'(req) {

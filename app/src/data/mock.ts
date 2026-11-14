@@ -270,6 +270,11 @@ export function putServerUser(p: Partial<User> & { id: string; name: string }): 
   serverUsers.set(p.id, u);
   return u;
 }
+/** A known real person's photo as the server has it now (their room look); someone not known yet is left alone. */
+export function setServerFace(id: string, avatar: string | null) {
+  const u = serverUsers.get(id);
+  if (u && u.avatar !== (avatar ?? NO_PHOTO)) serverUsers.set(id, { ...u, avatar: avatar ?? NO_PHOTO });
+}
 export const putServerRoom = (r: Room) => void serverRooms.set(r.id, r);
 export const serverUserKnown = (id: string) => serverUsers.has(id);
 export const serverRoomKnown = (id: string) => serverRooms.has(id);

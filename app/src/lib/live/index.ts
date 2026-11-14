@@ -21,6 +21,7 @@ import { liveRules, noteLiveRate, rateChangedMessage, refreshLiveCatalog } from 
 import { forgetRoomPasswords } from '@/lib/live/room-password';
 import { forgetRoomFollows, putRoomFollow } from '@/lib/room-follow';
 import { replyOrder, unsureRefs } from '@/lib/live/requests';
+import { setLooksSelf } from '@/lib/live/looks';
 
 export const liveMode = api.apiEnabled;
 /**
@@ -48,6 +49,7 @@ export const onAccountChange = (l: () => void) => {
 const setMyId = (id: string | null) => {
   if (id === myId) return;
   myId = id;
+  setLooksSelf(id);
   accountListeners.forEach((l) => l());
 };
 /** A server id as this phone names it: mine is 'me'. */
