@@ -1,6 +1,8 @@
 // A server room on the room screen (lib/live): the room's presence model (lib/room-presence) follows the real
 // voice connection instead of the demo's simulated people. Everyone connected to the room's LiveKit room is in
 // it; the mic each one sits on is their own `seat` attribute; talking rings follow LiveKit's active speakers.
+// The people already connected when this phone comes in join its presence too, but as people who were here first
+// (lib/room-entrance PeerJoin.fresh false): only someone who comes in after me is an entrance (a line, their effect).
 // Returns who has switched their mic off, so their seat shows it on every phone.
 // My own seat goes out the same way, so every phone draws the same mics. When the owner or an admin moves me or
 // takes me off a mic (server/api/rooms.mjs), the server changes that attribute and this phone follows it.
@@ -9,10 +11,11 @@ import { useEffect, useMemo, useRef } from 'react';
 import { getRoom, join, leave, leaveSeat, takeSeat } from '@/lib/room-presence';
 import { rememberUser, refreshWallet, toLocal } from '@/lib/live';
 import { onServerSeat, onSignal, publishSeat, useLivePeers, type RoomSignal } from '@/lib/live/room-bus';
+import { peerChanges, type PeerJoin } from '@/lib/room-entrance';
 
 type Hooks = {
-  /** Someone came in / went out (their local id and name). */
-  onJoin: (uid: string, name: string) => void;
+  /** Someone is now in the room / went out (their local id and name). */
+  onJoin: (uid: string, name: string, join: PeerJoin) => void;
   onLeave: (uid: string, name: string) => void;
   /** A chat line another phone sent here, or a gift the server announced. `from` is the sender's local id. */
   onSignal: (from: string, msg: RoomSignal) => void;
@@ -22,12 +25,14 @@ type Hooks = {
 };
 
 export function useLiveRoomSync(roomId: string, enabled: boolean, mySeat: number | null, hooks: Hooks) {
-  const { peers, meSpeaking } = useLivePeers(roomId);
+  const { peers, meSpeaking, meJoinedAt } = useLivePeers(roomId);
   const hooksRef = useRef(hooks);
   useEffect(() => {
     hooksRef.current = hooks;
   });
   const names = useRef(new Map<string, string>());
+  // When each person left during this visit (this phone's clock).
+  const leftAt = useRef(new Map<string, number>());
 
   // Presence and mics follow the connected phones.
   useEffect(() => {
@@ -35,14 +40,16 @@ export function useLiveRoomSync(roomId: string, enabled: boolean, mySeat: number
     const here = new Map(peers.map((p) => [toLocal(p.identity), p]));
     here.delete('me'); // my own account on a second phone: not shown twice
     for (const p of peers) rememberUser({ id: p.identity, name: p.name });
-    for (const uid of getRoom(roomId)!.members) {
-      if (uid === 'me' || here.has(uid)) continue;
+    const now = Date.now();
+    const { leaves, joins } = peerChanges(getRoom(roomId)!.members, here, meJoinedAt, leftAt.current, now);
+    for (const uid of leaves) {
       leave(roomId, uid);
+      leftAt.current.set(uid, now);
       hooksRef.current.onLeave(uid, names.current.get(uid) ?? 'Bir üye');
       names.current.delete(uid);
     }
+    for (const j of joins) if (join(roomId, j.uid).ok) hooksRef.current.onJoin(j.uid, j.name, j.join);
     for (const [uid, p] of here) {
-      if (!getRoom(roomId)!.members.includes(uid) && join(roomId, uid).ok) hooksRef.current.onJoin(uid, p.name);
       names.current.set(uid, p.name);
       const r = getRoom(roomId)!;
       if (p.seat !== null && r.seats[p.seat] !== uid) takeSeat(roomId, uid, p.seat);
@@ -51,7 +58,7 @@ export function useLiveRoomSync(roomId: string, enabled: boolean, mySeat: number
     const talking = new Set(peers.filter((p) => p.speaking).map((p) => toLocal(p.identity)));
     if (meSpeaking) talking.add('me');
     hooksRef.current.setSpeaking(talking);
-  }, [enabled, roomId, peers, meSpeaking]);
+  }, [enabled, roomId, peers, meSpeaking, meJoinedAt]);
 
   // My mic, for the other phones.
   useEffect(() => {

@@ -50,14 +50,15 @@ export async function refreshLucky() {
 
 /**
  * `count` of one package to each of `toIds` (this phone's ids). Throws the server's refusal (age, Cömertlik,
- * balance, closed package, daily limit). The same send tried again after a lost answer is played once.
+ * balance, closed package, daily limit). The same send tried again after a lost answer is played once. `named`: a
+ * win goes to every room with my name and photo (else as "Bir kullanıcı").
  */
-export async function liveLuckySend(giftId: string, toIds: string[], count: number, roomId: string) {
+export async function liveLuckySend(giftId: string, toIds: string[], count: number, roomId: string, named = false) {
   const to = toIds.map(toServer);
   if (to.some((x) => !x)) throw new Error('Bu kişiye Şanslı hediye gönderilemez.');
   const ids = to as string[];
   const g = known.get(giftId);
-  const r = await once(`lucky:${giftId}:${ids.join(',')}:${count}:${roomId}`, (ref) => api.luckySend(giftId, ids, count, roomId, ref));
+  const r = await once(`lucky:${giftId}:${ids.join(',')}:${count}:${roomId}`, (ref) => api.luckySend(giftId, ids, count, roomId, ref, named));
   // Two rows, the price and the reward, so the whole price counts as spending (store SERVER_TAKES).
   const won = r.send.payout;
   const what = `${g?.name ?? giftId} ×${count * ids.length}`;

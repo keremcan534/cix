@@ -1,6 +1,6 @@
-// Platform-wide win announcements (stand-in for the server's broadcast channel). Every win in any room
-// or game goes out to every room; rooms show them one at a time as a banner near the top.
-// The feed also simulates other people's wins so the prototype shows what other rooms would see.
+// Platform-wide win announcements. Every win in any room or game goes out to every room; rooms show them one at a
+// time as a banner near the top. In a live build the other people's Şanslı wins come from the server on the live line
+// (lib/live/win-news); the offline demo makes up other rooms' wins so it shows what they would see.
 import { useSyncExternalStore } from 'react';
 
 import { ROOMS, USERS, roomById } from '@/data/mock';
@@ -8,6 +8,10 @@ import { liveBuild } from '@/lib/live-flag';
 
 export type WinNews = {
   id: string;
+  /** Another phone's win with its name shown: the winner's server id, so someone I blocked is skipped. */
+  uid?: string;
+  /** Wins with the same key (one person, one gift) merge while they wait, so a run of sends is one banner. */
+  key?: string;
   userName: string;
   avatar?: string;
   /** "Şanslı › Uğur Böceği", "Oyun Merkezi › Şans Çarkı" … */
@@ -52,11 +56,24 @@ export const setShowMyName = (on: boolean) => {
 };
 
 const rid = () => Math.random().toString(36).slice(2, 9);
+/**
+ * Puts a win in the banner line. `mine`: my own win (with my name only if Ayarlar lets it). A win with a `key` joins a
+ * waiting banner of the same key (one person's run of the same gift: the best multiplier, the coins and wins added),
+ * so a quick run of sends doesn't fill the line; the one showing stays as it is.
+ */
 export function announceWin(news: Omit<WinNews, 'id' | 'at'>, opts?: { mine?: boolean }) {
   if (news.amount <= 0) return;
   const n: WinNews = { ...news, id: rid(), at: Date.now(), ...(opts?.mine && !showMyName ? { userName: 'Bir kullanıcı', avatar: undefined } : null) };
-  // Keep the newest few; a long backlog would be old news by the time it shows.
-  queue = [...queue, n].slice(-MAX_QUEUE);
+  const at = n.key ? queue.findIndex((x, i) => i > 0 && x.key === n.key) : -1;
+  if (at > 0) {
+    const w = queue[at];
+    const mult = Math.max(w.mult ?? 0, n.mult ?? 0);
+    const merged: WinNews = { ...w, amount: w.amount + n.amount, ...(mult ? { mult } : {}), wins: (w.wins ?? 1) + (n.wins ?? 1), at: n.at };
+    queue = queue.map((x, i) => (i === at ? merged : x));
+  } else {
+    // Keep the newest few; a long backlog would be old news by the time it shows.
+    queue = [...queue, n].slice(-MAX_QUEUE);
+  }
   emit();
 }
 /** An Oyun Salonu win. The source prefix counts too, so an announcement without the flag is still caught. */

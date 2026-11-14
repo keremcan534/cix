@@ -96,6 +96,21 @@ test('kilitli mikrofonlar oda bilgisinden gelir; kişi listesi değişince kalı
   reportPeers(null, []);
 });
 
+test('kişilerin ve benim odaya giriş zamanım (ses sunucusunun saati) görüntüyle gelir', () => {
+  const me = 1_700_000_100_000;
+  // The join times travel with the people (a change of one is a new list), and my own with them.
+  reportPeers('oda-g', [{ identity: 'u1', name: 'Ali', seat: null, speaking: false, micOn: false, joinedAt: me - 9_000 }], false, me);
+  const first = getLivePeers('oda-g');
+  assert.equal(first.meJoinedAt, me);
+  assert.equal(first.peers[0].joinedAt, me - 9_000);
+  reportPeers('oda-g', [{ identity: 'u1', name: 'Ali', seat: null, speaking: false, micOn: false, joinedAt: me - 9_000 }], false, me);
+  assert.equal(getLivePeers('oda-g'), first, 'aynı liste: aynı görüntü');
+  reportPeers('oda-g', [{ identity: 'u1', name: 'Ali', seat: null, speaking: false, micOn: false, joinedAt: me + 60_000 }], false, me);
+  assert.equal(getLivePeers('oda-g').peers[0].joinedAt, me + 60_000, 'yeniden bağlanan yeni zamanla gelir');
+  reportPeers(null, []);
+  assert.equal(getLivePeers('oda-g').meJoinedAt, 0);
+});
+
 test('oda durumu (düzen, mikrofon sayısı, kuyruk) oda bilgisinden gelir; bozuk olan atılır', () => {
   // Only the server writes micQueue, and it writes everything at once: without it there is no state.
   assert.equal(parseRoomState('{"lockedSeats":[2]}'), null);

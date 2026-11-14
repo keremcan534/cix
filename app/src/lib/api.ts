@@ -235,6 +235,8 @@ export async function retrySignIn(): Promise<boolean> {
 /** Any route of the API with this session (the agency panels go through lib/agency-net). */
 export const apiRequest = <T>(method: 'GET' | 'POST', path: string, body?: object) => call<T>(method, path, body);
 
+/** The live line, with the wins announced to everyone (server/api/live-line.mjs lineWin; lib/live/win-news). */
+const LIVE_LINE = '/api/live?wins=1';
 /**
  * Opens my live line (lib/live/live-line): a request that stays open while the server writes events into it.
  * Null when there is no server or no session yet. Not compressed, so each event comes through as it is written.
@@ -243,14 +245,14 @@ export async function openLiveLine(signal: AbortSignal): Promise<Response | null
   if (!BASE) return null;
   await restoreSession();
   if (!session) return null;
-  return fetch(`${BASE}/api/live`, { headers: { Authorization: `Bearer ${session}`, Accept: 'text/event-stream', 'Accept-Encoding': 'identity' }, signal });
+  return fetch(`${BASE}${LIVE_LINE}`, { headers: { Authorization: `Bearer ${session}`, Accept: 'text/event-stream', 'Accept-Encoding': 'identity' }, signal });
 }
 
 /** The live line's address and my session, for the line's second way of reading it (XMLHttpRequest). */
 export async function liveLineTarget(): Promise<{ url: string; token: string } | null> {
   if (!BASE) return null;
   await restoreSession();
-  return session ? { url: `${BASE}/api/live`, token: session } : null;
+  return session ? { url: `${BASE}${LIVE_LINE}`, token: session } : null;
 }
 /** Ayarlar › Bağlantı testi: the server sends a ping on my line; `open` is how many lines it has from me. */
 export const pingLiveLine = () => call<{ open: number }>('POST', '/api/live/ping', {});
@@ -918,8 +920,9 @@ export type ServerLucky = {
   minAge: number; gameCoins: number; mine: ServerLuckySend[];
 };
 export const lucky = () => call<ServerLucky>('GET', '/api/lucky');
-export const luckySend = (giftId: string, to: string[], count: number, room?: string, ref = newRef()) =>
-  call<{ send: ServerLuckySend; user: ServerUser; replay: boolean }>('POST', '/api/lucky/send', { giftId, to, count, room, ref });
+/** `named`: a win may carry my name and photo to every room (Ayarlar › "Kazançlarımda adım görünsün"). */
+export const luckySend = (giftId: string, to: string[], count: number, room?: string, ref = newRef(), named = false) =>
+  call<{ send: ServerLuckySend; user: ServerUser; replay: boolean }>('POST', '/api/lucky/send', { giftId, to, count, room, ref, named });
 export type ServerLuckyConfig = { gifts: ServerLuckyGift[]; dailyPayoutLimit: number; announceFrom: number };
 export type ServerLuckyStats = { sends: number; spent: number; paid: number; shared: number };
 export type ServerLuckyAdminSend = ServerLuckySend & { sender: { id: string; name: string } };
@@ -1322,7 +1325,10 @@ export type LiveKey =
   | CasinoKey
   | DecorKey
   | RoomKey
-  | EventKey;
+  | EventKey
+  | WinKey;
+/** Kazanç duyurusu (server/api/live-registry.mjs): from how many coins a Şanslı win is announced in every room (0: every win). */
+export type WinKey = 'lucky_announce_min_coins';
 /** Odalar (server/api/live-registry.mjs, "Odalar"): when a room without its staff closes, and the Patron koltuğu's coins and minutes. */
 export type RoomKey = 'room_staff_away_minutes' | 'boss_seat_coins' | 'boss_seat_minutes';
 /** Etkinlik Merkezi (server/api/live-registry.mjs, "Etkinlikler"): who may apply, how far ahead, how long and big, the grace, strikes. */

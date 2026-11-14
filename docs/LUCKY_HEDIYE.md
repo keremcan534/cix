@@ -11,7 +11,7 @@ Kullanıcı Uğurlu kategorisinden bir hediye gönderir. Sunucu yayımlanmış o
 | `src/lib/lucky.ts` | Sunucunun yerine geçen katman: paketler, olasılıklar, çekiliş, ödül rezervi, kayıtlar, denetim. |
 | `src/components/room/gift-sheet.tsx` | Hediye paneli › **🍀 Uğurlu** rafı: paketler, tam olasılık tablosu, Geçmişim. |
 | `src/components/room/lucky-combo.tsx` | Sağ alttaki tekrar çarkı: çember etrafında dolan çizgi, basınca aynı hediyeyi aynı kişilere tekrar gönderir (×1, ×2, ×3 …). |
-| `src/lib/broadcast.ts`, `src/components/fx/win-banner.tsx` | Tüm odalara kazanç duyurusu: üst ortada ışıltılı bant, sırayla gösterilir. |
+| `src/lib/broadcast.ts`, `src/components/fx/win-banner.tsx`, `src/lib/live/win-news.ts` | Tüm odalara kazanç duyurusu: üst ortada ışıltılı bant, sırayla gösterilir; canlı sürümde başkalarının kazançları anlık hattan gelir. |
 | `src/components/room/lucky-result.tsx` | Odadaki sonuç kartı (çarpan + ödül veya "ödül çıkmadı"). Dokunmaları engellemez, mikrofona dokunmaz. |
 | `src/app/oda/[id].tsx` | `sendLuckyGift`: alıcının hediye kaydı, PK puanı, sohbet bildirimi. |
 | `src/app/lucky-yonetimi.tsx` | Yönetim paneli (`lucky.manage`). |
@@ -39,11 +39,13 @@ Kullanıcı Uğurlu kategorisinden bir hediye gönderir. Sunucu yayımlanmış o
 - **Alıcı ve PK:** Alıcıya hediye değerinin %20'si elmas yazılır (aşağı yuvarlanır). PK'da alıcının (Takım PK'da takımının) puanına da aynı %20 eklenir; gönderenin kazandığı ödül PK'ya hiç sayılmaz. Normal hediyeler değişmedi (tam değer).
 - **Cömertlik puanı:** Harcanan jeton sayılır, kazanılan ödül sayılmaz.
 - **Duyuru:** Herhangi bir odada biri kazanç elde edince (Uğurlu veya Oyun Merkezi) **tüm odalarda** üst ortada ışıltılı bir bant çıkar: "X kazandı! Uğurlu › Uğur Böceği ×10 · +1.000 jeton · oda adı".
-  - Bantlar sırayla gösterilir (en fazla 6 bekler); 30 saniyeden eski duyuru gösterilmez.
+  - Bantlar sırayla gösterilir (en fazla 6 bekler); 30 saniyeden eski duyuru gösterilmez. Aynı kişinin aynı hediyedeki kazançları bant beklerken tek bantta birleşir (en yüksek çarpan, toplam ödül, kazanç sayısı).
+  - Şanslı kazanç bandını Cömertlik seviyesi ne olursa olsun herkes görür (Güncelleme 5); Oyun Salonu kazancını yalnız Oyun Salonu'nu görebilenler görür. Engellediğim kişinin kazancı gösterilmez.
   - Bir gönderimde birden çok kazanç varsa tek bant: en yüksek çarpan ve toplam ödül.
   - Kullanıcı Ayarlar › Gizlilik'ten adının gizlenmesini seçebilir; o zaman "Bir kullanıcı kazandı" yazar.
   - ×50 ve üzeri kazanç ayrıca o odanın sohbetine de yazılır.
-  - Prototipte diğer odaların kazançları 25–50 saniyede bir örnek olarak üretilir; gerçek sistemde sunucunun yayın kanalından gelir.
+  - Canlı sürümde sunucu her Şanslı kazancını uygulaması açık herkese anlık hattan gönderir (`lineWin`, [`SUNUCU.md`](SUNUCU.md)); kazananın kendi telefonu bandı hemen kendisi gösterir. Yöneticiler Canlı ayarlar › Kazanç duyurusu'ndan en az kazancı seçer (varsayılan 0: her kazanç). Adını gizleyenin adı sunucuya da gitmez.
+  - Prototipte (sunucusuz demo) diğer odaların kazançları 25–50 saniyede bir örnek olarak üretilir.
 - **Mikrofon ve oda:** Sonuç kartı yalnızca görseldir. Koltuk, mikrofon ve ses bağlantısı değişmez.
 
 ## Kabul testleri (web prototipi, Playwright)

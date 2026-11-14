@@ -15,7 +15,7 @@ import { useSyncExternalStore } from 'react';
 
 import { CASINO_GAMES, ROOM_GAMES, type CasinoGame, type RoomGame } from '@/data/games';
 import { ME } from '@/data/mock';
-import { announceWin, isCasinoWin, isChanceWin, type WinNews } from '@/lib/broadcast';
+import { announceWin, isCasinoWin, type WinNews } from '@/lib/broadcast';
 import { BOARDS, boardMaxPayout, boardPayout } from '@/lib/board-games';
 import { CASINO_HOUSE_SHARE, DUEL_MULT, PICKS, duelMultiplier, isLineSlot, maxMultiplier, outcomeOf, splitStake, type Outcome } from '@/lib/casino-odds';
 import { SLOT_CONFIGS } from '@/lib/slot-configs';
@@ -103,9 +103,9 @@ export const gamblingLevelOk = (wealthLevel: number) => wealthLevel >= CASINO_MI
  *  this phone (playCasino, playBoard). */
 export const casinoVisible = (wealthLevel: number, paidGames = true) => paidGames && gamblingLevelOk(wealthLevel);
 /** A win banner that is not news for this user, skipped and never shown: an Oyun Salonu win for someone who cannot
- *  see Oyun Salonu, and any other win of chance (Şanslı) below the gambling level. */
-export const winNewsHidden = (n: Pick<WinNews, 'casino' | 'source'>, wealthLevel: number, paidGames = true) =>
-  isCasinoWin(n) ? !casinoVisible(wealthLevel, paidGames) : isChanceWin(n) && !gamblingLevelOk(wealthLevel);
+ *  see Oyun Salonu. A Şanslı win is shown to everyone in every room (the owner's wish, Güncelleme 5 madde 9), below
+ *  the gambling level too, where the Şanslı shelf itself stays closed. */
+export const winNewsHidden = (n: Pick<WinNews, 'casino' | 'source'>, wealthLevel: number, paidGames = true) => isCasinoWin(n) && !casinoVisible(wealthLevel, paidGames);
 const CASINO_OFF = 'Bu oyun şu an kapalı.';
 export type Access = { ok: true } | { ok: false; reason: string; needWealth?: number };
 /** Same check the server runs on every launch and every round; the UI only uses it to explain. */

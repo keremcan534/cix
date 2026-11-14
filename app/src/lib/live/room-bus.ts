@@ -3,7 +3,9 @@
 //
 //  - peers: everyone else connected to the room's voice, with the mic they sit on (their own `seat` participant
 //    attribute: set by their phone, or by the server when the owner or an admin moves them), whether their mic
-//    is on (their LiveKit microphone track, muted when they switch it off) and whether they are talking right now;
+//    is on (their LiveKit microphone track, muted when they switch it off), whether they are talking right now and
+//    when they came in (the voice server's clock, as my own join time is): who came in after me is an entrance,
+//    the people already inside when I came are not;
 //  - signals: small messages inside the room. They are not stored anywhere: whoever is in the room sees them, a
 //    later joiner doesn't. The phones send each other chat lines, the emoji over their own seat, a Hamle
 //    (lib/room-moves: a kiss or a punch to the next mic, the dice, Taş Kağıt Makas) and the free Hareketli reactions. A gift is announced by the server after it is paid (server/api/gifts.mjs, LiveKit
@@ -28,7 +30,8 @@ import { isSeatColor, type SeatColorId } from '@/data/seat-colors';
 import type { BossNews } from '@/lib/patron-seat';
 import { parseMove, type Move } from '@/lib/room-moves';
 
-export type LivePeer = { identity: string; name: string; seat: number | null; speaking: boolean; micOn: boolean };
+/** `joinedAt`: when they came into the room, on the voice server's clock (ms; 0 or missing: not known). */
+export type LivePeer = { identity: string; name: string; seat: number | null; speaking: boolean; micOn: boolean; joinedAt?: number };
 /** What one phone may send the others: a chat line, an emoji or sticker over its own seat, a free Hareketli. */
 export type PeerSignal =
   | { t: 'chat'; text: string }
@@ -82,9 +85,10 @@ export type MusicRepeat = 'off' | 'one' | 'all';
  * playlist in its order, played rows included (the sheet shows it).
  */
 export type RoomMusic = { tracks: QueueTrack[]; startedAt: number | null; pausedAt: number | null; repeat: MusicRepeat; list: QueueTrack[] };
-type Snapshot = { roomId: string | null; peers: LivePeer[]; meSpeaking: boolean; lockedSeats: number[]; state: RoomState | null };
+/** `meJoinedAt`: when this phone came into the room on this connection, on the voice server's clock (0: not yet). */
+type Snapshot = { roomId: string | null; peers: LivePeer[]; meSpeaking: boolean; meJoinedAt: number; lockedSeats: number[]; state: RoomState | null };
 
-const EMPTY: Snapshot = { roomId: null, peers: [], meSpeaking: false, lockedSeats: [], state: null };
+const EMPTY: Snapshot = { roomId: null, peers: [], meSpeaking: false, meJoinedAt: 0, lockedSeats: [], state: null };
 let snap: Snapshot = EMPTY;
 let link: Link | null = null;
 const listeners = new Set<() => void>();
@@ -115,17 +119,23 @@ const subscribe = (l: () => void) => {
 /** The voice engine says how to set my mic attribute and send a signal (null when no LiveKit engine). */
 export const bindLink = (l: Link | null) => void (link = l);
 
-/** Who is connected right now (my own talking indicator included). `roomId` null = not in a room. */
-export function reportPeers(roomId: string | null, peers: LivePeer[], meSpeaking = false) {
+/**
+ * Who is connected right now (my own talking indicator and join time included). `roomId` null = not in a room.
+ * `meJoinedAt`: when I came in on this connection (voice server ms; 0 while connecting).
+ */
+export function reportPeers(roomId: string | null, peers: LivePeer[], meSpeaking = false, meJoinedAt = 0) {
   const same =
     snap.roomId === roomId &&
     snap.meSpeaking === meSpeaking &&
+    snap.meJoinedAt === meJoinedAt &&
     snap.peers.length === peers.length &&
-    snap.peers.every((p, i) => p.identity === peers[i].identity && p.seat === peers[i].seat && p.speaking === peers[i].speaking && p.micOn === peers[i].micOn && p.name === peers[i].name);
+    snap.peers.every(
+      (p, i) => p.identity === peers[i].identity && p.seat === peers[i].seat && p.speaking === peers[i].speaking && p.micOn === peers[i].micOn && p.name === peers[i].name && p.joinedAt === peers[i].joinedAt,
+    );
   if (same) return;
   // The locks belong to the room: a new list of people keeps them, another room starts without.
   const sameRoom = snap.roomId === roomId;
-  snap = roomId ? { roomId, peers, meSpeaking, lockedSeats: sameRoom ? snap.lockedSeats : [], state: sameRoom ? snap.state : null } : EMPTY;
+  snap = roomId ? { roomId, peers, meSpeaking, meJoinedAt, lockedSeats: sameRoom ? snap.lockedSeats : [], state: sameRoom ? snap.state : null } : EMPTY;
   listeners.forEach((l) => l());
 }
 

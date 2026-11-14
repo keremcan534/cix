@@ -5,7 +5,8 @@
 //   GET  /api/economy                                   → economy (below)
 //   POST /api/shop/buy     { sku, price, ref }          → { user, replay, economy }
 //   POST /api/shop/equip   { slot, sku | null }         → { economy }
-//   GET  /api/looks?ids=a,b                             → { looks: { [id]: look } }   (what others see; at most 50)
+//   GET  /api/looks?ids=a,b                             → { looks: { [id]: look + { name, avatarUrl } } }   (what others
+//                                                         see; at most 50; no name or photo of someone who blocked me)
 //   POST /api/wallet/spend { amount, reason, ref }      → { user, replay }   (old apps: their item spends become buys)
 //   GET  /api/admin/economy/user?id=                    (admin) → { user, items, rewardCoins, rewards, reviews }
 //   POST /api/admin/economy/grant  { userId, sku, days?, reason, ref }   (admin) → { replay, item }
@@ -334,10 +335,20 @@ export const economyRoutes = {
   },
 
   async 'GET /api/looks'(req, url) {
-    await auth(req);
+    const me = await auth(req);
     const ids = [...new Set(String(url.searchParams.get('ids') ?? '').split(',').map((x) => x.trim()).filter(Boolean))];
     if (ids.length > 50 || !ids.every((x) => UUID.test(x))) throw new HttpError(400, 'En çok 50 geçerli kullanıcı kimliği');
-    return { looks: await looksOf(ids) };
+    const looks = await looksOf(ids);
+    // Their name and photo too: a room knows its people from the voice connection by id and name only, so someone no
+    // screen has read yet (a new account) would sit on a mic without their photo. Not of someone who blocked me, as
+    // GET /api/user doesn't show them.
+    const faces = await db.query(
+      `SELECT u.id, u.name, u.avatar_url FROM users u
+        WHERE u.id = ANY($1::uuid[]) AND NOT EXISTS (SELECT 1 FROM blocks b WHERE b.blocker = u.id AND b.blocked = $2)`,
+      [ids, me.id],
+    );
+    for (const x of faces.rows) if (looks[x.id]) Object.assign(looks[x.id], { name: x.name, avatarUrl: x.avatar_url ?? null });
+    return { looks };
   },
 
   /**

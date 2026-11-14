@@ -16,6 +16,7 @@ import { loadBlocks, loadFollowing } from '@/lib/live/blocks';
 import { checkNewFollowers } from '@/lib/live/follows';
 import { checkRoomInvites } from '@/lib/live/room-social';
 import { lineOpen, onLine, startLiveLine } from '@/lib/live/live-line';
+import { takeWinEvent } from '@/lib/live/win-news';
 import { pollMessages } from '@/lib/live/messages';
 import { loadPrivacy } from '@/lib/live/privacy';
 import { refreshSpendLimit } from '@/lib/live/spend-limit';
@@ -133,6 +134,8 @@ export function LiveSync() {
     // Calls and an open chat listen for their own events (lib/live/one-on-one, useLiveThread).
     const stopLine = startLiveLine();
     const offLine = onLine((e) => {
+      // Another person's win (lib/live/win-news): a banner in every room, nothing of mine to read again.
+      if (takeWinEvent(e)) return;
       if (e.type === 'call' || e.type === 'message_read') return;
       if (e.type === 'follow' || e.type === 'reconnected') resumed = true;
       if (e.type === 'room_invite' || e.type === 'reconnected') invitesDue = true;

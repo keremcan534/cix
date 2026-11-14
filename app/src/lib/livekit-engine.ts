@@ -36,6 +36,11 @@ export type LiveKitConfig = {
 
 /** LiveKit room names allow what the token service allows: letters, digits, _ and -. */
 const roomName = (roomId: string) => `oda-${roomId}`.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 64);
+/** A participant's join time (LiveKit's, whole seconds of the voice server's clock) in ms; 0 when there is none. */
+const joinedMs = (d: Date | undefined) => {
+  const t = d?.getTime() ?? 0;
+  return Number.isFinite(t) && t > 0 ? t : 0;
+};
 
 export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
   const s: EngineStats = { roomId: null, connects: 0, reconnects: 0, disconnects: 0, concurrent: 0, maxConcurrent: 0, publishing: false, publishStarts: 0, route: 'speaker' };
@@ -167,8 +172,9 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
   /** Everyone else in the room for the room screen (lib/live/room-bus). */
   const snapshot = (r: Room) => {
     if (room !== r || !s.roomId) return;
-    const peers = [...r.remoteParticipants.values()].map((p) => ({ identity: p.identity, name: p.name || 'Üye', seat: parseSeat(p.attributes?.seat), speaking: p.isSpeaking, micOn: p.isMicrophoneEnabled }));
-    reportPeers(s.roomId, peers, r.localParticipant.isSpeaking);
+    const peers = [...r.remoteParticipants.values()].map((p) => ({ identity: p.identity, name: p.name || 'Üye', seat: parseSeat(p.attributes?.seat), speaking: p.isSpeaking, micOn: p.isMicrophoneEnabled, joinedAt: joinedMs(p.joinedAt) }));
+    // My own join time is the voice server's once connected; before that LiveKit would make one up from this phone's clock.
+    reportPeers(s.roomId, peers, r.localParticipant.isSpeaking, r.state === ConnectionState.Connected ? joinedMs(r.localParticipant.joinedAt) : 0);
   };
   bindLink({
     setSeat(next) {
