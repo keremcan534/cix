@@ -45,6 +45,30 @@ app/scripts/alpha-stack.sh kaynak.webm cikti.mp4 --crf 22                      #
 İpucu: kaynakta tamamen şeffaf piksellerin rengi siyah yerine kenardaki renge yakın olursa (ör. parıltının rengi),
 yumuşak kenarlarda koyu hale oluşmaz. Test klibi bu yüzden parıltı renginde (camgöbeği) saydam bir tuvalde üretildi.
 
+### Cila: `app/scripts/fx-polish.py`
+
+Hediye ve giriş videoları sunucuya konmadan önce bundan geçer (Python 3, numpy, Pillow, ffmpeg). İki şeyi düzeltir:
+
+- **Sis:** siyah zeminli videodan parlaklıkla kesilen kliplerde zemin tam siyah değilse (gece şehri, yer, sis), o bölge
+  yarı saydam soluk bir tabaka olarak kalır; oda üstünde gri-beyaz bir blok ya da hale gibi görünür ("sönük arka plan").
+  Soluk (renksiz), düzgün ve yarı saydam alanlar silinir; nesnenin kendisi, kıvılcımlar, alevler ve renkli parıltılar kalır.
+- **Kesik kenarlar:** çerçevenin kenarına değen her şey (roketin alevi, sarayın merdiveni, ejderhanın kanadı) düz bir
+  çizgiyle biterdi; 9:16'dan uzun telefonlarda video ekranın içinde durduğu için bu çizgi görünür (çoğu zaman altta).
+  Saydamlık dört kenarda yumuşakça sıfıra iner (yanlar %7, üst %6, alt %9).
+
+```bash
+python3 app/scripts/fx-polish.py kaynak.mp4 server/api/fx/ad.mp4 --strength 1
+```
+
+`--strength`: 0 sisi bırakır (efekte ait yumuşak ışık: Kristal Saray'ın kuzey ışığı, Hazine Sandığı'nın parlaması),
+1 ince tabakaları alır, 2 yoğunları da (klibe gömülü bir arka plan: Altın Süper Otomobil). Renk yarısı değişmez, ses
+kopyalanır. Şu anki klipler: 2 → altin-super-otomobil, altin-gemi, efsanevi-tek-boynuz; 1 → altin-aslan, kraliyet-taci,
+roket, ejderha, anka-kusu; 0 → kristal-saray, hazine-sandigi, sevimli-panda, tatli-ayicik, pirlanta-yuzuk.
+
+Sınırı: nesneyle aynı parlaklıkta, tamamen opak bir parıltı bloğu (Kraliyet Tacı'nın, Altın Gemi'nin ve Efsanevi Tek
+Boynuz'un arkasındaki ışık) maskede nesneden ayrılamaz. Bunlar için en iyisi kaynağın arka plansız (saydam ProRes 4444,
+alfa WebM ya da PNG dizisi) ya da tam siyah zeminli halidir; o zaman `alpha-stack.sh` ile yığılıp bununla cilalanır.
+
 ### Test klipleri (`app/assets/video/alpha-test/`)
 
 7 saniyelik, soldan sağa giden, hafifçe zıplayan bir araba ("TEST ARAÇ" yazılı, yuvarlak köşeli gövde, tekerlekler)
