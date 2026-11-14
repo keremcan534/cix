@@ -59,6 +59,26 @@ Videolar artık uygulamaya gömülmez. `server/api/fx/` içinden verilir; telefo
 
 **Penguen çıkartma paketi (14 Kasım):** 24 hareketli penguen, mağazada 150 jeton (`pack-penguen`). Her çıkartma bir kare tablosu (WebP) ve durağan bir resim; telefon ve web aynı oynatır (`app/src/components/sprite-sticker.tsx`). Panelde durağan, sohbette bir kez, mikrofonda döngüde oynar.
 
+## Oda iki parça (14 Kasım)
+
+Müşterinin videosunda klavye açılınca sohbet koltukların üstüne çıkıyor, klavye kapanınca koltuklar bir süre küçük kalıyordu. İstek: oda Balkon çubuğunun alt kenarından ("Balkon çizgisi") iki parça.
+
+- **Üst parça:** Başlık, panolar, mikrofonlar ve Balkon çubuğu kendiliğinden hiç kıpırdamaz. Mikrofon boyları odanın klavyesiz yüksekliğinden hesaplanır (`app/src/lib/room-split.ts`, `components/room/fit-stage.tsx`). Şunlar mikrofonları küçültmez, kesmez, kaydırmaz:
+  - klavye (odanın ya da bir pencerenin),
+  - emoji paneli,
+  - sohbetin altındaki notlar (susturma, reddedilen satır, @ isimleri),
+  - sohbetin kendisi.
+- **Üst parçayı değiştirenler:** Yalnız kişinin kendi seçimi (sohbet tutamağı, Küçült/Büyüt), oda düzeni ve PK. Müzik çubuğu, anket ya da kuyruk gibi bir pano gelince mikrofonlar boylarını korur; yer sohbetten alınır. Sohbet en az boyuna inince yüzler küçülür.
+- **Yazarken:**
+  - Klavye yerini yalnız sohbetten alır; Balkon çubuğu yazarken de görünür.
+  - Sohbet sekmeleri ve tutamak gizlenir.
+  - Son mesajlar tek satır halinde ("İsim: mesaj") Balkon ile yazı alanı arasında görünür. 891 dp boyunda bir telefonda (Galaxy A sınıfı) bu iki satırdır.
+- **Alttan açılan pencereler:** En fazla Balkon çizgisine kadar açılır (`app/src/lib/sheet-space.ts`). Oda bu çizgiyi ölçer, her alt pencere boyunu oradan alır ve içeriği kayar.
+  - Emoji paneli de çizginin altında açılır.
+  - Hediye penceresi orada sıkışık düzendedir: tutamak ve seviye satırı yok, raf notu yalnız Şanslı'da, toplam tutar düğmede, uyarı yalnız sorun varsa. Adet listesi iki sütundur.
+  - Oda dışında pencereler eski boylarında kalır.
+- **Oyun paneli** (Oyun Salonu oyunları) oyun alanı gerektirdiği için eskisi gibi ekranın üçte ikisini kaplar.
+
 ## Telefonda denenecekler
 
 - **PK:** Tek kişiyle PK başlat, ikinci telefon mikrofona çıksın: birkaç saniyede her telefonda PK'ye girmeli (Takım PK'de az kişili takıma).
@@ -70,4 +90,7 @@ Videolar artık uygulamaya gömülmez. `server/api/fx/` içinden verilir; telefo
   - "Mikrofon denoise" altında konuşunca "Çalışıyor" yazmalı. "başlatılamadı" derse `SimilarDenoise` etiketli logcat satırları gerekir.
   - Gürültü engellemeyi ayrı odalarda ya da kulaklıkla deneyin; iki telefon aynı odada hoparlörle yankı yapar.
 - **Hediyeler:** Videolu hediyeleri arka arkaya at: her biri sonuna kadar, sırayla oynamalı. Tekrar çarkı jeton bitince tek uyarıyla kapanmalı.
-- **Düzen:** Emoji panelini açınca koltuklar kıpırdamamalı; tablette katkı kürsüsü sığmalı.
+- **Düzen:**
+  - Emoji panelini açınca koltuklar kıpırdamamalı; tablette katkı kürsüsü sığmalı.
+  - **Oda iki parça:** Odada yazı alanına dokun, birkaç mesaj yaz ve gönder, klavyeyi geri tuşuyla kapat. Koltuklar ve Balkon çubuğu hiç küçülmemeli, kaymamalı, örtülmemeli. Yazarken son mesajlar Balkon'un altında görünmeli.
+  - Hediye, kişi kartı, menü, kişiler ve mesajlar pencereleri Balkon çizgisine kadar açılmalı; içleri kaymalı.

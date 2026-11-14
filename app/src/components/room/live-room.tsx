@@ -565,7 +565,13 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // two parts (lib/room-split): the keyboard takes its room from the chat alone, whose last lines stay in sight between
   // the Balkon bar and the field; the header, the mics and the Balkon bar don't move.
   const [inputFocused, setInputFocused] = useState(false);
-  const typing = useKeyboardOpen() && inputFocused;
+  const keyboardUp = useKeyboardOpen();
+  const typing = keyboardUp && inputFocused;
+  // The keyboard came up for this field: the controls stay over it until it has gone (the field may lose its focus
+  // first, as when the emoji panel takes the keyboard's place). A sheet's keyboard leaves the room as it is.
+  const [ownKeyboard, setOwnKeyboard] = useState(false);
+  if (typing && !ownKeyboard) setOwnKeyboard(true);
+  if (!keyboardUp && ownKeyboard) setOwnKeyboard(false);
   // The room measured with no keyboard up (lib/room-split): its height between the status and navigation bars, the
   // header, the controls under the chat, and the Balkon line inside the stage part. The mics are sized from these and
   // a sheet over the room rises at most to the line (lib/sheet-space).
@@ -3626,7 +3632,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             it to, the taller height is kept while a keyboard is up). */}
         <KeyboardAvoid
           style={{ flex: 1 }}
-          enabled={inputFocused}
+          enabled={inputFocused || ownKeyboard}
           onLayout={(e) => {
             const h = Math.round(e.nativeEvent.layout.height);
             setRoomH((old) => steadyNext(old, h, Keyboard.isVisible()));
