@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { GIFTS } from '@/data/mock';
 import { RULES } from '@/data/rules';
 import { exchangeOwnDiamonds, selfExchangeRate } from '@/lib/coins-bank';
-import { activeCampaign, campaignCoins, liveRules, parseLiveCatalog, parseSavedLiveCatalog, rateChangedMessage, validRate, visibleGifts, type LiveCatalog } from '@/lib/live/catalog-live';
+import { activeCampaign, bagGifts, campaignCoins, liveRules, parseLiveCatalog, parseSavedLiveCatalog, rateChangedMessage, validRate, visibleGifts, type LiveCatalog } from '@/lib/live/catalog-live';
 import { GIFTS_PAUSED } from '@/data/gifts-paused';
 // Plain JavaScript modules of the server; TypeScript reads them through allowJs.
 import * as server from '../../server/api/catalog.mjs';
@@ -42,14 +42,14 @@ describe('Canlı katalog: hediye rafı', () => {
     const shown = visibleGifts(GIFTS, c);
     assert.deepEqual(ids(shown), ids(GIFTS).filter((id) => !['g2', 'h5', 'v12'].includes(id) && !GIFTS_PAUSED.has(id)));
     // A gift only a newer app knows is not added; names, art and prices stay the compiled ones.
-    const extra = parseLiveCatalog({ gifts: [{ id: 'g1' }, { id: 'z99' }] });
-    assert.deepEqual(visibleGifts(GIFTS, extra), [GIFTS.find((g) => g.id === 'g1')]);
+    const extra = parseLiveCatalog({ gifts: [{ id: 'g6' }, { id: 'z99' }] });
+    assert.deepEqual(visibleGifts(GIFTS, extra), [GIFTS.find((g) => g.id === 'g6')]);
   });
 
-  test('boş sunucu tablosu (eski sunucu gibi): şimdilik kapalı 37 dışındaki 28 hediyenin hepsi', () => {
+  test('boş sunucu tablosu (eski sunucu gibi): şimdilik kapalı 41 dışındaki 24 hediyenin hepsi', () => {
     const c = parseLiveCatalog(body());
     assert.equal(GIFTS.length, 65);
-    assert.equal(visibleGifts(GIFTS, c).length, 28);
+    assert.equal(visibleGifts(GIFTS, c).length, 24);
     assert.equal(c.packs.length, 9);
   });
 
@@ -75,13 +75,27 @@ describe('Canlı katalog: hediye rafı', () => {
     const subset = (list: string[]) => list.map((id) => GIFTS.find((g) => g.id === id)!);
     const cp = subset(['c9', 'c12', 'c1']);
     const chat = subset(['g1', 'g2', 'g3', 'g4', 'g5']);
-    // Taç (g5) is off the shelf for now; a hidden one drops too.
-    assert.deepEqual(ids(visibleGifts(chat, parseLiveCatalog(body({ hidden: ['g2'] })))), ['g1', 'g3', 'g4']);
+    // The five chat gifts are all off the shelf for now: the chat keeps them rather than open empty.
+    assert.equal(visibleGifts(chat, parseLiveCatalog(body({ hidden: ['g2'] }))), chat);
+    // A list with gifts still on the shelf: a hidden one drops.
+    const videos = subset(['g6', 'h13', 'h14']);
+    assert.deepEqual(ids(visibleGifts(videos, parseLiveCatalog(body({ hidden: ['h13'] })))), ['g6', 'h14']);
     // The three İkili gifts are all off the shelf for now: the relationship screen keeps them rather than open empty.
     assert.equal(visibleGifts(cp, parseLiveCatalog(body({ hidden: ['c12'] }))), cp);
     const noCp = parseLiveCatalog(body({ hidden: ['c1', 'c9', 'c12'] }));
     assert.equal(visibleGifts(cp, noCp), cp);
     assert.equal(visibleGifts(chat, parseLiveCatalog(body({ hidden: ['g1', 'g2', 'g3', 'g4', 'g5'] }))), chat);
+  });
+
+  test('Çantam: raftan kalkan hediye çantada gönderilebilir kalır (Kalp, görev ödülü); Canlı ayarlarda gizlenen düşer', () => {
+    const c = parseLiveCatalog(body({ hidden: ['h13'] }));
+    const inBag = ids(bagGifts(GIFTS, c));
+    assert.ok(GIFTS_PAUSED.has('g2') && inBag.includes('g2'), 'Kalp çantada');
+    assert.ok(!ids(visibleGifts(GIFTS, c)).includes('g2'), 'Kalp rafta değil');
+    assert.ok(!inBag.includes('h13'), 'gizlenen düşer');
+    assert.ok(inBag.includes('h15'));
+    // Without a server list (offline, broken copy): everything compiled.
+    assert.equal(bagGifts(GIFTS, null).length, GIFTS.length);
   });
 });
 

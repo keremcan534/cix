@@ -126,12 +126,12 @@ describe('hediye videoları sunucudan', () => {
 });
 
 describe('animasyonu olmayan hediyeler şimdilik raftan kalktı', () => {
-  test('katalog onları listelemez; videosu olan ve dört standart hediye kalır; eski uygulamadan gönderim geçer', async () => {
+  test('katalog onları listelemez; videosu olanlar kalır; eski uygulamadan gönderim geçer', async () => {
     const { GIFTS, GIFTS_PAUSED } = await import('../catalog.mjs');
     const { gifts } = await catalog();
     const listed = new Set(gifts.map((g) => g.id));
     for (const id of GIFTS_PAUSED) assert.ok(!listed.has(id), `${id} listede`);
-    for (const id of ['g1', 'g2', 'g3', 'g4', ...Object.keys(FX_VIDEOS.gift)]) assert.ok(listed.has(id), `${id} listede değil`);
+    for (const id of Object.keys(FX_VIDEOS.gift)) assert.ok(listed.has(id), `${id} listede değil`);
     // Nothing with a video is paused, and every id is a real gift.
     for (const id of GIFTS_PAUSED) {
       assert.ok(GIFTS.has(id), id);

@@ -125,6 +125,16 @@ export function visibleGifts<G extends { id: string }>(compiled: G[], c: LiveCat
   return shown.length ? shown : compiled;
 }
 
+/**
+ * Çantam: what may be sent from the backpack. A gift off the shelf for now stays sendable there (the server takes it,
+ * and the daily call task puts Kalp in the bag); only a gift the server stopped listing for another reason (hidden in
+ * Canlı ayarlar, which it refuses) drops.
+ */
+export function bagGifts<G extends { id: string }>(compiled: G[], c: LiveCatalog | null = current): G[] {
+  const listed = c?.giftIds ? new Set(c.giftIds) : null;
+  return compiled.filter((g) => !listed || listed.has(g.id) || GIFTS_PAUSED.has(g.id));
+}
+
 let rulesMemo: { rate: number; rules: Rules } | null = null;
 /** The rules with the server's Çevir rate (lib/coins-bank selfExchangeRate / exchangeOwnDiamonds); RULES when
  *  the server didn't say or said something outside 40–75. The same object until the rate changes. */
