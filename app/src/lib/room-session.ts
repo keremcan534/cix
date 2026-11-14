@@ -492,6 +492,7 @@ export const engineInfo = () => ({ name: engine.name, capabilities: engine.capab
 export function setEngine(next: AudioEngine) {
   engine = next;
   engine.setNoiseSuppression?.(denoise);
+  engine.setRawMic?.(rawMic);
   played = -1;
   syncVolume();
 }
@@ -500,6 +501,12 @@ let denoise = true;
 export function setNoiseSuppression(on: boolean) {
   denoise = on;
   engine.setNoiseSuppression?.(on);
+}
+// "Ham mikrofon" (settings.micRaw): the mic without any voice processing, for singing; kept for a new engine too.
+let rawMic = false;
+export function setRawMic(on: boolean) {
+  rawMic = on;
+  engine.setRawMic?.(on);
 }
 // "Konuşma sesi" (settings.voiceVolume): how loud the room's voices play on this phone.
 let volume = 1;

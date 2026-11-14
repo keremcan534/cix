@@ -26,7 +26,7 @@ import { isFiniteNumber, oneOf, withDefaults } from '@/lib/saved-state';
 import { ME_DEFAULT, parkAccount, readSnapshot, unparkAccount, type Snapshot } from '@/lib/snapshot';
 import { setGameVolume } from '@/lib/game-sound';
 import { setHapticsEnabled } from '@/lib/haptics';
-import { setNoiseSuppression } from '@/lib/room-session';
+import { setNoiseSuppression, setRawMic } from '@/lib/room-session';
 import { CONVERSATIONS, GIFTS, ME, isServerId, type Conversation, type EventShareCard, type RoomInviteCard, type User } from '@/data/mock';
 import type { ServerEarnings, ServerUser } from '@/lib/api';
 import { block as serverBlock, follow } from '@/lib/api';
@@ -88,6 +88,8 @@ export type Settings = {
   micAnim: boolean;
   seatReactions: boolean;
   micDenoise: boolean;
+  /** Ham mikrofon: no voice processing at all, for singing (lib/room-session setRawMic). */
+  micRaw: boolean;
   invitesFrom: 'everyone' | 'following' | 'nobody';
   dailySpendLimit: number; // coins; 0 = no limit
   /** My wins (Lucky, games) are announced in every room with my name (off: "Bir kullanıcı"). */
@@ -509,7 +511,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       gameVolume: 0.4,
       voiceVolume: 1,
       giftSounds: true,
-      bigGiftsOnly: false, micDenoise: true,
+      bigGiftsOnly: false, micDenoise: true, micRaw: false,
       giftFx: true,
       entryFx: true,
       micAnim: true,
@@ -535,6 +537,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   }, [settings]);
   // "Mikrofon denoise" (Efektler ve ses): the AI cleaning on every mic this phone sends, rooms and 1v1 calls alike.
   useEffect(() => setNoiseSuppression(settings.micDenoise), [settings.micDenoise]);
+  useEffect(() => setRawMic(settings.micRaw), [settings.micRaw]);
   // The demo starts with three sample notices about sample people and rooms. A live build starts empty, and
   // drops the samples once from a save made before (their ids are only ever used by these samples).
   const [notifications, setNotifications] = useState<Notice[]>(() =>

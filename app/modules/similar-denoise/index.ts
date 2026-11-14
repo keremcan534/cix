@@ -6,7 +6,7 @@ import { requireOptionalNativeModule } from 'expo';
 /** In the mic's path yet, and how many 10 ms frames it has cleaned since the app started. */
 export type AiDenoiseStatus = { attached: boolean; frames: number };
 
-const native = requireOptionalNativeModule<{ setEnabled(on: boolean): boolean; status?(): AiDenoiseStatus }>('SimilarDenoise');
+const native = requireOptionalNativeModule<{ setEnabled(on: boolean): boolean; status?(): AiDenoiseStatus; setPhoneNs?(on: boolean): boolean }>('SimilarDenoise');
 
 /** This build has the AI denoise (an Android APK with the module). */
 export const aiDenoiseAvailable = () => native !== null;
@@ -26,5 +26,17 @@ export function aiDenoiseStatus(): AiDenoiseStatus | null {
     return native?.status?.() ?? null;
   } catch {
     return null;
+  }
+}
+
+/**
+ * The phone's own noise suppressor (Android's, which the voice engine starts with the mic): off for "Ham mikrofon".
+ * True when the phone took it; false while the mic records (it follows from the next room), or without the module.
+ */
+export function setPhoneNoiseSuppressor(on: boolean): boolean {
+  try {
+    return native?.setPhoneNs?.(on) ?? false;
+  } catch {
+    return false;
   }
 }

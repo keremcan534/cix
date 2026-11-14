@@ -334,7 +334,7 @@ function Volume({ settings, set, k, label }: { settings: Settings; set: SetFn; k
   );
 }
 
-type ToggleKey = 'micDenoise' | 'effectsOff' | 'giftFx' | 'bigGiftsOnly' | 'entryFx' | 'micAnim' | 'seatReactions' | 'reduceMotion' | 'lowData';
+type ToggleKey = 'micDenoise' | 'micRaw' | 'effectsOff' | 'giftFx' | 'bigGiftsOnly' | 'entryFx' | 'micAnim' | 'seatReactions' | 'reduceMotion' | 'lowData';
 const NOTE_COLOR: Record<DenoiseLine['tone'], string> = { ok: semantic.live, wait: colors.textDim, bad: colors.gold };
 /** A switch with its name, what it does and, when there is one, how it stands on this phone right now. */
 function SwitchRow({ label, hint, note, value, onChange, off = false }: { label: string; hint?: string; note?: DenoiseLine | null; value: boolean; onChange: (v: boolean) => void; off?: boolean }) {
@@ -403,10 +403,18 @@ export function EffectsSheet({
           set={set}
           k="micDenoise"
           label="Mikrofon denoise"
-          hint="Arka plan gürültüsünü (fan, trafik, klavye) yapay zekâyla temizler. Temel gürültü engelleme her zaman açıktır."
-          note={denoiseNote}
+          hint="Arka plan gürültüsünü (fan, trafik, klavye) yapay zekâyla temizler. Ham mikrofon kapalıyken temel gürültü engelleme her zaman açıktır."
+          note={settings.micRaw ? null : denoiseNote}
+          off={settings.micRaw}
         />
       )}
+      <SoundToggle
+        settings={settings}
+        set={set}
+        k="micRaw"
+        label="Ham mikrofon (şarkı modu)"
+        hint="Gürültü engelleme, yankı giderme ve otomatik ses ayarı tamamen kapanır; sesin olduğu gibi gider. Kulaklık tak: yoksa odadakiler kendi seslerini yankı olarak duyar."
+      />
       <Text style={styles.label}>Efektler</Text>
       <SoundToggle settings={settings} set={set} k="effectsOff" label="Tüm efektleri kapat" hint="Aşağıdakilerin hepsini birden kapatır." />
       <Text style={styles.label}>Hediyeler</Text>

@@ -5,7 +5,8 @@ import expo.modules.kotlin.modules.ModuleDefinition
 
 /**
  * JS: setEnabled(on) → true once the AI denoise is in the mic's path (AiDenoise); status() → whether it is and how
- * many 10 ms frames it has cleaned, so a phone where it doesn't run can be seen (Efektler ve ses).
+ * many 10 ms frames it has cleaned, so a phone where it doesn't run can be seen (Efektler ve ses); setPhoneNs(on) →
+ * the phone's own noise suppressor for "Ham mikrofon" (PhoneNoiseSuppressor).
  */
 class SimilarDenoiseModule : Module() {
   override fun definition() = ModuleDefinition {
@@ -13,6 +14,10 @@ class SimilarDenoiseModule : Module() {
 
     Function("setEnabled") { on: Boolean ->
       AiDenoise.setEnabled(on)
+    }
+
+    Function("setPhoneNs") { on: Boolean ->
+      PhoneNoiseSuppressor.set(on)
     }
 
     Function("status") {

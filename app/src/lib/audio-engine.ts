@@ -44,6 +44,8 @@ export interface AudioEngine {
   setRoute(route: AudioRoute): void;
   /** "Mikrofon denoise": the AI cleaning on the live mic, on top of the always-on noise suppression (engines without a real mic skip it). */
   setNoiseSuppression?(on: boolean): void;
+  /** "Ham mikrofon": no voice processing at all (no noise suppression, echo cancellation or gain control), for singing. */
+  setRawMic?(on: boolean): void;
   /** How loud the other people in the room play on this phone, 0 (room sound off) to 1. */
   setPlaybackVolume?(volume: number): void;
   /** My camera in a Video layout's camera seat (görüntülü yuva); engines without real media skip it. */
