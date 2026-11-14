@@ -115,7 +115,8 @@ export const TITLE_HOWTO = `Oda Efsanesi: odan Lv.${R.roomLevel} olunca. Yüksel
 export type Pedestal = { id: string; emoji: string; name: string };
 export type ShowcaseView = { medals: Medal[]; titles: Title[]; rides: Pedestal[]; entries: Pedestal[]; giftWall: (Gift & { count: number })[] };
 
-const shopItems = (skus: readonly string[]) => skus.flatMap((sku) => COSMETICS.filter((c) => c.id === sku).map((c) => ({ id: c.id, emoji: c.emoji, name: c.name })));
+// Items taken out of the shop (data/catalog `retired`) aren't shown on the Vitrin either.
+const shopItems = (skus: readonly string[]) => skus.flatMap((sku) => COSMETICS.filter((c) => c.id === sku && !c.retired).map((c) => ({ id: c.id, emoji: c.emoji, name: c.name })));
 
 /** The server's Vitrin answer with the app's names and looks; an id this app doesn't know is left out. */
 export function showcaseView(s: Showcase): ShowcaseView {

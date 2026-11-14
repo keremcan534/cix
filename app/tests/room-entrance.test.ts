@@ -79,16 +79,16 @@ function phone(me: Person, meJoinedAt: number, roomBonds: RoomBond[] = []) {
 }
 
 const owner: Person = { id: 'u-owner', name: 'Oda Sahibi', look: { entry: 'en-dragon', vipLevel: 7 } };
-const admin: Person = { id: 'u-admin', name: 'Yönetici', look: { entry: 'en-comet', ride: 'rd-sport' } };
+const admin: Person = { id: 'u-admin', name: 'Yönetici', look: { entry: 'en-gemi', ride: 'rd-sport' } };
 const newbie: Person = { id: 'u-new', name: 'Yeni', look: {} };
-const kaan: Person = { id: 'u-kaan', name: 'KaaN', look: { entry: 'en-thunder', ride: 'rd-scooter', noble: 2 } };
-const artemis: Person = { id: 'u-artemis', name: 'ARTEMİS', look: { entry: 'en-sparkle' } };
+const kaan: Person = { id: 'u-kaan', name: 'KaaN', look: { entry: 'en-aslan', ride: 'rd-scooter', noble: 2 } };
+const artemis: Person = { id: 'u-artemis', name: 'ARTEMİS', look: { entry: 'en-roket' } };
 const couple: RoomBond[] = [{ a: 'u-artemis', b: 'u-kaan', kind: 'cift', level: 9 }];
 
 describe('(a) giriş efekti yalnız sahibinin, yalnız kendi girişinde', () => {
   test('efekt girenin kendi görünüşünden; oda sahibinin ve yöneticinin efekti başkasına geçmez', () => {
     assert.equal(entryPlanOf(owner.look)?.fx, 'dragon');
-    assert.deepEqual(entryPlanOf(admin.look), { fx: 'comet', rideId: 'rd-sport', ride: '🏎️' });
+    assert.deepEqual(entryPlanOf(admin.look), { fx: 'gemi', rideId: 'rd-sport', ride: '🏎️' });
     // A new account wears nothing: no banner, whoever else in the room has one.
     assert.equal(entryPlanOf(newbie.look), null);
     assert.equal(entryPlanOf(undefined), null);
@@ -101,12 +101,12 @@ describe('(a) giriş efekti yalnız sahibinin, yalnız kendi girişinde', () => 
   test('yöneticinin telefonu: başkası girince yöneticinin kendi efekti oynamaz', () => {
     const p = phone(admin, T, []);
     p.sync([{ ...owner, at: T - 300 * S }], T);
-    assert.deepEqual(p.played(), ['Yönetici:comet'], 'yalnız kendi girişi');
+    assert.deepEqual(p.played(), ['Yönetici:gemi'], 'yalnız kendi girişi');
     p.sync([{ ...owner, at: T - 300 * S }, { ...newbie, at: T + 60 * S }], T + 61 * S);
     assert.deepEqual(p.chat, ['Yeni odaya girdi']);
     assert.deepEqual(p.played(), [], 'yeni gelenin efekti yok; yöneticinin efekti tekrar oynamaz');
     p.sync([{ ...owner, at: T - 300 * S }, { ...newbie, at: T + 60 * S }, { ...kaan, at: T + 90 * S }], T + 91 * S);
-    assert.deepEqual(p.played(), ['KaaN:thunder'], 'girenin kendi efekti');
+    assert.deepEqual(p.played(), ['KaaN:aslan'], 'girenin kendi efekti');
   });
 });
 
@@ -118,7 +118,7 @@ describe('(b) yeni gelen, içerideki kişilerin girişlerini tekrar görmez', ()
     assert.deepEqual(p.played(), [], 'oda sahibinin ve yöneticinin efekti yeni gelende oynamaz');
     p.sync([{ ...owner, at: T - 900 * S }, { ...admin, at: T - 120 * S }, { ...kaan, at: T - 3 * S }, { ...artemis, at: T + 30 * S }], T + 31 * S);
     assert.deepEqual(p.chat, ['ARTEMİS odaya girdi']);
-    assert.deepEqual(p.played(), ['ARTEMİS:sparkle']);
+    assert.deepEqual(p.played(), ['ARTEMİS:roket']);
   });
 
   test('aynı liste yeniden gelince (her ses olayında) giriş tekrarlanmaz', () => {
@@ -128,7 +128,7 @@ describe('(b) yeni gelen, içerideki kişilerin girişlerini tekrar görmez', ()
     const later = [...people, { ...admin, at: T + 10 * S }];
     for (let i = 0; i < 5; i++) p.sync(later, T + (11 + i) * S);
     assert.deepEqual(p.chat, ['Yönetici odaya girdi']);
-    assert.deepEqual(p.played(), ['Yönetici:comet']);
+    assert.deepEqual(p.played(), ['Yönetici:gemi']);
   });
 
   test('benim bağlantım kopup gelince: herkes yeniden listelenir ama giriş efekti oynamaz', () => {
@@ -147,13 +147,13 @@ describe('(b) yeni gelen, içerideki kişilerin girişlerini tekrar görmez', ()
   test('başkasının bağlantısı kopup bir dakika içinde gelince satır var, efekt yok; sonra gelince efekt de var', () => {
     const p = phone(newbie, T);
     p.sync([{ ...kaan, at: T + 5 * S }], T + 6 * S);
-    assert.deepEqual(p.played(), ['KaaN:thunder']);
+    assert.deepEqual(p.played(), ['KaaN:aslan']);
     p.sync([], T + 20 * S);
     p.sync([{ ...kaan, at: T + 24 * S }], T + 25 * S);
     assert.deepEqual(p.played(), [], 'kopup gelen');
     p.sync([], T + 30 * S);
     p.sync([{ ...kaan, at: T + 30 * S + RETURN_MS }], T + 31 * S + RETURN_MS);
-    assert.deepEqual(p.played(), ['KaaN:thunder'], 'çıkıp sonra giren');
+    assert.deepEqual(p.played(), ['KaaN:aslan'], 'çıkıp sonra giren');
   });
 
   test('ses sunucusunun saatiyle: benden sonra gelen giriştir, önce gelen ya da bilinmeyen değil', () => {
@@ -176,18 +176,18 @@ describe('(c) bir giriş, bir bildirim', () => {
     third.sync([inside], T - 599 * S);
     third.played();
     third.sync([inside, { ...kaan, at: T }], T + S);
-    assert.deepEqual(third.played(), ['KaaN:thunder']);
+    assert.deepEqual(third.played(), ['KaaN:aslan']);
     assert.deepEqual(third.chat.filter((l) => l.includes('KaaN')), ['KaaN odaya girdi']);
 
     const hers = phone(artemis, T - 600 * S, couple);
     hers.sync([], T - 599 * S);
     hers.played();
     hers.sync([{ ...kaan, at: T }], T + S);
-    assert.deepEqual(hers.played(), ['KaaN:thunder']);
+    assert.deepEqual(hers.played(), ['KaaN:aslan']);
 
     const his = phone(kaan, T, couple);
     his.sync([inside], T + S);
-    assert.deepEqual(his.played(), ['KaaN:thunder'], 'kendi girişi, eşi için çift bildirimi yok');
+    assert.deepEqual(his.played(), ['KaaN:aslan'], 'kendi girişi, eşi için çift bildirimi yok');
   });
 });
 
@@ -197,11 +197,11 @@ describe('(d) çift bildirimi yalnız aynı anda ilk girişte, kendi girişlerin
     third.sync([], T - 299 * S);
     third.sync([{ ...artemis, at: T }], T + S);
     third.sync([{ ...artemis, at: T }, { ...kaan, at: T + 8 * S }], T + 9 * S);
-    assert.deepEqual(third.played(), ['ARTEMİS:sparkle', 'KaaN:thunder', 'ARTEMİS & KaaN']);
+    assert.deepEqual(third.played(), ['ARTEMİS:roket', 'KaaN:aslan', 'ARTEMİS & KaaN']);
     // KaaN's phone: ARTEMİS was inside 8 s before him; his own banner, then the joint one.
     const his = phone(kaan, T + 8 * S, couple);
     his.sync([{ ...artemis, at: T }], T + 9 * S);
-    assert.deepEqual(his.played(), ['KaaN:thunder', 'ARTEMİS & KaaN']);
+    assert.deepEqual(his.played(), ['KaaN:aslan', 'ARTEMİS & KaaN']);
     // Someone coming in after them sees none of it.
     const later = phone(newbie, T + 120 * S, couple);
     later.sync([{ ...artemis, at: T }, { ...kaan, at: T + 8 * S }], T + 121 * S);
@@ -215,12 +215,24 @@ describe('(d) çift bildirimi yalnız aynı anda ilk girişte, kendi girişlerin
     assert.ok(third.played().includes('ARTEMİS & KaaN'));
     third.sync([], T + 600 * S);
     third.sync([{ ...artemis, at: T + 900 * S }, { ...kaan, at: T + 901 * S }], T + 902 * S);
-    assert.deepEqual(third.played(), ['ARTEMİS:sparkle', 'KaaN:thunder']);
+    assert.deepEqual(third.played(), ['ARTEMİS:roket', 'KaaN:aslan']);
 
     const apart = phone(newbie, T - 300 * S, couple);
     apart.sync([], T - 299 * S);
     apart.sync([{ ...artemis, at: T }], T + S);
     apart.sync([{ ...artemis, at: T }, { ...kaan, at: T + 45 * S }], T + 46 * S);
-    assert.deepEqual(apart.played(), ['ARTEMİS:sparkle', 'KaaN:thunder']);
+    assert.deepEqual(apart.played(), ['ARTEMİS:roket', 'KaaN:aslan']);
+  });
+});
+
+describe('satıştan kalkan giriş efektleri', () => {
+  test('takılı kalmış olsa da oynamaz; VIP ya da rütbe bandı yerine geçer', async () => {
+    const { entryPlanOf } = await import('@/lib/room-entrance');
+    for (const entry of ['en-sparkle', 'en-thunder', 'en-comet']) {
+      assert.equal(entryPlanOf({ entry, vipLevel: 0 }), null, entry);
+      assert.equal(entryPlanOf({ entry, noble: 2, vipLevel: 0 })?.fx, 'vip', `${entry} + rütbe`);
+    }
+    assert.equal(entryPlanOf({ entry: 'en-aslan', vipLevel: 0 })?.fx, 'aslan');
+    assert.equal(entryPlanOf({ entry: 'en-dragon', vipLevel: 0 })?.fx, 'dragon');
   });
 });

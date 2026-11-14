@@ -17,9 +17,9 @@ export type Cosmetic = {
     // Video entries (components/fx/entry EntryFx): their clip is the gift's (server/api/fx.mjs FX_VIDEOS.entry).
     | 'roket' | 'ayicik' | 'panda' | 'tac' | 'tekboynuz' | 'anka' | 'gemi' | 'saray' | 'otomobil' | 'aslan';
   /**
-   * No longer sold (the owner, 14 Nov: entry effects with no animation of their own, only the drawn banner). The
-   * shop shows it only to someone who owns it, who can still wear it until it runs out; the server refuses a new
-   * purchase (server/api/catalog.mjs SHOP_PAUSED, the same list).
+   * Gone (the owner, 14 Nov: entry effects with no animation of their own, only the drawn banner). Not in the shop,
+   * not on the Vitrin, and not played even when someone still has it on (lib/room-entrance entryPlanOf, the room's
+   * own entry); the server refuses a purchase (server/api/catalog.mjs SHOP_PAUSED, the same list).
    */
   retired?: true;
 };

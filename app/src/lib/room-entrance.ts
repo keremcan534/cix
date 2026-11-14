@@ -68,10 +68,11 @@ export type EntryPlan = { fx: EntryFx; rideId?: string; ride?: string; badge?: s
 /** What `look` (one person's, as the server keeps it) shows when its owner comes in; null when nothing worn shows. */
 export function entryPlanOf(look: { entry?: string | null; ride?: string | null; noble?: number | null; vipLevel?: number } | undefined): EntryPlan | null {
   if (!look) return null;
-  // Only an item of its own slot: anything else in it would be no entry effect at all.
+  // Only an item of its own slot, and not one taken out of the shop (data/catalog `retired`): either would be no
+  // entry effect at all.
   const worn = (id: string | null | undefined, kind: 'entry' | 'ride') => {
     const c = cosmeticById(id ?? undefined);
-    return c?.kind === kind ? c : undefined;
+    return c?.kind === kind && !c.retired ? c : undefined;
   };
   const entryItem = worn(look.entry, 'entry');
   const ride = worn(look.ride, 'ride');
