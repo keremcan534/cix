@@ -39,7 +39,7 @@ hediyeyi sessizce atlar, videosunu indirmez (adresi `/api/fx/g/…`, onların s�
 | İkon | PNG ya da WebP, saydam, kare (en çok 1:1,25), 128–4096 px (önerilen 512 × 512), en çok 10 MB. Telefonlar hediye panelinin bütün ikonlarını indirir: 1024 px'ten ya da 1 MB'tan büyük ikonu sunucu kaydederken küçültür (en çok 1024 px ve 1 MB, saydam PNG, `tools/icon-fit.py`); yüklenen büyük dosya silinir |
 | Video (hazır) | Yığılmış MP4: H.264, üst yarı renk, alt yarı alfa (ör. 540 × 1920), 1–15 sn, en çok 12 MB |
 | Video (kaynak) | Saydam WebM (VP8/VP9 alfa) ya da ProRes 4444 .mov, en çok 500 MB; sunucu 540 × 960 görünür, 20 fps, AAC sesli yığılmış MP4'e çevirir. Dosya küçük olsun diye bu boyutta (540 × 960, 20 fps) dışa aktarın: görüntü aynı kalır, ProRes 4444 dosyası 1080 × 1920'ye göre kabaca dörtte birine iner |
-| SVGA | SVGA 2.x, en çok 100 MB ve 15 sn (çevirici dosyayı bütün okur, sınırı bu yüzden küçük); sunucu aynı biçime çevirir, sesini korur. Ekrandaki boyutu: Küçük %45, Orta %60 (varsayılan), Büyük %80, Tam ekran %100 |
+| SVGA | SVGA 2.x, en çok 250 MB ve 15 sn (çevirici dosyayı bütün okur: 244 MB'lık bir SVGA 0,8 GB bellekle yaklaşık bir dakikada çevrildi); sunucu aynı biçime çevirir, sesini korur. Ekrandaki boyutu: Küçük %45, Orta %60 (varsayılan), Büyük %80, Tam ekran %100 |
 | Arka plan silme | **Yapılmaz.** Kaynakta saydamlık yoksa ya da çıkan videonun hiçbir yeri saydam değilse reddedilir; arka planı silinmiş kaynak yükleyin. Reddedilen videonun odada nasıl görüneceği (arka planıyla kutu gibi) listede **Önizle** ile izlenir |
 | Silme | Hediye raflardan ve panelden kalkar, gönderilemez; satır geçmiş için saklanır, ikonu ve videosu depodan silinir |
 | Bağlantıdan dosya | Finans panelinde her dosyanın yanında "ya da bağlantı yapıştır": sunucu dosyayı bir kez indirir, yüklenmiş gibi denetler ve kendisi sunar (aşağıda **Bağlantıdan dosya**) |
@@ -127,7 +127,7 @@ vardır: dosyayı kendi sitenize (ör. GoDaddy hostingde `/hediyeler/` klasörü
 - **Güvenlik:** sunucu yalnız internette herkese açık adreslere bağlanır: bu makine (API, panel, veritabanı), konteyner
   ağı, özel ağlar, link-local (bulut üst verisi), CGNAT, çok noktaya yayın ve ayrılmış bloklar olmaz; alan adı çözüldükten
   sonra ve her yönlendirmede (en çok 5) yeniden denetlenir, bağlantı denetlenen adrese gider. Boyut sınırları yüklemeyle
-  aynı (ikon 10 MB, hazır MP4 12 MB, video kaynağı 500 MB, SVGA 100 MB), süre ikon için 1, video için 10 dakika. Her deneme `audit_events`
+  aynı (ikon 10 MB, hazır MP4 12 MB, video kaynağı 500 MB, SVGA 250 MB), süre ikon için 1, video için 10 dakika. Her deneme `audit_events`
   `gift.fetch` satırıdır (bağlantı, sonuç, panelden ise panel kullanıcısı). `server/api/link-fetch.mjs`.
 - Uygulamadaki Yönetim › Hediyeler formunda bağlantı alanı yok (yeni APK gerektirir); sunucu ucu (`/api/admin/gifts/fetch`)
   hazır.

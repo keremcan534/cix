@@ -60,8 +60,8 @@ const KINDS = {
   gifticon: { types: ['image/png', 'image/webp'], max: 10 * 1024 * 1024, admin: true },
   giftvideo: { types: ['video/mp4'], max: 12 * 1024 * 1024, admin: true },
   // A video source may be big (a ProRes 4444 .mov with alpha is about 100 MB for 10 s even at the app's 540 × 960);
-  // an SVGA stays at 100 MB: the converter reads it whole (tools/svga-to-fx.py).
-  giftsource: { types: ['video/webm', 'video/quicktime', 'application/x-svga'], max: 500 * 1024 * 1024, typeMax: { 'application/x-svga': 100 * 1024 * 1024 }, admin: true },
+  // an SVGA up to 250 MB: the converter reads it whole (tools/svga-to-fx.py; a 244 MB one peaked at 0.8 GB).
+  giftsource: { types: ['video/webm', 'video/quicktime', 'application/x-svga'], max: 500 * 1024 * 1024, typeMax: { 'application/x-svga': 250 * 1024 * 1024 }, admin: true },
   // Yönetim › Emojiler (emoji.mjs), admins only: a sticker's picture, a transparent PNG or WebP or a Lottie animation
   // (its JSON, pictures inside it).
   stickerart: { types: ['image/png', 'image/webp', 'application/json'], max: 512 * 1024, admin: true },
