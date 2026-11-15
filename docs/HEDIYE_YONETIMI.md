@@ -41,6 +41,7 @@ hediyeyi sessizce atlar, videosunu indirmez (adresi `/api/fx/g/…`, onların s�
 | SVGA | SVGA 2.x, en çok 100 MB ve 15 sn; sunucu aynı biçime çevirir, sesini korur. Ekrandaki boyutu: Küçük %45, Orta %60 (varsayılan), Büyük %80, Tam ekran %100 |
 | Arka plan silme | **Yapılmaz.** Kaynakta saydamlık yoksa ya da çıkan videonun hiçbir yeri saydam değilse reddedilir; arka planı silinmiş kaynak yükleyin |
 | Silme | Hediye raflardan ve panelden kalkar, gönderilemez; satır geçmiş için saklanır, ikonu ve videosu depodan silinir |
+| Bağlantıdan dosya | Finans panelinde her dosyanın yanında "ya da bağlantı yapıştır": sunucu dosyayı bir kez indirir, yüklenmiş gibi denetler ve kendisi sunar (aşağıda **Bağlantıdan dosya**) |
 | Raftan kaldırma | Panelde kalır, kataloğda görünmez, gönderilemez; tekrar rafa konabilir |
 
 ## Yöneticinin adımları
@@ -56,6 +57,34 @@ hediyeyi sessizce atlar, videosunu indirmez (adresi `/api/fx/g/…`, onların s�
    "Video hazır · süre · boyut", olmazsa nedeni ("Bu videoda saydamlık yok…"). Çevrilirken hediye videosuz gönderilir
    (ikonu uçar), eski video varsa o oynar.
 7. Listede ok tuşlarıyla rafın içinde sıra, **Düzenle**, **Raftan kaldır / Rafa koy**, **Sil**.
+
+## Bağlantıdan dosya (kendi sitenizden)
+
+Finans panelinin (Uygulama › Hediyeler) hediye formunda ikonun ve videonun **Dosya seç**'inin altında bir bağlantı alanı
+vardır: dosyayı kendi sitenize (ör. GoDaddy hostingde `/hediyeler/` klasörüne) koyup adresini yapıştırırsınız,
+**Bağlantıdan çek**'e basarsınız, sonra **Kaydet**.
+
+- **Hangi bağlantı olur:** dosyayı **doğrudan indiren** adres; tarayıcıda açınca dosyanın kendisi görünmeli ya da hemen
+  inmeli. Ör. `https://alanadiniz.com/hediyeler/yuzuk.png`, `https://alanadiniz.com/hediyeler/yuzuk.svga`. `http://` ya da
+  `https://` ile başlamalı, 80/443 dışında bir port, kullanıcı adı ya da parola olmamalı.
+- **Olmayanlar:** Google Drive ya da Dropbox **paylaşım sayfası**, GoDaddy **dosya yöneticisi**, giriş isteyen sayfalar:
+  bunlar dosyayı değil bir web sayfasını açar ve "Bu bağlantı dosyanın kendisini değil bir web sayfasını açıyor…"
+  cümlesiyle reddedilir. Bulunamayan dosya "sunucu 404 dedi", yanlış tür "İkon PNG ya da WebP olmalı; bağlantıdaki bir
+  SVGA" gibi, büyük dosya sınırıyla, yavaş ya da kapalı site "zamanında cevap vermedi" der.
+- **Ne olur:** uygulamanın sunucusu dosyayı **bir kez** indirir, türünü ilk baytlarından okur, depoya koyar; kaydedince
+  yüklenen dosya gibi denetlenir ve (WebM / MOV / SVGA ise) çevrilir. Telefonlar dosyayı **bizim sunucumuzdan** alır,
+  sizin sitenize hiç bağlanmaz: siteniz yavaşlasa ya da kapansa odalar etkilenmez; eski APK'lar, saydamlık ve sınırlar
+  yüklemedeki gibidir.
+- **Yenileme:** dosyayı sitenizde aynı adreste değiştirirseniz hediye kendiliğinden değişmez. Düzenle'de bağlantı
+  saklıdır; **Bağlantıdan yeniden çek** ve **Kaydet** ile yeni dosya alınır. Listede bağlantıdan gelen hediyede "🔗
+  bağlantıdan" yazar. Bilgisayardan dosya seçilirse bağlantı silinir.
+- **Güvenlik:** sunucu yalnız internette herkese açık adreslere bağlanır: bu makine (API, panel, veritabanı), konteyner
+  ağı, özel ağlar, link-local (bulut üst verisi), CGNAT, çok noktaya yayın ve ayrılmış bloklar olmaz; alan adı çözüldükten
+  sonra ve her yönlendirmede (en çok 5) yeniden denetlenir, bağlantı denetlenen adrese gider. Boyut sınırları yüklemeyle
+  aynı (ikon 1 MB, hazır MP4 12 MB, kaynak / SVGA 100 MB), süre ikon için 1, video için 5 dakika. Her deneme `audit_events`
+  `gift.fetch` satırıdır (bağlantı, sonuç, panelden ise panel kullanıcısı). `server/api/link-fetch.mjs`.
+- Uygulamadaki Yönetim › Hediyeler formunda bağlantı alanı yok (yeni APK gerektirir); sunucu ucu (`/api/admin/gifts/fetch`)
+  hazır.
 
 ## Telefona nasıl gider
 
@@ -102,6 +131,9 @@ Kendi alan adınızda yönetim açılırsa o adres de `AllowedOrigins`'e eklenir
 
 ## Testler
 
+- Bağlantıdan dosya: `server/api/test/gift-links.test.mjs` (sahte müşteri sitesi: ikon iner, depoya yüklenmiş gibi konur,
+  kaydedilir, bağlantı saklanır ve denetimde; türü baytlarından; MP4, SVGA 1.x, web sayfası, büyük dosya, 404, döngü;
+  bu sunucu, özel ağ, bulut üst verisi, yönlendirme ve ad üzerinden iç adres reddi).
 - Sunucu: `server/api/test/custom-gifts.test.mjs` (yetki, ikon kuralları, katalog ve sürüm, eski uygulamanın süzgeci,
   sunucu fiyatıyla gönderim, fiyat değişikliği, raftan kaldırma, sıra, hazır video, WebM çevirme, saydamlığı olmayan
   kaynağın reddi, SVGA çevirme ve boyutu, SVGA 1.x ve 15 sn'den uzunun reddi, silme ve denetim kaydı). CI ffmpeg,

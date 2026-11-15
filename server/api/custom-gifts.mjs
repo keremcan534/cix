@@ -7,6 +7,9 @@
 //   POST /api/admin/gifts/update { id, …any of the above; video: null takes it off }        → { gift }
 //   POST /api/admin/gifts/delete { id }                    → { deleted }
 //   POST /api/admin/gifts/order  { ids }                   → { gifts }   (each id's place: its index; lower first)
+//   POST /api/admin/gifts/fetch  { slot: 'icon'|'video', url } → { url, link, kind, type, bytes, video, svga }
+//        a file from a link the admin pasted, downloaded once here and stored as if uploaded (fetchRoute below);
+//        create and update take iconLink / videoLink with it, so the panel can fetch the same link again.
 //   GET|HEAD /api/fx/g/<id>.mp4                            → a gift's stacked video (sendCustomFx, public)
 //
 // Admins only; every change is an audit_events row (who, what, before and after, from where). `icon` and `video.url`
@@ -37,7 +40,8 @@ import { GIFTS } from './catalog.mjs';
 import { HttpError, auth, clientIp, db, env, int, limit, readJson, text, tx } from './core.mjs';
 import { FX_PATH, mp4Duration } from './fx.mjs';
 import { panelDetail } from './panel.mjs';
-import { downloadStored, keyOf, kindMax, readStored, removeFiles, sendFile, storageOn, storedUrl, verifyUpload, writeStored } from './media.mjs';
+import { download, linkOf } from './link-fetch.mjs';
+import { downloadStored, keyOf, kindMax, readStored, removeFiles, sendFile, storageOn, storeFile, storedUrl, verifyUpload, writeStored } from './media.mjs';
 
 const positive = (v, d) => {
   const n = Number(v ?? d);
@@ -646,7 +650,21 @@ async function saving(fn) {
 }
 /** What the audit keeps of a row. */
 const auditOf = (r) =>
-  r && { name: r.name, emoji: r.emoji, price: Number(r.price), cat: r.cat, minSvip: Number(r.min_svip), enabled: r.enabled, icon: r.icon_url, video: r.video_url ?? null, job: r.job_status ?? null };
+  r && {
+    name: r.name,
+    emoji: r.emoji,
+    price: Number(r.price),
+    cat: r.cat,
+    minSvip: Number(r.min_svip),
+    enabled: r.enabled,
+    icon: r.icon_url,
+    video: r.video_url ?? null,
+    job: r.job_status ?? null,
+    iconLink: r.icon_link ?? null,
+    videoLink: r.video_link ?? null,
+  };
+/** iconLink / videoLink in a body: undefined (unchanged), null (none: the file was uploaded) or a checked link. */
+const linkField = (v) => (v === undefined ? undefined : v === null || v === '' ? null : linkOf(v));
 const SHELF_ORDER = `array_position(ARRAY['hot', 'couple', 'gameplay', 'privilege'], g.cat), g.sort, length(g.id), g.id`;
 
 /** The panel's view of gifts that aren't deleted (all, or `ids`), with how often each was sent. */
@@ -673,6 +691,9 @@ async function adminGifts(ids = null) {
     sort: Number(x.sort),
     enabled: x.enabled,
     icon: x.icon_url,
+    // Where the icon and the video were fetched from (null: uploaded), for fetching them again.
+    iconLink: x.icon_link ?? null,
+    videoLink: x.video_link ?? null,
     // At this server (the fx route serves it for the preview even while the gift is taken off).
     video: x.video_url ? { url: fxUrl(x.id, x.video_v), bytes: Number(x.video_bytes), ms: Number(x.video_ms ?? 0) } : null,
     job: x.job_status ? { status: x.job_status, error: x.job_error ?? null } : null,
@@ -683,6 +704,42 @@ async function adminGifts(ids = null) {
   }));
 }
 const oneGift = async (id) => (await adminGifts([id]))[0];
+
+/** Link downloads running now, and how many may run at once (each can be as big as a source). */
+let fetching = 0;
+const FETCH_MAX = 2;
+/** What a downloaded gift file is, from its first bytes: the type it is stored as, 'zip' (an SVGA 1.x), else null. */
+export function sniff(b) {
+  if (b.length >= 8 && b.readUInt32BE(0) === 0x89504e47 && b.readUInt32BE(4) === 0x0d0a1a0a) return 'image/png';
+  if (b.length >= 12 && b.toString('latin1', 0, 4) === 'RIFF' && b.toString('latin1', 8, 12) === 'WEBP') return 'image/webp';
+  if (b.length >= 4 && b.readUInt32BE(0) === 0x1a45dfa3) return 'video/webm';
+  if (b.length >= 12 && b.toString('latin1', 4, 8) === 'ftyp') return b.toString('latin1', 8, 12) === 'qt  ' ? 'video/quicktime' : 'video/mp4';
+  if (b.length >= 8 && ['moov', 'mdat', 'wide', 'free', 'skip', 'pnot'].includes(b.toString('latin1', 4, 8))) return 'video/quicktime';
+  // SVGA 2.x is a zlib stream (a valid header: 0x78, the pair a multiple of 31); 1.x is a zip.
+  if (b.length >= 2 && b[0] === 0x78 && ((b[0] << 8) | b[1]) % 31 === 0) return 'application/x-svga';
+  if (b.length >= 2 && b.toString('latin1', 0, 2) === 'PK') return 'zip';
+  return null;
+}
+const WHAT = { 'image/png': 'bir PNG resim', 'image/webp': 'bir WebP resim', 'video/mp4': 'bir MP4 video', 'video/webm': 'bir WebM video', 'video/quicktime': 'bir MOV video', 'application/x-svga': 'bir SVGA', zip: 'bir zip dosyası' };
+const what = (type) => WHAT[type] ?? 'tanınmayan bir dosya (resim ya da video değil)';
+/** The upload kind a fetched file goes in as, for its slot: the same rules as the panel's file picker. */
+async function fetchedKind(slot, type, bytes) {
+  if (slot === 'icon') {
+    if (type === 'image/png' || type === 'image/webp') return 'gifticon';
+    throw new HttpError(400, `İkon PNG ya da WebP olmalı; bağlantıdaki ${what(type)}`);
+  }
+  if (type === 'video/mp4') {
+    if (bytes > LIMITS.videoBytes) throw new HttpError(400, `Hazır MP4 en fazla ${mb(LIMITS.videoBytes)} MB olabilir (bu ${mb(bytes)} MB): saydam WebM / MOV kaynağı ya da SVGA verin`);
+    return 'giftvideo';
+  }
+  if (type === 'video/webm' || type === 'video/quicktime' || type === 'application/x-svga') {
+    const svga = type === 'application/x-svga';
+    if (!(await (svga ? canSvga() : canConvert()))) throw new HttpError(400, `Bu sunucu ${svga ? 'SVGA' : 'video'} çeviremiyor: hazır yığılmış MP4 verin`);
+    return 'giftsource';
+  }
+  if (type === 'zip') throw new HttpError(400, 'SVGA 1.x okunmuyor: animasyonu SVGA 2.x olarak dışa aktarın');
+  throw new HttpError(400, `Video hazır MP4, saydam WebM / MOV ya da SVGA olmalı; bağlantıdaki ${what(type)}`);
+}
 const writeLimit = (a) => limit(`gifts-admin:${a.id}`, 60, 'Çok fazla deneme, biraz bekle');
 
 export const customGiftRoutes = {
@@ -707,16 +764,18 @@ export const customGiftRoutes = {
     await checkIcon(b.icon);
     const video = await videoOf(b.video ?? null);
     const stacked = video?.kind === 'stacked' ? video : null;
+    const iconLink = linkField(b.iconLink) ?? null;
+    const videoLink = video ? (linkField(b.videoLink) ?? null) : null;
     const id = await saving(() =>
       tx(async (c) => {
         const id = `a${(await c.query("SELECT nextval('custom_gift_ids') AS n")).rows[0].n}`;
         const first = Number((await c.query('SELECT coalesce(min(sort), 1) - 1 AS s FROM custom_gifts WHERE cat = $1 AND deleted_at IS NULL', [cat])).rows[0].s);
         const r = await c.query(
           `INSERT INTO custom_gifts (id, name, emoji, price, cat, min_svip, sort, enabled, icon_url, video_url, video_bytes, video_ms, video_v, job_status, job_source, job_fill,
-                                     created_by, updated_by)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $17) RETURNING *`,
+                                     created_by, updated_by, icon_link, video_link)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $17, $18, $19) RETURNING *`,
           [id, name, emoji, price, cat, minSvip, first, b.enabled !== false, b.icon, stacked?.url ?? null, stacked?.bytes ?? null, stacked?.ms ?? null, stacked?.v ?? null,
-            video?.kind === 'source' ? 'processing' : null, video?.kind === 'source' ? video.url : null, video?.kind === 'source' ? video.fill : null, a.id],
+            video?.kind === 'source' ? 'processing' : null, video?.kind === 'source' ? video.url : null, video?.kind === 'source' ? video.fill : null, a.id, iconLink, videoLink],
         );
         await audited(c, a.id, 'gift.create', { gift: id, before: null, after: auditOf(r.rows[0]), ...panelDetail(a) }, clientIp(req));
         return id;
@@ -755,6 +814,13 @@ export const customGiftRoutes = {
       next.icon = b.icon;
     }
     const video = await videoOf(b.video);
+    // A new icon or video takes the link it came with (none: it was uploaded); a link may also change alone.
+    const iconLink = linkField(b.iconLink);
+    const videoLink = linkField(b.videoLink);
+    if (next.icon !== undefined) next.iconLink = iconLink ?? null;
+    else if (iconLink !== undefined) next.iconLink = iconLink;
+    if (video !== undefined) next.videoLink = video === null ? null : (videoLink ?? null);
+    else if (videoLink !== undefined) next.videoLink = videoLink;
     if (!Object.keys(next).length && video === undefined) throw new HttpError(400, 'Değişiklik yok');
     const drop = [];
     await saving(() =>
@@ -781,6 +847,8 @@ export const customGiftRoutes = {
           set('icon_url', next.icon);
           drop.push(r.icon_url);
         }
+        if (next.iconLink !== undefined) set('icon_link', next.iconLink);
+        if (next.videoLink !== undefined) set('video_link', next.videoLink);
         if (video === null || video?.kind === 'stacked') {
           set('video_url', video?.url ?? null);
           set('video_bytes', video?.bytes ?? null);
@@ -805,6 +873,53 @@ export const customGiftRoutes = {
     await refreshCustomGifts();
     if (video?.kind === 'source') kickJobs();
     return { gift: await oneGift(id) };
+  },
+
+  /**
+   * A gift's file from a link the admin pasted ("ya da bağlantı yapıştır"): downloaded once here (link-fetch.mjs:
+   * public addresses only, the slot's size limit, a time limit), what it is read from its first bytes, and put in
+   * the storage as if it had been uploaded; the save then checks and converts it like any upload, and phones get it
+   * from this server, never from the link. slot 'icon': a PNG or WebP; 'video': a ready MP4, a WebM or MOV source
+   * or an SVGA. Each try (a refusal too) is an audit_events row with the link.
+   */
+  async 'POST /api/admin/gifts/fetch'(req) {
+    const a = await admin(req);
+    limit(`gift-fetch:${a.id}`, 10, 'Çok fazla bağlantı denemesi, biraz bekle');
+    const b = await readJson(req, 4096);
+    const pasted = typeof b.url === 'string' ? b.url.trim().slice(0, 2000) : null;
+    const slot = b.slot === 'icon' || b.slot === 'video' ? b.slot : null;
+    const note = (detail) => audited(db, a.id, 'gift.fetch', { slot, link: pasted, ...detail, ...panelDetail(a) }, clientIp(req)).catch(() => {});
+    let counted = false;
+    try {
+      if (!slot) throw new HttpError(400, 'Bağlantı ikon ya da video için olmalı');
+      const link = linkOf(b.url);
+      if (!storageOn()) throw new HttpError(503, 'Dosya deposu ayarlı değil: bağlantıdan da yüklenemez');
+      if (fetching >= FETCH_MAX) throw new HttpError(429, 'Şu an başka bağlantılar indiriliyor, biraz sonra tekrar dene');
+      fetching++;
+      counted = true;
+      const out = await temp(async (dir) => {
+        const file = path.join(dir, 'file');
+        const got = await download(link, file, slot === 'icon' ? { max: LIMITS.iconBytes, ms: 60_000 } : { max: LIMITS.sourceBytes, ms: 300_000 });
+        const type = sniff(got.head);
+        const kind = await fetchedKind(slot, type, got.bytes);
+        return { url: await storeFile(kind, a.id, file, type), kind, type, bytes: got.bytes, at: got.url };
+      });
+      await note({ kind: out.kind, type: out.type, bytes: out.bytes, file: keyOf(out.url), ...(out.at !== link ? { redirectedTo: out.at.slice(0, 2000) } : {}) });
+      return {
+        url: out.url,
+        link,
+        kind: out.kind,
+        type: out.type,
+        bytes: out.bytes,
+        video: out.kind === 'giftvideo' ? 'stacked' : out.kind === 'giftsource' ? 'source' : null,
+        svga: out.type === 'application/x-svga',
+      };
+    } catch (e) {
+      await note({ refused: String(e?.message ?? e).slice(0, 300) });
+      throw e;
+    } finally {
+      if (counted) fetching--;
+    }
   },
 
   /** Off the shelves and the panel for good; the row stays for the history, its files go. */
