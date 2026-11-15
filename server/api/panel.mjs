@@ -53,6 +53,35 @@ export const PANEL_ROUTES = new Set([
   'GET /api/admin/casino/report',
   'GET /api/admin/alerts',
   'GET /api/admin/finance-sync',
+  // Kullanıcılar (admin.mjs, referrals.mjs): search, ban and lifting it, room level, deleting, an invite's coins back.
+  'GET /api/admin/users',
+  'POST /api/admin/users/delete',
+  'POST /api/admin/users/room-level',
+  'POST /api/admin/ban',
+  'POST /api/admin/referrals/revoke',
+  // Şikâyetler (admin.mjs) and a reported room's own pictures (room-decor.mjs).
+  'GET /api/admin/reports',
+  'POST /api/admin/reports/handle',
+  'GET /api/admin/rooms/background',
+  'POST /api/admin/rooms/background/remove',
+  'POST /api/admin/rooms/cover/remove',
+  // Destek (support.mjs).
+  'GET /api/admin/support',
+  'GET /api/admin/support/ticket',
+  'POST /api/admin/support/reply',
+  'POST /api/admin/support/status',
+  // Duyurular (team.mjs; a notice's picture is a 'notice' upload).
+  'GET /api/admin/team',
+  'POST /api/admin/team',
+  'POST /api/admin/team/remove',
+  // Etkinlikler (events.mjs).
+  'GET /api/admin/events',
+  'POST /api/admin/events/review',
+  'POST /api/admin/events/remove',
+  'GET /api/admin/events/categories',
+  'POST /api/admin/events/categories',
+  'POST /api/admin/events/categories/remove',
+  'GET /api/admin/events/report',
 ]);
 
 const clean = (v, max) => (typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, max) : '');
