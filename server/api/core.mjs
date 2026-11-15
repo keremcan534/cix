@@ -131,6 +131,9 @@ export const ageOf = (birth, now = new Date()) => {
  * their sanctions and sending an appeal; once the ban is over it is refused, so the app signs in again.
  */
 export async function auth(req, { appeal = false } = {}) {
+  // Finance Control's server on a route it may call (panel.mjs; index.mjs checked the key, the way in and the route):
+  // its account, as an admin, named for the panel user.
+  if (req.panelActor) return req.panelActor;
   const m = /^Bearer ([A-Za-z0-9_-]{20,})$/.exec(req.headers.authorization ?? '');
   if (!m) throw new HttpError(401, 'Giriş gerekli');
   const hash = sha(m[1]);

@@ -1,0 +1,82 @@
+// Finance Control (the finance panel at panel.<domain>, repo similarclup-finance-control) acting on this API: its
+// Uygulama pages (Hediyeler, …) call the admin routes listed in PANEL_ROUTES from its own server, never from a
+// browser. Three locks, all here:
+//   - the key: X-Panel-Key must equal PANEL_API_KEY (.env, made on the server by the deploy, server.yml; the panel
+//     gets it through compose.yaml as FC_APP_API_KEY). No key set: the header opens nothing.
+//   - the way in: only a call made on this machine straight to the API. Caddy adds X-Forwarded-For to everything it
+//     forwards (and strips X-Panel-Key and X-Panel-User from outside requests), so a forwarded request with the
+//     header is refused.
+//   - the list: a route not in PANEL_ROUTES is refused with the key, whatever it is.
+// Finance Control decides which of its users may use which page (its own roles); X-Panel-User names that person
+// (base64url JSON { id, email, name, role }). On this side they act as the Finance Control account (PANEL_ACTOR,
+// role admin, 067): every route checks and records as for an admin, the account's name carries the panel user's, and
+// every panel request that changes something (and every refusal) is an audit_events row 'panel.request' naming them.
+import { HttpError, db, env, same } from './core.mjs';
+
+/** The account the panel acts as (067_panel_actor.sql): role admin, never a person, can't sign in. */
+export const PANEL_ACTOR = 'fc000000-0000-4000-8000-000000000001';
+const KEY = String(env.PANEL_API_KEY ?? '').trim();
+/** A key shorter than this is treated as none (a typo must not open the admin routes). */
+const KEY_MIN = 32;
+export const panelOn = () => KEY.length >= KEY_MIN;
+
+/** What Finance Control may call: `METHOD path`. */
+export const PANEL_ROUTES = new Set([
+  // Hediyeler (custom-gifts.mjs) and its uploads (media.mjs kinds gifticon, giftvideo, giftsource).
+  'GET /api/admin/gifts',
+  'POST /api/admin/gifts',
+  'POST /api/admin/gifts/update',
+  'POST /api/admin/gifts/delete',
+  'POST /api/admin/gifts/order',
+  'POST /api/media/upload-url',
+]);
+
+const clean = (v, max) => (typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, max) : '');
+
+/**
+ * The panel user a request acts for: null without X-Panel-Key; a 401 for a wrong key (or none configured), a 403
+ * for a forwarded request or a route not on the list, a 400 without a readable X-Panel-User.
+ */
+export function panelOf(req, method, path) {
+  const key = req.headers['x-panel-key'];
+  if (key === undefined) return null;
+  if (!panelOn() || typeof key !== 'string' || !same(key, KEY)) throw new HttpError(401, 'Panel anahtarı geçersiz');
+  if (req.headers['x-forwarded-for'] !== undefined) throw new HttpError(403, 'Panel anahtarı yalnız sunucunun kendi içinden kullanılır');
+  if (!PANEL_ROUTES.has(`${method} ${path}`)) throw new HttpError(403, 'Bu işlem finans panelinden yapılamaz');
+  let who = null;
+  try {
+    const raw = req.headers['x-panel-user'];
+    who = typeof raw === 'string' ? JSON.parse(Buffer.from(raw, 'base64url').toString('utf8')) : null;
+  } catch {}
+  const id = Number(who?.id);
+  if (!Number.isSafeInteger(id) || id < 1 || !clean(who?.email, 200)) throw new HttpError(400, 'Panel kullanıcısı eksik');
+  return { id, email: clean(who.email, 200), name: clean(who.name, 80) || clean(who.email, 200), role: clean(who.role, 40) };
+}
+
+let actor = null;
+/** The Finance Control account as auth() hands it to a route, named for the panel user acting now. */
+export async function panelUser(panel) {
+  actor ??= (await db.query('SELECT * FROM users WHERE id = $1', [PANEL_ACTOR])).rows[0] ?? null;
+  if (!actor) throw new HttpError(503, 'Finans paneli hesabı hazır değil');
+  // Names show in pushes and lists (live settings: "… değişti: <name>"): who in the panel did it.
+  return { ...actor, role: 'admin', name: `Finance Control · ${panel.name}`.slice(0, 80), session_scope: 'full', panel };
+}
+
+/** What an audit row says about a panel action (custom-gifts.mjs adds it to its own rows). */
+export const panelDetail = (u) => (u?.panel ? { panelUser: u.panel } : {});
+
+/**
+ * Every panel request that changes something, and every refusal: one audit_events row with the panel user, written
+ * before the answer goes out (so the panel's next read finds it). Never fails the request.
+ */
+export async function auditPanel(panel, method, path, status) {
+  if (!panel || (method === 'GET' && status < 400)) return;
+  try {
+    await db.query("INSERT INTO audit_events (actor, action, target, detail, ip) VALUES ($1, 'panel.request', NULL, $2, 'finance-control')", [
+      PANEL_ACTOR,
+      JSON.stringify({ method, path, status, panelUser: panel }),
+    ]);
+  } catch (e) {
+    console.error('panel audit failed', String(e?.message ?? e).slice(0, 200));
+  }
+}

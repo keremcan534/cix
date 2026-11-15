@@ -7,12 +7,14 @@ uygulama: `app/src/components/admin/gifts-admin.tsx` (panel), `app/src/lib/live/
 
 ## Tasarım notu (kısa)
 
-**Panel nerede:** uygulamadaki **Ayarlar › Yönetim › Hediyeler** sekmesi. Bu ekran telefonda ve tarayıcıda (web sürümü,
-`https://keremcan534.github.io/cix/`, aynı yönetici hesabıyla giriş → Ayarlar › Yönetim) aynı şekilde çalışır; ekip
-bilgisayardan da hediye ekler. Web sitesindeki panel (Finance Control, `panel.<alan adı>`, ayrı depo
-`similarclup-finance-control`) bilerek bağımsız bir finans platformu: kendi kullanıcıları, kendi veritabanı var ve
-uygulamanın koduna dokunmaz. Hediye kataloğu orada olsaydı panelden API'ye ikinci bir yetki anahtarı ve ikinci bir
-izin modeli gerekirdi. Uçlar genel (`/api/admin/gifts…`): ileride orada bir sayfa isterseniz aynı API'yi çağırır.
+**Panel nerede:** iki yerde, aynı sunucu uçlarıyla (`/api/admin/gifts…`):
+
+- Uygulamadaki **Ayarlar › Yönetim › Hediyeler**: telefonda ve tarayıcıda (web sürümü, `https://keremcan534.github.io/cix/`,
+  yönetici hesabıyla giriş) çalışır.
+- Web'deki finans paneli (Finance Control, `panel.<alan adı>`, ayrı depo `similarclup-finance-control`) **Uygulama ›
+  Hediyeler**: panelin kendi kullanıcıları ve rolleriyle (`app.gifts`). Panelin sunucusu API'yi aynı makinede bir
+  anahtarla çağırır; işlem API'de Finance Control hesabıyla yapılır ve denetim kaydına panel kullanıcısının adıyla
+  yazılır (`docs/SUNUCU.md` › Finans paneli). Panelde video önizlemesi tarayıcıda da saydam oynar.
 
 **Akış:** yönetici ikon (ve isterse video ya da SVGA) yükler, ad, fiyat, raf, VIP sınırı yazar, önizler, kaydeder.
 Sunucu satırı yazar, kataloğun sürümünü (`v`) artırır; telefonlar `/api/config`'te sürümün değiştiğini görünce kataloğu
@@ -82,7 +84,8 @@ hediyeyi sessizce atlar, videosunu indirmez (adresi `/api/fx/g/…`, onların s�
 
 ### Tarayıcıdan yükleme için bir kez: depoda CORS izni
 
-Telefondan yüklemede gerekmez. Web sürümünden (bilgisayardan) ikon ve video yüklemek için Cloudflare R2'de kovanın
+Telefondan ve finans panelinden (dosya panelin sunucusundan geçer) yüklemede gerekmez. Uygulamanın web sürümünden ikon ve
+video yüklemek için Cloudflare R2'de kovanın
 **Settings › CORS Policy** bölümüne şu kural eklenmeli:
 
 ```json

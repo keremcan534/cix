@@ -70,6 +70,10 @@ services:
       # The first admin. Empty → the panel makes one and writes it to /data/giris-bilgileri.txt.
       FC_ADMIN_EMAIL: ${FC_ADMIN_EMAIL:-}
       FC_ADMIN_PASSWORD: ${FC_ADMIN_PASSWORD:-}
+      # Uygulama pages (Hediyeler…): the API's admin routes on this machine, with the key it checks (server/api/panel.mjs).
+      # PANEL_API_KEY is made in .env by the deploy (server.yml) and never leaves the server.
+      FC_APP_API_URL: http://127.0.0.1:7890
+      FC_APP_API_KEY: ${PANEL_API_KEY:-}
     volumes: ['financedata:/data']
     stop_grace_period: 15s
     logging: *logging

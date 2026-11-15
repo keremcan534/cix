@@ -141,6 +141,11 @@ jobs:
           $SSH "cd /opt/similar && if ! sudo grep -qE '^DOMAIN=.+' .env; then
               sudo sed -i '/^DOMAIN=/d' .env && echo 'DOMAIN=${HOST//./-}.sslip.io' | sudo tee -a .env >/dev/null && echo 'set DOMAIN in .env'; fi"
 
+          # The finance panel's key to the API's admin routes (server/api/panel.mjs, compose.yaml FC_APP_API_KEY): made
+          # once on the server, kept in .env, never printed or sent anywhere.
+          $SSH 'cd /opt/similar && if ! sudo grep -qE "^PANEL_API_KEY=[0-9a-f]{64}$" .env; then
+              sudo sed -i "/^PANEL_API_KEY=/d" .env && printf "PANEL_API_KEY=%s\n" "$(openssl rand -hex 32)" | sudo tee -a .env >/dev/null && echo "set PANEL_API_KEY in .env"; fi'
+
           # Test server switch (TEST_MODE above). Changing .env recreates the services that read it.
           if [ "$TEST_MODE" = 1 ]; then v=1; else v=0; fi
           # No daily cap on test coins while testing (0 = unlimited, wallet.mjs TEST_DAILY).
@@ -232,3 +237,24 @@ jobs:
             sleep 3
           done
           echo "The panel did not answer at $url (last status: ${code:-none})"; exit 1
+      # The panel's Uygulama pages reach the API (server/api/panel.mjs): from inside the panel's container, with its own
+      # FC_APP_API_URL and FC_APP_API_KEY, a read the panel may make. Prints only the status; a read leaves no audit row.
+      # Through Caddy the key must open nothing (the header is stripped there).
+      - name: Check the panel's link to the API
+        if: steps.key.outputs.ready == 'true' && steps.finance.outcome == 'success'
+        working-directory: .
+        run: |
+          cat > "$RUNNER_TEMP/link-check.mjs" <<'JS'
+          const who = Buffer.from(JSON.stringify({ id: 1, email: 'kurulum@similar.local', name: 'Kurulum denetimi', role: 'deploy' })).toString('base64url');
+          const url = process.env.FC_APP_API_URL;
+          const key = process.env.FC_APP_API_KEY ?? '';
+          if (!url || key.length < 32) { console.log('link: not configured'); process.exit(0); }
+          const r = await fetch(`${url}/api/admin/gifts`, { headers: { 'x-panel-key': key, 'x-panel-user': who } });
+          console.log(`link: ${r.status}`);
+          JS
+          out=$(ssh -i ~/.ssh/deploy ubuntu@$HOST "cd /opt/similar && sudo docker compose exec -T finance node --input-type=module -" < "$RUNNER_TEMP/link-check.mjs" 2>&1 | tail -1) || true
+          echo "panel → API $out"
+          outside=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 -H 'X-Panel-Key: x' "https://${HOST//./-}.sslip.io/api/admin/gifts" || true)
+          echo "outside with a panel header: $outside (401: needs a session, the header was ignored)"
+          case "$out" in *"link: 200"*) ;; *) echo "::warning::panel → API link: ${out:-no answer}" ;; esac
+          if [ "$outside" != 401 ]; then echo "::error::the API answered $outside to an outside request with a panel header"; exit 1; fi

@@ -25,7 +25,8 @@
 // Patron koltuğu: boss-seat.mjs. A room left without its owner and admins rests: room-autoclose.mjs.
 // Agency network (top/sub agencies, commission, performance tiers, payouts, transfers): agency.mjs for
 // agencies and streamers, agency-admin.mjs for the centre (docs/AJANS_HIYERARSI.md).
-// Every call except sign-in, health and the catalog needs "Authorization: Bearer <session>".
+// Every call except sign-in, health and the catalog needs "Authorization: Bearer <session>". Finance Control's server
+// calls the admin routes it may with its own key instead (panel.mjs).
 // Error reporting, the app's remote config and kill switches, and the health warnings: reporting.mjs,
 // features.mjs, alerts.mjs.
 import fs from 'node:fs';
@@ -52,6 +53,7 @@ import { EXCHANGE, SHOP, SVIP_XP, exchangeCoins } from './catalog.mjs';
 import { financeSyncRoutes, startFinanceSync, stopFinanceSync } from './finance-sync.mjs';
 import { FILE_PATH, HttpError, RawText, allow, auth, claimRef, clientIp, db, env, filesOut, int, migrate, once, readJson, sha, tx, userId } from './core.mjs';
 import { giftRoutes } from './gifts.mjs';
+import { auditPanel, panelOf, panelUser } from './panel.mjs';
 import { customGiftRoutes, refreshCustomGifts, sendCustomFx, startCustomGifts, stopCustomGifts } from './custom-gifts.mjs';
 import { FX_PATH, sendFx } from './fx.mjs';
 import { jetonRoutes } from './jeton.mjs';
@@ -436,8 +438,17 @@ const server = http.createServer(async (req, res) => {
   try {
     // A feature switched off in .env (FEATURES_OFF) is refused before its route runs.
     gate(req.method, url.pathname);
+    // Finance Control's server (panel.mjs): its key, the way in and the route are checked before the route runs,
+    // which then sees the panel's account as the signed-in admin (core.mjs auth).
+    const panel = panelOf(req, req.method, url.pathname);
+    if (panel) {
+      req.panel = panel;
+      req.panelActor = await panelUser(panel);
+    }
     if (url.pathname === LIVE_LINE) return await openLine(req, res);
-    send(200, await route(req, url));
+    const out = await route(req, url);
+    await auditPanel(req.panel, req.method, url.pathname, 200);
+    send(200, out);
   } catch (err) {
     // A malformed value that only Postgres caught is the request's fault: 400, not a server error. An id that
     // isn't a uuid, a number or date out of range; text Postgres can't store, such as a NUL byte (22021). A
@@ -446,6 +457,7 @@ const server = http.createServer(async (req, res) => {
     const e = bad ? new HttpError(400, bad) : err;
     // 5xx: counted for the health warnings and reported (SENTRY_DSN).
     failed(e, req.method, url.pathname);
+    await auditPanel(req.panel, req.method, url.pathname, e instanceof HttpError ? e.code : 500);
     // extra: structured detail for the app (a ban or mute for its screen, sanctions.mjs).
     if (e instanceof HttpError) return send(e.code, { error: e.message, ...(e.extra ?? {}) });
     console.error(e);

@@ -36,6 +36,7 @@ import zlib from 'node:zlib';
 import { GIFTS } from './catalog.mjs';
 import { HttpError, auth, clientIp, db, env, int, limit, readJson, text, tx } from './core.mjs';
 import { FX_PATH, mp4Duration } from './fx.mjs';
+import { panelDetail } from './panel.mjs';
 import { downloadStored, keyOf, kindMax, readStored, removeFiles, sendFile, storageOn, storedUrl, verifyUpload, writeStored } from './media.mjs';
 
 const positive = (v, d) => {
@@ -717,7 +718,7 @@ export const customGiftRoutes = {
           [id, name, emoji, price, cat, minSvip, first, b.enabled !== false, b.icon, stacked?.url ?? null, stacked?.bytes ?? null, stacked?.ms ?? null, stacked?.v ?? null,
             video?.kind === 'source' ? 'processing' : null, video?.kind === 'source' ? video.url : null, video?.kind === 'source' ? video.fill : null, a.id],
         );
-        await audited(c, a.id, 'gift.create', { gift: id, before: null, after: auditOf(r.rows[0]) }, clientIp(req));
+        await audited(c, a.id, 'gift.create', { gift: id, before: null, after: auditOf(r.rows[0]), ...panelDetail(a) }, clientIp(req));
         return id;
       }),
     );
@@ -796,7 +797,7 @@ export const customGiftRoutes = {
         set('updated_by', a.id);
         sets.push('updated_at = now()', "rev = nextval('custom_gift_rev')");
         const after = await c.query(`UPDATE custom_gifts SET ${sets.join(', ')} WHERE id = $1 RETURNING *`, vals);
-        await audited(c, a.id, 'gift.update', { gift: id, before: auditOf(r), after: auditOf(after.rows[0]) }, clientIp(req));
+        await audited(c, a.id, 'gift.update', { gift: id, before: auditOf(r), after: auditOf(after.rows[0]), ...panelDetail(a) }, clientIp(req));
       }),
     );
     // A file the gift still holds (the same one sent again) is kept by media.mjs.
@@ -818,7 +819,7 @@ export const customGiftRoutes = {
         "UPDATE custom_gifts SET deleted_at = now(), enabled = false, job_status = NULL, job_source = NULL, job_error = NULL, updated_by = $2, updated_at = now(), rev = nextval('custom_gift_rev') WHERE id = $1",
         [id, a.id],
       );
-      await audited(c, a.id, 'gift.delete', { gift: id, before: auditOf(r), after: null }, clientIp(req));
+      await audited(c, a.id, 'gift.delete', { gift: id, before: auditOf(r), after: null, ...panelDetail(a) }, clientIp(req));
       return r;
     });
     removeFiles([r.icon_url, r.video_url, r.job_source].filter(Boolean));
@@ -842,7 +843,7 @@ export const customGiftRoutes = {
            FROM unnest($1::text[]) WITH ORDINALITY AS x(id, n) WHERE g.id = x.id AND g.sort <> x.n - 1`,
         [ids, a.id],
       );
-      await audited(c, a.id, 'gift.order', { before: r.rows.map((x) => x.id), after: ids }, clientIp(req));
+      await audited(c, a.id, 'gift.order', { before: r.rows.map((x) => x.id), after: ids, ...panelDetail(a) }, clientIp(req));
     });
     await refreshCustomGifts();
     return { gifts: await adminGifts() };
