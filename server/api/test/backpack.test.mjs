@@ -236,7 +236,9 @@ describe('Jeton Noktası ve engeller', () => {
     const sale = await ok(call('POST', '/api/jeton/transfer', { to: buyer.user.id, coins: 100, paymentRef: 'HAVALE-9', ref: rnd(6) }, bank.session), 'satış');
     assert.equal(sale.transfer.paymentRef, 'HAVALE-9');
 
-    await q('UPDATE users SET diamonds = 5000 WHERE id = $1', [host.user.id]);
+    const had = Number((await q('SELECT diamonds FROM users WHERE id = $1', [host.user.id]))[0].diamonds);
+    assert.ok(had < 5000);
+    await h.credit(host.user.id, 5000 - had, { currency: 'diamond' });
     await ok(call('POST', '/api/block', { to: host.user.id, block: true }, bank.session), 'banka engelledi');
     assert.ok(!(await list(host)).banks.some((x) => x.id === bank.user.id), 'engelleyen banka listede yok');
     await refused(call('POST', '/api/jeton/sell-diamonds', { bank: bank.user.id, diamonds: 1000, ref: rnd(6) }, host.session), 403, 'engelleyen bankaya bozdurma');

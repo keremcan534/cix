@@ -31,8 +31,7 @@ const ok = async (p, what) => {
 const q = async (sql, args) => (await h.sql.query(sql, args)).rows;
 /** Coins straight into the account, as bought coins. */
 async function credit(u, amount) {
-  await q("INSERT INTO coin_lots (user_id, channel, amount, remaining, lock_hours, ref) VALUES ($1, 'test', $2, $2, 0, $3)", [u.user.id, amount, `t-${rnd(6)}`]);
-  await q('UPDATE users SET coins = coins + $2 WHERE id = $1', [u.user.id, amount]);
+  await h.credit(u.user.id, amount);
 }
 /** The person is connected to this voice room (what LiveKit's webhook writes). */
 const enter = (u, room) => q("INSERT INTO room_presence (room, identity, sid) VALUES ($1, $2, 'PA_test')", [room, u.user.id]);

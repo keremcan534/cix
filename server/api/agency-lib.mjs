@@ -7,7 +7,7 @@
 import crypto from 'node:crypto';
 
 import { HttpError, db, move } from './core.mjs';
-import { LOCK_HOURS } from './wallet.mjs';
+import { LOCK_HOURS, diamondState } from './wallet.mjs';
 
 export const DIAMONDS_PER_USD = 5000;
 /** The first release runs two agency levels (top, sub). The data model allows more; settings can't exceed this. */
@@ -663,6 +663,10 @@ export const ASSISTANT_BACK_REASON = 'Ajans asistanı payı geri alındı';
  * negative amount takes whole diamonds back, as far as the balance goes (the rest is owed and later shares pay it
  * first). Returns the whole diamonds that moved (+ in, − out). The account row is locked first, so two splits for
  * the same assistant at once can't both count the same fraction.
+ *
+ * Taking back: the assistant's own shares still locked go first, and their locks with them (newest first), then
+ * diamonds that may leave. Diamonds locked by someone's gift stay where they are: they answer that gift's store
+ * refund (jeton.mjs). So the locks never count more diamonds than the account has (money-check.mjs `locks`).
  */
 async function settleAssistant(c, userId, amount, ref, detail) {
   await c.query('SELECT 1 FROM users WHERE id = $1 FOR UPDATE', [userId]);
@@ -675,8 +679,21 @@ async function settleAssistant(c, userId, amount, ref, detail) {
     return delta;
   }
   if (delta < 0) {
-    const balance = Number((await c.query('SELECT diamonds FROM users WHERE id = $1', [userId])).rows[0].diamonds);
-    const take = Math.min(-delta, balance);
+    const s = await diamondState(c, userId);
+    const own = (
+      await c.query("SELECT id, amount, unlock_at, ref FROM diamond_locks WHERE user_id = $1 AND channel = 'asistan' AND status = 'active' AND unlock_at > now() ORDER BY unlock_at DESC, id DESC", [userId])
+    ).rows;
+    const ownLocked = Math.min(s.locked, own.reduce((n, k) => n + Number(k.amount), 0));
+    const take = Math.min(-delta, s.withdrawable + ownLocked);
+    let release = Math.min(take, ownLocked);
+    for (const k of own) {
+      if (release <= 0) break;
+      const amount = Number(k.amount);
+      await c.query("UPDATE diamond_locks SET status = 'reversed' WHERE id = $1", [k.id]);
+      // Part of a lock goes: the rest stays locked until the same time.
+      if (amount > release) await c.query("INSERT INTO diamond_locks (user_id, amount, channel, unlock_at, ref) VALUES ($1, $2, 'asistan', $3, $4)", [userId, amount - release, k.unlock_at, k.ref]);
+      release -= Math.min(amount, release);
+    }
     if (take > 0) await move(c, userId, 'diamond', -take, ASSISTANT_BACK_REASON, ref, null, { channel: 'asistan', detail });
     return -take;
   }

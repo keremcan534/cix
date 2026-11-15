@@ -8,14 +8,20 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 import pg from 'pg';
 
+import { checkMoney, describeMoney } from '../money-check.mjs';
+
 const PG = { host: process.env.PGHOST ?? '127.0.0.1', port: Number(process.env.PGPORT ?? 5432), user: process.env.POSTGRES_USER ?? 'postgres', password: process.env.POSTGRES_PASSWORD ?? '' };
 
 /**
  * Registers before/after hooks that start the API with `extraEnv` on a fresh database. Returns helpers;
  * `sql` (a pool on the test database) and `logs` (the API's stdout lines) fill in once it is up. Development
  * sign-in is on unless `extraEnv` sets ALLOW_DEV_AUTH; a value of undefined leaves a variable unset.
+ *
+ * After the file's tests the API stops and the money checks (money-check.mjs) run on what the tests left: every
+ * test is also a test that no coin or diamond was lost, made up or moved without its ledger row. A file that writes
+ * wallet tables itself on purpose passes `{ moneyCheck: 'why' }`, which skips them.
  */
-export function startApi(extraEnv = {}) {
+export function startApi(extraEnv = {}, { moneyCheck = true } = {}) {
   const DB = `similar_test_${process.pid}`;
   const PORT = 17000 + (process.pid % 2000);
   const base = `http://127.0.0.1:${PORT}`;
@@ -77,12 +83,22 @@ export function startApi(extraEnv = {}) {
   });
 
   after(async () => {
-    h.api?.kill();
-    await h.sql?.end();
-    const root = new pg.Client({ ...PG, database: 'postgres' });
-    await root.connect();
-    await root.query(`DROP DATABASE IF EXISTS ${DB} WITH (FORCE)`);
-    await root.end();
+    let problems = [];
+    try {
+      if (h.api && h.api.exitCode === null) {
+        const exited = new Promise((r) => h.api.once('exit', r));
+        h.api.kill();
+        await Promise.race([exited, new Promise((r) => setTimeout(r, 5000))]);
+      }
+      if (moneyCheck === true && h.sql) problems = await checkMoney(h.sql);
+    } finally {
+      await h.sql?.end();
+      const root = new pg.Client({ ...PG, database: 'postgres' });
+      await root.connect();
+      await root.query(`DROP DATABASE IF EXISTS ${DB} WITH (FORCE)`);
+      await root.end();
+    }
+    assert.deepEqual(problems, [], `para denetimi:\n${describeMoney(problems)}`);
   });
 
   /** [status, json] of one request. */
@@ -109,6 +125,58 @@ export function startApi(extraEnv = {}) {
     await h.sql.query("INSERT INTO sessions (token_hash, user_id, expires_at) VALUES ($1, $2, now() + interval '1 day')", [crypto.createHash('sha256').update(session).digest('hex'), u.id]);
     return { user: { id: u.id, name: u.name }, session };
   };
+
+  /**
+   * A starting balance outside any flow, booked the way wallet.mjs books one so the money checks hold: the balance,
+   * the ledger row and, for coins, a coin lot (`channel`, `lockHours`). h.debit takes coins (oldest lots first) or
+   * diamonds the same way. Both return the new balance.
+   */
+  h.credit = (userId, amount, { currency = 'coin', channel = 'test', lockHours = 0, reason = 'Test hazırlığı' } = {}) => book(userId, currency, amount, { channel, lockHours, reason });
+  h.debit = (userId, amount, { currency = 'coin', reason = 'Test hazırlığı' } = {}) => book(userId, currency, -amount, { reason });
+  async function book(userId, currency, amount, { channel = 'test', lockHours = 0, reason }) {
+    assert.ok(Number.isSafeInteger(amount) && amount !== 0, 'tutar');
+    const col = { coin: 'coins', diamond: 'diamonds', game: 'game_coins' }[currency];
+    const ref = `test-${rnd(8)}`;
+    const c = await h.sql.connect();
+    try {
+      await c.query('BEGIN');
+      await c.query('SELECT 1 FROM users WHERE id = $1 FOR UPDATE', [userId]);
+      const lots = [];
+      if (currency === 'coin' && amount > 0) {
+        const r = await c.query('INSERT INTO coin_lots (user_id, channel, amount, remaining, lock_hours, ref) VALUES ($1, $2, $3, $3, $4, $5) RETURNING id', [userId, channel, amount, lockHours, ref]);
+        lots.push({ lot: Number(r.rows[0].id), channel, amount, lockHours });
+      } else if (currency === 'coin') {
+        let left = -amount;
+        for (const l of (await c.query('SELECT id, channel, remaining, lock_hours FROM coin_lots WHERE user_id = $1 AND remaining > 0 ORDER BY id FOR UPDATE', [userId])).rows) {
+          if (!left) break;
+          const take = Math.min(left, Number(l.remaining));
+          await c.query('UPDATE coin_lots SET remaining = remaining - $2 WHERE id = $1', [l.id, take]);
+          lots.push({ lot: Number(l.id), channel: l.channel, amount: take, lockHours: l.lock_hours });
+          left -= take;
+        }
+        assert.equal(left, 0, 'jeton partileri yetmiyor');
+      }
+      const b = (await c.query(`UPDATE users SET ${col} = ${col} + $2 WHERE id = $1 RETURNING ${col} AS b`, [userId, amount])).rows[0].b;
+      const channels = new Set(lots.map((l) => l.channel));
+      await c.query('INSERT INTO ledger (user_id, currency, amount, balance, reason, ref, channel, detail) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)', [
+        userId,
+        currency,
+        amount,
+        b,
+        reason,
+        ref,
+        channels.size ? (channels.size === 1 ? lots[0].channel : 'mixed') : null,
+        JSON.stringify(lots.length ? { lots } : {}),
+      ]);
+      await c.query('COMMIT');
+      return Number(b);
+    } catch (e) {
+      await c.query('ROLLBACK');
+      throw e;
+    } finally {
+      c.release();
+    }
+  }
 
   /** Waits for a line of the API's output that matches `re`, from line `from` on. */
   h.waitLog = async (re, from = 0, ms = 3000) => {

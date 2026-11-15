@@ -202,7 +202,7 @@ describe('yayın sunucusu', () => {
   test('veritabanında bir kez test jetonu olduysa hiçbir çekim ödenmez (yalnızca reddedilir)', async () => {
     await ok(buyGoogle(buyer.session, 'coins_100000', `paid${rnd(12)}`));
     await ok(call('POST', '/api/gifts/send', { to: host.user.id, giftId: 'c3', count: 1, ref: ref() }, buyer.session));
-    await q("INSERT INTO coin_lots (user_id, channel, amount, remaining, lock_hours, ref) VALUES ($1, 'test', 10, 10, 0, 'eski-test')", [buyer.user.id]);
+    await h.credit((await h.account('Eski test')).user.id, 10);
     const w = (await ok(call('POST', '/api/wallet/withdraw', { diamonds: 50_000, method: 'other', details: { holder: 'Ada Yılmaz', account: 'Wise: ada@example.com' }, ref: ref() }, host.session))).withdrawal;
     const row = (await ok(call('GET', '/api/admin/withdrawals', null, admin.session))).rows.find((x) => x.id === w.id);
     assert.equal(row.payable, false);

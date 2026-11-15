@@ -31,8 +31,7 @@ const q = async (sql, vals = []) => (await h.sql.query(sql, vals)).rows;
 const num = (v) => Number(v);
 /** Coins as from a Google Play purchase, put straight into the database (no store here): a lot and the balance. */
 const storeCoins = async (who, amount) => {
-  await q("INSERT INTO coin_lots (user_id, channel, amount, remaining, lock_hours, ref) VALUES ($1, 'google', $2, $2, 0, $3)", [who.id, amount, ref()]);
-  await q('UPDATE users SET coins = coins + $2 WHERE id = $1', [who.id, amount]);
+  await h.credit(who.id, amount, { channel: 'google' });
 };
 
 // Shared state, filled in step by step.

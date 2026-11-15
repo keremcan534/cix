@@ -127,7 +127,13 @@ export async function refundPurchase(c, id, { actor = null, ip = '', source = 'a
     const balance = Number((await c.query('SELECT coins FROM users WHERE id = $1', [l.user_id])).rows[0].coins);
     const take = Math.min(left, balance);
     await c.query('UPDATE coin_lots SET remaining = 0 WHERE id = $1', [l.id]);
-    if (take > 0) await move(c, l.user_id, 'coin', -take, 'İade: satın alınan jeton geri alındı', `refund:${id}:c${l.id}`, null, { channel: l.channel, actor, detail: { purchase: id, lot: Number(l.id) } });
+    // detail.lots, as on every coin row (wallet.mjs): the lot the coins left (money-check.mjs `moved`).
+    if (take > 0)
+      await move(c, l.user_id, 'coin', -take, 'İade: satın alınan jeton geri alındı', `refund:${id}:c${l.id}`, null, {
+        channel: l.channel,
+        actor,
+        detail: { purchase: id, lot: Number(l.id), lots: [{ lot: Number(l.id), channel: l.channel, amount: take }] },
+      });
     coins += take;
   }
   for (const k of locks) {

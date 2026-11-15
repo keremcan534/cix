@@ -214,7 +214,9 @@ describe('Ajans asistanı', () => {
     const gift2 = (await income(a1, 100, { occurredAt: at })).commission;
     assert.equal(num((await shareOf(gift2.id)).wallet), 16);
     const spent = await diamondsOf(helper);
-    await q("UPDATE users SET diamonds = 10 WHERE id = $1", [helper.id]);
+    // Spent: only diamonds whose lock is open can leave the account.
+    await q("UPDATE diamond_locks SET unlock_at = now() - interval '1 second' WHERE user_id = $1", [helper.id]);
+    await h.debit(helper.id, spent - 10, { currency: 'diamond' });
     const back2 = (await income(a1, -100, { type: 'refund', occurredAt: at })).commission;
     assert.equal(num((await shareOf(back2.id)).wallet), -10, 'bakiyedeki 10 geri alınır');
     assert.equal(await diamondsOf(helper), 0);

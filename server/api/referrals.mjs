@@ -312,7 +312,9 @@ export const referralRoutes = {
         const balance = Number((await c.query('SELECT coins FROM users WHERE id = $1', [uid])).rows[0].coins);
         const take = Math.min(left, balance);
         if (lots.length) await c.query('UPDATE coin_lots SET remaining = 0 WHERE id = ANY($1::bigint[])', [lots.map((l) => l.id)]);
-        if (take > 0) await move(c, uid, 'coin', -take, 'Davet ödülü geri alındı', ref(`revoke-${role}`, invitee), null, { channel: 'odul', actor: a.id, detail: { reward: 'invite', role, revoked: true } });
+        // detail.lots, as on every coin row (wallet.mjs): the invite lots the coins left (money-check.mjs `moved`).
+        const used = lots.map((l) => ({ lot: Number(l.id), channel: 'odul', amount: Number(l.remaining) }));
+        if (take > 0) await move(c, uid, 'coin', -take, 'Davet ödülü geri alındı', ref(`revoke-${role}`, invitee), null, { channel: 'odul', actor: a.id, detail: { reward: 'invite', role, revoked: true, lots: used } });
         back[role] = take;
       }
       await c.query("UPDATE referrals SET status = 'revoked', reason = 'staff' WHERE invitee_id = $1", [invitee]);

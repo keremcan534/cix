@@ -128,7 +128,7 @@ describe('Rüzgâr Gülü sunucuda', () => {
     assert.match(why.error, /Yetersiz/);
     assert.equal((await me(a.session)).coins, 20000, 'reddedilen istek jeton almaz');
     // WHEEL_DAILY=600000: a 50 × 10.000 request fits, the next 10 × 10.000 doesn't.
-    await h.sql.query('UPDATE users SET coins = coins + 1000000 WHERE id = $1', [a.user.id]);
+    await h.credit(a.user.id, 1000000);
     assert.equal((await spin(a.session, 'okyanus', 50))[0], 200);
     const [st2, why2] = await spin(a.session, 'okyanus', 50);
     assert.equal(st2, 409);
@@ -149,8 +149,8 @@ describe('Rüzgâr Gülü sunucuda', () => {
 
   test('Jeton Noktası satışı ve iade geri alımı Cömertlik saymaz', async () => {
     const a = await signUp('Satıcı');
-    const debit = (amount, reason) =>
-      h.sql.query("INSERT INTO ledger (user_id, currency, amount, balance, reason, ref) VALUES ($1, 'coin', $2, 0, $3, $4)", [a.user.id, -amount, reason, rnd(8)]);
+    await h.credit(a.user.id, 15000, { channel: 'google' });
+    const debit = (amount, reason) => h.debit(a.user.id, amount, { reason });
     await debit(10000, 'Jeton Noktası satışı');
     await debit(5000, 'İade: satın alınan jeton geri alındı');
     assert.equal((await call('GET', '/api/wheel', null, a.session))[1].allowed, false, 'satış ve iade harcama değil');

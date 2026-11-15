@@ -184,8 +184,7 @@ describe('Oyun Salonu sunucuda', () => {
     assert.equal(st, 409);
     assert.match(why.error, /Yetersiz/);
     // Reward coins (daily check-in, tasks) are for the shop only.
-    await h.sql.query('UPDATE users SET coins = coins + 5000 WHERE id = $1', [a.user.id]);
-    await h.sql.query("INSERT INTO coin_lots (user_id, channel, amount, remaining, lock_hours, ref) VALUES ($1, 'odul', 5000, 5000, 168, $2)", [a.user.id, rnd(6)]);
+    await h.credit(a.user.id, 5000, { channel: 'odul', lockHours: 168 });
     const [st2, why2] = await play(a.session, { game: 'goldtree', bet: 5000 });
     assert.equal(st2, 409);
     assert.equal(why2.code, 'reward_coins_only');

@@ -17,8 +17,7 @@ const buy = (s, sku, price, ref = rnd(6)) => call('POST', '/api/shop/buy', { sku
 const coins = async (u) => Number((await h.sql.query('SELECT coins FROM users WHERE id = $1', [u.user.id])).rows[0].coins);
 async function person(name, amount, channel = 'test') {
   const u = await signUp(name);
-  await h.sql.query('INSERT INTO coin_lots (user_id, channel, amount, remaining, lock_hours, ref) VALUES ($1, $2, $3, $3, 0, $4)', [u.user.id, channel, amount, `t-${rnd(6)}`]);
-  await h.sql.query('UPDATE users SET coins = coins + $2 WHERE id = $1', [u.user.id, amount]);
+  await h.credit(u.user.id, amount, { channel });
   return u;
 }
 
