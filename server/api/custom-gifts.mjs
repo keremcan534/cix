@@ -284,7 +284,13 @@ export async function sendCustomFx(req, res, name) {
 
 // --- Checking the files ------------------------------------------------------------------------------------
 /** A refusal about the file itself, shown to the admin as it is (a conversion that ends with one is not tried again). */
-class FileError extends Error {}
+class FileError extends Error {
+  /** `preview`: what came out (a stacked MP4) when the file converted but can't be used, so the panel can show it. */
+  constructor(message, preview = null) {
+    super(message);
+    this.preview = preview;
+  }
+}
 
 /** A PNG's or WebP's size and whether it can be transparent, from its first bytes; null for anything else. */
 export function imageInfo(b) {
@@ -409,7 +415,10 @@ export async function matteOf(file) {
 /** A mask that is grey (not a picture) but nowhere transparent: the background was never removed. */
 const OPAQUE = 128;
 const NOT_GREY = 16;
-const OPAQUE_TEXT = 'Videonun hiçbir yeri saydam değil: arka planı silinmemiş görünüyor. Sunucu arka plan silemez; arka planı silinmiş (saydam) bir kaynak yükle.';
+const EXPORT_HINT = 'Dışa aktarırken arka plan katmanını kapatıp ProRes 4444 + Alpha (.mov) ya da saydam WebM seçin.';
+const OPAQUE_TEXT = `Videonun hiçbir yeri saydam değil: arka planı silinmemiş, odada kutu gibi görünür; sunucu arka planı silemez. ${EXPORT_HINT}`;
+const NO_ALPHA_TEXT = `Bu videoda saydamlık (alfa kanalı) yok: arka planıyla odada kutu gibi görünür; sunucu arka planı silemez. ${EXPORT_HINT}`;
+const SVGA_OPAQUE_TEXT = 'SVGA’nın hiçbir yeri saydam değil: arka plan görseli var, odada kutu gibi görünür. Animasyonu arka plan katmanı olmadan dışa aktarın.';
 
 const temp = async (fn) => {
   const dir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'similar-gift-'));
@@ -548,7 +557,7 @@ async function convertSvga(input, dir, fill) {
     if (/nothing visible/.test(r.err)) throw new FileError('SVGA’da görünen bir şey yok');
     throw new FileError('SVGA çevrilemedi: dosya bozuk ya da desteklenmeyen bir özellik var');
   }
-  return stackedResult(output);
+  return stackedResult(output, SVGA_OPAQUE_TEXT);
 }
 
 // --- Turning a transparent source into a stacked video (one at a time, in the background) -------------------
@@ -585,9 +594,6 @@ export async function convertSource(input, dir) {
   const p = await probe(input);
   const v = p.streams.find((s) => s.codec_type === 'video');
   if (!v) throw new FileError('Videoda görüntü yok');
-  if (!hasAlpha(v)) {
-    throw new FileError('Bu videoda saydamlık (alfa kanalı) yok. Sunucu arka plan silemez: arka planı silinmiş, saydam bir WebM (VP8/VP9 alfa) ya da ProRes 4444 .mov yükle.');
-  }
   const length = Number(p.format?.duration ?? 0);
   if (length * 1000 > LIMITS.videoMaxMs + 1000) throw new FileError(`Video en çok ${seconds(LIMITS.videoMaxMs)} saniye olabilir (bu ${seconds(length * 1000)} sn)`);
   const output = path.join(dir, 'stacked.mp4');
@@ -596,13 +602,24 @@ export async function convertSource(input, dir) {
     console.error('gift video ffmpeg', r.code, r.err.slice(-400));
     throw new FileError('Video çevrilemedi: kaynak okunamadı ya da bozuk');
   }
-  return stackedResult(output);
+  // Without alpha it still converted (all opaque): refused, with what it would look like for the panel.
+  if (!hasAlpha(v)) throw new FileError(NO_ALPHA_TEXT, await previewOf(output));
+  return stackedResult(output, OPAQUE_TEXT);
 }
 
-/** A converted video, checked like an uploaded one: somewhere transparent, small enough, long enough. */
-async function stackedResult(output) {
+/** What came out, for the panel's preview of a refused video: null when too big to keep. */
+async function previewOf(output) {
+  const buf = await fs.promises.readFile(output).catch(() => null);
+  return buf && buf.length <= LIMITS.videoBytes ? buf : null;
+}
+
+/**
+ * A converted video, checked like an uploaded one: somewhere transparent (else `opaque`, the sentence, with what came
+ * out), small enough, long enough.
+ */
+async function stackedResult(output, opaque) {
   const m = await matteOf(output);
-  if (m && m.ymin > OPAQUE) throw new FileError(OPAQUE_TEXT);
+  if (m && m.ymin > OPAQUE) throw new FileError(opaque, await previewOf(output));
   const buf = await fs.promises.readFile(output);
   if (buf.length > LIMITS.videoBytes) throw new FileError(`Çevrilen video çok büyük (${mb(buf.length)} MB, en çok ${mb(LIMITS.videoBytes)} MB): daha kısa ya da sade bir kaynak dene`);
   const ms = mp4Duration(buf);
@@ -627,19 +644,19 @@ async function convertJob(row) {
     const key = `giftvideo/${src.split('/')[1]}/${row.id}-${Date.now().toString(36)}-${crypto.randomBytes(6).toString('base64url')}.mp4`;
     const url = await writeStored(key, out.buf, 'video/mp4');
     const done = await tx(async (c) => {
-      const cur = (await c.query('SELECT video_url, job_source, deleted_at FROM custom_gifts WHERE id = $1 FOR UPDATE', [row.id])).rows[0];
+      const cur = (await c.query('SELECT video_url, job_source, job_preview, deleted_at FROM custom_gifts WHERE id = $1 FOR UPDATE', [row.id])).rows[0];
       if (!cur || cur.deleted_at || cur.job_source !== row.job_source) return null;
       await c.query(
         `UPDATE custom_gifts SET video_url = $2, video_bytes = $3, video_ms = $4, video_v = $5, job_status = NULL, job_source = NULL, job_error = NULL, job_tries = 0,
-                rev = nextval('custom_gift_rev') WHERE id = $1`,
+                job_preview = NULL, rev = nextval('custom_gift_rev') WHERE id = $1`,
         [row.id, url, out.buf.length, out.ms, sha12(out.buf)],
       );
       await audited(c, null, 'gift.video_ready', { gift: row.id, bytes: out.buf.length, ms: out.ms });
-      return { old: cur.video_url };
+      return { old: cur.video_url, preview: cur.job_preview };
     });
     // Replaced, taken off or deleted while it ran: the new file goes, nothing else changes.
     if (!done) return removeFiles([url]);
-    removeFiles([done.old, row.job_source].filter(Boolean));
+    removeFiles([done.old, done.preview, row.job_source].filter(Boolean));
     await refreshCustomGifts();
     console.log(`gift video ready: ${row.id}, ${out.buf.length} bytes, ${out.ms} ms`);
   } catch (e) {
@@ -647,11 +664,21 @@ async function convertJob(row) {
     if (!file) console.error('gift video job', row.id, String(e?.message ?? e).slice(0, 200));
     if (file || row.job_tries >= MAX_TRIES) {
       const error = (file ? e.message : 'Video çevrilemedi, yeniden yükle').slice(0, 300);
-      const r = await db.query("UPDATE custom_gifts SET job_status = 'failed', job_error = $3, job_source = NULL WHERE id = $1 AND job_source = $2", [row.id, row.job_source, error]);
-      if (r.rowCount) {
-        await audited(db, null, 'gift.video_failed', { gift: row.id, error });
-        removeFiles([row.job_source]);
+      let preview = null;
+      if (file && e.preview && src) {
+        const key = `giftvideo/${src.split('/')[1]}/${row.id}-onizleme-${Date.now().toString(36)}-${crypto.randomBytes(6).toString('base64url')}.mp4`;
+        preview = await writeStored(key, e.preview, 'video/mp4').catch((err) => (console.error('gift video preview', String(err?.message ?? err).slice(0, 200)), null));
       }
+      const r = await db.query(
+        `UPDATE custom_gifts g SET job_status = 'failed', job_error = $3, job_source = NULL, job_preview = $4
+           FROM (SELECT id, job_preview AS old FROM custom_gifts WHERE id = $1 FOR UPDATE) x
+          WHERE g.id = x.id AND g.job_source = $2 RETURNING x.old`,
+        [row.id, row.job_source, error, preview],
+      );
+      if (r.rowCount) {
+        await audited(db, null, 'gift.video_failed', { gift: row.id, error, preview: !!preview });
+        removeFiles([row.job_source, r.rows[0].old].filter(Boolean));
+      } else if (preview) removeFiles([preview]);
     } else {
       await db.query("UPDATE custom_gifts SET job_at = now() + $3 * interval '30 seconds' WHERE id = $1 AND job_source = $2", [row.id, row.job_source, row.job_tries]);
     }
@@ -851,7 +878,8 @@ const customView = (x, sent) => ({
   videoLink: x.video_link ?? null,
   // At this server (the fx route serves it for the preview even while the gift is taken off).
   video: x.video_url ? { url: fxUrl(x.id, x.video_v), bytes: Number(x.video_bytes), ms: Number(x.video_ms ?? 0) } : null,
-  job: x.job_status ? { status: x.job_status, error: x.job_error ?? null } : null,
+  // preview: what a refused video came out as (its background and all), for the panel to show.
+  job: x.job_status ? { status: x.job_status, error: x.job_error ?? null, preview: x.job_preview ?? null } : null,
   sent: sent.get(x.id) ?? { count: 0, coins: 0 },
   createdAt: x.created_at,
   updatedAt: x.updated_at,
@@ -879,7 +907,7 @@ function appView(id, x, sent) {
     videoLink: x?.video_link ?? null,
     video: g.video ? { url: fxUrl(id, g.video.v), bytes: g.video.bytes, ms: g.video.ms } : g.videoOff ? null : original.video,
     videoOff: g.videoOff,
-    job: x?.job_status ? { status: x.job_status, error: x.job_error ?? null } : null,
+    job: x?.job_status ? { status: x.job_status, error: x.job_error ?? null, preview: x.job_preview ?? null } : null,
     // The app's gifts have no index of their own in gift_events: the last 30 days, found by time.
     sent: sent.get(id) ?? { count: 0, coins: 0, days: 30 },
     original,
@@ -939,12 +967,24 @@ export function sniff(b) {
 }
 const WHAT = { 'image/png': 'bir PNG resim', 'image/webp': 'bir WebP resim', 'video/mp4': 'bir MP4 video', 'video/webm': 'bir WebM video', 'video/quicktime': 'bir MOV video', 'application/x-svga': 'bir SVGA', zip: 'bir zip dosyası' };
 const what = (type) => WHAT[type] ?? 'tanınmayan bir dosya (resim ya da video değil)';
+const VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/quicktime', 'application/x-svga'];
+const VIDEO_END = /\.(mp4|m4v|webm|mov|svga)$/i;
+const sizeOf = (length) => (length ? ` (${mb(length)} MB)` : '');
+/** The sentence for a link too big for the icon: a video pasted in the icon's field is said to be one. */
+const iconTooBig = ({ type, length, url }) =>
+  type.startsWith('video/') || type === 'application/x-svga' || VIDEO_END.test(url.pathname)
+    ? `Bu bağlantı bir video${sizeOf(length)}: ikonun değil, videonun bağlantı alanına yapıştırın`
+    : `İkon en fazla ${mb(LIMITS.iconBytes)} MB olabilir${length ? ` (bu ${mb(length)} MB)` : ''}`;
+const videoTooBig = ({ length }) => `Video en fazla ${mb(LIMITS.sourceBytes)} MB olabilir${length ? ` (bu ${mb(length)} MB)` : ''}`;
+
 /** The upload kind a fetched file goes in as, for its slot: the same rules as the panel's file picker. */
 async function fetchedKind(slot, type, bytes) {
   if (slot === 'icon') {
     if (type === 'image/png' || type === 'image/webp') return 'gifticon';
+    if (VIDEO_TYPES.includes(type)) throw new HttpError(400, 'Bu bağlantı bir video: ikonun değil, videonun bağlantı alanına yapıştırın');
     throw new HttpError(400, `İkon PNG ya da WebP olmalı; bağlantıdaki ${what(type)}`);
   }
+  if (type === 'image/png' || type === 'image/webp') throw new HttpError(400, 'Bu bağlantı bir resim: videonun değil, ikonun bağlantı alanına yapıştırın');
   if (type === 'video/mp4') {
     if (bytes > LIMITS.videoBytes) throw new HttpError(400, `Hazır MP4 en fazla ${mb(LIMITS.videoBytes)} MB olabilir (bu ${mb(bytes)} MB): saydam WebM / MOV kaynağı ya da SVGA verin`);
     return 'giftvideo';
@@ -1055,13 +1095,13 @@ async function updateApp(req, a, id, b) {
         set('video_ms', video?.ms ?? null);
         set('video_v', video?.v ?? null);
         set('video_off', video === null);
-        sets.push('job_status = NULL', 'job_source = NULL', 'job_error = NULL', 'job_tries = 0');
-        drop.push(r.video_url, r.job_source);
+        sets.push('job_status = NULL', 'job_source = NULL', 'job_error = NULL', 'job_tries = 0', 'job_preview = NULL');
+        drop.push(r.video_url, r.job_source, r.job_preview);
       } else if (video?.kind === 'source') {
         set('job_source', video.url);
         set('job_fill', video.fill);
-        sets.push('video_off = false', "job_status = 'processing'", 'job_error = NULL', 'job_tries = 0', 'job_at = now()');
-        drop.push(r.job_source);
+        sets.push('video_off = false', "job_status = 'processing'", 'job_error = NULL', 'job_tries = 0', 'job_at = now()', 'job_preview = NULL');
+        drop.push(r.job_source, r.job_preview);
       }
       set('updated_by', a.id);
       sets.push('updated_at = now()', "rev = nextval('custom_gift_rev')");
@@ -1193,13 +1233,13 @@ export const customGiftRoutes = {
           set('video_bytes', video?.bytes ?? null);
           set('video_ms', video?.ms ?? null);
           set('video_v', video?.v ?? null);
-          sets.push('job_status = NULL', 'job_source = NULL', 'job_error = NULL', 'job_tries = 0');
-          drop.push(r.video_url, r.job_source);
+          sets.push('job_status = NULL', 'job_source = NULL', 'job_error = NULL', 'job_tries = 0', 'job_preview = NULL');
+          drop.push(r.video_url, r.job_source, r.job_preview);
         } else if (video?.kind === 'source') {
           set('job_source', video.url);
           set('job_fill', video.fill);
-          sets.push("job_status = 'processing'", 'job_error = NULL', 'job_tries = 0', 'job_at = now()');
-          drop.push(r.job_source);
+          sets.push("job_status = 'processing'", 'job_error = NULL', 'job_tries = 0', 'job_at = now()', 'job_preview = NULL');
+          drop.push(r.job_source, r.job_preview);
         }
         set('updated_by', a.id);
         sets.push('updated_at = now()', "rev = nextval('custom_gift_rev')");
@@ -1238,7 +1278,7 @@ export const customGiftRoutes = {
       counted = true;
       const out = await temp(async (dir) => {
         const file = path.join(dir, 'file');
-        const got = await download(link, file, slot === 'icon' ? { max: LIMITS.iconBytes, ms: 60_000 } : { max: LIMITS.sourceBytes, ms: 300_000 });
+        const got = await download(link, file, slot === 'icon' ? { max: LIMITS.iconBytes, ms: 60_000, tooBig: iconTooBig } : { max: LIMITS.sourceBytes, ms: 300_000, tooBig: videoTooBig });
         const type = sniff(got.head);
         const kind = await fetchedKind(slot, type, got.bytes);
         return { url: await storeFile(kind, a.id, file, type), kind, type, bytes: got.bytes, at: got.url };
@@ -1297,8 +1337,8 @@ export const customGiftRoutes = {
         }
         if (fields.includes('video')) {
           sets.push('video_url = NULL', 'video_bytes = NULL', 'video_ms = NULL', 'video_v = NULL', 'video_link = NULL', 'video_off = false');
-          sets.push('job_status = NULL', 'job_source = NULL', 'job_error = NULL', 'job_tries = 0', 'job_fill = NULL');
-          drop.push(r.video_url, r.job_source);
+          sets.push('job_status = NULL', 'job_source = NULL', 'job_error = NULL', 'job_tries = 0', 'job_fill = NULL', 'job_preview = NULL');
+          drop.push(r.video_url, r.job_source, r.job_preview);
         }
         sets.push('updated_by = $2', 'updated_at = now()', "rev = nextval('custom_gift_rev')");
         const after = await c.query(`UPDATE custom_gifts SET ${sets.join(', ')} WHERE id = $1 RETURNING *`, [id, a.id]);
@@ -1321,13 +1361,13 @@ export const customGiftRoutes = {
       const r = (await c.query('SELECT * FROM custom_gifts WHERE id = $1 AND deleted_at IS NULL FOR UPDATE', [id])).rows[0];
       if (!r) throw new HttpError(404, 'Hediye bulunamadı');
       await c.query(
-        "UPDATE custom_gifts SET deleted_at = now(), enabled = false, job_status = NULL, job_source = NULL, job_error = NULL, updated_by = $2, updated_at = now(), rev = nextval('custom_gift_rev') WHERE id = $1",
+        "UPDATE custom_gifts SET deleted_at = now(), enabled = false, job_status = NULL, job_source = NULL, job_error = NULL, job_preview = NULL, updated_by = $2, updated_at = now(), rev = nextval('custom_gift_rev') WHERE id = $1",
         [id, a.id],
       );
       await audited(c, a.id, 'gift.delete', { gift: id, before: auditOf(r), after: null, ...panelDetail(a) }, clientIp(req));
       return r;
     });
-    removeFiles([r.icon_url, r.video_url, r.job_source].filter(Boolean));
+    removeFiles([r.icon_url, r.video_url, r.job_source, r.job_preview].filter(Boolean));
     await refreshCustomGifts();
     return { deleted: true };
   },

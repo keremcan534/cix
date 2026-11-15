@@ -347,13 +347,11 @@ async function deleteKeys(keys) {
     // A room's own background and its card picture stay while they are in use (room-decor.mjs clears the row first).
     if (key.startsWith('roombg/') && (await db.query('SELECT 1 FROM room_decor WHERE position($1 in custom_url) > 0 LIMIT 1', [key])).rowCount) continue;
     if (key.startsWith('roomcover/') && (await db.query('SELECT 1 FROM rooms WHERE position($1 in cover_url) > 0 LIMIT 1', [key])).rowCount) continue;
-    // A gift's icon, video or source stays while a gift that isn't deleted holds it (custom-gifts.mjs clears it first).
-    if (
-      key.startsWith('gift') &&
-      (await db.query("SELECT 1 FROM custom_gifts WHERE deleted_at IS NULL AND position($1 in icon_url || ' ' || coalesce(video_url, '') || ' ' || coalesce(job_source, '')) > 0 LIMIT 1", [key]))
-        .rowCount
-    )
-      continue;
+    // A gift's icon, video, source or refused video's preview stays while a gift that isn't deleted holds it
+    // (custom-gifts.mjs clears it first). concat_ws skips the empty ones: an app's own gift changed by staff may have
+    // no icon of its own, and a plain || would make the whole text null.
+    const giftFiles = "SELECT 1 FROM custom_gifts WHERE deleted_at IS NULL AND position($1 in concat_ws(' ', icon_url, video_url, job_source, job_preview)) > 0 LIMIT 1";
+    if (key.startsWith('gift') && (await db.query(giftFiles, [key])).rowCount) continue;
     const res = await fetch(signed('DELETE', key), { method: 'DELETE', signal: AbortSignal.timeout(10_000) });
     // 404: already gone, which is what was wanted.
     if (!res.ok && res.status !== 404) console.error('storage delete', res.status);

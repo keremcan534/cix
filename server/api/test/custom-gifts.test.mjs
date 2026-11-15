@@ -127,6 +127,9 @@ function makeFiles() {
   ff(['-f', 'lavfi', '-i', `color=c=black@0:s=270x480:r=20:d=2,format=rgba,${box}`, '-c:v', 'libvpx-vp9', '-pix_fmt', 'yuva420p', '-auto-alt-ref', '0', '-b:v', '300k', files.source]);
   files.opaque = path.join(dir, 'opak.webm');
   ff(['-f', 'lavfi', '-i', `color=c=black:s=270x480:r=20:d=2,${box}`, '-c:v', 'libvpx-vp9', '-pix_fmt', 'yuv420p', '-b:v', '300k', files.opaque]);
+  // Exported "with alpha" but the background left on: an alpha channel that is nowhere transparent.
+  files.opaqueAlpha = path.join(dir, 'opak-alfali.webm');
+  ff(['-f', 'lavfi', '-i', `color=c=black:s=270x480:r=20:d=2,format=rgba,${box}`, '-c:v', 'libvpx-vp9', '-pix_fmt', 'yuva420p', '-auto-alt-ref', '0', '-b:v', '300k', files.opaqueAlpha]);
   files.stacked = path.join(dir, 'yigilmis.mp4');
   ff(convertArgs(files.source, files.stacked, 'vp9').slice(4));
   files.plain = path.join(dir, 'duz.mp4');
@@ -360,7 +363,7 @@ describe('Yönetim › Hediyeler', () => {
     assert.equal((await fetch(`${h.base}${fx.url}`)).status, 404);
   });
 
-  test('saydam kaynak sunucuda yığılmış videoya çevrilir; saydamlığı olmayan reddedilir', { skip: NO_FFMPEG }, async () => {
+  test('saydam kaynak sunucuda yığılmış videoya çevrilir; saydamlığı olmayan reddedilir, nasıl göründüğü panelde izlenir', { skip: NO_FFMPEG }, async () => {
     await freshAdmin();
     const g = await newGift();
     const src = await upload(admin, 'giftsource', fs.readFileSync(files.source), 'video/webm');
@@ -380,16 +383,48 @@ describe('Yönetim › Hediyeler', () => {
     assert.ok(!stored.has(keyOfUrl(src)), 'kaynak çevrildikten sonra silindi');
     assert.ok((await q("SELECT 1 FROM audit_events WHERE action = 'gift.video_ready' AND detail->>'gift' = $1", [g.id])).rowCount);
 
-    // No transparency: the server can't remove a background; the gift keeps the video it has.
+    // No transparency: the server can't remove a background; the gift keeps the video it has. What it would look like
+    // is kept for the panel (Önizle): the same stacked MP4, its mask white all over (the whole frame shows).
     const opaque = await upload(admin, 'giftsource', fs.readFileSync(files.opaque), 'video/webm');
     await ok(call('POST', '/api/admin/gifts/update', { id: g.id, video: { url: opaque, kind: 'source' } }, admin.session), 'opak kaynak');
     const failed = await settled(g.id);
     assert.equal(failed.job.status, 'failed');
-    assert.match(failed.job.error, /saydamlık/);
-    assert.match(failed.job.error, /arka plan silemez/);
+    assert.match(failed.job.error, /saydamlık \(alfa kanalı\) yok/);
+    assert.match(failed.job.error, /arka planı silemez/);
+    assert.match(failed.job.error, /ProRes 4444 \+ Alpha/);
     assert.equal(failed.video.url, done.video.url, 'eski video yerinde');
+    const previewKey = keyOfUrl(failed.job.preview);
+    assert.match(previewKey, new RegExp(`^giftvideo/.+/${g.id}-onizleme-.+\\.mp4$`));
+    const preview = stored.get(previewKey)?.body;
+    assert.ok(preview?.length > 0, 'önizleme depoda');
+    const probedPreview = spawnSync(process.env.FFPROBE || 'ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=codec_name,width,height', '-of', 'csv=p=0', '-'], { input: preview });
+    assert.equal(String(probedPreview.stdout).trim(), 'h264,540,1920');
+    const mask = spawnSync(FFMPEG, ['-v', 'error', '-i', 'pipe:0', '-vf', 'crop=iw:ih/2:0:ih/2,format=gray', '-frames:v', '1', '-f', 'rawvideo', 'pipe:1'], { input: preview, maxBuffer: 1 << 24 }).stdout;
+    assert.ok(mask.length > 0 && Math.min(...mask.subarray(0, 50_000)) > 200, 'maske her yerde beyaz: her yer görünür');
+    assert.equal((await q("SELECT detail->>'preview' AS p FROM audit_events WHERE action = 'gift.video_failed' AND detail->>'gift' = $1 ORDER BY id DESC LIMIT 1", [g.id])).rows[0].p, 'true');
     await sleep(300);
     assert.ok(!stored.has(keyOfUrl(opaque)));
+
+    // An alpha channel that is nowhere transparent: the same, with its own sentence; the earlier preview goes.
+    const opaqueAlpha = await upload(admin, 'giftsource', fs.readFileSync(files.opaqueAlpha), 'video/webm');
+    await ok(call('POST', '/api/admin/gifts/update', { id: g.id, video: { url: opaqueAlpha, kind: 'source' } }, admin.session), 'alfası opak kaynak');
+    await sleep(300);
+    assert.ok(!stored.has(previewKey), 'yeni video başlarken eski önizleme silindi');
+    const failedAgain = await settled(g.id);
+    assert.equal(failedAgain.job.status, 'failed');
+    assert.match(failedAgain.job.error, /hiçbir yeri saydam değil/);
+    const previewKey2 = keyOfUrl(failedAgain.job.preview);
+    assert.ok(stored.has(previewKey2));
+    assert.notEqual(previewKey2, previewKey);
+
+    // A good video afterwards: ready, and the preview of the refusal goes with it.
+    const good = await upload(admin, 'giftsource', fs.readFileSync(files.source), 'video/webm');
+    await ok(call('POST', '/api/admin/gifts/update', { id: g.id, video: { url: good, kind: 'source' } }, admin.session), 'iyi kaynak');
+    const ready = await settled(g.id);
+    assert.equal(ready.job, null);
+    await sleep(300);
+    assert.ok(!stored.has(previewKey2), 'önizleme silindi');
+    assert.equal((await q('SELECT job_preview FROM custom_gifts WHERE id = $1', [g.id])).rows[0].job_preview, null);
   });
 
   test('SVGA sunucuda videoya çevrilir; boyutu seçilir; SVGA 1.x ve 15 saniyeden uzunu reddedilir', { skip: NO_SVGA }, async () => {

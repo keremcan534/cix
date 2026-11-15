@@ -40,7 +40,7 @@ hediyeyi sessizce atlar, videosunu indirmez (adresi `/api/fx/g/…`, onların s�
 | Video (hazır) | Yığılmış MP4: H.264, üst yarı renk, alt yarı alfa (ör. 540 × 1920), 1–15 sn, en çok 12 MB |
 | Video (kaynak) | Saydam WebM (VP8/VP9 alfa) ya da ProRes 4444 .mov, en çok 100 MB; sunucu 540 × 960 görünür, 20 fps, AAC sesli yığılmış MP4'e çevirir |
 | SVGA | SVGA 2.x, en çok 100 MB ve 15 sn; sunucu aynı biçime çevirir, sesini korur. Ekrandaki boyutu: Küçük %45, Orta %60 (varsayılan), Büyük %80, Tam ekran %100 |
-| Arka plan silme | **Yapılmaz.** Kaynakta saydamlık yoksa ya da çıkan videonun hiçbir yeri saydam değilse reddedilir; arka planı silinmiş kaynak yükleyin |
+| Arka plan silme | **Yapılmaz.** Kaynakta saydamlık yoksa ya da çıkan videonun hiçbir yeri saydam değilse reddedilir; arka planı silinmiş kaynak yükleyin. Reddedilen videonun odada nasıl görüneceği (arka planıyla kutu gibi) listede **Önizle** ile izlenir |
 | Silme | Hediye raflardan ve panelden kalkar, gönderilemez; satır geçmiş için saklanır, ikonu ve videosu depodan silinir |
 | Bağlantıdan dosya | Finans panelinde her dosyanın yanında "ya da bağlantı yapıştır": sunucu dosyayı bir kez indirir, yüklenmiş gibi denetler ve kendisi sunar (aşağıda **Bağlantıdan dosya**) |
 | Raftan kaldırma | Panelde kalır, kataloğda görünmez, gönderilemez; tekrar rafa konabilir |
@@ -89,8 +89,13 @@ Saklama: `custom_gifts` tablosunda uygulama hediyesinin kimliğiyle bir satır (
 5. **Önizleme:** rafındaki kutucuk (ikon, ad, fiyat) ve büyük ikon; videosu hazır olan hediyenin videosu telefonda
    oda sahnesinin üstünde oynatılabilir (web'de saydam video oynatıcı yok).
 6. **Hediyeyi ekle.** Çevrilen videoda liste "Video çevriliyor" der ve birkaç saniyede bir yenilenir; bitince
-   "Video hazır · süre · boyut", olmazsa nedeni ("Bu videoda saydamlık yok…"). Çevrilirken hediye videosuz gönderilir
-   (ikonu uçar), eski video varsa o oynar.
+   "Video hazır · süre · boyut", olmazsa nedeni tam cümleyle: ne yanlış ve nasıl dışa aktarılmalı ("Bu videoda saydamlık
+   (alfa kanalı) yok: arka planıyla odada kutu gibi görünür… arka plan katmanını kapatıp ProRes 4444 + Alpha (.mov) ya da
+   saydam WebM seçin"). Çevrilirken hediye videosuz gönderilir (ikonu uçar), eski video varsa o oynar.
+   - **Reddedilen videonun önizlemesi:** Video çevrildi ama hiçbir yeri saydam değilse (arka planı silinmemişse) çıkan hali
+     saklanır; listede ve Düzenle'de **Önizle** onu oda sahnesinin üstünde oynatır, böylece odada nasıl, arka planıyla kutu
+     gibi görüneceği görülür. Hediyedeki video değişmez. Önizleme dosyası sonraki videoyla, orijinale dönmeyle ya da
+     hediyeyle silinir (`custom_gifts.job_preview`, 072).
 7. Listede ok tuşlarıyla rafın içinde sıra, **Düzenle**, **Raftan kaldır / Rafa koy**, **Sil**.
 
 ## Bağlantıdan dosya (kendi sitenizden)
@@ -106,12 +111,18 @@ vardır: dosyayı kendi sitenize (ör. GoDaddy hostingde `/hediyeler/` klasörü
   bunlar dosyayı değil bir web sayfasını açar ve "Bu bağlantı dosyanın kendisini değil bir web sayfasını açıyor…"
   cümlesiyle reddedilir. Bulunamayan dosya "sunucu 404 dedi", yanlış tür "İkon PNG ya da WebP olmalı; bağlantıdaki bir
   SVGA" gibi, büyük dosya sınırıyla, yavaş ya da kapalı site "zamanında cevap vermedi" der.
+- **Yanlış alana yapıştırılan bağlantı:** Videonun bağlantısı ikonun alanına (ya da resmin bağlantısı videonun alanına)
+  yapıştırılırsa panel bunu dosya adından anlar, bağlantıyı doğru alana taşır ve orada çeker ("Bu bir video bağlantısı:
+  Video alanına taşındı"). Adından anlaşılmazsa sunucu söyler: "Bu bağlantı bir video (19,5 MB): ikonun değil, videonun
+  bağlantı alanına yapıştırın" (1 MB sınırı yerine).
 - **Ne olur:** uygulamanın sunucusu dosyayı **bir kez** indirir, türünü ilk baytlarından okur, depoya koyar; kaydedince
   yüklenen dosya gibi denetlenir ve (WebM / MOV / SVGA ise) çevrilir. Telefonlar dosyayı **bizim sunucumuzdan** alır,
   sizin sitenize hiç bağlanmaz: siteniz yavaşlasa ya da kapansa odalar etkilenmez; eski APK'lar, saydamlık ve sınırlar
   yüklemedeki gibidir.
-- **Yenileme:** dosyayı sitenizde aynı adreste değiştirirseniz hediye kendiliğinden değişmez. Düzenle'de bağlantı
-  saklıdır; **Bağlantıdan yeniden çek** ve **Kaydet** ile yeni dosya alınır. Listede bağlantıdan gelen hediyede "🔗
+- **Yenileme:** dosyayı sitenizde aynı adreste değiştirirseniz hediye kendiliğinden değişmez, bilerek: her yeni dosya
+  denetlenip çevrilmeden telefonlara gitmemeli (siteniz değişir, bozulur ya da başkası dosyayı değiştirirse odalarda
+  denetlenmemiş bir şey çıkmasın). Düzenle'de bağlantı saklıdır; **Bağlantıdan yeniden çek** ve **Kaydet** ile yeni dosya
+  alınır, çevrilir ve telefonlara kendiliğinden gider (uygulama güncellemesi gerekmez). Listede bağlantıdan gelen hediyede "🔗
   bağlantıdan" yazar. Bilgisayardan dosya seçilirse bağlantı silinir.
 - **Güvenlik:** sunucu yalnız internette herkese açık adreslere bağlanır: bu makine (API, panel, veritabanı), konteyner
   ağı, özel ağlar, link-local (bulut üst verisi), CGNAT, çok noktaya yayın ve ayrılmış bloklar olmaz; alan adı çözüldükten
@@ -162,12 +173,14 @@ Kendi alan adınızda yönetim açılırsa o adres de `AllowedOrigins`'e eklenir
 
 - SVGA 1.x (zip) okunmaz; 2.x'te vektör şekiller, maskeler ve kırpma yolları çizilmez (betik sayar ve atlar).
 - Sunucu 1 OCPU: 5 saniyelik bir SVGA birkaç on saniyede, 15 saniyelik büyük bir kaynak birkaç dakikada çevrilir.
-- Web'de saydam video oynatıcı olmadığı için video önizlemesi yalnız telefonda.
+- Panelin önizlemesi videoyu telefonlardaki gibi saydam çizer (oda sahnesinin üstünde); yalnız ses ve hız tarayıcıya göre
+  az farklı olabilir.
 
 ## Testler
 
 - Bağlantıdan dosya: `server/api/test/gift-links.test.mjs` (sahte müşteri sitesi: ikon iner, depoya yüklenmiş gibi konur,
   kaydedilir, bağlantı saklanır ve denetimde; türü baytlarından; MP4, SVGA 1.x, web sayfası, büyük dosya, 404, döngü;
+  ikonun alanına yapıştırılan video ve videonun alanına yapıştırılan resim, ikonun 1 MB'ı yerine "bu bir video";
   bu sunucu, özel ağ, bulut üst verisi, yönlendirme ve ad üzerinden iç adres reddi).
 - Uygulamanın kendi hediyeleri: `server/api/test/builtin-gifts.test.mjs` (panel listesi ve uygulamadaki değerler, ad /
   emoji / fiyat, eski uygulamanın kataloğu ve 409'ları, gösterilen fiyatla gönderim ve tekrar, ad çakışması, raf ve VIP,
@@ -175,7 +188,7 @@ Kendi alan adınızda yönetim açılırsa o adres de `AllowedOrigins`'e eklenir
   `app/tests/app-gift-edits.test.ts` (telefonda `gifts=2`: değerler, sıra, raftakiler, ikon, bozuk alanlar, eski sunucu, kopya).
 - Sunucu: `server/api/test/custom-gifts.test.mjs` (yetki, ikon kuralları, katalog ve sürüm, eski uygulamanın süzgeci,
   sunucu fiyatıyla gönderim, fiyat değişikliği, raftan kaldırma, sıra, hazır video, WebM çevirme, saydamlığı olmayan
-  kaynağın reddi, SVGA çevirme ve boyutu, SVGA 1.x ve 15 sn'den uzunun reddi, silme ve denetim kaydı). CI ffmpeg,
+  ve alfası hiçbir yerde saydam olmayan kaynağın reddi ve önizlemesi (maskesi her yerde beyaz; yeni videoyla silinir), SVGA çevirme ve boyutu, SVGA 1.x ve 15 sn'den uzunun reddi, silme ve denetim kaydı). CI ffmpeg,
   numpy ve Pillow'u kurar.
 - Uygulama: `app/tests/custom-gifts.test.ts` (katalogdan okuma, bozuk kayıtların atlanması, raf sırası, kimlikle bulma,
   telefondaki kopya, video adresi ve eski uygulamanın süzgeci, paneldeki yardımcılar).

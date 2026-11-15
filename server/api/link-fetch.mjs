@@ -172,8 +172,10 @@ function failure(e, timedOut) {
 /**
  * Downloads `link` into `file`: at most `max` bytes, the whole of it within `ms`. Resolves with { bytes, type (what
  * the host called it), url (where it ended after redirects), head (its first 64 bytes) }; a 400 in words otherwise.
+ * `tooBig({ type, length, url })`: the sentence for a file over `max` (length null when the host didn't say it), e.g.
+ * that the link is a video pasted where a picture goes; the size alone when it gives none.
  */
-export async function download(link, file, { max, ms = 120_000 }) {
+export async function download(link, file, { max, ms = 120_000, tooBig }) {
   const signal = AbortSignal.timeout(ms);
   let u = new URL(link);
   try {
@@ -201,17 +203,18 @@ export async function download(link, file, { max, ms = 120_000 }) {
         res.resume();
         throw bad(PAGE);
       }
+      const over = (length) => bad(tooBig?.({ type, length, url: u }) ?? `Dosya en fazla ${mb(max)} MB olabilir${length ? ` (bu ${mb(length)} MB)` : ''}`);
       const length = Number(res.headers['content-length']);
       if (Number.isFinite(length) && length > max) {
         res.resume();
-        throw bad(`Dosya en fazla ${mb(max)} MB olabilir (bu ${mb(length)} MB)`);
+        throw over(length);
       }
       let bytes = 0;
       let head = Buffer.alloc(0);
       const guard = new Transform({
         transform(chunk, _enc, done) {
           bytes += chunk.length;
-          if (bytes > max) return done(bad(`Dosya en fazla ${mb(max)} MB olabilir`));
+          if (bytes > max) return done(over(null));
           if (head.length < 64) {
             head = Buffer.concat([head, chunk.subarray(0, 64 - head.length)]);
             if (head.length >= 64 && looksLikePage(head)) return done(bad(PAGE));
