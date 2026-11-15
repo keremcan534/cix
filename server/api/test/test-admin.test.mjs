@@ -52,7 +52,7 @@ describe('test sunucusu: yönetici her şeyin en üstünde', () => {
     assert.equal((await me(admin)).coins, 10_000_000);
     assert.equal((await fills(admin)).length, 1);
     assert.equal((await ranks(admin)).length, 1);
-    await q('UPDATE users SET coins = 1000 WHERE id = $1', [admin.user.id]);
+    await h.debit(admin.user.id, 10_000_000 - 1000);
     assert.equal((await me(admin)).coins, 10_000_000);
     assert.deepEqual((await fills(admin)).map((x) => Number(x.amount)), [10_000_000, 9_999_000]);
     assert.equal((await ranks(admin)).length, 1);

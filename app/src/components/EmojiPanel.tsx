@@ -9,9 +9,11 @@ import { AssetView } from '@/components/fx/anim-player';
 import { Icon3D } from '@/components/Icon3D';
 import { EMOJI_PACKS_ICON, REACTION_TAB_ANIMATED, StickerArt } from '@/components/ReactionArt';
 import { DISPLAY_LABEL, type Animation } from '@/data/animations';
-import { packOfSticker, stickerById, type Sticker } from '@/data/catalog';
+import { type Sticker } from '@/data/catalog';
 import { isLive, isSentAnim, useAnimations } from '@/lib/animations';
 import { animIdOf, animKey, emojiTabPacks, favourites, lastTab, notePick, openTab, panelTabs, pickCounts, setLastTab, type PanelKind, type PanelTab } from '@/lib/emoji-panel';
+import { useLiveCatalog } from '@/lib/live/catalog-live';
+import { livePackOf, livePacks, liveSticker } from '@/lib/live/emoji-live';
 import { stickerIdOf, stickerToken } from '@/lib/stickers';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
@@ -48,7 +50,10 @@ export function EmojiPanel({ onPick, hint, onAnimate, onClose, fill }: { onPick:
   const styles = useStyles();
   const t = useTheme();
   const room = !!onAnimate;
-  const [tabs] = useState(() => panelTabs(room));
+  // The packs as Yönetim › Emojiler has them now (the app's own without a server); fixed while the panel is open.
+  const catalogNow = useLiveCatalog();
+  const [packs] = useState(() => livePacks(catalogNow));
+  const [tabs] = useState(() => panelTabs(room, packs));
   const [tab, setTab] = useState<PanelTab>(() => openTab(lastTab(), tabs));
   // Favoriler as it was when the panel opened: a pick counts, but the grid doesn't move under the finger.
   const [counts] = useState(pickCounts);
@@ -86,8 +91,8 @@ export function EmojiPanel({ onPick, hint, onAnimate, onClose, fill }: { onPick:
   const canSend = (key: string) => {
     if (animIdOf(key)) return sendable(animOf(key));
     const id = stickerIdOf(key);
-    const p = id ? packOfSticker(id) : undefined;
-    return !!p && !p.retired && (!p.roomOnly || room) && packUnlocked(p.id);
+    const p = id ? livePackOf(id) : undefined;
+    return !!p && !p.retired && p.stickers.some((s) => s.id === id) && (!p.roomOnly || room) && packUnlocked(p.id);
   };
   const favs = tab.id === 'fav' ? favourites(counts, recentEmojis, canSend) : [];
 
@@ -162,7 +167,7 @@ export function EmojiPanel({ onPick, hint, onAnimate, onClose, fill }: { onPick:
       );
     }
     const id = stickerIdOf(key);
-    const x = id ? stickerById(id) : undefined;
+    const x = id ? liveSticker(id) : undefined;
     if (!x) return null;
     return (
       <Pressable key={key} onPress={() => pick(key)} style={styles.stickerCell} accessibilityLabel={x.name}>
@@ -238,7 +243,7 @@ export function EmojiPanel({ onPick, hint, onAnimate, onClose, fill }: { onPick:
       ) : tab.id === 'emoji' ? (
         // The faces first, then Müzik and (in a room) Hamle; it scrolls inside the panel, so the room's mics stay.
         <ScrollView style={list} nestedScrollEnabled>
-          {emojiTabPacks(room).map((p, i) => (
+          {emojiTabPacks(room, packs).map((p, i) => (
             <View key={p.id}>
               {i > 0 && <Text style={styles.section}>{p.name}</Text>}
               <View style={styles.grid}>{p.stickers.map((x) => (p.roomOnly ? moveCell(x) : stickerCell(x)))}</View>

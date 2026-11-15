@@ -200,18 +200,23 @@ async function cleanup() {
  * How many people are in each voice room right now, as LiveKit counts them (room name → people), read at most
  * every 10 s. The room lists show this, so the count is right even when LiveKit's webhooks don't reach us. null
  * when LIVEKIT_API_URL isn't set or LiveKit can't be reached: the caller then uses room_presence.
+ * One read at a time: everyone who asks while LiveKit answers shares it (a whole room re-reads at once when the
+ * room changes, docs/YUK_TESTI.md), so a busy moment costs LiveKit one ListRooms, not hundreds.
  */
-let counts = { at: 0, map: null };
+let counts = { at: 0, map: null, reading: null };
 export async function voiceCounts() {
   if (!env.LIVEKIT_API_URL) return null;
   if (Date.now() - counts.at < 10_000) return counts.map;
-  try {
-    counts = { at: Date.now(), map: new Map((await listVoiceRooms(3_000)).map((x) => [x.name, x.people])) };
-  } catch (e) {
-    console.error('livekit ListRooms counts', String(e).slice(0, 200));
-    counts = { at: Date.now(), map: null };
-  }
-  return counts.map;
+  counts.reading ??= listVoiceRooms(3_000)
+    .then(
+      (list) => new Map(list.map((x) => [x.name, x.people])),
+      (e) => (console.error('livekit ListRooms counts', String(e).slice(0, 200)), null),
+    )
+    .then((map) => {
+      counts = { at: Date.now(), map, reading: null };
+      return map;
+    });
+  return counts.reading;
 }
 
 /**

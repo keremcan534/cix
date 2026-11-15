@@ -10,5 +10,6 @@ COPY room-games ./room-games
 COPY tools ./tools
 COPY migrations ./migrations
 COPY fx ./fx
+COPY art ./art
 USER node
 CMD ["node", "index.mjs"]

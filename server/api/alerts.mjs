@@ -13,6 +13,9 @@
 //   mail_quota_high     today's e-mail codes passed ALERT_MAIL_QUOTA_PCT % (80) of the free daily quota of the mail
 //                       providers (mail.mjs); at 100 % e-mail sign-in stops until midnight UTC
 //   mail_failing        the last 10 e-mail codes could not be sent by any provider
+//   money_mismatch      the money checks (money-check.mjs) found balances, ledger rows, coin lots or diamond locks
+//                       that don't add up; they run in the background every MONEY_CHECK_MIN minutes (60; 0 = off)
+//                       on the accounts touched since migration 071, and this uses the last finished run
 //   alerts_error        the checks themselves failed (see the API log)
 //
 // The checks read the last hour of the ledger, so the public answer is computed at most once a minute
@@ -21,6 +24,7 @@ import fs from 'node:fs';
 
 import { HttpError, auth, db, env } from './core.mjs';
 import { MAIL_DAILY, mailFailing, mailProviders } from './mail.mjs';
+import { checkMoney, moneyCheckFrom } from './money-check.mjs';
 import { lastFailures, recent5xx } from './reporting.mjs';
 
 const num = (v, d) => (v === undefined || v === '' || !Number.isFinite(Number(v)) ? d : Number(v));
@@ -32,9 +36,44 @@ const T = {
   diamonds1h: num(env.ALERT_DIAMONDS_1H, 500_000),
   testTopup1h: num(env.ALERT_TEST_TOPUP_1H, 500_000),
   mailQuotaPct: num(env.ALERT_MAIL_QUOTA_PCT, 80),
+  moneyMin: num(env.MONEY_CHECK_MIN, 60),
 };
 const CACHE_MS = num(env.ALERT_CACHE_S, 60) * 1000;
 const FINANCE_ON = !!env.FINANCE_API_KEY;
+
+// The money checks read every touched account's whole ledger: never in the health answer's path. A run starts when
+// the last one is MONEY_CHECK_MIN old; the alerts use the last finished run (none yet right after a start).
+let money = { at: null, ms: 0, since: 0, problems: [], error: null };
+let moneyRun = null;
+async function runMoney(since) {
+  const started = Date.now();
+  let r;
+  try {
+    r = { problems: await checkMoney(db, { since }), error: null };
+  } catch (e) {
+    console.error('money check failed', e.message);
+    r = { problems: [], error: e.message };
+  }
+  if (r.problems.length) console.error(`money check: ${r.problems.map((p) => `${p.code} ${p.count}`).join(', ')}`);
+  return { at: new Date().toISOString(), ms: Date.now() - started, since, ...r };
+}
+/**
+ * The last finished money check of the watched accounts; starts a new one in the background when due (or
+ * `force`d), and `wait` waits for it. `all`: every account and ledger row now, migration 071's past included (on
+ * request only; the alerts keep watching their part).
+ */
+export async function moneyCheck({ force = false, wait = false, all = false } = {}) {
+  if (all) return runMoney(0);
+  const due = T.moneyMin > 0 && (!money.at || Date.now() - new Date(money.at).getTime() >= T.moneyMin * 60_000);
+  if ((due || force) && !moneyRun) {
+    moneyRun = moneyCheckFrom(db)
+      .then(runMoney)
+      .then((run) => (money = run))
+      .finally(() => (moneyRun = null));
+  }
+  if (wait && moneyRun) return moneyRun;
+  return money;
+}
 
 /** Every check, with its details. Each warning: { code, message (Turkish), value, threshold, details? }. */
 export async function checkAll() {
@@ -116,6 +155,13 @@ export async function checkAll() {
       add('mail_quota_high', `Bugünkü ücretsiz e-posta kotasının %${pct} kullanıldı (${sent}/${cap})`, pct, T.mailQuotaPct, Object.fromEntries(capped.map((p) => [p, { sent: rows.find((r) => r.provider === p)?.sent ?? 0, cap: MAIL_DAILY[p] }])));
   }
   if (mailFailing()) add('mail_failing', 'Son 10 e-posta kodu hiçbir sağlayıcıyla gönderilemedi', 10, 10);
+
+  const m = await moneyCheck();
+  if (m.problems.length) {
+    const n = m.problems.reduce((a, p) => a + p.count, 0);
+    add('money_mismatch', `Para kayıtlarında ${n} tutarsızlık: ${m.problems.map((p) => p.message).join('; ')}`, n, 0, { checkedAt: m.at, problems: m.problems });
+  }
+  if (m.error) add('alerts_error', `Para denetimi çalışmadı: ${m.error}`, null, null);
   return out;
 }
 
@@ -141,5 +187,15 @@ export const alertRoutes = {
     const u = await auth(req);
     if (u.role !== 'admin') throw new HttpError(403, 'Yönetici hesabı gerekli');
     return { warnings: await checkAll(), thresholds: T, financeSync: FINANCE_ON, recentFailures: lastFailures(20) };
+  },
+
+  /**
+   * The money checks now, waited for: { at, ms, since, problems, error }. ?all=1 checks every account and ledger
+   * row, the ones before migration 071 too (docs/PARA_DENETIMI.md).
+   */
+  async 'GET /api/admin/money-check'(req, url) {
+    const u = await auth(req);
+    if (u.role !== 'admin') throw new HttpError(403, 'Yönetici hesabı gerekli');
+    return moneyCheck({ force: true, wait: true, all: url.searchParams.get('all') === '1' });
   },
 };

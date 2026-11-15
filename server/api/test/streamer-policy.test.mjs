@@ -135,8 +135,7 @@ describe('Yayıncı kuralları', () => {
 
   test('Gelir kaynakları: oda, Anlar, profil hediyeleri ayrı; arama ve mesaj ücreti 0 (birebir yoksa)', async () => {
     const [giver, host] = await Promise.all([account('Veren', null), account('Alan')]);
-    await q("INSERT INTO coin_lots (user_id, channel, amount, remaining, lock_hours, ref) VALUES ($1, 'google', 100000, 100000, 0, $2)", [giver.id, ref()]);
-    await q('UPDATE users SET coins = coins + 100000 WHERE id = $1', [giver.id]);
+    await h.credit(giver.id, 100000, { channel: 'google' });
     const gift = (await call('GET', '/api/catalog'))[1].gifts.find((g) => g.price >= 10 && !g.minSvip);
     ok(await giver.post('/api/gifts/send', { to: host.id, giftId: gift.id, count: 1, room: 'oda1', ref: ref() }), 'oda');
     ok(await giver.post('/api/gifts/send', { to: host.id, giftId: gift.id, count: 1, place: 'moment', ref: ref() }), 'anlar');

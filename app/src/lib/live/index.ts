@@ -17,7 +17,7 @@ import { ROOM_THEMES, roomCoverUrl } from '@/data/catalog';
 import { isServerId, putServerRoom, putServerUser, type Room, type User } from '@/data/mock';
 import { putLevels } from '@/lib/live/levels';
 import { putDistance } from '@/lib/live/distances';
-import { liveRules, noteLiveRate, rateChangedMessage, refreshLiveCatalog } from '@/lib/live/catalog-live';
+import { giftById, liveRules, noteLiveRate, rateChangedMessage, refreshLiveCatalog } from '@/lib/live/catalog-live';
 import { forgetRoomPasswords } from '@/lib/live/room-password';
 import { forgetRoomFollows, putRoomFollow } from '@/lib/room-follow';
 import { replyOrder, unsureRefs } from '@/lib/live/requests';
@@ -174,11 +174,20 @@ export async function liveExchange(diamonds: number) {
   return r.coins;
 }
 
-/** A gift to a real person, at the server's price. `room` = the LiveKit room it was sent in; `place` = where outside one. */
-export async function liveGift(to: string, giftId: string, count: number, room?: string, place?: api.GiftPlace) {
+/**
+ * A gift to a real person, at the server's price. `room` = the LiveKit room it was sent in; `place` = where outside
+ * one; `price` = the unit price the screen showed (the catalog's when not given). A gift whose price moved meanwhile
+ * (409 price_changed) costs nothing: the catalog is read again and the error says the new price.
+ */
+export async function liveGift(to: string, giftId: string, count: number, room?: string, place?: api.GiftPlace, price = giftById(giftId)?.price) {
   const id = toServer(to);
   if (!id) throw new Error('Bu kişiye şu an ulaşılamıyor');
-  return applied(await once(`gift:${id}:${giftId}:${count}:${room ?? place ?? ''}`, (ref) => api.sendGift(id, giftId, count, room, ref, place)), 'Hediye gönderildi');
+  try {
+    return applied(await once(`gift:${id}:${giftId}:${count}:${room ?? place ?? ''}`, (ref) => api.sendGift(id, giftId, count, room, ref, place, price)), 'Hediye gönderildi');
+  } catch (e) {
+    if (e instanceof api.ApiError && e.status === 409 && (e.data.code === 'price_changed' || e.data.code === 'update_required')) void refreshLiveCatalog();
+    throw e;
+  }
 }
 
 /** A paid Hareketli in a server room, at the server's price; the server tells the room (server/api/room-fx.mjs). */

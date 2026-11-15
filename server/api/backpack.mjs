@@ -20,6 +20,7 @@
 import { recordIncome } from './agency-lib.mjs';
 import { GIFTS, GIFT_COUNTS } from './catalog.mjs';
 import { HttpError, REF, auth, blockedBetween, db, int, limit, readJson, selfUser, tx, userId } from './core.mjs';
+import { giftNameOf } from './custom-gifts.mjs';
 import { ROOM, announceGift, liveKitRoom } from './gifts.mjs';
 import { BACKPACK_TASK_GIFT } from './live-registry.mjs';
 import { live } from './live-settings.mjs';
@@ -105,8 +106,11 @@ export const backpackRoutes = {
     const s = live();
     const b = await readJson(req);
     if (!REF.test(b.ref ?? '')) throw new HttpError(400, 'Geçersiz istek kimliği');
-    const gift = GIFTS.get(b.giftId);
-    if (!gift) throw new HttpError(400, 'Bu hediye artık yok');
+    // A reward keeps the value it was given at, the app's price (a price changed in Yönetim › Hediyeler doesn't make
+    // the bag's gifts worth more), under the name the gift has now.
+    const base = GIFTS.get(b.giftId);
+    if (!base) throw new HttpError(400, 'Bu hediye artık yok');
+    const gift = { ...base, name: giftNameOf(base.id) ?? base.name };
     const count = int(b.count ?? 1, 1, 10_000);
     if (!count || !GIFT_COUNTS.includes(count)) throw new HttpError(400, `Adet ${GIFT_COUNTS.join(', ')} olabilir`);
     const to = userId(b.to, 'alıcı');

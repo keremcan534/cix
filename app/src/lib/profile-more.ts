@@ -3,8 +3,8 @@
 // effects, medals and titles. The server checks every value again and decides what is earned; this only reads its
 // answers and catches mistakes before a save. Pure, for node --test (tests/profile-more.test.ts).
 import { COSMETICS } from '@/data/catalog';
-import { GIFTS, type Gift } from '@/data/mock';
-import { liveCatalog } from '@/lib/live/catalog-live';
+import { type Gift } from '@/data/mock';
+import { everyGift } from '@/lib/live/catalog-live';
 import { MEDALS, NO_EXTRAS, PERSONALITY_TAGS, TITLES, type Medal, type ProfileExtras, type Title } from '@/data/profile';
 import type { ServerExtras, Showcase } from '@/lib/api';
 import { CONTACT_MESSAGE, checkText, contactRefusal } from '@/lib/contact-filter';
@@ -128,6 +128,6 @@ export function showcaseView(s: Showcase): ShowcaseView {
     rides: shopItems(s.rides),
     entries: shopItems(s.entries),
     // The admins' gifts this phone's catalog lists come after the compiled ones (server/api/custom-gifts.mjs).
-    giftWall: [...GIFTS, ...(liveCatalog()?.remote ?? [])].map((g) => ({ ...g, count: got.get(g.id) ?? 0 })),
+    giftWall: everyGift().map((g) => ({ ...g, count: got.get(g.id) ?? 0 })),
   };
 }

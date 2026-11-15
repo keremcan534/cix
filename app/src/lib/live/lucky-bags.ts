@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import * as api from '@/lib/api';
 import { applyServerUser, once, refreshWallet, rememberUser } from '@/lib/live';
+import { refreshLiveCatalog } from '@/lib/live/catalog-live';
 import { onServerBag } from '@/lib/live/room-bus';
 
 export type BagKind = 'coins' | 'gift';
@@ -36,7 +37,10 @@ export type Bag = {
 };
 export type BagGrab = { user: BagPerson; units: number; coins: number };
 export type BagRules = { coins: number[]; coinPackets: number[]; giftCounts: number[]; giftPackets: number[]; delays: number[]; windowSeconds: number };
-export type BagDrop = { kind: 'coins'; amount: number; packets: number; delay: number; followersOnly: boolean } | { kind: 'gift'; giftId: string; count: number; packets: number; delay: number; followersOnly: boolean };
+/** A bag to drop; a gift bag carries the unit price the screen showed (`price`: the server refuses one that moved). */
+export type BagDrop =
+  | { kind: 'coins'; amount: number; packets: number; delay: number; followersOnly: boolean }
+  | { kind: 'gift'; giftId: string; count: number; price?: number; packets: number; delay: number; followersOnly: boolean };
 export type BagGot = { units: number; coins: number; kind: BagKind; giftId: string | null };
 
 /** What the server allows when it hasn't answered yet (server/api/lucky-bag-rules.mjs). */
@@ -66,7 +70,14 @@ export async function bagDetail(id: number) {
 /** Drops a bag (the coins leave at once). A short balance comes back as an ApiError (code insufficient). */
 export async function dropBag(room: string, d: BagDrop) {
   const key = d.kind === 'coins' ? `bag:${room}:c:${d.amount}:${d.packets}:${d.delay}:${d.followersOnly}` : `bag:${room}:g:${d.giftId}:${d.count}:${d.packets}:${d.delay}:${d.followersOnly}`;
-  const r = await once(key, (ref) => api.apiRequest<{ user: api.ServerUser; replay: boolean; bag: Bag }>('POST', '/api/lucky-bags', { room, ...d, ref }));
+  let r: { user: api.ServerUser; replay: boolean; bag: Bag };
+  try {
+    r = await once(key, (ref) => api.apiRequest<{ user: api.ServerUser; replay: boolean; bag: Bag }>('POST', '/api/lucky-bags', { room, ...d, ref }));
+  } catch (e) {
+    // The gift's price moved since the screen showed it: nothing was taken; the catalog is read again.
+    if (e instanceof api.ApiError && e.status === 409 && (e.data.code === 'price_changed' || e.data.code === 'update_required')) void refreshLiveCatalog();
+    throw e;
+  }
   applyServerUser(r, d.kind === 'coins' ? 'Jeton çantası' : 'Hediye çantası');
   return r.bag;
 }

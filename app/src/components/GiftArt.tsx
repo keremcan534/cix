@@ -2,8 +2,8 @@
 // 192 px for lists, chat and flights, 512 px for the full-screen send animation. Keyed by gift id
 // (GIFTS and the Lucky packages), so an admin renaming a gift or editing its emoji keeps its image.
 // A gift with no image (a new catalog entry) keeps its emoji until one is delivered. An admin's gift (Yönetim ›
-// Hediyeler) is drawn from the icon address the server's catalog gives (lib/live/catalog-live remoteIconOf), one
-// file for both sizes; the phone keeps it in its image cache.
+// Hediyeler), and one of the app's whose icon was replaced there, is drawn from the icon address the server's catalog
+// gives (lib/live/catalog-live remoteIconOf), one file for both sizes; the phone keeps it in its image cache.
 import { Image, type ImageSourcePropType, type ImageStyle, type StyleProp, type TextStyle } from 'react-native';
 
 import { Text } from '@/components/text';
@@ -102,9 +102,9 @@ function remoteArtOf(giftId: string): Art | undefined {
   return art;
 }
 
-/** The image for a catalog gift (GIFTS or Lucky package id, or an admin's gift's icon), if there is one. */
+/** The image for a catalog gift: the icon the server gave (an admin's gift, or a replaced one), else the app's own. */
 export const giftArtOf = (giftId?: string): Art | undefined =>
-  giftId ? (ART[giftId] ?? (giftId.startsWith('lk') ? LUCKY_DEFAULT : undefined) ?? remoteArtOf(giftId)) : undefined;
+  giftId ? (remoteArtOf(giftId) ?? ART[giftId] ?? (giftId.startsWith('lk') ? LUCKY_DEFAULT : undefined)) : undefined;
 /** Picks the file for the size it is drawn at (192 px covers up to ~64 pt on 3x screens). */
 export const giftSource = (art: Art, size: number) => (size > 64 ? art.lg : art.sm);
 

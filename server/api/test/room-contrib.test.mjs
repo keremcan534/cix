@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 
 import { rnd, startApi } from './harness.mjs';
 
-const h = startApi();
+const h = startApi({}, { moneyCheck: { skip: ['gifts', 'paid'], why: 'hediye ve ücretli olay geçmişini puan için doğrudan yazar' } });
 const { call, signUp } = h;
 const q = async (sql, args = []) => (await h.sql.query(sql, args)).rows;
 const topUp = async (s, amount) => {

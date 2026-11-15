@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Linking, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
@@ -27,6 +27,7 @@ import { useStaffRole } from '@/lib/live/admin';
 import { useLivePrivacy, usePrivacySetter, type PrivacyKey } from '@/lib/live/privacy';
 import { useEventReminderSetting } from '@/lib/live/event-reminders';
 import { type CodeKind } from '@/lib/live/account';
+import { siteHost } from '@/lib/remote-config';
 import { useRemoteConfig } from '@/lib/remote-control';
 import { installUpdate, useInstallState } from '@/lib/app-install';
 import { useAppUpdate, versionLabel } from '@/lib/app-update';
@@ -168,7 +169,7 @@ export default function SettingsScreen() {
     );
   // Live mode: the account's e-mail and checked number (the ways the server has on, lib/remote-config).
   const { email, phoneVerified } = useApp();
-  const { signIn, verify } = useRemoteConfig();
+  const { signIn, verify, adminSite } = useRemoteConfig();
   const update = useAppUpdate();
   const install = useInstallState();
   const [verifyKind, setVerifyKind] = useState<CodeKind | null>(null);
@@ -239,8 +240,15 @@ export default function SettingsScreen() {
             <ListRow
               icon="speedometer-outline"
               title="Yönetim"
-              subtitle={staff === 'admin' ? 'Şikâyetler, yaptırımlar, destek, para çekme, ajans ödemeleri ve iadeler' : 'Yaptırımlar, itirazlar ve destek talepleri'}
-              onPress={() => setAdminOpen(true)}
+              subtitle={
+                // On the web (Canlı ayarlar › Yönetim sitesi): the row opens the site, the in-app screen stays shut.
+                adminSite
+                  ? `Yönetim artık sitede: ${siteHost(adminSite)}`
+                  : staff === 'admin'
+                    ? 'Şikâyetler, yaptırımlar, destek, para çekme, ajans ödemeleri ve iadeler'
+                    : 'Yaptırımlar, itirazlar ve destek talepleri'
+              }
+              onPress={() => (adminSite ? void Linking.openURL(adminSite).catch(() => showAlert('Site açılamadı', adminSite)) : setAdminOpen(true))}
             />
           )}
           {alphaTest && (
@@ -561,7 +569,7 @@ export default function SettingsScreen() {
       </ScrollView>
       <LicensesSheet visible={licenses} onClose={() => setLicenses(false)} />
       {liveMode() && <VerifySheet kind={verifyKind} onClose={() => setVerifyKind(null)} />}
-      {staff && <AdminPanel visible={adminOpen} onClose={() => setAdminOpen(false)} moderator={staff === 'moderator'} />}
+      {staff && !adminSite && <AdminPanel visible={adminOpen} onClose={() => setAdminOpen(false)} moderator={staff === 'moderator'} />}
       {alphaTest && <AlphaVideoTestPanel visible={alphaOpen} onClose={() => setAlphaOpen(false)} />}
       {alphaTest && <EffectPreviewPanel visible={fxOpen} onClose={() => setFxOpen(false)} />}
     </SafeAreaView>

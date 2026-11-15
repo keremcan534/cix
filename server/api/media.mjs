@@ -1,7 +1,7 @@
 // Photo and video uploads go straight from the phone to S3-compatible storage (Cloudflare R2, Backblaze B2,
 // AWS S3…); the API only hands out a short-lived signed address, so big files never pass through it.
 //
-//   POST /api/media/upload-url { kind: 'avatar' | 'moment' | 'dm' | 'album' | 'notice' | 'music' | 'ticket' | 'roombg' | 'roomcover' | 'eventcover' | 'gifticon' | 'giftvideo' | 'giftsource', contentType, size } → { uploadUrl, headers, publicUrl, expiresIn }
+//   POST /api/media/upload-url { kind: 'avatar' | 'moment' | 'dm' | 'album' | 'notice' | 'music' | 'ticket' | 'roombg' | 'roomcover' | 'eventcover' | 'gifticon' | 'giftvideo' | 'giftsource' | 'stickerart', contentType, size } → { uploadUrl, headers, publicUrl, expiresIn }
 //
 // The app PUTs the file to uploadUrl with exactly `headers` (type and size are signed, so a different file
 // is refused by the storage), then saves publicUrl (e.g. PATCH /api/me { avatarUrl }).
@@ -31,7 +31,7 @@ import { pipeline } from 'node:stream/promises';
 
 import { FILE_PATH, HttpError, auth, db, env, limit, readJson, servedFiles } from './core.mjs';
 
-const TYPES = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/heic': 'heic', 'video/mp4': 'mp4', 'video/webm': 'webm', 'video/quicktime': 'mov', 'application/x-svga': 'svga' };
+const TYPES = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/heic': 'heic', 'video/mp4': 'mp4', 'video/webm': 'webm', 'video/quicktime': 'mov', 'application/x-svga': 'svga', 'application/json': 'json' };
 // What phones call the usual music files (the app names a file's type from its ending when the phone doesn't).
 const AUDIO = { 'audio/mpeg': 'mp3', 'audio/mp3': 'mp3', 'audio/mp4': 'm4a', 'audio/x-m4a': 'm4a', 'audio/m4a': 'm4a', 'audio/aac': 'aac', 'audio/ogg': 'ogg', 'audio/flac': 'flac', 'audio/wav': 'wav', 'audio/x-wav': 'wav' };
 const KINDS = {
@@ -59,6 +59,9 @@ const KINDS = {
   gifticon: { types: ['image/png', 'image/webp'], max: 1024 * 1024, admin: true },
   giftvideo: { types: ['video/mp4'], max: 12 * 1024 * 1024, admin: true },
   giftsource: { types: ['video/webm', 'video/quicktime', 'application/x-svga'], max: 100 * 1024 * 1024, admin: true },
+  // Yönetim › Emojiler (emoji.mjs), admins only: a sticker's picture, a transparent PNG or WebP or a Lottie animation
+  // (its JSON, pictures inside it).
+  stickerart: { types: ['image/png', 'image/webp', 'application/json'], max: 512 * 1024, admin: true },
 };
 /** The largest file of a kind, in bytes (custom-gifts.mjs shows its limits from here). */
 export const kindMax = (kind) => KINDS[kind]?.max ?? 0;
@@ -139,7 +142,7 @@ const signed = (method, key, query = {}) =>
     expires: 60,
     query,
   });
-const FILE_KEY = /^(avatar|moment|dm|album|notice|music|ticket|roombg|roomcover|eventcover|gifticon|giftvideo|giftsource)\/[0-9a-f-]{36}\/[A-Za-z0-9._-]{1,80}$/;
+const FILE_KEY = /^(avatar|moment|dm|album|notice|music|ticket|roombg|roomcover|eventcover|gifticon|giftvideo|giftsource|stickerart)\/[0-9a-f-]{36}\/[A-Za-z0-9._-]{1,80}$/;
 
 /** The storage key of one of our files from its public address (kind/<uploader>/<name>), else null. With
  *  `owner`, only a file that person uploaded. */
@@ -257,7 +260,7 @@ export async function writeStored(key, body, type) {
 }
 
 /** What a stored file is sent as: by its ending (which the upload route chose), never by what its uploader said. */
-const SENT_AS = { jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp', heic: 'image/heic', mp4: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime', mp3: 'audio/mpeg', m4a: 'audio/mp4', aac: 'audio/aac', ogg: 'audio/ogg', flac: 'audio/flac', wav: 'audio/wav' };
+const SENT_AS = { jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp', heic: 'image/heic', mp4: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime', mp3: 'audio/mpeg', m4a: 'audio/mp4', aac: 'audio/aac', ogg: 'audio/ogg', flac: 'audio/flac', wav: 'audio/wav', json: 'application/json' };
 
 /** Passes on exactly `n` bytes; more or fewer is an error, so an answer never holds other bytes than it announced. */
 const exactly = (n) => {
@@ -344,13 +347,11 @@ async function deleteKeys(keys) {
     // A room's own background and its card picture stay while they are in use (room-decor.mjs clears the row first).
     if (key.startsWith('roombg/') && (await db.query('SELECT 1 FROM room_decor WHERE position($1 in custom_url) > 0 LIMIT 1', [key])).rowCount) continue;
     if (key.startsWith('roomcover/') && (await db.query('SELECT 1 FROM rooms WHERE position($1 in cover_url) > 0 LIMIT 1', [key])).rowCount) continue;
-    // A gift's icon, video or source stays while a gift that isn't deleted holds it (custom-gifts.mjs clears it first).
-    if (
-      key.startsWith('gift') &&
-      (await db.query("SELECT 1 FROM custom_gifts WHERE deleted_at IS NULL AND position($1 in icon_url || ' ' || coalesce(video_url, '') || ' ' || coalesce(job_source, '')) > 0 LIMIT 1", [key]))
-        .rowCount
-    )
-      continue;
+    // A gift's icon, video, source or refused video's preview stays while a gift that isn't deleted holds it
+    // (custom-gifts.mjs clears it first). concat_ws skips the empty ones: an app's own gift changed by staff may have
+    // no icon of its own, and a plain || would make the whole text null.
+    const giftFiles = "SELECT 1 FROM custom_gifts WHERE deleted_at IS NULL AND position($1 in concat_ws(' ', icon_url, video_url, job_source, job_preview)) > 0 LIMIT 1";
+    if (key.startsWith('gift') && (await db.query(giftFiles, [key])).rowCount) continue;
     const res = await fetch(signed('DELETE', key), { method: 'DELETE', signal: AbortSignal.timeout(10_000) });
     // 404: already gone, which is what was wanted.
     if (!res.ok && res.status !== 404) console.error('storage delete', res.status);

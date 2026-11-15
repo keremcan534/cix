@@ -90,6 +90,16 @@ const host = http.createServer((req, res) => {
     for (let i = 0; i < 24; i++) res.write(Buffer.alloc(64 * 1024));
     return res.end();
   }
+  // A 19,5 MB video, said by its length (the API stops at the header, so the body need not come).
+  if (p === '/hediyeler/panda.mov') return res.writeHead(200, { 'content-type': 'video/quicktime', 'content-length': String(Math.round(19.5 * 1024 * 1024)) }).end(Buffer.alloc(16));
+  if (p === '/hediyeler/cok-buyuk.webm') return res.writeHead(200, { 'content-type': 'video/webm', 'content-length': String(101 * 1024 * 1024) }).end(Buffer.alloc(16));
+  if (p === '/hediyeler/parcali.mp4') {
+    // A video with no length given and a host that calls it nothing: known by its name once past the icon's limit.
+    res.writeHead(200, { 'content-type': 'application/octet-stream' });
+    res.write(MP4);
+    for (let i = 0; i < 20; i++) res.write(Buffer.alloc(64 * 1024));
+    return res.end();
+  }
   if (p === '/yok.png') return res.writeHead(404).end('yok');
   if (p === '/yonlendir') return res.writeHead(302, { location: '/hediyeler/ikon.png' }).end();
   if (p === '/ice-yonlendir') return res.writeHead(302, { location: 'http://169.254.169.254/latest/meta-data/' }).end();
@@ -176,8 +186,19 @@ describe('Hediye dosyası bağlantıdan', () => {
     assert.equal(mp4.video, 'stacked');
     assert.match(keyIn(mp4.url), /^giftvideo\/.+\.mp4$/);
     await refused(fetchAs(admin, 'video', `${HOST}/hediyeler/eski.svga`), 400, /SVGA 1\.x/);
-    await refused(fetchAs(admin, 'video', `${HOST}/hediyeler/ikon.png`), 400, /bağlantıdaki bir PNG resim/);
-    await refused(fetchAs(admin, 'icon', `${HOST}/hediyeler/hazir.mp4`), 400, /İkon PNG ya da WebP olmalı; bağlantıdaki bir MP4 video/);
+    // In the other slot's field: said so, whichever way round.
+    await refused(fetchAs(admin, 'video', `${HOST}/hediyeler/ikon.png`), 400, /^Bu bağlantı bir resim: videonun değil, ikonun bağlantı alanına yapıştırın$/);
+    await refused(fetchAs(admin, 'icon', `${HOST}/hediyeler/hazir.mp4`), 400, /^Bu bağlantı bir video: ikonun değil, videonun bağlantı alanına yapıştırın$/);
+  });
+
+  test("ikonun alanına yapıştırılan büyük video: 1 MB sınırı yerine bunun bir video olduğu söylenir; videonun sınırı 100 MB", async () => {
+    const admin = await freshAdmin();
+    await refused(fetchAs(admin, 'icon', `${HOST}/hediyeler/panda.mov`), 400, /^Bu bağlantı bir video \(19,5 MB\): ikonun değil, videonun bağlantı alanına yapıştırın$/);
+    await refused(fetchAs(admin, 'icon', `${HOST}/hediyeler/parcali.mp4`), 400, /^Bu bağlantı bir video: ikonun değil, videonun bağlantı alanına yapıştırın$/);
+    await refused(fetchAs(admin, 'icon', `${HOST}/buyuk.png`), 400, /^İkon en fazla 1 MB olabilir \(bu 3 MB\)$/);
+    await refused(fetchAs(admin, 'video', `${HOST}/hediyeler/cok-buyuk.webm`), 400, /^Video en fazla 100 MB olabilir \(bu 101 MB\)$/);
+    // Nothing of them reached the bucket.
+    assert.ok(![...stored.keys()].some((k) => k.includes(admin.user.id)));
   });
 
   test('web sayfası, büyük dosya, bulunamayan dosya ve sonsuz yönlendirme: ne olduğunu söyler', async () => {

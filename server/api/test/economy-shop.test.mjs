@@ -32,8 +32,7 @@ const daysUntil = (iso) => Math.round((new Date(iso).getTime() - Date.now()) / D
 
 /** Coins straight into the account as one lot ('test' = bought, 'odul' = reward coins; reward coins have no credit route yet). */
 async function credit(u, amount, channel = 'test') {
-  await h.sql.query('INSERT INTO coin_lots (user_id, channel, amount, remaining, lock_hours, ref) VALUES ($1, $2, $3, $3, 0, $4)', [u.user.id, channel, amount, `t-${rnd(6)}`]);
-  await h.sql.query('UPDATE users SET coins = coins + $2 WHERE id = $1', [u.user.id, amount]);
+  await h.credit(u.user.id, amount, { channel });
 }
 async function person(name, amount = 0, channel = 'test') {
   const u = await signUp(name);

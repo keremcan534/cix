@@ -38,6 +38,7 @@ describe('defaults are today', () => {
       features_off: [],
       notice: null,
       min_version: null,
+      admin_site: '',
       campaign: null,
       gifts_hidden: [],
       shop_hidden: [],
@@ -146,6 +147,7 @@ describe('defaults are today', () => {
       'event_block_days',
       'event_reminders_off',
       'lucky_announce_min_coins',
+      'admin_site',
     ]);
     for (const k of ['need_level', 'need_points', 'min_age', 'lucky_min_age', 'diamonds_per_usd', 'coin_diamond_ratio', 'lock_hours', 'test_daily', 'allow_test_topup', 'gift_prices', 'pack_prices', 'pack_coins', 'product_ids', 'sms_provider', '__proto__', 'constructor', 'toString']) {
       assert.ok(!Object.hasOwn(REGISTRY, k), k);
@@ -429,6 +431,18 @@ describe('snapshot', () => {
     assert.equal(s.withdrawWeekly, 1e7);
     assert.equal(s.otpPerHour, 300);
     assert.deepEqual(s.invalid, []);
+  });
+
+  test('Yönetim sitesi: the deploy writes the default (ADMIN_SITE); empty saved = the app, null = the default', () => {
+    const e = { ADMIN_SITE: '  https://panel.ornek.com  ' };
+    assert.equal(defaultsOf(e).admin_site, 'https://panel.ornek.com');
+    assert.equal(snapshotOf([], e).adminSite, 'https://panel.ornek.com');
+    assert.equal(snapshotOf([{ key: 'admin_site', value: '' }], e).adminSite, null, 'saved empty: Yönetim back in the app');
+    assert.equal(snapshotOf([{ key: 'admin_site', value: null }], e).adminSite, 'https://panel.ornek.com', 'Varsayılana dön');
+    assert.equal(snapshotOf([{ key: 'admin_site', value: 'https://yonetim.ornek.com' }], e).adminSite, 'https://yonetim.ornek.com');
+    for (const bad of ['', ' ', 'http://panel.ornek.com', 'panel.ornek.com', 'https://panel', `https://panel.ornek.com/${'x'.repeat(200)}`])
+      assert.equal(snapshotOf([], { ADMIN_SITE: bad }).adminSite, null, bad);
+    assert.equal(snapshotOf([], {}).adminSite, null);
   });
 
   test('saved values win, a later row wins, junk falls back to the default', () => {

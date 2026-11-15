@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 
 import { rnd, startApi, tokenOf } from './harness.mjs';
 
-const h = startApi();
+const h = startApi({}, { moneyCheck: { skip: ['gifts', 'paid'], why: 'hediye ve ücretli olay geçmişini puan için doğrudan yazar' } });
 const { call, signUp } = h;
 
 describe('Giriş ve cüzdan', () => {

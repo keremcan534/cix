@@ -609,7 +609,7 @@ function useMomentGift() {
         return false;
       }
       try {
-        await liveGift(to.id, g.id, 1, undefined, 'moment');
+        await liveGift(to.id, g.id, 1, undefined, 'moment', g.price);
       } catch (e) {
         showAlert('Hediye gönderilemedi', message(e), [{ text: 'Tamam', style: 'cancel' }, toWallet]);
         return false;

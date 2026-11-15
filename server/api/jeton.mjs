@@ -26,7 +26,9 @@ import { HttpError, assertClean, auth, blockedBetween, claimRef, clientIp, db, i
 import { EXCHANGE, bankExchangeCoins, diamondValueTl, wholesaleTl } from './catalog.mjs';
 import { CHANNELS, creditCoins, diamondState, spendCoins, spendDiamonds } from './wallet.mjs';
 import { recordIncome } from './agency-lib.mjs';
+import { voidRefundedBonds } from './bonds.mjs';
 import { refundItems } from './economy.mjs';
+import { voidRefundedBags } from './lucky-bags.mjs';
 
 const TRANSFER_MAX = 100_000_000;
 const DIAMONDS_MAX = 1_000_000_000;
@@ -94,10 +96,16 @@ export async function refundPurchase(c, id, { actor = null, ip = '', source = 'a
   // The coins' trail (lots passed on, the diamond locks gifts made) is read only once every account on it is
   // locked: a gift or a transfer that commits while we wait for a lock would otherwise be missed. Locking can
   // reveal more of the trail, so read again until the set of accounts stops growing.
+  //
+  // Everything is locked in the order the rest of the server uses, so a refund never deadlocks with a gift or a
+  // draw at the same moment (test/money-fuzz.test.mjs): the open Şanslı çantas first (drawBags locks a bag, then its
+  // people), then all the accounts in one id-ordered statement. When the trail grows past what is locked, the
+  // locks taken in this round go (ROLLBACK TO SAVEPOINT) and the next round takes the bigger set, in order again.
   let lots;
   let locks;
   const held = new Set();
-  for (;;) {
+  const bags = new Set();
+  const readTrail = async () => {
     lots = (
       await c.query(
         `WITH RECURSIVE t AS (SELECT id, user_id, channel FROM coin_lots WHERE purchase_id = $1
@@ -111,10 +119,38 @@ export async function refundPurchase(c, id, { actor = null, ip = '', source = 'a
         lots.map((l) => l.id),
       ])
     ).rows;
-    const more = [...new Set([...lots.map((l) => l.user_id), ...locks.map((k) => k.user_id)])].filter((u) => !held.has(u));
-    if (!more.length) break;
-    await c.query('SELECT 1 FROM users WHERE id = ANY($1::uuid[]) ORDER BY id FOR UPDATE', [more]);
-    more.forEach((u) => held.add(u));
+    const openBags = await c.query(
+      "SELECT id FROM lucky_bags WHERE status = 'open' AND EXISTS (SELECT 1 FROM jsonb_array_elements(parts) p WHERE (p->>'lot')::bigint = ANY($1::bigint[]))",
+      [lots.map((l) => l.id)],
+    );
+    // A pending bond's other person too: voiding the bond writes its refund with them as the counterparty, and the
+    // ledger's key check on their row must not wait behind a gift of theirs that waits for us.
+    const bondPeople = await c.query(
+      "SELECT b FROM bonds WHERE status = 'pending' AND EXISTS (SELECT 1 FROM jsonb_array_elements(held_lots) p WHERE (p->>'lot')::bigint = ANY($1::bigint[]))",
+      [lots.map((l) => l.id)],
+    );
+    return {
+      users: [...new Set([...lots.map((l) => l.user_id), ...locks.map((k) => k.user_id), ...bondPeople.rows.map((x) => x.b)])],
+      bags: openBags.rows.map((b) => Number(b.id)),
+    };
+  };
+  let want = await readTrail();
+  for (let round = 0; ; round++) {
+    if (round > 20) throw new HttpError(503, 'İade şu an yapılamadı, biraz sonra tekrar dene');
+    await c.query('SAVEPOINT refund_locks');
+    await c.query('SELECT 1 FROM lucky_bags WHERE id = ANY($1::bigint[]) ORDER BY id FOR UPDATE', [want.bags]);
+    await c.query('SELECT 1 FROM users WHERE id = ANY($1::uuid[]) ORDER BY id FOR UPDATE', [want.users]);
+    held.clear();
+    want.users.forEach((u) => held.add(u));
+    bags.clear();
+    want.bags.forEach((b) => bags.add(b));
+    const now = await readTrail();
+    if (now.users.every((u) => held.has(u)) && now.bags.every((b) => bags.has(b))) {
+      await c.query('RELEASE SAVEPOINT refund_locks');
+      break;
+    }
+    await c.query('ROLLBACK TO SAVEPOINT refund_locks');
+    want = { users: [...new Set([...want.users, ...now.users])], bags: [...new Set([...want.bags, ...now.bags])] };
   }
   let coins = 0;
   let diamonds = 0;
@@ -127,9 +163,19 @@ export async function refundPurchase(c, id, { actor = null, ip = '', source = 'a
     const balance = Number((await c.query('SELECT coins FROM users WHERE id = $1', [l.user_id])).rows[0].coins);
     const take = Math.min(left, balance);
     await c.query('UPDATE coin_lots SET remaining = 0 WHERE id = $1', [l.id]);
-    if (take > 0) await move(c, l.user_id, 'coin', -take, 'İade: satın alınan jeton geri alındı', `refund:${id}:c${l.id}`, null, { channel: l.channel, actor, detail: { purchase: id, lot: Number(l.id) } });
+    // detail.lots, as on every coin row (wallet.mjs): the lot the coins left (money-check.mjs `moved`).
+    if (take > 0)
+      await move(c, l.user_id, 'coin', -take, 'İade: satın alınan jeton geri alındı', `refund:${id}:c${l.id}`, null, {
+        channel: l.channel,
+        actor,
+        detail: { purchase: id, lot: Number(l.id), lots: [{ lot: Number(l.id), channel: l.channel, amount: take }] },
+      });
     coins += take;
   }
+  // Coins the trail's owners hold for a pending bond or an open Şanslı çanta came from these lots too: they go
+  // with the purchase, so they can't come back later or turn into someone's diamonds after this refund.
+  const escrowCoins = (await voidRefundedBonds(c, lots.map((l) => Number(l.id)))) + (await voidRefundedBags(c, lots.map((l) => Number(l.id))));
+  coins += escrowCoins;
   for (const k of locks) {
     const amount = Number(k.amount);
     // The agency share of this gift goes back whether or not its diamonds can still be taken. Once per lock:
@@ -150,7 +196,7 @@ export async function refundPurchase(c, id, { actor = null, ip = '', source = 'a
   await c.query('UPDATE users SET svip_xp = greatest(0, svip_xp - $2) WHERE id = $1', [p.user_id, p.coins]);
   // Coins already spent on shop items can't come back as coins: the buyer's items go, others' go to staff review.
   const { revokedItems, reviewItems } = await refundItems(c, { purchase: Number(id), buyer: p.user_id, lots: lots.map((l) => l.id), held, actor, ip });
-  await audit(c, actor, 'purchase.refund', p.user_id, { purchase: id, platform: p.platform, transaction: p.transaction_id, coins, diamonds, unrecoveredDiamonds, commissionDiamonds, revokedItems, reviewItems, source }, ip);
+  await audit(c, actor, 'purchase.refund', p.user_id, { purchase: id, platform: p.platform, transaction: p.transaction_id, coins, escrowCoins, diamonds, unrecoveredDiamonds, commissionDiamonds, revokedItems, reviewItems, source }, ip);
   return { coins, diamonds, unrecoveredDiamonds };
 }
 

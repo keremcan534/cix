@@ -24,8 +24,14 @@
 //   wholesale to a Jeton Noktası   → purchase on channel "jeton_noktasi" (the price the bank paid)
 //   diamonds → coins (Çevir/bozdurma) → bonus_grant (campaign elmas_cevirme / elmas_bozdurma)
 //   test top-up / test purchase    → promotion (campaign test_yukleme / test_satin_alma); store sandbox the same
-//   not sent: Jeton Noktası → user transfers (coins change hands, none are created), diamond debits other than refunds
-//   gifts (withdrawals included: the panel has no payout event type and records payouts itself), game coins.
+//   reward coins ('odul')          → bonus_grant (hos_geldin, davet_odulu, gorev_odulu, aile_sandigi); taken back → coin_spend
+//   paid message (one-on-one.mjs)  → gift (gift_ref mesaj_ucreti) from the payer's row, which names the earner
+//   paid call or match minute      → call (minutes 1, voice/video); a minute nobody earns → coin_spend
+//   Aile kurma, oda animasyonu, koltuk rengi, oda özel görseli → coin_spend (the shop's own buys carry their sku)
+//   Şanslı çanta gift share        → gift from the bag's sender (its coins left when the bag was made)
+//   not sent: Jeton Noktası → user transfers and coin bags (coins change hands, none are created), bond requests
+//   and their refunds (held coins; an accepted bond is a gift), diamond debits other than refunds (withdrawals
+//   included: the panel has no payout event type and records payouts itself), game coins.
 import { HttpError, auth, db, env } from './core.mjs';
 import { PACK_BY_PRODUCT } from './catalog.mjs';
 
@@ -52,6 +58,9 @@ export function eventsOf(r) {
     if (amount < 0 && r.reason.startsWith('İade') && d.purchase && store) return [refundOf(d.purchase, at)];
     if (amount > 0 && r.counterparty && r.ref.endsWith('-in') && r.reason.startsWith('Hediye alındı'))
       return [{ ...base, type: 'gift', sender_ref: r.counterparty, publisher_ref: r.user_id, coins: amount, gift_ref: r.gift_id ?? 'aktarim', room_ref: r.gift_room ?? null }];
+    // A gift bag's share (lucky-bags.mjs drawBags): a gift from the bag's sender, whose coins left with the bag.
+    if (amount > 0 && r.counterparty && r.ref.startsWith('bag:') && r.ref.endsWith('-in'))
+      return [{ ...base, type: 'gift', sender_ref: r.counterparty, publisher_ref: r.user_id, coins: amount, gift_ref: r.gift_id ?? 'sansli_canta', room_ref: r.gift_room ?? null }];
     return [];
   }
   if (r.currency !== 'coin') return [];
@@ -73,14 +82,38 @@ export function eventsOf(r) {
     if (r.channel === 'ugurlu') return [{ ...base, type: 'bonus_grant', user_ref: r.user_id, coins: amount, campaign_ref: 'ugurlu_odul' }];
     if (r.channel === 'toptan' && d.priceTl !== undefined)
       return [{ ...base, type: 'purchase', user_ref: r.user_id, channel: 'jeton_noktasi', amount: money(d.priceTl), currency: 'TRY', coins: amount, product_ref: 'toptan' }];
+    if (r.channel === 'odul') return [{ ...base, type: 'bonus_grant', user_ref: r.user_id, coins: amount, campaign_ref: rewardOf(r.reason) }];
     return [];
+  }
+
+  // A paid message or call minute (one-on-one.mjs payOneOnOne), from the payer's row: it names the earner (counterparty).
+  if (typeof d.oneOnOne === 'string') {
+    if (!r.counterparty) return [{ ...base, type: 'coin_spend', user_ref: r.user_id, coins: -amount, item_ref: d.oneOnOne }];
+    if (d.oneOnOne === 'message') return [{ ...base, type: 'gift', sender_ref: r.user_id, publisher_ref: r.counterparty, coins: -amount, gift_ref: 'mesaj_ucreti' }];
+    return [{ ...base, type: 'call', user_ref: r.user_id, publisher_ref: r.counterparty, coins: -amount, minutes: '1', kind: d.oneOnOne.includes('video') ? 'video' : 'voice' }];
   }
 
   // A shop buy (economy.mjs): the item is the catalog sku.
   if (typeof d.sku === 'string') return [{ ...base, type: 'coin_spend', user_ref: r.user_id, coins: -amount, item_ref: d.sku }];
   if (r.reason.startsWith('Uygulama içi:')) return [{ ...base, type: 'coin_spend', user_ref: r.user_id, coins: -amount, item_ref: r.reason.slice(13).trim().slice(0, 100) }];
   if (r.reason.startsWith('İade') && d.purchase && store) return [refundOf(d.purchase, at)];
+  const sink = sinkOf(r.reason, d);
+  if (sink) return [{ ...base, type: 'coin_spend', user_ref: r.user_id, coins: -amount, item_ref: sink }];
   return [];
+}
+
+/** The campaign of a reward coin grant ('odul'), from its ledger reason. */
+const rewardOf = (reason) =>
+  reason.startsWith('Hoş geldin') ? 'hos_geldin' : reason.startsWith('Davet ödülü') ? 'davet_odulu' : reason.startsWith('Görev ödülü') ? 'gorev_odulu' : reason.startsWith('Aile sandığı') ? 'aile_sandigi' : 'odul';
+
+/** Coins spent outside the shop on something of the app's (no sku on the row): the panel's item for it, or null. */
+function sinkOf(reason, d) {
+  if (reason.startsWith('Aile kurma:')) return 'aile_kurma';
+  if (reason.startsWith('Animasyon:')) return `oda_animasyonu:${d.animation ?? ''}`.slice(0, 100);
+  if (reason.startsWith('Koltuk rengi:')) return `koltuk_rengi:${d.seatColor ?? ''}`.slice(0, 100);
+  if (reason.startsWith('Oda süslemesi: özel görsel')) return 'oda_ozel_gorsel';
+  if (reason.startsWith('Davet ödülü geri alındı')) return 'davet_odulu_geri_alindi';
+  return null;
 }
 
 const refundOf = (purchase, at) => ({ type: 'refund', idempotency_key: `refund-${purchase}`, occurred_at: at, original_key: `purchase-${purchase}`, reason: 'Mağaza iadesi' });

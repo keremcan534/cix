@@ -90,8 +90,13 @@ function load() {
 let loaded = null;
 const fx = () => (loaded ??= load());
 
-/** GET /api/catalog `fx`: [{kind: 'gift' | 'entry', id, url, bytes, ms}], the gifts hidden in Canlı ayarlar left out. */
-export const fxCatalog = (giftsHidden = new Set()) => fx().list.filter((x) => !(x.kind === 'gift' && giftsHidden.has(x.id)));
+/**
+ * GET /api/catalog `fx`: [{kind: 'gift' | 'entry', id, url, bytes, ms}], the gifts hidden in Canlı ayarlar left out,
+ * and those whose clip Yönetim › Hediyeler replaced or stopped (`replaced`, custom-gifts.mjs replacedClips).
+ */
+export const fxCatalog = (giftsHidden = new Set(), replaced = new Set()) => fx().list.filter((x) => !(x.kind === 'gift' && (giftsHidden.has(x.id) || replaced.has(x.id))));
+/** A gift's own clip here ({ url, bytes, ms }), or null: the panel shows and plays it. */
+export const giftClip = (id) => fx().list.find((x) => x.kind === 'gift' && x.id === id) ?? null;
 
 /** GET or HEAD /api/fx/<name>: the clip as it is on disk, a `Range` as asked (bytes=a-b, a- or -n). */
 export function sendFx(req, res, name) {

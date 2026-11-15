@@ -35,8 +35,7 @@ const lastMeta = (room) => {
   return c && JSON.parse(c.body.metadata);
 };
 async function credit(u, amount, channel = 'test') {
-  await q('INSERT INTO coin_lots (user_id, channel, amount, remaining, lock_hours, ref) VALUES ($1, $2, $3, $3, 0, $4)', [u.user.id, channel, amount, `t-${rnd(6)}`]);
-  await q('UPDATE users SET coins = coins + $2 WHERE id = $1', [u.user.id, amount]);
+  await h.credit(u.user.id, amount, { channel });
 }
 const coinsOf = async (u) => Number((await q('SELECT coins FROM users WHERE id = $1', [u.user.id])).rows[0].coins);
 const PINK = SEAT_COLORS.get('pembe').price;

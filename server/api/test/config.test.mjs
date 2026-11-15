@@ -13,11 +13,14 @@ const h = startApi({
   APP_MIN_VERSION: '1.2.0',
   APP_UPDATE_URL: 'https://example.com/similar.apk',
   APP_NOTICE: '  Bu gece 02:00–02:15 bakım var.  ',
+  // Written by the deploy (server.yml) once the finance panel has Yönetim's pages.
+  ADMIN_SITE: ' https://panel.ornek.com ',
   FEATURES_OFF: 'gifts, Topup,dm,rooms,exchange,jeton,purchases,withdraw,unknown',
   // Nothing should warn here: no disk check, and the refused features must not count as server errors.
   ALERT_DISK_FREE_PCT: '0',
   ALERT_5XX_15M: '0',
   ALERT_CACHE_S: '0',
+  LIVE_POLL_MS: '200',
 });
 const { call } = h;
 
@@ -30,6 +33,8 @@ describe('app config', () => {
       minVersion: '1.2.0',
       updateUrl: 'https://example.com/similar.apk',
       notice: 'Bu gece 02:00–02:15 bakım var.',
+      // Canlı ayarlar › Yönetim sitesi not saved: the deploy's ADMIN_SITE, so the staff's Yönetim opens the site.
+      adminSite: 'https://panel.ornek.com',
       featuresOff: ['gifts', 'topup', 'dm', 'rooms', 'exchange', 'jeton', 'purchases', 'withdraw'],
       v: 0,
       // The harness turns on development sign-in only; e-mail, Google, SMS and WhatsApp are unset.
@@ -129,5 +134,37 @@ describe('alarms when all is well', () => {
     assert.deepEqual(j.warnings, []);
     assert.equal(j.thresholds.diamonds1h, 500_000);
     assert.equal(j.financeSync, false);
+  });
+});
+
+describe('Yönetim sitesi from the deploy (ADMIN_SITE)', () => {
+  test("the deploy's address is the default; saved empty brings Yönetim back to the app; back to the address asks twice", async () => {
+    const A = await h.account('Ayşe Yönetici', 'admin');
+    const SETTINGS = '/api/admin/live-settings';
+    const view = async () => (await call('GET', SETTINGS, null, A.session))[1];
+    const save = async (changes, extra = {}) => call('POST', SETTINGS, { changes, reason: 'Test değişikliği', baseV: (await view()).v, ...extra }, A.session);
+    const adminSite = async () => (await (await fetch(`${h.base}/api/config`)).json()).adminSite;
+    const until = async (want) => {
+      for (let i = 0; i < 50 && (await adminSite()) !== want; i++) await new Promise((r) => setTimeout(r, 100));
+      return adminSite();
+    };
+    const row = async () => (await view()).settings.find((s) => s.key === 'admin_site');
+    const { default: d, value, effective } = await row();
+    assert.deepEqual({ d, value, effective }, { d: 'https://panel.ornek.com', value: null, effective: 'https://panel.ornek.com' });
+
+    // Saved empty (the panel sends '' for an emptied field): Yönetim is in the app again, no second question.
+    const [st, j] = await save({ admin_site: '' });
+    assert.equal(st, 200, j.error);
+    assert.equal(await until(null), null);
+    const empty = await row();
+    assert.deepEqual({ value: empty.value, effective: empty.effective }, { value: '', effective: null });
+
+    // "Varsayılana dön" closes the in-app screen again: asked twice, like typing the address.
+    const [again, a] = await save({ admin_site: null });
+    assert.equal(again, 409, 'büyük değişiklik onay ister');
+    assert.ok(a.preview ?? a.error);
+    const [done, dd] = await save({ admin_site: null }, { confirm: true });
+    assert.equal(done, 200, dd.error);
+    assert.equal(await until('https://panel.ornek.com'), 'https://panel.ornek.com');
   });
 });

@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { rnd, startApi } from './harness.mjs';
 
 const CDN = 'https://cdn.example.com';
-const h = startApi({ AUTO_MUTE_REFUSALS: '0', S3_ENDPOINT: 'https://acc.r2.cloudflarestorage.com', S3_BUCKET: 'media', S3_KEY: 'testkey', S3_SECRET: 'testsecret', S3_PUBLIC_URL: CDN });
+const h = startApi({ AUTO_MUTE_REFUSALS: '0', S3_ENDPOINT: 'https://acc.r2.cloudflarestorage.com', S3_BUCKET: 'media', S3_KEY: 'testkey', S3_SECRET: 'testsecret', S3_PUBLIC_URL: CDN }, { moneyCheck: { skip: ['gifts', 'paid'], why: 'hediye ve ücretli olay geçmişini puan için doğrudan yazar' } });
 const { call, signUp } = h;
 const q = (s, p) => h.sql.query(s, p);
 const ok = async (p, what) => {

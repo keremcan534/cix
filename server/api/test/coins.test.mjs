@@ -209,6 +209,43 @@ describe('Jeton Noktası', () => {
 });
 
 describe('İade', () => {
+  test('iade edilen jeton bekleyen bağ isteğinden ve açık çantadan geri dönmez, kimseye elmas olmaz', async () => {
+    const admin = await staff('admin');
+    const buyer = await signUp('Bağcı');
+    const friend = await signUp('Arkadaş');
+    const grabber = await signUp('Kapan');
+    // 1.000 clean coins, then a purchase: 5.000 + its 2.500 first-purchase gift. Store-locked coins go oldest first,
+    // so the bond (5.000) takes the clean 1.000 and 4.000 of the purchase; the bag (1.000) the purchase's.
+    await ok(call('POST', '/api/wallet/test-topup', { amount: 1000, ref: rnd(6) }, buyer.session));
+    await buy(buyer.session, 'coins_5000');
+    const bond = (await ok(call('POST', '/api/bonds/request', { to: friend.user.id, kind: 'cift', ref: rnd(6) }, buyer.session))).bond;
+    const [, made] = await call('POST', '/api/rooms', { title: `Çanta ${rnd(2)}` }, buyer.session);
+    const bag = (await ok(call('POST', '/api/lucky-bags', { room: made.room.id, kind: 'coins', amount: 1000, packets: 5, followersOnly: false, delay: 0, ref: rnd(6) }, buyer.session))).bag;
+    assert.equal((await me(buyer.session)).coins, 2500);
+    await ok(call('POST', '/api/lucky-bags/grab', { id: bag.id }, grabber.session));
+    const grabberCoins = (await me(grabber.session)).coins;
+
+    const p = (await h.sql.query('SELECT id FROM purchases WHERE user_id = $1', [buyer.user.id])).rows[0];
+    // 2.500 in the wallet, 4.000 in the bond and 1.000 in the bag came from the purchase; the bond's clean 1.000 goes back.
+    assert.deepEqual(await ok(call('POST', '/api/admin/purchases/refund', { purchase: Number(p.id) }, admin.session)), { coins: 7500, diamonds: 0, unrecoveredDiamonds: 0 });
+    assert.equal((await me(buyer.session)).coins, 1000, 'bağdaki temiz 1.000 geri döner');
+    const b = (await h.sql.query('SELECT status FROM bonds WHERE id = $1', [bond.id])).rows[0];
+    assert.equal(b.status, 'withdrawn');
+    assert.equal((await call('POST', '/api/bonds/respond', { id: bond.id, accept: true }, friend.session))[0], 409, 'iade edilen bağ kabul edilmez');
+    const g = (await h.sql.query('SELECT status, returned FROM lucky_bags WHERE id = $1', [bag.id])).rows[0];
+    assert.deepEqual([g.status, Number(g.returned)], ['returned', 0]);
+
+    // The bag's draw time and the bond's expiry pass: nobody gets the refunded coins.
+    await h.sql.query("UPDATE lucky_bags SET closes_at = now() - interval '1 second' WHERE id = $1", [bag.id]);
+    await h.sql.query("UPDATE bonds SET expires_at = now() - interval '1 second' WHERE id = $1", [bond.id]);
+    await new Promise((r) => setTimeout(r, 600));
+    assert.equal((await me(buyer.session)).coins, 1000);
+    assert.equal((await me(friend.session)).diamonds, 0);
+    const won = await h.sql.query('SELECT count(*)::int AS n FROM lucky_bag_grabs WHERE bag_id = $1', [bag.id]);
+    assert.equal(won.rows[0].n, 0);
+    assert.equal((await me(grabber.session)).coins, grabberCoins, 'çantadan pay çıkmaz');
+  });
+
   test('harcanmamış jeton ve kilitli elmas geri alınır, açılmış elmas raporlanır, ikinci iade 409', async () => {
     const admin = await staff('admin');
     const mod = await staff('moderator');

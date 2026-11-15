@@ -116,7 +116,7 @@ Son güncelleme: preview-96 sonrası (Küçült, çanta yağmuru, @bahset düzel
 | 25 | Mikrofon değişikliği herkeste aynı | Telefonda denenmeli | |
 | 26 | Küçük mikrofon, büyüyen sohbet | Çalışıyor | |
 | 27 | Rüzgâr Gülü odada | Seviyeyle açılır | Cömertlik Lv.2'de açılır. Düğmesi örnekteki gibi sağ altta |
-| 28 | Uğurlu hediyeler ve yönetimi | Seviyeyle açılır | Cömertlik Lv.2 ve 18 yaş gerekir. Yönetimi: Ayarlar › Yönetim › Uğurlu hediyeler (sadece yönetici hesaplar) |
+| 28 | Uğurlu hediyeler ve yönetimi | Seviyeyle açılır | Cömertlik Lv.2 ve 18 yaş gerekir. Yönetimi: Yönetim sitesinde Uygulama › Şanslı hediye ayarı; yeni APK'da Ayarlar › Yönetim siteyi açar (eski APK'larda Ayarlar › Yönetim › Uğurlu hediyeler, sadece yönetici hesaplar) |
 
 ## Belge 2: Güncelleme 2
 

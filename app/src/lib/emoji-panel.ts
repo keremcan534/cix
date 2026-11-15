@@ -7,6 +7,8 @@
 //  - How often each item was picked: Favoriler shows the most used first (equal counts: the latest first).
 //
 // Kept on this phone for every room and chat, like the room chat's size (lib/room-chat-size); never sent anywhere.
+// The packs are the ones the panel is given (lib/live/emoji-live livePacks: as Yönetim › Emojiler has them now), the
+// app's own when none.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { STICKER_PACKS, type StickerPack } from '@/data/catalog';
@@ -26,12 +28,13 @@ const inEmojiTab = (id: string) => (EMOJI_TAB_PACKS as readonly string[]).includ
 /** A pack that is bought in the shop or opened by VIP. */
 export const isVipPack = (p: StickerPack) => p.price > 0 || !!p.minVip;
 
-/** The packs of the Emoji tab this panel shows. */
-export const emojiTabPacks = (room: boolean) => EMOJI_TAB_PACKS.map((id) => STICKER_PACKS.find((p) => p.id === id)).filter((p): p is StickerPack => !!p && (!p.roomOnly || room));
+/** The packs of the Emoji tab this panel shows (one taken off, or with no sticker left, isn't). */
+export const emojiTabPacks = (room: boolean, packs: readonly StickerPack[] = STICKER_PACKS) =>
+  EMOJI_TAB_PACKS.map((id) => packs.find((p) => p.id === id)).filter((p): p is StickerPack => !!p && !p.retired && p.stickers.length > 0 && (!p.roomOnly || room));
 
 /** The panel's tabs, Sabit first. `room`: a room's panel (Hareketli and Hamle); a chat's has neither. */
-export function panelTabs(room: boolean): PanelTab[] {
-  const shown = STICKER_PACKS.filter((p) => !p.retired && (!p.roomOnly || room) && !inEmojiTab(p.id));
+export function panelTabs(room: boolean, packs: readonly StickerPack[] = STICKER_PACKS): PanelTab[] {
+  const shown = packs.filter((p) => !p.retired && p.stickers.length > 0 && (!p.roomOnly || room) && !inEmojiTab(p.id));
   return [
     { id: 'emoji', kind: 'sabit' },
     { id: 'fav', kind: 'sabit' },

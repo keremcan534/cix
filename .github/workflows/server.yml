@@ -151,6 +151,21 @@ jobs:
           $SSH 'cd /opt/similar && if ! sudo grep -qE "^PANEL_API_KEY=[0-9a-f]{64}$" .env; then
               sudo sed -i "/^PANEL_API_KEY=/d" .env && printf "PANEL_API_KEY=%s\n" "$(openssl rand -hex 32)" | sudo tee -a .env >/dev/null && echo "set PANEL_API_KEY in .env"; fi'
 
+          # Ayarlar › Yönetim in the app opens the website (docs/YONETIM_SITESI.md) once the panel put up here has all of
+          # Yönetim's pages (Uygulama › Yaptırımlar came last): ADMIN_SITE, the default of Canlı ayarlar › Yönetim sitesi,
+          # is then the panel's address (Caddyfile: panel.DOMAIN). A panel without those pages takes it away again; a
+          # panel that could not be read changes nothing. A value saved in Canlı ayarlar wins over this one.
+          if [ "$FINANCE_OK" = true ]; then
+            site=
+            domain=$($SSH "sudo sed -n 's/^DOMAIN=//p' /opt/similar/.env" | tail -1 | tr -d "\"' \t\r")
+            if [ -f finance-src/web/pages/app-sanctions.js ] && [[ "$domain" =~ ^[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]]; then site="https://panel.$domain"; fi
+            if [ -n "$site" ]; then
+              $SSH "cd /opt/similar && if ! sudo grep -qx 'ADMIN_SITE=$site' .env; then sudo sed -i '/^ADMIN_SITE=/d' .env; echo 'ADMIN_SITE=$site' | sudo tee -a .env >/dev/null; echo 'set ADMIN_SITE=$site'; fi"
+            else
+              $SSH "cd /opt/similar && if sudo grep -q '^ADMIN_SITE=' .env; then sudo sed -i '/^ADMIN_SITE=/d' .env; echo 'removed ADMIN_SITE: this panel has no Yönetim pages'; fi"
+            fi
+          fi
+
           # Test server switch (TEST_MODE above). Changing .env recreates the services that read it.
           if [ "$TEST_MODE" = 1 ]; then v=1; else v=0; fi
           # No daily cap on test coins while testing (0 = unlimited, wallet.mjs TEST_DAILY).

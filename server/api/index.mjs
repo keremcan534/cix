@@ -54,7 +54,9 @@ import { financeSyncRoutes, startFinanceSync, stopFinanceSync } from './finance-
 import { FILE_PATH, HttpError, RawText, allow, auth, claimRef, clientIp, db, env, filesOut, int, migrate, once, readJson, sha, tx, userId } from './core.mjs';
 import { giftRoutes } from './gifts.mjs';
 import { auditPanel, panelOf, panelUser } from './panel.mjs';
+import { sendArt } from './art.mjs';
 import { customGiftRoutes, refreshCustomGifts, sendCustomFx, startCustomGifts, stopCustomGifts } from './custom-gifts.mjs';
+import { emojiRoutes, refreshEmoji, startEmoji, stopEmoji } from './emoji.mjs';
 import { FX_PATH, sendFx } from './fx.mjs';
 import { jetonRoutes } from './jeton.mjs';
 import { liveRoutes } from './live.mjs';
@@ -300,6 +302,7 @@ const routes = {
   ...pushRoutes,
   ...giftRoutes,
   ...customGiftRoutes,
+  ...emojiRoutes,
   ...backpackRoutes,
   ...pkRoutes,
   ...crossPkRoutes,
@@ -412,13 +415,14 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // A gift or entry video (fx.mjs; an admin's gift's, g/<id>.mp4, from the storage: custom-gifts.mjs): the same
-  // per-address limit as stored files; a phone fetches each clip once.
+  // A gift or entry video (fx.mjs; an admin's gift's, g/<id>.mp4, from the storage: custom-gifts.mjs) or the panel's
+  // copy of an app picture (art/…, art.mjs): the same per-address limit as stored files; a phone fetches each clip once.
   if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname.startsWith(FX_PATH)) {
     if (!allow(`ip-file:${clientIp(req)}`, RATE_FILES)) return void res.writeHead(429).end(JSON.stringify({ error: 'Çok fazla istek, biraz bekle' }));
     const name = url.pathname.slice(FX_PATH.length);
     try {
       if (name.startsWith('g/')) await sendCustomFx(req, res, name.slice(2));
+      else if (name.startsWith('art/')) sendArt(req, res, name.slice(4));
       else sendFx(req, res, name);
     } catch (e) {
       console.error('fx', e?.code ?? e?.name);
@@ -491,6 +495,7 @@ function shutdown(signal) {
   stopBossSweep();
   stopStaffSweep();
   stopCustomGifts();
+  stopEmoji();
   server.close();
   const started = Date.now();
   const wait = setInterval(async () => {
@@ -506,6 +511,7 @@ process.on('SIGINT', () => shutdown('SIGINT'));
 await migrate();
 await refreshLive();
 await refreshCustomGifts();
+await refreshEmoji();
 server.listen(PORT, '127.0.0.1', () => console.log(`api on 127.0.0.1:${PORT} version ${VERSION}${TEST_TOPUP ? ' (test top-up on)' : ''}`));
 startFinanceSync();
 startRefundSync();
@@ -521,3 +527,4 @@ startEventSweep();
 startBossSweep();
 startStaffSweep();
 startCustomGifts();
+startEmoji();

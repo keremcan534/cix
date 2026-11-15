@@ -1,5 +1,6 @@
 // An animated sticker on the phones: the Lottie animation itself (lottie-react-native). Still: its first frame (the
 // emoji panel shows a whole page of them at once); once: plays and stops (a chat); loop: over and over (on a mic).
+// `source` may also be { uri } (an animation the server keeps, Yönetim › Emojiler): LottieView loads it from there.
 import LottieView, { type AnimationObject } from 'lottie-react-native';
 import { View } from 'react-native';
 

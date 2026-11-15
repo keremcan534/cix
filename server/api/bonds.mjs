@@ -75,13 +75,43 @@ async function countKind(c, user, kind, withPending) {
   return Number(r.rows[0].n);
 }
 
-/** Puts a pending bond's coins back on the requester's lots. The requester's row and the bond must be locked. */
-async function refund(c, bond, status, reason) {
-  const lots = Array.isArray(bond.held_lots) ? bond.held_lots : [];
+/**
+ * Puts a pending bond's coins back on the requester's lots (`lots`: all it holds, or the part a store refund left)
+ * and ends it. The requester's row and the bond must be locked.
+ */
+async function refund(c, bond, status, reason, lots = Array.isArray(bond.held_lots) ? bond.held_lots : []) {
   for (const p of lots) if (p.lot) await c.query('UPDATE coin_lots SET remaining = LEAST(amount, remaining + $2) WHERE id = $1', [p.lot, p.amount]);
-  // No channel: the coins come back, none are created, so the finance panel has nothing to record.
-  await move(c, bond.a, 'coin', Number(bond.held_coins), reason, `bond-${bond.id}-iade`, bond.b, { detail: { bond: Number(bond.id), lots } });
+  const coins = lots.reduce((n, p) => n + Number(p.amount), 0);
+  // No channel: the coins come back, none are created, so the finance panel has nothing to record. The bond's own
+  // refs have a ':', which no request's ref may (core.mjs REF): nobody can take them first and block the bond
+  // (they were `bond-{id}`, `bond-{id}-in` and `bond-{id}-iade`).
+  if (coins > 0) await move(c, bond.a, 'coin', coins, reason, `bond:${bond.id}:iade`, bond.b, { detail: { bond: Number(bond.id), lots } });
   await c.query('UPDATE bonds SET status = $2, ended_at = now() WHERE id = $1', [bond.id, status]);
+}
+
+/**
+ * A store refund (jeton.mjs refundPurchase) of coins that pending bonds hold: each such bond ends as withdrawn,
+ * its coins from the refunded lots (`lotIds`) go with the purchase, and the rest goes back to the requester. So
+ * the refunded coins neither come back later nor become the other person's diamonds. The requesters' rows are
+ * locked (they own the lots). Returns the coins that went with the purchase.
+ */
+export async function voidRefundedBonds(c, lotIds) {
+  if (!lotIds.length) return 0;
+  const refunded = new Set(lotIds.map(Number));
+  const r = await c.query(
+    `SELECT * FROM bonds WHERE status = 'pending'
+        AND EXISTS (SELECT 1 FROM jsonb_array_elements(held_lots) p WHERE (p->>'lot')::bigint = ANY($1::bigint[]))
+      ORDER BY id FOR UPDATE`,
+    [[...refunded]],
+  );
+  let gone = 0;
+  for (const bond of r.rows) {
+    const parts = Array.isArray(bond.held_lots) ? bond.held_lots : [];
+    const keep = parts.filter((p) => !(p.lot && refunded.has(Number(p.lot))));
+    gone += Number(bond.held_coins) - keep.reduce((n, p) => n + Number(p.amount), 0);
+    await refund(c, bond, 'withdrawn', `Bağ isteği iadesi: ${KINDS[bond.kind]?.label ?? 'Bağ'} (satın alma iade edildi)`, keep);
+  }
+  return gone;
 }
 
 /** Locks the two accounts in id order (no deadlock when both act at once), then the bond. */
@@ -255,7 +285,7 @@ export const bondRoutes = {
       if ((await countKind(c, me.id, b.kind, false)) >= k.max) throw new HttpError(409, `${k.label} bağların dolu; önce birini bitir`);
       if ((await countKind(c, b.a, b.kind, false)) >= k.max) throw new HttpError(409, `İsteği gönderenin ${k.label} bağları dolu`);
       const total = Number(b.held_coins);
-      const ref = `bond-${b.id}`;
+      const ref = `bond:${b.id}`;
       const g = await c.query(`INSERT INTO gift_events (sender, recipient, gift_id, count, unit_price, total, room, ref) VALUES ($1, $2, $3, 1, $4, $4, NULL, $5) RETURNING id`, [
         b.a,
         b.b,

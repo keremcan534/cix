@@ -139,4 +139,35 @@ describe('Defter satırı → panel olayı', () => {
     assert.deepEqual(eventsOf(row({ currency: 'diamond', amount: -500, reason: 'Jetona çevrildi' })), []);
     assert.deepEqual(eventsOf(row({ currency: 'game', amount: 50, reason: 'Oyun' })), []);
   });
+
+  test('ücretli mesaj hediye, arama dakikası arama olarak; kazananın elmas satırı ikinci kez gitmez', () => {
+    const [m] = eventsOf(row({ currency: 'coin', amount: -240, counterparty: 'star', reason: 'Mesaj ücreti', ref: 'msg:5', detail: { oneOnOne: 'message', message: 5 } }));
+    assert.deepEqual([m.type, m.sender_ref, m.publisher_ref, m.coins, m.gift_ref], ['gift', 'u1', 'star', 240, 'mesaj_ucreti']);
+    const [k] = eventsOf(row({ currency: 'coin', amount: -2000, counterparty: 'star', reason: 'Görüntülü arama · 2. dakika', ref: 'call:9:2', detail: { oneOnOne: 'video_call', call: 9 } }));
+    assert.deepEqual([k.type, k.user_ref, k.publisher_ref, k.coins, k.minutes, k.kind], ['call', 'u1', 'star', 2000, '1', 'video']);
+    const [e] = eventsOf(row({ currency: 'coin', amount: -500, reason: 'Sesli eşleşme · 1. dakika', detail: { oneOnOne: 'match_voice' } }));
+    assert.deepEqual([e.type, e.coins, e.item_ref], ['coin_spend', 500, 'match_voice'], 'kimse kazanmazsa harcama');
+    assert.deepEqual(eventsOf(row({ currency: 'diamond', amount: 240, counterparty: 'u1', reason: 'Mesaj ücreti', ref: 'msg:5-in' })), []);
+  });
+
+  test('ödül jetonu kampanya, geri alınması harcama; uygulama içi harcamalar ve çanta hediyesi gider', () => {
+    const grant = (reason) => eventsOf(row({ currency: 'coin', amount: 100, channel: 'odul', reason }))[0];
+    assert.deepEqual(['Hoş geldin hediyesi', 'Davet ödülü: arkadaşın katıldı', 'Görev ödülü: 1 görüntülü arama yap', 'Aile sandığı: Bronz'].map((x) => [grant(x).type, grant(x).campaign_ref]), [
+      ['bonus_grant', 'hos_geldin'],
+      ['bonus_grant', 'davet_odulu'],
+      ['bonus_grant', 'gorev_odulu'],
+      ['bonus_grant', 'aile_sandigi'],
+    ]);
+    const spend = (reason, detail = {}) => eventsOf(row({ currency: 'coin', amount: -500, reason, detail })).map((x) => [x.type, x.coins, x.item_ref]);
+    assert.deepEqual(spend('Aile kurma: Kartallar'), [['coin_spend', 500, 'aile_kurma']]);
+    assert.deepEqual(spend('Animasyon: Konfeti', { animation: 'confetti' }), [['coin_spend', 500, 'oda_animasyonu:confetti']]);
+    assert.deepEqual(spend('Koltuk rengi: Pembe', { seatColor: 'pink' }), [['coin_spend', 500, 'koltuk_rengi:pink']]);
+    assert.deepEqual(spend('Oda süslemesi: özel görsel (30 gün)'), [['coin_spend', 500, 'oda_ozel_gorsel']]);
+    assert.deepEqual(spend('Davet ödülü geri alındı'), [['coin_spend', 500, 'davet_odulu_geri_alindi']]);
+    // Held coins: a bond request and a bag change hands later (the accepted bond and the bag's gifts are gifts).
+    assert.deepEqual(spend('Bağ isteği: Kanka (Kanka)'), []);
+    assert.deepEqual(spend('Jeton çantası: 1.000 jeton'), []);
+    const [b] = eventsOf(row({ currency: 'diamond', amount: 1999, counterparty: 'giver', reason: 'Şanslı çanta: Roket ×1', ref: 'bag:3:0-in', gift_id: 'g6', gift_room: 'oda-x' }));
+    assert.deepEqual([b.type, b.sender_ref, b.publisher_ref, b.coins, b.gift_ref, b.room_ref], ['gift', 'giver', 'u1', 1999, 'g6', 'oda-x']);
+  });
 });

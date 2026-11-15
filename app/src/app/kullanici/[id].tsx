@@ -358,7 +358,7 @@ export default function UserProfile() {
         return false;
       }
       try {
-        await liveGift(user.id, g.id, 1, undefined, 'profile');
+        await liveGift(user.id, g.id, 1, undefined, 'profile', g.price);
       } catch (e) {
         errorHaptic();
         showAlert('Hediye gönderilemedi', message(e), [

@@ -17,9 +17,10 @@ import { vipProductOf } from '@/lib/live/vip-core';
 // Plain JavaScript module of the server; TypeScript reads it through allowJs.
 import * as server from '../../server/api/catalog.mjs';
 import * as family from '../../server/api/family-rules.mjs';
+import * as stickers from '../../server/api/stickers.mjs';
 import { CHEST_MIN_CONTRIBUTION, CP_GIFT_IDS, KABILE_CHESTS, KABILE_TASKS, KABILE_THEMES } from '@/data/kabile';
 
-type ServerGift = { id: string; name: string; price: number; cat: string; minSvip: number };
+type ServerGift = { id: string; name: string; emoji: string; price: number; cat: string; minSvip: number };
 type ServerPack = { id: string; productId: string; coins: number; firstBonus: number };
 type ServerShopItem = { sku: string; kind: string; name: string; price: number; days: number | null; minVip: number };
 
@@ -48,9 +49,26 @@ describe('Sunucu kataloğu uygulamayla aynı', () => {
     assert.deepEqual(GIFTS.slice(0, 6).map((g) => g.id), ['g1', 'g2', 'g3', 'g4', 'g5', 'g6']);
   });
 
-  test('her hediyenin adı, fiyatı, kategorisi ve SVIP sınırı', () => {
-    const app = GIFTS.map((g) => ({ id: g.id, name: g.name, price: g.price, cat: g.cat, minSvip: g.minSvip ?? 0 }));
+  test('her hediyenin adı, emojisi, fiyatı, kategorisi ve SVIP sınırı', () => {
+    const app = GIFTS.map((g) => ({ id: g.id, name: g.name, emoji: g.emoji, price: g.price, cat: g.cat, minSvip: g.minSvip ?? 0 }));
     assert.deepEqual([...(server.GIFTS as Map<string, ServerGift>).values()], app);
+  });
+
+  test('emoji paketleri (Yönetim › Emojiler): her paketin adı, fiyatı, VIP sınırı, bayrakları ve çıkartmaları', () => {
+    type ServerSticker = { id: string; name: string; emoji: string };
+    type ServerStickerPack = { id: string; name: string; price: number; minVip: number; animated: boolean; roomOnly: boolean; retired: boolean; stickers: ServerSticker[] };
+    const app = STICKER_PACKS.map((p) => ({
+      id: p.id,
+      name: p.name,
+      price: p.price,
+      minVip: p.minVip ?? 0,
+      animated: !!p.animated,
+      roomOnly: !!p.roomOnly,
+      retired: !!p.retired,
+      stickers: p.stickers.map(({ id, name, emoji }) => ({ id, name, emoji })),
+    }));
+    const onServer = (stickers.STICKER_PACKS as readonly ServerStickerPack[]).map((p) => ({ ...p, stickers: p.stickers.map((x) => ({ ...x })) }));
+    assert.deepEqual(onServer, app);
   });
 
   test('oda kapakları (seviyeleriyle) ve temalar sunucudakiyle aynı', () => {

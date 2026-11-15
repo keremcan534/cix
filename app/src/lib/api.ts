@@ -455,13 +455,26 @@ export type CatalogBody = {
   exchange?: { usdTry: number; minDiamonds: number };
   v?: number;
 };
-/** Gift prices, counts, coin packs and SVIP thresholds as the server charges them (no sign-in needed). */
-export const catalog = () => call<CatalogBody>('GET', '/api/catalog');
+/** Gift prices, counts, coin packs and SVIP thresholds as the server charges them (no sign-in needed; gifts=2: the
+ *  app's own gifts as changed in Yönetim › Hediyeler too; emoji=1: the emoji panel's packs, lib/live/catalog-live). */
+export const catalog = () => call<CatalogBody>('GET', '/api/catalog?gifts=2&emoji=1');
 /** Where a gift outside a room was sent from (Gelir's sources on the server). */
 export type GiftPlace = 'chat' | 'moment' | 'profile' | 'family';
-/** A gift at the server's price; `room` = sent on stage (no push to the recipient); `place` = where, outside a room. */
-export const sendGift = (to: string, giftId: string, count: number, room?: string, ref = newRef(), place?: GiftPlace) =>
-  call<{ user: ServerUser; replay: boolean; total: number }>('POST', '/api/gifts/send', { to, giftId, count, room, ref, ...(place && !room ? { place } : {}) });
+/**
+ * A gift at the server's price; `room` = sent on stage (no push to the recipient); `place` = where, outside a room;
+ * `price` = the unit price the screen showed: the server refuses a gift whose price moved meanwhile (409
+ * price_changed, with the price now), nothing is spent.
+ */
+export const sendGift = (to: string, giftId: string, count: number, room?: string, ref = newRef(), place?: GiftPlace, price?: number) =>
+  call<{ user: ServerUser; replay: boolean; total: number }>('POST', '/api/gifts/send', {
+    to,
+    giftId,
+    count,
+    room,
+    ref,
+    ...(place && !room ? { place } : {}),
+    ...(price !== undefined ? { price } : {}),
+  });
 /** Gelir's sources: the diamonds earned in the period, by where they came from (server wallet.mjs). */
 export type IncomeSource = { key: string; label: string; diamonds: number; count: number; live: boolean };
 export type IncomePeriod = 'day' | 'week' | 'month' | 'all';
