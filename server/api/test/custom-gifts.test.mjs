@@ -255,10 +255,11 @@ describe('Yönetim › Hediyeler', () => {
     // An icon up to 10 MB (the server makes a big one smaller for phones).
     await refused(call('POST', '/api/media/upload-url', { kind: 'gifticon', contentType: 'image/png', size: 10 * 1024 * 1024 + 1 }, admin.session), 400, /10 MB/);
     await ok(call('POST', '/api/media/upload-url', { kind: 'gifticon', contentType: 'image/png', size: 9 * 1024 * 1024 }, admin.session), '9 MB ikon');
-    // A video source up to 500 MB (a ProRes 4444 .mov is big); an SVGA up to 100 MB (read whole when converted).
+    // A video source up to 500 MB (a ProRes 4444 .mov is big); an SVGA up to 250 MB (read whole when converted).
     await refused(call('POST', '/api/media/upload-url', { kind: 'giftsource', contentType: 'video/webm', size: 501 * 1024 * 1024 }, admin.session), 400, /^Dosya en fazla 500 MB olabilir \(bu 501 MB\)$/);
     await ok(call('POST', '/api/media/upload-url', { kind: 'giftsource', contentType: 'video/quicktime', size: Math.round(107.3 * 1024 * 1024) }, admin.session), '107 MB MOV');
-    await refused(call('POST', '/api/media/upload-url', { kind: 'giftsource', contentType: 'application/x-svga', size: 101 * 1024 * 1024 }, admin.session), 400, /^Dosya en fazla 100 MB olabilir \(bu 101 MB\)$/);
+    await ok(call('POST', '/api/media/upload-url', { kind: 'giftsource', contentType: 'application/x-svga', size: Math.round(107.3 * 1024 * 1024) }, admin.session), '107 MB SVGA');
+    await refused(call('POST', '/api/media/upload-url', { kind: 'giftsource', contentType: 'application/x-svga', size: 251 * 1024 * 1024 }, admin.session), 400, /^Dosya en fazla 250 MB olabilir \(bu 251 MB\)$/);
     const p = await panel();
     assert.deepEqual(p.gifts, []);
     assert.equal(p.storage, true);
