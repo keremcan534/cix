@@ -106,7 +106,14 @@ const CONTACT_REASON = 'contact_sharing';
  */
 const SYSTEM_REASONS = [CONTACT_REASON];
 
+/**
+ * A finance panel user's sanction permissions (panel.mjs: their account is an admin here): from the panel
+ * permissions their role gives them. 'app.sanctions_full' is an admin's whole set, 'app.sanctions' a moderator's;
+ * a panel that sends no list (one from before) acts as an admin, as it always did.
+ */
+const PANEL_SANCTION_PERMS = { 'app.sanctions_full': ROLE_PERMS.admin, 'app.sanctions': ROLE_PERMS.moderator };
 export async function permsOf(u) {
+  if (u.panel && Array.isArray(u.panel.perms)) return new Set(u.panel.perms.flatMap((p) => PANEL_SANCTION_PERMS[p] ?? []));
   const out = new Set(ROLE_PERMS[u.role] ?? []);
   const r = await db.query('SELECT permission FROM admin_permissions WHERE user_id = $1', [u.id]);
   for (const x of r.rows) if (x.permission in PERMS) out.add(x.permission);

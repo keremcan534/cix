@@ -172,6 +172,31 @@ describe('Finans paneli API’de', () => {
     assert.equal(ev.actor, ME);
   });
 
+  test('paneldeki rol yaptırım yetkisini belirler: moderatör ömür boyu yasak veremez, onaylayamaz', async () => {
+    const MOD = { id: 9, email: 'mod@panel.test', name: 'Mod Ece', role: 'moderator', perms: ['app.sanctions', 'app.support'] };
+    const target = await h.account('Susturulacak');
+    const meta = (await panel('GET', '/api/admin/sanctions/meta', undefined, {}, MOD))[1];
+    assert.deepEqual(meta.perms.sort(), ['sanction.appeal', 'sanction.ban', 'sanction.device_ban', 'sanction.lift', 'sanction.mute', 'sanction.view']);
+    const reason = meta.reasons[0].code;
+    const [ms, m] = await panel('POST', '/api/admin/sanctions', { user: target.user.id, type: 'mute_global_text', minutes: 60, reason, description: 'Hakaret' }, {}, MOD);
+    assert.equal(ms, 200, m.error);
+    // A lifetime ban: a moderator may only propose it; it waits for someone with the full permissions.
+    const [bs, b] = await panel('POST', '/api/admin/sanctions', { user: target.user.id, type: 'account_ban', minutes: null, reason, description: 'Ömür boyu' }, {}, MOD);
+    assert.equal(bs, 200, b.error);
+    const prop = (await q("SELECT id, status FROM user_sanctions WHERE user_id = $1 AND sanction_type = 'account_ban'", [target.user.id])).rows[0];
+    assert.equal(prop.status, 'pending');
+    const [ma, mj] = await panel('POST', '/api/admin/sanctions/approve', { id: Number(prop.id), approve: true, note: 'Onaylıyorum' }, {}, MOD);
+    assert.equal(ma, 403);
+    assert.match(mj.error, /yetkin yok/);
+    // Someone whose panel role gives the full sanctions approves it.
+    const FULL = { ...OTHER, perms: ['app.sanctions_full'] };
+    const [fa, fj] = await panel('POST', '/api/admin/sanctions/approve', { id: Number(prop.id), approve: true, note: 'Kanıtlar yeterli' }, {}, FULL);
+    assert.equal(fa, 200, fj.error);
+    // No sanction permission in the panel role: nothing, not even the meta.
+    const NONE = { id: 10, email: 'fin@panel.test', name: 'Finans', role: 'finance_manager', perms: ['app.withdrawals'] };
+    assert.equal((await panel('GET', '/api/admin/sanctions/meta', undefined, {}, NONE))[0], 403);
+  });
+
   test('iki panel kullanıcısı iki kişidir: ömür boyu yasak önerisini öneren değil, öbürü onaylar', async () => {
     const target = await h.account('Yasaklanacak');
     const meta = (await panel('GET', '/api/admin/sanctions/meta'))[1];

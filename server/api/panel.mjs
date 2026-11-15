@@ -8,7 +8,8 @@
 //     header is refused.
 //   - the list: a route not in PANEL_ROUTES is refused with the key, whatever it is.
 // Finance Control decides which of its users may use which page (its own roles); X-Panel-User names that person
-// (base64url JSON { id, email, name, role }). On this side each panel user acts as an account of their own
+// (base64url JSON { id, email, name, role, perms? }: perms, their app.* permissions there, set what a page whose
+// rules go finer than the page does (sanctions.mjs permsOf: a moderator's sanctions or an admin's)). On this side each panel user acts as an account of their own
 // (panelActorId: role admin, never a person in any list, push or ranking, can't sign in, made the first time they
 // act), so every route checks and records as for an admin, and the rules that need two different people (a
 // proposed sanction's approver, a payout's second person, nobody deciding their own) tell panel users apart. Every
@@ -196,7 +197,8 @@ export function panelOf(req, method, path) {
   } catch {}
   const id = Number(who?.id);
   if (!Number.isSafeInteger(id) || id < 1 || id > 999_999_999_999 || !clean(who?.email, 200)) throw new HttpError(400, 'Panel kullanıcısı eksik');
-  return { id, email: clean(who.email, 200), name: clean(who.name, 80) || clean(who.email, 200), role: clean(who.role, 40) };
+  const perms = Array.isArray(who.perms) ? [...new Set(who.perms.filter((p) => typeof p === 'string' && /^app\.[a-z_]{1,40}$/.test(p)))].slice(0, 64) : undefined;
+  return { id, email: clean(who.email, 200), name: clean(who.name, 80) || clean(who.email, 200), role: clean(who.role, 40), ...(perms && { perms }) };
 }
 
 const actors = new Map();
