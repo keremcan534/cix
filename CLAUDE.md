@@ -44,6 +44,8 @@ web and a debug-signed APK (`preview.yml`, release `preview-N`). Production toda
 - Panel repo: Node 24 (`npx -y node@24`), `npm test`, `npx tsc --noEmit`.
 - Run the whole suites, not just the new tests: shared tables, `my-data`, drift tests and source-text tests catch
   what a feature test doesn't.
+- Load: `server/infra/loadtest/` (`docs/YUK_TESTI.md`) after a change to a hot path (room list, `/api/room`, gifts,
+  rankings, `/token`, `/api/live`) or before raising room or user limits. Never against the live server.
 
 ## Rules that must never be skipped
 
@@ -93,3 +95,6 @@ cash-outs (para çekme, Jeton Noktası, agency payouts) are a legal question the
 
 - PR #152: the app's own gifts and emoji packs became editable. Old APKs, the bag's reward value and the shop's
   name-based purchase path for older apps all needed explicit handling; the review found them, not the request.
+- Load test (Nov 2026): one core holds one busy 200-person room plus a few hundred very active users. The top database
+  cost was a per-request sum over a growing table (rankings); such reads need a cache or a summary table. Room size
+  limits go up to 5000 people, far beyond one machine (`docs/YUK_TESTI.md`).

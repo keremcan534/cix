@@ -40,6 +40,8 @@ export function startApi(extraEnv = {}) {
       RATE_AUTH: '100000',
       RATE_ALL: '100000',
       LOG_REQUESTS: '0',
+      // Boards read fresh after each gift (gifts.mjs keeps them RANKINGS_CACHE_MS); test/rankings-cache.test.mjs keeps them.
+      RANKINGS_CACHE_MS: '0',
       PUSH_ENABLED: '0',
       ALLOW_DEV_AUTH: '1',
       // The storage is a stand-in address in most tests: an uploaded file isn't looked up there (media.mjs).

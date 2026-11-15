@@ -5,7 +5,7 @@ Tarih: 15 Kasım 2026. Bütün depo, canlı sunucunun açık uçları (`/api/hea
 kurulum incelendi. Her maddede kimin işi olduğu yazılı: **siz** (karar, hesap, hukuk, para) ya da **Claude** (kod).
 Her iş bittiğinde buradan düşülür; yeni bir risk görülünce buraya eklenir.
 
-**Kısaca:** Kod tarafı sağlam ve testli (sunucu 786, uygulama 1187, panel 45 otomatik test). Yayını ve reklamı
+**Kısaca:** Kod tarafı sağlam ve testli (sunucu 787, uygulama 1187, panel 45 otomatik test). Yayını ve reklamı
 tehlikeye atanlar başka yerde: şans oyunlarının hukuki durumu, tek ve küçük sunucu, canlı sunucunun hâlâ test
 modunda olması, hata takibi olmaması ve kırık kodun birleşmeden önce yakalanmaması.
 
@@ -24,12 +24,18 @@ modunda olması, hata takibi olmaması ve kırık kodun birleşmeden önce yakal
 - **Öneri:** İlk sürümde Şanslı hediye kapalı olsun, ya da kazancı nakde dönmeyen ayrı bir bakiyeye gitsin (Oyun
   Salonu gibi). Kararı bir avukat görüşüyle siz verin; kapatma ya da ayrı bakiye işini Claude yapar.
 
-### 2. Sunucu kapasitesi (siz: bir tık · Claude: yük testi)
-- Canlı sunucu **1 çekirdek / 6 GB**. Ses odaları (LiveKit), veritabanı, API ve panel aynı makinede. 200 kişilik bir oda
-  ve reklamla aynı anda gelen yüzlerce kişi bu makineyi kilitleyebilir. Odalarda kişi üst sınırı da yok.
-- **Hemen:** Oracle'da makineyi **4 çekirdek / 24 GB**'a büyütün; ücretsiz sınırın içinde, birkaç dakika sürer.
-- **Reklamdan önce:** Yük testi. Kaç eş zamanlı kullanıcı ve 200 kişilik kaç oda kaldırıldığı ölçülür, sınırlar ona göre
-  konur. Sıradaki iş bu.
+### 2. Sunucu kapasitesi (siz: bir tık ve bir karar · Claude: yük testi yapıldı)
+- Canlı sunucu **1 çekirdek / 6 GB**. Ses odaları (LiveKit), veritabanı, API ve panel aynı makinede.
+- **Yük testi yapıldı** ([`YUK_TESTI.md`](YUK_TESTI.md)):
+  - Bu makine, 200 kişilik bir dolu oda ve birkaç yüz aktif kullanıcıyla doluyor. İki dolu oda sesi bozuyor.
+  - Çekirdek dolunca bütün odalar ve uygulama birlikte bozulur.
+  - Koddaki iki darboğaz giderildi: sıralama ve odadaki kişi sayısı.
+- **Hemen:** Oracle'da makineyi **4 çekirdek / 24 GB**'a büyütün. Ücretsiz sınırın içinde kalır; makine birkaç dakika
+  kapanıp açılır.
+- **Oda kişi sınırı (siz: karar):**
+  - Odanın seviyesine göre kişi sınırı 5000'e kadar çıkıyor. Tek makine bunu taşımaz.
+  - Öneri: ses sunucusu ayrılana kadar geçici bir üst sınır koymak, 4 çekirdekte 500 kişi. Panelden değiştirilebilir
+    olur.
 - **Büyüyünce:** Ses sunucusu (LiveKit) ayrı makineye ya da LiveKit Cloud'a, veritabanı ayrı makineye.
 
 ### 3. Canlı sunucu hâlâ test modunda (siz + Claude)
@@ -57,7 +63,9 @@ modunda olması, hata takibi olmaması ve kırık kodun birleşmeden önce yakal
 
 ### 6. Test (staging) sunucusu yok (siz: onay · Claude: kurulum)
 - Birleşen her PR doğrudan tek ve canlı sunucuya kuruluyor. Gerçek kullanıcılar gelince yeni özellik önce ayrı bir test
-  sunucusunda denenmeli. Oracle'ın ücretsiz sınırında ikinci küçük bir makine yeter.
+  sunucusunda denenmeli.
+- Oracle'ın ücretsiz Ampere sınırı toplam 4 çekirdek / 24 GB. Canlı sunucu 4 çekirdeğin hepsini alırsa (Kritik 2), test
+  sunucusu küçük ve ücretli bir makine olur.
 
 ### 7. Hesaplar ve yasal metinler (siz)
 - [`YAYIN_HAZIRLIGI.md`](YAYIN_HAZIRLIGI.md) §1:
@@ -117,10 +125,14 @@ modunda olması, hata takibi olmaması ve kırık kodun birleşmeden önce yakal
   veri, panel, mağaza ve hukuk) ve her işte uygulanacak kontrol listesi.
 - `.github/workflows/app-check.yml`: her PR'da uygulamanın tip denetimi, lint'i ve testleri (Kritik 5).
 - Bu rapor.
+- Yük testi ve sonuçları: [`YUK_TESTI.md`](YUK_TESTI.md). Testi tekrar çalıştırmak için araçlar
+  `server/infra/loadtest/` klasöründe.
+- Sıralama artık 30 saniyelik önbellekten okunuyor. Odadaki kişi sayısını soran istekler ses sunucusunda tek bir okumayı
+  paylaşıyor.
 
 ## Sıradaki iş (önerilen sıra)
 
-1. **Yük testi:** 200 kişilik oda ve eş zamanlı kullanıcı; sınırlar ona göre (Kritik 2).
+1. **Oda kişi üst sınırı** (sizin kararınızla) ve makine büyüyünce ses sunucusuna koruma sınırı (Kritik 2).
 2. **Açılış listesi:** Yayın günü adım adım (Kritik 3); test sunucusu kurulumu (Kritik 6).
 3. **Uçtan uca testler ve gece kontrolü** (Sonra).
 4. Sizden gelecek hesaplar geldikçe: Sentry, analitik, push, görsel moderasyon bağlantıları.

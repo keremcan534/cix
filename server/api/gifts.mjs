@@ -22,7 +22,7 @@
 // (LiveKit SendData, so no phone can fake one); the phones draw only these, never a peer's own claim.
 import { recordIncome } from './agency-lib.mjs';
 import { addBondCoins } from './bonds.mjs';
-import { HttpError, auth, blockedBetween, claimRef, db, int, once, readJson, userId } from './core.mjs';
+import { HttpError, auth, blockedBetween, claimRef, db, env, int, once, readJson, userId } from './core.mjs';
 import { EXCHANGE, GIFT_COUNTS, PACKS, SVIP_XP, VIP_SUBS, svipLevel } from './catalog.mjs';
 import { catalogGifts, checkShownPrice, customGiftsRev, giftFx, giftOf, replacedClips } from './custom-gifts.mjs';
 import { emojiCatalog, emojiRev } from './emoji.mjs';
@@ -42,10 +42,30 @@ export const PERIODS = ['day', 'week', 'month'];
 const SINCE = `date_trunc($1, now() AT TIME ZONE 'Europe/Istanbul') AT TIME ZONE 'Europe/Istanbul'`;
 
 /**
+ * How long a board is kept, in ms (RANKINGS_CACHE_MS, default 30 s; 0: every call reads it). A board sums the period's
+ * gift events, the costliest query under load (docs/YUK_TESTI.md): everyone opening Sıralama at once shares one read,
+ * a call while it runs waits for the same one.
+ */
+const BOARD_MS = Math.max(0, Number(env.RANKINGS_CACHE_MS ?? 30_000) || 0);
+const boards = new Map();
+
+/**
  * The top `n` of a board this day, week or month (Turkey's calendar): wealth = coins given in gifts, charm =
- * diamonds received, agency = the diamonds its streamers earned (the commission base, refunds taken off).
+ * diamonds received, agency = the diamonds its streamers earned (the commission base, refunds taken off). Kept for
+ * BOARD_MS.
  */
 export async function topBoard(board, period, n = 50) {
+  if (!BOARD_MS) return readBoard(board, period, n);
+  const key = `${board}:${period}:${n}`;
+  const hit = boards.get(key);
+  if (hit && Date.now() - hit.at < BOARD_MS) return hit.rows;
+  const rows = readBoard(board, period, n);
+  boards.set(key, { at: Date.now(), rows });
+  rows.catch(() => boards.get(key)?.rows === rows && boards.delete(key));
+  return rows;
+}
+
+async function readBoard(board, period, n) {
   if (board === 'agency') {
     const r = await db.query(
       `SELECT a.id, a.name, o.avatar_url, sum(c.base_diamonds) AS score
