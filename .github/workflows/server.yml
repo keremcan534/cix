@@ -107,6 +107,11 @@ jobs:
           # Push notifications through Firebase (server/api/push.mjs): the service account key's JSON, a secret. It
           # goes into .env base64-encoded (one line, no quotes) as FCM_SERVICE_ACCOUNT_B64, never printed.
           FCM_SERVICE_ACCOUNT: ${{ secrets.FCM_SERVICE_ACCOUNT }}
+          # The finance panel's own login (Finance Control, bootstrap.ts): a login named here that no panel account has
+          # yet is added once as a super admin; an existing account (and a password changed in the panel) is never
+          # touched. Secrets, so the public log shows neither.
+          FC_ADMIN_EMAIL: ${{ secrets.FC_ADMIN_EMAIL }}
+          FC_ADMIN_PASSWORD: ${{ secrets.FC_ADMIN_PASSWORD }}
         run: |
           install -m 700 -d ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
@@ -165,7 +170,7 @@ jobs:
               echo "::add-mask::$FCM_SERVICE_ACCOUNT_B64"
             fi
           fi
-          lines=$(for k in MAIL_PROVIDERS MAIL_FROM BREVO_API_KEY RESEND_API_KEY WHATSAPP_NUMBER WHATSAPP_APP_SECRET WHATSAPP_VERIFY_TOKEN OTP_REVIEW_EMAIL OTP_REVIEW_EMAIL_CODE S3_ENDPOINT S3_BUCKET S3_KEY S3_SECRET S3_PUBLIC_URL FCM_SERVICE_ACCOUNT_B64; do
+          lines=$(for k in MAIL_PROVIDERS MAIL_FROM BREVO_API_KEY RESEND_API_KEY WHATSAPP_NUMBER WHATSAPP_APP_SECRET WHATSAPP_VERIFY_TOKEN OTP_REVIEW_EMAIL OTP_REVIEW_EMAIL_CODE S3_ENDPOINT S3_BUCKET S3_KEY S3_SECRET S3_PUBLIC_URL FCM_SERVICE_ACCOUNT_B64 FC_ADMIN_EMAIL FC_ADMIN_PASSWORD; do
               v=${!k}
               v=${v#"${v%%[![:space:]]*}"}
               v=${v%"${v##*[![:space:]]}"}
@@ -240,6 +245,23 @@ jobs:
       # The panel's Uygulama pages reach the API (server/api/panel.mjs): from inside the panel's container, with its own
       # FC_APP_API_URL and FC_APP_API_KEY, a read the panel may make. Prints only the status; a read leaves no audit row.
       # Through Caddy the key must open nothing (the header is stripped there).
+      # The panel's own login (FC_ADMIN_EMAIL above): whether that account is there, read from the panel's database
+      # inside its container. Prints only present / missing, never the name or the password; signs nobody in.
+      - name: Check the panel's login account
+        if: steps.key.outputs.ready == 'true' && steps.finance.outcome == 'success'
+        working-directory: .
+        run: |
+          cat > "$RUNNER_TEMP/login-check.mjs" <<'JS'
+          import { DatabaseSync } from 'node:sqlite';
+          const name = (process.env.FC_ADMIN_EMAIL ?? '').trim();
+          if (!name) { console.log('login account: not set'); process.exit(0); }
+          const db = new DatabaseSync(`${process.env.FC_DATA_DIR ?? '/data'}/${process.env.FC_DB_FILE ?? 'finance.db'}`, { readOnly: true });
+          const row = db.prepare('SELECT u.active, r.key FROM users u JOIN roles r ON r.id = u.role_id WHERE u.email = ? COLLATE NOCASE').get(name);
+          console.log(`login account: ${!row ? 'missing' : row.active && row.key === 'super_admin' ? 'present' : 'present but not an active super admin'}`);
+          JS
+          out=$(ssh -i ~/.ssh/deploy ubuntu@$HOST "cd /opt/similar && sudo docker compose exec -T finance node --input-type=module -" < "$RUNNER_TEMP/login-check.mjs" 2>&1 | tail -1) || true
+          echo "panel $out"
+          case "$out" in *"login account: present"* | *"login account: not set"*) ;; *) echo "::warning::panel ${out:-login check gave no answer}" ;; esac
       - name: Check the panel's link to the API
         if: steps.key.outputs.ready == 'true' && steps.finance.outcome == 'success'
         working-directory: .
