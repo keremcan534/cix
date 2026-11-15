@@ -41,10 +41,10 @@ describe('Finans paneli API’de', () => {
     const [fwd, fj] = await panel('GET', '/api/admin/gifts', undefined, { 'x-forwarded-for': '203.0.113.9' });
     assert.equal(fwd, 403);
     assert.match(fj.error, /sunucunun kendi içinden/);
-    const [off, oj] = await panel('GET', '/api/admin/users');
+    const [off, oj] = await panel('GET', '/api/admin/sanctions/pending');
     assert.equal(off, 403);
     assert.match(oj.error, /finans panelinden yapılamaz/);
-    assert.ok(!PANEL_ROUTES.has('GET /api/admin/users'));
+    assert.ok(!PANEL_ROUTES.has('GET /api/admin/sanctions/pending'));
     assert.equal((await panel('GET', '/api/admin/gifts', undefined, { 'x-panel-user': 'bozuk' }))[0], 400);
     assert.equal((await panel('GET', '/api/admin/gifts', undefined, { 'x-panel-user': user({ id: 0, email: '' }) }))[0], 400);
     // Without the header the route is the app's own: a session is needed.
@@ -101,6 +101,41 @@ describe('Finans paneli API’de', () => {
     assert.equal(row.set_by, PANEL_ACTOR);
     assert.deepEqual((await lastPanelRows(1))[0], { method: 'POST', path: '/api/admin/live-settings', status: 200, panelUser: WHO });
     assert.equal((await fetch(`${h.base}/api/catalog`).then((r) => r.json())).exchange.usdTry, 50);
+  });
+
+  test('operasyon uçları panelden: duyuru, askıya alma ve kaldırma, destek; Yaptırımlar listede değil', async () => {
+    for (const p of [
+      '/api/admin/users?q=Panel',
+      '/api/admin/reports?status=open',
+      '/api/admin/support?status=waiting',
+      '/api/admin/team',
+      '/api/admin/events?status=review',
+      '/api/admin/events/categories',
+      '/api/admin/events/report?days=30',
+    ]) {
+      const [st, j] = await panel('GET', p);
+      assert.equal(st, 200, `${p}: ${j.error}`);
+    }
+    // A notice put up from the panel is the Finance Control account's, and comes down again.
+    const [ns, n] = await panel('POST', '/api/admin/team', { kind: 'update', title: 'Panelden duyuru', body: 'Bakım gece 03.00’te.' });
+    assert.equal(ns, 200, n.error);
+    assert.equal((await q('SELECT created_by FROM team_notices WHERE id = $1', [n.notice.id])).rows[0].created_by, PANEL_ACTOR);
+    assert.equal((await panel('POST', '/api/admin/team/remove', { id: n.notice.id }))[0], 200);
+    // A ban and lifting it: a sanction by the Finance Control account; each a panel.request row.
+    const someone = await h.account('Panel Denek');
+    const [bs, b] = await panel('POST', '/api/admin/ban', { user: someone.user.id, days: 3 });
+    assert.equal(bs, 200, b.error);
+    assert.ok(b.bannedUntil);
+    assert.equal((await lastPanelRows(1))[0].path, '/api/admin/ban');
+    const [ls, l] = await panel('POST', '/api/admin/ban', { user: someone.user.id, days: null });
+    assert.equal(ls, 200, l.error);
+    assert.equal(l.bannedUntil, null);
+    // A staff reply on a ticket that isn't there: the app's answer, and a row for the refusal.
+    const [rs] = await panel('POST', '/api/admin/support/reply', { id: 999999, text: 'Merhaba' });
+    assert.equal(rs, 404);
+    assert.deepEqual((await lastPanelRows(1))[0], { method: 'POST', path: '/api/admin/support/reply', status: 404, panelUser: WHO });
+    // Sanctions stay in the app: not on the list.
+    assert.equal((await panel('GET', '/api/admin/sanctions/meta'))[0], 403);
   });
 
   test('Finance Control hesabı bir kişi değil: listelerde görünmez, oturumu yok', async () => {
