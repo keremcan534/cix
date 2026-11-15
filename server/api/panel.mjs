@@ -68,6 +68,7 @@ export const PANEL_ROUTES = new Set([
   // Reports and the server's state: Oyun Salonu (casino.mjs), the warnings (alerts.mjs), the sending to this panel.
   'GET /api/admin/casino/report',
   'GET /api/admin/alerts',
+  'GET /api/admin/money-check',
   'GET /api/admin/finance-sync',
   // Kullanıcılar (admin.mjs, referrals.mjs): search, ban and lifting it, room level, deleting, an invite's coins back.
   'GET /api/admin/users',

@@ -26,7 +26,9 @@ import { HttpError, assertClean, auth, blockedBetween, claimRef, clientIp, db, i
 import { EXCHANGE, bankExchangeCoins, diamondValueTl, wholesaleTl } from './catalog.mjs';
 import { CHANNELS, creditCoins, diamondState, spendCoins, spendDiamonds } from './wallet.mjs';
 import { recordIncome } from './agency-lib.mjs';
+import { voidRefundedBonds } from './bonds.mjs';
 import { refundItems } from './economy.mjs';
+import { voidRefundedBags } from './lucky-bags.mjs';
 
 const TRANSFER_MAX = 100_000_000;
 const DIAMONDS_MAX = 1_000_000_000;
@@ -136,6 +138,10 @@ export async function refundPurchase(c, id, { actor = null, ip = '', source = 'a
       });
     coins += take;
   }
+  // Coins the trail's owners hold for a pending bond or an open Şanslı çanta came from these lots too: they go
+  // with the purchase, so they can't come back later or turn into someone's diamonds after this refund.
+  const escrowCoins = (await voidRefundedBonds(c, lots.map((l) => Number(l.id)))) + (await voidRefundedBags(c, lots.map((l) => Number(l.id))));
+  coins += escrowCoins;
   for (const k of locks) {
     const amount = Number(k.amount);
     // The agency share of this gift goes back whether or not its diamonds can still be taken. Once per lock:
@@ -156,7 +162,7 @@ export async function refundPurchase(c, id, { actor = null, ip = '', source = 'a
   await c.query('UPDATE users SET svip_xp = greatest(0, svip_xp - $2) WHERE id = $1', [p.user_id, p.coins]);
   // Coins already spent on shop items can't come back as coins: the buyer's items go, others' go to staff review.
   const { revokedItems, reviewItems } = await refundItems(c, { purchase: Number(id), buyer: p.user_id, lots: lots.map((l) => l.id), held, actor, ip });
-  await audit(c, actor, 'purchase.refund', p.user_id, { purchase: id, platform: p.platform, transaction: p.transaction_id, coins, diamonds, unrecoveredDiamonds, commissionDiamonds, revokedItems, reviewItems, source }, ip);
+  await audit(c, actor, 'purchase.refund', p.user_id, { purchase: id, platform: p.platform, transaction: p.transaction_id, coins, escrowCoins, diamonds, unrecoveredDiamonds, commissionDiamonds, revokedItems, reviewItems, source }, ip);
   return { coins, diamonds, unrecoveredDiamonds };
 }
 

@@ -126,7 +126,7 @@ export const messageRoutes = {
         if (!r.rowCount) return null;
         price = pair.dmPrice;
         const id = Number(r.rows[0].id);
-        if (price > 0) await payOneOnOne(c, { kind: 'message', payer: me.id, earner: pair.earner, coins: price, ref: `msg-${id}`, label: 'Mesaj ücreti', income: `msg:${id}`, messageId: id });
+        if (price > 0) await payOneOnOne(c, { kind: 'message', payer: me.id, earner: pair.earner, coins: price, ref: `msg:${id}`, label: 'Mesaj ücreti', income: `msg:${id}`, messageId: id });
         return r.rows[0];
       }).catch((e) => {
         if (e.code === '23505') return null;

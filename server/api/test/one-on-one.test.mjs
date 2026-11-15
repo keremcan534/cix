@@ -280,6 +280,27 @@ describe('Birebir arama', () => {
     await q("UPDATE calls SET callee_seen = now() - interval '31 seconds' WHERE id = $1", [k.id]);
     await until(async () => (await q('SELECT status, end_reason FROM calls WHERE id = $1', [k.id])).rows[0].end_reason === 'lost');
   });
+
+  test('dakika ücreti, kimliği önceden başka bir harcamada kullanılarak atlanamaz', async () => {
+    const man = await person('Kerem', 'Erkek');
+    const star = await streamer('Lale');
+    const other = await person('Başka', 'Kadın');
+    await giftPoints(man.user.id, star.user.id, 1500);
+    await topUp(man.session, 10000);
+    const { call: k } = await ok(ring(man.session, star.user.id), 'ara');
+    await ok(call('POST', '/api/calls/answer', { id: k.id }, star.session), 'aç');
+    // The refs the server once used for the coming minutes and their earnings, taken first by the payer's own
+    // spending (any request's ref): the minutes are charged all the same.
+    for (const ref of [`call-${k.id}-2`, `call-${k.id}-3`]) await ok(call('POST', '/api/wallet/gift', { to: other.user.id, amount: 1, ref }, man.session), 'hediye');
+    await backdate(k.id, 61);
+    assert.equal((await beat(man.session, k.id)).call.minutes, 2);
+    await backdate(k.id, 60);
+    const three = (await beat(star.session, k.id)).call;
+    assert.equal(three.minutes, 3);
+    assert.equal(three.coins, 6000);
+    assert.equal((await me(man.session)).coins, 10000 - 2 - 6000);
+    assert.equal((await me(star.session)).diamonds, 6000);
+  });
 });
 
 describe('Eşleşme', () => {

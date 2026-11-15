@@ -189,9 +189,12 @@ const tokenFor = (k, u) =>
 
 const minuteLabel = (k, n) => `${MODE_TEXT[k.mode]} ${k.kind === 'match' ? 'eşleşme' : 'arama'} · ${n}. dakika`;
 
-/** Charges minute n of a live call (both accounts locked). */
+/**
+ * Charges minute n of a live call (both accounts locked). Its ref has a ':', which no request's ref may (core.mjs
+ * REF), so the payer can't take it first with some other spending and make the minute fail (it was `call-{id}-{n}`).
+ */
 async function chargeMinute(c, k, n) {
-  const ref = `call-${k.id}-${n}`;
+  const ref = `call:${k.id}:${n}`;
   await payOneOnOne(c, { kind: k.kind === 'match' ? `match_${k.mode}` : `${k.mode}_call`, payer: k.payer, earner: k.earner, coins: k.price, ref, label: minuteLabel(k, n), income: `call:${k.id}:${n}`, callId: Number(k.id) });
   await c.query('UPDATE calls SET minutes = $2, coins = coins + $3 WHERE id = $1', [k.id, n, k.price]);
 }

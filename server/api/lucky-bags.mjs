@@ -81,6 +81,33 @@ async function giveBack(c, b) {
   await c.query("UPDATE lucky_bags SET status = 'returned', shares = '{}', parts = '[]', returned = $2 WHERE id = $1", [b.id, back]);
 }
 
+/**
+ * A store refund (jeton.mjs refundPurchase) of coins in open bags: each such bag closes as returned, its coins
+ * from the refunded lots (`lotIds`) go with the purchase and the rest goes back to the sender. So nobody wins the
+ * refunded coins, as coins or diamonds, after the refund. The senders' rows are locked (they own the lots).
+ * Returns the coins that went with the purchase.
+ */
+export async function voidRefundedBags(c, lotIds) {
+  if (!lotIds.length) return 0;
+  const refunded = new Set(lotIds.map(Number));
+  const r = await c.query(
+    `SELECT * FROM lucky_bags WHERE status = 'open'
+        AND EXISTS (SELECT 1 FROM jsonb_array_elements(parts) p WHERE (p->>'lot')::bigint = ANY($1::bigint[]))
+      ORDER BY id FOR UPDATE`,
+    [[...refunded]],
+  );
+  let gone = 0;
+  for (const b of r.rows) {
+    const keep = b.parts.filter((p) => !(p.lot && refunded.has(Number(p.lot))));
+    const back = keep.reduce((sum, p) => sum + p.amount, 0);
+    gone += b.parts.reduce((sum, p) => sum + p.amount, 0) - back;
+    const portions = keep.map((p) => ({ channel: p.channel, amount: p.amount, lockHours: p.lockHours, sourceLot: p.lot }));
+    if (back > 0) await creditCoins(c, b.sender, portions, 'Şanslı çanta: satın alma iade edildi, kalan pay iadesi', `bag:${b.id}:back`, null, { detail: { bag: Number(b.id) } });
+    await c.query("UPDATE lucky_bags SET status = 'returned', shares = '{}', parts = '[]', returned = $2 WHERE id = $1", [b.id, back]);
+  }
+  return gone;
+}
+
 /** Bags whose time is up: their shares dealt among those who joined and paid, or back to the sender. */
 export async function drawBags() {
   const due = await db.query("SELECT id FROM lucky_bags WHERE status = 'open' AND closes_at <= now() ORDER BY id LIMIT 100");
