@@ -29,6 +29,30 @@ export const PANEL_ROUTES = new Set([
   'POST /api/admin/gifts/delete',
   'POST /api/admin/gifts/order',
   'POST /api/media/upload-url',
+  // Para çekme (withdraw.mjs).
+  'GET /api/admin/withdrawals',
+  'POST /api/admin/withdrawals/decide',
+  // Ajans ödemeleri (agency-admin.mjs) and the payout policy they follow.
+  'GET /api/admin/agency/payouts',
+  'POST /api/admin/agency/payouts/decide',
+  'GET /api/admin/agency/settings',
+  // İadeler and the wallet audit (refunds.mjs, jeton.mjs).
+  'GET /api/admin/purchases',
+  'POST /api/admin/purchases/refund',
+  'POST /api/admin/purchases/voided-sync',
+  'GET /api/admin/wallet/audit',
+  // Şanslı hediyeler (lucky.mjs).
+  'GET /api/admin/lucky',
+  'POST /api/admin/lucky/config',
+  // Canlı ayarlar (live-settings.mjs).
+  'GET /api/admin/live-settings',
+  'POST /api/admin/live-settings',
+  'GET /api/admin/live-settings/history',
+  'POST /api/admin/live-settings/rollback',
+  // Reports and the server's state: Oyun Salonu (casino.mjs), the warnings (alerts.mjs), the sending to this panel.
+  'GET /api/admin/casino/report',
+  'GET /api/admin/alerts',
+  'GET /api/admin/finance-sync',
 ]);
 
 const clean = (v, max) => (typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, max) : '');

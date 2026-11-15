@@ -73,6 +73,36 @@ describe('Finans paneli API’de', () => {
     assert.deepEqual((await lastPanelRows(1))[0], rows[0]);
   });
 
+  test('finans uçları panelden: okumalar açık; Canlı ayar önizleme bir şey yazmaz, kayıt panel kullanıcısıyla', async () => {
+    for (const p of [
+      '/api/admin/withdrawals?status=pending',
+      '/api/admin/agency/payouts',
+      '/api/admin/agency/settings',
+      '/api/admin/purchases',
+      '/api/admin/lucky',
+      '/api/admin/live-settings',
+      '/api/admin/live-settings/history',
+      '/api/admin/casino/report',
+      '/api/admin/alerts',
+      '/api/admin/finance-sync',
+    ]) {
+      const [st, j] = await panel('GET', p);
+      assert.equal(st, 200, `${p}: ${j.error}`);
+    }
+    const view = (await panel('GET', '/api/admin/live-settings'))[1];
+    const before = (await q('SELECT count(*)::int AS n FROM live_settings')).rows[0].n;
+    const [ds, dry] = await panel('POST', '/api/admin/live-settings', { changes: { exchange_usd_try: 50 }, reason: 'Panelden kur denemesi', baseV: view.v, dryRun: true });
+    assert.equal(ds, 200, dry.error);
+    assert.equal(dry.preview[0].key, 'exchange_usd_try');
+    assert.equal((await q('SELECT count(*)::int AS n FROM live_settings')).rows[0].n, before, 'önizleme yazmaz');
+    const [ss, saved] = await panel('POST', '/api/admin/live-settings', { changes: { exchange_usd_try: 50 }, reason: 'Panelden kur', baseV: view.v, confirm: true });
+    assert.equal(ss, 200, saved.error);
+    const row = (await q("SELECT set_by FROM live_settings WHERE key = 'exchange_usd_try' ORDER BY id DESC LIMIT 1")).rows[0];
+    assert.equal(row.set_by, PANEL_ACTOR);
+    assert.deepEqual((await lastPanelRows(1))[0], { method: 'POST', path: '/api/admin/live-settings', status: 200, panelUser: WHO });
+    assert.equal((await fetch(`${h.base}/api/catalog`).then((r) => r.json())).exchange.usdTry, 50);
+  });
+
   test('Finance Control hesabı bir kişi değil: listelerde görünmez, oturumu yok', async () => {
     const admin = await h.account('Yönetici', 'admin');
     const r = await fetch(`${h.base}/api/admin/users?q=Finance`, { headers: { authorization: `Bearer ${admin.session}` } });
