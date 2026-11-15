@@ -58,13 +58,17 @@ const KINDS = {
   // company's files, like a notice's picture.
   gifticon: { types: ['image/png', 'image/webp'], max: 1024 * 1024, admin: true },
   giftvideo: { types: ['video/mp4'], max: 12 * 1024 * 1024, admin: true },
-  giftsource: { types: ['video/webm', 'video/quicktime', 'application/x-svga'], max: 100 * 1024 * 1024, admin: true },
+  // A video source may be big (a ProRes 4444 .mov with alpha is about 100 MB for 10 s even at the app's 540 × 960);
+  // an SVGA stays at 100 MB: the converter reads it whole (tools/svga-to-fx.py).
+  giftsource: { types: ['video/webm', 'video/quicktime', 'application/x-svga'], max: 500 * 1024 * 1024, typeMax: { 'application/x-svga': 100 * 1024 * 1024 }, admin: true },
   // Yönetim › Emojiler (emoji.mjs), admins only: a sticker's picture, a transparent PNG or WebP or a Lottie animation
   // (its JSON, pictures inside it).
   stickerart: { types: ['image/png', 'image/webp', 'application/json'], max: 512 * 1024, admin: true },
 };
-/** The largest file of a kind, in bytes (custom-gifts.mjs shows its limits from here). */
-export const kindMax = (kind) => KINDS[kind]?.max ?? 0;
+/** The largest file of a kind, in bytes; of one type of it when that type has its own (custom-gifts.mjs shows them). */
+export const kindMax = (kind, type) => KINDS[kind]?.typeMax?.[type] ?? KINDS[kind]?.max ?? 0;
+const mbOf = (n) => (n / 1024 / 1024).toLocaleString('tr-TR', { maximumFractionDigits: 1 });
+const tooBig = (max, size) => new HttpError(400, `Dosya en fazla ${mbOf(max)} MB olabilir${size ? ` (bu ${mbOf(size)} MB)` : ''}`);
 const EXPIRES = 10 * 60;
 
 /** Whether `uid` may keep a music library (music.mjs): they have a room, or run one or play in one. */
@@ -185,7 +189,7 @@ export async function readStored(key, max) {
 
 /** A stored file written to `file` on this machine as it comes (a big video never sits in memory); throws past `max` bytes. */
 export async function downloadStored(key, file, max) {
-  const res = await fetch(signed('GET', key), { signal: AbortSignal.timeout(180_000) });
+  const res = await fetch(signed('GET', key), { signal: AbortSignal.timeout(600_000) });
   if (!res.ok || !res.body) {
     await res.body?.cancel().catch(() => {});
     throw new Error(`storage read ${res.status}`);
@@ -213,7 +217,7 @@ export async function storeFile(kind, uid, file, type) {
   const k = KINDS[kind];
   if (!k || !k.types.includes(type)) throw new HttpError(400, 'Bu dosya türü yüklenemez');
   const size = (await fs.promises.stat(file)).size;
-  if (size < 1 || size > k.max) throw new HttpError(400, `Dosya en fazla ${k.max / 1024 / 1024} MB olabilir`);
+  if (size < 1 || size > kindMax(kind, type)) throw tooBig(kindMax(kind, type), size);
   if (!storageOn()) throw new HttpError(503, 'Dosya deposu ayarlı değil');
   const key = newKey(kind, uid, type);
   const url = presign({
@@ -232,7 +236,7 @@ export async function storeFile(kind, uid, file, type) {
       headers: { 'content-type': type, 'content-length': String(size) },
       body: Readable.toWeb(fs.createReadStream(file)),
       duplex: 'half',
-      signal: AbortSignal.timeout(300_000),
+      signal: AbortSignal.timeout(600_000),
     });
   } catch {
     throw unreachable();
@@ -384,9 +388,11 @@ export async function verifyUpload(url, kind) {
   const size = Number(res.headers.get('content-length') ?? 0);
   const type = (res.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase();
   const typeOk = !type || type === 'application/octet-stream' || k.types.includes(type);
-  if (size <= k.max && typeOk) return;
+  const max = kindMax(kind, key.endsWith('.svga') ? 'application/x-svga' : type);
+  if (size <= max && typeOk) return;
   later('storage delete failed', () => deleteKeys([key]));
-  throw new HttpError(400, typeOk ? `Dosya en fazla ${k.max / 1024 / 1024} MB olabilir` : 'Bu dosya türü yüklenemez');
+  if (typeOk) throw tooBig(max, size);
+  throw new HttpError(400, 'Bu dosya türü yüklenemez');
 }
 
 /** Every key under `prefix` (ListObjectsV2, a page of up to 1000 at a time). */
@@ -516,7 +522,7 @@ export const mediaRoutes = {
     if (k.admin && u.role !== 'admin') throw new HttpError(403, 'Yönetici hesabı gerekli');
     if (k.may && !(await k.may(u.id))) throw new HttpError(403, k.refused);
     if (!k.types.includes(contentType)) throw new HttpError(400, 'Bu dosya türü yüklenemez');
-    if (!Number.isSafeInteger(size) || size < 1 || size > k.max) throw new HttpError(400, `Dosya en fazla ${k.max / 1024 / 1024} MB olabilir`);
+    if (!Number.isSafeInteger(size) || size < 1 || size > kindMax(kind, contentType)) throw tooBig(kindMax(kind, contentType), Number.isSafeInteger(size) ? size : 0);
     const key = newKey(kind, u.id, contentType);
     // The address and the size are signed, the type isn't: Expo's fetch on the phone sends a file with the
     // file's own type, which is empty for a file read from the phone, and the storage refused that against a

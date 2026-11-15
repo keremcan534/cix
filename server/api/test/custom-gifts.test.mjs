@@ -228,7 +228,10 @@ describe('Yönetim › Hediyeler', () => {
     // Sizes and types of the kinds.
     await refused(call('POST', '/api/media/upload-url', { kind: 'gifticon', contentType: 'image/jpeg', size: 100 }, admin.session), 400, /türü/);
     await refused(call('POST', '/api/media/upload-url', { kind: 'gifticon', contentType: 'image/png', size: 2 * 1024 * 1024 }, admin.session), 400, /1 MB/);
-    await refused(call('POST', '/api/media/upload-url', { kind: 'giftsource', contentType: 'video/webm', size: 101 * 1024 * 1024 }, admin.session), 400, /100 MB/);
+    // A video source up to 500 MB (a ProRes 4444 .mov is big); an SVGA up to 100 MB (read whole when converted).
+    await refused(call('POST', '/api/media/upload-url', { kind: 'giftsource', contentType: 'video/webm', size: 501 * 1024 * 1024 }, admin.session), 400, /^Dosya en fazla 500 MB olabilir \(bu 501 MB\)$/);
+    await ok(call('POST', '/api/media/upload-url', { kind: 'giftsource', contentType: 'video/quicktime', size: Math.round(107.3 * 1024 * 1024) }, admin.session), '107 MB MOV');
+    await refused(call('POST', '/api/media/upload-url', { kind: 'giftsource', contentType: 'application/x-svga', size: 101 * 1024 * 1024 }, admin.session), 400, /^Dosya en fazla 100 MB olabilir \(bu 101 MB\)$/);
     const p = await panel();
     assert.deepEqual(p.gifts, []);
     assert.equal(p.storage, true);

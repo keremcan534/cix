@@ -81,6 +81,7 @@ export const LIMITS = Object.freeze({
   iconMaxPx: 1024,
   videoBytes: kindMax('giftvideo'),
   sourceBytes: kindMax('giftsource'),
+  svgaBytes: kindMax('giftsource', 'application/x-svga'),
   videoMinMs: 1000,
   videoMaxMs: 15_000,
   // What a source becomes: the size the phones show (stacked: twice as high), as the compiled clips (server/api/fx).
@@ -549,6 +550,9 @@ export function svgaInfo(buf) {
 
 /** The stacked MP4 made from the SVGA at `input` by tools/svga-to-fx.py (its own sound kept): { buf, ms }. */
 async function convertSvga(input, dir, fill) {
+  // Read whole here and by the converter: never one bigger than an SVGA may be uploaded.
+  const size = (await fs.promises.stat(input)).size;
+  if (size > LIMITS.svgaBytes) throw new FileError(`SVGA en fazla ${mb(LIMITS.svgaBytes)} MB olabilir (bu ${mb(size)} MB)`);
   svgaInfo(await fs.promises.readFile(input));
   const output = path.join(dir, 'stacked.mp4');
   const r = await run(PYTHON, ['-I', '-X', 'utf8', SVGA_TOOL, input, output, '--fill', String(fill)], { timeout: 10 * 60_000, keep: 0, nice: true });
@@ -991,6 +995,7 @@ async function fetchedKind(slot, type, bytes) {
   }
   if (type === 'video/webm' || type === 'video/quicktime' || type === 'application/x-svga') {
     const svga = type === 'application/x-svga';
+    if (svga && bytes > LIMITS.svgaBytes) throw new HttpError(400, `SVGA en fazla ${mb(LIMITS.svgaBytes)} MB olabilir (bu ${mb(bytes)} MB)`);
     if (!(await (svga ? canSvga() : canConvert()))) throw new HttpError(400, `Bu sunucu ${svga ? 'SVGA' : 'video'} çeviremiyor: hazır yığılmış MP4 verin`);
     return 'giftsource';
   }
@@ -1278,7 +1283,7 @@ export const customGiftRoutes = {
       counted = true;
       const out = await temp(async (dir) => {
         const file = path.join(dir, 'file');
-        const got = await download(link, file, slot === 'icon' ? { max: LIMITS.iconBytes, ms: 60_000, tooBig: iconTooBig } : { max: LIMITS.sourceBytes, ms: 300_000, tooBig: videoTooBig });
+        const got = await download(link, file, slot === 'icon' ? { max: LIMITS.iconBytes, ms: 60_000, tooBig: iconTooBig } : { max: LIMITS.sourceBytes, ms: 600_000, tooBig: videoTooBig });
         const type = sniff(got.head);
         const kind = await fetchedKind(slot, type, got.bytes);
         return { url: await storeFile(kind, a.id, file, type), kind, type, bytes: got.bytes, at: got.url };
