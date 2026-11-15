@@ -22,6 +22,9 @@
 		request_body {
 			max_size 1MB
 		}
+		# The finance panel's key opens admin routes only from this machine (server/api/panel.mjs): never from outside.
+		request_header -X-Panel-Key
+		request_header -X-Panel-User
 		reverse_proxy 127.0.0.1:7890
 	}
 
@@ -43,7 +46,13 @@ panel.{$DOMAIN:130-61-230-94.sslip.io} {
 		-Server
 	}
 
-	request_body {
+	# Uygulama › Hediyeler: an icon, a video or an SVGA goes through the panel to the storage (up to 100 MB).
+	@upload path /api/app/upload
+	request_body @upload {
+		max_size 110MB
+	}
+	@other not path /api/app/upload
+	request_body @other {
 		max_size 20MB
 	}
 	reverse_proxy 127.0.0.1:4300
