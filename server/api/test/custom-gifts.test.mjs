@@ -7,13 +7,14 @@
 import { after, before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
 
-import { convertArgs } from '../custom-gifts.mjs';
+import { convertArgs, imageInfo } from '../custom-gifts.mjs';
 import { startApi } from './harness.mjs';
 
 const CDN = 'https://pub-test.r2.dev';
@@ -77,6 +78,30 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // --- Files ---------------------------------------------------------------------------------------------------
 /** A PNG of w × h: a pink disc, transparent around it (alpha) or on white (no alpha channel). */
+/** A square PNG of random colour (it doesn't compress) with a transparent ground: a detailed icon, ~4 MB at 1024. */
+function noisyPng(w) {
+  const row = w * 4 + 1;
+  const raw = crypto.randomBytes(row * w);
+  for (let y = 0; y < w; y++) {
+    raw[y * row] = 0;
+    for (let x = 0; x < w; x++) raw[y * row + 1 + x * 4 + 3] = (x - w / 2) ** 2 + (y - w / 2) ** 2 < (w / 3) ** 2 ? 255 : 0;
+  }
+  const chunk = (type, data) => {
+    const len = Buffer.alloc(4);
+    len.writeUInt32BE(data.length);
+    const body = Buffer.concat([Buffer.from(type, 'latin1'), data]);
+    const crc = Buffer.alloc(4);
+    crc.writeUInt32BE((zlib.crc32?.(body) ?? 0) >>> 0);
+    return Buffer.concat([len, body, crc]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(w, 0);
+  ihdr.writeUInt32BE(w, 4);
+  ihdr[8] = 8;
+  ihdr[9] = 6;
+  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', ihdr), chunk('IDAT', zlib.deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
+}
+
 function png(w, h, { alpha = true } = {}) {
   const bpp = alpha ? 4 : 3;
   const row = w * bpp + 1;
@@ -227,7 +252,9 @@ describe('Yönetim › Hediyeler', () => {
     }
     // Sizes and types of the kinds.
     await refused(call('POST', '/api/media/upload-url', { kind: 'gifticon', contentType: 'image/jpeg', size: 100 }, admin.session), 400, /türü/);
-    await refused(call('POST', '/api/media/upload-url', { kind: 'gifticon', contentType: 'image/png', size: 2 * 1024 * 1024 }, admin.session), 400, /1 MB/);
+    // An icon up to 10 MB (the server makes a big one smaller for phones).
+    await refused(call('POST', '/api/media/upload-url', { kind: 'gifticon', contentType: 'image/png', size: 10 * 1024 * 1024 + 1 }, admin.session), 400, /10 MB/);
+    await ok(call('POST', '/api/media/upload-url', { kind: 'gifticon', contentType: 'image/png', size: 9 * 1024 * 1024 }, admin.session), '9 MB ikon');
     // A video source up to 500 MB (a ProRes 4444 .mov is big); an SVGA up to 100 MB (read whole when converted).
     await refused(call('POST', '/api/media/upload-url', { kind: 'giftsource', contentType: 'video/webm', size: 501 * 1024 * 1024 }, admin.session), 400, /^Dosya en fazla 500 MB olabilir \(bu 501 MB\)$/);
     await ok(call('POST', '/api/media/upload-url', { kind: 'giftsource', contentType: 'video/quicktime', size: Math.round(107.3 * 1024 * 1024) }, admin.session), '107 MB MOV');
@@ -263,11 +290,45 @@ describe('Yönetim › Hediyeler', () => {
     assert.ok(c.gifts.every((x) => /^[A-Za-z0-9_-]{1,32}$/.test(x.id)));
   });
 
-  test('ikon kuralları: saydam, kare, 128–1024 piksel, PNG/WebP; ad, fiyat, raf, VIP', async () => {
+  test('büyük ikon (10 MB, 4096 piksele kadar) telefonlar için küçültülür: en çok 1024 piksel ve 1 MB, saydam; yüklenen silinir', async () => {
+    await freshAdmin();
+    // Plain: 2048 px, shrunk to 1024 px.
+    const plain = await upload(admin, 'gifticon', png(2048, 2048), 'image/png');
+    const g1 = (await ok(call('POST', '/api/admin/gifts', { name: 'İri İkon', price: 10, cat: 'hot', icon: plain }, admin.session), 'büyük ikon')).gift;
+    assert.notEqual(g1.icon, plain, 'yerine küçüğü');
+    const kept1 = stored.get(keyOfUrl(g1.icon)).body;
+    const info1 = imageInfo(kept1);
+    assert.deepEqual([info1.width, info1.height, info1.alpha], [1024, 1024, true]);
+    assert.ok(kept1.length <= 1024 * 1024);
+    // Detailed (noise): 1024 px but 4 MB, shrunk until it is at most 1 MB.
+    const noisy = await upload(admin, 'gifticon', noisyPng(1024), 'image/png');
+    assert.ok(stored.get(keyOfUrl(noisy)).body.length > 3 * 1024 * 1024);
+    const g2 = (await ok(call('POST', '/api/admin/gifts/update', { id: g1.id, icon: noisy }, admin.session), 'ayrıntılı ikon')).gift;
+    const kept2 = stored.get(keyOfUrl(g2.icon)).body;
+    const info2 = imageInfo(kept2);
+    assert.ok(kept2.length <= 1024 * 1024 && info2.width < 1024 && info2.width === info2.height && info2.alpha, `${kept2.length} B, ${info2.width} px`);
+    // An app's own gift too.
+    const forApp = await upload(admin, 'gifticon', png(2048, 2048), 'image/png');
+    const app = (await ok(call('POST', '/api/admin/gifts/update', { id: 'g6', icon: forApp }, admin.session), 'uygulama hediyesine büyük ikon')).gift;
+    assert.equal(imageInfo(stored.get(keyOfUrl(app.icon)).body).width, 1024);
+    await ok(call('POST', '/api/admin/gifts/reset', { id: 'g6', fields: ['icon'] }, admin.session), 'ikonu geri al');
+    // A small one is kept as it came; the uploads that were replaced are gone.
+    const small = await upload(admin, 'gifticon', png(256, 256), 'image/png');
+    const g3 = (await ok(call('POST', '/api/admin/gifts', { name: 'Ufak İkon', price: 10, cat: 'hot', icon: small }, admin.session), 'küçük ikon')).gift;
+    assert.equal(g3.icon, small);
+    await sleep(300);
+    for (const u of [plain, noisy, forApp]) assert.ok(!stored.has(keyOfUrl(u)), `yüklenen silindi: ${keyOfUrl(u)}`);
+    // Over 4096 px or 10 MB: refused.
+    const huge = await upload(admin, 'gifticon', png(4100, 4100), 'image/png');
+    await refused(call('POST', '/api/admin/gifts', { name: 'Dev İkon', price: 10, cat: 'hot', icon: huge }, admin.session), 400, /128–4096 piksel olmalı \(bu 4100 × 4100\)/);
+    await refused(call('POST', '/api/media/upload-url', { kind: 'gifticon', contentType: 'image/png', size: 11 * 1024 * 1024 }, admin.session), 400, /^Dosya en fazla 10 MB olabilir \(bu 11 MB\)$/);
+  });
+
+  test('ikon kuralları: saydam, kare, 128–4096 piksel, PNG/WebP; ad, fiyat, raf, VIP', async () => {
     const opaque = await upload(admin, 'gifticon', png(256, 256, { alpha: false }), 'image/png');
     await refused(call('POST', '/api/admin/gifts', { name: 'Opak', price: 10, cat: 'hot', icon: opaque }, admin.session), 400, /saydam/);
     const small = await upload(admin, 'gifticon', png(64, 64), 'image/png');
-    await refused(call('POST', '/api/admin/gifts', { name: 'Küçük', price: 10, cat: 'hot', icon: small }, admin.session), 400, /128–1024/);
+    await refused(call('POST', '/api/admin/gifts', { name: 'Küçük', price: 10, cat: 'hot', icon: small }, admin.session), 400, /128–4096/);
     const wide = await upload(admin, 'gifticon', png(512, 256), 'image/png');
     await refused(call('POST', '/api/admin/gifts', { name: 'Geniş', price: 10, cat: 'hot', icon: wide }, admin.session), 400, /kare/);
     const notPng = await upload(admin, 'gifticon', Buffer.from('bu bir resim değil'), 'image/png');
