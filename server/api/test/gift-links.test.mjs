@@ -82,12 +82,13 @@ const host = http.createServer((req, res) => {
   if (p === '/hediyeler/eski.svga') return res.writeHead(200, { 'content-type': 'application/octet-stream' }).end(ZIP);
   if (p === '/paylas') return res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }).end(PAGE_HTML);
   if (p === '/gizli-sayfa.png') return res.writeHead(200, { 'content-type': 'application/octet-stream' }).end(`\n\n   ${PAGE_HTML}${' '.repeat(200)}`);
-  if (p === '/buyuk.png') return res.writeHead(200, { 'content-type': 'image/png', 'content-length': String(3 * 1024 * 1024) }).end(Buffer.alloc(3 * 1024 * 1024));
+  // Past the icon's 10 MB, said by its length (the API stops at the header, so the body need not come).
+  if (p === '/buyuk.png') return res.writeHead(200, { 'content-type': 'image/png', 'content-length': String(11 * 1024 * 1024) }).end(Buffer.alloc(16));
   if (p === '/buyuk-parcali.png') {
     // No length given: counted while it comes, stopped past the limit.
     res.writeHead(200, { 'content-type': 'image/png' });
     res.write(ICON.subarray(0, 8));
-    for (let i = 0; i < 24; i++) res.write(Buffer.alloc(64 * 1024));
+    for (let i = 0; i < 11 * 16; i++) res.write(Buffer.alloc(64 * 1024));
     return res.end();
   }
   // A 19,5 MB video, said by its length (the API stops at the header, so the body need not come).
@@ -198,11 +199,11 @@ describe('Hediye dosyası bağlantıdan', () => {
     await refused(fetchAs(admin, 'icon', `${HOST}/hediyeler/hazir.mp4`), 400, /^Bu bağlantı bir video: ikonun değil, videonun bağlantı alanına yapıştırın$/);
   });
 
-  test("ikonun alanına yapıştırılan büyük video: 1 MB sınırı yerine bunun bir video olduğu söylenir; videonun sınırı 500 MB, SVGA'nınki 100 MB", async () => {
+  test("ikonun alanına yapıştırılan büyük video: ikonun 10 MB sınırı yerine bunun bir video olduğu söylenir; videonun sınırı 500 MB, SVGA'nınki 100 MB", async () => {
     const admin = await freshAdmin();
     await refused(fetchAs(admin, 'icon', `${HOST}/hediyeler/panda.mov`), 400, /^Bu bağlantı bir video \(19,5 MB\): ikonun değil, videonun bağlantı alanına yapıştırın$/);
     await refused(fetchAs(admin, 'icon', `${HOST}/hediyeler/parcali.mp4`), 400, /^Bu bağlantı bir video: ikonun değil, videonun bağlantı alanına yapıştırın$/);
-    await refused(fetchAs(admin, 'icon', `${HOST}/buyuk.png`), 400, /^İkon en fazla 1 MB olabilir \(bu 3 MB\)$/);
+    await refused(fetchAs(admin, 'icon', `${HOST}/buyuk.png`), 400, /^İkon en fazla 10 MB olabilir \(bu 11 MB\)$/);
     await refused(fetchAs(admin, 'video', `${HOST}/hediyeler/cok-buyuk.webm`), 400, /^Video en fazla 500 MB olabilir \(bu 501 MB\)$/);
     await refused(fetchAs(admin, 'video', `${HOST}/hediyeler/buyuk.svga`), 400, /^SVGA en fazla 100 MB olabilir \(bu 101 MB\)$/);
     // Nothing of them reached the bucket.
@@ -213,8 +214,8 @@ describe('Hediye dosyası bağlantıdan', () => {
     const admin = await freshAdmin();
     await refused(fetchAs(admin, 'icon', `${HOST}/paylas`), 400, /web sayfasını açıyor.*doğrudan indiren bağlantı/);
     await refused(fetchAs(admin, 'icon', `${HOST}/gizli-sayfa.png`), 400, /web sayfasını açıyor/);
-    await refused(fetchAs(admin, 'icon', `${HOST}/buyuk.png`), 400, /en fazla 1 MB olabilir \(bu 3 MB\)/);
-    await refused(fetchAs(admin, 'icon', `${HOST}/buyuk-parcali.png`), 400, /en fazla 1 MB/);
+    await refused(fetchAs(admin, 'icon', `${HOST}/buyuk.png`), 400, /en fazla 10 MB olabilir \(bu 11 MB\)/);
+    await refused(fetchAs(admin, 'icon', `${HOST}/buyuk-parcali.png`), 400, /en fazla 10 MB/);
     await refused(fetchAs(admin, 'icon', `${HOST}/yok.png`), 400, /404.*bulunamadı/);
     await refused(fetchAs(admin, 'icon', `${HOST}/dongu`), 400, /çok fazla yönlendiriyor/);
     const rows = (await q("SELECT detail FROM audit_events WHERE action = 'gift.fetch' AND actor = $1 ORDER BY id", [admin.user.id])).rows.map((r) => r.detail);

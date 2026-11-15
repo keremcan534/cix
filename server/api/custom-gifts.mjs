@@ -66,6 +66,7 @@ const FFMPEG = env.FFMPEG || 'ffmpeg';
 const FFPROBE = env.FFPROBE || 'ffprobe';
 const PYTHON = env.PYTHON || 'python3';
 const SVGA_TOOL = path.join(import.meta.dirname, 'tools', 'svga-to-fx.py');
+const ICON_TOOL = path.join(import.meta.dirname, 'tools', 'icon-fit.py');
 /** A conversion that fails for no reason of the file's own (storage, a restart) is tried this many times. */
 const MAX_TRIES = 3;
 
@@ -78,7 +79,10 @@ export const LIMITS = Object.freeze({
   svipMax: 10,
   iconBytes: kindMax('gifticon'),
   iconMinPx: 128,
-  iconMaxPx: 1024,
+  iconMaxPx: 4096,
+  // What phones get: a bigger icon is made smaller here (checkIcon, tools/icon-fit.py).
+  iconServePx: 1024,
+  iconServeBytes: 1024 * 1024,
   videoBytes: kindMax('giftvideo'),
   sourceBytes: kindMax('giftsource'),
   svgaBytes: kindMax('giftsource', 'application/x-svga'),
@@ -320,19 +324,45 @@ export function imageInfo(b) {
   return null;
 }
 
-/** The icon at `url`: uploaded as a gift icon, a transparent PNG or WebP, square or nearly, 128–1024 px. */
+let pillow;
+const canFitIcon = () => (pillow ??= run(PYTHON, ['-I', '-c', 'import PIL'], { timeout: 20_000 }).then((r) => r.code === 0 && fs.existsSync(ICON_TOOL)));
+
+/**
+ * The icon at `url`: uploaded as a gift icon, a transparent PNG or WebP, square or nearly, 128–4096 px, up to 10 MB.
+ * Phones load every icon of the gift panel, so one bigger than they need (over 1024 px or 1 MB) is made smaller here
+ * (tools/icon-fit.py: an optimised PNG, transparency kept). { url: the icon to keep, upload: the file it replaced,
+ * to remove once the gift is saved (null: kept as uploaded) }.
+ */
 async function checkIcon(url) {
   const key = keyOf(url);
   if (!key?.startsWith('gifticon/')) throw new HttpError(400, 'İkonu önce yükle');
   await verifyUpload(url, 'gifticon');
   // A stand-in storage (most tests) has nothing to read.
-  if (env.UPLOAD_VERIFY === '0') return;
-  const info = imageInfo(await readStored(key, LIMITS.iconBytes));
+  if (env.UPLOAD_VERIFY === '0') return { url, upload: null };
+  const buf = await readStored(key, LIMITS.iconBytes);
+  const info = imageInfo(buf);
   if (!info) throw new HttpError(400, 'İkon PNG ya da WebP olmalı');
   const { width: w, height: h } = info;
   if (Math.min(w, h) < LIMITS.iconMinPx || Math.max(w, h) > LIMITS.iconMaxPx) throw new HttpError(400, `İkon ${LIMITS.iconMinPx}–${LIMITS.iconMaxPx} piksel olmalı (bu ${w} × ${h})`);
   if (Math.max(w, h) / Math.min(w, h) > 1.25) throw new HttpError(400, `İkon kare olmalı (bu ${w} × ${h})`);
   if (!info.alpha) throw new HttpError(400, 'İkon saydam olmalı: arka planı silinmiş PNG ya da WebP yükle');
+  if (buf.length <= LIMITS.iconServeBytes && Math.max(w, h) <= LIMITS.iconServePx) return { url, upload: null };
+  const big = `İkon en fazla ${LIMITS.iconServePx} piksel ve ${mb(LIMITS.iconServeBytes)} MB olabilir`;
+  if (!(await canFitIcon())) throw new HttpError(400, `${big} (bu ${w} × ${h}, ${mb(buf.length)} MB): bu sunucu küçültemiyor`);
+  const small = await temp(async (dir) => {
+    const input = path.join(dir, 'icon');
+    const output = path.join(dir, 'small.png');
+    await fs.promises.writeFile(input, buf);
+    const r = await run(PYTHON, ['-I', ICON_TOOL, input, output, '--max-px', String(LIMITS.iconServePx), '--max-bytes', String(LIMITS.iconServeBytes)], { timeout: 60_000, keep: 4096, nice: true });
+    if (r.code !== 0) {
+      console.error('gift icon fit', r.code, r.err.slice(-300));
+      throw new HttpError(400, /too detailed/.test(r.err) ? `${big}: bu resim küçültünce de çok büyük kalıyor, daha sade bir ikon yükle` : 'İkon okunamadı: PNG ya da WebP olmalı');
+    }
+    return fs.promises.readFile(output);
+  });
+  // Under the uploader's folder, like every stored file (media.mjs FILE_KEY).
+  const smallKey = `gifticon/${key.split('/')[1]}/${Date.now().toString(36)}-${crypto.randomBytes(6).toString('base64url')}.png`;
+  return { url: await writeStored(smallKey, small, 'image/png'), upload: url };
 }
 
 /** Runs a program; resolves with its exit code, its stdout (up to `keep` bytes) and the end of its stderr. Never through a shell. */
@@ -1021,6 +1051,8 @@ async function updateApp(req, a, id, b) {
   const base = GIFTS.get(id);
   const cur = builtinGift(id);
   const next = {};
+  // An icon made smaller on save (checkIcon): the upload it replaced goes once the gift is saved.
+  let iconUpload = null;
   if (b.name !== undefined) {
     const name = nameOf(b.name);
     nameFree(name, id);
@@ -1054,8 +1086,7 @@ async function updateApp(req, a, id, b) {
       if (cur.icon) next.icon = null;
     } else if (b.icon !== cur.icon) {
       if (typeof b.icon !== 'string' || !b.icon) throw new HttpError(400, 'İkonu önce yükle');
-      await checkIcon(b.icon);
-      next.icon = b.icon;
+      ({ url: next.icon, upload: iconUpload } = await checkIcon(b.icon));
     }
   }
   const video = await videoOf(b.video);
@@ -1114,7 +1145,7 @@ async function updateApp(req, a, id, b) {
       await audited(c, a.id, 'gift.update', { gift: id, before: auditOf(r), after: auditOf(after.rows[0]), ...panelDetail(a) }, clientIp(req));
     }),
   );
-  removeFiles(drop.filter(Boolean));
+  removeFiles([...drop, iconUpload].filter(Boolean));
   await refreshCustomGifts();
   if (video?.kind === 'source') kickJobs();
   return { gift: await oneGift(id) };
@@ -1141,7 +1172,7 @@ export const customGiftRoutes = {
     if (b.enabled !== undefined && typeof b.enabled !== 'boolean') throw new HttpError(400, 'Açık/kapalı geçersiz');
     nameFree(name, null);
     if (typeof b.icon !== 'string' || !b.icon) throw new HttpError(400, 'İkonu önce yükle');
-    await checkIcon(b.icon);
+    const icon = await checkIcon(b.icon);
     const video = await videoOf(b.video ?? null);
     const stacked = video?.kind === 'stacked' ? video : null;
     const iconLink = linkField(b.iconLink) ?? null;
@@ -1154,13 +1185,14 @@ export const customGiftRoutes = {
           `INSERT INTO custom_gifts (id, name, emoji, price, cat, min_svip, sort, enabled, icon_url, video_url, video_bytes, video_ms, video_v, job_status, job_source, job_fill,
                                      created_by, updated_by, icon_link, video_link)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $17, $18, $19) RETURNING *`,
-          [id, name, emoji, price, cat, minSvip, first, b.enabled !== false, b.icon, stacked?.url ?? null, stacked?.bytes ?? null, stacked?.ms ?? null, stacked?.v ?? null,
+          [id, name, emoji, price, cat, minSvip, first, b.enabled !== false, icon.url, stacked?.url ?? null, stacked?.bytes ?? null, stacked?.ms ?? null, stacked?.v ?? null,
             video?.kind === 'source' ? 'processing' : null, video?.kind === 'source' ? video.url : null, video?.kind === 'source' ? video.fill : null, a.id, iconLink, videoLink],
         );
         await audited(c, a.id, 'gift.create', { gift: id, before: null, after: auditOf(r.rows[0]), ...panelDetail(a) }, clientIp(req));
         return id;
       }),
     );
+    if (icon.upload) removeFiles([icon.upload]);
     await refreshCustomGifts();
     if (video?.kind === 'source') kickJobs();
     return { gift: await oneGift(id) };
@@ -1192,10 +1224,10 @@ export const customGiftRoutes = {
       if (typeof b.enabled !== 'boolean') throw new HttpError(400, 'Açık/kapalı geçersiz');
       next.enabled = b.enabled;
     }
+    let iconUpload = null;
     if (b.icon !== undefined && b.icon !== cur.icon) {
       if (typeof b.icon !== 'string' || !b.icon) throw new HttpError(400, 'İkonu önce yükle');
-      await checkIcon(b.icon);
-      next.icon = b.icon;
+      ({ url: next.icon, upload: iconUpload } = await checkIcon(b.icon));
     }
     const video = await videoOf(b.video);
     // A new icon or video takes the link it came with (none: it was uploaded); a link may also change alone.
@@ -1252,8 +1284,8 @@ export const customGiftRoutes = {
         await audited(c, a.id, 'gift.update', { gift: id, before: auditOf(r), after: auditOf(after.rows[0]), ...panelDetail(a) }, clientIp(req));
       }),
     );
-    // A file the gift still holds (the same one sent again) is kept by media.mjs.
-    removeFiles(drop.filter(Boolean));
+    // A file the gift still holds (the same one sent again) is kept by media.mjs; an icon made smaller replaced its upload.
+    removeFiles([...drop, iconUpload].filter(Boolean));
     await refreshCustomGifts();
     if (video?.kind === 'source') kickJobs();
     return { gift: await oneGift(id) };

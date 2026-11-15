@@ -56,7 +56,8 @@ const KINDS = {
   // Yönetim › Hediyeler (custom-gifts.mjs), admins only: a gift's icon (a transparent PNG or WebP), its ready stacked
   // video, or a transparent source the server turns into one (a WebM, a ProRes .mov or an SVGA animation). The
   // company's files, like a notice's picture.
-  gifticon: { types: ['image/png', 'image/webp'], max: 1024 * 1024, admin: true },
+  // An icon up to 10 MB: custom-gifts.mjs makes one over 1024 px or 1 MB smaller for phones.
+  gifticon: { types: ['image/png', 'image/webp'], max: 10 * 1024 * 1024, admin: true },
   giftvideo: { types: ['video/mp4'], max: 12 * 1024 * 1024, admin: true },
   // A video source may be big (a ProRes 4444 .mov with alpha is about 100 MB for 10 s even at the app's 540 × 960);
   // an SVGA stays at 100 MB: the converter reads it whole (tools/svga-to-fx.py).
