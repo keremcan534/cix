@@ -118,7 +118,9 @@ describe('Emoji ve çıkartma paketleri', () => {
     );
     // Free, so nobody loses a purchase; no paid pack is retired.
     for (const p of STICKER_PACKS.filter((x) => x.retired)) assert.ok(!p.price && !p.minVip, p.name);
-    assert.match(read('app/magaza.tsx'), /STICKER_PACKS\.filter\(\(p\) => !p\.roomOnly && !p\.retired\)/);
+    // The shop lists the packs as Yönetim › Emojiler has them (lib/live/emoji-live), the retired ones left out.
+    assert.match(read('app/magaza.tsx'), /stickerPacks = livePacks\(/);
+    assert.match(read('app/magaza.tsx'), /stickerPacks\.filter\(\(p\) => !p\.roomOnly && !p\.retired/);
     const art = read('components/ReactionArt.tsx');
     for (const x of STICKER_PACKS.find((p) => p.id === 'basic')!.stickers) assert.ok(art.includes(`'${x.id}': require(`), x.id);
   });

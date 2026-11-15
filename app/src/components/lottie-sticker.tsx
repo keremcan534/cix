@@ -6,7 +6,7 @@ import { Text } from '@/components/text';
 /** How an animated sticker plays: still (its first frame), once, or over and over. */
 export type StickerPlay = 'still' | 'once' | 'loop';
 export type LottieStickerProps = {
-  /** The animation (its JSON, as `require` gives it). */
+  /** The animation: its JSON, as `require` gives it, or { uri } of one the server keeps (Yönetim › Emojiler). */
   source: object;
   size: number;
   play: StickerPlay;

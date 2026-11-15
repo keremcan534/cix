@@ -9,12 +9,16 @@
 // for one. A new one goes into SRC below together with its pack (data/catalog, and server/api/catalog.mjs for a sold
 // pack). The Penguen pack moves on every phone and the web: each sticker is a sheet of frames and a still (SPRITES,
 // components/sprite-sticker), made from the designer's animated WebPs.
+// Yönetim › Emojiler (server/api/emoji.mjs) may give a sticker another picture, or add stickers of its own, with no app
+// update: their address comes with the catalog (lib/live/emoji-live stickerArt), a PNG/WebP drawn as an image or a
+// Lottie animation played like the Duygular ones; such a picture wins over the app's own. Names and emoji come from
+// there too.
 import { Image, StyleSheet, View, type StyleProp, type TextStyle } from 'react-native';
 
 import { Text } from '@/components/text';
 import { LottieSticker, type StickerPlay } from '@/components/lottie-sticker';
 import { SpriteSticker, type SpriteArt } from '@/components/sprite-sticker';
-import { stickerById } from '@/data/catalog';
+import { liveSticker, stickerArt } from '@/lib/live/emoji-live';
 import { bigEmojiSize, emojiOnlyCount, emojiRuns } from '@/lib/emoji-text';
 import { mentionRuns } from '@/lib/room-mention';
 import { MIRRORED_ART, MOVE_ART } from '@/lib/room-moves';
@@ -222,8 +226,11 @@ const SPRITES: Record<string, SpriteArt> = {
   'penguen-cosku': { sheet: require('../../assets/reactions/penguen/penguen-cosku-kareler.webp'), still: require('../../assets/reactions/penguen/penguen-cosku.webp'), frames: 24, cols: 5, frameMs: 85 },
 };
 
-/** Whether a sticker moves (an animation or a sheet of frames, not a picture). */
-export const isAnimatedSticker = (id: string) => id in ANIM || id in SPRITES;
+/** Whether a sticker moves (an animation or a sheet of frames, not a picture); a picture from the server decides for it. */
+export const isAnimatedSticker = (id: string) => {
+  const art = stickerArt(id);
+  return art ? art.kind === 'lottie' : id in ANIM || id in SPRITES;
+};
 
 export const REACTION_TAB_ANIMATED = require('../../assets/reactions/tepki-sekme-hareketli.png');
 export const EMOJI_PACKS_ICON = require('../../assets/reactions/magaza-emoji-paketleri.png');
@@ -231,10 +238,18 @@ export const EMOJI_PACKS_ICON = require('../../assets/reactions/magaza-emoji-pak
 export const stickerArtOf = (id: string): number | undefined => SRC[id] ?? SPRITES[id]?.still;
 
 /** The stickers of a stickers-only message (at most 3), or null for anything else. */
-export const stickersOf = (text: string) => matchStickers(text, (id) => id in SRC || id in ANIM || id in SPRITES);
+export const stickersOf = (text: string) => matchStickers(text, (id) => id in SRC || id in ANIM || id in SPRITES || !!stickerArt(id));
 
 /** Text for previews (inbox, notifications): sticker tokens become their names. */
-export const messagePreview = (text: string) => stickerText(text, (id) => stickerById(id)?.name);
+export const messagePreview = (text: string) => stickerText(text, (id) => liveSticker(id)?.name);
+
+/** One source object per address, so an image or animation isn't handed a new source on every render. */
+const remoteSources = new Map<string, { uri: string }>();
+const remoteSource = (uri: string) => {
+  let s = remoteSources.get(uri);
+  if (!s) remoteSources.set(uri, (s = { uri }));
+  return s;
+};
 
 export type { StickerPlay };
 
@@ -253,7 +268,11 @@ export function StickerArt({ id, size, play = 'still' }: { id: string; size: num
 function StickerFace({ id, size, play }: { id: string; size: number; play: StickerPlay }) {
   const src = SRC[id];
   // A catalog sticker, or one of the pictures a Hamle plays (lib/room-moves).
-  const sticker = stickerById(id) ?? MOVE_ART[id];
+  const sticker = liveSticker(id) ?? MOVE_ART[id];
+  // A picture from Yönetim › Emojiler: an admin's sticker, or one of the app's given another.
+  const remote = stickerArt(id);
+  if (remote?.kind === 'lottie') return <LottieSticker source={remoteSource(remote.url)} size={size} play={play} label={sticker?.name} fallback={sticker?.emoji ?? '❔'} />;
+  if (remote) return <Image source={remoteSource(remote.url)} style={{ width: size, height: size }} resizeMode="contain" accessibilityLabel={sticker?.name} accessibilityIgnoresInvertColors />;
   const sprite = SPRITES[id];
   if (sprite) return <SpriteSticker art={sprite} size={size} play={play} label={sticker?.name} />;
   const anim = ANIM[id];

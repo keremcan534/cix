@@ -56,6 +56,7 @@ import { giftRoutes } from './gifts.mjs';
 import { auditPanel, panelOf, panelUser } from './panel.mjs';
 import { sendArt } from './art.mjs';
 import { customGiftRoutes, refreshCustomGifts, sendCustomFx, startCustomGifts, stopCustomGifts } from './custom-gifts.mjs';
+import { emojiRoutes, refreshEmoji, startEmoji, stopEmoji } from './emoji.mjs';
 import { FX_PATH, sendFx } from './fx.mjs';
 import { jetonRoutes } from './jeton.mjs';
 import { liveRoutes } from './live.mjs';
@@ -301,6 +302,7 @@ const routes = {
   ...pushRoutes,
   ...giftRoutes,
   ...customGiftRoutes,
+  ...emojiRoutes,
   ...backpackRoutes,
   ...pkRoutes,
   ...crossPkRoutes,
@@ -493,6 +495,7 @@ function shutdown(signal) {
   stopBossSweep();
   stopStaffSweep();
   stopCustomGifts();
+  stopEmoji();
   server.close();
   const started = Date.now();
   const wait = setInterval(async () => {
@@ -508,6 +511,7 @@ process.on('SIGINT', () => shutdown('SIGINT'));
 await migrate();
 await refreshLive();
 await refreshCustomGifts();
+await refreshEmoji();
 server.listen(PORT, '127.0.0.1', () => console.log(`api on 127.0.0.1:${PORT} version ${VERSION}${TEST_TOPUP ? ' (test top-up on)' : ''}`));
 startFinanceSync();
 startRefundSync();
@@ -523,3 +527,4 @@ startEventSweep();
 startBossSweep();
 startStaffSweep();
 startCustomGifts();
+startEmoji();

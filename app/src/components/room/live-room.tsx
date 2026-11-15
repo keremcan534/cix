@@ -90,7 +90,7 @@ import { useRoomBonds } from '@/components/room/room-bonds';
 import { BOND_KINDS, bondTint, bubbleBondOf, jointEntries, micLinkOf, roomBondKey, type JointState, type RoomBond } from '@/data/bonds';
 import { Avatar } from '@/components/ui';
 import { AGENCIES } from '@/data/agency';
-import { BOSS_SEAT_MIN_LEVEL, COSMETICS, MUSIC_CATALOG, STANDARD_EMOJI, STICKER_PACKS, adminCapacity, cosmeticById, djCapacity, memberLimit, micCapacity, roomCode, roomLevel, roomTypeInfo, ROOM_LEVEL_REWARDS, type RoomTheme, type Track } from '@/data/catalog';
+import { BOSS_SEAT_MIN_LEVEL, COSMETICS, MUSIC_CATALOG, STANDARD_EMOJI, adminCapacity, cosmeticById, djCapacity, memberLimit, micCapacity, roomCode, roomLevel, roomTypeInfo, ROOM_LEVEL_REWARDS, type RoomTheme, type Track } from '@/data/catalog';
 import { FAMILIES, INCOMING_GIFT_POOL, vipTier } from '@/data/economy';
 import { GATES, nobleInfo } from '@/data/status';
 import { LUCKY_RECIPIENT_SHARE, RULES, luckyHostDiamonds, pct } from '@/data/rules';
@@ -99,6 +99,7 @@ import * as api from '@/lib/api';
 import { isLiveRoom, isLockedRoom, liveGift, liveMode, liveRoomAnimation, message as errorText, myServerId, putRoomAnswer, refreshServerRoom, rememberUser, toLocal, toServer, updateServerRoom } from '@/lib/live';
 import { liveBackpackGift } from '@/lib/live/backpack';
 import { giftById, refreshLiveCatalog } from '@/lib/live/catalog-live';
+import { liveSticker } from '@/lib/live/emoji-live';
 import { useLiveRoomSync } from '@/lib/live/room';
 import { useRoomTop } from '@/lib/live/room-contrib';
 import { onServerLook, onServerRoom, sendSignal, useBossNews, useLivePeers, type LuckySignal, type RoomSignal } from '@/lib/live/room-bus';
@@ -252,10 +253,10 @@ function entryShowOf(look: Look | undefined, name: string, avatar: string): Entr
 // What another phone may put over its seat: a sticker of a known pack, or a standard emoji an older app's panel had
 // (no free text, no unknown art).
 const SEAT_EMOJI = new Set(STANDARD_EMOJI.flatMap((g) => g.emojis));
-const STICKER_IDS = new Set(STICKER_PACKS.flatMap((p) => p.stickers.map((x) => x.id)));
+// A sticker the phone knows: the app's own, or one Yönetim › Emojiler added (lib/live/emoji-live).
 const seatEmojiOk = (e: string) => {
   const sticker = stickerIdOf(e);
-  return sticker ? STICKER_IDS.has(sticker) : SEAT_EMOJI.has(e);
+  return sticker ? !!liveSticker(sticker) : SEAT_EMOJI.has(e);
 };
 /** Lv8 joint entrance banner: both photos, the bond named ("Çift Lv8"); me first when I am one of the two. */
 function jointShowOf(b: RoomBond, myAvatar: string): EntryShow {

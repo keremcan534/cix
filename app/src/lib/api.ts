@@ -456,8 +456,8 @@ export type CatalogBody = {
   v?: number;
 };
 /** Gift prices, counts, coin packs and SVIP thresholds as the server charges them (no sign-in needed; gifts=2: the
- *  app's own gifts as changed in Yönetim › Hediyeler too, lib/live/catalog-live). */
-export const catalog = () => call<CatalogBody>('GET', '/api/catalog?gifts=2');
+ *  app's own gifts as changed in Yönetim › Hediyeler too; emoji=1: the emoji panel's packs, lib/live/catalog-live). */
+export const catalog = () => call<CatalogBody>('GET', '/api/catalog?gifts=2&emoji=1');
 /** Where a gift outside a room was sent from (Gelir's sources on the server). */
 export type GiftPlace = 'chat' | 'moment' | 'profile' | 'family';
 /**

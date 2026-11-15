@@ -20,6 +20,7 @@
 // Feature 'shop' (features.mjs ROUTES) stops buys and the old-app spend; reads, equip and looks stay open.
 import { HttpError, REF, UUID, auth, claimRef, clientIp, db, env, int, limit, once, readJson, text, tx, userId } from './core.mjs';
 import { FREE_MICFX, MAX_AHEAD_DAYS, PAID_ONLY, SHOP, SHOP_PAUSED, SLOTS, labelOf, vipLevelOf } from './catalog.mjs';
+import { packByName, packItem, packSkus } from './emoji.mjs';
 import { live } from './live-settings.mjs';
 // live.mjs imports rooms.mjs, which imports this file; the functions are only used inside handlers.
 import { roomPacket, roomService } from './live.mjs';
@@ -152,10 +153,12 @@ const boughtWith = async (uid, ref) =>
 
 /**
  * What may be bought now: the catalog minus the live shop_hidden set and the items no longer sold (catalog.mjs
- * SHOP_PAUSED); special IDs only once SHOP_SPECIAL_IDS=1.
+ * SHOP_PAUSED); special IDs only once SHOP_SPECIAL_IDS=1. A sticker pack ('pack-<id>') as Yönetim › Emojiler has it
+ * now (emoji.mjs packItem: its price there, the admins' own packs too).
  */
 export function sellable(sku) {
-  const item = typeof sku === 'string' ? SHOP.get(sku) : undefined;
+  const pack = packItem(sku);
+  const item = pack !== undefined ? pack : typeof sku === 'string' ? SHOP.get(sku) : undefined;
   if (!item || live().shopHidden.has(sku) || SHOP_PAUSED.has(sku)) return null;
   if (item.kind === 'specialId' && env.SHOP_SPECIAL_IDS !== '1') return null;
   return item;
@@ -188,7 +191,10 @@ export async function economyOf(uid, q = db) {
   const iso = (t) => (t === null ? null : new Date(t).toISOString());
   return {
     serverNow: iso(st.now),
-    shop: [...SHOP.values()].filter((x) => sellable(x.sku)).map(({ sku, kind, name, price, days, minVip }) => ({ sku, kind, name, price, days, minVip })),
+    shop: [...[...SHOP.keys()].filter((sku) => !sku.startsWith('pack-')), ...packSkus()]
+      .map(sellable)
+      .filter(Boolean)
+      .map(({ sku, kind, name, price, days, minVip }) => ({ sku, kind, name, price, days, minVip })),
     items: [...st.items.values()].map((x) => ({ sku: x.sku, kind: x.kind, until: iso(x.until) })),
     equipped: wornOf(u.equipped, (slot, sku) => st.items.get(sku)?.kind === slot),
     noble: st.noble && { tier: st.noble.tier, until: iso(st.noble.until) },
@@ -310,6 +316,8 @@ export function itemOfReason(reason) {
   for (const [p, kinds] of PREFIX) {
     if (!reason.startsWith(p)) continue;
     const name = reason.slice(p.length).replace(/\s*\(\d+ gün\)$/, '').trim();
+    // A sticker pack by its name now (Yönetim › Emojiler) or the app's name for it: what this server sells it at.
+    if (kinds.includes('sticker')) return packByName(name);
     const renamed = kinds.includes('noble') ? OLD_NOBLE : OLD_SHOP;
     const old = Object.hasOwn(renamed, name) ? SHOP.get(renamed[name]) : null;
     return (old && kinds.includes(old.kind) ? old : null) ?? [...SHOP.values()].find((x) => kinds.includes(x.kind) && x.name === name) ?? null;
@@ -325,7 +333,7 @@ const itemOf = (e, now) => ({
   userId: e.user_id,
   sku: e.sku,
   kind: e.kind,
-  name: SHOP.get(e.sku)?.name ?? e.sku,
+  name: SHOP.get(e.sku)?.name ?? packItem(e.sku, { any: true })?.name ?? e.sku,
   tier: e.tier,
   price: Number(e.price),
   startsAt: e.starts_at,
@@ -443,7 +451,9 @@ export const economyRoutes = {
     const a = await admin(req);
     const b = await readJson(req);
     const id = userId(b.userId);
-    const item = typeof b.sku === 'string' ? SHOP.get(b.sku) : undefined;
+    // A sticker pack as Yönetim › Emojiler has it (the admins' own too, a free one too); anything else from the shop.
+    const pack = packItem(b.sku, { any: true });
+    const item = pack !== undefined ? pack : typeof b.sku === 'string' ? SHOP.get(b.sku) : undefined;
     if (!item) throw new HttpError(400, 'Bilinmeyen ürün');
     let days = item.days;
     if (b.days !== undefined && b.days !== null) {

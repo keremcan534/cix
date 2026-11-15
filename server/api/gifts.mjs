@@ -1,6 +1,6 @@
 // Gifts at the server's price, and the rankings they feed.
 //
-//   GET  /api/catalog[?gifts=2]                                   → { gifts, counts, packs, vipPlans, svipXp, purchases, campaign, exchange, fx, v }
+//   GET  /api/catalog[?gifts=2][&emoji=1]                         → { gifts, counts, packs, vipPlans, svipXp, purchases, campaign, exchange, fx, v, emoji? }
 //   POST /api/gifts/send  { to, giftId, count, price?, room?, place?, ref } → { user, replay, total }  (place: chat|moment|profile|family)
 //   GET  /api/rankings?board=wealth|charm|agency&period=day|week|month → { rows }  (agency: rows carry agency, not user)
 //
@@ -25,6 +25,7 @@ import { addBondCoins } from './bonds.mjs';
 import { HttpError, auth, blockedBetween, claimRef, db, int, once, readJson, userId } from './core.mjs';
 import { EXCHANGE, GIFT_COUNTS, PACKS, SVIP_XP, VIP_SUBS, svipLevel } from './catalog.mjs';
 import { catalogGifts, checkShownPrice, customGiftsRev, giftFx, giftOf, replacedClips } from './custom-gifts.mjs';
+import { emojiCatalog, emojiRev } from './emoji.mjs';
 import { fxCatalog } from './fx.mjs';
 import { live } from './live-settings.mjs';
 import { scorePkGift } from './pk.mjs';
@@ -106,8 +107,10 @@ export const giftRoutes = {
       exchange: { usdTry: s.usdTry, minDiamonds: EXCHANGE.minDiamonds },
       // The gift and entry videos the phones download and keep (fx.mjs, and the admins' gifts'); an older app ignores it.
       fx: [...fxCatalog(s.giftsHidden, replacedClips()), ...giftFx(s.giftsHidden)],
-      // Grows with every live settings save and every change to the admins' gifts (as /api/config's).
-      v: s.v + customGiftsRev(),
+      // The emoji panel's packs and stickers as they are now (emoji.mjs): only for an app that asks (emoji=1).
+      ...(url?.searchParams.get('emoji') === '1' ? { emoji: emojiCatalog() } : {}),
+      // Grows with every live settings save and every change in Yönetim › Hediyeler and Emojiler (as /api/config's).
+      v: s.v + customGiftsRev() + emojiRev(),
     };
   },
 

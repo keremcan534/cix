@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { Appearance as SystemAppearance, useColorScheme } from 'react-native';
 
 import { agencyByCode, type AgencyRole } from '@/data/agency';
-import { COSMETICS, FREE_PACK_IDS, ROOM_THEMES, ROOM_TYPES, STICKER_PACKS, type CosmeticKind, type RoomTheme, type RoomType, type TicketCategory } from '@/data/catalog';
+import { COSMETICS, FREE_PACK_IDS, ROOM_THEMES, ROOM_TYPES, type CosmeticKind, type RoomTheme, type RoomType, type TicketCategory } from '@/data/catalog';
 import {
   CHECKIN_REWARDS,
   TASKS,
@@ -29,6 +29,7 @@ import { setHapticsEnabled } from '@/lib/haptics';
 import { setNoiseSuppression, setRawMic } from '@/lib/room-session';
 import { CONVERSATIONS, ME, isServerId, type Conversation, type EventShareCard, type RoomInviteCard, type User } from '@/data/mock';
 import { giftById } from '@/lib/live/catalog-live';
+import { livePack } from '@/lib/live/emoji-live';
 import type { ServerEarnings, ServerUser } from '@/lib/api';
 import { block as serverBlock, follow } from '@/lib/api';
 import { bindWallet, forgetLiveAccount, liveEquip, liveMode, liveSpend, myServerId, rememberUser, toLocal, toServer } from '@/lib/live';
@@ -933,12 +934,14 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       liveEquip(kind, id);
     },
     emojiPacks,
+    // The packs as Yönetim › Emojiler has them now (lib/live/emoji-live): its price, VIP level and name; one made free
+    // there is open to all, and a pack bought or free before stays open.
     packUnlocked: (id) => {
-      const pack = STICKER_PACKS.find((p) => p.id === id);
+      const pack = livePack(id);
       return !!pack && (emojiPacks.has(id) || (!pack.price && !pack.minVip) || (!!pack.minVip && vipLevel >= pack.minVip));
     },
     buyEmojiPack: (id) => {
-      const pack = STICKER_PACKS.find((p) => p.id === id);
+      const pack = livePack(id);
       if (!pack) return 'Paket bulunamadı';
       if (emojiPacks.has(id)) return 'Zaten sahipsin';
       if (pack.minVip && vipLevel < pack.minVip) return `VIP ${pack.minVip} ile açılır`;

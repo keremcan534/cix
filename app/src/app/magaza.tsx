@@ -14,8 +14,10 @@ import { AnimatedFrame, type FrameFx } from '@/components/fx/frames';
 import { SCENES } from '@/components/fx/scenes';
 import { Backdrop, EdgeLight, PressableScale, glassChipOf } from '@/components/fx/surface';
 import { CoinPill, Header } from '@/components/ui';
-import { COSMETICS, COSMETIC_KINDS, STICKER_PACKS, type Cosmetic, type CosmeticKind } from '@/data/catalog';
+import { COSMETICS, COSMETIC_KINDS, type Cosmetic, type CosmeticKind } from '@/data/catalog';
 import { showAlert } from '@/lib/alert';
+import { useLiveCatalog } from '@/lib/live/catalog-live';
+import { livePacks } from '@/lib/live/emoji-live';
 import { useApp } from '@/store';
 import { fonts, makeStyles, useTheme } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
@@ -28,6 +30,8 @@ type Tab = CosmeticKind | 'emoji';
 
 export default function StoreScreen() {
   const { coins, inventory, equipped, buyCosmetic, equip, packUnlocked, buyEmojiPack, vipLevel, settings, me } = useApp();
+  // The sticker packs as Yönetim › Emojiler has them now (name, price, VIP level, order, the admins' own).
+  const stickerPacks = livePacks(useLiveCatalog());
   const [tab, setTab] = useState<Tab>('frame');
   const [preview, setPreview] = useState<EntryShow | null>(null);
   const t = useTheme();
@@ -85,7 +89,7 @@ export default function StoreScreen() {
       <ScrollView contentContainerStyle={styles.grid}>
         {tab === 'emoji' && <Text style={styles.freeNote}>Standart emojiler herkese ücretsiz. Buradaki paketler özel çizim çıkartmalardır.</Text>}
         {tab === 'emoji'
-          ? STICKER_PACKS.filter((p) => !p.roomOnly && !p.retired).map((p, i) => {
+          ? stickerPacks.filter((p) => !p.roomOnly && !p.retired && p.stickers.length > 0).map((p, i) => {
               const owned = packUnlocked(p.id);
               const hue = hueAt(i + 2);
               return (
