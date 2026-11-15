@@ -28,6 +28,7 @@ export const PANEL_ROUTES = new Set([
   'POST /api/admin/gifts/update',
   'POST /api/admin/gifts/delete',
   'POST /api/admin/gifts/order',
+  'POST /api/admin/gifts/fetch',
   'POST /api/media/upload-url',
   // Para çekme (withdraw.mjs).
   'GET /api/admin/withdrawals',

@@ -198,6 +198,47 @@ export async function downloadStored(key, file, max) {
   return n;
 }
 
+/** A new storage key for a `kind` file of `uid`: not guessable, grouped by person (an account's files are found and
+ *  removed together), ending as its type says. */
+const newKey = (kind, uid, type) => `${kind}/${uid}/${Date.now().toString(36)}-${crypto.randomBytes(9).toString('base64url')}.${TYPES[type] ?? AUDIO[type]}`;
+
+/**
+ * A file on disk put in the storage as a `kind` file of `uid`, held to the kind's types and size like an upload
+ * (custom-gifts.mjs: a gift's file fetched from a link). Streamed with its length; resolves with its stored address.
+ */
+export async function storeFile(kind, uid, file, type) {
+  const k = KINDS[kind];
+  if (!k || !k.types.includes(type)) throw new HttpError(400, 'Bu dosya türü yüklenemez');
+  const size = (await fs.promises.stat(file)).size;
+  if (size < 1 || size > k.max) throw new HttpError(400, `Dosya en fazla ${k.max / 1024 / 1024} MB olabilir`);
+  if (!storageOn()) throw new HttpError(503, 'Dosya deposu ayarlı değil');
+  const key = newKey(kind, uid, type);
+  const url = presign({
+    method: 'PUT',
+    url: `${endpointOf()}/${env.S3_BUCKET}/${key}`,
+    region: env.S3_REGION ?? 'auto',
+    accessKey: env.S3_KEY,
+    secretKey: env.S3_SECRET,
+    expires: 300,
+    headers: { 'content-length': String(size) },
+  });
+  let res;
+  try {
+    res = await fetch(url, {
+      method: 'PUT',
+      headers: { 'content-type': type, 'content-length': String(size) },
+      body: Readable.toWeb(fs.createReadStream(file)),
+      duplex: 'half',
+      signal: AbortSignal.timeout(300_000),
+    });
+  } catch {
+    throw unreachable();
+  }
+  await res.body?.cancel().catch(() => {});
+  if (!res.ok) throw unreachable();
+  return storedUrl(key);
+}
+
 /** Puts `body` (a Buffer) in the storage under `key` with a signed PUT; resolves with its stored address. */
 export async function writeStored(key, body, type) {
   const url = presign({
@@ -475,8 +516,7 @@ export const mediaRoutes = {
     if (k.may && !(await k.may(u.id))) throw new HttpError(403, k.refused);
     if (!k.types.includes(contentType)) throw new HttpError(400, 'Bu dosya türü yüklenemez');
     if (!Number.isSafeInteger(size) || size < 1 || size > k.max) throw new HttpError(400, `Dosya en fazla ${k.max / 1024 / 1024} MB olabilir`);
-    // Not guessable, and grouped by person so an account's files can be found (and removed) together.
-    const key = `${kind}/${u.id}/${Date.now().toString(36)}-${crypto.randomBytes(9).toString('base64url')}.${TYPES[contentType] ?? AUDIO[contentType]}`;
+    const key = newKey(kind, u.id, contentType);
     // The address and the size are signed, the type isn't: Expo's fetch on the phone sends a file with the
     // file's own type, which is empty for a file read from the phone, and the storage refused that against a
     // signed type (403). The type is checked where the file is used (verifyUpload). It still goes back for the
