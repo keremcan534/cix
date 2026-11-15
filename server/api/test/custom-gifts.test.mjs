@@ -14,7 +14,7 @@ import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
 
-import { convertArgs, imageInfo } from '../custom-gifts.mjs';
+import { convertArgs, imageInfo, visibleBox } from '../custom-gifts.mjs';
 import { startApi } from './harness.mjs';
 
 const CDN = 'https://pub-test.r2.dev';
@@ -543,6 +543,66 @@ describe('Yönetim › Hediyeler', () => {
       assert.match(failed.job.error, re);
       assert.equal(failed.video.url, done.video.url);
     }
+  });
+
+  test('eski varsayılan boyutta (%60) çevrilmiş video bir kez tam ekrana büyür; başka boyuttakine ve değişmişine dokunulmaz', { skip: NO_SVGA }, async () => {
+    /** The share of the 540 × 960 frame the video at `url` (this server's) ever shows. */
+    const shown = async (url) => {
+      const file = path.join(dir, `olc-${crypto.randomBytes(4).toString('hex')}.mp4`);
+      fs.writeFileSync(file, Buffer.from(await (await fetch(`${h.base}${url}`)).arrayBuffer()));
+      const box = await visibleBox(file, 540, 960);
+      return { w: box.w / 540, h: box.h / 960 };
+    };
+    const row = async (id) => (await q('SELECT video_url, video_enlarge FROM custom_gifts WHERE id = $1', [id])).rows[0];
+    await freshAdmin();
+    // Made as before Tam ekran was the default: the SVGA's visible part 60 % of the width.
+    const g = await newGift();
+    const src = await upload(admin, 'giftsource', svga(30), 'application/x-svga');
+    await ok(call('POST', '/api/admin/gifts/update', { id: g.id, video: { url: src, kind: 'source', fill: 0.6 } }, admin.session), 'svga %60');
+    const small = await settled(g.id, 120_000);
+    assert.equal(small.job, null, JSON.stringify(small.job));
+    const was = await shown(small.video.url);
+    assert.ok(Math.abs(was.w - 0.6) < 0.03, `önce ${JSON.stringify(was)}`);
+    // The database keeps S3_PUBLIC_URL/<key>.
+    const keyIn = (url) => url.slice(CDN.length + 1);
+    const oldFile = keyIn((await row(g.id)).video_url);
+    assert.ok(stored.has(oldFile));
+    // Not that size: a ready stacked MP4 (the box moving across most of the frame).
+    const other = await newGift();
+    const ready = await upload(admin, 'giftvideo', fs.readFileSync(files.stacked), 'video/mp4');
+    await ok(call('POST', '/api/admin/gifts/update', { id: other.id, video: { url: ready, kind: 'stacked' } }, admin.session), 'hazır video');
+    const otherUrl = (await settled(other.id)).video.url;
+    // A mark naming a video replaced since: it just goes.
+    const third = await newGift();
+    const thirdVideo = await upload(admin, 'giftsource', svga(30), 'application/x-svga');
+    await ok(call('POST', '/api/admin/gifts/update', { id: third.id, video: { url: thirdVideo, kind: 'source', fill: 0.6 } }, admin.session), 'üçüncü');
+    const thirdUrl = (await settled(third.id, 120_000)).video.url;
+
+    // As migration 074 marks the videos there at the time.
+    await q('UPDATE custom_gifts SET video_enlarge = video_url WHERE id = ANY($1)', [[g.id, other.id]]);
+    await q("UPDATE custom_gifts SET video_enlarge = 'https://eski.example/giftvideo/x/y.mp4' WHERE id = $1", [third.id]);
+    const end = Date.now() + 60_000;
+    let big;
+    while (!(big = (await panel()).gifts.find((x) => x.id === g.id && x.video.url !== small.video.url)) && Date.now() < end) await sleep(200);
+    assert.ok(big, 'büyütüldü');
+    const now = await shown(big.video.url);
+    assert.ok(now.w > 0.95 && now.h <= 1, `sonra ${JSON.stringify(now)}`);
+    assert.ok(Math.abs(big.video.ms - small.video.ms) <= 100, `${small.video.ms} → ${big.video.ms} ms`);
+    assert.ok(big.video.bytes > 0 && big.video.bytes <= 12 * 1024 * 1024);
+    // The phones get the new one (the catalog lists it with a new version); the old file goes; the mark goes.
+    assert.ok((await settled(g.id)).video.url === big.video.url);
+    assert.ok((await catalog()).fx.some((x) => x.id === g.id && x.url === big.video.url));
+    await sleep(300);
+    for (const id of [g.id, other.id, third.id]) assert.equal((await row(id)).video_enlarge, null, `${id}: işaret kalmadı`);
+    assert.ok(!stored.has(oldFile), 'eski dosya silindi');
+    assert.ok(stored.has(keyIn((await row(g.id)).video_url)), 'yenisi depoda');
+    const audit = (await q("SELECT detail FROM audit_events WHERE action = 'gift.video_enlarged' AND detail->>'gift' = $1", [g.id])).rows;
+    assert.equal(audit.length, 1);
+    assert.ok(Math.abs(audit[0].detail.visible[0] - 324) <= 12, JSON.stringify(audit[0].detail));
+    // The others as they were.
+    assert.equal((await settled(other.id)).video.url, otherUrl);
+    assert.equal((await settled(third.id)).video.url, thirdUrl);
+    assert.equal((await q("SELECT count(*)::int AS n FROM audit_events WHERE action = 'gift.video_enlarged' AND detail->>'gift' = ANY($1)", [[other.id, third.id]])).rows[0].n, 0);
   });
 
   test('silinen hediye raflardan ve panelden kalkar, dosyaları gider, geçmişi kalır; her adım denetimde', async () => {

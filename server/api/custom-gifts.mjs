@@ -147,9 +147,11 @@ export function startCustomGifts() {
     if (busy) return;
     busy = true;
     try {
-      const r = await db.query("SELECT coalesce(max(rev), 0) AS rev, count(*) FILTER (WHERE job_status = 'processing') AS jobs FROM custom_gifts");
+      const r = await db.query(
+        "SELECT coalesce(max(rev), 0) AS rev, count(*) FILTER (WHERE job_status = 'processing') AS jobs, count(*) FILTER (WHERE video_enlarge IS NOT NULL) AS enlarge FROM custom_gifts",
+      );
       if (Number(r.rows[0].rev) !== snap.rev) await refreshCustomGifts();
-      if (Number(r.rows[0].jobs) > 0) kickJobs();
+      if (Number(r.rows[0].jobs) > 0 || Number(r.rows[0].enlarge) > 0) kickJobs();
     } catch (e) {
       console.error('custom gifts sync failed', String(e?.message ?? e).slice(0, 200));
     } finally {
@@ -723,6 +725,150 @@ async function convertJob(row) {
   }
 }
 
+// --- Once: the videos made at the old default SVGA size, full screen (migration 074) ---------------------------
+/**
+ * The old default: svga-to-fx.py scaled an SVGA's visible part to 60 % of the frame's width (at most of its height)
+ * and centred it, so all of it is in the middle 60 % of the frame; at Tam ekran the same part is 1 / 0.6 as big,
+ * around the same centre.
+ */
+const OLD_FILL = 0.6;
+/** The mask brighter than this (limited range, 16 is transparent) is visible: a faint glow counts. */
+const SEEN = 24;
+
+/**
+ * The part of a stacked video's `W` × `H` frame that is ever visible, every frame of the clip: { x, y, w, h } in its
+ * pixels (even), or null when nothing is or it can't be read. Measured at half size.
+ */
+export async function visibleBox(file, W, H) {
+  const w = W / 2;
+  const h = H / 2;
+  const plane = w * h;
+  // 15 s at 20 fps at half size: about 40 MB.
+  const r = await run(FFMPEG, ['-v', 'error', '-i', file, '-an', '-vf', `crop=${W}:${H}:0:${H},scale=${w}:${h}:flags=area,format=gray`, '-f', 'rawvideo', 'pipe:1'], {
+    timeout: 120_000,
+    keep: 96 << 20,
+    nice: true,
+  });
+  if (r.code !== 0 || r.out.length < plane) return null;
+  const px = r.out;
+  let [x0, y0, x1, y1] = [w, h, -1, -1];
+  for (let f = 0; f + plane <= px.length; f += plane) {
+    for (let y = 0; y < h; y++) {
+      const row = f + y * w;
+      for (let x = 0; x < w; x++) {
+        if (px[row + x] <= SEEN) continue;
+        if (x < x0) x0 = x;
+        if (x > x1) x1 = x;
+        if (y < y0) y0 = y;
+        if (y > y1) y1 = y;
+      }
+    }
+  }
+  return x1 < 0 ? null : { x: x0 * 2, y: y0 * 2, w: (x1 - x0 + 1) * 2, h: (y1 - y0 + 1) * 2 };
+}
+
+/** The middle 60 % of a `W` × `H` frame (even pixels): where all of an SVGA made at the old default size is. */
+export const oldFrame = (W, H) => {
+  const [w, h] = [Math.round((W * OLD_FILL) / 2) * 2, Math.round((H * OLD_FILL) / 2) * 2];
+  return { x: (W - w) / 2, y: (H - h) / 2, w, h };
+};
+/**
+ * Whether `box` (visibleBox) is what the old default made: inside the middle 60 % of the frame (a pixel or two for
+ * rounding) and reaching its edges across or down (a faint edge may stay under SEEN), so not a smaller size picked.
+ */
+export function oldDefaultSize(box, W, H) {
+  const f = oldFrame(W, H);
+  const inside = box.x >= f.x - 4 && box.y >= f.y - 4 && box.x + box.w <= f.x + f.w + 4 && box.y + box.h <= f.y + f.h + 4;
+  return inside && Math.max(box.w / f.w, box.h / f.h) >= 0.92;
+}
+
+/**
+ * ffmpeg's arguments to cut the middle 60 % (oldFrame) out of both halves of a stacked `W` × `H` video and scale it to
+ * the whole frame: what svga-to-fx.py makes at `--fill 1` from the same SVGA, only from the smaller picture. The
+ * colour and the mask are cut and scaled alike; the sound is kept as it is.
+ */
+export function enlargeArgs(input, output, W, H) {
+  const f = oldFrame(W, H);
+  const part = (y) => `crop=${f.w}:${f.h}:${f.x}:${y},scale=${W}:${H}:flags=lanczos`;
+  return [
+    ...['-hide_banner', '-v', 'error', '-y', '-i', input],
+    ...['-filter_complex', `[0:v]split=2[t][b];[t]${part(f.y)}[c];[b]${part(H + f.y)}[a];[c][a]vstack=inputs=2,format=yuv420p[v]`],
+    ...['-map', '[v]', '-map', '0:a:0?'],
+    ...['-c:v', 'libx264', '-profile:v', 'main', '-preset', 'medium', '-crf', '23', '-g', String(LIMITS.fps * 2), '-pix_fmt', 'yuv420p'],
+    ...['-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv'],
+    ...['-c:a', 'copy', '-movflags', '+faststart', '-threads', '2', output],
+  ];
+}
+
+const unmark = (id) => db.query('UPDATE custom_gifts SET video_enlarge = NULL WHERE id = $1', [id]);
+/**
+ * One gift whose video is marked (migration 074): when it is the old default size, made full screen from the video
+ * itself (softer than the SVGA converted again at Tam ekran, which the admin can still do), swapped in, the old file
+ * deleted. Any other video is left as it is. The mark always goes, whatever happens.
+ */
+async function enlargeJob(row) {
+  const key = keyOf(row.video_url);
+  const { width: W, height: H } = LIMITS;
+  let url = null;
+  try {
+    const out = !key?.startsWith('giftvideo/')
+      ? null
+      : await temp(async (dir) => {
+          const input = path.join(dir, 'video.mp4');
+          await fs.promises.writeFile(input, await readStored(key, LIMITS.videoBytes));
+          const v = (await probe(input)).streams.find((s) => s.codec_type === 'video');
+          if (v?.width !== W || v?.height !== 2 * H) return null;
+          const box = await visibleBox(input, W, H);
+          if (!box || !oldDefaultSize(box, W, H)) return null;
+          const output = path.join(dir, 'tam-ekran.mp4');
+          const r = await run(FFMPEG, enlargeArgs(input, output, W, H), { timeout: 10 * 60_000, keep: 0, nice: true });
+          if (r.code !== 0) throw new Error(`ffmpeg ${r.code} ${r.err.slice(-200)}`);
+          const buf = await fs.promises.readFile(output);
+          if (buf.length > LIMITS.videoBytes) throw new Error(`${buf.length} bytes`);
+          return { buf, ms: mp4Duration(buf), box };
+        });
+    if (!out) return void (await unmark(row.id));
+    const to = `giftvideo/${key.split('/')[1]}/${row.id}-${Date.now().toString(36)}-${crypto.randomBytes(6).toString('base64url')}.mp4`;
+    url = await writeStored(to, out.buf, 'video/mp4');
+    const done = await tx(async (c) => {
+      const cur = (await c.query('SELECT video_url, deleted_at FROM custom_gifts WHERE id = $1 FOR UPDATE', [row.id])).rows[0];
+      if (!cur || cur.deleted_at || cur.video_url !== row.video_url) return false;
+      await c.query(
+        `UPDATE custom_gifts SET video_url = $2, video_bytes = $3, video_ms = $4, video_v = $5, video_enlarge = NULL, rev = nextval('custom_gift_rev') WHERE id = $1`,
+        [row.id, url, out.buf.length, out.ms, sha12(out.buf)],
+      );
+      await audited(c, null, 'gift.video_enlarged', { gift: row.id, before: row.video_url, after: url, visible: [out.box.w, out.box.h], bytes: out.buf.length });
+      return true;
+    });
+    if (!done) {
+      removeFiles([url]);
+      return void (await unmark(row.id));
+    }
+    removeFiles([row.video_url]);
+    await refreshCustomGifts();
+    console.log(`gift video full screen: ${row.id}, ${out.buf.length} bytes`);
+  } catch (e) {
+    console.error('gift video enlarge', row.id, String(e?.message ?? e).slice(0, 200));
+    if (url) removeFiles([url]);
+    await unmark(row.id);
+  }
+}
+
+/** The marked videos, one after another; a mark whose video was replaced or deleted since just goes. */
+async function enlargeOld() {
+  await db.query('UPDATE custom_gifts SET video_enlarge = NULL WHERE video_enlarge IS NOT NULL AND (video_url IS DISTINCT FROM video_enlarge OR deleted_at IS NOT NULL)');
+  const seen = new Set();
+  for (;;) {
+    const r = await db.query(
+      `SELECT id, video_url FROM custom_gifts WHERE video_enlarge IS NOT NULL AND video_enlarge = video_url AND deleted_at IS NULL AND job_status IS DISTINCT FROM 'processing' ORDER BY id LIMIT 1`,
+    );
+    // Each job takes its mark away; one that didn't would come again: never twice.
+    if (!r.rowCount || seen.has(r.rows[0].id)) return;
+    seen.add(r.rows[0].id);
+    await enlargeJob(r.rows[0]);
+  }
+}
+
 let working = false;
 let again = false;
 /** Runs the conversions waiting now, one after another (a call while it runs makes it look again afterwards). */
@@ -746,6 +892,8 @@ export function kickJobs() {
           if (!r.rowCount) break;
           await convertJob(r.rows[0]);
         }
+        // Once (migration 074): the videos made at the old default SVGA size, after the conversions.
+        await enlargeOld();
       } while (again);
       // Cut off too often (restarts, the storage): given up on, so the panel says so.
       const stuck = await db.query(
