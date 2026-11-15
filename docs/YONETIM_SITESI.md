@@ -1,7 +1,7 @@
 # Yönetim sitesi: uygulamadaki Yönetim ekranı siteye taşındı
 
-Uygulamada Ayarlar › Yönetim'de ne yapılabiliyorsa, artık hepsi finans panelinin sitesinde (**Finance Control**,
-Uygulama bölümü) yapılabiliyor. Uygulamada yalnız odanın içinden yapılanlar kalıyor: odadan atma ve oda içi susturma
+Uygulamada Ayarlar › Yönetim'de ne yapılabiliyorsa, artık hepsi finans panelinin sitesinde (**Finance Control**)
+yapılabiliyor. Menü konulara göre gruplu; üstteki arama kutusu (Ctrl+K) her sayfayı bulur. Uygulamada yalnız odanın içinden yapılanlar kalıyor: odadan atma ve oda içi susturma
 gibi.
 
 ## Ne nerede
@@ -9,20 +9,20 @@ gibi.
 | Uygulamadaki sekme | Sitedeki sayfa | Gereken yetki |
 | --- | --- | --- |
 | Özet | Ana panel, Uyarılar | — |
-| Kullanıcılar | Uygulama › Kullanıcılar | app.users |
-| Canlı ayarlar | Uygulama › Canlı ayarlar | app.settings |
-| Hediyeler, Emojiler | Uygulama › Hediyeler, Emojiler | app.gifts, app.emojis |
-| Şanslı hediyeler | Uygulama › Şanslı hediye ayarı | app.lucky |
-| Oyun Salonu | Uygulama › Oyun Salonu ve durum | app.reports |
-| Etkinlikler, Duyurular | Uygulama › Etkinlikler, Duyurular | app.events, app.notices |
-| Para çekme | Uygulama › Para çekme | app.withdrawals |
-| Ajans ödemeleri | Uygulama › Ajans ödemeleri | app.payouts |
-| Şikâyetler, Destek | Uygulama › Şikâyetler, Destek | app.complaints, app.support |
-| İadeler | Uygulama › İadeler ve cüzdan | app.refunds |
-| **Yaptırımlar** (yeni) | Uygulama › Yaptırımlar | app.sanctions ya da app.sanctions_full |
-| **Ajans merkezi personeli** (yeni) | Uygulama › Ajans personeli | app.agency_staff |
-| **Kişinin mağaza eşyaları** (yeni) | Uygulama › Mağaza eşyaları | app.economy |
-| **Jeton Noktası** (yeni) | Uygulama › Jeton Noktası | app.jeton |
+| Kullanıcılar | Kullanıcılar ve güvenlik › Kullanıcılar | app.users |
+| Canlı ayarlar | Ayarlar › Canlı ayarlar | app.settings |
+| Hediyeler, Emojiler | Hediye ve mağaza › Hediyeler, Emojiler | app.gifts, app.emojis |
+| Şanslı hediyeler | Hediye ve mağaza › Şanslı hediye ayarı | app.lucky |
+| Oyun Salonu | Rapor ve maliyet › Oyun Salonu ve durum | app.reports |
+| Etkinlikler, Duyurular | Duyuru ve etkinlik › Etkinlikler, Duyurular | app.events, app.notices |
+| Para çekme | Para › Para çekme | app.withdrawals |
+| Ajans ödemeleri | Ajanslar › Ajans ödemeleri | app.payouts |
+| Şikâyetler, Destek | Kullanıcılar ve güvenlik › Şikâyetler, Destek | app.complaints, app.support |
+| İadeler | Para › İadeler ve cüzdan | app.refunds |
+| **Yaptırımlar** (yeni) | Kullanıcılar ve güvenlik › Yaptırımlar | app.sanctions ya da app.sanctions_full |
+| **Ajans merkezi personeli** (yeni) | Ajanslar › Ajans personeli | app.agency_staff |
+| **Kişinin mağaza eşyaları** (yeni) | Hediye ve mağaza › Mağaza eşyaları | app.economy |
+| **Jeton Noktası** (yeni) | Para › Jeton Noktası | app.jeton |
 
 ## Roller
 
@@ -43,7 +43,7 @@ Sitede herkes kendi hesabıyla girer. Kim neyi yaparsa, işlem uygulamada o kiş
 | **Moderatör** (yeni) | Yaptırımlar (moderatör yetkisiyle), Destek |
 | Salt okunur | Ana panel ve raporlar |
 
-Rolleri ve yetkileri sitede Yönetim › Kullanıcılar ve roller'den değiştirebilirsiniz.
+Rolleri ve yetkileri sitede Ayarlar › Panel kullanıcıları ve rolleri'nden değiştirebilirsiniz. Menünün üstündeki arama kutusu (Ctrl+K) her sayfayı bulur: ör. "ban" yazınca Yaptırımlar.
 
 ## Geçiş adımları
 
@@ -59,7 +59,7 @@ Rolleri ve yetkileri sitede Yönetim › Kullanıcılar ve roller'den değiştir
    - Yeni APK'da Ayarlar › Yönetim bu siteyi açar. Siteye panelin giriş adınız ve parolanızla girersiniz.
    - Eski APK'larda ekran açık kalır. Sunucu, işlemi kim yaparsa yapsın aynı kurallarla denetler.
 3. **Başka çalışanınız varsa sitede hesap açın.**
-   - Yönetim › Kullanıcılar ve roller'den her çalışana kendi hesabını ve doğru rolü verin. Moderatörlere Moderatör
+   - Ayarlar › Panel kullanıcıları ve rolleri'nden her çalışana kendi hesabını ve doğru rolü verin. Moderatörlere Moderatör
      rolünü verin.
    - Herkes iki adımlı doğrulamayı açsın.
 

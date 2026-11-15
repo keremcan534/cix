@@ -92,9 +92,10 @@ export const LIMITS = Object.freeze({
   width: 540,
   height: 960,
   fps: 20,
-  // An SVGA's size on the screen (the share of the width its visible part takes); 0.6 unless the admin picks another.
+  // An SVGA's size on the screen (the share of the frame its canvas takes): the whole screen, as the app's own gift
+  // videos, unless the admin picks a smaller one.
   fills: [0.45, 0.6, 0.8, 1],
-  fill: 0.6,
+  fill: 1,
 });
 /** An admin's gift's id; the app's own are catalog.mjs GIFTS keys (g1, h15, c13, v12, …, never 'a'). */
 const ID = /^a[0-9]{1,9}$/;
@@ -446,10 +447,11 @@ export async function matteOf(file) {
 /** A mask that is grey (not a picture) but nowhere transparent: the background was never removed. */
 const OPAQUE = 128;
 const NOT_GREY = 16;
-const EXPORT_HINT = 'Dışa aktarırken arka plan katmanını kapatıp ProRes 4444 + Alpha (.mov) ya da saydam WebM seçin.';
-const OPAQUE_TEXT = `Videonun hiçbir yeri saydam değil: arka planı silinmemiş, odada kutu gibi görünür; sunucu arka planı silemez. ${EXPORT_HINT}`;
-const NO_ALPHA_TEXT = `Bu videoda saydamlık (alfa kanalı) yok: arka planıyla odada kutu gibi görünür; sunucu arka planı silemez. ${EXPORT_HINT}`;
-const SVGA_OPAQUE_TEXT = 'SVGA’nın hiçbir yeri saydam değil: arka plan görseli var, odada kutu gibi görünür. Animasyonu arka plan katmanı olmadan dışa aktarın.';
+const EXPORT_HINT = 'Arka plan katmanını kapatıp ProRes 4444 + Alpha (.mov) ya da saydam WebM dışa aktarın';
+const FULL_HINT = 'arka planıyla tam ekran oynasın istiyorsanız "Arka planlı tam ekran"ı seçin.';
+const OPAQUE_TEXT = `Videonun hiçbir yeri saydam değil, odada kutu gibi görünür. ${EXPORT_HINT}; ${FULL_HINT}`;
+const NO_ALPHA_TEXT = `Bu videoda saydamlık (alfa kanalı) yok, odada kutu gibi görünür. ${EXPORT_HINT}; ${FULL_HINT}`;
+const SVGA_OPAQUE_TEXT = `SVGA’nın hiçbir yeri saydam değil (arka plan görseli var), odada kutu gibi görünür. Animasyonu arka plan katmanı olmadan dışa aktarın; ${FULL_HINT}`;
 
 const temp = async (fn) => {
   const dir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'similar-gift-'));
@@ -466,7 +468,7 @@ const seconds = (ms) => (ms / 1000).toLocaleString('tr-TR', { maximumFractionDig
  * A ready stacked MP4 at `url`: 1–15 s, and where ffmpeg runs here, H.264 with its bottom half a grey mask that is
  * transparent somewhere. Returns what the fx list needs: { url, bytes, ms, v }.
  */
-async function checkStacked(url) {
+async function checkStacked(url, { opaque = false } = {}) {
   const key = keyOf(url);
   if (!key?.startsWith('giftvideo/')) throw new HttpError(400, 'Videoyu önce yükle');
   await verifyUpload(url, 'giftvideo');
@@ -493,7 +495,7 @@ async function checkStacked(url) {
       const m = await matteOf(file);
       if (!m) throw new HttpError(400, 'Video okunamadı');
       if (m.chroma > NOT_GREY) throw new HttpError(400, 'Alt yarı alfa maskesi değil (renkli görüntü var): video yığılmış biçimde değil');
-      if (m.ymin > OPAQUE) throw new HttpError(400, OPAQUE_TEXT);
+      if (m.ymin > OPAQUE && !opaque) throw new HttpError(400, OPAQUE_TEXT);
     });
   }
   return { url, bytes: buf.length, ms, v: sha12(buf) };
@@ -579,7 +581,7 @@ export function svgaInfo(buf) {
 }
 
 /** The stacked MP4 made from the SVGA at `input` by tools/svga-to-fx.py (its own sound kept): { buf, ms }. */
-async function convertSvga(input, dir, fill) {
+async function convertSvga(input, dir, fill, { opaque = false } = {}) {
   // Read whole here and by the converter: never one bigger than an SVGA may be uploaded.
   const size = (await fs.promises.stat(input)).size;
   if (size > LIMITS.svgaBytes) throw new FileError(`SVGA en fazla ${mb(LIMITS.svgaBytes)} MB olabilir (bu ${mb(size)} MB)`);
@@ -591,7 +593,7 @@ async function convertSvga(input, dir, fill) {
     if (/nothing visible/.test(r.err)) throw new FileError('SVGA’da görünen bir şey yok');
     throw new FileError('SVGA çevrilemedi: dosya bozuk ya da desteklenmeyen bir özellik var');
   }
-  return stackedResult(output, SVGA_OPAQUE_TEXT);
+  return stackedResult(output, SVGA_OPAQUE_TEXT, { opaque });
 }
 
 // --- Turning a transparent source into a stacked video (one at a time, in the background) -------------------
@@ -624,7 +626,7 @@ export function convertArgs(input, output, codec) {
  * The stacked MP4 made from the transparent video at `input` (a file here, `dir` its temp folder): { buf, ms }. A
  * FileError says what is wrong with the file itself (no transparency, too long, unreadable).
  */
-export async function convertSource(input, dir) {
+export async function convertSource(input, dir, { opaque = false } = {}) {
   const p = await probe(input);
   const v = p.streams.find((s) => s.codec_type === 'video');
   if (!v) throw new FileError('Videoda görüntü yok');
@@ -636,9 +638,10 @@ export async function convertSource(input, dir) {
     console.error('gift video ffmpeg', r.code, r.err.slice(-400));
     throw new FileError('Video çevrilemedi: kaynak okunamadı ya da bozuk');
   }
-  // Without alpha it still converted (all opaque): refused, with what it would look like for the panel.
-  if (!hasAlpha(v)) throw new FileError(NO_ALPHA_TEXT, await previewOf(output));
-  return stackedResult(output, OPAQUE_TEXT);
+  // Without alpha it still converted (all opaque): refused, with what it would look like for the panel, unless the
+  // admin asked for it to play full screen with its background.
+  if (!hasAlpha(v) && !opaque) throw new FileError(NO_ALPHA_TEXT, await previewOf(output));
+  return stackedResult(output, OPAQUE_TEXT, { opaque });
 }
 
 /** What came out, for the panel's preview of a refused video: null when too big to keep. */
@@ -648,12 +651,12 @@ async function previewOf(output) {
 }
 
 /**
- * A converted video, checked like an uploaded one: somewhere transparent (else `opaque`, the sentence, with what came
+ * A converted video, checked like an uploaded one: somewhere transparent (else `opaqueText`, with what came
  * out), small enough, long enough.
  */
-async function stackedResult(output, opaque) {
+async function stackedResult(output, opaqueText, { opaque = false } = {}) {
   const m = await matteOf(output);
-  if (m && m.ymin > OPAQUE) throw new FileError(opaque, await previewOf(output));
+  if (m && m.ymin > OPAQUE && !opaque) throw new FileError(opaqueText, await previewOf(output));
   const buf = await fs.promises.readFile(output);
   if (buf.length > LIMITS.videoBytes) throw new FileError(`Çevrilen video çok büyük (${mb(buf.length)} MB, en çok ${mb(LIMITS.videoBytes)} MB): daha kısa ya da sade bir kaynak dene`);
   const ms = mp4Duration(buf);
@@ -672,7 +675,8 @@ async function convertJob(row) {
     const out = await temp(async (dir) => {
       const input = path.join(dir, `source.${src.split('.').pop()}`);
       await downloadStored(src, input, LIMITS.sourceBytes);
-      return src.endsWith('.svga') ? convertSvga(input, dir, row.job_fill === null ? LIMITS.fill : Number(row.job_fill)) : convertSource(input, dir);
+      const opaque = row.job_opaque === true;
+      return src.endsWith('.svga') ? convertSvga(input, dir, row.job_fill === null ? LIMITS.fill : Number(row.job_fill), { opaque }) : convertSource(input, dir, { opaque });
     });
     // Under the uploader's folder, like every stored file (media.mjs FILE_KEY).
     const key = `giftvideo/${src.split('/')[1]}/${row.id}-${Date.now().toString(36)}-${crypto.randomBytes(6).toString('base64url')}.mp4`;
@@ -736,7 +740,7 @@ export function kickJobs() {
           const r = await db.query(
             `UPDATE custom_gifts SET job_tries = job_tries + 1
               WHERE id = (SELECT id FROM custom_gifts WHERE job_status = 'processing' AND deleted_at IS NULL AND job_tries < $1 AND job_at <= now() ORDER BY job_at LIMIT 1)
-              RETURNING id, job_source, job_tries, job_fill`,
+              RETURNING id, job_source, job_tries, job_fill, job_opaque`,
             [MAX_TRIES],
           );
           if (!r.rowCount) break;
@@ -808,8 +812,11 @@ async function videoOf(v) {
   if (v === null) return null;
   const o = v && typeof v === 'object' && !Array.isArray(v) ? v : {};
   const url = typeof o.url === 'string' ? o.url : '';
-  if (o.kind === 'stacked') return { kind: 'stacked', ...(await checkStacked(url)) };
-  if (o.kind === 'source') return { kind: 'source', ...(await checkSource(url, o.fill)) };
+  // opaque: plays full screen with its background (no transparency needed); an older app or panel never sends it.
+  if (o.opaque !== undefined && typeof o.opaque !== 'boolean') throw new HttpError(400, 'Arka planlı tam ekran seçimi geçersiz');
+  const opaque = o.opaque === true;
+  if (o.kind === 'stacked') return { kind: 'stacked', ...(await checkStacked(url, { opaque })) };
+  if (o.kind === 'source') return { kind: 'source', ...(await checkSource(url, o.fill)), opaque };
   throw new HttpError(400, 'Video hazır yığılmış MP4 (stacked) ya da saydam kaynak (source) olmalı');
 }
 /** The unique name index lost a race: the same answer as nameFree. */
@@ -1136,6 +1143,7 @@ async function updateApp(req, a, id, b) {
       } else if (video?.kind === 'source') {
         set('job_source', video.url);
         set('job_fill', video.fill);
+        set('job_opaque', video.opaque);
         sets.push('video_off = false', "job_status = 'processing'", 'job_error = NULL', 'job_tries = 0', 'job_at = now()', 'job_preview = NULL');
         drop.push(r.job_source, r.job_preview);
       }
@@ -1183,10 +1191,11 @@ export const customGiftRoutes = {
         const first = await firstSort(c, cat);
         const r = await c.query(
           `INSERT INTO custom_gifts (id, name, emoji, price, cat, min_svip, sort, enabled, icon_url, video_url, video_bytes, video_ms, video_v, job_status, job_source, job_fill,
-                                     created_by, updated_by, icon_link, video_link)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $17, $18, $19) RETURNING *`,
+                                     created_by, updated_by, icon_link, video_link, job_opaque)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $17, $18, $19, $20) RETURNING *`,
           [id, name, emoji, price, cat, minSvip, first, b.enabled !== false, icon.url, stacked?.url ?? null, stacked?.bytes ?? null, stacked?.ms ?? null, stacked?.v ?? null,
-            video?.kind === 'source' ? 'processing' : null, video?.kind === 'source' ? video.url : null, video?.kind === 'source' ? video.fill : null, a.id, iconLink, videoLink],
+            video?.kind === 'source' ? 'processing' : null, video?.kind === 'source' ? video.url : null, video?.kind === 'source' ? video.fill : null, a.id, iconLink, videoLink,
+            video?.kind === 'source' && video.opaque],
         );
         await audited(c, a.id, 'gift.create', { gift: id, before: null, after: auditOf(r.rows[0]), ...panelDetail(a) }, clientIp(req));
         return id;
@@ -1275,6 +1284,7 @@ export const customGiftRoutes = {
         } else if (video?.kind === 'source') {
           set('job_source', video.url);
           set('job_fill', video.fill);
+          set('job_opaque', video.opaque);
           sets.push("job_status = 'processing'", 'job_error = NULL', 'job_tries = 0', 'job_at = now()', 'job_preview = NULL');
           drop.push(r.job_source, r.job_preview);
         }
