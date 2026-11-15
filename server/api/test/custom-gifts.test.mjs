@@ -455,8 +455,8 @@ describe('Yönetim › Hediyeler', () => {
     const failed = await settled(g.id);
     assert.equal(failed.job.status, 'failed');
     assert.match(failed.job.error, /saydamlık \(alfa kanalı\) yok/);
-    assert.match(failed.job.error, /arka planı silemez/);
     assert.match(failed.job.error, /ProRes 4444 \+ Alpha/);
+    assert.match(failed.job.error, /"Arka planlı tam ekran"/);
     assert.equal(failed.video.url, done.video.url, 'eski video yerinde');
     const previewKey = keyOfUrl(failed.job.preview);
     assert.match(previewKey, new RegExp(`^giftvideo/.+/${g.id}-onizleme-.+\\.mp4$`));
@@ -482,11 +482,29 @@ describe('Yönetim › Hediyeler', () => {
     assert.ok(stored.has(previewKey2));
     assert.notEqual(previewKey2, previewKey);
 
+    // Full screen with its background, asked for: the same video is taken, its mask white all over.
+    const scene = await upload(admin, 'giftsource', fs.readFileSync(files.opaque), 'video/webm');
+    await refused(call('POST', '/api/admin/gifts/update', { id: g.id, video: { url: scene, kind: 'source', opaque: 'evet' } }, admin.session), 400, /Arka planlı tam ekran/);
+    await ok(call('POST', '/api/admin/gifts/update', { id: g.id, video: { url: scene, kind: 'source', opaque: true } }, admin.session), 'arka planlı tam ekran');
+    const full = await settled(g.id);
+    assert.equal(full.job, null, JSON.stringify(full.job));
+    assert.ok(full.video.bytes > 0);
+    const fullClip = Buffer.from(await (await fetch(`${h.base}${full.video.url}`)).arrayBuffer());
+    const fullMask = spawnSync(FFMPEG, ['-v', 'error', '-i', 'pipe:0', '-vf', 'crop=iw:ih/2:0:ih/2,format=gray', '-frames:v', '1', '-f', 'rawvideo', 'pipe:1'], { input: fullClip, maxBuffer: 1 << 24 }).stdout;
+    assert.ok(Math.min(...fullMask.subarray(0, 50_000)) > 200, 'her yer görünür');
+    assert.ok(!stored.has(previewKey2), 'reddedilenin önizlemesi yeni videoyla gitti');
+    // A ready stacked MP4 with nowhere transparent: refused, unless asked for full screen with its background.
+    const opaqueStacked = path.join(dir, 'opak-yigilmis.mp4');
+    ff(convertArgs(files.opaque, opaqueStacked, 'vp9').slice(4));
+    const ready = await upload(admin, 'giftvideo', fs.readFileSync(opaqueStacked), 'video/mp4');
+    await refused(call('POST', '/api/admin/gifts/update', { id: g.id, video: { url: ready, kind: 'stacked' } }, admin.session), 400, /hiçbir yeri saydam değil/);
+    await ok(call('POST', '/api/admin/gifts/update', { id: g.id, video: { url: ready, kind: 'stacked', opaque: true } }, admin.session), 'hazır arka planlı');
+
     // A good video afterwards: ready, and the preview of the refusal goes with it.
     const good = await upload(admin, 'giftsource', fs.readFileSync(files.source), 'video/webm');
     await ok(call('POST', '/api/admin/gifts/update', { id: g.id, video: { url: good, kind: 'source' } }, admin.session), 'iyi kaynak');
-    const ready = await settled(g.id);
-    assert.equal(ready.job, null);
+    const goodDone = await settled(g.id);
+    assert.equal(goodDone.job, null);
     await sleep(300);
     assert.ok(!stored.has(previewKey2), 'önizleme silindi');
     assert.equal((await q('SELECT job_preview FROM custom_gifts WHERE id = $1', [g.id])).rows[0].job_preview, null);
