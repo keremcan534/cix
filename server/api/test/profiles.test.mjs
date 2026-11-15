@@ -40,7 +40,7 @@ const h = startApi({
   LEVELS_CACHE_MS: '0',
   MOMENT_CHARM: '0',
   AUTO_MUTE_REFUSALS: '0',
-});
+}, { moneyCheck: { skip: ['gifts', 'paid'], why: 'hediye ve ücretli olay geçmişini puan için doğrudan yazar' } });
 const { call, signUp } = h;
 const q = (s, p) => h.sql.query(s, p);
 const ok = async (p, what) => {

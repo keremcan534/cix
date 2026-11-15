@@ -10,6 +10,11 @@
 //   lots     users.coins = what is left in the account's coin lots (wallet.mjs): every coin has a source
 //   moved    every coin row of the ledger names the lots it used (detail.lots), adding up to its amount
 //   locks    the diamonds still locked (diamond_locks) are not more than the account's diamonds
+//   gifts    every gift event paid its recipient its total in diamonds (ledger ref `{ref}-in`) and, when the sender
+//            paid it in coins on the spot (Hediye, Şanslı hediye), took exactly that from the sender (ref `{ref}`);
+//            a bond, a Şanslı çanta and Çantam paid the coins before, or not in coins
+//   paid     every paid message or call minute (paid_events) took its coins from the payer and, when someone earns
+//            it, gave them the same in diamonds
 //
 // `since` (a ledger id): only the accounts with a ledger row after it, and only those rows for `chain` and `moved`.
 // 0 checks everything. The live server watches from migration 071 on (money_check_from); its earlier rows, the test
@@ -55,6 +60,26 @@ export const MONEY_CHECKS = {
             FROM users u JOIN (SELECT user_id, sum(amount) AS locked FROM diamond_locks
                                 WHERE status = 'active' AND unlock_at > now() GROUP BY 1) l ON l.user_id = u.id
            WHERE ${ACCOUNTS} AND l.locked > u.diamonds AND u.deleted_at IS NULL`,
+  },
+  gifts: {
+    message: (n) => `${n} hediyede gönderenden düşen jeton ya da alıcıya geçen elmas hediyenin tutarı değil`,
+    sql: `SELECT g.id, g.sender, g.recipient, g.gift_id, g.total, g.ref, -s.amount AS paid, r.amount AS got
+            FROM gift_events g
+            LEFT JOIN ledger r ON r.user_id = g.recipient AND r.currency = 'diamond' AND r.ref = g.ref || '-in'
+            LEFT JOIN ledger s ON s.user_id = g.sender AND s.currency = 'coin' AND s.ref = g.ref
+           WHERE ($1::bigint = 0 OR g.recipient IN (SELECT user_id FROM ledger WHERE id > $1) OR g.sender IN (SELECT user_id FROM ledger WHERE id > $1))
+             AND (r.amount IS DISTINCT FROM g.total
+                  OR (g.ref NOT LIKE 'bond%' AND g.ref NOT LIKE 'bag:%' AND NOT EXISTS (SELECT 1 FROM backpack_moves m WHERE m.gift_event = g.id)
+                      AND s.amount IS DISTINCT FROM -g.total))`,
+  },
+  paid: {
+    message: (n) => `${n} ücretli mesaj ya da arama dakikasında ödenen jeton ile kazanılan elmas tutmuyor`,
+    sql: `SELECT p.id, p.kind, p.payer, p.earner, p.coins, p.ref, -s.amount AS paid, r.amount AS got
+            FROM paid_events p
+            LEFT JOIN ledger s ON s.user_id = p.payer AND s.currency = 'coin' AND s.ref = p.ref
+            LEFT JOIN ledger r ON r.user_id = p.earner AND r.currency = 'diamond' AND r.ref = p.ref || '-in'
+           WHERE ($1::bigint = 0 OR p.payer IN (SELECT user_id FROM ledger WHERE id > $1))
+             AND (s.amount IS DISTINCT FROM -p.coins OR (p.earner IS NOT NULL AND r.amount IS DISTINCT FROM p.coins))`,
   },
 };
 

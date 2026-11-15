@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 
 import { rnd, startApi, tokenOf } from './harness.mjs';
 
-const h = startApi({ AUTO_MUTE_REFUSALS: '0', CALL_SWEEP_MS: '300' });
+const h = startApi({ AUTO_MUTE_REFUSALS: '0', CALL_SWEEP_MS: '300' }, { moneyCheck: { skip: ['gifts', 'paid'], why: 'hediye ve ücretli olay geçmişini puan için doğrudan yazar' } });
 const { call, signUp } = h;
 const q = (s, p) => h.sql.query(s, p);
 const me = async (s) => (await call('GET', '/api/me', null, s))[1].user;

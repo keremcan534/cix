@@ -1,0 +1,137 @@
+// Many people moving money at once, in random order (docs/PARA_DENETIMI.md): top-ups, purchases, gifts, Çevir,
+// bonds, Şanslı çanta, the shop, Oyun Salonu, Jeton Noktası sales and diamond sales, store refunds, with some
+// requests sent twice at the same moment. Whatever the order, no request may fail with a server error, and the
+// harness's money checks after this file (money-check.mjs) must find every coin and diamond where the ledger says.
+import { describe, test } from 'node:test';
+import assert from 'node:assert/strict';
+
+import { rnd, startApi } from './harness.mjs';
+
+// Locks of 0 days: gifted diamonds can leave at once, so Çevir and diamond sales run on them too.
+const h = startApi({ BOND_SWEEP_MS: '200', BAG_SWEEP_MS: '200', LOCK_DAYS_STORE: '0', LOCK_DAYS_JETON: '0', TEST_TOPUP_DAILY: '100000000', AGENCY_JOBS: '0' });
+const { call, signUp } = h;
+const q = async (sql, args) => (await h.sql.query(sql, args)).rows;
+const ok = async (p, what) => {
+  const [st, j] = await p;
+  assert.equal(st, 200, `${what}: ${j.error}`);
+  return j;
+};
+
+// A seeded random, so a failing run can be replayed with the same MONEY_FUZZ_SEED.
+let seed = Number(process.env.MONEY_FUZZ_SEED ?? Date.now() % 100000);
+const random = () => ((seed = (seed * 48271) % 2147483647) / 2147483647);
+const pick = (list) => list[Math.floor(random() * list.length)];
+const OPS = Number(process.env.MONEY_FUZZ_OPS ?? 500);
+
+describe('Para: aynı anda rastgele işlemler', () => {
+  test(`${OPS} işlem, 8'er 8'er aynı anda: hiçbiri sunucu hatası vermez, para yerinde kalır`, async () => {
+    const startSeed = seed;
+    const admin = await signUp('Yönetici');
+    await q("UPDATE users SET role = 'admin' WHERE id = $1", [admin.user.id]);
+    const people = await Promise.all(Array.from({ length: 10 }, (_, i) => signUp(`Kişi ${i}`)));
+    const bank = await signUp('Jeton Noktası');
+    await ok(call('POST', '/api/admin/jeton/bank', { user: bank.user.id, enabled: true }, admin.session), 'banka');
+    await ok(call('POST', '/api/admin/jeton/wholesale', { bank: bank.user.id, coins: 500_000, paymentRef: 'DEKONT-1', ref: rnd(6) }, admin.session), 'toptan');
+    for (const p of people) await ok(call('POST', '/api/wallet/test-topup', { amount: 10000, ref: rnd(6) }, p.session), 'yükleme');
+    const room = (await ok(call('POST', '/api/rooms', { title: `Para ${rnd(2)}` }, people[0].session), 'oda')).room.id;
+    // The shelf's gifts anyone may send (most are paused or for VIPs): Roket 1.999, and the like.
+    const gifts = (await ok(call('GET', '/api/catalog?gifts=2'), 'katalog')).gifts.filter((g) => !g.minSvip && g.price <= 3000);
+    assert.ok(gifts.length >= 1);
+    const shop = [['fr-neon', 150], ['en-sparkle', 200], ['fr-silver', 800]];
+    const other = (u) => {
+      for (;;) {
+        const x = pick(people);
+        if (x !== u) return x;
+      }
+    };
+    const bondIds = async () => (await q("SELECT id FROM bonds WHERE status = 'pending'")).map((r) => Number(r.id));
+    const bagIds = async () => (await q("SELECT id FROM lucky_bags WHERE status = 'open'")).map((r) => Number(r.id));
+
+    /** One random request: [label, method, path, body, session], built when it runs. */
+    const MIX = [
+      [8, async (u) => ['yükleme', 'POST', '/api/wallet/test-topup', { amount: pick([1000, 5000]), ref: rnd(6) }, u.session]],
+      [6, async (u) => ['satın alma', 'POST', '/api/wallet/purchase', { platform: 'test', productId: pick(['coins_1000', 'coins_5000']), transactionId: rnd(8) }, u.session]],
+      [16, async (u) => {
+        const g = pick(gifts);
+        return ['hediye', 'POST', '/api/gifts/send', { to: other(u).user.id, giftId: g.id, count: 1, price: g.price, place: pick(['profile', 'chat']), ref: rnd(6) }, u.session];
+      }],
+      [6, async (u) => ['test hediyesi', 'POST', '/api/wallet/gift', { to: other(u).user.id, amount: 1 + Math.floor(random() * 500), ref: rnd(6) }, u.session]],
+      [8, async (u) => ['çevir', 'POST', '/api/wallet/exchange', { diamonds: pick([100, 500, 1000]), ref: rnd(6) }, u.session]],
+      [5, async (u) => ['bağ isteği', 'POST', '/api/bonds/request', { to: other(u).user.id, kind: pick(['kardes', 'kanka']), ref: rnd(6) }, u.session]],
+      [5, async (u) => {
+        const id = pick(await bondIds());
+        return id ? ['bağ cevabı', 'POST', '/api/bonds/respond', { id, accept: random() < 0.6 }, u.session] : null;
+      }],
+      [3, async (u) => {
+        const id = pick(await bondIds());
+        return id ? ['bağ geri alma', 'POST', '/api/bonds/withdraw', { id }, u.session] : null;
+      }],
+      [4, async (u) => ['çanta', 'POST', '/api/lucky-bags', { room, kind: 'coins', amount: 1000, packets: 5, followersOnly: false, delay: 0, ref: rnd(6) }, u.session]],
+      [6, async (u) => {
+        const id = pick(await bagIds());
+        return id ? ['çanta kapma', 'POST', '/api/lucky-bags/grab', { id }, u.session] : null;
+      }],
+      [6, async (u) => {
+        const [sku, price] = pick(shop);
+        return ['mağaza', 'POST', '/api/shop/buy', { sku, price, ref: rnd(6) }, u.session];
+      }],
+      [6, async (u) => ['oyun', 'POST', '/api/casino/play', { game: 'jackpot', bet: 250, ref: rnd(8) }, u.session]],
+      [4, async (u) => ['jeton noktası satışı', 'POST', '/api/jeton/transfer', { to: u.user.id, coins: pick([500, 1500]), paymentRef: 'HAVALE-1', ref: rnd(6) }, bank.session]],
+      [4, async (u) => ['elmas bozdurma', 'POST', '/api/jeton/sell-diamonds', { bank: bank.user.id, diamonds: pick([500, 1000]), ref: rnd(6) }, u.session]],
+      [3, async () => {
+        const p = pick(await q("SELECT id FROM purchases WHERE status <> 'refunded'"));
+        return p ? ['iade', 'POST', '/api/admin/purchases/refund', { purchase: Number(p.id) }, admin.session] : null;
+      }],
+    ];
+    const WEIGHT = MIX.reduce((s, [w]) => s + w, 0);
+    const choose = () => {
+      let r = random() * WEIGHT;
+      for (const [w, fn] of MIX) if ((r -= w) <= 0) return fn;
+      return MIX[0][1];
+    };
+
+    const seen = new Map();
+    const failures = [];
+    const note = (label, st, j) => {
+      const k = `${label} ${st}`;
+      seen.set(k, (seen.get(k) ?? 0) + 1);
+      if (st >= 500 || st === 0) failures.push(`${label}: ${st} ${j?.error ?? ''}`);
+    };
+    const send = async (req) => {
+      const [label, method, path, body, session] = req;
+      try {
+        const [st, j] = await call(method, path, body, session);
+        note(label, st, j);
+      } catch (e) {
+        note(label, 0, { error: e.message });
+      }
+    };
+    let left = OPS;
+    const worker = async () => {
+      while (left-- > 0) {
+        const req = await choose()(pick(people));
+        if (!req) continue;
+        // One in ten goes out twice at the same moment, as a double tap or a retry does.
+        if (random() < 0.1) await Promise.all([send(req), send(req)]);
+        else await send(req);
+      }
+    };
+    await Promise.all(Array.from({ length: 8 }, worker));
+
+    // What is still waiting ends now: bags draw, bonds run out, and the sweeps settle them.
+    await q("UPDATE lucky_bags SET closes_at = now() - interval '1 second' WHERE status = 'open'");
+    await q("UPDATE bonds SET expires_at = now() - interval '1 second' WHERE status = 'pending'");
+    for (let i = 0; i < 50; i++) {
+      const [w] = await q("SELECT (SELECT count(*) FROM lucky_bags WHERE status = 'open') + (SELECT count(*) FROM bonds WHERE status = 'pending') AS n");
+      if (Number(w.n) === 0) break;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    const summary = [...seen].sort().map(([k, n]) => `${k}: ${n}`).join(', ');
+    assert.deepEqual(failures, [], `tohum ${startSeed}; ${summary}`);
+    const [open] = await q("SELECT (SELECT count(*) FROM lucky_bags WHERE status = 'open') AS bags, (SELECT count(*) FROM bonds WHERE status = 'pending') AS bonds");
+    assert.deepEqual([Number(open.bags), Number(open.bonds)], [0, 0], 'bekleyen çanta ve bağ kalmadı');
+    // Enough of each kind actually went through for the run to mean something.
+    for (const label of ['hediye', 'çevir', 'mağaza', 'oyun', 'satın alma']) assert.ok((seen.get(`${label} 200`) ?? 0) > 0, `${label} hiç geçmedi (${summary})`);
+    console.log(`para karıştırma: tohum ${startSeed}; ${summary}`);
+  });
+});

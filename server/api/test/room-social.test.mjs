@@ -28,7 +28,7 @@ const lk = http.createServer((req, res) => {
 await new Promise((r) => lk.listen(LK_PORT, '127.0.0.1', r));
 after(() => new Promise((r) => (lk.closeAllConnections?.(), lk.close(r))));
 
-const h = startApi({ LIVEKIT_API_URL: `http://127.0.0.1:${LK_PORT}`, ROOM_BADGE_CACHE_MS: '0', AUTO_MUTE_REFUSALS: '0' });
+const h = startApi({ LIVEKIT_API_URL: `http://127.0.0.1:${LK_PORT}`, ROOM_BADGE_CACHE_MS: '0', AUTO_MUTE_REFUSALS: '0' }, { moneyCheck: { skip: ['gifts', 'paid'], why: 'hediye ve ücretli olay geçmişini puan için doğrudan yazar' } });
 const { call, signUp } = h;
 const q = (s, p) => h.sql.query(s, p);
 const ok = async (p, what) => {

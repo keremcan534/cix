@@ -8,7 +8,7 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 import pg from 'pg';
 
-import { checkMoney, describeMoney } from '../money-check.mjs';
+import { MONEY_CHECKS, checkMoney, describeMoney } from '../money-check.mjs';
 
 const PG = { host: process.env.PGHOST ?? '127.0.0.1', port: Number(process.env.PGPORT ?? 5432), user: process.env.POSTGRES_USER ?? 'postgres', password: process.env.POSTGRES_PASSWORD ?? '' };
 
@@ -19,9 +19,11 @@ const PG = { host: process.env.PGHOST ?? '127.0.0.1', port: Number(process.env.P
  *
  * After the file's tests the API stops and the money checks (money-check.mjs) run on what the tests left: every
  * test is also a test that no coin or diamond was lost, made up or moved without its ledger row. A file that writes
- * wallet tables itself on purpose passes `{ moneyCheck: 'why' }`, which skips them.
+ * wallet tables itself on purpose passes `{ moneyCheck: 'why' }`, which skips them all, or `{ moneyCheck: { skip:
+ * ['gifts'], why } }` for some.
  */
 export function startApi(extraEnv = {}, { moneyCheck = true } = {}) {
+  const skip = new Set(moneyCheck === true ? [] : typeof moneyCheck === 'object' ? moneyCheck.skip : Object.keys(MONEY_CHECKS));
   const DB = `similar_test_${process.pid}`;
   const PORT = 17000 + (process.pid % 2000);
   const base = `http://127.0.0.1:${PORT}`;
@@ -90,7 +92,8 @@ export function startApi(extraEnv = {}, { moneyCheck = true } = {}) {
         h.api.kill();
         await Promise.race([exited, new Promise((r) => setTimeout(r, 5000))]);
       }
-      if (moneyCheck === true && h.sql) problems = await checkMoney(h.sql);
+      const only = Object.keys(MONEY_CHECKS).filter((k) => !skip.has(k));
+      if (only.length && h.sql) problems = await checkMoney(h.sql, { only });
     } finally {
       await h.sql?.end();
       const root = new pg.Client({ ...PG, database: 'postgres' });
