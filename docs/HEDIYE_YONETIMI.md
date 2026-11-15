@@ -1,7 +1,8 @@
 # Hediye yönetimi (Yönetim › Hediyeler)
 
 Yöneticiler yeni hediyeyi uygulama güncellemesi olmadan ekler, düzenler, raftan kaldırır, siler ve sıralar; hediye
-herkesin uygulamasında görünür ve gönderilebilir. Sunucu: `server/api/custom-gifts.mjs` (tablo `066_custom_gifts.sql`),
+herkesin uygulamasında görünür ve gönderilebilir. Uygulamanın kendi hediyeleri de aynı yerden değişir (aşağıda
+**Uygulamanın kendi hediyeleri**). Sunucu: `server/api/custom-gifts.mjs` (tablo `066_custom_gifts.sql`, `069`),
 uygulama: `app/src/components/admin/gifts-admin.tsx` (panel), `app/src/lib/live/gifts-admin.ts` (çağrılar, yükleme),
 `app/src/lib/live/catalog-live.ts` (telefonda katalog), `app/src/components/GiftArt.tsx` (uzak ikon).
 
@@ -43,6 +44,40 @@ hediyeyi sessizce atlar, videosunu indirmez (adresi `/api/fx/g/…`, onların s�
 | Silme | Hediye raflardan ve panelden kalkar, gönderilemez; satır geçmiş için saklanır, ikonu ve videosu depodan silinir |
 | Bağlantıdan dosya | Finans panelinde her dosyanın yanında "ya da bağlantı yapıştır": sunucu dosyayı bir kez indirir, yüklenmiş gibi denetler ve kendisi sunar (aşağıda **Bağlantıdan dosya**) |
 | Raftan kaldırma | Panelde kalır, kataloğda görünmez, gönderilemez; tekrar rafa konabilir |
+
+## Uygulamanın kendi hediyeleri (hazır 65 hediye)
+
+Uygulamayla gelen hediyeler (Gül, Roket, Sevimli Panda, Pırlanta Yüzük…, `server/api/catalog.mjs` `GIFT_ROWS`) de
+panelden değişir; geliştiriciye ya da uygulama güncellemesine gerek yoktur. Finans panelinin **Uygulama › Hediyeler**
+listesi bunları da gösterir (`GET /api/admin/gifts?builtin=1`): uygulamadaki resmi (sunucunun `art/` kopyası), uygulamadaki
+değerleri (`original`), neyin değiştirildiği (`changed`) ve son 30 günde kaç kez gönderildiği.
+
+- **Değişebilenler:** ad, emoji, fiyat, raf, VIP seviyesi (Özel rafta), rafta / kapalı, raftaki sıra, ikon, video (hazır
+  MP4, saydam WebM / MOV ya da SVGA; yöneticinin hediyelerindeki kurallarla). Duraklatılmış hediyeler (14 Kasım'da raftan
+  kalkan 41 hediye, `GIFTS_PAUSED`) **Rafa koy** ile geri gelir; açık bir hediye raftan kaldırılabilir.
+- **Orijinaline dön:** `POST /api/admin/gifts/reset` `{id, fields?}` hediyeyi (ya da yalnız bir alanını) uygulamadaki
+  haline döndürür; yüklenen ikon ve video depodan silinir. Raftaki yeri, istenmedikçe yerinde kalır (sıralanmış raf bozulmaz).
+- **Silinmez:** uygulamanın hediyesi her telefonda var; silmek yerine raftan kaldırılır.
+- **Raftan kalkan uygulama hediyesi** (duraklatılmışlar gibi) kataloğa girmez ama gönderilebilir: eski bir telefon ya da
+  Çantam gönderebilir, odadaki telefonlar onu çizer.
+- **Video:** yeni video uygulamanın kendi klibinin yerine geçer (`/api/fx/g/<id>.mp4`; yöneticinin hediyeleri gelen
+  sürümden bu yana her uygulama indirir). `video: null` hediyeyi videosuz uçurur; orijinale dönünce kendi klibi geri gelir.
+- **Fiyat ve eski uygulamalar:** eski APK hediyenin adını, resmini ve fiyatını kendi içinden çizer. Fiyatı panelden
+  değiştirilen bir uygulama hediyesi bu yüzden eski uygulamaların kataloğunda hiç görünmez, gönderirlerse "uygulamayı
+  güncelle" der (409 `update_required`), jeton düşmez. Ad, emoji, ikon ve raf değişikliği eski uygulamada eski haliyle
+  görünür, gönderim sorunsuz işler. Bu değişikliği taşıyan APK'dan itibaren telefon her şeyi sunucudan alır
+  (`/api/catalog?gifts=2`), raftakini yalnız sunucunun listesine bakarak gösterir ve gönderirken ekranda gördüğü fiyatı
+  da yollar: arada fiyat değiştiyse sunucu reddeder (409 `price_changed`, yeni fiyatla), telefon kataloğu yeniden okur.
+- **Çantam (görev ödülü):** çantadaki hediye ödül olarak verildiği değerle, uygulamadaki fiyatıyla gönderilir; panelden
+  fiyat değişikliği ödülü değerli kılmaz. Adı panelde verilen addır.
+- **Ad çakışması:** iki hediye aynı adı taşıyamaz (uygulamanınkiler şimdiki adlarıyla). Bir uygulama hediyesinin adı
+  değiştirilince eski adı başka hediyeye verilebilir; o zaman o hediye "ad" alanında orijinaline dönemez (409).
+- **Panel resimleri:** `server/api/art/gifts/<id>.webp` ve `art/stickers/` uygulamanın resimlerinin küçük kopyalarıdır
+  (`python3 server/api/tools/panel-art.py` ile yeniden üretilir), `GET /api/fx/art/…` ile panele gider; telefonlar
+  kullanmaz.
+
+Saklama: `custom_gifts` tablosunda uygulama hediyesinin kimliğiyle bir satır (`builtin`, 069); her boş sütun
+"uygulamadaki gibi" demektir, satır hiç silinmez (katalog sürümü yalnız artar).
 
 ## Yöneticinin adımları
 
@@ -134,6 +169,10 @@ Kendi alan adınızda yönetim açılırsa o adres de `AllowedOrigins`'e eklenir
 - Bağlantıdan dosya: `server/api/test/gift-links.test.mjs` (sahte müşteri sitesi: ikon iner, depoya yüklenmiş gibi konur,
   kaydedilir, bağlantı saklanır ve denetimde; türü baytlarından; MP4, SVGA 1.x, web sayfası, büyük dosya, 404, döngü;
   bu sunucu, özel ağ, bulut üst verisi, yönlendirme ve ad üzerinden iç adres reddi).
+- Uygulamanın kendi hediyeleri: `server/api/test/builtin-gifts.test.mjs` (panel listesi ve uygulamadaki değerler, ad /
+  emoji / fiyat, eski uygulamanın kataloğu ve 409'ları, gösterilen fiyatla gönderim ve tekrar, ad çakışması, raf ve VIP,
+  rafa koyma ve kaldırma, karışık sıra, ikon, video ve kapatma, orijinale dönme, silinmezlik, denetim, Şanslı çanta),
+  `app/tests/app-gift-edits.test.ts` (telefonda `gifts=2`: değerler, sıra, raftakiler, ikon, bozuk alanlar, eski sunucu, kopya).
 - Sunucu: `server/api/test/custom-gifts.test.mjs` (yetki, ikon kuralları, katalog ve sürüm, eski uygulamanın süzgeci,
   sunucu fiyatıyla gönderim, fiyat değişikliği, raftan kaldırma, sıra, hazır video, WebM çevirme, saydamlığı olmayan
   kaynağın reddi, SVGA çevirme ve boyutu, SVGA 1.x ve 15 sn'den uzunun reddi, silme ve denetim kaydı). CI ffmpeg,

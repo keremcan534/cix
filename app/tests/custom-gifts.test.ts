@@ -13,7 +13,7 @@ import { giftById, giftShelf, parseLiveCatalog, parseRemoteGifts, parseSavedLive
 import { contentTypeOf, fileProblem, moved, videoKindOf, videoLine, type AdminGift, type GiftLimits } from '@/lib/gifts-admin-core';
 import * as server from '../../server/api/catalog.mjs';
 
-type ServerGift = { id: string; name: string; price: number; cat: string; minSvip: number };
+type ServerGift = { id: string; name: string; emoji: string; price: number; cat: string; minSvip: number };
 const ICON = 'https://130-61-230-94.sslip.io/api/media/f/gifticon/00000000-0000-4000-8000-000000000001/x.png';
 const custom = (id: string, o: Record<string, unknown> = {}) => ({ id, name: `Hediye ${id}`, price: 1500, cat: 'hot', minSvip: 0, emoji: '🌙', icon: ICON, custom: true, ...o });
 /** GET /api/catalog as gifts.mjs builds it now: the admins' gifts first, then the compiled ones. */

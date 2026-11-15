@@ -22,10 +22,12 @@ export const panelOn = () => KEY.length >= KEY_MIN;
 
 /** What Finance Control may call: `METHOD path`. */
 export const PANEL_ROUTES = new Set([
-  // Hediyeler (custom-gifts.mjs) and its uploads (media.mjs kinds gifticon, giftvideo, giftsource).
+  // Hediyeler (custom-gifts.mjs: the admins' and the app's own) and its uploads (media.mjs kinds gifticon, giftvideo,
+  // giftsource).
   'GET /api/admin/gifts',
   'POST /api/admin/gifts',
   'POST /api/admin/gifts/update',
+  'POST /api/admin/gifts/reset',
   'POST /api/admin/gifts/delete',
   'POST /api/admin/gifts/order',
   'POST /api/admin/gifts/fetch',

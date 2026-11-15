@@ -10,7 +10,7 @@ import { CoinPill, Header } from '@/components/ui';
 import { CHECKIN_REWARDS, TASKS, type TaskKey } from '@/data/economy';
 import { RewardBurst, type Reward } from '@/components/fx/reward';
 import { GiftArt } from '@/components/GiftArt';
-import { GIFTS } from '@/data/mock';
+import { giftById } from '@/lib/live/catalog-live';
 import { liveMode, message, oneOnOneOpen } from '@/lib/live';
 import { useBackpack } from '@/lib/live/backpack';
 import { claimLiveCallTask, useLiveCallTask } from '@/lib/live/call-log';
@@ -60,7 +60,7 @@ export default function TaskCenter() {
   const liveCallTask = useLiveCallTask(liveMode() && oneOnOneOpen());
   // Live: the gift the call task also puts in Çantam (Canlı ayarlar may set none).
   const bagSource = useBackpack(liveMode() && oneOnOneOpen())?.sources.find((x) => x.key === 'call_task');
-  const bagGift = bagSource ? GIFTS.find((g) => g.id === bagSource.giftId) : undefined;
+  const bagGift = bagSource ? giftById(bagSource.giftId) : undefined;
   const rewards = useRewards();
   const inviteLine = inviteBannerText(liveMode(), rewards);
 
@@ -146,7 +146,7 @@ export default function TaskCenter() {
               }
               void claimLiveCallTask()
                 .then((r) => {
-                  const g = r.gift ? GIFTS.find((x) => x.id === r.gift?.giftId) : undefined;
+                  const g = r.gift ? giftById(r.gift.giftId) : undefined;
                   if (r.paid) setReward({ icon: 'tasks', title: `${t.title} tamamlandı${g && r.gift ? ` · çantana ${g.name} ×${r.gift.count}` : ''}`, amount: r.task.reward });
                 })
                 .catch((e) => showAlert('Ödül alınamadı', message(e)));

@@ -2,7 +2,9 @@
 // no show, data/gift-shows); the four standard ones (Gül, Kalp, Kahve, Pasta) went too, the same evening. The same
 // list as server/api/catalog.mjs GIFTS_PAUSED (tests/server-catalog.test.ts): the server leaves them out of the
 // catalog, so older apps drop them too, and lib/live/catalog-live visibleGifts leaves them out here. A send from an
-// older app still goes through. Taking an id out of both lists brings the gift back.
+// older app still goes through. Taking an id out of both lists brings the gift back; so does Yönetim › Hediyeler
+// (server/api/custom-gifts.mjs, "Rafa koy"), without an update, for every app that reads the catalog with gifts=2:
+// there the server's list alone says what is on the shelves.
 export const GIFTS_PAUSED: ReadonlySet<string> = new Set([
   // Popüler
   'g1', 'g2', 'g3', 'g4', 'g5', 'g7', 'g8', 'h1', 'h3', 'h4', 'h5', 'h6', 'h7', 'h8', 'h9', 'h10', 'h11',

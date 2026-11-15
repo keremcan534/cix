@@ -171,7 +171,7 @@ export function useChatGift(user: User, onSent: () => void) {
         return false;
       }
       try {
-        await liveGift(user.id, g.id, 1, undefined, 'chat');
+        await liveGift(user.id, g.id, 1, undefined, 'chat', g.price);
       } catch (e) {
         showAlert('Hediye gönderilemedi', message(e), [{ text: 'Tamam', style: 'cancel' }, toWallet]);
         return false;

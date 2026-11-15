@@ -1,7 +1,7 @@
 // Gifts at the server's price, and the rankings they feed.
 //
-//   GET  /api/catalog                                             → { gifts, counts, packs, vipPlans, svipXp, purchases, campaign, exchange, fx, v }
-//   POST /api/gifts/send  { to, giftId, count, room?, place?, ref } → { user, replay, total }  (place: chat|moment|profile|family)
+//   GET  /api/catalog[?gifts=2]                                   → { gifts, counts, packs, vipPlans, svipXp, purchases, campaign, exchange, fx, v }
+//   POST /api/gifts/send  { to, giftId, count, price?, room?, place?, ref } → { user, replay, total }  (place: chat|moment|profile|family)
 //   GET  /api/rankings?board=wealth|charm|agency&period=day|week|month → { rows }  (agency: rows carry agency, not user)
 //
 // The sender's coins become the recipient's diamonds 1 to 1 (app/src/data/rules.ts creatorDiamondsPerCoin);
@@ -13,15 +13,18 @@
 // Canlı ayarlar (live-settings.mjs): a hidden gift or pack is left out of the catalog, and a hidden gift is
 // refused (400 "Bu hediye artık yok", nothing moves; old apps still show it). The catalog also says which
 // campaign runs now, the Çevir rate and the settings' version (v), which the app compares with /api/config.
-// Prices stay compiled, except the admins' own gifts (Yönetim › Hediyeler, custom-gifts.mjs), which are listed and
-// sent here at the price saved there.
+// Every gift is listed and sent at the price Yönetim › Hediyeler (custom-gifts.mjs) gives it: an admin's own, or one
+// of the app's with what was changed about it. `price` in a send is the price the phone showed (a newer app sends it);
+// checkShownPrice refuses a gift whose price moved meanwhile, and one of the app's re-priced gifts from an older app.
+// gifts=2 in the catalog: the phone draws what the server says about the app's own gifts too (name, emoji, price,
+// shelf, order, icon) and trusts its list alone (giftsFormat: 2); without it the re-priced ones are left out.
 // A gift sent in a server room is announced to the room's voice connection from here, after it is paid
 // (LiveKit SendData, so no phone can fake one); the phones draw only these, never a peer's own claim.
 import { recordIncome } from './agency-lib.mjs';
 import { addBondCoins } from './bonds.mjs';
 import { HttpError, auth, blockedBetween, claimRef, db, int, once, readJson, userId } from './core.mjs';
-import { EXCHANGE, GIFTS, GIFTS_PAUSED, GIFT_COUNTS, PACKS, SVIP_XP, VIP_SUBS, svipLevel } from './catalog.mjs';
-import { catalogGifts, customFx, customGiftsRev, giftOf } from './custom-gifts.mjs';
+import { EXCHANGE, GIFT_COUNTS, PACKS, SVIP_XP, VIP_SUBS, svipLevel } from './catalog.mjs';
+import { catalogGifts, checkShownPrice, customGiftsRev, giftFx, giftOf, replacedClips } from './custom-gifts.mjs';
 import { fxCatalog } from './fx.mjs';
 import { live } from './live-settings.mjs';
 import { scorePkGift } from './pk.mjs';
@@ -80,14 +83,17 @@ export function announceGift(room, packet) {
 
 export const giftRoutes = {
   /** Public: the app can show prices before sign-in and cache them. */
-  async 'GET /api/catalog'() {
+  async 'GET /api/catalog'(req, url) {
     const s = live();
     const now = Date.now();
     const c = s.campaign;
+    const app2 = url?.searchParams.get('gifts') === '2';
     return {
-      // The admins' gifts first (custom-gifts.mjs: with their icon; an older app skips them), then the compiled ones,
-      // without those off the shelf for now (catalog.mjs GIFTS_PAUSED): left out, so older apps drop them too.
-      gifts: [...catalogGifts(), ...[...GIFTS.values()].filter((g) => !s.giftsHidden.has(g.id) && !GIFTS_PAUSED.has(g.id))],
+      // Every gift on the shelves in the shelves' order (custom-gifts.mjs): the admins' with their icon (an older app
+      // skips them), the app's own as changed in the panel. Off the shelves (the app's paused ones unless put back,
+      // catalog.mjs GIFTS_PAUSED) or hidden in Canlı ayarlar: left out, so older apps drop them too.
+      gifts: catalogGifts({ app2, hidden: s.giftsHidden }),
+      ...(app2 ? { giftsFormat: 2 } : {}),
       counts: GIFT_COUNTS,
       packs: PACKS.filter((p) => !s.packsHidden.has(p.id)).map(({ id, productId, coins, firstBonus }) => ({ id, productId, coins, firstBonus })),
       // Abonelik's store products (vip.mjs), sold through the same stores as the packs (`purchases`).
@@ -99,7 +105,7 @@ export const giftRoutes = {
       campaign: c && Date.parse(c.startsAt) <= now && now < Date.parse(c.endsAt) ? { percent: c.percent, startsAt: c.startsAt, endsAt: c.endsAt, label: c.label } : null,
       exchange: { usdTry: s.usdTry, minDiamonds: EXCHANGE.minDiamonds },
       // The gift and entry videos the phones download and keep (fx.mjs, and the admins' gifts'); an older app ignores it.
-      fx: [...fxCatalog(s.giftsHidden), ...customFx()],
+      fx: [...fxCatalog(s.giftsHidden, replacedClips()), ...giftFx(s.giftsHidden)],
       // Grows with every live settings save and every change to the admins' gifts (as /api/config's).
       v: s.v + customGiftsRev(),
     };
@@ -110,7 +116,8 @@ export const giftRoutes = {
     // Read once: a gift that passed the check before a hide is committed; the next one is refused.
     const s = live();
     const b = await readJson(req);
-    // A compiled gift or an admin's on the shelves (custom-gifts.mjs), at this server's price either way.
+    // One of the app's gifts (as changed in the panel) or an admin's on the shelves (custom-gifts.mjs), at this
+    // server's price either way.
     const gift = giftOf(b.giftId);
     if (!gift) throw new HttpError(400, 'Bu hediye artık yok');
     const count = int(b.count ?? 1, 1, 10_000);
@@ -135,6 +142,8 @@ export const giftRoutes = {
       await claimRef(c, u.id, 'coin', b.ref);
       // After the ref check: a retry of a gift that went through before the hide gets its replay, not a 400.
       if (s.giftsHidden.has(gift.id)) throw new HttpError(400, 'Bu hediye artık yok');
+      // The price the phone showed (none from an older app): a gift whose price moved is refused, nothing moves.
+      checkShownPrice(gift, b.price);
       const g = await c.query('INSERT INTO gift_events (sender, recipient, gift_id, count, unit_price, total, room, place, ref) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id', [
         u.id,
         to,

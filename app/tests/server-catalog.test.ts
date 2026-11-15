@@ -19,7 +19,7 @@ import * as server from '../../server/api/catalog.mjs';
 import * as family from '../../server/api/family-rules.mjs';
 import { CHEST_MIN_CONTRIBUTION, CP_GIFT_IDS, KABILE_CHESTS, KABILE_TASKS, KABILE_THEMES } from '@/data/kabile';
 
-type ServerGift = { id: string; name: string; price: number; cat: string; minSvip: number };
+type ServerGift = { id: string; name: string; emoji: string; price: number; cat: string; minSvip: number };
 type ServerPack = { id: string; productId: string; coins: number; firstBonus: number };
 type ServerShopItem = { sku: string; kind: string; name: string; price: number; days: number | null; minVip: number };
 
@@ -48,8 +48,8 @@ describe('Sunucu kataloğu uygulamayla aynı', () => {
     assert.deepEqual(GIFTS.slice(0, 6).map((g) => g.id), ['g1', 'g2', 'g3', 'g4', 'g5', 'g6']);
   });
 
-  test('her hediyenin adı, fiyatı, kategorisi ve SVIP sınırı', () => {
-    const app = GIFTS.map((g) => ({ id: g.id, name: g.name, price: g.price, cat: g.cat, minSvip: g.minSvip ?? 0 }));
+  test('her hediyenin adı, emojisi, fiyatı, kategorisi ve SVIP sınırı', () => {
+    const app = GIFTS.map((g) => ({ id: g.id, name: g.name, emoji: g.emoji, price: g.price, cat: g.cat, minSvip: g.minSvip ?? 0 }));
     assert.deepEqual([...(server.GIFTS as Map<string, ServerGift>).values()], app);
   });
 

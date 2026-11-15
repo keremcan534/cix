@@ -14,6 +14,13 @@
 // `fx`. giftShelf() puts them first on their shelves, giftById() finds them, components/GiftArt draws their icon.
 // An older app's copy of this file knows only the compiled gifts and skips them.
 //
+// The app's own gifts can be changed there too (name, emoji, price, shelf, VIP level, order, on the shelves or not,
+// icon). This app asks for the whole story (GET /api/catalog?gifts=2): the server then answers giftsFormat 2, lists
+// every gift on the shelves in the shelves' order with what it is now (`shelf`, `app`), and its list alone says what is
+// on the shelves (the compiled pause list, data/gifts-paused, no longer applies: an admin may put a gift back). The
+// compiled gifts' art stays the fallback; a replaced icon is drawn from its address. Sends carry the price shown
+// (lib/live liveGift), so a price that moved meanwhile is refused (409 price_changed) and the catalog is read again.
+//
 // Screens: useLiveCatalog() re-renders when it changes; giftShelf(cat) (or visibleGifts(list, cat) for a fixed list),
 // liveRules(cat) and activeCampaign(Date.now(), cat) read it (without `cat`, the current copy outside React).
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -40,6 +47,8 @@ const GIFT_ID = /^[A-Za-z0-9_-]{1,32}$/;
 export type LiveCampaign = { percent: number; startsAt: string; endsAt: string; label: string };
 /** An admin's gift (server/api/custom-gifts.mjs): drawn from its icon address, sent at the price the server says. */
 export type RemoteGift = Gift & { icon: string; custom: true };
+/** One of the app's own gifts as the server says it is now (gifts=2); `icon` only when it was replaced. */
+export type AppGiftEdit = { name: string; emoji: string; price: number; cat: GiftCat; minSvip: number; icon?: string };
 export type LiveCatalog = {
   /** The server's live settings version; 0 from an older server. */
   v: number;
@@ -55,6 +64,10 @@ export type LiveCatalog = {
   fx: FxVideo[] | null;
   /** The admins' gifts the server lists, in its order; [] from an older server. */
   remote: RemoteGift[];
+  /** Every gift on the shelves, in the shelves' order (gifts=2); null from an older server, which says less. */
+  shelf: string[] | null;
+  /** The app's own gifts on the shelves as they are now (gifts=2): id → its values; {} from an older server. */
+  app: Record<string, AppGiftEdit>;
 };
 
 // --- Reading the server's answer, without trusting it ----------------------------------------------------
@@ -113,10 +126,42 @@ export function parseRemoteGifts(list: unknown): RemoteGift[] {
   return out;
 }
 
+const COMPILED = new Map(GIFTS.map((g) => [g.id, g]));
+/**
+ * The app's own gifts in the server's list (gifts=2), each as it is now. An entry with anything malformed keeps the
+ * compiled value of that field; an icon only with a well-formed address. Never thrown.
+ */
+export function parseAppGifts(list: unknown): Record<string, AppGiftEdit> {
+  const out: Record<string, AppGiftEdit> = {};
+  if (!Array.isArray(list)) return out;
+  for (const x of list) {
+    const g = obj(x);
+    const base = typeof g.id === 'string' ? COMPILED.get(g.id) : undefined;
+    if (!base || g.custom === true || Object.hasOwn(out, base.id)) continue;
+    const name = typeof g.name === 'string' ? g.name.replace(/\s+/g, ' ').trim().slice(0, 40) : '';
+    const price = typeof g.price === 'number' && Number.isSafeInteger(g.price) && g.price >= 1 && g.price <= PRICE_MAX ? g.price : base.price;
+    const cat = CATS.find((c) => c === g.cat) ?? base.cat ?? 'hot';
+    const svip = typeof g.minSvip === 'number' && Number.isInteger(g.minSvip) && g.minSvip >= 0 && g.minSvip <= 15 ? g.minSvip : (base.minSvip ?? 0);
+    const emoji = typeof g.emoji === 'string' && g.emoji.trim() && g.emoji.length <= 16 ? g.emoji.trim() : base.emoji;
+    out[base.id] = { name: name || base.name, emoji, price, cat, minSvip: cat === 'privilege' ? Math.max(1, svip) : 0, ...(typeof g.icon === 'string' && ICON_URL.test(g.icon) ? { icon: g.icon } : {}) };
+  }
+  return out;
+}
+/** The ids of the server's list in its order (gifts=2): the app's own and the admins' it can draw. */
+function shelfOf(list: unknown, app: Record<string, AppGiftEdit>, remote: RemoteGift[]): string[] {
+  if (!Array.isArray(list)) return [];
+  const known = new Set([...Object.keys(app), ...remote.map((g) => g.id)]);
+  const ids = list.map((x) => obj(x).id).filter((id): id is string => typeof id === 'string' && known.has(id));
+  return [...new Set(ids)];
+}
+
 /** GET /api/catalog as the live catalog; anything malformed is left out (the compiled value is used), never thrown. */
 export function parseLiveCatalog(raw: unknown): LiveCatalog {
   const r = obj(raw);
   const rate = obj(r.exchange).usdTry;
+  const remote = parseRemoteGifts(r.gifts);
+  // The server said it all (gifts=2): what is on the shelves, in which order, and what the app's own gifts are now.
+  const app = r.giftsFormat === 2 ? parseAppGifts(r.gifts) : {};
   return {
     v: version(r.v),
     giftIds: idList(r.gifts, (g) => obj(g).id),
@@ -124,7 +169,9 @@ export function parseLiveCatalog(raw: unknown): LiveCatalog {
     campaign: campaignOf(r.campaign),
     usdTry: validRate(rate) ? rate : null,
     fx: parseFxList(r.fx),
-    remote: parseRemoteGifts(r.gifts),
+    remote,
+    shelf: r.giftsFormat === 2 ? shelfOf(r.gifts, app, remote) : null,
+    app,
   };
 }
 
@@ -139,6 +186,10 @@ export function parseSavedLiveCatalog(raw: string | null): { catalog: LiveCatalo
   }
   if (!x || typeof x !== 'object' || Array.isArray(x)) return null;
   const r = x as Record<string, unknown>;
+  const remote = parseRemoteGifts(r.remote);
+  // Kept as the catalog had them: the edits as entries of the list they came in, the order as ids.
+  const app = parseAppGifts(Object.entries(obj(r.app)).map(([id, e]) => ({ ...obj(e), id })));
+  const shelf = Array.isArray(r.shelf) ? shelfOf(r.shelf.map((id) => ({ id })), app, remote) : null;
   return {
     catalog: {
       v: version(r.v),
@@ -147,7 +198,9 @@ export function parseSavedLiveCatalog(raw: string | null): { catalog: LiveCatalo
       campaign: campaignOf(r.campaign),
       usdTry: validRate(r.usdTry) ? r.usdTry : null,
       fx: parseFxList(r.fx),
-      remote: parseRemoteGifts(r.remote),
+      remote,
+      shelf,
+      app,
     },
     // A copy an older app saved, before the videos were listed, counts as old: the next poll reads the catalog again.
     fetchedAt: 'fx' in r && typeof r.fetchedAt === 'number' && Number.isFinite(r.fetchedAt) ? r.fetchedAt : 0,
@@ -158,49 +211,81 @@ export function parseSavedLiveCatalog(raw: string | null): { catalog: LiveCatalo
 let current: LiveCatalog | null = null;
 let fetchedAt = 0;
 
-/**
- * The gift shelf: the compiled gifts (names, art, prices) the server still lists, in the compiled order, without the
- * ones off the shelf for now (data/gifts-paused; an older server still lists them). When none of them would be left,
- * the whole compiled list: the app never hides every gift.
- */
-export function visibleGifts<G extends { id: string }>(compiled: G[], c: LiveCatalog | null = current): G[] {
-  const listed = c?.giftIds ? new Set(c.giftIds) : null;
-  const shown = compiled.filter((g) => !GIFTS_PAUSED.has(g.id) && (!listed || listed.has(g.id)));
-  return shown.length ? shown : compiled;
+/** A compiled gift as the server says it is now (gifts=2), else as compiled; the art and badges stay the app's. */
+function liveGiftOf<G extends Gift>(g: G, c: LiveCatalog | null): G {
+  const e = c?.app[g.id];
+  if (!e) return g;
+  return { ...g, name: e.name, emoji: e.emoji, price: e.price, cat: e.cat, minSvip: e.minSvip || undefined };
+}
+/** Whether the server's list alone says what is on the shelves (gifts=2, and it listed anything). */
+const trusted = (c: LiveCatalog | null): c is LiveCatalog & { shelf: string[] } => !!c?.shelf?.length;
+
+type Views = { c: LiveCatalog | null; shelf: Gift[]; byId: Map<string, Gift> };
+let views: Views | null = null;
+/** The gifts as they are now, worked out once per copy of the catalog (the same objects until it changes). */
+function viewsOf(c: LiveCatalog | null): Views {
+  if (views?.c === c) return views;
+  const byId = new Map<string, Gift>();
+  for (const g of GIFTS) byId.set(g.id, liveGiftOf(g, c));
+  for (const g of c?.remote ?? []) if (!byId.has(g.id)) byId.set(g.id, g);
+  const listed = trusted(c) ? c.shelf.map((id) => byId.get(id)).filter((g): g is Gift => !!g) : [];
+  const shelf = listed.length ? listed : [...(c?.remote ?? []), ...visibleGifts(GIFTS, c)];
+  views = { c, shelf, byId };
+  return views;
 }
 
 /**
- * Çantam: what may be sent from the backpack. A gift off the shelf for now stays sendable there (the server takes it,
- * and the daily call task puts Kalp in the bag); only a gift the server stopped listing for another reason (hidden in
- * Canlı ayarlar, which it refuses) drops.
+ * The gifts of `compiled` (a fixed list: CP gifts, a chat's gifts) that the server still lists, as they are now. From
+ * a server that says it all (gifts=2) its list decides; otherwise the compiled order without the ones off the shelf for
+ * now (data/gifts-paused; an older server still lists them). When none would be left, the whole compiled list: the app
+ * never hides every gift.
  */
-export function bagGifts<G extends { id: string }>(compiled: G[], c: LiveCatalog | null = current): G[] {
+export function visibleGifts<G extends Gift>(compiled: G[], c: LiveCatalog | null = current): G[] {
   const listed = c?.giftIds ? new Set(c.giftIds) : null;
-  return compiled.filter((g) => !listed || listed.has(g.id) || GIFTS_PAUSED.has(g.id));
+  const shown = trusted(c) ? compiled.filter((g) => c.shelf.includes(g.id)) : compiled.filter((g) => !GIFTS_PAUSED.has(g.id) && (!listed || listed.has(g.id)));
+  return asNow(shown.length ? shown : compiled, c);
+}
+/** `list` as the gifts are now: the same array when the server changed none of the app's gifts. */
+const asNow = <G extends Gift>(list: G[], c: LiveCatalog | null): G[] => (c && Object.keys(c.app).length ? list.map((g) => liveGiftOf(g, c)) : list);
+
+/**
+ * Çantam: what may be sent from the backpack, as the gifts are now. A gift off the shelf for now stays sendable there
+ * (the server takes it, and the daily call task puts Kalp in the bag); only a gift the server stopped listing for
+ * another reason (hidden in Canlı ayarlar, which it refuses) drops. From a server that says it all, its backpack list
+ * (lib/live/backpack) already leaves those out.
+ */
+export function bagGifts<G extends Gift>(compiled: G[], c: LiveCatalog | null = current): G[] {
+  const listed = c?.giftIds ? new Set(c.giftIds) : null;
+  return asNow(
+    compiled.filter((g) => trusted(c) || !listed || listed.has(g.id) || GIFTS_PAUSED.has(g.id)),
+    c,
+  );
 }
 
-let shelfMemo: { c: LiveCatalog | null; gifts: Gift[] } | null = null;
 /**
- * Every gift that may be sent now: the admins' gifts the server lists (first, in its order: they lead their shelves),
- * then the compiled ones visibleGifts leaves. The same array until the catalog changes.
+ * Every gift that may be sent now, in the shelves' order. From a server that says it all: its list (the admins' and
+ * the app's own as they are now). Otherwise the admins' gifts the server lists (first, in its order: they lead their
+ * shelves), then the compiled ones visibleGifts leaves. The same array until the catalog changes.
  */
 export function giftShelf(c: LiveCatalog | null = current): Gift[] {
-  if (shelfMemo?.c !== c) shelfMemo = { c, gifts: [...(c?.remote ?? []), ...visibleGifts(GIFTS, c)] };
-  return shelfMemo.gifts;
+  return viewsOf(c).shelf;
 }
 
 /**
- * A gift by id, to draw a gift that arrives (a room's announcement, a combo, a history line): a compiled one, or an
- * admin's this phone's catalog lists. Undefined for one it doesn't know (an admin's gift newer than the copy here:
- * read the catalog again, refreshLiveCatalog).
+ * A gift by id, to draw a gift that arrives (a room's announcement, a combo, a history line): one of the app's as it
+ * is now, or an admin's this phone's catalog lists. Undefined for one it doesn't know (an admin's gift newer than the
+ * copy here: read the catalog again, refreshLiveCatalog).
  */
 export function giftById(id: string | null | undefined, c: LiveCatalog | null = current): Gift | undefined {
   if (!id) return undefined;
-  return GIFTS.find((g) => g.id === id) ?? c?.remote.find((g) => g.id === id);
+  return viewsOf(c).byId.get(id);
 }
 
-/** An admin's gift's icon address (components/GiftArt), or undefined. */
-export const remoteIconOf = (id: string, c: LiveCatalog | null = current): string | undefined => c?.remote.find((g) => g.id === id)?.icon;
+/** Every gift this phone can draw, the app's own as they are now and the admins' listed (the profile's gift wall). */
+export const everyGift = (c: LiveCatalog | null = current): Gift[] => [...viewsOf(c).byId.values()];
+
+/** A gift's icon address when the server gave one (an admin's gift, or one of the app's whose icon was replaced). */
+export const remoteIconOf = (id: string, c: LiveCatalog | null = current): string | undefined => c?.app[id]?.icon ?? c?.remote.find((g) => g.id === id)?.icon;
 
 let rulesMemo: { rate: number; rules: Rules } | null = null;
 /** The rules with the server's Çevir rate (lib/coins-bank selfExchangeRate / exchangeOwnDiamonds); RULES when
@@ -279,7 +364,8 @@ export function fetchLiveCatalog(): Promise<unknown> {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
     try {
-      const res = await fetch(`${BASE}/api/catalog`, { signal: ctrl.signal });
+      // gifts=2: the whole story about the app's own gifts too (server/api/gifts.mjs).
+      const res = await fetch(`${BASE}/api/catalog?gifts=2`, { signal: ctrl.signal });
       if (!res.ok) throw new Error(`Sunucu hatası (${res.status})`);
       const body: unknown = await res.json();
       fetchedAt = Date.now();
@@ -308,7 +394,7 @@ export const liveCatalogStale = (now = Date.now()) => !current || now - fetchedA
 /** The server named its current Çevir rate (409 rate_changed): the screens show it before the catalog is read again. */
 export function noteLiveRate(usdTry: unknown) {
   if (!validRate(usdTry)) return;
-  publish({ ...(current ?? { v: 0, giftIds: null, packs: [], campaign: null, fx: null, remote: [] }), usdTry });
+  publish({ ...(current ?? { v: 0, giftIds: null, packs: [], campaign: null, fx: null, remote: [], shelf: null, app: {} }), usdTry });
 }
 
 const subscribe = (l: () => void) => {

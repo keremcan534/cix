@@ -81,7 +81,7 @@ export function LuckyBagSheet({ visible, room, rules, coins, svipLevel, onClose,
   const send = async () => {
     if (busy) return;
     if (kind === 'gift' && !gift) return;
-    const body: BagDrop = kind === 'coins' ? { kind, amount: a, packets: cp, delay: d, followersOnly: followers } : { kind, giftId: gift!.id, count: gc, packets: gp, delay: d, followersOnly: followers };
+    const body: BagDrop = kind === 'coins' ? { kind, amount: a, packets: cp, delay: d, followersOnly: followers } : { kind, giftId: gift!.id, count: gc, price: gift!.price, packets: gp, delay: d, followersOnly: followers };
     setBusy(true);
     try {
       const bag = await dropBag(room, body);

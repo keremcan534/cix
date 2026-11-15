@@ -2765,7 +2765,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // (server/api/backpack.mjs) no coins move: the server takes the gifts out of the backpack, and the room draws it at
   // the catalog's price, as the other phones do.
   const deliverLiveGifts = async (sheetGift: Gift, toIds: string[], count: number, fromBag = false, quiet = false): Promise<number> => {
-    const gift = fromBag ? (GIFTS.find((g) => g.id === sheetGift.id) ?? sheetGift) : sheetGift;
+    const gift = fromBag ? (giftById(sheetGift.id) ?? sheetGift) : sheetGift;
     const sent: string[] = [];
     let error: string | null = null;
     for (const uid of toIds) {
@@ -2777,7 +2777,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       }
       try {
         if (fromBag) await liveBackpackGift(uid, gift.id, count, id);
-        else await liveGift(uid, gift.id, count, id);
+        else await liveGift(uid, gift.id, count, id, undefined, gift.price);
         sent.push(uid);
       } catch (e) {
         error = errorText(e);

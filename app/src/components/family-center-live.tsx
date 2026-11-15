@@ -109,7 +109,7 @@ export function useFamilyGift(list: Gift[], place: GiftPlace | undefined, onSent
       return false;
     }
     try {
-      await liveGift(to.id, g.id, 1, undefined, place);
+      await liveGift(to.id, g.id, 1, undefined, place, g.price);
     } catch (e) {
       showAlert('Hediye gönderilemedi', message(e), [
         { text: 'Tamam', style: 'cancel' },

@@ -3,7 +3,7 @@
 //
 //   GET  /api/lucky-bags?room=                 → { bags, rules, serverNow }   the room's bags still open
 //   GET  /api/lucky-bags/one?id=               → { bag, grabs }                who won how much (after the draw)
-//   POST /api/lucky-bags       { room, kind, amount?, giftId?, count?, packets, delay, followersOnly, ref }
+//   POST /api/lucky-bags       { room, kind, amount?, giftId?, count?, price?, packets, delay, followersOnly, ref }
 //                                              → { bag, user, replay }
 //   POST /api/lucky-bags/grab  { id }          → { joined, bag }               I'm in the draw (again: no change)
 //
@@ -20,7 +20,7 @@
 // for Cömertlik (wheel.mjs wealthPoints: "çantası"); reward coins ('odul') can't go in a bag (spendCoins 'paid').
 import { recordIncome } from './agency-lib.mjs';
 import { svipLevel } from './catalog.mjs';
-import { giftNameOf, giftOf } from './custom-gifts.mjs';
+import { checkShownPrice, giftNameOf, giftOf } from './custom-gifts.mjs';
 import { HttpError, auth, blockedBetween, claimRef, db, env, int, limit, once, readJson, tx } from './core.mjs';
 import { announceGift, liveKitRoom, ROOM } from './gifts.mjs';
 import { live } from './live-settings.mjs';
@@ -201,7 +201,8 @@ export const luckyBagRoutes = {
       if (!units || !BAG_RULES.coins.includes(units)) throw new HttpError(400, `Çantaya ${BAG_RULES.coins.map(fmt).join(', ')} jeton konabilir`);
       if (!packets || !BAG_RULES.coinPackets.includes(packets)) throw new HttpError(400, `Pay sayısı ${BAG_RULES.coinPackets.join(', ')} olabilir`);
     } else {
-      // A compiled gift or an admin's on the shelves (custom-gifts.mjs), at this server's price.
+      // One of the app's gifts (as changed in the panel) or an admin's on the shelves (custom-gifts.mjs), at this
+      // server's price; checkShownPrice below, once the ref is claimed.
       gift = giftOf(b.giftId);
       if (!gift || live().giftsHidden.has(gift.id)) throw new HttpError(400, 'Bu hediye artık yok');
       if (gift.minSvip && svipLevel(Number(u.svip_xp)) < gift.minSvip) throw new HttpError(403, `${gift.name} VIP ${gift.minSvip} ve üstü için`);
@@ -221,6 +222,8 @@ export const luckyBagRoutes = {
     const out = await once(u.id, 'coin', b.ref, async (c) => {
       await c.query('SELECT 1 FROM users WHERE id = $1 FOR UPDATE', [u.id]);
       await claimRef(c, u.id, 'coin', b.ref);
+      // The unit price the phone showed (none from an older app): a gift whose price moved is refused, nothing moves.
+      if (gift) checkShownPrice(gift, b.price);
       // "çantası" keeps it out of Cömertlik (wheel.mjs wealthPoints).
       const parts = await spendCoins(c, u.id, total, `${kind === 'coins' ? 'Jeton çantası' : 'Hediye çantası'}: ${what}`, b.ref, null, { detail: { luckyBag: kind } });
       const shares = split(units, packets);

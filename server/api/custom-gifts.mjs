@@ -1,16 +1,27 @@
 // Yönetim › Hediyeler: gifts the admins add, change, take down and order from the panel, with no app update
-// (docs/HEDIYE_YONETIMI.md). The compiled gifts (catalog.mjs GIFTS, in step with the app) stay as they are; these come
-// next to them, from the custom_gifts table (066).
+// (docs/HEDIYE_YONETIMI.md), and the app's own gifts (catalog.mjs GIFTS, in step with the app) changed the same way:
+// name, emoji, price, shelf, VIP level, order, on the shelves or not, icon and video, each back to the app's value at
+// will. Both live in the custom_gifts table (066, 069): an admin's gift is a row of its own ('a' and a number); a row
+// with a compiled gift's id (builtin) holds only what was changed about it, every NULL column "as in the app".
 //
-//   GET  /api/admin/gifts                                  → { gifts, limits, convert, storage }
+//   GET  /api/admin/gifts[?builtin=1]                      → { gifts, limits, convert, storage }  (builtin=1: the app's own too)
 //   POST /api/admin/gifts        { name, price, cat, minSvip?, emoji?, enabled?, icon, video? } → { gift }
 //   POST /api/admin/gifts/update { id, …any of the above; video: null takes it off }        → { gift }
-//   POST /api/admin/gifts/delete { id }                    → { deleted }
+//        an app's own gift too: icon: null gives it the app's picture again, video: null stops its video
+//   POST /api/admin/gifts/reset  { id, fields? }           → { gift }   an app's own gift back to the app's values
+//        (fields: any of name, emoji, price, cat — with its VIP level —, enabled, sort, icon, video; none: all)
+//   POST /api/admin/gifts/delete { id }                    → { deleted }  (an admin's gift; the app's own can't go)
 //   POST /api/admin/gifts/order  { ids }                   → { gifts }   (each id's place: its index; lower first)
 //   POST /api/admin/gifts/fetch  { slot: 'icon'|'video', url } → { url, link, kind, type, bytes, video, svga }
 //        a file from a link the admin pasted, downloaded once here and stored as if uploaded (fetchRoute below);
 //        create and update take iconLink / videoLink with it, so the panel can fetch the same link again.
 //   GET|HEAD /api/fx/g/<id>.mp4                            → a gift's stacked video (sendCustomFx, public)
+//
+// The app's own gifts in older apps: they draw the compiled name, picture and price whatever the server says, so a
+// gift whose price was changed is left out of their catalog (a newer app asks for ?gifts=2) and refused from them at
+// send (checkShownPrice: a newer app sends the price it showed, 409 price_changed when it moved meanwhile). A replaced
+// video reaches every app since the admins' gifts came (preview with /api/fx/g/); a gift put back on the shelves only
+// the apps that trust the server's list (gifts=2) show, the others keep the compiled pause list (catalog.mjs).
 //
 // Admins only; every change is an audit_events row (who, what, before and after, from where). `icon` and `video.url`
 // are files uploaded first (media.mjs kinds gifticon, giftvideo, giftsource). video: { url, kind: 'stacked' } is a
@@ -20,11 +31,13 @@
 // screen), one at a time; the video in effect stays until the new one is done. Nothing here removes a background: a
 // source without transparency is refused, and the panel says so.
 //
-// What the phones get: GET /api/catalog lists the enabled ones before the compiled gifts (catalogGifts: icon, emoji,
-// custom: true; the app puts them first on their shelf) and their videos in `fx` at /api/fx/g/<id>.mp4?v=… (customFx). An older app shows only
-// the gifts compiled into it, and its fx filter refuses that address, so it never downloads a clip it can't use. The
-// catalog's and /api/config's `v` add customGiftsRev(), so a change here makes the phones read the catalog again. A
-// gift is sent at this server's price like any other (gifts.mjs, lucky-bags.mjs giftOf).
+// What the phones get: GET /api/catalog lists every gift on the shelves in the shelves' order (catalogGifts: an
+// admin's with icon, emoji, custom: true; the app's own with what was changed, an icon only when it was replaced) and
+// the videos in `fx`, the replaced and the admins' at /api/fx/g/<id>.mp4?v=… (giftFx; fx.mjs leaves out the app's
+// clips that were replaced or stopped, replacedClips). An app older than the admins' gifts shows only the gifts
+// compiled into it, and its fx filter refuses that address, so it never downloads a clip it can't use. The catalog's
+// and /api/config's `v` add customGiftsRev(), so a change here makes the phones read the catalog again. A gift is
+// sent at this server's price like any other (gifts.mjs, lucky-bags.mjs giftOf).
 //
 // The table is kept in memory (refreshCustomGifts after every change here, and every CUSTOM_GIFTS_POLL_MS for
 // another process's). FFMPEG / FFPROBE / PYTHON: the programs (default ffmpeg, ffprobe, python3 with numpy and
@@ -36,9 +49,10 @@ import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
 
-import { GIFTS } from './catalog.mjs';
+import { artUrl } from './art.mjs';
+import { GIFTS, GIFTS_PAUSED } from './catalog.mjs';
 import { HttpError, auth, clientIp, db, env, int, limit, readJson, text, tx } from './core.mjs';
-import { FX_PATH, mp4Duration } from './fx.mjs';
+import { FX_PATH, giftClip, mp4Duration } from './fx.mjs';
 import { panelDetail } from './panel.mjs';
 import { download, linkOf } from './link-fetch.mjs';
 import { downloadStored, keyOf, kindMax, readStored, removeFiles, sendFile, storageOn, storeFile, storedUrl, verifyUpload, writeStored } from './media.mjs';
@@ -77,28 +91,37 @@ export const LIMITS = Object.freeze({
   fills: [0.45, 0.6, 0.8, 1],
   fill: 0.6,
 });
+/** An admin's gift's id; the app's own are catalog.mjs GIFTS keys (g1, h15, c13, v12, …, never 'a'). */
 const ID = /^a[0-9]{1,9}$/;
 const fmt = (n) => n.toLocaleString('tr-TR');
 const mb = (n) => (n / 1024 / 1024).toLocaleString('tr-TR', { maximumFractionDigits: 1 });
 const lower = (s) => s.toLocaleLowerCase('tr');
+/** Where an app's gift sits on its shelf until someone moves it: after the admins' own, in the app's order. */
+const APP_SORT = new Map([...GIFTS.keys()].map((id, i) => [id, 1000 + i]));
+const num = (v) => (v === null || v === undefined ? null : Number(v));
 
 // --- The table in memory -----------------------------------------------------------------------------------
 /** rev: the largest custom_gifts.rev (0: none yet); rows: id → the row as the rest of the server reads it. */
 let snap = { rev: 0, rows: new Map() };
 
+/** A row as it is stored; on an app's gift (builtin) every null is "as in the app". */
 const viewOf = (r) =>
   Object.freeze({
     id: r.id,
+    builtin: r.builtin === true,
     name: r.name,
     emoji: r.emoji,
-    price: Number(r.price),
+    price: num(r.price),
     cat: r.cat,
-    minSvip: Number(r.min_svip),
-    sort: Number(r.sort),
+    minSvip: num(r.min_svip),
+    sort: num(r.sort),
     enabled: r.enabled,
     deleted: !!r.deleted_at,
     icon: r.icon_url,
     video: r.video_url ? Object.freeze({ url: r.video_url, bytes: Number(r.video_bytes), ms: Number(r.video_ms ?? 0), v: r.video_v }) : null,
+    videoOff: r.video_off === true,
+    job: r.job_status ?? null,
+    updatedAt: r.updated_at ?? null,
   });
 
 /** Reads the table again (never back to an older copy). */
@@ -137,34 +160,122 @@ export function stopCustomGifts() {
 
 /** Added to the live settings' version in the catalog and /api/config: grows with every change a phone should see. */
 export const customGiftsRev = () => snap.rev;
-/** The gifts on the shelves now, in their order. */
-const listed = () => [...snap.rows.values()].filter((g) => g.enabled && !g.deleted);
 
 /**
- * A gift that may be sent now, at this server's price: a compiled one (catalog.mjs GIFTS), or an admin's that is on
- * the shelves ({ id, name, price, cat, minSvip, custom: true }). Undefined for anything else.
+ * An app's own gift as it is now: the app's values (catalog.mjs GIFTS) with what the admins changed (`o`, its row as
+ * viewOf reads it, or null). `icon` and `video` are only the replaced ones (null: the app's own picture, and its own
+ * clip unless videoOff).
+ */
+function appGiftOf(base, o) {
+  const cat = o?.cat ?? base.cat;
+  return {
+    id: base.id,
+    builtin: true,
+    name: o?.name ?? base.name,
+    emoji: o?.emoji ?? base.emoji,
+    price: o?.price ?? base.price,
+    cat,
+    minSvip: cat === 'privilege' ? Math.max(1, o?.minSvip ?? base.minSvip) : 0,
+    sort: o?.sort ?? APP_SORT.get(base.id),
+    enabled: o?.enabled ?? !GIFTS_PAUSED.has(base.id),
+    icon: o?.icon ?? null,
+    video: o?.video ?? null,
+    videoOff: !!o?.videoOff,
+  };
+}
+/** One of the app's gifts as it is now (appGiftOf); undefined for an id that isn't one of them. */
+export function builtinGift(id) {
+  const base = typeof id === 'string' ? GIFTS.get(id) : undefined;
+  return base ? appGiftOf(base, snap.rows.get(id) ?? null) : undefined;
+}
+/** An admin's gift as the rest of this module reads it. */
+const customGift = (r) => ({ ...r, builtin: false, videoOff: false });
+
+const CAT_ORDER = (cat) => CATS.indexOf(cat);
+/** The shelves' order: shelf, place on it, an admin's before the app's at the same place, then the older first. */
+const byShelf = (a, b) =>
+  CAT_ORDER(a.cat) - CAT_ORDER(b.cat) || a.sort - b.sort || Number(a.builtin) - Number(b.builtin) || (APP_SORT.get(a.id) ?? 0) - (APP_SORT.get(b.id) ?? 0) || a.id.length - b.id.length || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+
+let memo = { snap: null, all: [] };
+/** Every gift that isn't deleted, as it is now (the admins' and the app's own), in the shelves' order. */
+export function allGifts() {
+  if (memo.snap !== snap) {
+    const all = [...[...snap.rows.values()].filter((r) => !r.builtin && !r.deleted).map(customGift), ...[...GIFTS.keys()].map(builtinGift)];
+    memo = { snap, all: all.sort(byShelf) };
+  }
+  return memo.all;
+}
+/** The gifts on the shelves now, in their order. */
+const listed = () => allGifts().filter((g) => g.enabled);
+
+/**
+ * A gift that may be sent now, at this server's price: an app's own one (as changed in the panel; also while it is off
+ * the shelves, as the app's paused gifts always were: an older app or Çantam may still send it), or an admin's that is
+ * on the shelves ({ id, name, price, cat, minSvip, emoji, custom: true }). Undefined for anything else.
  */
 export function giftOf(id) {
   if (typeof id !== 'string') return undefined;
-  const compiled = GIFTS.get(id);
-  if (compiled) return compiled;
+  const app = builtinGift(id);
+  if (app) return { id, name: app.name, emoji: app.emoji, price: app.price, cat: app.cat, minSvip: app.minSvip, builtin: true };
   const g = snap.rows.get(id);
-  return g && g.enabled && !g.deleted ? { id: g.id, name: g.name, price: g.price, cat: g.cat, minSvip: g.minSvip, custom: true } : undefined;
+  return g && !g.builtin && g.enabled && !g.deleted ? { id: g.id, name: g.name, emoji: g.emoji, price: g.price, cat: g.cat, minSvip: g.minSvip, custom: true } : undefined;
 }
-/** A gift's name, a taken-down or deleted one's too (history lines, Şanslı çanta); null when nothing has this id. */
-export const giftNameOf = (id) => GIFTS.get(id)?.name ?? snap.rows.get(id)?.name ?? null;
-/** Every admin's gift that isn't deleted (the profile's Vitrin counts them). */
-export const customGiftIds = () => [...snap.rows.values()].filter((g) => !g.deleted).map((g) => g.id);
+/** A gift's name now, a taken-down or deleted one's too (history lines, Şanslı çanta); null when nothing has this id. */
+export const giftNameOf = (id) => builtinGift(id)?.name ?? snap.rows.get(id)?.name ?? null;
+/** Every admin's gift that isn't deleted (the profile's Vitrin counts them; the app's own it counts anyway). */
+export const customGiftIds = () => [...snap.rows.values()].filter((g) => !g.builtin && !g.deleted).map((g) => g.id);
 
-/** GET /api/catalog: the admins' gifts on the shelves, for the phones that can draw them (an older app skips them). */
-export const catalogGifts = () => listed().map((g) => ({ id: g.id, name: g.name, price: g.price, cat: g.cat, minSvip: g.minSvip, emoji: g.emoji, icon: g.icon, custom: true }));
+/**
+ * The price a phone showed for `gift` (a newer app sends it with the gift, `shown`): a gift whose price changed since
+ * the phone read the catalog is refused and nothing moves (409 price_changed with the price now; the phone reads the
+ * catalog again). An older app sends none and shows the app's own price: one of the app's gifts whose price was
+ * changed in the panel is refused there (409 update_required). An admin's gift has no price of the app's.
+ */
+export function checkShownPrice(gift, shown) {
+  if (shown !== undefined && shown !== null) {
+    if (shown === gift.price) return;
+    throw Object.assign(new HttpError(409, `${gift.name} hediyesinin fiyatı değişti: artık ${fmt(gift.price)} jeton. Yeni fiyatı görüp yeniden gönder.`), {
+      extra: { code: 'price_changed', giftId: gift.id, price: gift.price },
+    });
+  }
+  const base = GIFTS.get(gift.id);
+  if (base && base.price !== gift.price) {
+    throw Object.assign(new HttpError(409, `${gift.name} hediyesinin fiyatı değişti. Göndermek için uygulamayı güncelle.`), { extra: { code: 'update_required' } });
+  }
+}
+
+/**
+ * GET /api/catalog `gifts`: every gift on the shelves, in the shelves' order. An admin's: { id, name, price, cat,
+ * minSvip, emoji, icon, custom: true } (an older app skips it); the app's own: { id, name, emoji, price, cat, minSvip }
+ * as changed, and `icon` when it was replaced (an app reading gifts=2 draws these; an older one only takes the id).
+ * `app2`: the phone reads it all (?gifts=2); otherwise the app's gifts whose price was changed are left out, since
+ * that app would show its own price.
+ */
+export function catalogGifts({ app2 = false, hidden = new Set() } = {}) {
+  const out = [];
+  for (const g of listed()) {
+    if (g.builtin) {
+      if (hidden.has(g.id) || (!app2 && g.price !== GIFTS.get(g.id).price)) continue;
+      out.push({ id: g.id, name: g.name, emoji: g.emoji, price: g.price, cat: g.cat, minSvip: g.minSvip, ...(g.icon ? { icon: g.icon } : {}) });
+    } else out.push({ id: g.id, name: g.name, price: g.price, cat: g.cat, minSvip: g.minSvip, emoji: g.emoji, icon: g.icon, custom: true });
+  }
+  return out;
+}
 const fxUrl = (id, v) => `${FX_PATH}g/${id}.mp4?v=${v}`;
-/** GET /api/catalog `fx`: their videos, as fx.mjs lists the compiled ones. */
-export const customFx = () => listed().filter((g) => g.video).map((g) => ({ kind: 'gift', id: g.id, url: fxUrl(g.id, g.video.v), bytes: g.video.bytes, ms: g.video.ms }));
+/**
+ * GET /api/catalog `fx`, next to fx.mjs's list: the admins' gifts' videos (those on the shelves) and the videos the
+ * app's own gifts were given instead of theirs (on the shelves or not: they can still be sent), at this server.
+ */
+export const giftFx = (hidden = new Set()) =>
+  allGifts()
+    .filter((g) => g.video && !hidden.has(g.id) && (g.builtin || g.enabled))
+    .map((g) => ({ kind: 'gift', id: g.id, url: fxUrl(g.id, g.video.v), bytes: g.video.bytes, ms: g.video.ms }));
+/** The app's gifts whose own clip (fx.mjs) isn't played: given another video, or stopped. fx.mjs leaves them out. */
+export const replacedClips = () => new Set([...snap.rows.values()].filter((r) => r.builtin && (r.video || r.videoOff)).map((r) => r.id));
 
 /** GET or HEAD /api/fx/g/<id>.mp4: the gift's stacked video from the storage (a taken-down one's too, for the panel's preview). */
 export async function sendCustomFx(req, res, name) {
-  const m = /^(a[0-9]{1,9})\.mp4$/.exec(name);
+  const m = /^([a-z][0-9]{1,9})\.mp4$/.exec(name);
   const g = m ? snap.rows.get(m[1]) : null;
   const key = g && !g.deleted && g.video ? keyOf(g.video.url) : null;
   if (!key) return void res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' }).end('Bulunamadı');
@@ -595,9 +706,10 @@ async function admin(req) {
   if (u.role !== 'admin') throw new HttpError(403, 'Yönetici hesabı gerekli');
   return u;
 }
-const idOf = (v) => {
-  if (typeof v !== 'string' || !ID.test(v)) throw new HttpError(400, 'Geçersiz hediye');
-  return v;
+/** A gift's id in a body: an admin's ('a' and a number), with `app` one of the app's own too. */
+const idOf = (v, { app = false } = {}) => {
+  if (typeof v === 'string' && (ID.test(v) || (app && GIFTS.has(v)))) return v;
+  throw new HttpError(400, 'Geçersiz hediye');
 };
 const nameOf = (v) => text(v, LIMITS.nameMin, LIMITS.nameMax, 'Ad').replace(/\s+/g, ' ');
 const priceOf = (v) => {
@@ -623,11 +735,11 @@ const emojiOf = (v) => {
   if (!s || s.length > 16 || /[\p{L}\p{N}<>&]/u.test(s)) throw new HttpError(400, 'Emoji yalnız bir emoji olmalı');
   return s;
 };
-/** No two gifts on the shelves with one name: the compiled ones included. */
+/** No two gifts with one name: the app's own (as they are named now) and the admins' that aren't deleted. */
 function nameFree(name, self) {
   const n = lower(name);
-  if ([...GIFTS.values()].some((g) => lower(g.name) === n)) throw new HttpError(409, `“${name}” uygulamadaki bir hediyenin adı, başka bir ad seç`);
-  if ([...snap.rows.values()].some((g) => !g.deleted && g.id !== self && lower(g.name) === n)) throw new HttpError(409, `“${name}” adında bir hediye zaten var`);
+  const taken = allGifts().find((g) => g.id !== self && lower(g.name) === n);
+  if (taken) throw new HttpError(409, taken.builtin ? `“${name}” uygulamadaki bir hediyenin adı, başka bir ad seç` : `“${name}” adında bir hediye zaten var`);
 }
 /** video in a body: undefined (unchanged), null (taken off), or a checked stacked video or source. */
 async function videoOf(v) {
@@ -648,60 +760,165 @@ async function saving(fn) {
     throw e;
   }
 }
-/** What the audit keeps of a row. */
+/** What the audit keeps of a row (an app's gift's: null where it is as in the app). */
 const auditOf = (r) =>
   r && {
+    ...(r.builtin ? { builtin: true } : {}),
     name: r.name,
     emoji: r.emoji,
-    price: Number(r.price),
+    price: num(r.price),
     cat: r.cat,
-    minSvip: Number(r.min_svip),
+    minSvip: num(r.min_svip),
+    sort: num(r.sort),
     enabled: r.enabled,
     icon: r.icon_url,
     video: r.video_url ?? null,
+    ...(r.video_off ? { videoOff: true } : {}),
     job: r.job_status ?? null,
     iconLink: r.icon_link ?? null,
     videoLink: r.video_link ?? null,
   };
 /** iconLink / videoLink in a body: undefined (unchanged), null (none: the file was uploaded) or a checked link. */
 const linkField = (v) => (v === undefined ? undefined : v === null || v === '' ? null : linkOf(v));
-const SHELF_ORDER = `array_position(ARRAY['hot', 'couple', 'gameplay', 'privilege'], g.cat), g.sort, length(g.id), g.id`;
 
-/** The panel's view of gifts that aren't deleted (all, or `ids`), with how often each was sent. */
-async function adminGifts(ids = null) {
+/**
+ * The place before every gift on `cat` now (an admin's, or an app's whose place was set), where a new gift or one
+ * moved there goes. The app's gifts nobody moved sit after the admins' anyway (APP_SORT).
+ */
+async function firstSort(c, cat) {
+  const appIds = [...GIFTS.values()].filter((g) => g.cat === cat).map((g) => g.id);
+  const r = await c.query(
+    `SELECT coalesce(min(sort), 1) - 1 AS s FROM custom_gifts
+      WHERE deleted_at IS NULL AND sort IS NOT NULL AND (cat = $1 OR (builtin AND cat IS NULL AND id = ANY($2::text[])))`,
+    [cat, appIds],
+  );
+  return Number(r.rows[0].s);
+}
+/** An app's gift's row, made the first time anything about it changes: every column null, i.e. as in the app. */
+const appRows = (c, ids, actor) =>
+  c.query(
+    `INSERT INTO custom_gifts (id, builtin, name, emoji, price, cat, min_svip, sort, enabled, icon_url, created_by, updated_by)
+     SELECT x, true, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, $2, $2 FROM unnest($1::text[]) AS x ON CONFLICT (id) DO NOTHING`,
+    [ids, actor],
+  );
+
+/** What an app's gift is in the app itself: the panel shows it next to what it is now, and goes back to it. */
+function originalOf(id) {
+  const base = GIFTS.get(id);
+  const clip = giftClip(id);
+  return {
+    name: base.name,
+    emoji: base.emoji,
+    price: base.price,
+    cat: base.cat,
+    minSvip: base.minSvip,
+    enabled: !GIFTS_PAUSED.has(id),
+    icon: artUrl('gifts', id),
+    video: clip ? { url: clip.url, bytes: clip.bytes, ms: clip.ms } : null,
+  };
+}
+/**
+ * Which of an app's gift's values were changed (the row's columns that aren't null), as RESET names them. Its place
+ * isn't among them: ordering a shelf places every gift on it, and the panel shows the order anyway.
+ */
+const changedOf = (r) =>
+  !r
+    ? []
+    : [
+        ...(r.name !== null ? ['name'] : []),
+        ...(r.emoji !== null ? ['emoji'] : []),
+        ...(r.price !== null ? ['price'] : []),
+        ...(r.cat !== null || r.min_svip !== null ? ['cat'] : []),
+        ...(r.enabled !== null ? ['enabled'] : []),
+        ...(r.icon_url !== null ? ['icon'] : []),
+        ...(r.video_url !== null || r.video_off || r.job_status !== null ? ['video'] : []),
+      ];
+
+/** An admin's gift as the panel shows it. */
+const customView = (x, sent) => ({
+  id: x.id,
+  builtin: false,
+  name: x.name,
+  emoji: x.emoji,
+  price: Number(x.price),
+  cat: x.cat,
+  minSvip: Number(x.min_svip),
+  sort: Number(x.sort),
+  enabled: x.enabled,
+  icon: x.icon_url,
+  // Where the icon and the video were fetched from (null: uploaded), for fetching them again.
+  iconLink: x.icon_link ?? null,
+  videoLink: x.video_link ?? null,
+  // At this server (the fx route serves it for the preview even while the gift is taken off).
+  video: x.video_url ? { url: fxUrl(x.id, x.video_v), bytes: Number(x.video_bytes), ms: Number(x.video_ms ?? 0) } : null,
+  job: x.job_status ? { status: x.job_status, error: x.job_error ?? null } : null,
+  sent: sent.get(x.id) ?? { count: 0, coins: 0 },
+  createdAt: x.created_at,
+  updatedAt: x.updated_at,
+  updatedBy: x.updated_by ? { id: x.updated_by, name: x.updated_by_name ?? null } : null,
+});
+/**
+ * An app's own gift as the panel shows it: as it is now (the app's picture, served here, unless one was given
+ * instead; its own clip unless replaced or stopped), what it is in the app (`original`) and what was changed.
+ */
+function appView(id, x, sent) {
+  const g = appGiftOf(GIFTS.get(id), x ? viewOf(x) : null);
+  const original = originalOf(id);
+  return {
+    id,
+    builtin: true,
+    name: g.name,
+    emoji: g.emoji,
+    price: g.price,
+    cat: g.cat,
+    minSvip: g.minSvip,
+    sort: g.sort,
+    enabled: g.enabled,
+    icon: g.icon ?? original.icon,
+    iconLink: x?.icon_link ?? null,
+    videoLink: x?.video_link ?? null,
+    video: g.video ? { url: fxUrl(id, g.video.v), bytes: g.video.bytes, ms: g.video.ms } : g.videoOff ? null : original.video,
+    videoOff: g.videoOff,
+    job: x?.job_status ? { status: x.job_status, error: x.job_error ?? null } : null,
+    // The app's gifts have no index of their own in gift_events: the last 30 days, found by time.
+    sent: sent.get(id) ?? { count: 0, coins: 0, days: 30 },
+    original,
+    changed: changedOf(x),
+    createdAt: null,
+    updatedAt: x?.updated_at ?? null,
+    updatedBy: x?.updated_by ? { id: x.updated_by, name: x.updated_by_name ?? null } : null,
+  };
+}
+
+/**
+ * The panel's view of gifts that aren't deleted (all, or `ids`), in the shelves' order, with how often each was sent.
+ * The app's own gifts only with `app` (or when `ids` names them): an older panel lists the admins' alone.
+ */
+async function adminGifts(ids = null, { app = false } = {}) {
+  const withApp = app || (ids ?? []).some((id) => GIFTS.has(id));
   const r = await db.query(
     `SELECT g.*, u.name AS updated_by_name FROM custom_gifts g LEFT JOIN users u ON u.id = g.updated_by
-      WHERE g.deleted_at IS NULL AND ($1::text[] IS NULL OR g.id = ANY($1::text[])) ORDER BY ${SHELF_ORDER}`,
-    [ids],
+      WHERE g.deleted_at IS NULL AND ($1::text[] IS NULL OR g.id = ANY($1::text[])) AND ($2 OR NOT g.builtin)`,
+    [ids, withApp],
   );
+  const custom = r.rows.filter((x) => !x.builtin);
+  const rows = new Map(r.rows.filter((x) => x.builtin).map((x) => [x.id, x]));
+  const appIds = withApp ? [...GIFTS.keys()].filter((id) => !ids || ids.includes(id)) : [];
   const sent = new Map();
-  if (r.rowCount) {
+  if (custom.length) {
     const s = await db.query("SELECT gift_id, sum(count)::bigint AS n, sum(total)::bigint AS coins FROM gift_events WHERE gift_id LIKE 'a%' AND gift_id = ANY($1::text[]) GROUP BY gift_id", [
-      r.rows.map((x) => x.id),
+      custom.map((x) => x.id),
     ]);
     for (const x of s.rows) sent.set(x.gift_id, { count: Number(x.n), coins: Number(x.coins) });
   }
-  return r.rows.map((x) => ({
-    id: x.id,
-    name: x.name,
-    emoji: x.emoji,
-    price: Number(x.price),
-    cat: x.cat,
-    minSvip: Number(x.min_svip),
-    sort: Number(x.sort),
-    enabled: x.enabled,
-    icon: x.icon_url,
-    // Where the icon and the video were fetched from (null: uploaded), for fetching them again.
-    iconLink: x.icon_link ?? null,
-    videoLink: x.video_link ?? null,
-    // At this server (the fx route serves it for the preview even while the gift is taken off).
-    video: x.video_url ? { url: fxUrl(x.id, x.video_v), bytes: Number(x.video_bytes), ms: Number(x.video_ms ?? 0) } : null,
-    job: x.job_status ? { status: x.job_status, error: x.job_error ?? null } : null,
-    sent: sent.get(x.id) ?? { count: 0, coins: 0 },
-    createdAt: x.created_at,
-    updatedAt: x.updated_at,
-    updatedBy: x.updated_by ? { id: x.updated_by, name: x.updated_by_name ?? null } : null,
-  }));
+  if (appIds.length) {
+    const s = await db.query(
+      "SELECT gift_id, sum(count)::bigint AS n, sum(total)::bigint AS coins FROM gift_events WHERE created_at >= now() - interval '30 days' AND gift_id = ANY($1::text[]) GROUP BY gift_id",
+      [appIds],
+    );
+    for (const x of s.rows) sent.set(x.gift_id, { count: Number(x.n), coins: Number(x.coins), days: 30 });
+  }
+  return [...custom.map((x) => customView(x, sent)), ...appIds.map((id) => appView(id, rows.get(id), sent))].sort(byShelf);
 }
 const oneGift = async (id) => (await adminGifts([id]))[0];
 
@@ -742,10 +959,128 @@ async function fetchedKind(slot, type, bytes) {
 }
 const writeLimit = (a) => limit(`gifts-admin:${a.id}`, 60, 'Çok fazla deneme, biraz bekle');
 
+/**
+ * What POST /api/admin/gifts/reset can give back to one of the app's gifts; without `fields`, all but its place (an
+ * ordered shelf keeps its order). Its place goes back with its shelf when it was moved to another one.
+ */
+const RESET = ['name', 'emoji', 'price', 'cat', 'enabled', 'sort', 'icon', 'video'];
+const RESET_ALL = RESET.filter((f) => f !== 'sort');
+
+/**
+ * POST /api/admin/gifts/update for one of the app's own gifts: the same fields and checks as an admin's gift. A value
+ * equal to the app's is kept as null (so a later app change to it shows), icon: null gives it the app's picture back,
+ * video: null stops its video (its own clip too), a new video replaces its own clip (a source: the clip in effect
+ * plays until it is converted). An older app goes on showing the app's name, picture and price (checkShownPrice).
+ */
+async function updateApp(req, a, id, b) {
+  const base = GIFTS.get(id);
+  const cur = builtinGift(id);
+  const next = {};
+  if (b.name !== undefined) {
+    const name = nameOf(b.name);
+    nameFree(name, id);
+    next.name = name === base.name ? null : name;
+  }
+  if (b.price !== undefined) {
+    const price = priceOf(b.price);
+    next.price = price === base.price ? null : price;
+  }
+  let cat = cur.cat;
+  if (b.cat !== undefined) {
+    cat = catOf(b.cat);
+    next.cat = cat === base.cat ? null : cat;
+  }
+  if (b.minSvip !== undefined || b.cat !== undefined) {
+    const was = cur.cat === 'privilege' ? cur.minSvip : base.cat === 'privilege' ? base.minSvip : 1;
+    const svip = svipOf(b.minSvip ?? (cat === 'privilege' ? was : 0), cat);
+    next.minSvip = svip === base.minSvip ? null : svip;
+  }
+  if (b.emoji !== undefined) {
+    const emoji = b.emoji === null || b.emoji === '' ? base.emoji : emojiOf(b.emoji);
+    next.emoji = emoji === base.emoji ? null : emoji;
+  }
+  if (b.enabled !== undefined) {
+    if (typeof b.enabled !== 'boolean') throw new HttpError(400, 'Açık/kapalı geçersiz');
+    next.enabled = b.enabled === !GIFTS_PAUSED.has(id) ? null : b.enabled;
+  }
+  // The app's picture as the panel shows it, or null: back to it. Another address: a new icon.
+  if (b.icon !== undefined) {
+    if (b.icon === null || b.icon === artUrl('gifts', id)) {
+      if (cur.icon) next.icon = null;
+    } else if (b.icon !== cur.icon) {
+      if (typeof b.icon !== 'string' || !b.icon) throw new HttpError(400, 'İkonu önce yükle');
+      await checkIcon(b.icon);
+      next.icon = b.icon;
+    }
+  }
+  const video = await videoOf(b.video);
+  const iconLink = linkField(b.iconLink);
+  const videoLink = linkField(b.videoLink);
+  if (next.icon !== undefined) next.iconLink = next.icon === null ? null : (iconLink ?? null);
+  else if (iconLink !== undefined && cur.icon) next.iconLink = iconLink;
+  if (video !== undefined) next.videoLink = video === null ? null : (videoLink ?? null);
+  else if (videoLink !== undefined && cur.video) next.videoLink = videoLink;
+  if (!Object.keys(next).length && video === undefined) throw new HttpError(400, 'Değişiklik yok');
+  const drop = [];
+  await saving(() =>
+    tx(async (c) => {
+      await appRows(c, [id], a.id);
+      const r = (await c.query('SELECT * FROM custom_gifts WHERE id = $1 AND builtin FOR UPDATE', [id])).rows[0];
+      if (!r) throw new HttpError(404, 'Hediye bulunamadı');
+      const vals = [id];
+      const sets = [];
+      const set = (col, v) => {
+        vals.push(v);
+        sets.push(`${col} = $${vals.length}`);
+      };
+      if (next.name !== undefined) set('name', next.name);
+      if (next.price !== undefined) set('price', next.price);
+      if (next.emoji !== undefined) set('emoji', next.emoji);
+      if (next.enabled !== undefined) set('enabled', next.enabled);
+      if (next.minSvip !== undefined) set('min_svip', next.minSvip);
+      // Moved to another shelf: first there, as an admin's gift is.
+      if (next.cat !== undefined) {
+        set('cat', next.cat);
+        if (cat !== cur.cat) set('sort', await firstSort(c, cat));
+      }
+      if (next.icon !== undefined) {
+        set('icon_url', next.icon);
+        drop.push(r.icon_url);
+      }
+      if (next.iconLink !== undefined) set('icon_link', next.iconLink);
+      if (next.videoLink !== undefined) set('video_link', next.videoLink);
+      if (video === null || video?.kind === 'stacked') {
+        set('video_url', video?.url ?? null);
+        set('video_bytes', video?.bytes ?? null);
+        set('video_ms', video?.ms ?? null);
+        set('video_v', video?.v ?? null);
+        set('video_off', video === null);
+        sets.push('job_status = NULL', 'job_source = NULL', 'job_error = NULL', 'job_tries = 0');
+        drop.push(r.video_url, r.job_source);
+      } else if (video?.kind === 'source') {
+        set('job_source', video.url);
+        set('job_fill', video.fill);
+        sets.push('video_off = false', "job_status = 'processing'", 'job_error = NULL', 'job_tries = 0', 'job_at = now()');
+        drop.push(r.job_source);
+      }
+      set('updated_by', a.id);
+      sets.push('updated_at = now()', "rev = nextval('custom_gift_rev')");
+      const after = await c.query(`UPDATE custom_gifts SET ${sets.join(', ')} WHERE id = $1 RETURNING *`, vals);
+      await audited(c, a.id, 'gift.update', { gift: id, before: auditOf(r), after: auditOf(after.rows[0]), ...panelDetail(a) }, clientIp(req));
+    }),
+  );
+  removeFiles(drop.filter(Boolean));
+  await refreshCustomGifts();
+  if (video?.kind === 'source') kickJobs();
+  return { gift: await oneGift(id) };
+}
+
 export const customGiftRoutes = {
-  async 'GET /api/admin/gifts'(req) {
+  /** ?builtin=1: the app's own gifts too, each with its values in the app (`original`) and what was changed. */
+  async 'GET /api/admin/gifts'(req, url) {
     await admin(req);
-    return { gifts: await adminGifts(), limits: LIMITS, convert: await canConvert(), svga: await canSvga(), storage: storageOn() };
+    const app = url?.searchParams.get('builtin') === '1';
+    return { gifts: await adminGifts(null, { app }), limits: LIMITS, convert: await canConvert(), svga: await canSvga(), storage: storageOn() };
   },
 
   /** A new gift, first on its shelf; on the shelves at once unless enabled is false. */
@@ -769,7 +1104,7 @@ export const customGiftRoutes = {
     const id = await saving(() =>
       tx(async (c) => {
         const id = `a${(await c.query("SELECT nextval('custom_gift_ids') AS n")).rows[0].n}`;
-        const first = Number((await c.query('SELECT coalesce(min(sort), 1) - 1 AS s FROM custom_gifts WHERE cat = $1 AND deleted_at IS NULL', [cat])).rows[0].s);
+        const first = await firstSort(c, cat);
         const r = await c.query(
           `INSERT INTO custom_gifts (id, name, emoji, price, cat, min_svip, sort, enabled, icon_url, video_url, video_bytes, video_ms, video_v, job_status, job_source, job_fill,
                                      created_by, updated_by, icon_link, video_link)
@@ -786,12 +1121,16 @@ export const customGiftRoutes = {
     return { gift: await oneGift(id) };
   },
 
-  /** Changes what the body names; a new icon or video replaces the old file, which is then deleted. */
+  /**
+   * Changes what the body names; a new icon or video replaces the old file, which is then deleted. One of the app's
+   * own gifts too (updateApp).
+   */
   async 'POST /api/admin/gifts/update'(req) {
     const a = await admin(req);
     writeLimit(a);
     const b = await readJson(req, 8192);
-    const id = idOf(b.id);
+    const id = idOf(b.id, { app: true });
+    if (GIFTS.has(id)) return updateApp(req, a, id, b);
     const cur = snap.rows.get(id);
     if (!cur || cur.deleted) throw new HttpError(404, 'Hediye bulunamadı');
     const next = {};
@@ -841,7 +1180,7 @@ export const customGiftRoutes = {
         // A gift moved to another shelf goes first there.
         if (next.cat !== undefined && next.cat !== r.cat) {
           set('cat', next.cat);
-          set('sort', Number((await c.query('SELECT coalesce(min(sort), 1) - 1 AS s FROM custom_gifts WHERE cat = $1 AND deleted_at IS NULL', [next.cat])).rows[0].s));
+          set('sort', await firstSort(c, next.cat));
         }
         if (next.icon !== undefined) {
           set('icon_url', next.icon);
@@ -922,11 +1261,62 @@ export const customGiftRoutes = {
     }
   },
 
-  /** Off the shelves and the panel for good; the row stays for the history, its files go. */
+  /**
+   * An app's own gift back to the app's values: `fields` of RESET (cat with its VIP level, and its place when it was
+   * on another shelf), or all of them but its place. Its replaced files go. Nothing to do for one never changed.
+   */
+  async 'POST /api/admin/gifts/reset'(req) {
+    const a = await admin(req);
+    writeLimit(a);
+    const b = await readJson(req, 2048);
+    if (typeof b.id === 'string' && ID.test(b.id)) throw new HttpError(400, 'Yalnız uygulamanın kendi hediyeleri orijinaline döner');
+    const id = idOf(b.id, { app: true });
+    let fields = RESET_ALL;
+    if (b.fields !== undefined) {
+      if (!Array.isArray(b.fields) || !b.fields.length || !b.fields.every((f) => RESET.includes(f))) throw new HttpError(400, `Geri alınabilenler: ${RESET.join(', ')}`);
+      fields = [...new Set(b.fields)];
+    }
+    // The app's name may have been given to another gift meanwhile.
+    if (fields.includes('name')) nameFree(GIFTS.get(id).name, id);
+    const drop = [];
+    await saving(() =>
+      tx(async (c) => {
+        const r = (await c.query('SELECT * FROM custom_gifts WHERE id = $1 FOR UPDATE', [id])).rows[0];
+        if (!r) return;
+        const sets = [];
+        if (fields.includes('name')) sets.push('name = NULL');
+        if (fields.includes('emoji')) sets.push('emoji = NULL');
+        if (fields.includes('price')) sets.push('price = NULL');
+        if (fields.includes('cat')) sets.push('cat = NULL', 'min_svip = NULL');
+        if (fields.includes('enabled')) sets.push('enabled = NULL');
+        // Moved to another shelf: its place there means nothing on its own one.
+        if (fields.includes('sort') || (fields.includes('cat') && r.cat !== null)) sets.push('sort = NULL');
+        if (fields.includes('icon')) {
+          sets.push('icon_url = NULL', 'icon_link = NULL');
+          drop.push(r.icon_url);
+        }
+        if (fields.includes('video')) {
+          sets.push('video_url = NULL', 'video_bytes = NULL', 'video_ms = NULL', 'video_v = NULL', 'video_link = NULL', 'video_off = false');
+          sets.push('job_status = NULL', 'job_source = NULL', 'job_error = NULL', 'job_tries = 0', 'job_fill = NULL');
+          drop.push(r.video_url, r.job_source);
+        }
+        sets.push('updated_by = $2', 'updated_at = now()', "rev = nextval('custom_gift_rev')");
+        const after = await c.query(`UPDATE custom_gifts SET ${sets.join(', ')} WHERE id = $1 RETURNING *`, [id, a.id]);
+        await audited(c, a.id, 'gift.reset', { gift: id, fields, before: auditOf(r), after: auditOf(after.rows[0]), ...panelDetail(a) }, clientIp(req));
+      }),
+    );
+    removeFiles(drop.filter(Boolean));
+    await refreshCustomGifts();
+    return { gift: await oneGift(id) };
+  },
+
+  /** Off the shelves and the panel for good; the row stays for the history, its files go. An admin's gift only. */
   async 'POST /api/admin/gifts/delete'(req) {
     const a = await admin(req);
     writeLimit(a);
-    const id = idOf((await readJson(req, 1024)).id);
+    const b = await readJson(req, 1024);
+    if (typeof b.id === 'string' && GIFTS.has(b.id)) throw new HttpError(400, 'Uygulamanın kendi hediyesi silinemez: raftan kaldırabilir ya da orijinaline döndürebilirsin');
+    const id = idOf(b.id);
     const r = await tx(async (c) => {
       const r = (await c.query('SELECT * FROM custom_gifts WHERE id = $1 AND deleted_at IS NULL FOR UPDATE', [id])).rows[0];
       if (!r) throw new HttpError(404, 'Hediye bulunamadı');
@@ -942,25 +1332,32 @@ export const customGiftRoutes = {
     return { deleted: true };
   },
 
-  /** The order of a shelf: each id's place is its index in `ids` (lower first). */
+  /** The order of a shelf: each id's place is its index in `ids` (lower first); the app's own gifts among them too. */
   async 'POST /api/admin/gifts/order'(req) {
     const a = await admin(req);
     writeLimit(a);
     const b = await readJson(req, 16_384);
     if (!Array.isArray(b.ids) || !b.ids.length || b.ids.length > 500) throw new HttpError(400, 'Sıra listesi geçersiz');
-    const ids = b.ids.map(idOf);
+    const ids = b.ids.map((v) => idOf(v, { app: true }));
     if (new Set(ids).size !== ids.length) throw new HttpError(400, 'Bir hediye sırada iki kez olamaz');
+    const custom = ids.filter((id) => !GIFTS.has(id));
+    const app = ids.filter((id) => GIFTS.has(id));
+    // The order before, as the shelves show it now.
+    const before = allGifts()
+      .filter((g) => ids.includes(g.id))
+      .map((g) => g.id);
     await tx(async (c) => {
-      const r = await c.query('SELECT id, sort FROM custom_gifts WHERE id = ANY($1::text[]) AND deleted_at IS NULL ORDER BY sort, length(id), id FOR UPDATE', [ids]);
-      if (r.rowCount !== ids.length) throw new HttpError(404, 'Hediye bulunamadı');
+      const r = await c.query('SELECT id FROM custom_gifts WHERE id = ANY($1::text[]) AND deleted_at IS NULL AND NOT builtin FOR UPDATE', [custom]);
+      if (r.rowCount !== custom.length) throw new HttpError(404, 'Hediye bulunamadı');
+      if (app.length) await appRows(c, app, a.id);
       await c.query(
         `UPDATE custom_gifts g SET sort = x.n - 1, rev = nextval('custom_gift_rev'), updated_by = $2, updated_at = now()
-           FROM unnest($1::text[]) WITH ORDINALITY AS x(id, n) WHERE g.id = x.id AND g.sort <> x.n - 1`,
+           FROM unnest($1::text[]) WITH ORDINALITY AS x(id, n) WHERE g.id = x.id AND g.sort IS DISTINCT FROM x.n - 1`,
         [ids, a.id],
       );
-      await audited(c, a.id, 'gift.order', { before: r.rows.map((x) => x.id), after: ids, ...panelDetail(a) }, clientIp(req));
+      await audited(c, a.id, 'gift.order', { before, after: ids, ...panelDetail(a) }, clientIp(req));
     });
     await refreshCustomGifts();
-    return { gifts: await adminGifts() };
+    return { gifts: await adminGifts(null, { app: app.length > 0 }) };
   },
 };
