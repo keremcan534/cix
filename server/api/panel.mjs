@@ -82,6 +82,36 @@ export const PANEL_ROUTES = new Set([
   'POST /api/admin/events/categories',
   'POST /api/admin/events/categories/remove',
   'GET /api/admin/events/report',
+  // Ajans merkezi (agency-admin.mjs): the network's tree and list, applications, status, rate, tier, parent, a
+  // streamer's agency, transfers and transition commission, performance runs, reports, the commission simulator.
+  'GET /api/admin/agency/tree',
+  'GET /api/admin/agency/overview',
+  'GET /api/admin/agency/list',
+  'POST /api/admin/agency/create',
+  'POST /api/admin/agency/decide',
+  'POST /api/admin/agency/status',
+  'POST /api/admin/agency/rate',
+  'POST /api/admin/agency/tier',
+  'POST /api/admin/agency/parent',
+  'POST /api/admin/agency/assign',
+  'GET /api/admin/agency/performance',
+  'POST /api/admin/agency/performance/run',
+  'GET /api/admin/agency/transfers',
+  'POST /api/admin/agency/transfers/decide',
+  'POST /api/admin/agency/transition',
+  'GET /api/admin/agency/audit',
+  'POST /api/admin/agency/simulate',
+  'GET /api/admin/agency/report',
+  'GET /api/admin/agency/bd-report',
+  // The commission ledger and the network's rules: a recalculation, a manual income, a reversal, an adjustment,
+  // closing a period, a setting. Staff roles and permissions, BD assignment, operations score, violations,
+  // appeals and the background jobs stay in the app.
+  'POST /api/admin/agency/commissions/run',
+  'POST /api/admin/agency/income',
+  'POST /api/admin/agency/commissions/reverse',
+  'POST /api/admin/agency/adjust',
+  'POST /api/admin/agency/periods/close',
+  'POST /api/admin/agency/settings',
 ]);
 
 const clean = (v, max) => (typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, max) : '');

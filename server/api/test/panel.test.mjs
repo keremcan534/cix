@@ -138,6 +138,38 @@ describe('Finans paneli API’de', () => {
     assert.equal((await panel('GET', '/api/admin/sanctions/meta'))[0], 403);
   });
 
+  test('Ajans merkezi panelden: okumalar ve simülasyon; ajans kurulur ve askıya alınır; personel yetkileri listede değil', async () => {
+    for (const p of [
+      '/api/admin/agency/overview',
+      '/api/admin/agency/tree',
+      '/api/admin/agency/list?status=pending&pendingWith=center',
+      '/api/admin/agency/performance',
+      '/api/admin/agency/transfers?status=pending',
+      '/api/admin/agency/audit',
+      '/api/admin/agency/report',
+    ]) {
+      const [st, j] = await panel('GET', p);
+      assert.equal(st, 200, `${p}: ${j.error}`);
+    }
+    const [ss, sim] = await panel('POST', '/api/admin/agency/simulate', { base: 100000 });
+    assert.equal(ss, 200, sim.error);
+    assert.equal(sim.base, 100000);
+    // An agency the centre sets up from the panel: the Finance Control account's, approved at once.
+    const [cs, created] = await panel('POST', '/api/admin/agency/create', { name: 'Panel Ajansı', country: 'Türkiye' });
+    assert.equal(cs, 200, created.error);
+    assert.equal(created.agency.status, 'approved');
+    assert.equal((await q('SELECT created_by FROM agencies WHERE id = $1', [created.agency.id])).rows[0].created_by, PANEL_ACTOR);
+    const [st, s] = await panel('POST', '/api/admin/agency/status', { id: created.agency.id, status: 'suspended', reason: 'Panelden deneme askısı' });
+    assert.equal(st, 200, s.error);
+    const audit = (await q("SELECT actor_id FROM agency_audit WHERE action = 'agency.status' AND target_id = $1", [created.agency.id])).rows[0];
+    assert.equal(audit.actor_id, PANEL_ACTOR);
+    assert.deepEqual((await lastPanelRows(1))[0], { method: 'POST', path: '/api/admin/agency/status', status: 200, panelUser: WHO });
+    // The centre's own staff permissions and background jobs stay in the app.
+    assert.equal((await panel('GET', '/api/admin/agency/roles'))[0], 403);
+    assert.equal((await panel('POST', '/api/admin/agency/staff/set', { user: PANEL_ACTOR }))[0], 403);
+    assert.equal((await panel('POST', '/api/admin/agency/jobs/run', {}))[0], 403);
+  });
+
   test('Finance Control hesabı bir kişi değil: listelerde görünmez, oturumu yok', async () => {
     const admin = await h.account('Yönetici', 'admin');
     const r = await fetch(`${h.base}/api/admin/users?q=Finance`, { headers: { authorization: `Bearer ${admin.session}` } });
