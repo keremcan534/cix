@@ -123,8 +123,14 @@ export async function refundPurchase(c, id, { actor = null, ip = '', source = 'a
       "SELECT id FROM lucky_bags WHERE status = 'open' AND EXISTS (SELECT 1 FROM jsonb_array_elements(parts) p WHERE (p->>'lot')::bigint = ANY($1::bigint[]))",
       [lots.map((l) => l.id)],
     );
+    // A pending bond's other person too: voiding the bond writes its refund with them as the counterparty, and the
+    // ledger's key check on their row must not wait behind a gift of theirs that waits for us.
+    const bondPeople = await c.query(
+      "SELECT b FROM bonds WHERE status = 'pending' AND EXISTS (SELECT 1 FROM jsonb_array_elements(held_lots) p WHERE (p->>'lot')::bigint = ANY($1::bigint[]))",
+      [lots.map((l) => l.id)],
+    );
     return {
-      users: [...new Set([...lots.map((l) => l.user_id), ...locks.map((k) => k.user_id)])],
+      users: [...new Set([...lots.map((l) => l.user_id), ...locks.map((k) => k.user_id), ...bondPeople.rows.map((x) => x.b)])],
       bags: openBags.rows.map((b) => Number(b.id)),
     };
   };

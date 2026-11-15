@@ -46,6 +46,10 @@ web and a debug-signed APK (`preview.yml`, release `preview-N`). Production toda
   what a feature test doesn't.
 - Load: `server/infra/loadtest/` (`docs/YUK_TESTI.md`) after a change to a hot path (room list, `/api/room`, gifts,
   rankings, `/token`, `/api/live`) or before raising room or user limits. Never against the live server.
+- Money: every test file ends with the money checks (`money-check.mjs` via `harness.mjs`): balances = ledger chain =
+  coin lots, locks within diamonds, gift and paid-event legs. A test that needs a starting balance uses `h.credit` /
+  `h.debit`, never raw SQL on wallet tables. `test/money-fuzz.test.mjs` races random money requests; a new money route
+  goes into its mix. Server-made ledger refs contain `:` (client refs can't), so a client can't take them first.
 
 ## Rules that must never be skipped
 
@@ -98,3 +102,7 @@ cash-outs (para çekme, Jeton Noktası, agency payouts) are a legal question the
 - Load test (Nov 2026): one core holds one busy 200-person room plus a few hundred very active users. The top database
   cost was a per-request sum over a growing table (rankings); such reads need a cache or a summary table. Room size
   limits go up to 5000 people, far beyond one machine (`docs/YUK_TESTI.md`).
+- Money audit (Nov 2026, `docs/PARA_DENETIMI.md`): no balance moved outside `move`, but two holes were real: a payer
+  could pre-use a server ref (`call-{id}-{n}`) and make call minutes free, and a store refund missed coins held in
+  escrow (pending bonds, open bags). A refund locking accounts piecemeal deadlocked with gifts; only the concurrent
+  random test found it. Escrow, server-made refs and lock order are where money bugs hide.

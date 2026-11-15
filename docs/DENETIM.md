@@ -5,7 +5,7 @@ Tarih: 15 Kasım 2026. Bütün depo, canlı sunucunun açık uçları (`/api/hea
 kurulum incelendi. Her maddede kimin işi olduğu yazılı: **siz** (karar, hesap, hukuk, para) ya da **Claude** (kod).
 Her iş bittiğinde buradan düşülür; yeni bir risk görülünce buraya eklenir.
 
-**Kısaca:** Kod tarafı sağlam ve testli (sunucu 787, uygulama 1187, panel 45 otomatik test). Yayını ve reklamı
+**Kısaca:** Kod tarafı sağlam ve testli (sunucu 796, uygulama 1187, panel 45 otomatik test). Yayını ve reklamı
 tehlikeye atanlar başka yerde: şans oyunlarının hukuki durumu, tek ve küçük sunucu, canlı sunucunun hâlâ test
 modunda olması, hata takibi olmaması ve kırık kodun birleşmeden önce yakalanmaması.
 
@@ -129,10 +129,19 @@ modunda olması, hata takibi olmaması ve kırık kodun birleşmeden önce yakal
   `server/infra/loadtest/` klasöründe.
 - Sıralama artık 30 saniyelik önbellekten okunuyor. Odadaki kişi sayısını soran istekler ses sunucusunda tek bir okumayı
   paylaşıyor.
+- Para denetimi ([`PARA_DENETIMI.md`](PARA_DENETIMI.md)):
+  - Her testin sonunda ve canlıda saatte bir çalışıyor; tutarsızlıkta `money_mismatch` alarmı veriyor.
+  - Aynı anda rastgele işlem testi eklendi.
+  - Kapatılan açıklar: ücretli aramanın bedavaya getirilmesi ve iade sonrası jetonun Bağ isteğinden ya da Şanslı
+    çantadan geri dönmesi.
+  - Düzeltilen hatalar: iade ile hediyenin kilitlenmesi ve asistan payının kilidi.
+  - Finans paneline giden olaylar tamamlandı.
 
 ## Sıradaki iş (önerilen sıra)
 
 1. **Oda kişi üst sınırı** (sizin kararınızla) ve makine büyüyünce ses sunucusuna koruma sınırı (Kritik 2).
+   **Para denetiminden kalanlar** ([`PARA_DENETIMI.md`](PARA_DENETIMI.md) "Kalanlar"): ekranda görülen fiyat
+   kontrolü olmayan yerler (karar sizin, yeni APK), hesap geçmişinde sayfalama, panele abonelik satışları.
 2. **Açılış listesi:** Yayın günü adım adım (Kritik 3); test sunucusu kurulumu (Kritik 6).
 3. **Uçtan uca testler ve gece kontrolü** (Sonra).
 4. Sizden gelecek hesaplar geldikçe: Sentry, analitik, push, görsel moderasyon bağlantıları.
