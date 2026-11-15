@@ -1,6 +1,7 @@
 # Yayına hazırlık: durum ve eksikler
 
-Bu belge mağazaya (Google Play, App Store) ve web'e çıkış için gereken her şeyin tek listesidir. Ayrıntılı denetim notları PR #35'te; sunucu `docs/SUNUCU.md`'de. Her satırın sahibi yazılı: **siz** (hesap, para, hukuk veya ürün kararı) ya da **biz** (mühendislik).
+Bu belge mağazaya (Google Play, App Store) ve web'e çıkış için gereken her şeyin tek listesidir. Güncel risk ve öncelik
+özeti (reklam öncesi kritik maddeler, kimin işi olduğu): [`DENETIM.md`](DENETIM.md). Ayrıntılı denetim notları PR #35'te; sunucu `docs/SUNUCU.md`'de. Her satırın sahibi yazılı: **siz** (hesap, para, hukuk veya ürün kararı) ya da **biz** (mühendislik).
 
 Durum: ✅ hazır · 🟡 kısmen · ⏳ yapılacak · ⛔ sizden bir şey bekliyor
 

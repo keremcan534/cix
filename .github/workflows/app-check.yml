@@ -1,0 +1,38 @@
+name: App checks
+
+# The app on every pull request: typecheck, lint and the tests, so a broken change shows before it is merged (preview.yml
+# runs the tests again on the default branch before it builds the web and the APK, and only then). The app's tests read
+# server modules too (the catalogs and rules the two sides share: server/api/catalog.mjs, stickers.mjs, *-rules.mjs…),
+# so a server change that could break them runs this as well. GitHub › Settings › Branches: make "App checks / check"
+# and "Server / test" required for the default branch, and nothing merges red.
+on:
+  pull_request:
+    paths: ['app/**', 'server/api/*.mjs', '.github/workflows/app-check.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: app-check-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: app
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Lint
+        run: npx expo lint
+      - name: Tests
+        run: npm test
