@@ -46,10 +46,11 @@ panel.{$DOMAIN:130-61-230-94.sslip.io} {
 		-Server
 	}
 
-	# Uygulama › Hediyeler: an icon, a video or an SVGA goes through the panel to the storage (up to 100 MB).
+	# Uygulama › Hediyeler: an icon, a video or an SVGA goes through the panel to the storage, streamed (a video
+	# source up to 500 MB, media.mjs giftsource).
 	@upload path /api/app/upload
 	request_body @upload {
-		max_size 110MB
+		max_size 510MB
 	}
 	@other not path /api/app/upload
 	request_body @other {

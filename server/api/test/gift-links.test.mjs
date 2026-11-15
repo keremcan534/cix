@@ -92,7 +92,14 @@ const host = http.createServer((req, res) => {
   }
   // A 19,5 MB video, said by its length (the API stops at the header, so the body need not come).
   if (p === '/hediyeler/panda.mov') return res.writeHead(200, { 'content-type': 'video/quicktime', 'content-length': String(Math.round(19.5 * 1024 * 1024)) }).end(Buffer.alloc(16));
-  if (p === '/hediyeler/cok-buyuk.webm') return res.writeHead(200, { 'content-type': 'video/webm', 'content-length': String(101 * 1024 * 1024) }).end(Buffer.alloc(16));
+  if (p === '/hediyeler/cok-buyuk.webm') return res.writeHead(200, { 'content-type': 'video/webm', 'content-length': String(501 * 1024 * 1024) }).end(Buffer.alloc(16));
+  if (p === '/hediyeler/buyuk.svga') {
+    // An SVGA past its 100 MB: its bytes say SVGA only once it has come (the host calls it nothing).
+    res.writeHead(200, { 'content-type': 'application/octet-stream' });
+    res.write(Buffer.from([0x78, 0x9c]));
+    for (let i = 0; i < 101; i++) res.write(Buffer.alloc(1024 * 1024));
+    return res.end();
+  }
   if (p === '/hediyeler/parcali.mp4') {
     // A video with no length given and a host that calls it nothing: known by its name once past the icon's limit.
     res.writeHead(200, { 'content-type': 'application/octet-stream' });
@@ -191,12 +198,13 @@ describe('Hediye dosyası bağlantıdan', () => {
     await refused(fetchAs(admin, 'icon', `${HOST}/hediyeler/hazir.mp4`), 400, /^Bu bağlantı bir video: ikonun değil, videonun bağlantı alanına yapıştırın$/);
   });
 
-  test("ikonun alanına yapıştırılan büyük video: 1 MB sınırı yerine bunun bir video olduğu söylenir; videonun sınırı 100 MB", async () => {
+  test("ikonun alanına yapıştırılan büyük video: 1 MB sınırı yerine bunun bir video olduğu söylenir; videonun sınırı 500 MB, SVGA'nınki 100 MB", async () => {
     const admin = await freshAdmin();
     await refused(fetchAs(admin, 'icon', `${HOST}/hediyeler/panda.mov`), 400, /^Bu bağlantı bir video \(19,5 MB\): ikonun değil, videonun bağlantı alanına yapıştırın$/);
     await refused(fetchAs(admin, 'icon', `${HOST}/hediyeler/parcali.mp4`), 400, /^Bu bağlantı bir video: ikonun değil, videonun bağlantı alanına yapıştırın$/);
     await refused(fetchAs(admin, 'icon', `${HOST}/buyuk.png`), 400, /^İkon en fazla 1 MB olabilir \(bu 3 MB\)$/);
-    await refused(fetchAs(admin, 'video', `${HOST}/hediyeler/cok-buyuk.webm`), 400, /^Video en fazla 100 MB olabilir \(bu 101 MB\)$/);
+    await refused(fetchAs(admin, 'video', `${HOST}/hediyeler/cok-buyuk.webm`), 400, /^Video en fazla 500 MB olabilir \(bu 501 MB\)$/);
+    await refused(fetchAs(admin, 'video', `${HOST}/hediyeler/buyuk.svga`), 400, /^SVGA en fazla 100 MB olabilir \(bu 101 MB\)$/);
     // Nothing of them reached the bucket.
     assert.ok(![...stored.keys()].some((k) => k.includes(admin.user.id)));
   });
