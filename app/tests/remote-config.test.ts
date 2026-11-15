@@ -4,7 +4,7 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { EMPTY_CONFIG, compareVersions, featureLabel, FEATURES, needsUpdate, offMessage, parseConfig, parseSignIn, parseVerify, parseVersion, routeGate } from '@/lib/remote-config';
+import { EMPTY_CONFIG, compareVersions, featureLabel, FEATURES, needsUpdate, offMessage, parseConfig, parseSignIn, parseVerify, parseVersion, routeGate, siteHost } from '@/lib/remote-config';
 import { scrubBreadcrumb, scrubText, scrubUrl } from '@/lib/report-scrub';
 
 describe('Uzaktan ayar: sürüm karşılaştırma', () => {
@@ -165,5 +165,23 @@ describe('Hata raporu: telefondan çıkmayanlar', () => {
     assert.deepEqual(warn.data, {});
     const net = scrubBreadcrumb({ category: 'fetch', data: { url: 'https://x.io/api/messages?to=u2', method: 'POST', status_code: 503, body: '{"text":"selam"}' } })!;
     assert.deepEqual(net.data, { url: 'https://x.io/api/messages', method: 'POST', status_code: 503 });
+  });
+});
+
+describe('Yönetim sitesi (adminSite)', () => {
+  test('https adresi alınır; başka her şey ya da hiç gelmemesi null: Yönetim uygulamada kalır', () => {
+    assert.equal(EMPTY_CONFIG.adminSite, null);
+    assert.equal(parseConfig({ adminSite: 'https://panel.ornek.com' }).adminSite, 'https://panel.ornek.com');
+    assert.equal(parseConfig({ adminSite: '  https://panel.ornek.com/app  ' }).adminSite, 'https://panel.ornek.com/app');
+    for (const bad of [undefined, null, '', 'http://panel.ornek.com', 'panel.ornek.com', 'https://panel', 'javascript:alert(1)', 42, ['https://a.b'], { u: 1 }])
+      assert.equal(parseConfig({ adminSite: bad }).adminSite, null, String(bad));
+    assert.equal(parseConfig({ adminSite: `https://a.b/${'x'.repeat(300)}` }).adminSite, `https://a.b/${'x'.repeat(195)}`.slice(0, 200));
+    // An older server sends no field: the in-app screen stays.
+    assert.equal(parseConfig({ minVersion: '1.0.0' }).adminSite, null);
+  });
+
+  test('satırda sitenin adı görünür', () => {
+    assert.equal(siteHost('https://panel.ornek.com'), 'panel.ornek.com');
+    assert.equal(siteHost('https://panel.ornek.com/uygulama?x=1#y'), 'panel.ornek.com');
   });
 });

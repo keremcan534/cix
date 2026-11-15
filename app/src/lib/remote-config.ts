@@ -1,5 +1,6 @@
 // What the server's GET /api/config says about this app (server/api/features.mjs): the minimum version, where
-// to update, a notice banner, features switched off for a while, and the live settings version. Pure logic, no
+// to update, a notice banner, where the staff's Yönetim is when it is on the web, features switched off for a
+// while, and the live settings version. Pure logic, no
 // React; the fetching and the hooks are in lib/remote-control, the screens in components/remote-control.
 
 export const FEATURES = ['gifts', 'purchases', 'topup', 'exchange', 'jeton', 'games', 'dm', 'rooms', 'withdraw'] as const;
@@ -14,6 +15,9 @@ export type RemoteConfig = {
   minVersion: string | null;
   updateUrl: string | null;
   notice: string | null;
+  /** Yönetim's website (Canlı ayarlar › Yönetim sitesi): set, Ayarlar › Yönetim opens it instead of the in-app
+   *  screen; null keeps the screen (an older server sends none). */
+  adminSite: string | null;
   featuresOff: Feature[];
   /** The server's live settings version (Canlı ayarlar); 0 from an older server. When it changes, the live
    *  catalog is read again (lib/remote-control, lib/live/catalog-live). */
@@ -25,7 +29,7 @@ export type RemoteConfig = {
 
 const VERIFY_OFF: VerifyFlags = { sms: false, whatsapp: false };
 /** Nothing set: what the app uses before the first answer, and without a server. */
-export const EMPTY_CONFIG: RemoteConfig = { minVersion: null, updateUrl: null, notice: null, featuresOff: [], v: 0, signIn: null, verify: VERIFY_OFF };
+export const EMPTY_CONFIG: RemoteConfig = { minVersion: null, updateUrl: null, notice: null, adminSite: null, featuresOff: [], v: 0, signIn: null, verify: VERIFY_OFF };
 
 const isFeature = (v: unknown): v is Feature => typeof v === 'string' && (FEATURES as readonly string[]).includes(v);
 const record = (v: unknown) => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null);
@@ -48,10 +52,12 @@ export function parseConfig(raw: unknown): RemoteConfig {
   const str = (v: unknown, max: number) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null);
   const min = str(r.minVersion, 20);
   const url = str(r.updateUrl, 500);
+  const site = str(r.adminSite, 200);
   return {
     minVersion: min && parseVersion(min) ? min : null,
     updateUrl: url && /^https:\/\/\S+$/.test(url) ? url : null,
     notice: str(r.notice, 300),
+    adminSite: site && /^https:\/\/[^\s/]+\.\S{2,}$/.test(site) ? site : null,
     featuresOff: Array.isArray(r.featuresOff) ? [...new Set(r.featuresOff.filter(isFeature))] : [],
     v: typeof r.v === 'number' && Number.isSafeInteger(r.v) && r.v >= 0 ? r.v : 0,
     signIn: parseSignIn(r.signIn),
@@ -77,6 +83,9 @@ export function compareVersions(a: string, b: string): number {
 export const needsUpdate = (current: string, config: RemoteConfig) => !!config.minVersion && !!parseVersion(current) && compareVersions(current, config.minVersion) < 0;
 
 export const isOff = (config: RemoteConfig, f: Feature) => config.featuresOff.includes(f);
+
+/** The site's address as Ayarlar › Yönetim shows it: its host ("panel.ornek.com"). */
+export const siteHost = (url: string) => url.replace(/^https:\/\//, '').split(/[/?#]/)[0];
 
 const LABEL: Record<Feature, string> = {
   gifts: 'Hediye gönderme',

@@ -116,6 +116,7 @@ export const configRoutes = {
   async 'GET /api/config'() {
     const s = live();
     // .env's switched-off features first, in .env's order, then the live ones.
-    return { minVersion: s.minVersion, updateUrl: CONFIG.updateUrl, notice: s.notice, featuresOff: [...new Set([...CONFIG.featuresOff, ...s.featuresOff])], v: s.v + customGiftsRev() + emojiRev(), ...signInOf(env, s.otpPerHour) };
+    // adminSite: the staff's Yönetim is on the web (Canlı ayarlar › Yönetim sitesi); null keeps it in the app.
+    return { minVersion: s.minVersion, updateUrl: CONFIG.updateUrl, notice: s.notice, adminSite: s.adminSite, featuresOff: [...new Set([...CONFIG.featuresOff, ...s.featuresOff])], v: s.v + customGiftsRev() + emojiRev(), ...signInOf(env, s.otpPerHour) };
   },
 };

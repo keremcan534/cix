@@ -79,6 +79,7 @@ export function defaultsOf(e = process.env) {
     features_off: [],
     notice: cfg.notice,
     min_version: cfg.minVersion,
+    admin_site: '',
     campaign: null,
     gifts_hidden: [],
     shop_hidden: [],
@@ -777,6 +778,27 @@ export const REGISTRY = {
   ...roomEntries(),
   ...eventEntries(),
   ...winEntries(),
+  admin_site: {
+    field: 'adminSite',
+    group: 'Yönetim',
+    label: 'Yönetim sitesi',
+    help: 'Doluyken (https://…) uygulamadaki Yönetim ekranı açılmaz; personel bu adresteki siteye gider. Önce herkesin sitede hesabı olsun. Boş bırakınca Yönetim ekranı uygulamada yeniden açılır. Eski uygulamalarda ekran açık kalır.',
+    type: 'text',
+    bounds: { max: 200 },
+    parse(v) {
+      if (typeof v !== 'string') bad('Yönetim sitesi adresi metin olmalı');
+      const s = v.trim();
+      if (s && !/^https:\/\/[^\s/]+\.[^\s]{2,}$/.test(s)) bad('Yönetim sitesi https:// ile başlayan bir adres olmalı');
+      if (s.length > 200) bad('Yönetim sitesi adresi en çok 200 karakter olabilir');
+      return s;
+    },
+    // Closing the in-app screen asks twice; opening it again doesn't.
+    big: (before, after) => !!after && !before,
+    impact(before, after) {
+      if (after) return `Uygulamadaki Yönetim ekranı açılmaz, personel ${after} adresine gider. Eski uygulamalarda ekran açık kalır.`;
+      return 'Yönetim ekranı uygulamada yeniden açılır.';
+    },
+  },
 };
 for (const k of Object.keys(REGISTRY)) REGISTRY[k].default = DEFAULTS[k];
 freezeDeep(REGISTRY);
@@ -824,7 +846,7 @@ const readOnlySet = (xs) => {
  * over the defaults of `e`. A value the registry no longer accepts (e.g. bounds tightened by a later deploy) and
  * unknown keys are ignored; the first are listed in `invalid`. FEATURES_OFF is always added to the live list,
  * and the live notice and minimum version replace .env's ('' = no notice, null = .env's).
- *   { v, featuresOff: Set, notice, minVersion, giftsHidden: Set, shopHidden: Set, packsHidden: Set, campaign, usdTry, withdrawMax,
+ *   { v, featuresOff: Set, notice, minVersion, adminSite, giftsHidden: Set, shopHidden: Set, packsHidden: Set, campaign, usdTry, withdrawMax,
  *     withdrawWeekly, otpPerHour, dmPrice, callVoice, callVideo, callFree, callSeconds, callPlainVoice, callPlainVideo,
  *     matchVoice, matchVideo, matchFree, matchSeconds, heartVoice,
  *     heartVideo, backpackCallTask, rewardsOff: Set, welcomeCoins, inviteCoins, inviteDailyCap, casinoOff: Set, casinoOpen: Set, casinoMaxBet,
@@ -855,6 +877,7 @@ export function snapshotOf(rows = [], e = process.env, { v = 0 } = {}) {
     featuresOff: readOnlySet([...envOff, ...val('features_off').filter((f) => !envOff.includes(f))]),
     notice: notice === '' ? null : notice,
     minVersion: val('min_version'),
+    adminSite: val('admin_site') || null,
     giftsHidden: readOnlySet(val('gifts_hidden')),
     shopHidden: readOnlySet(val('shop_hidden')),
     packsHidden: readOnlySet(val('packs_hidden')),

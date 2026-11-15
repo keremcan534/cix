@@ -30,6 +30,8 @@ describe('app config', () => {
       minVersion: '1.2.0',
       updateUrl: 'https://example.com/similar.apk',
       notice: 'Bu gece 02:00–02:15 bakım var.',
+      // Canlı ayarlar › Yönetim sitesi unset: the staff's Yönetim stays in the app.
+      adminSite: null,
       featuresOff: ['gifts', 'topup', 'dm', 'rooms', 'exchange', 'jeton', 'purchases', 'withdraw'],
       v: 0,
       // The harness turns on development sign-in only; e-mail, Google, SMS and WhatsApp are unset.

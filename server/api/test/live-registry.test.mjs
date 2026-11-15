@@ -38,6 +38,7 @@ describe('defaults are today', () => {
       features_off: [],
       notice: null,
       min_version: null,
+      admin_site: '',
       campaign: null,
       gifts_hidden: [],
       shop_hidden: [],
@@ -146,6 +147,7 @@ describe('defaults are today', () => {
       'event_block_days',
       'event_reminders_off',
       'lucky_announce_min_coins',
+      'admin_site',
     ]);
     for (const k of ['need_level', 'need_points', 'min_age', 'lucky_min_age', 'diamonds_per_usd', 'coin_diamond_ratio', 'lock_hours', 'test_daily', 'allow_test_topup', 'gift_prices', 'pack_prices', 'pack_coins', 'product_ids', 'sms_provider', '__proto__', 'constructor', 'toString']) {
       assert.ok(!Object.hasOwn(REGISTRY, k), k);

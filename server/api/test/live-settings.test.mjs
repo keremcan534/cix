@@ -68,7 +68,7 @@ describe('nothing saved', () => {
   test('/api/config is the .env config plus v: 0; the catalog is whole', async () => {
     A = await h.account('Ayşe Yönetici', 'admin');
     B = await h.account('Bora Yönetici', 'admin');
-    assert.deepEqual(await config(), { minVersion: null, updateUrl: null, notice: null, featuresOff: ['dm'], v: 0, ...SIGN_IN });
+    assert.deepEqual(await config(), { minVersion: null, updateUrl: null, notice: null, adminSite: null, featuresOff: ['dm'], v: 0, ...SIGN_IN });
     const [st, cat] = await call('GET', '/api/catalog');
     assert.equal(st, 200);
     // 65 gifts, 41 of them off the shelf for now (catalog.mjs GIFTS_PAUSED).
@@ -111,6 +111,7 @@ describe('nothing saved', () => {
         ...['room_staff_away_minutes', 'boss_seat_coins', 'boss_seat_minutes'],
         ...['event_min_room_level', 'event_min_lead_minutes', 'event_max_minutes', 'event_max_capacity', 'event_grace_minutes', 'event_strike_limit', 'event_block_days', 'event_reminders_off'],
         'lucky_announce_min_coins',
+        'admin_site',
       ],
     );
     const by = Object.fromEntries(j.settings.map((x) => [x.key, x]));
@@ -436,7 +437,7 @@ describe('LIVE_SAFE_MODE', () => {
       return [r.status, await r.json()];
     };
     try {
-      assert.deepEqual(await (await fetch(`${base}/api/config`)).json(), { minVersion: null, updateUrl: null, notice: null, featuresOff: ['dm'], v: 0, ...SIGN_IN });
+      assert.deepEqual(await (await fetch(`${base}/api/config`)).json(), { minVersion: null, updateUrl: null, notice: null, adminSite: null, featuresOff: ['dm'], v: 0, ...SIGN_IN });
       const [st, p] = await sc('GET', SETTINGS, null, G.session);
       assert.equal(st, 200);
       assert.equal(p.safeMode, true);
@@ -460,5 +461,22 @@ describe('LIVE_SAFE_MODE', () => {
       await new Promise((r) => (safe.exitCode !== null ? r() : safe.on('exit', r)));
       safe = null;
     }
+  });
+});
+
+describe('Yönetim sitesi', () => {
+  test('Yönetim sitesi: https adres, kapatırken iki kez sorulur; /api/config adminSite; boş bırakınca uygulamaya döner', async () => {
+    for (const bad of ['http://panel.ornek.com', 'panel.ornek.com', 'https://panel', 'https://panel .ornek.com'])
+      assert.equal((await save(A.session, { admin_site: bad }))[0], 400, bad);
+    const [st, j] = await save(A.session, { admin_site: 'https://panel.ornek.com' });
+    assert.equal(st, 409, 'büyük değişiklik onay ister');
+    assert.ok(j.preview ?? j.error);
+    const [ok, done] = await save(A.session, { admin_site: 'https://panel.ornek.com' }, { confirm: true });
+    assert.equal(ok, 200, done.error);
+    assert.equal((await config()).adminSite, 'https://panel.ornek.com');
+    // Back in the app: no second question.
+    const [back, b] = await save(A.session, { admin_site: '' });
+    assert.equal(back, 200, b.error);
+    assert.equal((await config()).adminSite, null);
   });
 });

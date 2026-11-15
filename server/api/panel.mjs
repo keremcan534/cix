@@ -8,13 +8,21 @@
 //     header is refused.
 //   - the list: a route not in PANEL_ROUTES is refused with the key, whatever it is.
 // Finance Control decides which of its users may use which page (its own roles); X-Panel-User names that person
-// (base64url JSON { id, email, name, role }). On this side they act as the Finance Control account (PANEL_ACTOR,
-// role admin, 067): every route checks and records as for an admin, the account's name carries the panel user's, and
-// every panel request that changes something (and every refusal) is an audit_events row 'panel.request' naming them.
+// (base64url JSON { id, email, name, role }). On this side each panel user acts as an account of their own
+// (panelActorId: role admin, never a person in any list, push or ranking, can't sign in, made the first time they
+// act), so every route checks and records as for an admin, and the rules that need two different people (a
+// proposed sanction's approver, a payout's second person, nobody deciding their own) tell panel users apart. Every
+// panel request that changes something (and every refusal) is an audit_events row 'panel.request' naming them.
 import { HttpError, db, env, same } from './core.mjs';
 
-/** The account the panel acts as (067_panel_actor.sql): role admin, never a person, can't sign in. */
+/**
+ * The Finance Control account (067_panel_actor.sql): role admin, never a person, can't sign in. Panel requests made
+ * before each panel user had an account of their own name it; it still answers for a panel user whose account
+ * couldn't be made.
+ */
 export const PANEL_ACTOR = 'fc000000-0000-4000-8000-000000000001';
+/** The account panel user `id` acts as here: fixed by their id, beside PANEL_ACTOR's. */
+export const panelActorId = (id) => `fc000000-0000-4000-8001-${String(id).padStart(12, '0')}`;
 const KEY = String(env.PANEL_API_KEY ?? '').trim();
 /** A key shorter than this is treated as none (a typo must not open the admin routes). */
 const KEY_MIN = 32;
@@ -121,14 +129,52 @@ export const PANEL_ROUTES = new Set([
   'GET /api/admin/agency/report',
   'GET /api/admin/agency/bd-report',
   // The commission ledger and the network's rules: a recalculation, a manual income, a reversal, an adjustment,
-  // closing a period, a setting. Staff roles and permissions, BD assignment, operations score, violations,
-  // appeals and the background jobs stay in the app.
+  // closing a period, a setting.
   'POST /api/admin/agency/commissions/run',
   'POST /api/admin/agency/income',
   'POST /api/admin/agency/commissions/reverse',
   'POST /api/admin/agency/adjust',
   'POST /api/admin/agency/periods/close',
   'POST /api/admin/agency/settings',
+  // The agency centre's staff (roles and who holds them), BD assignment, operations score, violations and their
+  // appeals, and the network's background jobs run now.
+  'GET /api/admin/agency/roles',
+  'POST /api/admin/agency/roles',
+  'GET /api/admin/agency/staff',
+  'POST /api/admin/agency/staff/set',
+  'POST /api/admin/agency/staff/remove',
+  'POST /api/admin/agency/bd',
+  'POST /api/admin/agency/ops-score',
+  'POST /api/admin/agency/violation',
+  'GET /api/admin/agency/appeals',
+  'POST /api/admin/agency/appeals/decide',
+  'POST /api/admin/agency/jobs/run',
+  // Yaptırımlar (sanctions.mjs): the sanctions screen's meta, search, a person's record, the proposals waiting for a
+  // second person, applying, lifting, approving, evidence; appeals; the automatic policies, who may do what, a
+  // device's risk.
+  'GET /api/admin/sanctions/meta',
+  'GET /api/admin/sanctions/search',
+  'GET /api/admin/sanctions/user',
+  'GET /api/admin/sanctions/pending',
+  'POST /api/admin/sanctions',
+  'POST /api/admin/sanctions/lift',
+  'POST /api/admin/sanctions/approve',
+  'POST /api/admin/sanctions/evidence',
+  'GET /api/admin/appeals',
+  'POST /api/admin/appeals/decide',
+  'POST /api/admin/sanction-policies',
+  'GET /api/admin/sanction-permissions',
+  'POST /api/admin/sanction-permissions',
+  'POST /api/admin/devices/risk',
+  // A person's shop items (economy.mjs): what they own, giving an item, taking one back, the items a refund left to
+  // review.
+  'GET /api/admin/economy/user',
+  'POST /api/admin/economy/grant',
+  'POST /api/admin/economy/revoke',
+  'GET /api/admin/economy/reviews',
+  // Jeton Noktası (jeton.mjs): turning an account into a bank or back, selling a bank its stock.
+  'POST /api/admin/jeton/bank',
+  'POST /api/admin/jeton/wholesale',
 ]);
 
 const clean = (v, max) => (typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, max) : '');
@@ -149,17 +195,31 @@ export function panelOf(req, method, path) {
     who = typeof raw === 'string' ? JSON.parse(Buffer.from(raw, 'base64url').toString('utf8')) : null;
   } catch {}
   const id = Number(who?.id);
-  if (!Number.isSafeInteger(id) || id < 1 || !clean(who?.email, 200)) throw new HttpError(400, 'Panel kullanıcısı eksik');
+  if (!Number.isSafeInteger(id) || id < 1 || id > 999_999_999_999 || !clean(who?.email, 200)) throw new HttpError(400, 'Panel kullanıcısı eksik');
   return { id, email: clean(who.email, 200), name: clean(who.name, 80) || clean(who.email, 200), role: clean(who.role, 40) };
 }
 
-let actor = null;
-/** The Finance Control account as auth() hands it to a route, named for the panel user acting now. */
+const actors = new Map();
+/**
+ * The panel user's own account as auth() hands it to a route. Made (or renamed) only when it isn't known yet or
+ * their name changed in the panel: like PANEL_ACTOR, deleted_at keeps it out of every list, ranking and push.
+ */
 export async function panelUser(panel) {
-  actor ??= (await db.query('SELECT * FROM users WHERE id = $1', [PANEL_ACTOR])).rows[0] ?? null;
-  if (!actor) throw new HttpError(503, 'Finans paneli hesabı hazır değil');
+  const id = panelActorId(panel.id);
   // Names show in pushes and lists (live settings: "… değişti: <name>"): who in the panel did it.
-  return { ...actor, role: 'admin', name: `Finance Control · ${panel.name}`.slice(0, 80), session_scope: 'full', panel };
+  const name = `Finance Control · ${panel.name}`.slice(0, 80);
+  let row = actors.get(id);
+  if (!row || row.name !== name) {
+    row = (
+      await db.query(
+        `INSERT INTO users (id, name, role, deleted_at) VALUES ($1, $2, 'admin', now())
+         ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, role = 'admin', deleted_at = coalesce(users.deleted_at, now()) RETURNING *`,
+        [id, name],
+      )
+    ).rows[0];
+    actors.set(id, row);
+  }
+  return { ...row, role: 'admin', name, session_scope: 'full', panel };
 }
 
 /** What an audit row says about a panel action (custom-gifts.mjs adds it to its own rows). */
@@ -172,8 +232,9 @@ export const panelDetail = (u) => (u?.panel ? { panelUser: u.panel } : {});
 export async function auditPanel(panel, method, path, status) {
   if (!panel || (method === 'GET' && status < 400)) return;
   try {
+    // The panel user's own account once it exists (a request refused before it was made names the shared one).
     await db.query("INSERT INTO audit_events (actor, action, target, detail, ip) VALUES ($1, 'panel.request', NULL, $2, 'finance-control')", [
-      PANEL_ACTOR,
+      actors.has(panelActorId(panel.id)) ? panelActorId(panel.id) : PANEL_ACTOR,
       JSON.stringify({ method, path, status, panelUser: panel }),
     ]);
   } catch (e) {
