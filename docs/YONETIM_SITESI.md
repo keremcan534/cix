@@ -47,24 +47,31 @@ Rolleri ve yetkileri sitede Yönetim › Kullanıcılar ve roller'den değiştir
 
 ## Geçiş adımları
 
-1. **Panel güncellemesini gönderin.**
-   - Panel deposu için hazır yamalar `server/infra/finance-panel-patches/` klasöründe.
-   - En kolayı: `cix` ve `similarclup-finance-control` depoları seçili yeni bir Claude oturumu açıp "panel yamalarını
-     uygula ve gönder" demek.
-2. **Herkese sitede hesap açın.**
+1. **İki PR'ı sırayla birleştirin.**
+   - Önce panelinkini: [similarclup-finance-control PR #7](https://github.com/keremcan534/similarclup-finance-control/pull/7).
+   - Sonra uygulamanınkini: [cix PR #152](https://github.com/keremcan534/cix/pull/152).
+   - Sunucu kurulurken panelin son hali de kurulur.
+   - Ters sırada birleştirirseniz bir şey bozulmaz. Panel, sunucu bir sonraki kurulana kadar eski haliyle kalır; uygulamadaki
+     Yönetim ekranı da açık kalır. Hemen kurmak için: GitHub › Actions › Server › Run workflow.
+2. **Gerisi kendiliğinden olur.**
+   - Kurulum, panelde Yönetim sayfalarını görünce Canlı ayarlar › Yönetim › **Yönetim sitesi**'ne panelin adresini yazar:
+     `https://panel.<alan adı>`, bugün `https://panel.130-61-230-94.sslip.io`.
+   - Yeni APK'da Ayarlar › Yönetim bu siteyi açar. Siteye panelin giriş adınız ve parolanızla girersiniz.
+   - Eski APK'larda ekran açık kalır. Sunucu, işlemi kim yaparsa yapsın aynı kurallarla denetler.
+3. **Başka çalışanınız varsa sitede hesap açın.**
    - Yönetim › Kullanıcılar ve roller'den her çalışana kendi hesabını ve doğru rolü verin. Moderatörlere Moderatör
      rolünü verin.
    - Herkes iki adımlı doğrulamayı açsın.
-3. **Uygulamadaki ekranı kapatın.**
-   - Panelde Canlı ayarlar › Yönetim › **Yönetim sitesi** alanına sitenin adresini yazın (`https://…`).
-   - Bundan sonra yeni uygulamada Ayarlar › Yönetim siteyi açar, uygulamadaki ekran açılmaz. Alanı boşaltırsanız ekran
-     uygulamaya geri döner.
-   - Eski APK'larda ekran açık kalır. Sunucu, yetkilinin işlemini kim yaparsa yapsın aynı kurallarla denetler.
+
+**Geri almak için:** Canlı ayarlar › Yönetim sitesi alanını boş kaydedin; Yönetim ekranı uygulamaya döner. Siteye
+yeniden çevirmek için aynı yerde "Varsayılana dön" deyin (ikinci bir onay ister).
 
 ## Notlar
 
 - **Cihaz banı:** Sitede, kişinin bilinen bütün cihazlarına uygulanır.
 - **Oda içi susturma:** Yalnız odanın içinden verilir.
+- **Adres değişirse:** Gerçek alan adına geçince (`DOMAIN`) kurulum yeni adresi kendisi yazar. Canlı ayarlar'a elle bir
+  adres yazdıysanız o geçerli kalır.
 - **Doğrulama:** Bütün sayfalar, gerçek uygulama sunucusuna karşı tarayıcıyla baştan sona denendi:
   - susturma
   - ömür boyu ban önerisi ve ikinci kişinin onayı
@@ -72,3 +79,4 @@ Rolleri ve yetkileri sitede Yönetim › Kullanıcılar ve roller'den değiştir
   - Jeton Noktası açma ve toptan satış
   - ajans rolleri ve arka plan işleri
   - moderatörün yalnız kendi sayfalarını görmesi
+  - Canlı ayarlar › Yönetim sitesi: kurulumun yazdığı adres, boş kayıt, varsayılana dönüş

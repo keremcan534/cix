@@ -101,9 +101,10 @@ modunda olması, hata takibi olmaması ve kırık kodun birleşmeden önce yakal
    yapılmalı. Claude her madde için adım adım deneme listesi çıkarır.
 6. **Finans paneli güvenliği (siz):** Panel para çekme ve ajans ödemelerini onaylıyor. Her panel kullanıcısında iki
    adımlı doğrulama açık olmalı; panel adresi yalnız ekibe verilmeli.
-7. **Panel deposu (siz: yeni oturum):** Hediyeler, Emojiler ve Yönetim'in kalanı (Yaptırımlar, Ajans personeli, Mağaza
-   eşyaları, Jeton Noktası, Moderatör rolü) hazır ve test edildi. Bu oturum panel deposuna yazamadığı için yamalar
-   `server/infra/finance-panel-patches/` klasöründe bekliyor. İki depo seçili yeni bir oturumda uygulanıp gönderilir
+7. **Panel (siz: iki PR'ı sırayla birleştirmek):** Hediyeler, Emojiler ve Yönetim'in kalanı (Yaptırımlar, Ajans
+   personeli, Mağaza eşyaları, Jeton Noktası, Moderatör rolü) panel deposunda
+   [PR #7](https://github.com/keremcan534/similarclup-finance-control/pull/7)'de, uygulama tarafı #152'de. Önce panelinki,
+   sonra #152 birleştirilir. Kurulum uygulamadaki Yönetim'i siteye kendisi çevirir
    ([`YONETIM_SITESI.md`](YONETIM_SITESI.md)).
 
 ---

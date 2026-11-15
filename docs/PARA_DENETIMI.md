@@ -107,7 +107,7 @@ Bunların hepsi otomatik testlerle denendi.
   - Abonelik (VIP) satın alımları: gerçek para olduğu için önemli.
   - Çantam'dan gönderilen ücretsiz hediyelerin elması.
   - Ajans asistanı payları.
-  - Bunlar panelde yeni bir olay türü gerektiriyor, yani panel deposunda değişiklik. O depoya yazma izni hâlâ yok.
+  - Bunlar panelde yeni bir olay türü gerektiriyor, yani panel deposunda da değişiklik.
 - **Günlük mutabakat:**
   - Panelin her gün uygulamayla toplamları karşılaştırması gerekiyor.
   - Sebep: Aktarım satırları sırayla okuyor. Çok uzun süren bir işlem 60 saniyelik payı aşarsa, satırı nadiren de olsa

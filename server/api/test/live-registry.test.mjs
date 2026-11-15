@@ -433,6 +433,18 @@ describe('snapshot', () => {
     assert.deepEqual(s.invalid, []);
   });
 
+  test('Yönetim sitesi: the deploy writes the default (ADMIN_SITE); empty saved = the app, null = the default', () => {
+    const e = { ADMIN_SITE: '  https://panel.ornek.com  ' };
+    assert.equal(defaultsOf(e).admin_site, 'https://panel.ornek.com');
+    assert.equal(snapshotOf([], e).adminSite, 'https://panel.ornek.com');
+    assert.equal(snapshotOf([{ key: 'admin_site', value: '' }], e).adminSite, null, 'saved empty: Yönetim back in the app');
+    assert.equal(snapshotOf([{ key: 'admin_site', value: null }], e).adminSite, 'https://panel.ornek.com', 'Varsayılana dön');
+    assert.equal(snapshotOf([{ key: 'admin_site', value: 'https://yonetim.ornek.com' }], e).adminSite, 'https://yonetim.ornek.com');
+    for (const bad of ['', ' ', 'http://panel.ornek.com', 'panel.ornek.com', 'https://panel', `https://panel.ornek.com/${'x'.repeat(200)}`])
+      assert.equal(snapshotOf([], { ADMIN_SITE: bad }).adminSite, null, bad);
+    assert.equal(snapshotOf([], {}).adminSite, null);
+  });
+
   test('saved values win, a later row wins, junk falls back to the default', () => {
     const rows = [
       { key: 'features_off', value: ['gifts', 'dm'] },

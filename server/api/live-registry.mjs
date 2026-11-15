@@ -72,6 +72,13 @@ const perHourOf = (v) => {
   return Number.isSafeInteger(n) && n >= 0 ? n : 300;
 };
 
+/** Canlı ayarlar › Yönetim sitesi: https://…, at most 200 characters. */
+const SITE_RE = /^https:\/\/[^\s/]+\.[^\s]{2,}$/;
+const siteOf = (v) => {
+  const s = String(v ?? '').trim();
+  return s.length <= 200 && SITE_RE.test(s) ? s : '';
+};
+
 /** What each key means when it is null (or has no row): today's constants and the .env values of `e`. */
 export function defaultsOf(e = process.env) {
   const cfg = configOf(e);
@@ -79,7 +86,8 @@ export function defaultsOf(e = process.env) {
     features_off: [],
     notice: cfg.notice,
     min_version: cfg.minVersion,
-    admin_site: '',
+    // The deploy writes ADMIN_SITE (server.yml) once the finance panel it put up has all of Yönetim's pages.
+    admin_site: siteOf(e.ADMIN_SITE),
     campaign: null,
     gifts_hidden: [],
     shop_hidden: [],
@@ -782,18 +790,21 @@ export const REGISTRY = {
     field: 'adminSite',
     group: 'Yönetim',
     label: 'Yönetim sitesi',
-    help: 'Doluyken (https://…) uygulamadaki Yönetim ekranı açılmaz; personel bu adresteki siteye gider. Önce herkesin sitede hesabı olsun. Boş bırakınca Yönetim ekranı uygulamada yeniden açılır. Eski uygulamalarda ekran açık kalır.',
+    help: 'Doluyken (https://…) uygulamadaki Yönetim ekranı açılmaz, personel bu adresteki siteye gider; herkesin sitede hesabı olmalı. Varsayılanı kurulum yazar: Yönetim sayfaları olan finans panelinin adresi. Boş kaydedilirse Yönetim ekranı uygulamada yeniden açılır. Eski uygulamalarda ekran açık kalır.',
     type: 'text',
     bounds: { max: 200 },
     parse(v) {
       if (typeof v !== 'string') bad('Yönetim sitesi adresi metin olmalı');
       const s = v.trim();
-      if (s && !/^https:\/\/[^\s/]+\.[^\s]{2,}$/.test(s)) bad('Yönetim sitesi https:// ile başlayan bir adres olmalı');
+      if (s && !SITE_RE.test(s)) bad('Yönetim sitesi https:// ile başlayan bir adres olmalı');
       if (s.length > 200) bad('Yönetim sitesi adresi en çok 200 karakter olabilir');
       return s;
     },
-    // Closing the in-app screen asks twice; opening it again doesn't.
-    big: (before, after) => !!after && !before,
+    // Closing the in-app screen asks twice, also by going back to a default that is a site; opening it again doesn't.
+    big(before, after) {
+      const to = after === null ? REGISTRY.admin_site.default : after;
+      return !!to && !before;
+    },
     impact(before, after) {
       if (after) return `Uygulamadaki Yönetim ekranı açılmaz, personel ${after} adresine gider. Eski uygulamalarda ekran açık kalır.`;
       return 'Yönetim ekranı uygulamada yeniden açılır.';
