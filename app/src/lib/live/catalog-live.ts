@@ -210,8 +210,10 @@ export function parseSavedLiveCatalog(raw: string | null): { catalog: LiveCatalo
       app,
       emoji: parseLiveEmoji(r.emoji),
     },
-    // A copy an older app saved, before the videos were listed, counts as old: the next poll reads the catalog again.
-    fetchedAt: 'fx' in r && typeof r.fetchedAt === 'number' && Number.isFinite(r.fetchedAt) ? r.fetchedAt : 0,
+    // A copy an older app saved counts as old: the next poll reads the catalog again. One from before the videos were
+    // listed (no fx), or from before the shelves were (no shelf): that app hid the gifts put back on the shelves
+    // (data/gifts-paused), and an updated phone would go on hiding them until the copy was ten minutes old.
+    fetchedAt: 'fx' in r && 'shelf' in r && typeof r.fetchedAt === 'number' && Number.isFinite(r.fetchedAt) ? r.fetchedAt : 0,
   };
 }
 

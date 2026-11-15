@@ -98,5 +98,19 @@ describe('Uygulamanın hediyeleri: sunucunun dediği gibi (gifts=2)', () => {
     assert.deepEqual(back?.catalog, c);
     assert.deepEqual(ids(giftShelf(back!.catalog)), ['h15', 'g1']);
     assert.equal(everyGift(back!.catalog).find((g) => g.id === 'h15')?.price, 6500);
+    assert.equal(back?.fetchedAt, 5);
+  });
+
+  test('güncellenen telefon: eski APK’nın kopyası (raf listesi yok) eski sayılır, katalog hemen yeniden okunur', () => {
+    // What the APK before gifts=2 kept: the ids the server listed, the videos, no shelf. It hid the paused gifts
+    // the admin put back (Gül…); read back here it still would, so it must not count as fresh.
+    const before = { v: 64, giftIds: ['a4', 'g1', 'g2', 'g6'], packs: [], campaign: null, usdTry: null, fx: [], remote: [], fetchedAt: Date.now() - 60_000 };
+    const back = parseSavedLiveCatalog(JSON.stringify(before));
+    assert.equal(back?.fetchedAt, 0, 'eski kopya: hemen yeniden okunur');
+    assert.ok(!ids(giftShelf(back!.catalog)).includes('g1'), 'yeniden okunana kadar eski kopyanın dediği');
+    // The fresh answer: the server's list alone decides, Gül is back.
+    const fresh = parseLiveCatalog(format2([base('g1'), base('g2'), base('g6')]));
+    assert.deepEqual(ids(giftShelf(fresh)), ['g1', 'g2', 'g6']);
+    assert.equal(parseSavedLiveCatalog(JSON.stringify({ ...fresh, fetchedAt: 7 }))?.fetchedAt, 7, 'yeni kopya taze kalır');
   });
 });

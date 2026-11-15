@@ -56,7 +56,10 @@ değerleri (`original`), neyin değiştirildiği (`changed`) ve son 30 günde ka
 
 - **Değişebilenler:** ad, emoji, fiyat, raf, VIP seviyesi (Özel rafta), rafta / kapalı, raftaki sıra, ikon, video (hazır
   MP4, saydam WebM / MOV ya da SVGA; yöneticinin hediyelerindeki kurallarla). Duraklatılmış hediyeler (14 Kasım'da raftan
-  kalkan 41 hediye, `GIFTS_PAUSED`) **Rafa koy** ile geri gelir; açık bir hediye raftan kaldırılabilir.
+  kalkan 41 hediye, `GIFTS_PAUSED`) **Rafa koy** ile geri gelir; açık bir hediye raftan kaldırılabilir. Rafa konan
+  duraklatılmış hediyeyi yalnız preview-163 ve sonraki APK'lar gösterir (eskisi kendi listesine göre gizler). Eski APK'dan
+  güncellenen telefon, eski APK'nın sakladığı kataloğu eski sayar ve hemen yeniden okur (bu değişiklikten sonraki
+  APK'larda; preview-163'te en çok ~11 dakika sürüyordu: uygulamayı kapatıp açmak ya da beklemek yetiyordu).
 - **Orijinaline dön:** `POST /api/admin/gifts/reset` `{id, fields?}` hediyeyi (ya da yalnız bir alanını) uygulamadaki
   haline döndürür; yüklenen ikon ve video depodan silinir. Raftaki yeri, istenmedikçe yerinde kalır (sıralanmış raf bozulmaz).
 - **Silinmez:** uygulamanın hediyesi her telefonda var; silmek yerine raftan kaldırılır.
