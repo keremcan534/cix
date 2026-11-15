@@ -164,6 +164,12 @@ describe('Finans paneli API’de', () => {
       const [st, j] = await panel('GET', p);
       assert.equal(st, 200, `${p}: ${j.error}`);
     }
+    // What an editor outside the app needs: the items a grant may give, the agency roles' permission names.
+    const eco = (await panel('GET', `/api/admin/economy/user?id=${someone.user.id}`))[1];
+    assert.ok(eco.grantable.some((x) => x.sku === 'fr-neon' && x.days === 7));
+    assert.ok(eco.grantable.some((x) => x.sku.startsWith('pack-') && x.days === null));
+    const roles = (await panel('GET', '/api/admin/agency/roles'))[1];
+    assert.ok(Object.keys(roles.agencyPerms).length > 0 && Object.keys(roles.platformPerms).length > 0);
     // Jeton Noktası: an account turned into a bank from the panel, by the panel user's account.
     const [js, j] = await panel('POST', '/api/admin/jeton/bank', { user: someone.user.id, enabled: true });
     assert.equal(js, 200, j.error);

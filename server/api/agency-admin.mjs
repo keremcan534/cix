@@ -743,7 +743,8 @@ export const agencyAdminRoutes = {
   async 'GET /api/admin/agency/roles'(req) {
     await center(db, req, 'agencies.view');
     const r = await db.query('SELECT * FROM staff_roles ORDER BY scope, id');
-    return { roles: r.rows.map((x) => ({ id: Number(x.id), name: x.name, scope: x.scope, permissions: x.permissions, protected: x.protected, archived: !!x.archived_at })), platformPerms: PLATFORM_PERMS };
+    // agencyPerms: what an agency-scope role may hold, for editors outside the app (the finance panel).
+    return { roles: r.rows.map((x) => ({ id: Number(x.id), name: x.name, scope: x.scope, permissions: x.permissions, protected: x.protected, archived: !!x.archived_at })), platformPerms: PLATFORM_PERMS, agencyPerms: AGENCY_PERMS };
   },
 
   async 'POST /api/admin/agency/roles'(req) {

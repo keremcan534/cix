@@ -443,6 +443,12 @@ export const economyRoutes = {
       rewardCoins: Number(reward.rows[0].n),
       rewards: rewards.rows.map((x) => ({ id: Number(x.id), amount: Number(x.amount), reason: x.reason, ref: x.ref, detail: x.detail, createdAt: x.created_at })),
       reviews: reviews.rows.filter((x) => !x.revoked_at).map((x) => ({ id: Number(x.id), ...x.detail, createdAt: x.created_at })),
+      // What a staff grant may give (POST /api/admin/economy/grant): the shop's items and the sticker packs, with
+      // their own length (days null: for good), for editors outside the app (the finance panel).
+      grantable: [
+        ...[...SHOP.values()].map((s) => ({ sku: s.sku, kind: s.kind, name: s.name, days: s.days })),
+        ...packSkus().map((sku) => packItem(sku, { any: true })).filter(Boolean).map((s) => ({ sku: s.sku, kind: s.kind, name: s.name, days: s.days })),
+      ],
     };
   },
 

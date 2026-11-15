@@ -1,0 +1,899 @@
+From 1ea70ed8eba7dff6c2c2cad1820ad32e2e55427e Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 15 Nov 2026 13:43:40 +0000
+Subject: [PATCH 1/2] =?UTF-8?q?Uygulama=20=E2=80=BA=20Hediyeler=20uygulama?=
+ =?UTF-8?q?n=C4=B1n=20kendi=20hediyelerini=20de=20g=C3=B6sterir;=20yeni=20?=
+ =?UTF-8?q?sayfa=20Uygulama=20=E2=80=BA=20Emojiler?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Hediyeler: liste uygulamanın kendi 65 hediyesini de getirir (?builtin=1): "Uygulamanın" ve
+"Değiştirildi" işaretleri, uygulamadaki ad ve fiyat, duraklatılmışlar, kendi videosu; düzenleyicide
+her alanın altında uygulamadaki değeri, "Uygulamanın resmine dön", "Uygulamanın videosuna dön";
+listede "Orijinale dön" (POST /api/admin/gifts/reset). Uygulamanın hediyesi silinmez.
+
+Emojiler (yetki app.emojis, 006 ile finans ve operasyon yöneticisine): emoji panelinin paketleri
+kart kart, çıkartmalarıyla. Paket: ad, fiyat, VIP, açık/kapalı, sıra, orijinale dönme, yeni paket,
+kimsenin almadığı paketi silme. Çıkartma: ad, emoji, paket, açık/kapalı, sıra, resim (saydam
+PNG/WebP ya da Lottie, bilgisayardan ya da bağlantıdan), orijinale dönme, silme. Yükleme türü
+stickerart; bağlantıdan resim /api/app/emoji/fetch.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01HLqmjW6EjKzw7JzVjtYozc
+---
+ README.md                                     |   4 +-
+ server/app-admin.ts                           |  25 +-
+ server/bootstrap.ts                           |   2 +
+ server/context.ts                             |   3 +-
+ .../migrations/006_app_emoji_permissions.sql  |   6 +
+ tests/app-admin.test.ts                       |  68 +++-
+ web/app.js                                    |   2 +
+ web/pages/app-emojis.js                       | 304 ++++++++++++++++++
+ web/pages/app-gifts.js                        | 133 ++++++--
+ web/styles.css                                |   9 +
+ 10 files changed, 514 insertions(+), 42 deletions(-)
+ create mode 100644 server/migrations/006_app_emoji_permissions.sql
+ create mode 100644 web/pages/app-emojis.js
+
+diff --git a/README.md b/README.md
+index 4d780c2..cff94cf 100644
+--- a/README.md
++++ b/README.md
+@@ -61,7 +61,8 @@ npm run restore -- data/backups/finance-....db   # sunucu durdurulmuşken
+ | Kullanıcılar ve roller | 5 hazır rol ve yeni rol tanımlama. Yetkiler tek tek seçilebilir; ajans kapsamlı roller yalnız kendi ajansını görür. |
+ | Denetim kaydı | Tüm kritik değişiklikler önce/sonra değerleriyle tutulur. Kayıtlar hash zinciriyle bağlıdır ve zincir doğrulanabilir. |
+ | Ayarlar | Raporlama para birimi, çift onay, döviz kurları, jeton/elmas değerleri, vergi parametreleri, finansal dönem kapatma ve yedek alma. |
+-| Uygulama › Hediyeler | Similar Club uygulamasının hediyeleri: ekleme, düzenleme (ad, fiyat, raf, VIP, emoji), raftan kaldırma, silme, sıralama; ikon, hazır saydam video, WebM/MOV ya da SVGA yükleme (uygulamanın sunucusu çevirir) ya da her dosya için kendi sitenizdeki bağlantıyı yapıştırma (uygulamanın sunucusu bir kez indirir, aynı denetimden geçirir; "Bağlantıdan yeniden çek" ile yenilenir) ve önizleme. Uygulama güncellemesi olmadan herkesin hediye panelinde görünür. Ayrıntı: [Similar Club'ı yönetme](#similar-clubı-yönetme). |
++| Uygulama › Hediyeler | Similar Club uygulamasının hediyeleri: ekleme, düzenleme (ad, fiyat, raf, VIP, emoji), raftan kaldırma, silme, sıralama; uygulamanın kendi hediyelerinin de her alanını değiştirme ve **Orijinale dön**; ikon, hazır saydam video, WebM/MOV ya da SVGA yükleme (uygulamanın sunucusu çevirir) ya da her dosya için kendi sitenizdeki bağlantıyı yapıştırma (uygulamanın sunucusu bir kez indirir, aynı denetimden geçirir; "Bağlantıdan yeniden çek" ile yenilenir) ve önizleme. Uygulama güncellemesi olmadan herkesin hediye panelinde görünür. Ayrıntı: [Similar Club'ı yönetme](#similar-clubı-yönetme). |
++| Uygulama › Emojiler | Emoji panelinin çıkartma paketleri: uygulamanın kendi paketleri (ad, fiyat, VIP, açık/kapalı, sıra) ve çıkartmaları (ad, emoji, resim, paket, açık/kapalı, sıra) değişir ve orijinaline döner; yeni paket ve çıkartma eklenir (saydam PNG/WebP ya da Lottie animasyonu, bilgisayardan ya da bağlantıdan). Uygulama güncellemesi olmadan telefonlara gider. |
+ | Uygulama › Para çekme | Yayıncıların elmas → para talepleri: hesap bilgisi, tutar; bankadan gönderildikten sonra "Ödendi" işareti ya da nedenli ret (elmaslar geri döner). Para bu panelden gönderilmez. |
+ | Uygulama › Ajans ödemeleri | Ajans komisyon talepleri: onay, dekont numarasıyla "Ödendi", ret, iptal. |
+ | Uygulama › İadeler ve cüzdan | Mağaza alımlarını arama ve iade etme (harcanmamış jeton ve kilitli elmas geri alınır), Google Play iadelerini okuma, bir hesabın cüzdan dökümü. |
+@@ -133,6 +134,7 @@ Hangi panel kullanıcısının hangi sayfayı kullanacağını bu panelin roller
+ | Yetki | Sayfa | Hazır rollerde |
+ | --- | --- | --- |
+ | `app.gifts` | Uygulama › Hediyeler | Süper yönetici, finans yöneticisi, operasyon yöneticisi |
++| `app.emojis` | Uygulama › Emojiler | Süper yönetici, finans yöneticisi, operasyon yöneticisi |
+ | `app.withdrawals` | Uygulama › Para çekme | Süper yönetici, finans yöneticisi |
+ | `app.payouts` | Uygulama › Ajans ödemeleri | Süper yönetici, finans yöneticisi |
+ | `app.refunds` | Uygulama › İadeler ve cüzdan | Süper yönetici, finans yöneticisi |
+diff --git a/server/app-admin.ts b/server/app-admin.ts
+index de7ff27..6865046 100644
+--- a/server/app-admin.ts
++++ b/server/app-admin.ts
+@@ -29,11 +29,25 @@ export function appLink(env: NodeJS.ProcessEnv = process.env): AppLink {
+  * /api/app/<the rest after /api/admin/>.
+  */
+ export const APP_ROUTES: [string, string, Permission | Permission[]][] = [
++  // Hediyeler: the admins' own and the app's own (?builtin=1 lists them, reset takes one back to the app's values).
+   ['GET', '/api/admin/gifts', 'app.gifts'],
+   ['POST', '/api/admin/gifts', 'app.gifts'],
+   ['POST', '/api/admin/gifts/update', 'app.gifts'],
++  ['POST', '/api/admin/gifts/reset', 'app.gifts'],
+   ['POST', '/api/admin/gifts/delete', 'app.gifts'],
+   ['POST', '/api/admin/gifts/order', 'app.gifts'],
++  // Emojiler: the emoji panel's packs and stickers, the app's and the admins' own
++  ['GET', '/api/admin/emoji', 'app.emojis'],
++  ['POST', '/api/admin/emoji/packs', 'app.emojis'],
++  ['POST', '/api/admin/emoji/packs/update', 'app.emojis'],
++  ['POST', '/api/admin/emoji/packs/reset', 'app.emojis'],
++  ['POST', '/api/admin/emoji/packs/delete', 'app.emojis'],
++  ['POST', '/api/admin/emoji/packs/order', 'app.emojis'],
++  ['POST', '/api/admin/emoji/stickers', 'app.emojis'],
++  ['POST', '/api/admin/emoji/stickers/update', 'app.emojis'],
++  ['POST', '/api/admin/emoji/stickers/reset', 'app.emojis'],
++  ['POST', '/api/admin/emoji/stickers/delete', 'app.emojis'],
++  ['POST', '/api/admin/emoji/stickers/order', 'app.emojis'],
+   // Para çekme
+   ['GET', '/api/admin/withdrawals', 'app.withdrawals'],
+   ['POST', '/api/admin/withdrawals/decide', 'app.withdrawals'],
+@@ -122,11 +136,11 @@ export const APP_ROUTES: [string, string, Permission | Permission[]][] = [
+ const COMPUTE_ONLY = new Set(['/api/admin/agency/simulate']);
+ export const localPath = (appPath: string) => `/api/app${appPath.slice('/api/admin'.length)}`;
+ /** Upload kinds and the permission each needs (the app's media.mjs kinds). */
+-const UPLOADS: Record<string, Permission> = { gifticon: 'app.gifts', giftvideo: 'app.gifts', giftsource: 'app.gifts', notice: 'app.notices' };
++const UPLOADS: Record<string, Permission> = { gifticon: 'app.gifts', giftvideo: 'app.gifts', giftsource: 'app.gifts', stickerart: 'app.emojis', notice: 'app.notices' };
+ /** The permissions that may open the app's stored files through here (every page that shows them). */
+ // The app serves these files to anyone with the address (media.mjs GET /api/media/f/…); the panel still asks for a
+ // page that shows them: gift art, a reported post's or room's picture, a ticket's photo, a notice's or event's picture.
+-const FILE_PERMS: Permission[] = ['app.gifts', 'app.complaints', 'app.support', 'app.notices', 'app.events'];
++const FILE_PERMS: Permission[] = ['app.gifts', 'app.emojis', 'app.complaints', 'app.support', 'app.notices', 'app.events'];
+ 
+ const off = () => new HttpError(503, 'Uygulama bağlantısı ayarlı değil: sunucuda FC_APP_API_URL ve FC_APP_API_KEY gerekli', 'app_off');
+ 
+@@ -186,6 +200,13 @@ export function appRoutes(r: Router<Ctx>, link: AppLink) {
+     audit(ctx, 'app.gifts.fetch', 'app', null, null, { method: 'POST', path: '/api/admin/gifts/fetch', body: req.body });
+     return { ...out, preview: localFiles(out.url) };
+   });
++  // A sticker's picture from a link (Emojiler): the same, for a PNG, WebP or Lottie JSON of at most 512 KB.
++  r.add('POST', '/api/app/emoji/fetch', async (req, ctx) => {
++    need(ctx, 'app.emojis');
++    const out = await appCall(ctx, link, 'POST', '/api/admin/emoji/fetch', req.body, { raw: true, timeoutMs: 90_000 });
++    audit(ctx, 'app.emoji.fetch', 'app', null, null, { method: 'POST', path: '/api/admin/emoji/fetch', body: req.body });
++    return { ...out, preview: localFiles(out.url) };
++  });
+   r.get('/api/app/status', (_req, ctx) => {
+     if (!ctx.user) throw new HttpError(401, 'Oturum açmanız gerekiyor', 'unauthenticated');
+     return { connected: !!link };
+diff --git a/server/bootstrap.ts b/server/bootstrap.ts
+index b483fba..20c40bd 100644
+--- a/server/bootstrap.ts
++++ b/server/bootstrap.ts
+@@ -36,6 +36,7 @@ export const SYSTEM_ROLES: { key: string; name: string; scope: 'platform' | 'age
+       'simulation.use',
+       'audit.view',
+       'app.gifts',
++      'app.emojis',
+       'app.withdrawals',
+       'app.payouts',
+       'app.refunds',
+@@ -59,6 +60,7 @@ export const SYSTEM_ROLES: { key: string; name: string; scope: 'platform' | 'age
+       'alerts.view',
+       'simulation.use',
+       'app.gifts',
++      'app.emojis',
+       'app.reports',
+       'app.users',
+       'app.complaints',
+diff --git a/server/context.ts b/server/context.ts
+index 7f67d48..e06bf92 100644
+--- a/server/context.ts
++++ b/server/context.ts
+@@ -35,7 +35,8 @@ export const PERMISSIONS = {
+   'settings.edit': 'Kur, vergi, para birimi, sistem ayarları',
+   'simulation.use': 'Büyüme simülasyonu',
+   // Uygulama: the Similar Club app's own admin API, through this panel (server/app-admin.ts).
+-  'app.gifts': 'Uygulama: hediyeleri ekle, düzenle, sırala, kaldır',
++  'app.gifts': 'Uygulama: hediyeleri (uygulamanın kendi hediyeleri de) ekle, düzenle, sırala, kaldır, orijinaline döndür',
++  'app.emojis': 'Uygulama: emoji paketleri ve çıkartmaları (uygulamanınkiler de) ekle, düzenle, sırala, kaldır, orijinaline döndür',
+   'app.withdrawals': 'Uygulama: para çekme taleplerini ödendi işaretle / reddet (kritik)',
+   'app.payouts': 'Uygulama: ajans ödemelerini onayla, ödendi işaretle, reddet (kritik)',
+   'app.refunds': 'Uygulama: mağaza iadesi ve cüzdan denetimi',
+diff --git a/server/migrations/006_app_emoji_permissions.sql b/server/migrations/006_app_emoji_permissions.sql
+new file mode 100644
+index 0000000..612570a
+--- /dev/null
++++ b/server/migrations/006_app_emoji_permissions.sql
+@@ -0,0 +1,6 @@
++-- Uygulama › Emojiler (server/app-admin.ts): whoever manages the app's gifts manages its emoji packs and stickers too.
++-- Roles made before this get the permission here (a fresh database gets it from bootstrap.ts SYSTEM_ROLES); the super
++-- admin always has every permission.
++UPDATE roles SET permissions = json_insert(permissions, '$[#]', 'app.emojis')
++ WHERE key IN ('finance_manager', 'operations_manager')
++   AND NOT EXISTS (SELECT 1 FROM json_each(roles.permissions) WHERE value = 'app.emojis');
+diff --git a/tests/app-admin.test.ts b/tests/app-admin.test.ts
+index 8795050..5533f51 100644
+--- a/tests/app-admin.test.ts
++++ b/tests/app-admin.test.ts
+@@ -67,6 +67,10 @@ const fakeApp = createServer(async (req, res) => {
+     const b = JSON.parse(body.toString('utf8'));
+     return json(200, { url: `${appBase}/api/media/f/gifticon/u1/linked.png`, link: b.url, kind: 'gifticon', type: 'image/png', bytes: 3000, video: null, svga: false });
+   }
++  if (req.method === 'POST' && url.pathname === '/api/admin/emoji/fetch') {
++    const b = JSON.parse(body.toString('utf8'));
++    return json(200, { url: `${appBase}/api/media/f/stickerart/u1/linked.png`, link: b.url, kind: 'image', type: 'image/png', bytes: 2000 });
++  }
+   if (req.method === 'POST' && url.pathname.startsWith('/api/admin/gifts')) return json(200, { gift: { id: 'a2', ...JSON.parse(body.toString('utf8') || '{}') } });
+   // The other admin routes (Para çekme, Ajans ödemeleri, İadeler, Şanslı, Canlı ayarlar, raporlar): an echo.
+   if (url.pathname.startsWith('/api/admin/')) return json(200, { ok: true, path: url.pathname + url.search });
+@@ -435,19 +439,75 @@ test('bağlantıdan dosya: uygulama indirir; kaydedilecek adres olduğu gibi, ö
+   assert.match(no.json.error, /web sayfasını/);
+ });
+ 
++test('Hediyeler: uygulamanın kendi hediyeleri listede istenir, orijinale dönme uygulamaya aynen gider', async () => {
++  env.as('operations_manager', 'ops@test.local');
++  const ops = await loginAs('ops@test.local');
++  assert.equal((await call('GET', '/api/app/gifts?builtin=1', undefined, ops)).status, 200);
++  assert.equal(seen.at(-1)!.path, '/api/admin/gifts?builtin=1');
++  const r = await call('POST', '/api/app/gifts/reset', { id: 'g6', fields: ['price'] }, ops);
++  assert.equal(r.status, 200, JSON.stringify(r.json));
++  assert.equal(seen.at(-1)!.path, '/api/admin/gifts/reset');
++  assert.deepEqual(JSON.parse(seen.at(-1)!.body), { id: 'g6', fields: ['price'] });
++  assert.ok(env.db.get("SELECT 1 FROM audit_logs WHERE action = 'app.gifts.reset'"));
++  env.as('read_only', 'ro@test.local');
++  assert.equal((await call('POST', '/api/app/gifts/reset', { id: 'g6' }, await loginAs('ro@test.local'))).status, 403);
++});
++
++test('Emojiler: kendi yetkisiyle; paketler, çıkartmalar, sıra, orijinale dönme, resim yükleme ve bağlantıdan resim', async () => {
++  env.as('operations_manager', 'ops@test.local');
++  env.as('finance_manager', 'fin@test.local');
++  env.as('read_only', 'ro@test.local');
++  const ops = await loginAs('ops@test.local');
++  const fin = await loginAs('fin@test.local');
++  const ro = await loginAs('ro@test.local');
++  for (const [method, path, body] of [
++    ['GET', '/api/app/emoji', undefined],
++    ['POST', '/api/app/emoji/packs', { name: 'Kedi Sarayı', price: 120 }],
++    ['POST', '/api/app/emoji/packs/update', { id: 'fun', price: 70 }],
++    ['POST', '/api/app/emoji/packs/reset', { id: 'fun' }],
++    ['POST', '/api/app/emoji/packs/order', { ids: ['penguen', 'vip'] }],
++    ['POST', '/api/app/emoji/packs/delete', { id: 'ep1' }],
++    ['POST', '/api/app/emoji/stickers', { pack: 'ep1', name: 'Mırnav', art: 'x' }],
++    ['POST', '/api/app/emoji/stickers/update', { id: 'vip-tac', name: 'Altın Taç' }],
++    ['POST', '/api/app/emoji/stickers/reset', { id: 'vip-tac' }],
++    ['POST', '/api/app/emoji/stickers/order', { pack: 'vip', ids: ['vip-elmas', 'vip-tac'] }],
++    ['POST', '/api/app/emoji/stickers/delete', { id: 'es2' }],
++  ] as const) {
++    for (const h of [ops, fin]) assert.equal((await call(method, path, body, h)).status, 200, `${path}`);
++    assert.equal(seen.at(-1)!.path, path.replace('/api/app/', '/api/admin/'));
++    if (body) assert.deepEqual(JSON.parse(seen.at(-1)!.body), body);
++    assert.equal((await call(method, path, body, ro)).status, 403, `salt okunur: ${path}`);
++  }
++  assert.ok(env.db.get("SELECT 1 FROM audit_logs WHERE action = 'app.emoji.packs.update'"));
++  // A sticker's picture streams to the storage like a gift's icon; a Lottie (JSON) too.
++  const res = await fetch(`${base}/api/app/upload?kind=stickerart`, { method: 'POST', headers: { ...ops, 'content-type': 'application/json' }, body: '{"v":"5.7.4"}' });
++  assert.equal(res.status, 200);
++  assert.deepEqual(JSON.parse(seen.at(-1)!.body), { kind: 'stickerart', contentType: 'application/json', size: 13 });
++  assert.equal((await fetch(`${base}/api/app/upload?kind=stickerart`, { method: 'POST', headers: { ...ro, 'content-type': 'image/png' }, body: ICON })).status, 403);
++  // From a link: the app downloads it; the address to save as it gave it, the preview through here.
++  const got = await call('POST', '/api/app/emoji/fetch', { url: 'https://alanadi.com/emoji/kedi.png' }, ops);
++  assert.equal(got.status, 200, JSON.stringify(got.json));
++  assert.equal(got.json.preview, '/api/app/media/f/stickerart/u1/linked.png');
++  assert.equal(seen.at(-1)!.path, '/api/admin/emoji/fetch');
++  assert.ok(env.db.get("SELECT 1 FROM audit_logs WHERE action = 'app.emoji.fetch'"));
++  assert.equal((await call('POST', '/api/app/emoji/fetch', { url: 'https://alanadi.com/x.png' }, ro)).status, 403);
++  // The stored pictures open for whoever manages the emojis.
++  assert.equal((await fetch(`${base}/api/app/media/f/stickerart/u1/x.png`, { headers: ops })).status, 200);
++});
++
+ test('daha önce kurulmuş rollere yeni yetki bir kez eklenir', () => {
+   const { db } = setup();
+   const ADDED: Record<string, string[]> = {
+-    finance_manager: ['app.gifts', 'app.withdrawals', 'app.payouts', 'app.refunds', 'app.lucky', 'app.settings', 'app.reports', 'app.agencies', 'app.agency_ledger'],
+-    operations_manager: ['app.gifts', 'app.reports', 'app.users', 'app.complaints', 'app.support', 'app.notices', 'app.events'],
++    finance_manager: ['app.gifts', 'app.emojis', 'app.withdrawals', 'app.payouts', 'app.refunds', 'app.lucky', 'app.settings', 'app.reports', 'app.agencies', 'app.agency_ledger'],
++    operations_manager: ['app.gifts', 'app.emojis', 'app.reports', 'app.users', 'app.complaints', 'app.support', 'app.notices', 'app.events'],
+   };
+-  // A database made before 002–005: the roles without the app permissions.
++  // A database made before 002–006: the roles without the app permissions.
+   for (const [key, list] of Object.entries(ADDED)) {
+     const perms: string[] = JSON.parse(db.value<string>('SELECT permissions FROM roles WHERE key = ?', key)!);
+     db.run('UPDATE roles SET permissions = ? WHERE key = ?', JSON.stringify(perms.filter((p) => !list.includes(p))), key);
+   }
+   db.run(
+-    "DELETE FROM schema_migrations WHERE name IN ('002_app_permissions.sql', '003_app_finance_permissions.sql', '004_app_operations_permissions.sql', '005_app_agency_permissions.sql')",
++    "DELETE FROM schema_migrations WHERE name IN ('002_app_permissions.sql', '003_app_finance_permissions.sql', '004_app_operations_permissions.sql', '005_app_agency_permissions.sql', '006_app_emoji_permissions.sql')",
+   );
+   db.migrate();
+   db.migrate();
+diff --git a/web/app.js b/web/app.js
+index f90e691..e544ef4 100644
+--- a/web/app.js
++++ b/web/app.js
+@@ -12,6 +12,7 @@ import { Simulation } from './pages/simulation.js';
+ import { Alerts } from './pages/alerts.js';
+ import { Integrations, Users, Audit, Settings, Account } from './pages/admin.js';
+ import { AppGifts } from './pages/app-gifts.js';
++import { AppEmojis } from './pages/app-emojis.js';
+ import { AppLucky, AppPayouts, AppRefunds, AppReports, AppSettings, AppWithdrawals } from './pages/app-finance.js';
+ import { AppComplaints, AppEvents, AppNotices, AppSupport, AppUsers } from './pages/app-ops.js';
+ import { AppAgencies } from './pages/app-agencies.js';
+@@ -47,6 +48,7 @@ const NAV = [
+   // The Similar Club app itself, through its admin API (server/app-admin.ts).
+   ['Uygulama', [
+     ['app-gifts', 'Hediyeler', 'app.gifts', AppGifts],
++    ['app-emojis', 'Emojiler', 'app.emojis', AppEmojis],
+     ['app-withdrawals', 'Para çekme', 'app.withdrawals', AppWithdrawals],
+     ['app-payouts', 'Ajans ödemeleri', 'app.payouts', AppPayouts],
+     ['app-refunds', 'İadeler ve cüzdan', 'app.refunds', AppRefunds],
+diff --git a/web/pages/app-emojis.js b/web/pages/app-emojis.js
+new file mode 100644
+index 0000000..c07302c
+--- /dev/null
++++ b/web/pages/app-emojis.js
+@@ -0,0 +1,304 @@
++// Uygulama › Emojiler: the Similar Club app's emoji panel, its sticker packs and their stickers, changed without an app
++// update (the app's server/api/emoji.mjs; server/app-admin.ts passes the calls on as the signed-in panel user). The
++// app's own packs and stickers change (a pack's name, price, VIP level, on/off and order; a sticker's name, emoji, pack,
++// picture, on/off and order) and go back to the app's values ("Orijinale dön"); the team adds packs and stickers of its
++// own, with a transparent PNG/WebP or a Lottie animation as the picture. Each pack is a card with its stickers.
++import { Badge, Button, Card, Loading, Modal, Page, act, html, num, post, showError, toast, useApi, useApp, useState } from '../lib.js';
++
++const kb = (n) => `${Math.max(1, Math.round(n / 1024))} KB`;
++const ending = (name) => (/\.([A-Za-z0-9]{1,8})$/.exec(name ?? '')?.[1] ?? '').toLowerCase();
++const PACK_TR = { name: 'ad', price: 'fiyat', minVip: 'VIP', enabled: 'rafta / kapalı' };
++const STICKER_TR = { pack: 'paket', name: 'ad', emoji: 'emoji', enabled: 'rafta / kapalı', art: 'resim' };
++const listOf = (fields, tr) => (fields ?? []).map((f) => tr[f] ?? f).join(', ');
++/** Stickers shown in a closed pack's card. */
++const PEEK = 12;
++
++/** What a picked picture is uploaded as (the app's stickerart kind), or null. */
++function artType(file) {
++  const t = (file.type || '').toLowerCase();
++  const e = ending(file.name);
++  if (t === 'image/png' || e === 'png') return 'image/png';
++  if (t === 'image/webp' || e === 'webp') return 'image/webp';
++  if (t === 'application/json' || e === 'json') return 'application/json';
++  return null;
++}
++/** Uploads a picked picture through this server to the app's storage; resolves with the address to save. */
++async function upload(file) {
++  const type = artType(file);
++  if (!type) throw new Error('Resim PNG, WebP ya da Lottie (JSON) olmalı');
++  const res = await fetch('/api/app/upload?kind=stickerart', { method: 'POST', headers: { 'content-type': type }, body: file, credentials: 'same-origin' });
++  let d = null;
++  try {
++    d = await res.json();
++  } catch {}
++  if (!res.ok || !d?.url) throw new Error(d?.error ?? `Yükleme başarısız (${res.status})`);
++  return d.url;
++}
++
++/** A sticker as the panel can draw it: its picture, or its emoji (a Lottie animation, an app sticker that moves). */
++const Face = ({ s, size = 48 }) =>
++  s.picture
++    ? html`<img src=${s.picture} width=${size} height=${size} alt="" loading="lazy" style="object-fit:contain" />`
++    : html`<span class="sticker-emoji" style=${`font-size:${Math.round(size * 0.7)}px;line-height:${size}px`}>${s.emoji}</span>`;
++
++const packLine = (p) =>
++  p.roomOnly ? 'odanın kendi paketi (satılmaz)' : p.price > 0 ? `🪙 ${num(p.price)}${p.minVip ? ` · VIP ${p.minVip}+` : ''}` : p.minVip ? `VIP ${p.minVip} ile açılır` : 'ücretsiz';
++
++export function AppEmojis() {
++  const { can, meta } = useApp();
++  const list = useApi(meta.app_link ? '/api/app/emoji' : null);
++  const [open, setOpen] = useState(() => new Set());
++  const [packEdit, setPackEdit] = useState(null);
++  const [stickerEdit, setStickerEdit] = useState(null);
++
++  if (!meta.app_link)
++    return html`<${Page} title="Uygulama emojileri"><div class="empty bad">Uygulama bağlantısı ayarlı değil: sunucuda FC_APP_API_URL ve FC_APP_API_KEY gerekli.</div></${Page}>`;
++  const edit = can('app.emojis');
++  const done = (text) => (toast(text), list.reload());
++
++  const movePack = async (packs, p, by) => {
++    const ids = packs.map((x) => x.id);
++    const i = ids.indexOf(p.id);
++    const j = i + by;
++    if (j < 0 || j >= ids.length) return;
++    [ids[i], ids[j]] = [ids[j], ids[i]];
++    (await act(() => post('/api/app/emoji/packs/order', { ids }), 'Sıra kaydedildi')) && list.reload();
++  };
++  const moveSticker = async (p, s, by) => {
++    const ids = p.stickers.map((x) => x.id);
++    const i = ids.indexOf(s.id);
++    const j = i + by;
++    if (j < 0 || j >= ids.length) return;
++    [ids[i], ids[j]] = [ids[j], ids[i]];
++    (await act(() => post('/api/app/emoji/stickers/order', { pack: p.id, ids }), 'Sıra kaydedildi')) && list.reload();
++  };
++  const togglePack = async (p) => {
++    if (!confirm(p.enabled ? `“${p.name}” emoji panelinden ve mağazadan kalksın mı? Alanların gönderdiği çıkartmalar mesajlarda görünmeye devam eder.` : `“${p.name}” yeniden açılsın mı?`)) return;
++    (await act(() => post('/api/app/emoji/packs/update', { id: p.id, enabled: !p.enabled }), p.enabled ? 'Paket kapatıldı' : 'Paket açıldı')) && list.reload();
++  };
++  const resetPack = async (p) => {
++    if (!confirm(`“${p.name}” uygulamadaki haline dönsün mü? Geri alınacak: ${listOf(p.changed, PACK_TR)}. Sırası değişmez.`)) return;
++    (await act(() => post('/api/app/emoji/packs/reset', { id: p.id }), 'Paket orijinaline döndü')) && list.reload();
++  };
++  const deletePack = async (p) => {
++    if (!confirm(`“${p.name}” ve içindeki çıkartmalar silinsin mi? Resimleri depodan silinir; gönderilmiş çıkartmalar mesajlarda emojisiyle görünür. Geri alınamaz.`)) return;
++    (await act(() => post('/api/app/emoji/packs/delete', { id: p.id }), 'Paket silindi')) && list.reload();
++  };
++  const fold = (id) => setOpen((x) => (x.has(id) ? new Set([...x].filter((y) => y !== id)) : new Set([...x, id])));
++
++  return html`<${Page}
++    title="Uygulama emojileri"
++    subtitle="Emoji panelinin çıkartma paketleri. Uygulamanın kendi paketlerinin adı, fiyatı, VIP'i, sırası ve çıkartmalarının adı, emojisi, resmi ve paketi buradan değişir, istenince orijinaline döner; yeni paket ve çıkartma da eklenir. Değişiklik uygulama güncellemesi olmadan bu sürümden sonraki APK'lara gider. Her işlem hem burada hem uygulamada denetim kaydına adınızla yazılır."
++    actions=${edit && html`<${Button} kind="primary" onClick=${() => setPackEdit({})}>Yeni paket</${Button}>`}
++  >
++    <${Loading} state=${list}>${(d) => html`
++      ${!d.storage && html`<div class="empty bad">Uygulamanın dosya deposu açık değil: çıkartma resmi yüklenemez, yeni çıkartma eklenemez.</div>`}
++      ${d.packs.map((p, i) => {
++        const shown = open.has(p.id) ? p.stickers : p.stickers.slice(0, PEEK);
++        return html`<${Card}
++          key=${p.id}
++          title=${html`<span>${p.name}</span> ${p.builtin ? html`<${Badge} s="info" label="Uygulamanın" />` : html`<${Badge} s="active" label="Eklenen" />`}
++            ${!p.enabled && html` <${Badge} s="passive" label="Kapalı" />`}
++            ${p.changed?.length > 0 && html` <${Badge} s="warning" label=${`Değiştirildi: ${listOf(p.changed, PACK_TR)}`} />`}
++            ${p.emojiTab && html` <${Badge} label="Emoji sekmesinde" />`}`}
++          actions=${html`
++            <small class="muted">${packLine(p)} · ${p.stickers.length} çıkartma${p.owners ? ` · ${num(p.owners)} kişi aldı` : ''}</small>
++            ${edit && html`
++              <button class="btn ghost" aria-label="Bir üste" disabled=${i === 0} onClick=${() => movePack(d.packs, p, -1)}>↑</button>
++              <button class="btn ghost" aria-label="Bir alta" disabled=${i === d.packs.length - 1} onClick=${() => movePack(d.packs, p, 1)}>↓</button>
++              <${Button} onClick=${() => setPackEdit({ pack: p })}>Düzenle</${Button}>
++              <${Button} kind="ghost" onClick=${() => togglePack(p)}>${p.enabled ? 'Kapat' : 'Aç'}</${Button}>
++              ${p.builtin ? p.changed?.length > 0 && html`<${Button} kind="ghost" onClick=${() => resetPack(p)}>Orijinale dön</${Button}>` : html`<${Button} kind="danger" disabled=${p.owners > 0} title=${p.owners ? 'Alan var: silinemez, kapatılabilir' : ''} onClick=${() => deletePack(p)}>Sil</${Button}>`}
++              ${!p.roomOnly && html`<${Button} kind="primary" disabled=${!d.storage} onClick=${() => setStickerEdit({ pack: p })}>Çıkartma ekle</${Button}>`}`}`}
++        >
++          ${p.builtin && p.changed?.length > 0 && html`<p class="muted">Uygulamada: ${p.original.name} · ${packLine({ ...p, ...p.original })}${p.original.enabled ? '' : ' · kapalı'}</p>`}
++          <div class="sticker-grid">
++            ${shown.map(
++              (s, k) => html`<div class=${`sticker-tile ${s.enabled ? '' : 'off'}`} key=${s.id}>
++                <button class="sticker-face" title=${`${s.name} (${s.id})`} disabled=${!edit} onClick=${() => setStickerEdit({ sticker: s, pack: p })}><${Face} s=${s} /></button>
++                <small>${s.name}</small>
++                <span class="row gap">
++                  ${s.art?.kind === 'lottie' && html`<${Badge} label="Lottie" />`}
++                  ${!s.enabled && html`<${Badge} s="passive" label="Kapalı" />`}
++                  ${s.changed?.length > 0 && html`<${Badge} s="warning" label=${listOf(s.changed, STICKER_TR)} />`}
++                  ${!s.builtin && html`<${Badge} s="active" label="Eklenen" />`}
++                </span>
++                ${edit && open.has(p.id) && html`<span class="row gap">
++                  <button class="btn ghost" aria-label="Öne al" disabled=${k === 0} onClick=${() => moveSticker(p, s, -1)}>←</button>
++                  <button class="btn ghost" aria-label="Arkaya al" disabled=${k === p.stickers.length - 1} onClick=${() => moveSticker(p, s, 1)}>→</button>
++                </span>`}
++              </div>`,
++            )}
++          </div>
++          ${p.stickers.length > PEEK || (edit && p.stickers.length > 1)
++            ? html`<${Button} kind="ghost" onClick=${() => fold(p.id)}>${open.has(p.id) ? 'Kapat' : p.stickers.length > PEEK ? `Hepsini göster (${p.stickers.length})` : 'Sırala'}</${Button}>`
++            : ''}
++        </${Card}>`;
++      })}`}</${Loading}>
++    ${packEdit && list.data && html`<${PackEditor} pack=${packEdit.pack} limits=${list.data.limits} onClose=${() => setPackEdit(null)} onSaved=${(t) => (setPackEdit(null), done(t))} />`}
++    ${stickerEdit && list.data && html`<${StickerEditor} sticker=${stickerEdit.sticker} pack=${stickerEdit.pack} packs=${list.data.packs} limits=${list.data.limits} onClose=${() => setStickerEdit(null)} onSaved=${(t) => (setStickerEdit(null), done(t))} />`}
++  </${Page}>`;
++}
++
++function PackEditor({ pack, limits: L, onClose, onSaved }) {
++  const app = !!pack?.builtin;
++  const o = pack?.original;
++  const [v, setV] = useState({ name: pack?.name ?? '', price: String(pack?.price ?? 0), minVip: String(pack?.minVip ?? 0), enabled: pack ? pack.enabled : true });
++  const [busy, setBusy] = useState(false);
++  const was = (show, text) => app && show && html`<small class="muted">Uygulamada: ${text}</small>`;
++  const save = async () => {
++    const name = v.name.replace(/\s+/g, ' ').trim();
++    const price = Number(v.price);
++    const minVip = Number(v.minVip);
++    if (name.length < L.packNameMin || name.length > L.packNameMax) return showError(new Error(`Ad ${L.packNameMin}–${L.packNameMax} karakter olmalı`));
++    if (!Number.isSafeInteger(price) || price < 0 || price > L.priceMax) return showError(new Error(`Fiyat 0–${num(L.priceMax)} jeton olmalı (0: ücretsiz)`));
++    const fields = { name, price, minVip, enabled: !!v.enabled };
++    setBusy(true);
++    try {
++      if (pack) {
++        const patch = {};
++        for (const k of Object.keys(fields)) if (fields[k] !== pack[k]) patch[k] = fields[k];
++        if (!Object.keys(patch).length) return onClose();
++        await post('/api/app/emoji/packs/update', { id: pack.id, ...patch });
++        onSaved('Paket kaydedildi');
++      } else {
++        await post('/api/app/emoji/packs', fields);
++        onSaved('Paket eklendi; şimdi çıkartmalarını ekleyin');
++      }
++    } catch (e) {
++      showError(e);
++    } finally {
++      setBusy(false);
++    }
++  };
++  return html`<${Modal} title=${pack ? `${pack.name}${app ? ' (uygulamanın paketi)' : ''}` : 'Yeni paket'} onClose=${onClose}>
++    <div class="form"><div class="grid2">
++      <label class="field"><span>Ad *</span><input value=${v.name} maxlength=${L.packNameMax} onInput=${(e) => setV({ ...v, name: e.target.value })} placeholder="Ör. Kedi Sarayı" />${was(v.name.trim() !== o?.name, o?.name)}</label>
++      <label class="field"><span>Fiyat (jeton)</span><input inputmode="numeric" value=${v.price} disabled=${pack?.roomOnly} onInput=${(e) => setV({ ...v, price: e.target.value.replace(/[^\d]/g, '') })} /><small class="muted">0: ücretsiz (ya da yalnız VIP ile açılır). Mağazada bu fiyatla satılır.</small>${was(Number(v.price) !== o?.price, `${num(o?.price)} jeton`)}</label>
++      <label class="field"><span>En düşük VIP seviyesi</span><select value=${v.minVip} onChange=${(e) => setV({ ...v, minVip: e.target.value })}>${Array.from({ length: L.vipMax + 1 }, (_, i) => html`<option value=${String(i)}>${i ? `VIP ${i}` : 'Herkes'}</option>`)}</select>${was(Number(v.minVip) !== o?.minVip, o?.minVip ? `VIP ${o.minVip}` : 'herkes')}</label>
++      <label class="field inline"><span>Açık (panelde ve mağazada)</span><input type="checkbox" checked=${v.enabled} onChange=${(e) => setV({ ...v, enabled: e.target.checked })} />${was(!!v.enabled !== o?.enabled, o?.enabled ? 'açık' : 'kapalı')}</label>
++    </div></div>
++    ${pack?.owners > 0 && html`<p class="note">Bu paketi ${num(pack.owners)} kişi aldı. Fiyat değişikliği yeni alımlardan itibaren geçer; kapatılsa da aldıkları çıkartmalar mesajlarda görünür.</p>`}
++    <div class="row end gap" style="margin-top:12px">
++      <${Button} onClick=${onClose} disabled=${busy}>Vazgeç</${Button}>
++      <${Button} kind="primary" disabled=${busy} onClick=${save}>${busy ? 'Kaydediliyor…' : pack ? 'Kaydet' : 'Paketi ekle'}</${Button}>
++    </div>
++  </${Modal}>`;
++}
++
++function StickerEditor({ sticker, pack, packs, limits: L, onClose, onSaved }) {
++  const app = !!sticker?.builtin;
++  const o = sticker?.original;
++  const [v, setV] = useState({ name: sticker?.name ?? '', emoji: sticker?.emoji ?? '', pack: sticker?.pack ?? pack.id, enabled: sticker ? sticker.enabled : true });
++  // A picked file ({ file, url, kind }), a fetched one ({ at, url, kind, link, bytes }) or { reset: true }: the app's own.
++  const [art, setArt] = useState(null);
++  const [link, setLink] = useState(sticker?.artLink ?? '');
++  const [busy, setBusy] = useState(null);
++  const was = (show, text) => app && show && html`<small class="muted">Uygulamada: ${text}</small>`;
++  // A Hamle sticker stays in Hamle; nothing else goes there.
++  const choices = packs.filter((p) => (pack.roomOnly ? p.id === pack.id : !p.roomOnly));
++  const face = art?.reset ? { picture: o?.picture, emoji: v.emoji || o?.emoji } : art ? { picture: art.kind === 'image' ? art.url : null, emoji: v.emoji || '🙂' } : { picture: sticker?.picture, emoji: v.emoji || sticker?.emoji || '🙂' };
++
++  const pick = (e) => {
++    const file = e.target.files?.[0];
++    if (!file) return;
++    const type = artType(file);
++    if (!type) return showError(new Error('Resim PNG, WebP ya da Lottie (JSON) olmalı'));
++    if (file.size > L.artBytes) return showError(new Error(`Resim en fazla ${kb(L.artBytes)} olabilir (bu ${kb(file.size)})`));
++    setArt({ file, url: URL.createObjectURL(file), kind: type === 'application/json' ? 'lottie' : 'image' });
++  };
++  const pull = async () => {
++    setBusy('İndiriliyor…');
++    try {
++      const out = await post('/api/app/emoji/fetch', { url: link.trim() });
++      setArt({ at: out.url, url: out.preview, kind: out.kind, link: out.link, bytes: out.bytes });
++      setLink(out.link);
++      toast(`Resim bağlantıdan alındı (${kb(out.bytes)}); kaydedince çıkartmaya geçer`);
++    } catch (e) {
++      showError(e);
++    } finally {
++      setBusy(null);
++    }
++  };
++  const save = async () => {
++    const name = v.name.replace(/\s+/g, ' ').trim();
++    if (name.length < L.nameMin || name.length > L.nameMax) return showError(new Error(`Ad ${L.nameMin}–${L.nameMax} karakter olmalı`));
++    if (!sticker && !art) return showError(new Error('Resim seçin'));
++    try {
++      let at;
++      if (art?.at) at = art.at;
++      else if (art?.file) {
++        setBusy('Resim yükleniyor…');
++        at = await upload(art.file);
++      }
++      setBusy('Kaydediliyor…');
++      if (sticker) {
++        const patch = {};
++        if (name !== sticker.name) patch.name = name;
++        if ((v.emoji.trim() || (app ? o.emoji : sticker.emoji)) !== sticker.emoji) patch.emoji = v.emoji.trim();
++        if (v.pack !== sticker.pack) patch.pack = v.pack;
++        if (!!v.enabled !== sticker.enabled) patch.enabled = !!v.enabled;
++        if (at) Object.assign(patch, { art: at, artLink: art.link ?? null });
++        if (art?.reset) patch.art = null;
++        if (!Object.keys(patch).length) return onClose();
++        await post('/api/app/emoji/stickers/update', { id: sticker.id, ...patch });
++        onSaved('Çıkartma kaydedildi');
++      } else {
++        await post('/api/app/emoji/stickers', { pack: v.pack, name, emoji: v.emoji.trim(), enabled: !!v.enabled, art: at, artLink: art.link ?? null });
++        onSaved('Çıkartma eklendi');
++      }
++    } catch (e) {
++      showError(e);
++    } finally {
++      setBusy(null);
++    }
++  };
++  const reset = async () => {
++    if (!confirm(`“${sticker.name}” uygulamadaki haline dönsün mü? Geri alınacak: ${listOf(sticker.changed, STICKER_TR)}. Yüklenen resim silinir.`)) return;
++    if (await act(() => post('/api/app/emoji/stickers/reset', { id: sticker.id }))) onSaved('Çıkartma orijinaline döndü');
++  };
++  const remove = async () => {
++    if (!confirm(`“${sticker.name}” silinsin mi? Resmi depodan silinir; gönderildiği mesajlarda emojisiyle görünür. Geri alınamaz.`)) return;
++    if (await act(() => post('/api/app/emoji/stickers/delete', { id: sticker.id }))) onSaved('Çıkartma silindi');
++  };
++
++  return html`<${Modal} title=${sticker ? `${sticker.name}${app ? ' (uygulamanın çıkartması)' : ''}` : `${pack.name}: yeni çıkartma`} wide onClose=${onClose}>
++    <div class="form"><div class="grid2">
++      <label class="field"><span>Ad *</span><input value=${v.name} maxlength=${L.nameMax} onInput=${(e) => setV({ ...v, name: e.target.value })} placeholder="Ör. Mırnav" />${was(v.name.trim() !== o?.name, o?.name)}</label>
++      <label class="field"><span>Emoji</span><input value=${v.emoji} maxlength="8" onInput=${(e) => setV({ ...v, emoji: e.target.value })} placeholder=${app ? o.emoji : '🙂'} /><small class="muted">Yazı satırlarında ve resmin çizilemediği yerde görünür.</small>${was(v.emoji.trim() && v.emoji.trim() !== o?.emoji, o?.emoji)}</label>
++      <label class="field"><span>Paket</span><select value=${v.pack} onChange=${(e) => setV({ ...v, pack: e.target.value })}>${choices.map((p) => html`<option value=${p.id}>${p.name}</option>`)}</select>${was(v.pack !== o?.pack, packs.find((p) => p.id === o?.pack)?.name ?? o?.pack)}</label>
++      <label class="field inline"><span>Açık (panelde görünür)</span><input type="checkbox" checked=${v.enabled} onChange=${(e) => setV({ ...v, enabled: e.target.checked })} /></label>
++    </div></div>
++
++    <h3>Resim</h3>
++    <p class="muted">Saydam (arka planı silinmiş) PNG ya da WebP, kare, ${L.artMinPx}–${L.artMaxPx} piksel (önerilen 256 × 256), ya da en çok ${num(L.lottieMaxMs / 1000)} saniyelik bir Lottie animasyonu (JSON, resimleri dosyanın içinde); en çok ${kb(L.artBytes)}. Lottie telefonda oynar; burada emojisi görünür.${app ? ' Seçmezseniz uygulamanın resmi kalır.' : ''}</p>
++    <div class="row gap wrap">
++      <input type="file" accept="image/png,image/webp,application/json,.json" aria-label="Çıkartma resmi" onChange=${pick} />
++      ${app && sticker.changed?.includes('art') && !art?.reset && html`<${Button} kind="ghost" onClick=${() => setArt({ reset: true })}>Uygulamanın resmine dön</${Button}>`}
++      ${art?.reset && html`<span class="muted">Kaydedince uygulamanın resmi döner.</span> <${Button} kind="ghost" onClick=${() => setArt(null)}>Vazgeç</${Button}>`}
++    </div>
++    <div class="row gap wrap" style="margin-top:6px">
++      <input type="url" style="flex:1;min-width:280px" value=${link} placeholder="ya da bağlantı yapıştırın: https://alanadiniz.com/emoji/kedi.png" aria-label="Resmin bağlantısı" onInput=${(e) => setLink(e.target.value)} />
++      <${Button} disabled=${!!busy || !link.trim()} onClick=${pull}>${busy === 'İndiriliyor…' ? busy : 'Bağlantıdan çek'}</${Button}>
++    </div>
++    ${art?.file && html`<small class="muted">${art.file.name} · ${art.kind === 'lottie' ? 'Lottie animasyonu' : 'resim'} · ${kb(art.file.size)}</small>`}
++    ${art?.at && html`<small class="muted">Bağlantıdan alındı · ${art.kind === 'lottie' ? 'Lottie animasyonu' : 'resim'} · ${kb(art.bytes)}</small>`}
++
++    <h3>Önizleme</h3>
++    <div class="gift-preview">
++      <div class="gift-tile"><${Face} s=${face} size=${56} /><b>${v.name.trim() || 'Çıkartma adı'}</b></div>
++      <div class="muted">${packs.find((p) => p.id === v.pack)?.name ?? ''} · ${v.enabled ? 'açık' : 'kapalı'}${(art?.kind ?? sticker?.art?.kind) === 'lottie' ? ' · Lottie' : ''}</div>
++    </div>
++
++    <div class="row gap" style="margin-top:12px;justify-content:space-between">
++      <span class="row gap">
++        ${app && sticker.changed?.length > 0 && html`<${Button} kind="ghost" disabled=${!!busy} onClick=${reset}>Orijinale dön</${Button}>`}
++        ${sticker && !app && html`<${Button} kind="danger" disabled=${!!busy} onClick=${remove}>Sil</${Button}>`}
++      </span>
++      <span class="row gap">
++        <${Button} onClick=${onClose} disabled=${!!busy}>Vazgeç</${Button}>
++        <${Button} kind="primary" disabled=${!!busy} onClick=${save}>${busy && busy !== 'İndiriliyor…' ? busy : sticker ? 'Kaydet' : 'Çıkartmayı ekle'}</${Button}>
++      </span>
++    </div>
++  </${Modal}>`;
++}
+diff --git a/web/pages/app-gifts.js b/web/pages/app-gifts.js
+index 6263aa9..49be0ec 100644
+--- a/web/pages/app-gifts.js
++++ b/web/pages/app-gifts.js
+@@ -1,9 +1,10 @@
+-// Uygulama › Hediyeler: the Similar Club app's gifts that the team adds without an app update (the app's Yönetim ›
+-// Hediyeler does the same; server/app-admin.ts passes the calls on as the signed-in panel user). A list per shelf in
+-// the phones' order, an editor (name, price, shelf, VIP, emoji, icon, video or SVGA), and a preview: the shelf tile,
+-// the icon, and the transparent video drawn over a stage the way the phones draw it. Files go through this server to
+-// the app's storage; the app checks them when the gift is saved and converts a WebM / MOV / SVGA itself. Nothing
+-// removes a background: the editor says so before a file is picked.
++// Uygulama › Hediyeler: the Similar Club app's gifts, changed without an app update (the app's Yönetim › Hediyeler
++// does the same; server/app-admin.ts passes the calls on as the signed-in panel user): the ones the team adds, and the
++// app's own (?builtin=1), whose every value (name, price, shelf, VIP, emoji, on/off, order, icon, video) can change
++// and go back to the app's ("Orijinale dön"). A list per shelf in the phones' order, an editor, and a preview: the
++// shelf tile, the icon, and the transparent video drawn over a stage the way the phones draw it. Files go through this
++// server to the app's storage; the app checks them when the gift is saved and converts a WebM / MOV / SVGA itself.
++// Nothing removes a background: the editor says so before a file is picked.
+ import { Badge, Button, Loading, Modal, Page, Table, act, dateTimeTr, html, num, post, showError, toast, useApi, useApp, useEffect, useRef, useState } from '../lib.js';
+ 
+ const CATS = [
+@@ -17,6 +18,16 @@ const FILLS = { 0.45: 'Küçük', 0.6: 'Orta', 0.8: 'Büyük', 1: 'Tam ekran' };
+ const mb = (n) => (n / 1024 / 1024).toLocaleString('tr-TR', { maximumFractionDigits: 1 });
+ const sec = (ms) => (ms / 1000).toLocaleString('tr-TR', { maximumFractionDigits: 1 });
+ const ending = (name) => (/\.([A-Za-z0-9]{1,8})$/.exec(name ?? '')?.[1] ?? '').toLowerCase();
++/** What "Değiştirildi" names, as the app answers it (`changed`). */
++const FIELD_TR = { name: 'ad', emoji: 'emoji', price: 'fiyat', cat: 'raf / VIP', enabled: 'rafta / kapalı', icon: 'ikon', video: 'video' };
++const changedText = (g) => (g.changed ?? []).map((f) => FIELD_TR[f] ?? f).join(', ');
++const KINDS = [
++  ['all', 'Hepsi'],
++  ['app', 'Uygulamanın'],
++  ['mine', 'Eklenenler'],
++  ['changed', 'Değiştirilenler'],
++];
++const kindOk = (k, g) => k === 'all' || (k === 'app' && g.builtin) || (k === 'mine' && !g.builtin) || (k === 'changed' && g.builtin && g.changed?.length > 0);
+ 
+ /** What a picked file is uploaded as (the app's upload kinds), or null when the app won't take it. */
+ function typeOf(kind, file) {
+@@ -57,16 +68,21 @@ function upload(kind, file, onProgress) {
+ function videoLine(g) {
+   if (g.job?.status === 'processing') return html`<${Badge} s="pending" label=${g.video ? 'Yeni video çevriliyor' : 'Video çevriliyor'} />`;
+   if (g.job?.status === 'failed') return html`<span><${Badge} s="error" label="Çevrilemedi" /> <small class="muted">${g.job.error}</small></span>`;
+-  if (g.video) return html`<${Badge} s="active" label=${`Hazır · ${sec(g.video.ms)} sn · ${mb(g.video.bytes)} MB`} />`;
++  // The app's own clip, as long as nobody replaced or stopped it.
++  const own = g.builtin && !g.changed?.includes('video');
++  if (g.video) return html`<${Badge} s="active" label=${`${own ? 'Uygulamanın videosu' : 'Hazır'} · ${sec(g.video.ms)} sn · ${mb(g.video.bytes)} MB`} />`;
++  if (g.videoOff) return html`<span class="muted">Kapatıldı (ikon uçar)</span>`;
+   return html`<span class="muted">Yok (ikon uçar)</span>`;
+ }
+ 
+ export function AppGifts() {
+   const { can, meta } = useApp();
+   const [shelf, setShelf] = useState('all');
++  const [kind, setKind] = useState('all');
+   const [edit, setEdit] = useState(null);
+   const [playing, setPlaying] = useState(null);
+-  const list = useApi(meta.app_link ? '/api/app/gifts' : null);
++  // builtin=1: the app's own gifts too, with their values in the app and what was changed.
++  const list = useApi(meta.app_link ? '/api/app/gifts?builtin=1' : null);
+   const processing = !!list.data?.gifts.some((g) => g.job?.status === 'processing');
+   // A video converts on the app's server: the list is read again every few seconds until it is done.
+   useEffect(() => {
+@@ -88,33 +104,45 @@ export function AppGifts() {
+     (await act(() => post('/api/app/gifts/order', { ids }), 'Sıra kaydedildi')) && list.reload();
+   };
+   const toggle = async (g) => {
+-    if (!confirm(g.enabled ? `“${g.name}” raflardan kalksın mı? Gönderilemez; burada kalır ve yeniden rafa konabilir.` : `“${g.name}” herkesin hediye panelinde görünsün mü?`)) return;
++    const off = g.builtin
++      ? `“${g.name}” raflardan kalksın mı? Hediye panelinde görünmez; çantasında olan (ya da eski bir telefon) yine gönderebilir. Burada kalır ve yeniden rafa konabilir.`
++      : `“${g.name}” raflardan kalksın mı? Gönderilemez; burada kalır ve yeniden rafa konabilir.`;
++    if (!confirm(g.enabled ? off : `“${g.name}” herkesin hediye panelinde görünsün mü?`)) return;
+     (await act(() => post('/api/app/gifts/update', { id: g.id, enabled: !g.enabled }), g.enabled ? 'Raftan kaldırıldı' : 'Rafa kondu')) && list.reload();
+   };
+   const remove = async (g) => {
+     if (!confirm(`“${g.name}” raflardan ve bu listeden kalksın mı? İkonu ve videosu silinir; gönderim geçmişi kalır. Geri alınamaz.`)) return;
+     (await act(() => post('/api/app/gifts/delete', { id: g.id }), 'Hediye silindi')) && list.reload();
+   };
++  /** One of the app's gifts back to the app's values (its place on the shelf stays). */
++  const reset = async (g) => {
++    if (!confirm(`“${g.name}” uygulamadaki haline dönsün mü? Geri alınacak: ${changedText(g)}. Yüklenen ikon ve video silinir; raftaki yeri değişmez.`)) return;
++    (await act(() => post('/api/app/gifts/reset', { id: g.id }), 'Orijinaline döndü')) && list.reload();
++  };
+ 
+   return html`<${Page}
+     title="Uygulama hediyeleri"
+-    subtitle="Buradan eklenen hediye uygulama güncellemesi olmadan herkesin hediye panelinde, rafının başında görünür. Fiyatı uygulamanın sunucusu belirler; gönderim, PK, oda seviyesi ve elmaslar diğer hediyeler gibi işler. Her işlem hem burada hem uygulamada denetim kaydına adınızla yazılır."
++    subtitle="Buradan eklenen hediye uygulama güncellemesi olmadan herkesin hediye panelinde, rafının başında görünür. Uygulamanın kendi hediyelerinin de adı, fiyatı, rafı, VIP'i, sırası, rafta olup olmadığı, ikonu ve videosu buradan değişir ve istenince orijinaline döner. Fiyatı uygulamanın sunucusu belirler; fiyatı değişen uygulama hediyesini eski APK'lar göstermez. Her işlem hem burada hem uygulamada denetim kaydına adınızla yazılır."
+     actions=${can('app.gifts') && html`<${Button} kind="primary" disabled=${!list.data?.storage} onClick=${() => setEdit({})}>Yeni hediye</${Button}>`}
+   >
+-    <div class="row gap wrap" style="margin-bottom:10px">
++    <div class="row gap wrap" style="margin-bottom:6px">
+       ${[['all', 'Tümü'], ...CATS].map(([k, l]) => html`<button class=${`chip ${shelf === k ? 'on' : ''}`} onClick=${() => setShelf(k)}>${l}</button>`)}
+     </div>
++    <div class="row gap wrap" style="margin-bottom:10px">
++      ${KINDS.map(([k, l]) => html`<button class=${`chip ${kind === k ? 'on' : ''}`} onClick=${() => setKind(k)}>${l}</button>`)}
++    </div>
+     <${Loading} state=${list}>${(d) => html`
+       ${!d.storage && html`<div class="empty bad">Uygulamanın dosya deposu açık değil: ikon ve video yüklenemez, yeni hediye eklenemez.</div>`}
+       <${Table}
+-        empty="Henüz eklenmiş hediye yok. “Yeni hediye” ile ilkini ekleyin."
++        empty="Bu süzgeçte hediye yok."
+         columns=${[
+-          { key: 'icon', label: '', render: (g) => html`<img class="gift-icon" src=${g.icon} alt="" loading="lazy" />` },
++          { key: 'icon', label: '', render: (g) => (g.icon ? html`<img class="gift-icon" src=${g.icon} alt="" loading="lazy" />` : html`<span class="gift-emoji">${g.emoji}</span>`) },
+           {
+             key: 'name',
+             label: 'Ad',
+-            render: (g) =>
+-              html`<strong>${g.name}</strong><br /><small class="muted">${g.id}${g.iconLink || g.videoLink ? ' · 🔗 bağlantıdan' : ''}</small>`,
++            render: (g) => html`<strong>${g.name}</strong> ${g.builtin ? html`<${Badge} s="info" label="Uygulamanın" />` : ''}
++              ${g.changed?.length > 0 ? html` <${Badge} s="warning" label=${`Değiştirildi: ${changedText(g)}`} />` : ''}
++              <br /><small class="muted">${g.id}${g.iconLink || g.videoLink ? ' · 🔗 bağlantıdan' : ''}${g.builtin && g.changed?.includes('name') ? ` · uygulamada: ${g.original.name}` : ''}</small>`,
+           },
+           {
+             key: 'cat',
+@@ -126,10 +154,25 @@ export function AppGifts() {
+                 ${can('app.gifts') && html`<button class="btn ghost" aria-label="Bir üste" disabled=${i === 0} onClick=${() => move(d.gifts, g, -1)}>↑</button><button class="btn ghost" aria-label="Bir alta" disabled=${i === row.length - 1} onClick=${() => move(d.gifts, g, 1)}>↓</button>`}</span>`;
+             },
+           },
+-          { key: 'price', label: 'Fiyat (jeton)', align: 'right', render: (g) => num(g.price) },
+-          { key: 'enabled', label: 'Durum', render: (g) => html`<${Badge} s=${g.enabled ? 'active' : 'passive'} label=${g.enabled ? 'Rafta' : 'Kapalı'} />` },
++          {
++            key: 'price',
++            label: 'Fiyat (jeton)',
++            align: 'right',
++            render: (g) => html`${num(g.price)}${g.builtin && g.price !== g.original.price ? html`<br /><small class="muted">uygulamada <s>${num(g.original.price)}</s></small>` : ''}`,
++          },
++          {
++            key: 'enabled',
++            label: 'Durum',
++            render: (g) =>
++              html`<${Badge} s=${g.enabled ? 'active' : 'passive'} label=${g.enabled ? 'Rafta' : 'Kapalı'} />${g.builtin && !g.enabled && !g.original.enabled && !g.changed?.includes('enabled') ? html`<br /><small class="muted">uygulamada duraklatılmış</small>` : ''}`,
++          },
+           { key: 'video', label: 'Video', render: videoLine },
+-          { key: 'sent', label: 'Gönderim', align: 'right', render: (g) => (g.sent.count ? `${num(g.sent.count)} · ${num(g.sent.coins)} jeton` : '—') },
++          {
++            key: 'sent',
++            label: 'Gönderim',
++            align: 'right',
++            render: (g) => (g.sent.count ? html`${num(g.sent.count)} · ${num(g.sent.coins)} jeton${g.sent.days ? html`<br /><small class="muted">son ${g.sent.days} gün</small>` : ''}` : '—'),
++          },
+           { key: 'updatedAt', label: 'Son değişiklik', render: (g) => html`${dateTimeTr(g.updatedAt)}<br /><small class="muted">${g.updatedBy?.name ?? ''}</small>` },
+           {
+             key: 'a',
+@@ -138,11 +181,13 @@ export function AppGifts() {
+               ${g.video && html`<${Button} kind="ghost" onClick=${() => setPlaying(g.video.url)}>Oynat</${Button}>`}
+               ${can('app.gifts') && html`<${Button} onClick=${() => setEdit({ gift: g })}>Düzenle</${Button}>
+               <${Button} kind="ghost" onClick=${() => toggle(g)}>${g.enabled ? 'Raftan kaldır' : 'Rafa koy'}</${Button}>
+-              <${Button} kind="danger" onClick=${() => remove(g)}>Sil</${Button}>`}
++              ${g.builtin
++                ? g.changed?.length > 0 && html`<${Button} kind="ghost" onClick=${() => reset(g)}>Orijinale dön</${Button}>`
++                : html`<${Button} kind="danger" onClick=${() => remove(g)}>Sil</${Button}>`}`}
+             </span>`,
+           },
+         ]}
+-        rows=${d.gifts.filter((g) => shelf === 'all' || g.cat === shelf)}
++        rows=${d.gifts.filter((g) => (shelf === 'all' || g.cat === shelf) && kindOk(kind, g))}
+       />`}</${Loading}>
+     ${edit && list.data && html`<${Editor} gift=${edit.gift} admin=${list.data} onClose=${() => setEdit(null)} onSaved=${(text) => (setEdit(null), toast(text), list.reload())} />`}
+     ${playing && html`<${Modal} title="Önizleme" onClose=${() => setPlaying(null)}><${Stage} src=${playing} onEnd=${() => setPlaying(null)} /></${Modal}>`}
+@@ -212,6 +257,9 @@ const linkName = (link) => {
+ 
+ function Editor({ gift, admin, onClose, onSaved }) {
+   const L = admin.limits;
++  // One of the app's own gifts: its values in the app (`original`) show under each field that differs.
++  const app = !!gift?.builtin;
++  const o = gift?.original;
+   const [v, setV] = useState({
+     name: gift?.name ?? '',
+     price: gift ? String(gift.price) : '',
+@@ -220,6 +268,7 @@ function Editor({ gift, admin, onClose, onSaved }) {
+     emoji: gift?.emoji ?? '',
+     enabled: gift ? gift.enabled : true,
+   });
++  // A picked or fetched icon ({ file, url } / { at, url, link }), or { reset: true }: back to the app's picture.
+   const [icon, setIcon] = useState(null);
+   const [video, setVideo] = useState(gift?.video || gift?.job ? { mode: 'keep' } : { mode: 'none' });
+   const [step, setStep] = useState(null);
+@@ -228,8 +277,10 @@ function Editor({ gift, admin, onClose, onSaved }) {
+   const [links, setLinks] = useState({ icon: gift?.iconLink ?? '', video: gift?.videoLink ?? '' });
+   const [pulling, setPulling] = useState(null);
+   const set = (k) => (e) => setV({ ...v, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value });
+-  const iconUrl = icon ? icon.url : gift?.icon ?? null;
++  const iconUrl = icon?.reset ? (o?.icon ?? null) : icon ? icon.url : (gift?.icon ?? null);
+   useEffect(() => () => icon?.file && URL.revokeObjectURL(icon.url), [icon]);
++  /** The app's value of a field, under it, when the gift's differs. */
++  const was = (show, text) => app && show && html`<small class="muted">Uygulamada: ${text}</small>`;
+ 
+   const pickIcon = (e) => {
+     const file = e.target.files?.[0];
+@@ -279,6 +330,12 @@ function Editor({ gift, admin, onClose, onSaved }) {
+     </div>`;
+   };
+ 
++  /** One of the app's gifts: its video back to the app's own clip (a separate call, nothing else changes). */
++  const videoBack = async () => {
++    if (!confirm('Video uygulamadaki haline dönsün mü? Yüklenen video silinir.')) return;
++    if (await act(() => post('/api/app/gifts/reset', { id: gift.id, fields: ['video'] }))) onSaved('Video orijinaline döndü');
++  };
++
+   const save = async () => {
+     const name = v.name.replace(/\s+/g, ' ').trim();
+     const price = Number(v.price);
+@@ -288,7 +345,7 @@ function Editor({ gift, admin, onClose, onSaved }) {
+     try {
+       let iconAt;
+       if (icon?.at) iconAt = icon.at;
+-      else if (icon) {
++      else if (icon?.file) {
+         setStep('İkon yükleniyor…');
+         iconAt = await upload('gifticon', icon.file);
+       }
+@@ -304,15 +361,17 @@ function Editor({ gift, admin, onClose, onSaved }) {
+         videoSpec = video.kind === 'stacked' ? { url, kind: 'stacked' } : { url, kind: 'source', ...(video.kind === 'svga' ? { fill: video.fill } : {}) };
+       }
+       // Where a new file came from (null: picked from this computer), kept for "Bağlantıdan yeniden çek".
+-      const iconLink = icon ? (icon.link ?? null) : undefined;
++      const iconLink = icon && !icon.reset ? (icon.link ?? null) : undefined;
+       const videoLink = video.mode === 'link' ? video.link : video.mode === 'file' ? null : undefined;
+       setStep('Kaydediliyor…');
+       const fields = { name, price, cat: v.cat, minSvip: v.cat === 'privilege' ? Number(v.minSvip) : 0, emoji: v.emoji.trim(), enabled: !!v.enabled };
+       if (gift) {
+         const patch = {};
+         for (const k of ['name', 'price', 'cat', 'minSvip', 'enabled']) if (fields[k] !== gift[k]) patch[k] = fields[k];
+-        if ((fields.emoji || '🎁') !== gift.emoji) patch.emoji = fields.emoji;
++        if ((fields.emoji || (app ? o.emoji : '🎁')) !== gift.emoji) patch.emoji = fields.emoji;
+         if (iconAt) patch.icon = iconAt;
++        // Back to the app's picture.
++        if (icon?.reset) patch.icon = null;
+         if (iconLink !== undefined) patch.iconLink = iconLink;
+         if (videoLink !== undefined) patch.videoLink = videoLink;
+         if (videoSpec !== undefined && !(videoSpec === null && !gift.video && !gift.job)) patch.video = videoSpec;
+@@ -330,19 +389,24 @@ function Editor({ gift, admin, onClose, onSaved }) {
+   };
+ 
+   const price = Number(v.price);
+-  return html`<${Modal} title=${gift ? gift.name : 'Yeni hediye'} wide onClose=${onClose}>
++  return html`<${Modal} title=${gift ? `${gift.name}${app ? ' (uygulamanın hediyesi)' : ''}` : 'Yeni hediye'} wide onClose=${onClose}>
++    ${app && html`<p class="note">Uygulamayla gelen bir hediye. Değiştirdiğiniz her şey uygulama güncellemesi olmadan telefonlara gider; listedeki <b>Orijinale dön</b> hepsini geri alır. Fiyatı değişirse eski APK'lar bu hediyeyi göstermez (yanlış fiyat göstermesinler diye).</p>`}
+     <div class="form"><div class="grid2">
+-      <label class="field"><span>Ad *</span><input value=${v.name} maxlength=${L.nameMax} onInput=${set('name')} placeholder="Ör. Altın Yıldız" /></label>
+-      <label class="field"><span>Fiyat (jeton) *</span><input inputmode="numeric" value=${v.price} onInput=${(e) => setV({ ...v, price: e.target.value.replace(/[^\d]/g, '') })} placeholder="Ör. 9999" /><small class="muted">1–${num(L.priceMax)} jeton; değişiklik yeni gönderimlerden itibaren geçer.</small></label>
+-      <label class="field"><span>Raf</span><select value=${v.cat} onChange=${set('cat')}>${CATS.map(([k, l]) => html`<option value=${k}>${l}</option>`)}</select></label>
++      <label class="field"><span>Ad *</span><input value=${v.name} maxlength=${L.nameMax} onInput=${set('name')} placeholder="Ör. Altın Yıldız" />${was(v.name.trim() !== o?.name, o?.name)}</label>
++      <label class="field"><span>Fiyat (jeton) *</span><input inputmode="numeric" value=${v.price} onInput=${(e) => setV({ ...v, price: e.target.value.replace(/[^\d]/g, '') })} placeholder="Ör. 9999" /><small class="muted">1–${num(L.priceMax)} jeton; değişiklik yeni gönderimlerden itibaren geçer.</small>${was(price !== o?.price, `${num(o?.price)} jeton`)}</label>
++      <label class="field"><span>Raf</span><select value=${v.cat} onChange=${set('cat')}>${CATS.map(([k, l]) => html`<option value=${k}>${l}</option>`)}</select>${was(v.cat !== o?.cat, `${CAT[o?.cat]}${o?.cat === 'privilege' ? ` · VIP ${o.minSvip}+` : ''}`)}</label>
+       ${v.cat === 'privilege' && html`<label class="field"><span>En düşük VIP seviyesi</span><select value=${v.minSvip} onChange=${set('minSvip')}>${Array.from({ length: L.svipMax }, (_, i) => html`<option value=${String(i + 1)}>VIP ${i + 1}</option>`)}</select></label>`}
+-      <label class="field"><span>Emoji (isteğe bağlı)</span><input value=${v.emoji} maxlength="8" onInput=${set('emoji')} placeholder="🎁" /><small class="muted">Sohbet satırlarında ve ikon yüklenmeden önce görünür.</small></label>
+-      <label class="field inline"><span>Rafta (herkes görür)</span><input type="checkbox" checked=${v.enabled} onChange=${set('enabled')} /></label>
++      <label class="field"><span>Emoji ${app ? '' : '(isteğe bağlı)'}</span><input value=${v.emoji} maxlength="8" onInput=${set('emoji')} placeholder=${app ? o.emoji : '🎁'} /><small class="muted">Sohbet satırlarında ve ikon yüklenmeden önce görünür.</small>${was(v.emoji.trim() && v.emoji.trim() !== o?.emoji, o?.emoji)}</label>
++      <label class="field inline"><span>Rafta (herkes görür)</span><input type="checkbox" checked=${v.enabled} onChange=${set('enabled')} />${was(!!v.enabled !== o?.enabled, o?.enabled ? 'rafta' : 'duraklatılmış')}</label>
+     </div></div>
+ 
+     <h3>İkon</h3>
+-    <p class="muted">Saydam (arka planı silinmiş) PNG ya da WebP, kare, ${L.iconMinPx}–${L.iconMaxPx} piksel (önerilen 512 × 512), en çok ${mb(L.iconBytes)} MB.</p>
+-    <input type="file" accept="image/png,image/webp" aria-label="İkon dosyası" onChange=${pickIcon} />
++    <p class="muted">Saydam (arka planı silinmiş) PNG ya da WebP, kare, ${L.iconMinPx}–${L.iconMaxPx} piksel (önerilen 512 × 512), en çok ${mb(L.iconBytes)} MB.${app ? ' Seçmezseniz uygulamanın resmi kalır.' : ''}</p>
++    <div class="row gap wrap">
++      <input type="file" accept="image/png,image/webp" aria-label="İkon dosyası" onChange=${pickIcon} />
++      ${app && (gift.changed?.includes('icon') || (icon && !icon.reset)) && !icon?.reset && html`<${Button} kind="ghost" onClick=${() => setIcon({ reset: true })}>Uygulamanın resmine dön</${Button}>`}
++      ${icon?.reset && html`<span class="muted">Kaydedince uygulamanın resmi döner.</span> <${Button} kind="ghost" onClick=${() => setIcon(null)}>Vazgeç</${Button}>`}
++    </div>
+     ${linkRow('icon', 'https://alanadiniz.com/hediyeler/yuzuk.png')}
+     ${icon?.at && html`<small class="muted">Bağlantıdan alındı: ${linkName(icon.link)} · ${size(icon.bytes)}</small>`}
+ 
+@@ -362,6 +426,7 @@ function Editor({ gift, admin, onClose, onSaved }) {
+       ${video.mode === 'none' && html`<span class="muted">Video yok: gönderilince ikonu uçar.</span>`}
+       ${video.mode !== 'none' && html`<${Button} kind="ghost" onClick=${() => setVideo({ mode: 'none' })}>Videoyu kaldır</${Button}>`}
+       ${video.mode === 'none' && (gift?.video || gift?.job) && html`<${Button} kind="ghost" onClick=${() => setVideo({ mode: 'keep' })}>Vazgeç</${Button}>`}
++      ${app && gift.changed?.includes('video') && html`<${Button} kind="ghost" disabled=${!!step} onClick=${videoBack}>${o.video ? 'Uygulamanın videosuna dön' : 'Videoyu orijinaline döndür'}</${Button}>`}
+     </div>
+     ${linkRow('video', 'https://alanadiniz.com/hediyeler/yuzuk.svga')}
+     <p class="muted">
+@@ -375,12 +440,12 @@ function Editor({ gift, admin, onClose, onSaved }) {
+     <h3>Önizleme</h3>
+     <div class="gift-preview">
+       <div class="gift-tile">
+-        ${iconUrl ? html`<img src=${iconUrl} alt="" />` : html`<span class="gift-emoji">${v.emoji.trim() || '🎁'}</span>`}
++        ${iconUrl ? html`<img src=${iconUrl} alt="" />` : html`<span class="gift-emoji">${v.emoji.trim() || o?.emoji || '🎁'}</span>`}
+         <b>${v.name.trim() || 'Hediye adı'}</b>
+         <small>${v.cat === 'privilege' ? `VIP ${v.minSvip}` : `🪙 ${Number.isSafeInteger(price) && price > 0 ? num(price) : '—'}`}</small>
+       </div>
+       ${iconUrl && html`<img class="gift-big" src=${iconUrl} alt="" />`}
+-      <div class="muted">${CAT[v.cat]} rafının başında · ${v.enabled ? 'rafta' : 'kapalı'}</div>
++      <div class="muted">${CAT[v.cat]} rafı · ${v.enabled ? 'rafta' : 'kapalı'}</div>
+       ${((video.mode === 'file' || video.mode === 'link') && video.kind === 'stacked') || (video.mode === 'keep' && gift?.video)
+         ? html`<${Button} onClick=${() => setPreview(video.mode === 'keep' ? gift.video.url : video.url)}>Videoyu oynat</${Button}>`
+         : (video.mode === 'file' || video.mode === 'link') && html`<small class="muted">Bu dosya uygulamanın sunucusunda çevrildikten sonra listeden oynatılır.</small>`}
+diff --git a/web/styles.css b/web/styles.css
+index fdc3765..2c0b9b6 100644
+--- a/web/styles.css
++++ b/web/styles.css
+@@ -199,5 +199,14 @@ dl.kv dd { margin: 0; font-variant-numeric: tabular-nums; }
+ .gift-tile small { font-size: 12px; opacity: 0.75; }
+ .gift-emoji { font-size: 34px; line-height: 44px; }
+ .gift-big { width: 120px; height: 120px; object-fit: contain; }
++/* Uygulama › Emojiler: a pack's stickers. */
++.sticker-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; margin-bottom: 8px; }
++.sticker-tile { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 4px; border: 1px solid var(--border); border-radius: 10px; text-align: center; min-width: 0; }
++.sticker-tile.off { opacity: 0.55; }
++.sticker-tile small { font-size: 12px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
++.sticker-tile .row { justify-content: center; flex-wrap: wrap; }
++.sticker-face { width: 60px; height: 60px; display: grid; place-items: center; padding: 4px; border: 0; border-radius: 8px; background: var(--surface-2); cursor: pointer; }
++.sticker-face:disabled { cursor: default; }
++.sticker-emoji { display: inline-block; }
+ .alpha-stage { display: grid; justify-items: center; gap: 6px; margin-top: 10px; padding: 10px; border-radius: var(--radius); background: radial-gradient(circle at 50% 30%, #3b2147, #120c18 70%); }
+ .alpha-video { width: min(270px, 100%); height: auto; aspect-ratio: 9 / 16; }
+-- 
+2.43.0
+

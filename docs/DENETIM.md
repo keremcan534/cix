@@ -101,8 +101,10 @@ modunda olması, hata takibi olmaması ve kırık kodun birleşmeden önce yakal
    yapılmalı. Claude her madde için adım adım deneme listesi çıkarır.
 6. **Finans paneli güvenliği (siz):** Panel para çekme ve ajans ödemelerini onaylıyor. Her panel kullanıcısında iki
    adımlı doğrulama açık olmalı; panel adresi yalnız ekibe verilmeli.
-7. **Panel deposu (siz: izin):** Hediyeler ve Emojiler ekranları hazır ve test edildi, ama bu oturumun panel deposuna
-   yazma izni yok (PR #152).
+7. **Panel deposu (siz: yeni oturum):** Hediyeler, Emojiler ve Yönetim'in kalanı (Yaptırımlar, Ajans personeli, Mağaza
+   eşyaları, Jeton Noktası, Moderatör rolü) hazır ve test edildi. Bu oturum panel deposuna yazamadığı için yamalar
+   `server/infra/finance-panel-patches/` klasöründe bekliyor. İki depo seçili yeni bir oturumda uygulanıp gönderilir
+   ([`YONETIM_SITESI.md`](YONETIM_SITESI.md)).
 
 ---
 
