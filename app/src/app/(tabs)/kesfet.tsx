@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useRef, useState, type ComponentRef } from 'react';
-import { FlatList, Modal, Pressable, ScrollView, View } from 'react-native';
+import { FlatList, Modal, Pressable, ScrollView, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
@@ -11,7 +11,7 @@ import { SCENES } from '@/components/fx/scenes';
 import { Backdrop } from '@/components/fx/surface';
 import { Button, CharmBadge, StateIcon, VerifiedBadge, VipBadge } from '@/components/ui';
 import { roomById, USERS, userById, type User } from '@/data/mock';
-import { COUNTRIES, DISCOVER_PROMO, DISCOVER_SHORTCUTS, EXTRA_BIOS, PARTY_AVATAR_IDS, REAL_PERSON, countryOf, preciseKm } from '@/data/social-ui';
+import { COUNTRIES, DISCOVER_PROMO, DISCOVER_SHORTCUTS, EXTRA_BIOS, REAL_PERSON, countryOf, preciseKm } from '@/data/social-ui';
 import { charmRankBoost } from '@/data/charm';
 import { wealthCharmOf } from '@/data/profile';
 import { useGreet } from '@/components/use-greet';
@@ -19,8 +19,8 @@ import { useApp } from '@/store';
 import { SCRIM, fonts, makeStyles, useTheme } from '@/theme';
 import { firstName, greetingFor } from '@/lib/greeting';
 import { RowSkeleton, Skeletons } from '@/components/fx/skeleton';
-import { EmojiIcon } from '@/components/Icon3D';
-import { SimilarityChip } from '@/components/similarity';
+import { EmojiIcon, Icon3D } from '@/components/Icon3D';
+import { interestParts } from '@/data/profile-art';
 import { similarity } from '@/lib/similarity';
 import { Photo } from '@/components/photo';
 import { liveMode, oneOnOneOpen, reloadDiscoverPeople, useDiscoverPeople, useDiscoverState } from '@/lib/live';
@@ -109,35 +109,36 @@ export default function DiscoverScreen() {
         contentContainerStyle={{ paddingBottom: 24 }}
         ListHeaderComponent={
           <View>
-            {/* A word for the person, by the time of day ("Günaydın, Ayşe"). */}
-            <Text style={styles.greet} accessibilityRole="header" numberOfLines={1}>
-              {greetingFor(hour)}
-              {firstName(me.name) ? <Text style={styles.greetName}>, {firstName(me.name)}</Text> : null}
-            </Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shortcuts}>
-              {/* Aile (groups) is local-only: a live build doesn't offer it until the server has it. */}
-              {DISCOVER_SHORTCUTS.filter((s) => s.id !== 'call' || oneOnOneOpen()).map((s) => (
-                <Pressable key={s.id} onPress={() => router.push(s.href)}>
-                  {/* Each shortcut fills its card with its own color, so the four never read as one. */}
-                  <LinearGradient colors={s.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.shortcut, s.wide && styles.shortcutWide]}>
-                    <ShortcutArt id={s.id} emoji={s.emoji} />
-                    <Text style={[styles.shortcutTitle, !s.wide && { textAlign: 'center' }]} numberOfLines={s.wide ? 1 : 2}>
-                      {s.title}
-                    </Text>
-                    {s.wide && <Text style={styles.shortcutSub}>{s.subtitle}</Text>}
-                  </LinearGradient>
-                </Pressable>
+            {/* A word for the person, by the time of day ("İyi günler, Ayşe"), on a pink glass bar with a waving hand. */}
+            <LinearGradient colors={['#FFF6FA', '#FCE3EF', '#F8CFE4']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.greetBar}>
+              <View style={styles.greetHand}>
+                <EmojiIcon emoji="👋" size={24} />
+              </View>
+              <Text style={styles.greet} accessibilityRole="header" numberOfLines={1}>
+                {greetingFor(hour)}
+                {firstName(me.name) ? `, ${firstName(me.name)}` : ''}
+              </Text>
+              <View style={styles.greetHearts} pointerEvents="none">
+                <Icon3D name="heart" size={26} />
+                <Icon3D name="heart" size={15} style={styles.greetHeartSmall} />
+              </View>
+            </LinearGradient>
+            {/* Four glossy tiles in one row: Hemen Tanış, Canlı Odalar, Aile, Jeton Kazan. */}
+            <View style={styles.tiles}>
+              {DISCOVER_SHORTCUTS.filter((s) => s.id !== 'call' || oneOnOneOpen()).map((s, _i, all) => (
+                <QuickTile key={s.id} id={s.id} title={s.title} subtitle={s.id === 'call' ? s.subtitle : undefined} emoji={s.emoji} colors={s.colors} count={all.length} onPress={() => router.push(s.href)} />
               ))}
-            </ScrollView>
+            </View>
 
-            <View style={styles.tabsRow}>
+            {/* The lists on a pink glass bar: the chosen one on its own pill, then Sıralama and the country. */}
+            <View style={styles.tabsBar}>
               <ScrollView ref={tabStrip} horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={styles.tabs} onLayout={(e) => setStripW(e.nativeEvent.layout.width)}>
                 {TABS.map((t) => (
                   <Pressable
                     key={t}
                     onPress={() => pickTab(t)}
                     onLayout={(e) => tabAt.current.set(t, { x: e.nativeEvent.layout.x, w: e.nativeEvent.layout.width })}
-                    style={{ alignItems: 'center' }}
+                    style={[styles.tabItem, t === tab && styles.tabItemOn]}
                     accessibilityRole="tab"
                     accessibilityState={{ selected: t === tab }}
                   >
@@ -146,11 +147,13 @@ export default function DiscoverScreen() {
                   </Pressable>
                 ))}
               </ScrollView>
+              <View style={styles.tabSep} />
               <Pressable style={styles.iconBtn} onPress={() => router.push('/siralama')} hitSlop={6} accessibilityLabel="Sıralama">
-                <Ionicons name="trophy-outline" size={24} color={colors.text} />
+                <Ionicons name="trophy-outline" size={22} color={HOME.plum} />
               </Pressable>
+              <View style={styles.tabSep} />
               <Pressable style={styles.iconBtn} onPress={() => setFilterOpen(true)} hitSlop={6} accessibilityLabel="Ülke seç">
-                <Ionicons name="globe-outline" size={24} color={colors.text} />
+                <Ionicons name="globe-outline" size={22} color={HOME.plum} />
                 {!isDefault(filters) && <View style={styles.filterDot} />}
               </Pressable>
             </View>
@@ -243,40 +246,62 @@ export default function DiscoverScreen() {
   );
 }
 
-function ShortcutArt({ id, emoji }: { id: string; emoji: string }) {
-  const { colors } = useTheme();
+/** The design's palette for the pink glass on this screen: deep ink on light glass, in either scheme. */
+const HOME = { ink: '#2B0A1C', plum: '#7A4A63', pink: '#E0287D', deep: '#8E1450', glass: '#FFF0F7', line: 'rgba(226,150,192,0.55)' } as const;
+
+/** A tile's picture: white glyphs for calls and rooms, the 3D tent and coin for Aile and Jeton Kazan. */
+function TileArt({ id, emoji, size }: { id: string; emoji: string; size: number }) {
   const styles = useStyles();
   if (id === 'call')
     return (
-      <View style={styles.artRow}>
-        <Ionicons name="mic" size={26} color="#fff" />
-        <Ionicons name="heart" size={22} color="#FFE3EC" />
-        <Ionicons name="videocam" size={26} color="#fff" />
+      <View style={styles.tileArtRow}>
+        <Ionicons name="mic" size={size * 0.62} color="#fff" />
+        <Ionicons name="videocam" size={size * 0.7} color="#fff" />
       </View>
     );
   if (id === 'party')
     return (
-      <View style={styles.artCenter}>
-        <Ionicons name="stats-chart" size={12} color="#fff" style={{ position: 'absolute', left: 0, top: 0 }} />
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          {/* No photo: the person glyph, like every other face in the app (never an empty ring). */}
-          {PARTY_AVATAR_IDS.map((uid, i) => (
-            <Photo key={uid} uri={userById(uid).avatar} kind="face" style={[styles.partyAvatar, i === 1 && styles.partyAvatarMid, i > 0 && { marginLeft: -10 }]} />
-          ))}
-        </View>
+      <View>
+        <Ionicons name="people" size={size * 0.85} color="#fff" />
+        <Ionicons name="wifi" size={size * 0.38} color="#fff" style={styles.tileWifi} />
       </View>
     );
-  if (id === 'free')
-    return (
-      <View style={styles.artCenter}>
-        <View style={styles.starCircle}>
-          <Ionicons name="star" size={20} color={colors.primaryText} />
-        </View>
-      </View>
-    );
+  if (id === 'free') return <Icon3D name="coin" size={size * 0.95} />;
+  return <EmojiIcon emoji={emoji} size={size * 0.82} />;
+}
+
+/** One of the four glossy tiles: its colour, a gloss on top, its picture and its name. */
+function QuickTile({ id, title, subtitle, emoji, colors: fill, count, onPress }: { id: string; title: string; subtitle?: string; emoji: string; colors: readonly [string, string]; count: number; onPress: () => void }) {
+  const styles = useStyles();
+  const { width } = useWindowDimensions();
+  const w = Math.floor((Math.min(width, 640) - 32 - (count - 1) * 8) / count);
   return (
-    <View style={styles.artCenter}>
-      <EmojiIcon emoji={emoji} size={34} />
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={subtitle ? `${title}, ${subtitle}` : title} style={({ pressed }) => pressed && { opacity: 0.85 }}>
+      <LinearGradient colors={fill} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={[styles.tile, { width: w, height: Math.round(w * 1.12), boxShadow: `0 6px 16px ${fill[1]}66` }]}>
+        <LinearGradient colors={['rgba(255,255,255,0.42)', 'rgba(255,255,255,0)']} style={styles.tileGloss} pointerEvents="none" />
+        <View style={styles.tileArt}>
+          <TileArt id={id} emoji={emoji} size={Math.min(40, w * 0.42)} />
+        </View>
+        <Text style={styles.tileTitle} numberOfLines={2}>
+          {title}
+        </Text>
+        {subtitle && w >= 88 ? (
+          <Text style={styles.tileSub} numberOfLines={1}>
+            {subtitle}
+          </Text>
+        ) : null}
+      </LinearGradient>
+    </Pressable>
+  );
+}
+
+/** "%75 benzer": pink when it's a good match, a quieter plum below half. */
+function MatchChip({ score }: { score: number }) {
+  const styles = useStyles();
+  const c = score >= 50 ? HOME.pink : HOME.plum;
+  return (
+    <View style={[styles.matchChip, { borderColor: c }]} accessibilityLabel={`Yüzde ${score} benzer`}>
+      <Text style={[styles.matchText, { color: c }]}>%{score} benzer</Text>
     </View>
   );
 }
@@ -298,7 +323,7 @@ function UserRow({
 }) {
   const female = user.gender === 'Kadın';
   const { me } = useApp();
-  const { colors, semantic } = useTheme();
+  const { colors } = useTheme();
   const styles = useStyles();
   const sim = similarity(me, user);
   // A live build: the server's levels (none until sent); the demo's are made up from the id.
@@ -306,13 +331,15 @@ function UserRow({
   // Live: the server's distance between our two cities ("Aynı şehir", "350 km"; none when a city is unknown or the
   // profile is private); the demo's sample one.
   const distance = !showDistance ? null : liveMode() ? cityDistanceText(distanceOf(user.id)) : preciseKm(user);
+  const interests = (user.interests ?? []).slice(0, 3).map(interestParts);
   return (
-    <Pressable style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.card }]} onPress={() => router.push(`/kullanici/${user.id}`)}>
+    // A pink glass card (the owner's design): photo, name and level, chips, then Selam or Sohbet and Takip.
+    <Pressable style={({ pressed }) => [styles.card, pressed && { opacity: 0.92 }]} onPress={() => router.push(`/kullanici/${user.id}`)}>
       <View>
-        <Photo uri={user.avatar} kind="face" style={styles.photo} />
+        <Photo uri={user.avatar} kind="face" style={[styles.photo, user.online && styles.photoOnline]} />
         {user.online && <View style={styles.onlineDot} />}
       </View>
-      <View style={{ flex: 1, gap: 5 }}>
+      <View style={{ flex: 1, minWidth: 0, gap: 5 }}>
         <View style={styles.nameRow}>
           <Text style={styles.name} numberOfLines={1}>
             {user.name}
@@ -340,22 +367,43 @@ function UserRow({
               {user.age > 0 && <Text style={styles.chipText}>{user.age}</Text>}
             </View>
           )}
-          <SimilarityChip score={sim.score} />
+          <MatchChip score={sim.score} />
         </View>
-        <Text style={styles.bio} numberOfLines={1}>
-          {EXTRA_BIOS[user.id] ?? user.bio}
-        </Text>
-      </View>
-      <View style={{ alignItems: 'center', gap: 8 }}>
-        <Pressable onPress={onGreet} hitSlop={6}>
-          <View style={[styles.hiBtn, { backgroundColor: greeted ? colors.cardAlt : semantic.socialFill }]} accessibilityRole="button" accessibilityLabel={greeted ? `${user.name} ile sohbet` : `${user.name} kişisine selam ver`}>
-            <Ionicons name={greeted ? 'chatbubble-ellipses' : 'hand-left'} size={13} color={greeted ? colors.text : '#fff'} />
-            <Text style={[styles.hiText, greeted && { color: colors.text }]}>{greeted ? 'Sohbet' : 'Selam'}</Text>
+        {interests.length > 0 ? (
+          <View style={styles.chips}>
+            {interests.map((x) => (
+              <View key={x.name} style={styles.chip}>
+                {x.art ? <Art name={x.art} size={14} /> : x.emoji ? <Text style={styles.chipEmoji}>{x.emoji}</Text> : null}
+                <Text style={styles.chipText} numberOfLines={1}>
+                  {x.name}
+                </Text>
+              </View>
+            ))}
           </View>
+        ) : (
+          <Text style={styles.bio} numberOfLines={1}>
+            {EXTRA_BIOS[user.id] ?? user.bio}
+          </Text>
+        )}
+      </View>
+      <View style={styles.cardSep} />
+      <View style={styles.actions}>
+        <Pressable onPress={onGreet} hitSlop={6} accessibilityRole="button" accessibilityLabel={greeted ? `${user.name} ile sohbet` : `${user.name} kişisine selam ver`}>
+          {greeted ? (
+            <View style={styles.chatBtn}>
+              <Ionicons name="chatbubble-ellipses" size={15} color={HOME.pink} />
+              <Text style={styles.chatText}>Sohbet</Text>
+            </View>
+          ) : (
+            <LinearGradient colors={['#FF4A86', '#D8175E']} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={styles.hiBtn}>
+              <Ionicons name="hand-left" size={15} color="#fff" />
+              <Text style={styles.hiText}>Selam</Text>
+            </LinearGradient>
+          )}
         </Pressable>
-        <Pressable onPress={onToggleFollow} hitSlop={6} style={styles.followBtn}>
-          <Ionicons name={isFollowing ? 'heart' : 'heart-outline'} size={14} color={isFollowing ? colors.pink : colors.text} />
-          <Text style={[styles.followText, isFollowing && { color: colors.pink }]}>{isFollowing ? 'Takipte' : 'Takip et'}</Text>
+        <Pressable onPress={onToggleFollow} hitSlop={6} style={[styles.followBtn, isFollowing && styles.followOn]} accessibilityRole="button" accessibilityLabel={isFollowing ? `${user.name}, takiptesin. Takibi bırak` : `${user.name} kişisini takip et`}>
+          <Ionicons name={isFollowing ? 'heart' : 'heart-outline'} size={15} color={isFollowing ? HOME.pink : HOME.ink} />
+          <Text style={[styles.followText, isFollowing && { color: HOME.pink }]}>{isFollowing ? 'Takipte' : 'Takip et'}</Text>
         </Pressable>
       </View>
     </Pressable>
@@ -436,28 +484,57 @@ function FilterSheet({
   );
 }
 
-const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark, edge }) => ({
-  greet: { color: colors.textDim, fontSize: 20, fontFamily: fonts.displayBold, letterSpacing: -0.3, paddingHorizontal: 16, paddingTop: 12 },
-  greetName: { color: colors.text },
-  shortcuts: { gap: 8, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4 },
-  shortcut: { width: 92, height: 104, borderRadius: 16, padding: 10, overflow: 'hidden', justifyContent: 'flex-end', gap: 2, ...(dark ? {} : { boxShadow: lift.boxShadow }) },
-  shortcutWide: { width: 150 },
-  // Two lines for the narrow cards, so "Canlı Odalar" and "Jeton Kazan" are never cut at 360 px.
-  // White on the colored card; a soft shadow keeps it readable on the light end of each gradient.
-  shortcutTitle: { color: '#fff', fontWeight: '800', fontSize: 14, lineHeight: 18, textShadowColor: 'rgba(0,0,0,0.25)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
-  shortcutSub: { color: 'rgba(255,255,255,0.9)', fontSize: 12 },
-  artRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  artCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', alignSelf: 'stretch' },
-  // White rings read on the navy card; on paper a soft shadow keeps the stacked faces apart.
-  partyAvatar: { width: 26, height: 26, borderRadius: 13, borderWidth: 2, borderColor: '#fff', backgroundColor: colors.cardAlt, ...(dark ? {} : { boxShadow: '0 1px 3px rgba(64,20,40,0.18)' }) },
-  partyAvatarMid: { width: 34, height: 34, borderRadius: 17, zIndex: 1 },
-  starCircle: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-  tabsRow: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingRight: 12, paddingTop: 14, paddingBottom: 6 },
-  tabs: { gap: 18, paddingHorizontal: 16, alignItems: 'center' },
-  tab: { color: colors.textDim, fontSize: 16, fontWeight: '600' },
-  tabActive: { color: colors.text, fontSize: 19, fontWeight: '800' },
-  underline: { height: 3, borderRadius: 2, backgroundColor: colors.primary, marginTop: 4, width: 20 },
-  iconBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
+const useStyles = makeStyles(({ colors, lift, dark, edge }) => ({
+  // The greeting on a pink glass bar: the waving hand in its own circle, the hearts on the right.
+  greetBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginHorizontal: 16,
+    marginTop: 10,
+    height: 60,
+    borderRadius: 30,
+    paddingLeft: 7,
+    paddingRight: 14,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.9)',
+    boxShadow: '0 0 18px rgba(255,120,190,0.35)',
+  },
+  greetHand: { width: 46, height: 46, borderRadius: 23, backgroundColor: '#FBD3E5', alignItems: 'center', justifyContent: 'center' },
+  greet: { flex: 1, color: HOME.deep, fontSize: 21, fontFamily: fonts.display, letterSpacing: -0.3 },
+  greetHearts: { flexDirection: 'row', alignItems: 'flex-start' },
+  greetHeartSmall: { marginLeft: -4, marginTop: -8 },
+  tiles: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 12 },
+  tile: { borderRadius: 20, padding: 8, overflow: 'hidden', alignItems: 'center', justifyContent: 'flex-end', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.55)' },
+  tileGloss: { position: 'absolute', left: 0, right: 0, top: 0, height: '48%' },
+  tileArt: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  tileArtRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  tileWifi: { position: 'absolute', right: -8, top: -8 },
+  // White on the coloured tile; a soft shadow keeps it readable on the light end of each gradient.
+  tileTitle: { color: '#fff', fontFamily: fonts.display, fontSize: 13, lineHeight: 16, textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.25)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
+  tileSub: { color: 'rgba(255,255,255,0.92)', fontSize: 10, textAlign: 'center' },
+  tabsBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginTop: 14,
+    marginBottom: 6,
+    height: 54,
+    borderRadius: 27,
+    paddingHorizontal: 5,
+    backgroundColor: 'rgba(255,240,247,0.97)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.9)',
+    boxShadow: '0 0 14px rgba(255,120,190,0.28)',
+  },
+  tabs: { gap: 4, alignItems: 'center' },
+  tabItem: { alignItems: 'center', paddingHorizontal: 12, paddingTop: 7, paddingBottom: 5, borderRadius: 22 },
+  tabItemOn: { backgroundColor: '#F9D0E4' },
+  tab: { color: HOME.plum, fontSize: 15, fontWeight: '600' },
+  tabActive: { color: HOME.deep, fontSize: 16, fontWeight: '800' },
+  underline: { height: 3, borderRadius: 2, backgroundColor: HOME.pink, marginTop: 3, width: 34 },
+  tabSep: { width: 1, height: 24, backgroundColor: HOME.line, marginHorizontal: 2 },
+  iconBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   filterDot: { position: 'absolute', top: 2, right: 0, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary },
   activeFilters: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, marginTop: 4, backgroundColor: colors.card, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, ...lift },
   activeText: { flex: 1, color: colors.text, fontSize: 12 },
@@ -465,19 +542,41 @@ const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark, edge
   cityText: { flex: 1, color: colors.textDim, fontSize: 12 },
   optIn: { alignItems: 'center', gap: 10, padding: 24, marginTop: 20 },
   optInBtn: { backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 20, paddingVertical: 12 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12 },
-  photo: { width: 92, height: 92, borderRadius: 16, backgroundColor: colors.cardAlt },
-  onlineDot: { position: 'absolute', right: 2, bottom: 2, width: 14, height: 14, borderRadius: 7, backgroundColor: semantic.live, borderWidth: 2, borderColor: colors.bg },
+  // A person on a pink glass card (the same in either scheme: deep ink on light glass).
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginHorizontal: 16,
+    marginBottom: 10,
+    padding: 10,
+    borderRadius: 22,
+    backgroundColor: HOME.glass,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.9)',
+    boxShadow: '0 4px 14px rgba(120,20,70,0.2)',
+  },
+  photo: { width: 78, height: 78, borderRadius: 18, backgroundColor: '#FBD3E5' },
+  photoOnline: { borderWidth: 2, borderColor: '#F25FA8' },
+  onlineDot: { position: 'absolute', right: -2, bottom: -2, width: 16, height: 16, borderRadius: 8, backgroundColor: '#22C55E', borderWidth: 2.5, borderColor: '#fff' },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' },
-  name: { color: colors.text, fontWeight: '800', fontSize: 17, maxWidth: 140 },
-  chips: { flexDirection: 'row', gap: 6, alignItems: 'center' },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 2, borderWidth: 1, borderColor: colors.border, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
-  chipText: { color: colors.text, fontSize: 12 },
-  bio: { color: colors.textDim, fontSize: 13 },
-  hiBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7, minWidth: 76, justifyContent: 'center' },
-  hiText: { color: '#fff', fontWeight: '700', fontSize: 13 },
-  followBtn: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  followText: { color: colors.text, fontSize: 12, fontWeight: '600' },
+  name: { color: HOME.ink, fontFamily: fonts.display, fontSize: 17, maxWidth: 130 },
+  chips: { flexDirection: 'row', gap: 5, alignItems: 'center', flexWrap: 'wrap' },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: HOME.line, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
+  chipText: { color: HOME.ink, fontSize: 12 },
+  chipEmoji: { fontSize: 12 },
+  matchChip: { backgroundColor: '#FFFFFF', borderWidth: 1.5, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 1 },
+  matchText: { fontSize: 12, fontWeight: '800' },
+  bio: { color: HOME.plum, fontSize: 13 },
+  cardSep: { width: 1, alignSelf: 'stretch', marginVertical: 8, backgroundColor: HOME.line },
+  actions: { gap: 7, alignItems: 'stretch', width: 98 },
+  hiBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: 999, paddingVertical: 8, boxShadow: '0 3px 8px rgba(216,23,94,0.35)' },
+  hiText: { color: '#fff', fontWeight: '800', fontSize: 14 },
+  chatBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: 999, paddingVertical: 7, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: HOME.line },
+  chatText: { color: HOME.ink, fontWeight: '800', fontSize: 14 },
+  followBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, borderRadius: 999, paddingVertical: 6 },
+  followOn: { backgroundColor: '#FBD3E5' },
+  followText: { color: HOME.ink, fontSize: 13, fontWeight: '700' },
   promoWrap: { marginHorizontal: 16, marginVertical: 10 },
   promo: { borderRadius: 20, padding: 14, gap: 12, borderWidth: 1, borderColor: colors.border },
   promoTop: { flexDirection: 'row', alignItems: 'center', gap: 10 },
