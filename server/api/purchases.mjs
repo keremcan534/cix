@@ -37,7 +37,6 @@ import crypto from 'node:crypto';
 
 import { HttpError, auth, db, env, readJson, selfUser, sha, tx } from './core.mjs';
 import { PACK_BY_PRODUCT } from './catalog.mjs';
-import { announceLook } from './economy.mjs';
 import { campaignBonus, campaignRef } from './live-registry.mjs';
 import { campaignAt, live } from './live-settings.mjs';
 import { TEST_DAILY, creditCoins, playCoinsToday } from './wallet.mjs';
@@ -242,7 +241,8 @@ export const purchaseRoutes = {
     const out = await credit(u, b.platform, pack, proof.transactionId, proof.sandbox, proof.purchaseTime);
     await proof.finish();
     // Paid coins raise the VIP level (its frame on the mic): the rooms they are in see it at once. Best effort.
-    if (!out.replay && !proof.sandbox) void announceLook(u.id);
+    // Loaded when needed: economy.mjs pulls in the voice server's module, which wants LiveKit's keys at load (launch.test).
+    if (!out.replay && !proof.sandbox) void import('./economy.mjs').then((m) => m.announceLook(u.id)).catch(() => {});
     const me = (await db.query('SELECT * FROM users WHERE id = $1', [u.id])).rows[0];
     return { user: selfUser(me), ...out };
   },

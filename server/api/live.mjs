@@ -263,7 +263,8 @@ export const roomPacket = (room, packet) =>
 export async function voiceRoomsOf(uid) {
   const rooms = new Set((await db.query("SELECT DISTINCT room FROM room_presence WHERE identity = $1 AND room LIKE 'oda-%'", [uid])).rows.map((x) => x.room));
   const others = (await openVoiceRooms()).filter((room) => room.startsWith('oda-') && !rooms.has(room));
-  const there = await Promise.all(others.map((room) => roomService('GetParticipant', { room, identity: uid }, { roomAdmin: true, room }).then(() => true, () => false)));
+  // roomService answers true when the person is there and false for LiveKit's 404 (not there); a failure: not there.
+  const there = await Promise.all(others.map((room) => roomService('GetParticipant', { room, identity: uid }, { roomAdmin: true, room }).then((found) => found === true, () => false)));
   others.forEach((room, i) => there[i] && rooms.add(room));
   return [...rooms];
 }
