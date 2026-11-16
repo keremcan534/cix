@@ -31,6 +31,16 @@ Konsept görsellerdeki dört ekran uygulamaya geçti. Görseller "yalnız konsep
 
 Sahibin gönderdiği tasarıma göre: oda adı parlayan bir hapın içinde, "Küçült" pembe, "Çıkış" mercan renkli parlak cam küreler, açıklamaları ("Oda arkada sürer", "Odadan ayrıl") hap içinde, panel gece karası. **"Odayı herkes için kapat" kaldırıldı** (sahibin isteği). Uygulamada odayı kalıcı kapatmanın tek yeri burasıydı; artık oda, sahibi ve yöneticileri çıktıktan 5 dakika sonra kendiliğinden dinlenmeye geçer ve içlerinden biri dönünce yeniden açılır (Güncelleme 4 kuralı). Odanın üyeleri, yöneticileri ve kuralları böylece kaybolmaz.
 
+## Ana sayfa yeni tasarımı (16 Kasım)
+
+Sahibin gönderdiği tasarıma göre, açık ve koyu temada aynı pembe cam görünüm:
+
+- "İyi günler, Ad" el sallayan bir şeritte, sağda kalpler.
+- Dört parlak kutu tek sırada: Hemen Tanış, Canlı Odalar, Aile, Jeton Kazan.
+- Listeler (Ana Sayfa, Yakındakiler, Öne çıkanlar…) ile Sıralama ve ülke düğmeleri bir cam çubukta; seçili liste kendi hapında.
+- Her kişi pembe cam bir kartta: fotoğraf, isim ve Yankı rozeti, yaş, benzerlik ve ilgi alanları; yanında Selam ya da Sohbet ve Takip et / Takipte.
+- Alt menü ekranın kenarından biraz içeride yüzen pembe cam bir çubuk; seçili sekmenin simgesi ve adı pembe hapta.
+
 ## Mikrofon denoise
 
 Kod satır satır izlendi (LiveKit kancası, 48 kHz / 10 ms kareler, ölçek, APK derlemesi): temizlik **gönderilen sesin** yolunda ve çalışıyor. "Çalışmıyor" görünmesinin sebepleri:
