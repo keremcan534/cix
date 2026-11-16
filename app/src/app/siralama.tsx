@@ -19,6 +19,7 @@ import { agencyRankings, rankings, roomXpRankings, type AgencyRankingRow, type R
 import { liveMode, rememberUser, roomOf, toLocal, useServerRooms } from '@/lib/live';
 import { userById } from '@/data/mock';
 import { BrandLoader } from '@/components/fx/brand-loader';
+import { compact } from '@/lib/compact';
 
 /** Boards the server ranks in a live build: gift totals, agency income, open rooms, and Oda XP (server/api/room-xp.mjs). */
 const LIVE_BOARDS: Board[] = ['zengin', 'yayinci', 'ajans', 'oda', 'odaxp'];
@@ -172,7 +173,7 @@ function Score({ unit, n, small }: { unit: Unit; n: number; small?: boolean }) {
       {unit === 'diamond' && <Icon3D name="diamond" size={size} />}
       {unit === 'people' && <Ionicons name="people" size={size - 2} color={colors.textDim} />}
       <Text style={[styles.score, small && { fontSize: 12 }]}>
-        {n.toLocaleString('tr-TR')}
+        {compact(n)}
         {unit === 'xp' ? ' XP' : ''}
       </Text>
     </View>

@@ -2,6 +2,7 @@
 // who received the most, this hour, today or this week on Turkey's clock; 1 coin = 1 point. A server room's lists
 // come from the server (GET /api/rooms/contrib, lib/live/room-contrib); a demo room's from sample people plus the
 // gifts sent while the room is open. Pure, so it is unit tested.
+import { compact } from '@/lib/compact';
 
 export type ContribSide = 'sent' | 'received';
 export type ContribPeriod = 'hour' | 'day' | 'week';
@@ -31,9 +32,8 @@ export function emptyNote(side: ContribSide, period: ContribPeriod) {
   const when = period === 'hour' ? 'Bu saat' : period === 'day' ? 'Bugün' : 'Bu hafta';
   return side === 'sent' ? `${when} henüz hediye gönderilmedi` : `${when} henüz hediye alan yok`;
 }
-/** "12.450", "1,25 Mn": room amounts stay whole up to a million. */
-export const contribAmount = (n: number) =>
-  n >= 1_000_000 ? `${(n / 1_000_000).toLocaleString('tr-TR', { maximumFractionDigits: n >= 10_000_000 ? 1 : 2 })} Mn` : Math.round(n).toLocaleString('tr-TR');
+/** The room's amounts in their short form (güncelleme 6, lib/compact): 940, 12.45k, 1.25m. */
+export const contribAmount = (n: number) => compact(n);
 
 /** Highest first; a tie keeps the order people came in (whoever got there first). Nobody with 0 points is listed. */
 export function rankScores(scores: Iterable<readonly [string, number]>): ContribRow[] {

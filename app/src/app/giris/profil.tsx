@@ -16,6 +16,7 @@ import { showAlert } from '@/lib/alert';
 import { contactRefusal, isContactBlocked, refusalTitle } from '@/lib/contact-filter';
 import { IS_DEMO } from '@/lib/build';
 import { liveMode, message, saveProfile } from '@/lib/live';
+import { uploadAvatar } from '@/lib/live/profile';
 import { cleanInviteCode } from '@/lib/invite-view';
 import { enterInviteCode, useRewards } from '@/lib/live/rewards';
 import { ageFromYear, birthDateOf, birthYearError, firstSignupProblem, signupStep, welcomeText } from '@/lib/signup';
@@ -28,6 +29,9 @@ export default function ProfileSetupScreen() {
   const { colors, gradient } = useTheme();
   const styles = useStyles();
   const [photo, setPhoto] = useState<string | null>(null);
+  // The picked file itself: in live mode it is uploaded once the account is saved (güncelleme 6: it never was, so
+  // other people saw a blank face on the mic and in the Balkon).
+  const [picked, setPicked] = useState<ImagePicker.ImagePickerAsset | null>(null);
   // After Google sign-in: the name Google gave, to keep or change.
   const { ad } = useLocalSearchParams<{ ad?: string }>();
   const [name, setName] = useState(typeof ad === 'string' ? ad.slice(0, 20) : '');
@@ -61,7 +65,10 @@ export default function ProfileSetupScreen() {
 
   const pickPhoto = async () => {
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.7 });
-    if (!res.canceled) setPhoto(res.assets[0].uri);
+    if (!res.canceled) {
+      setPhoto(res.assets[0].uri);
+      setPicked(res.assets[0]);
+    }
   };
 
   const toggleInterest = (i: string) =>
@@ -87,7 +94,8 @@ export default function ProfileSetupScreen() {
       interests,
       bio: interests.length ? interests.join(' ') : 'Yeni buradayım 👋',
       verified: false,
-      ...(photo ? { avatar: photo } : {}),
+      // Live mode: my photo is the server's (uploaded below), never a file only this phone can open.
+      ...(photo && !live ? { avatar: photo } : {}),
     });
     // Live mode: the account is opened on the server now, so other phones see this name, age and city. There is
     // no selfie check behind it yet, so sign-up ends here and nothing claims the person is verified (giris-6).
@@ -112,6 +120,16 @@ export default function ProfileSetupScreen() {
         return;
       } finally {
         setBusy(false);
+      }
+      // The photo goes up now the account exists; if it can't, the account still opens and the person is told.
+      if (picked) {
+        try {
+          updateMe(await uploadAvatar(picked));
+        } catch (e) {
+          showAlert('Profil fotoğrafın yüklenemedi', `${message(e)}
+
+Profil › Düzenle’den fotoğrafını yeniden ekleyebilirsin.`);
+        }
       }
       login();
       const invited = code ? ` Davet kodun kaydedildi: ilk odana girdiğinde ikinize de ${rewards!.invite.coins.toLocaleString('tr-TR')} jeton gelir.` : '';

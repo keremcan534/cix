@@ -20,6 +20,18 @@ export const WAVE_IDS = ['wv-sparkle', 'wv-flame', 'wv-rainbow', 'wv-gold'] as c
 export type WaveId = (typeof WAVE_IDS)[number];
 export const isWave = (id: unknown): id is WaveId => typeof id === 'string' && (WAVE_IDS as readonly string[]).includes(id);
 
+/**
+ * A mic effect (the shop's 'micfx', lib/animations) as the speaking ring draws it (güncelleme 6). They used to play in a
+ * layer over the whole room at a fixed size, so on big faces they ran over the photo and on small ones over the next
+ * seat and the name, and each phone sized them its own way. Now the seat draws them, with the same rule as every wave:
+ * outside the photo, behind the frame, within the seat. Neon Halka: the turning colour ring; Ses Halkası: the ripple;
+ * Dönen Yıldızlar and the others: sparks turning on the ring.
+ */
+export function micFxWave(motion: string | null | undefined): WaveId | null {
+  if (!motion) return null;
+  return motion === 'ring' ? 'wv-rainbow' : motion === 'wave' ? 'wv-gold' : 'wv-sparkle';
+}
+
 const FLAME = ['#FF8A3D', '#FF3B30'] as const;
 const GOLD = '#F6BD60';
 // No purple: red, yellow, turquoise and blue round the ring.

@@ -4,7 +4,7 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { ROOM_LAYOUTS } from '@/data/room-layouts';
-import { FACE_MAX, FACE_MIN, fitFace, fitGrid, fitLayout, layoutHeight, layoutPlan, layoutSizes, seatHeight } from '@/lib/seat-fit';
+import { FACE_MAX, FACE_MIN, PK_LINE, fitFace, fitGrid, fitLayout, layoutHeight, layoutPlan, layoutSizes, nameLine, seatHeight } from '@/lib/seat-fit';
 
 const PHONES = [360, 390, 412];
 
@@ -14,8 +14,9 @@ describe('Klasik mikrofon düzeni', () => {
     assert.ok(few.face >= 80, `2 konuk: ${few.face}`);
     assert.ok(few.host > few.face, 'oda sahibi biraz daha büyük');
     assert.ok(few.height <= 300);
-    const many = fitGrid(19, 390, 300);
-    assert.ok(many.height <= 300, `20 mikrofon ${many.height} px`);
+    // Every row also keeps its PK points line (15 px), so 20 mics need a little more than the 300 px they used to.
+    const many = fitGrid(19, 390, 320);
+    assert.ok(many.height <= 320, `20 mikrofon ${many.height} px`);
     assert.ok(many.face < few.face && many.face >= FACE_MIN);
   });
 
@@ -41,12 +42,11 @@ describe('Klasik mikrofon düzeni', () => {
     for (let cols = 3; cols < f.cols; cols++) assert.ok(Math.ceil(29 / cols) >= Math.ceil(29 / f.cols));
   });
 
-  test('Patron koltuğu ve PK puanı yüksekliğe katılır', () => {
+  test('Patron koltuğu yüksekliğe katılır; PK puan satırı her koltukta baştan ayrılmış', () => {
     const plain = fitGrid(8, 390, 1000);
     assert.ok(fitGrid(8, 390, 1000, { boss: true }).height >= plain.height - 60);
-    assert.ok(fitGrid(8, 390, 1000, { pk: true }).height > plain.height);
-    const tight = fitGrid(8, 390, plain.height);
-    assert.ok(fitGrid(8, 390, plain.height, { pk: true }).face <= tight.face, 'PK sürerken yüzler küçülür, taşmaz');
+    // The points line is part of every seat, with or without a PK.
+    assert.equal(seatHeight(48), 48 + 4 + nameLine(48) + PK_LINE);
   });
 });
 
@@ -74,9 +74,9 @@ describe('Seçilen sahne düzeni', () => {
     const l = ROOM_LAYOUTS.find((x) => x.id === 'audio-30')!;
     const plan = layoutPlan(l.layoutSchema, 390, false);
     const least = layoutHeight(l.layoutSchema, plan, FACE_MIN);
-    assert.ok(least <= 310, `${least} px`);
-    // A typical stage height: the 30 mics fit it with faces a little above the smallest.
-    assert.ok(fitLayout(l.layoutSchema, plan, 360).face > FACE_MIN);
+    // Five rows, each with its PK points line (15 px): 75 px more than before, so the chat gives a little way.
+    assert.ok(least <= 380, `${least} px`);
+    assert.ok(fitLayout(l.layoutSchema, plan, 420).face > FACE_MIN);
   });
 
   test('az mikrofonlu düzende yüzler büyür, oda sahibi tek başına satırdaysa daha büyük', () => {
@@ -105,30 +105,30 @@ describe('fitFace', () => {
   });
 });
 
-describe('PK başlayınca sahne aynı kalır', () => {
-  test('klasik düzen: yer varsa yüzler ve sütunlar PK öncesiyle aynı, yalnızca puan satırı eklenir', () => {
-    // 6 mikrofon + Patron koltuğu, ekrandaki gibi.
-    const before = fitGrid(6, 360, 290, { boss: true });
-    const during = fitGrid(6, 360, 290 + 200, { boss: true, pk: true }, before);
-    assert.equal(during.face, before.face);
-    assert.equal(during.cols, before.cols);
-    assert.ok(during.height > before.height, 'puanlar yükseklik ister');
-    // Eski davranış (aynı yükseklikte PK): yüzler en küçüğe iniyordu.
-    assert.ok(fitGrid(6, 360, 290 - 60, { boss: true, pk: true }).face < before.face);
+describe('PK başlayınca sahne aynı kalır (güncelleme 6)', () => {
+  test('her düzende ve her mikrofon sayısında: PK açılınca yüz, sütun, yuva ve yükseklik değişmez', () => {
+    // A PK is not an input of the fit any more: the same call gives the same stage. The Seat always draws the points
+    // line (components/room/parts pkLine), so what the owner saw — gaps opening between the seats in the top and bottom
+    // rows when a PK started — can't happen.
+    for (const width of PHONES)
+      for (let guests = 0; guests <= 29; guests++)
+        for (const height of [220, 300, 420]) {
+          const a = fitGrid(guests, width, height, { boss: guests % 2 === 0 });
+          const b = fitGrid(guests, width, height, { boss: guests % 2 === 0 }, a);
+          assert.deepEqual(b, a, `${width} px, ${guests} konuk, ${height} px`);
+        }
   });
-  test('sohbet daha fazla yer veremiyorsa yüzler yalnızca gerektiği kadar küçülür, hiç büyümez', () => {
+  test('bir pano gelince (odalar arası PK tablosu) yüz önceki boyu geçmez, sütunlar aynı kalır', () => {
     const before = fitGrid(6, 360, 290, { boss: true });
-    const tight = fitGrid(6, 360, 300, { boss: true, pk: true }, before);
+    const tight = fitGrid(6, 360, 230, { boss: true }, before);
     assert.equal(tight.cols, before.cols);
-    assert.ok(tight.face < before.face && tight.face >= FACE_MIN);
-    assert.ok(tight.height <= 300);
-    assert.equal(fitGrid(6, 360, 5_000, { boss: true, pk: true }, before).face, before.face, 'fazla yer yüzü büyütmez');
+    assert.ok(tight.face <= before.face && tight.face >= FACE_MIN);
+    assert.equal(fitGrid(6, 360, 5_000, { boss: true }, before).face, before.face, 'fazla yer yüzü büyütmez');
   });
-  test('seçilen düzen: yüz PK öncesini geçmez', () => {
+  test('seçilen düzen: yüz pano öncesini geçmez', () => {
     const s = ROOM_LAYOUTS[0].layoutSchema;
     const plan = layoutPlan(s, 360, false);
     const before = fitLayout(s, plan, 260);
-    assert.equal(fitLayout(s, plan, 5_000, { pk: true }, before).face, before.face);
-    assert.ok(fitLayout(s, plan, 5_000, { pk: true }).face >= before.face);
+    assert.equal(fitLayout(s, plan, 5_000, {}, before).face, before.face);
   });
 });

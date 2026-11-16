@@ -62,12 +62,11 @@ describe('Oda iki parça: üst kısım yerinden oynamaz', () => {
     assert.ok(box - stage - PHONE.bar >= CHAT_LEAST, `sohbete ${box - stage - PHONE.bar} dp`);
   });
 
-  test('PK: yüzler PK yokkenki boyda kalır, puanlar sohbetten yer alır', () => {
+  test('PK: mikrofonlar hiç değişmez (puan satırı her koltukta baştan ayrılmış)', () => {
     const box = steadyBox(roomH, PHONE.header, PHONE.controls);
     const before = fitMics(grid(14), null, box, PHONE.bar, basis, 0);
-    const during = fitMics(grid(14, { pk: true }), grid(14), box, PHONE.bar, basis, 0);
-    assert.equal(during.face, before.face);
-    assert.ok(during.height > before.height, 'puanlar sahneyi uzatır');
+    const during = fitMics(grid(14), grid(14), box, PHONE.bar, basis, 0);
+    assert.deepEqual(during, before);
   });
 
   test('sahne: tuttuğu kadar, sohbete en azını bırakarak; takım PK alanı sohbetin seçtiği boya dokunmaz', () => {

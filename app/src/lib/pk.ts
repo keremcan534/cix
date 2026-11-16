@@ -14,6 +14,7 @@ import { useSyncExternalStore } from 'react';
 import type { ServerCrossPk, ServerPk } from '@/lib/api';
 
 import { GIFTS, ROOMS, roomById, userById } from '@/data/mock';
+import { compactFit } from '@/lib/compact';
 import { liveBuild } from '@/lib/live-flag';
 import { micUsersOf, onMicNow, roleOf } from '@/lib/room-presence';
 
@@ -64,7 +65,16 @@ export type PkResultData = {
   crowns: PkCrown[];
   /** Why nobody was crowned (tie, no points). */
   noCrown?: string;
+  /**
+   * "Taç Kazandıranlar" (güncelleme 6): the two people the crown screen shows. En Çok Atış Yapan sent the most PK
+   * points in valid gifts, En Çok Atışı Alan received the most; both over the whole PK (every team). Null when no
+   * valid gift was sent.
+   */
+  awards?: PkAwards;
 };
+/** One award: the person, their PK points (sent or received) and how many gifts those were. */
+export type PkAward = { userId: string; points: number; gifts: number };
+export type PkAwards = { topSender: PkAward | null; topRecipient: PkAward | null };
 export type PkSession = {
   id: string;
   kind: PkKind;
@@ -510,6 +520,27 @@ export function computeCrowns(pk: PkSession, winner: TeamId | 'tie' | null, winn
   };
 }
 
+/**
+ * En Çok Atış Yapan and En Çok Atışı Alan: the biggest sender and the biggest recipient of valid gifts over the whole PK,
+ * by PK points. A tie goes to more gifts, then to the lower id, so every phone names the same person from the same rows.
+ */
+export function computeAwards(pk: Pick<PkSession, 'records'>): PkAwards {
+  const sent = new Map<string, PkAward>();
+  const got = new Map<string, PkAward>();
+  const add = (m: Map<string, PkAward>, userId: string, points: number, gifts: number) => {
+    const a = m.get(userId) ?? { userId, points: 0, gifts: 0 };
+    m.set(userId, { userId, points: a.points + points, gifts: a.gifts + gifts });
+  };
+  pk.records
+    .filter((r) => r.status === 'Doğrulandı' && r.points > 0)
+    .forEach((r) => {
+      add(sent, r.senderId, r.points, r.count ?? 1);
+      add(got, r.recipientId, r.points, r.count ?? 1);
+    });
+  const best = (m: Map<string, PkAward>) => [...m.values()].sort((a, b) => b.points - a.points || b.gifts - a.gifts || (a.userId < b.userId ? -1 : a.userId > b.userId ? 1 : 0))[0] ?? null;
+  return { topSender: best(sent), topRecipient: best(got) };
+}
+
 /** The final result from the server's records; the same for every viewer. */
 export function computeResult(pk: PkSession): PkResultData {
   const [red, blue] = pk.teams;
@@ -520,7 +551,7 @@ export function computeResult(pk: PkSession): PkResultData {
     const top = ranking[0]?.points ?? 0;
     const winners = top > 0 ? ranking.filter((r) => r.points === top).map((r) => r.userId) : [];
     const diff = winners.length === 1 ? top - (ranking[1]?.points ?? 0) : 0;
-    return { winner: null, winners, red: 0, blue: 0, diff, validGifts, ranking, ...computeCrowns(pk, null, winners) };
+    return { winner: null, winners, red: 0, blue: 0, diff, validGifts, ranking, ...computeCrowns(pk, null, winners), awards: computeAwards(pk) };
   }
   const winner: TeamId | 'tie' = red.score === blue.score ? 'tie' : red.score > blue.score ? 'red' : 'blue';
   if (pk.kind === 'cross') {
@@ -531,14 +562,14 @@ export function computeResult(pk: PkSession): PkResultData {
         return { userId, points, teamId: pk.teams.find((t) => t.roomId === roomId)?.id };
       })
       .sort((a, b) => b.points - a.points);
-    return { winner, winners: [], red: red.score, blue: blue.score, diff: Math.abs(red.score - blue.score), validGifts, ranking, ...computeCrowns(pk, winner, []) };
+    return { winner, winners: [], red: red.score, blue: blue.score, diff: Math.abs(red.score - blue.score), validGifts, ranking, ...computeCrowns(pk, winner, []), awards: computeAwards(pk) };
   }
   const teamByUser: Record<string, TeamId> = {};
   pk.teams.forEach((t) => t.members.forEach((m) => (teamByUser[m] = t.id)));
   pk.records.forEach((r) => r.teamId && (teamByUser[r.recipientId] ??= r.teamId));
   const ids = [...new Set([...pk.teams.flatMap((t) => t.members), ...Object.keys(pk.points)])];
   const ranking = ids.map((userId) => ({ userId, points: pk.points[userId] ?? 0, teamId: teamByUser[userId] })).sort((a, b) => b.points - a.points);
-  return { winner, winners: [], red: red.score, blue: blue.score, diff: Math.abs(red.score - blue.score), validGifts, ranking, ...computeCrowns(pk, winner, []) };
+  return { winner, winners: [], red: red.score, blue: blue.score, diff: Math.abs(red.score - blue.score), validGifts, ranking, ...computeCrowns(pk, winner, []), awards: computeAwards(pk) };
 }
 
 /** Runs once per PK: only an active PK can be finalized, and the result is written in the same step. */
@@ -724,44 +755,48 @@ export const liveRanking = (pk: PkSession) =>
   [...new Set([...pk.participants, ...Object.keys(pk.points)])].map((userId) => ({ userId, points: pk.points[userId] ?? 0 })).sort((a, b) => b.points - a.points);
 
 // --- Points pill under a seat --------------------------------------------------------------------
-/**
- * A PK total in the app's short form (B = bin, Mn = milyon, Mr = milyar), cut down and never rounded up, so nobody
- * shows more points than they have: 940, 16,4B (16.450), 999B, 1,2Mn. `decimal` false drops the decimal: 16B.
- */
-export function shortPoints(n: number, decimal = true): string {
-  const v = Math.max(0, Math.floor(n));
-  if (v < 1000) return String(v);
-  const [unit, suffix] = v < 1e6 ? [1e3, 'B'] : v < 1e9 ? [1e6, 'Mn'] : [1e9, 'Mr'];
-  const tenths = Math.floor((v * 10) / unit);
-  const whole = Math.floor(tenths / 10);
-  return decimal && whole < 100 && tenths % 10 ? `${whole},${tenths % 10}${suffix}` : `${whole}${suffix}`;
-}
-
-/** Advances (em) in the pill's face, Plus Jakarta Sans ExtraBold; digits are tabular, 0.6 em each. */
-const ADVANCE: Record<string, number> = { '.': 0.41, ',': 0.39, B: 0.69, M: 0.91, n: 0.6, r: 0.45, '+': 0.68 };
-/** How wide `text` is drawn at `px` (the font size times the phone's text scale). */
-export const textWidth = (text: string, px: number) => [...text].reduce((w, ch) => w + (ADVANCE[ch] ?? 0.6) * px, 0);
 /** Between the gift icon and the number. */
 export const PILL_GAP = 2;
-
-export type PkPillBox = { size: number; pad: number; icon: boolean; room: number };
 /**
- * The points pill under a seat `width` px wide, at the phone's text `scale`: its text size and side padding, whether
- * the gift icon fits (only beside a whole 99.999: in a PK close scores must stay apart, so the number comes first),
- * and the room the number has. The pill keeps a pixel free on each side, so it never runs under the next seat.
+ * A generous width per character (em) of the pill's face, Plus Jakarta Sans ExtraBold: its digits are 0.6 em, '.' 0.41,
+ * 'k' 0.55, 'm' 0.85. Counting every character this wide leaves the number room on every phone; the text also shrinks
+ * itself rather than ever being cut (an earlier pill measured to the pixel showed "61.9…" on a phone).
  */
-export function pkPillBox(width: number, scale = 1): PkPillBox {
-  const size = width >= 80 ? 12 : width >= 50 ? 11 : width >= 44 ? 10 : 9;
-  const pad = size === 12 ? 6 : size === 11 ? 4 : 3;
-  const inner = width - 2 - 2 - 2 * pad;
-  const icon = textWidth('99.999', size * scale) + size + PILL_GAP <= inner;
-  return { size, pad, icon, room: icon ? inner - size - PILL_GAP : inner };
+export const CHAR_EM = 0.66;
+
+export type PkPillBox = {
+  /** The pill's own width: fixed for the seat, whatever the score, so nothing moves as the points grow. */
+  width: number;
+  /** Its height (the line the stage keeps under every name is lib/seat-fit PK_LINE). */
+  height: number;
+  /** Text size and side padding. */
+  size: number;
+  pad: number;
+  /** Whether the gift icon goes before the number. */
+  icon: boolean;
+  /** How many characters the number may have (lib/compact compactFit). */
+  chars: number;
+};
+
+/**
+ * The points pill under a seat `slot` px wide, at the phone's text `scale`. It is as wide as the seat allows (up to
+ * 72 px) and keeps that width: a growing score never widens it, never pushes the seats apart and never gets cut. The
+ * number is always the short form (61.99k, 1.25m): two decimals where they fit, else one, else none. The gift icon
+ * comes only where five characters (61.9k) still fit beside it.
+ */
+export function pkPillBox(slot: number, scale = 1): PkPillBox {
+  const width = Math.max(30, Math.min(72, Math.floor(slot) - 4));
+  const size = width >= 60 ? 11 : width >= 46 ? 10 : 9;
+  const pad = size === 11 ? 5 : 3;
+  const per = CHAR_EM * size * Math.max(1, scale);
+  const inner = width - 2 - 2 * pad;
+  const icon = inner - size - PILL_GAP >= 5 * per;
+  const chars = Math.max(3, Math.floor((icon ? inner - size - PILL_GAP : inner) / per));
+  // As tall as the points line under the name (lib/seat-fit PK_LINE, 15 px) at the most.
+  return { width, height: Math.min(15, size + 5), size, pad, icon, chars };
 }
-/** The longest form of `value` that fits `room` px at `px`: the whole number (16.450), then 16,4B, then 16B. */
-export function pkPointsText(value: number, room: number, px: number): string {
-  const forms = [Math.floor(Math.max(0, value)).toLocaleString('tr-TR'), shortPoints(value), shortPoints(value, false)];
-  return forms.find((s) => textWidth(s, px) <= room) ?? forms[2];
-}
+/** The score as the pill shows it: 940, 61.99k (or 61.9k, 61k where fewer characters fit), 1.25m. */
+export const pkPointsText = (value: number, chars: number) => compactFit(Math.max(0, value), chars);
 
 /** Test support. */
 export function resetPk() {

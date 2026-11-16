@@ -45,6 +45,9 @@ export function AnimatedFrame({ fx, size, still, headroom, children }: { fx: Fra
   const look = FRAME_LOOKS[fx];
   // The crown floats a little above the ring and bobs by a twentieth of the box: both within the headroom.
   const crownLift = headroom === undefined ? size * 0.3 : Math.max(0, Math.min(size * 0.3, headroom - size * 0.05));
+  // On a seat the halos and ripples stay within the room round the face too (güncelleme 6: the pulse frame's ripples
+  // went past the seat and onto the name): their biggest scale reaches `headroom` px past the face at most.
+  const most = (x: number) => (headroom === undefined ? x : Math.min(x, 1 + (2 * Math.max(2, Math.min(headroom, size / 7))) / size));
   const ring = Math.max(3, Math.round(size * 0.075));
   const spin = useLoop(look.spinMs, still);
   const breathe = useLoop(2000, still, 0.5);
@@ -68,7 +71,7 @@ export function AnimatedFrame({ fx, size, still, headroom, children }: { fx: Fra
             borderRadius: size / 2,
             backgroundColor: look.glow,
             opacity: wave(i ? shifted(breathe, 0.5) : breatheI).interpolate({ inputRange: [0, 1], outputRange: [0.1, i ? 0.16 : 0.26] }),
-            transform: [{ scale: wave(i ? shifted(breathe, 0.5) : breatheI).interpolate({ inputRange: [0, 1], outputRange: [1.04, i ? 1.3 : 1.16] }) }],
+            transform: [{ scale: wave(i ? shifted(breathe, 0.5) : breatheI).interpolate({ inputRange: [0, 1], outputRange: [1.04, most(i ? 1.3 : 1.16)] }) }],
           }}
         />
       ))}
@@ -89,7 +92,7 @@ export function AnimatedFrame({ fx, size, still, headroom, children }: { fx: Fra
                 borderWidth: Math.max(1.5, ring * 0.45),
                 borderColor: look.glow,
                 opacity: r.interpolate({ inputRange: [0, 1], outputRange: [0.7, 0] }),
-                transform: [{ scale: r.interpolate({ inputRange: [0, 1], outputRange: [1, 1.5] }) }],
+                transform: [{ scale: r.interpolate({ inputRange: [0, 1], outputRange: [1, most(1.5)] }) }],
               }}
             />
           );

@@ -54,9 +54,24 @@ export function meFromServer(u: api.ServerMe): Partial<User> {
   };
 }
 
-/** GET /api/me: my profile for the screen and the edit form. */
-export async function loadMe(): Promise<Partial<User>> {
+/** A photo only this phone can open (a picked file), not one other phones can load. */
+export const isLocalPhoto = (uri?: string | null) => !!uri && /^(file|content|ph|assets-library|blob):/i.test(uri);
+
+/**
+ * GET /api/me: my profile for the screen and the edit form. `localAvatar`: the photo this phone shows for me. An
+ * account opened before güncelleme 6 kept its sign-up photo on the phone only (the server had none, so others saw a
+ * blank face): it goes up now, once. If that fails (the file is gone, no connection) nothing changes and it is tried
+ * again next time.
+ */
+export async function loadMe(localAvatar?: string): Promise<Partial<User>> {
   const r = await api.apiRequest<{ user: api.ServerMe }>('GET', '/api/me');
+  if (!r.user.avatarUrl && isLocalPhoto(localAvatar)) {
+    try {
+      return await uploadAvatar({ uri: localAvatar! });
+    } catch {
+      // Keep what the phone shows; the next profile visit tries again.
+    }
+  }
   return meFromServer(r.user);
 }
 

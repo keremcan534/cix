@@ -12,6 +12,8 @@ Kaynaklar: *SIMILARCLUP — PK BATTLE MODÜLÜ* ve *Gelişmiş PK Modu, Takım P
 | `src/lib/room-presence.ts` | Odadaki kişiler ve mikrofonlar (ayrıntı: [`CANLI_ODA.md`](CANLI_ODA.md)). PK, katılımcı uygunluğunu buradan doğrular. |
 | `src/components/room/pk.tsx` | Kurulum paneli, Normal PK süre etiketi (oda başlığında), Takım PK arenası, odalar arası skor çubuğu, ayrıntı kartı. |
 | `src/components/room/pk-result.tsx` | Sonuç ekranı ve "Taç Kazandıranlar" ekranı. |
+| `src/components/room/pk-premium.tsx` | PK Premium görünümü (güncelleme 6): mor zemin, altın çerçeveler, defne çerçeveli yüzler, VS, aslan/kurt sancakları, kupa. Süsler `assets/pk/` içindeki şeffaf parçalar (`scripts/pk-art-cut.py` konsept görsellerden keser). |
+| `src/lib/compact.ts` | Bütün PK sayıları ve sıralamalar için kısaltma: 1k, 1.1k, 10.12k, 1m (aşağı yuvarlanır). |
 | `src/components/room/parts.tsx` | Koltuk altında canlı PK puanı (`PkPoints`), koltuğun genişliğine göre (Puanlama'da). Patron koltuğunda da gösterilir (`owner.tsx` `BossSeat`). |
 | `src/app/oda/[id].tsx` | Menü › **PK** (oda sahibi ve yöneticiler); hediyeler tek işlem kimliğiyle PK'ya yazılır. |
 | `src/app/pk-yonetimi.tsx` | Yönetim paneli (`pk.manage`): modlar, süreler, takım sınırları, hediye puanları, aktif PK (bitir/iptal/iade testi), geçmiş, kayıtlar. |
@@ -47,7 +49,7 @@ Kaynaklar: *SIMILARCLUP — PK BATTLE MODÜLÜ* ve *Gelişmiş PK Modu, Takım P
 - Varsayılan 1 jeton = 1 PK puanı; hediye başına puan yönetim panelinden ayarlanır, 0 puanlı hediye sayılmaz. Ayarlar PK başlarken dondurulur.
 - PK puanı jeton bakiyesi ve yayıncı kazancından ayrıdır; yalnızca sunucuda, hediye işlemi başarıyla tahsil edildikten sonra yazılır. İstemci puan göndermez.
 - **Kime yazılır:** hediyeyi alan kişi **o anda mikrofondaysa** (Takım PK'de ayrıca bir takımdaysa). Aksi hâlde hediye yine ulaşır ama puan yazılmaz; işlem "Reddedildi" kaydı olarak nedeniyle tutulur. Mikrofonda olup PK'ya henüz katılmamış kişiye hediye gelirse önce katılır, sonra puanlanır.
-- **Koltuk altındaki puan** koltuğun genişliğine göre yazılır (`lib/pk` `pkPillBox`, `pkPointsText`): sığıyorsa tam sayı (61.990), sığmıyorsa kısa yazım (16,4B, 123B, 1,2Mn; aşağı yuvarlanır, kimse olduğundan fazla görünmez). Hediye simgesi yalnızca tam sayının yanına sığdığı koltuklarda çıkar (yakın puanlar ayırt edilsin diye önce sayı). Dar koltukta yazı ve kenar boşluğu küçülür; telefonun yazı büyütmesi (en çok 1,15 kat) hesaba katılır. 2'den 30 mikrofona kadar her düzende, 320–430 px genişlikte sayı koltuğun içinde kalır (testli).
+- **Koltuk altındaki puan** (güncelleme 6): koltuk için **sabit genişlikte** bir rozet (`lib/pk` `pkPillBox`, `pkPointsText`); puan büyüdükçe rozet büyümez, sayı hep kısa yazılır (61.99k, 1.25m; yer azsa 61.9k, 61k; aşağı yuvarlanır). Asla "…" ile kesilmez (yazı gerekirse küçülür). Puan satırının yeri **her koltukta, PK olsun olmasın, baştan ayrılır** (`lib/seat-fit` `PK_LINE`, 15 px): Normal PK açılıp kapanınca koltuklar kıpırdamaz, yüzler küçülmez.
 - **Takım toplamı = takım üyelerinin geçerli puanlarının toplamı** (testle doğrulanır).
 - Odalar arası PK'de kişi başı puan **oda başına** tutulur (`pointKey`): aynı kişi iki odada hediye alsa da puanları karışmaz.
 - PK başlamadan (hazırlıkta) ve bittikten sonra gönderilen hediyeler sayılmaz.
@@ -62,7 +64,13 @@ Kaynaklar: *SIMILARCLUP — PK BATTLE MODÜLÜ* ve *Gelişmiş PK Modu, Takım P
 - **Takım PK:** kazanan takım, iki skor, fark, iki takımın üyeleri ve bireysel katkıları; takımın en çok puan alanı ⭐ ile gösterilir. Eşitlikte iki takım da "Berabere".
 - Sonuç ekranı kapatılabilir (X veya düğme); kapatılınca **Taç Kazandıranlar** ekranına geçilir. Her ekran izleyici başına bir kez açılır (`<pkId>` ve `<pkId>:crowns` görüldü kayıtları), yanlışlıkla ikinci kez açılmaz.
 
-## Taç kuralı ("Taç Kazandıranlar")
+## Taç Kazandıranlar ekranı (güncelleme 6)
+
+Konsept paketinin kuralı: ekranda **yalnız iki kişi**. **En Çok Atış Yapan:** PK boyunca geçerli hediyelerle en çok PK puanı gönderen. **En Çok Atışı Alan:** en çok alan. Bütün PK üzerinden (iki takım birlikte), kazanan veya beraberlik fark etmez; iade edilen hediye sayılmaz; eşitlikte daha çok hediye, sonra kimlik sırası (`lib/pk` `computeAwards`, sonuçta `result.awards`). Geçerli hediye yoksa ekran nedenini söyler. Sonuç ekranının altında da aynı iki kişi küçük gösterilir.
+
+## Taç ilişkileri (yönetim kaydı)
+
+Aşağıdaki eski kural yönetim panelinin geçmiş kaydında duruyor (`computeCrowns`); kullanıcı ekranı artık yukarıdaki iki kişiyi gösterir.
 
 Mevcut veri modelinde tanımlı değildi; şu kurallarla tanımlandı (`computeCrowns`):
 
@@ -72,7 +80,7 @@ Mevcut veri modelinde tanımlı değildi; şu kurallarla tanımlandı (`computeC
 4. **Birden fazla katkı:** her gönderen → taç alan çifti ayrı kart; katkıya göre sıralı. Her taç alanın en büyük katkıyı yapanı "👑 Taç kazandıran" olarak vurgulanır (eşitlikte hepsi).
 5. İlişkiler yalnızca kayıtlardan türetilir: kayıtta olmayan ilişki üretilmez, aynı katkı iki kez sayılmaz, sonuç sunucuda bir kez hesaplanıp saklanır.
 
-Ekran: `[gönderen avatarı] —🎁 +puan → [taç alan avatarı]`. Avatara dokununca profil açılır; profilden dönünce ekran yerinde durur. Liste kayar; küçük ekranda isimler kısaltılır, avatarlar üst üste binmez.
+
 
 ## Durumlar ve hata senaryoları
 

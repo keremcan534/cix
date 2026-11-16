@@ -5,7 +5,9 @@ import { afterEach, beforeEach, describe, mock, test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  CHAR_EM,
   applyServerPk,
+  computeAwards,
   computeCrowns,
   drawTeams,
   drawTeamsFrom,
@@ -24,15 +26,13 @@ import {
   revokeGift,
   serverPkSession,
   setInviteScenario,
-  shortPoints,
   startRoomPk,
-  textWidth,
   type PkSession,
 } from '@/lib/pk';
 import type { ServerPk } from '@/lib/api';
 import { ROOM_LAYOUTS } from '@/data/room-layouts';
 import { join, leave, leaveSeat, resetPresence, seedRoom, setBoss, takeSeat } from '@/lib/room-presence';
-import { fitGrid, layoutPlan } from '@/lib/seat-fit';
+import { PK_LINE, fitGrid, layoutPlan } from '@/lib/seat-fit';
 
 const R = 'pk-room';
 const PREP_MS = 5_000;
@@ -554,50 +554,62 @@ describe('Sunucu PK’sı (canlı mod): herkes aynı skoru ve sonucu görür', (
 });
 
 describe('Koltuk altındaki PK puanı her mikrofon düzeninde okunur', () => {
-  test('kısa yazım: B ve Mn, aşağı yuvarlanır (kimse olduğundan fazla görünmez)', () => {
-    assert.equal(shortPoints(0), '0');
-    assert.equal(shortPoints(940), '940');
-    assert.equal(shortPoints(1_000), '1B');
-    assert.equal(shortPoints(1_099), '1B');
-    assert.equal(shortPoints(16_450), '16,4B');
-    assert.equal(shortPoints(16_450, false), '16B');
-    assert.equal(shortPoints(61_990), '61,9B');
-    assert.equal(shortPoints(123_456), '123B');
-    assert.equal(shortPoints(999_999), '999B');
-    assert.equal(shortPoints(1_250_000), '1,2Mn');
-    assert.equal(shortPoints(2_500_000_000), '2,5Mr');
-  });
-
-  test('yer varsa tam sayı, yoksa kısa yazım; hediye simgesi yalnız tam sayının yanına sığdığında', () => {
-    const pill = (value: number, width: number, scale = 1) => {
-      const box = pkPillBox(width, scale);
-      return `${box.icon ? '🎁' : ''}${pkPointsText(value, box.room, box.size * scale)}`;
+  test('her zaman kısa yazım (k, m, b), aşağı yuvarlanır; yer azsa daha az ondalık', () => {
+    const pill = (value: number, slot: number, scale = 1) => {
+      const box = pkPillBox(slot, scale);
+      return `${box.icon ? '🎁' : ''}${pkPointsText(value, box.chars)}`;
     };
-    // 30 mikrofon, 390 px (ekran görüntüsü): koltuk 57 px.
-    assert.equal(pill(16_450, 57), '16.450');
-    assert.equal(pill(1_234_567, 57), '1,2Mn');
-    // Telefonun yazısı büyütülmüşse kısa yazıma geçer, yine kesilmez.
-    assert.equal(pill(123_456, 57, 1.15), '123B');
-    // 15 mikrofon, 390 px: koltuk 66 px.
-    assert.equal(pill(61_990, 66), '🎁61.990');
-    assert.equal(pill(169_990, 66), '🎁169B');
-    // Takım arenası ve geniş koltuklar.
-    assert.equal(pill(123_456, 80), '🎁123.456');
+    // Ekran görüntüsündeki 61.990: artık "61.9…" diye kesilmez.
+    assert.equal(pill(61_990, 96), '🎁61.99k');
+    assert.equal(pill(61_990, 66), '🎁61.9k');
+    assert.equal(pill(940, 66), '🎁940');
+    assert.equal(pill(1_234_567, 57), '🎁1.23m');
+    assert.equal(pill(1_234_567, 40), '1.2m');
+    // 30 mikrofonun en dar koltuğu: hediye simgesi yok, sayı yine kısa.
+    assert.equal(pill(169_990, 40), '169k');
+    assert.equal(pill(999_999, 96), '🎁999.9k');
   });
 
-  test('her düzende, her telefonda ve yazı büyütmede puan koltuğun içinde kalır', () => {
-    const widths = new Set<number>([56, 60, 64, 80, 96]);
+  test('rozet koltuk için sabit genişlikte: puan büyüdükçe genişlemez, koltuktan taşmaz', () => {
+    const widths = new Set<number>([40, 44, 56, 60, 64, 80, 96]);
     for (const phone of [320, 360, 390, 412, 430])
       for (const l of ROOM_LAYOUTS) for (const pkRoom of [false, true]) widths.add(layoutPlan(l.layoutSchema, phone, pkRoom).micW);
     for (const phone of [320, 360, 390, 412]) for (const mics of [4, 10, 15]) for (const h of [200, 300, 420]) widths.add(fitGrid(mics - 1, phone, h).slot);
-    assert.ok(Math.min(...widths) <= 42, `en dar koltuk ${Math.min(...widths)} px`);
     for (const width of widths)
-      for (const scale of [1, 1.15])
-        for (const value of [0, 7, 940, 9_999, 16_450, 61_990, 123_456, 999_999, 1_250_000, 9_999_999]) {
-          const box = pkPillBox(width, scale);
-          const text = pkPointsText(value, box.room, box.size * scale);
-          const drawn = 2 + 2 * box.pad + (box.icon ? box.size + 2 : 0) + textWidth(text, box.size * scale);
-          assert.ok(drawn <= width - 2, `${width} px, ${scale}x, ${value}: "${text}" ${drawn.toFixed(1)} px`);
+      for (const scale of [1, 1.15]) {
+        const box = pkPillBox(width, scale);
+        assert.ok(box.width <= width - 4 || box.width === 30, `${width} px: rozet ${box.width}`);
+        assert.ok(box.height <= PK_LINE, 'rozet puan satırına sığar');
+        // Every value in the same pill: its width never depends on the score.
+        for (const value of [0, 7, 940, 9_999, 16_450, 61_990, 123_456, 999_999, 1_250_000, 9_999_999, 2_500_000_000]) {
+          const text = pkPointsText(value, box.chars);
+          // Counted at the pill's generous width per character, the text fits beside the icon.
+          const drawn = 2 + 2 * box.pad + (box.icon ? box.size + 2 : 0) + text.length * CHAR_EM * box.size * Math.max(1, scale);
+          if (width >= 44) assert.ok(drawn <= box.width + 0.5, `${width} px, ${scale}x, ${value}: "${text}" ${drawn.toFixed(1)} > ${box.width}`);
+          assert.ok(!text.includes('…'));
         }
+      }
+  });
+});
+
+describe('Taç Kazandıranlar: En Çok Atış Yapan ve En Çok Atışı Alan', () => {
+  const rec = (senderId: string, recipientId: string, points: number, count = 1, status: 'Doğrulandı' | 'İade edildi' = 'Doğrulandı') => ({ txId: `${senderId}>${recipientId}:${points}`, senderId, recipientId, giftId: '', coins: points, points, at: 0, status, count });
+
+  test('en çok gönderen ve en çok alan, bütün PK boyunca (iki takım da)', () => {
+    const a = computeAwards({ records: [rec('u-a', 'u-x', 500, 2), rec('u-b', 'u-y', 300), rec('u-a', 'u-y', 400), rec('u-c', 'u-y', 100, 1, 'İade edildi')] });
+    assert.deepEqual(a.topSender, { userId: 'u-a', points: 900, gifts: 3 });
+    assert.deepEqual(a.topRecipient, { userId: 'u-y', points: 700, gifts: 2 }, 'iade edilen sayılmaz');
+  });
+
+  test('eşitlikte daha çok hediye, sonra kimlik: her telefon aynı kişiyi gösterir', () => {
+    const a = computeAwards({ records: [rec('u-b', 'u-x', 500, 1), rec('u-a', 'u-y', 500, 3)] });
+    assert.equal(a.topSender?.userId, 'u-a');
+    const b = computeAwards({ records: [rec('u-b', 'u-x', 500), rec('u-a', 'u-y', 500)] });
+    assert.equal(b.topSender?.userId, 'u-a');
+    assert.equal(b.topRecipient?.userId, 'u-x');
+  });
+
+  test('geçerli hediye yoksa ödül yok', () => {
+    assert.deepEqual(computeAwards({ records: [] }), { topSender: null, topRecipient: null });
   });
 });

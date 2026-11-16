@@ -42,10 +42,38 @@ export function artFit(art: FrameArtSize, size: number, maxScale: number) {
 }
 
 /**
- * How far (px) past the face the speaking ring may grow at full voice: a seventh of the face, never past the slot's
- * edge or into the row above (components/room/voice-wave).
+ * How much of the photo's radius a frame's ring may cover on a seat (güncelleme 6): the photo itself never shrinks, so
+ * a framed face is as big as everyone else's; a frame too big for the seat is drawn a little smaller, its ring over
+ * the photo's edge, down to this, and whatever still reaches past the seat's cell is cut at the cell's edge.
  */
-export const ringReach = (size: number, room: SeatRoom) => Math.max(3, Math.min(Math.round(size / 7), room.side, room.top));
+export const RING_OVER = 0.2;
+/** Under the face the picture may go this much past the name gap: the name's line has this much air above its letters. */
+const NAME_AIR = 3;
+
+/**
+ * A frame picture on a seat: its side (`frame`) for a photo of `size` px that keeps its size, and whether it must be
+ * cut to the seat's cell (`clip`, the cell's box round the face: `box`). The ring sits on the photo's edge when the
+ * picture fits the cell; else it is made smaller, the ring covering at most RING_OVER of the photo's radius; past that
+ * the picture is cut.
+ */
+export function seatArt(art: FrameArtSize, size: number, room: SeatRoom) {
+  const edge = size / (2 * art.hole * TUCK);
+  const least = ((1 - RING_OVER) * size) / (2 * art.hole);
+  const bottom = room.bottom + NAME_AIR;
+  const fit = artScaleIn(art, size, { ...room, bottom }) * size;
+  const frame = Math.min(edge, Math.max(least, fit));
+  return {
+    frame,
+    clip: frame > fit + 0.5,
+    box: { left: -room.side, top: -room.top, width: size + 2 * room.side, height: size + room.top + bottom },
+  };
+}
+
+/**
+ * How far (px) past the face the speaking ring may grow at full voice: a seventh of the face, never past the slot's
+ * edge, into the row above or onto the name's letters (components/room/voice-wave).
+ */
+export const ringReach = (size: number, room: SeatRoom) => Math.max(3, Math.min(Math.round(size / 7), room.side, room.top, room.bottom + NAME_AIR));
 
 /** Between the face and the speaking ring at rest. */
 export const RING_GAP = 1;
