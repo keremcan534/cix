@@ -77,8 +77,9 @@ export function LeaveSheet() {
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={closeLeaveDialog}>
+      {/* No panel behind the room's name and the two orbs (owner's call): they lie on the room itself, each with its own
+          glass and glow. Only the popular rooms sit on a card of their own. */}
       <Animated.View style={[s.sheet, { paddingTop: insets.top + space.xs, transform: [{ translateY: drop }] }]} accessibilityViewIsModal>
-        <LinearGradient colors={['rgba(22,37,60,0)', 'rgba(255,95,162,0.12)']} style={s.glow} pointerEvents="none" />
         {/* The room's name on a glass pill with a glowing live dot. */}
         <View style={s.where}>
           <View style={s.liveDot} />
@@ -95,7 +96,7 @@ export function LeaveSheet() {
           </Choice>
         </View>
         {picks.length > 0 && (
-          <>
+          <View style={s.popular}>
             <View style={s.sectionHead}>
               <Ionicons name="flame" size={16} color={semantic.social} />
               <Text style={s.section} accessibilityRole="header">
@@ -107,9 +108,9 @@ export function LeaveSheet() {
                 <Tile key={r.id} room={r} width={tileW} still={still} onPress={() => go(r)} />
               ))}
             </View>
-          </>
+            <View style={s.handle} />
+          </View>
         )}
-        <View style={s.handle} />
       </Animated.View>
       <Pressable style={s.scrim} onPress={closeLeaveDialog} accessibilityLabel="Vazgeç, odada kal" />
     </Modal>
@@ -214,21 +215,17 @@ function Tile({ room, width, still, onPress }: { room: Room; width: number; stil
 
 const useStyles = makeStyles(({ colors, semantic, ink, edge }) => ({
   scrim: { flex: 1 },
+  // No background: the room shows round the name and the orbs (each has its own glass and glow).
   sheet: {
     width: '100%',
     maxWidth: MAX_W,
     alignSelf: 'center',
-    // Night dark, as the design draws it, so the orbs' light shows (in the light theme too: it lies over a room).
-    backgroundColor: '#12060F',
-    borderBottomLeftRadius: radius.xl,
-    borderBottomRightRadius: radius.xl,
     paddingHorizontal: space.lg,
     paddingBottom: space.sm,
-    overflow: 'hidden',
-    ...edge.sheet,
   },
-  glow: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 180 },
-  handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: ink(0.18), marginTop: space.lg },
+  // The popular rooms on a night-dark card of their own, under the orbs.
+  popular: { marginTop: space.lg, backgroundColor: '#12060F', borderRadius: radius.xl, padding: space.md, paddingBottom: space.sm, ...edge.sheet },
+  handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)', marginTop: space.md },
   where: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -255,9 +252,9 @@ const useStyles = makeStyles(({ colors, semantic, ink, edge }) => ({
   orbIcon: { textShadowColor: 'rgba(0,0,0,0.25)', textShadowRadius: 4, textShadowOffset: { width: 0, height: 1 } },
   choiceLabel: { color: '#FFF1F8', fontFamily: fonts.display, fontSize: 26, marginTop: space.md, textShadowColor: 'rgba(255,60,170,0.9)', textShadowRadius: 12, textShadowOffset: { width: 0, height: 0 } },
   choiceLabelExit: { color: '#FF9AAA', textShadowColor: 'rgba(255,70,90,0.9)' },
-  notePill: { marginTop: space.sm, maxWidth: '100%', paddingVertical: 6, paddingHorizontal: 12, borderRadius: radius.pill, backgroundColor: 'rgba(120,30,90,0.55)', borderWidth: 1.5, borderColor: 'rgba(255,120,190,0.55)' },
+  notePill: { marginTop: space.sm, maxWidth: '100%', paddingVertical: 6, paddingHorizontal: 12, borderRadius: radius.pill, backgroundColor: 'rgba(90,18,66,0.82)', borderWidth: 1.5, borderColor: 'rgba(255,120,190,0.6)' },
   choiceNote: { color: '#FFE3F2', fontSize: 13, textAlign: 'center' },
-  sectionHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: space.xl, marginBottom: space.md },
+  sectionHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: space.md },
   section: { color: '#FFFFFF', fontFamily: fonts.displayBold, fontSize: type.bodyL },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP },
   tile: { borderRadius: radius.lg, overflow: 'hidden', backgroundColor: colors.cardAlt, borderWidth: 1, borderColor: ink(0.08) },
