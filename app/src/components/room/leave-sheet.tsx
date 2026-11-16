@@ -2,8 +2,10 @@
 // large round choices, "Küçült" (the room keeps playing; the mini card brings it
 // back) and "Çıkış" (leave it), and under them "Şu an popüler": the four busiest open rooms right now that can be
 // entered straight away (lib/room-picks). A room there leaves this one the way a switch does (mic off, voice
-// closed, lib/room-session leaveForRoom) and opens that one. The owner of a server room can also close it for
-// everyone. Dismissing the sheet changes nothing.
+// closed, lib/room-session leaveForRoom) and opens that one. Dismissing the sheet changes nothing. The two choices
+// are glowing glass orbs (the owner's design): pink Küçült, coral Çıkış, each with its note on a pill. "Odayı herkes
+// için kapat" is gone from here (owner's call): a room whose owner and admins have all left rests by itself
+// (server/api/room-autoclose.mjs) and opens again when one of them is back.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
@@ -16,9 +18,8 @@ import { PressableScale } from '@/components/fx/surface';
 import { Photo } from '@/components/photo';
 import { ROOMS, type Room } from '@/data/mock';
 import { roomBadge } from '@/data/rooms-ui';
-import { showAlert } from '@/lib/alert';
 import { tapHaptic } from '@/lib/haptics';
-import { closeServerRoom, isLockedRoom, isMyServerRoom, liveMode, message as errorText, reloadServerRooms, useServerRoomList } from '@/lib/live';
+import { isLockedRoom, liveMode, reloadServerRooms, useServerRoomList } from '@/lib/live';
 import { roomPassword } from '@/lib/live/room-password';
 import { popularRooms } from '@/lib/room-picks';
 import { closeLeaveDialog, continueLeave, endRoom, leaveForRoom, useRoomSession } from '@/lib/room-session';
@@ -27,6 +28,8 @@ import { fonts, makeStyles, radius, space, type, useTheme } from '@/theme';
 
 const GAP = 10;
 const MAX_W = 560;
+/** The two choices' orbs (px). */
+const ORB = 96;
 
 export function LeaveSheet() {
   const { leaveDialog, session } = useRoomSession();
@@ -59,7 +62,6 @@ export function LeaveSheet() {
     [current, live, serverRooms, blocked],
   );
   const tileW = Math.floor((Math.min(win.width, MAX_W) - space.lg * 2 - GAP) / 2);
-  const mine = !!session && isMyServerRoom(session.roomId);
 
   const minimize = () => continueLeave();
   const leave = () => {
@@ -72,29 +74,12 @@ export function LeaveSheet() {
     if (leaveForRoom()) router.push(href);
     else router.replace(href);
   };
-  const closeForAll = () => {
-    if (!session) return;
-    const id = session.roomId;
-    showAlert('Odayı kapat', 'Odan listelerden kalkacak ve artık kimse giremeyecek. Daha sonra yeni bir oda açabilirsin.', [
-      { text: 'Vazgeç', style: 'cancel' },
-      {
-        text: 'Kapat',
-        style: 'destructive',
-        onPress: () =>
-          closeServerRoom(id)
-            .then(() => {
-              endRoom('left');
-              continueLeave();
-            })
-            .catch((e) => showAlert('Oda kapatılamadı', errorText(e))),
-      },
-    ]);
-  };
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={closeLeaveDialog}>
       <Animated.View style={[s.sheet, { paddingTop: insets.top + space.xs, transform: [{ translateY: drop }] }]} accessibilityViewIsModal>
         <LinearGradient colors={['rgba(22,37,60,0)', 'rgba(255,95,162,0.12)']} style={s.glow} pointerEvents="none" />
+        {/* The room's name on a glass pill with a glowing live dot. */}
         <View style={s.where}>
           <View style={s.liveDot} />
           <Text style={s.whereText} numberOfLines={1}>
@@ -103,22 +88,12 @@ export function LeaveSheet() {
         </View>
         <View style={s.actions}>
           <Choice still={still} label="Küçült" note="Oda arkada sürer" onPress={minimize}>
-            <LinearGradient colors={['#FF7AB3', '#F0468E']} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={[s.circle, s.stayCircle]}>
-              <Ionicons name="contract" size={30} color={semantic.actionInk} />
-            </LinearGradient>
+            <Orb icon="contract" fill={['#FF5CBC', '#E0218F', '#93105E']} glow="rgba(255,60,170,0.75)" rim="rgba(255,190,230,0.9)" />
           </Choice>
           <Choice still={still} label="Çıkış" note="Odadan ayrıl" onPress={leave} danger>
-            <View style={[s.circle, s.exitCircle]}>
-              <Ionicons name="log-out-outline" size={30} color={semantic.danger} />
-            </View>
+            <Orb icon="log-out-outline" fill={['#FF8A72', '#EC3F5C', '#A0143E']} glow="rgba(255,90,100,0.7)" rim="rgba(255,200,190,0.9)" />
           </Choice>
         </View>
-        {mine && (
-          <Pressable onPress={closeForAll} style={s.closeAll} accessibilityRole="button" accessibilityLabel="Odayı herkes için kapat. Odan listelerden kalkar ve artık kimse giremez." hitSlop={6}>
-            <Ionicons name="power" size={14} color={semantic.danger} />
-            <Text style={s.closeAllText}>Odayı herkes için kapat</Text>
-          </Pressable>
-        )}
         {picks.length > 0 && (
           <>
             <View style={s.sectionHead}>
@@ -141,6 +116,19 @@ export function LeaveSheet() {
   );
 }
 
+/** A glowing glass orb: its colour from the top light down, a halo round it, a rim of light and a gloss on top. */
+function Orb({ icon, fill, glow, rim }: { icon: keyof typeof Ionicons.glyphMap; fill: readonly [string, string, string]; glow: string; rim: string }) {
+  const s = useStyles();
+  return (
+    <View style={[s.orbHalo, { boxShadow: `0 0 34px ${glow}` }]}>
+      <LinearGradient colors={fill} start={{ x: 0.25, y: 0 }} end={{ x: 0.75, y: 1 }} style={[s.orb, { borderColor: rim }]}>
+        <LinearGradient colors={['rgba(255,255,255,0.55)', 'rgba(255,255,255,0)']} style={s.gloss} pointerEvents="none" />
+        <Ionicons name={icon} size={Math.round(ORB * 0.4)} color="#fff" style={s.orbIcon} />
+      </LinearGradient>
+    </View>
+  );
+}
+
 /** One of the two round choices: springs under the finger, or just dims with "Animasyonları azalt". */
 function Choice({ still, label, note, danger, onPress, children }: { still: boolean; label: string; note: string; danger?: boolean; onPress: () => void; children: ReactNode }) {
   const s = useStyles();
@@ -148,7 +136,11 @@ function Choice({ still, label, note, danger, onPress, children }: { still: bool
     <View style={s.choice}>
       {children}
       <Text style={[s.choiceLabel, danger && s.choiceLabelExit]}>{label}</Text>
-      <Text style={s.choiceNote}>{note}</Text>
+      <View style={s.notePill}>
+        <Text style={s.choiceNote} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+          {note}
+        </Text>
+      </View>
     </View>
   );
   const a11y = { accessibilityRole: 'button' as const, accessibilityLabel: `${label}. ${note}` };
@@ -226,7 +218,8 @@ const useStyles = makeStyles(({ colors, semantic, ink, edge }) => ({
     width: '100%',
     maxWidth: MAX_W,
     alignSelf: 'center',
-    backgroundColor: colors.card,
+    // Night dark, as the design draws it, so the orbs' light shows (in the light theme too: it lies over a room).
+    backgroundColor: '#12060F',
     borderBottomLeftRadius: radius.xl,
     borderBottomRightRadius: radius.xl,
     paddingHorizontal: space.lg,
@@ -236,21 +229,36 @@ const useStyles = makeStyles(({ colors, semantic, ink, edge }) => ({
   },
   glow: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 180 },
   handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: ink(0.18), marginTop: space.lg },
-  where: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: space.md, paddingHorizontal: space.xl },
-  liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: semantic.live },
-  whereText: { color: colors.textDim, fontWeight: '700', fontSize: 13, flexShrink: 1 },
-  actions: { flexDirection: 'row', justifyContent: 'center', gap: 56, marginTop: space.lg },
-  choice: { alignItems: 'center', width: 104 },
-  circle: { width: 76, height: 76, borderRadius: 38, alignItems: 'center', justifyContent: 'center' },
-  stayCircle: { boxShadow: '0 8px 22px rgba(255,95,162,0.35)' },
-  exitCircle: { backgroundColor: 'rgba(255,122,130,0.12)', borderWidth: 1.5, borderColor: semantic.danger },
-  choiceLabel: { color: colors.text, fontFamily: fonts.display, fontSize: type.bodyL, marginTop: space.sm },
-  choiceLabelExit: { color: semantic.danger },
-  choiceNote: { color: colors.textDim, fontSize: type.caption, marginTop: 2, textAlign: 'center' },
-  closeAll: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', alignSelf: 'center', gap: 6, marginTop: space.md, paddingVertical: space.xs, paddingHorizontal: space.md },
-  closeAllText: { color: semantic.danger, fontWeight: '700', fontSize: 13 },
+  where: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    maxWidth: '86%',
+    gap: 10,
+    marginTop: space.md,
+    paddingVertical: 9,
+    paddingHorizontal: 22,
+    borderRadius: radius.pill,
+    backgroundColor: 'rgba(70,14,52,0.75)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,92,180,0.85)',
+    boxShadow: '0 0 16px rgba(255,60,170,0.45)',
+  },
+  liveDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: '#FF4FB0', boxShadow: '0 0 10px rgba(255,79,176,0.95)' },
+  whereText: { color: '#FFE3F2', fontFamily: fonts.display, fontSize: 19, flexShrink: 1 },
+  actions: { flexDirection: 'row', justifyContent: 'center', gap: 20, marginTop: space.xl },
+  choice: { alignItems: 'center', width: 140 },
+  orbHalo: { width: ORB, height: ORB, borderRadius: ORB / 2 },
+  orb: { width: ORB, height: ORB, borderRadius: ORB / 2, alignItems: 'center', justifyContent: 'center', borderWidth: 2, overflow: 'hidden' },
+  gloss: { position: 'absolute', top: 5, left: ORB * 0.16, width: ORB * 0.68, height: ORB * 0.42, borderRadius: ORB },
+  orbIcon: { textShadowColor: 'rgba(0,0,0,0.25)', textShadowRadius: 4, textShadowOffset: { width: 0, height: 1 } },
+  choiceLabel: { color: '#FFF1F8', fontFamily: fonts.display, fontSize: 26, marginTop: space.md, textShadowColor: 'rgba(255,60,170,0.9)', textShadowRadius: 12, textShadowOffset: { width: 0, height: 0 } },
+  choiceLabelExit: { color: '#FF9AAA', textShadowColor: 'rgba(255,70,90,0.9)' },
+  notePill: { marginTop: space.sm, maxWidth: '100%', paddingVertical: 6, paddingHorizontal: 12, borderRadius: radius.pill, backgroundColor: 'rgba(120,30,90,0.55)', borderWidth: 1.5, borderColor: 'rgba(255,120,190,0.55)' },
+  choiceNote: { color: '#FFE3F2', fontSize: 13, textAlign: 'center' },
   sectionHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: space.xl, marginBottom: space.md },
-  section: { color: colors.text, fontFamily: fonts.displayBold, fontSize: type.bodyL },
+  section: { color: '#FFFFFF', fontFamily: fonts.displayBold, fontSize: type.bodyL },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP },
   tile: { borderRadius: radius.lg, overflow: 'hidden', backgroundColor: colors.cardAlt, borderWidth: 1, borderColor: ink(0.08) },
   count: { position: 'absolute', top: space.sm, left: space.sm, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(4,10,20,0.55)', borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 3 },

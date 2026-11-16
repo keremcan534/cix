@@ -27,6 +27,10 @@ Konsept görsellerdeki dört ekran uygulamaya geçti. Görseller "yalnız konsep
 
 **Ürün kararı değişti:** Önceki "Taç Kazandıranlar" yalnız kazanana hediye gönderenleri listeliyordu, beraberlikte boştu. Yeni ekran kazanan kim olursa olsun en çok gönderen ve en çok alan kişiyi gösterir; beraberlikte de gösterir. Yönetim panelindeki eski taç kaydı aynen tutuluyor.
 
+## Odadan çıkış paneli (16 Kasım)
+
+Sahibin gönderdiği tasarıma göre: oda adı parlayan bir hapın içinde, "Küçült" pembe, "Çıkış" mercan renkli parlak cam küreler, açıklamaları ("Oda arkada sürer", "Odadan ayrıl") hap içinde, panel gece karası. **"Odayı herkes için kapat" kaldırıldı** (sahibin isteği). Uygulamada odayı kalıcı kapatmanın tek yeri burasıydı; artık oda, sahibi ve yöneticileri çıktıktan 5 dakika sonra kendiliğinden dinlenmeye geçer ve içlerinden biri dönünce yeniden açılır (Güncelleme 4 kuralı). Odanın üyeleri, yöneticileri ve kuralları böylece kaybolmaz.
+
 ## Mikrofon denoise
 
 Kod satır satır izlendi (LiveKit kancası, 48 kHz / 10 ms kareler, ölçek, APK derlemesi): temizlik **gönderilen sesin** yolunda ve çalışıyor. "Çalışmıyor" görünmesinin sebepleri:
