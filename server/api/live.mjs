@@ -18,7 +18,7 @@
 // (RoomService over Twirp, LIVEKIT_API_URL), so nobody stays in with a token they already had.
 import crypto from 'node:crypto';
 
-import { HttpError, UUID, auth, db, env, readRaw } from './core.mjs';
+import { HttpError, UUID, auth, db, env, filesOut, readRaw } from './core.mjs';
 import { roomEntered } from './referrals.mjs';
 import { eventJoined, eventRoomFinished } from './events.mjs';
 import { leftVoiceRoom, mayStay, voiceAccess, voiceRoomStarted } from './rooms.mjs';
@@ -249,9 +249,24 @@ export async function openVoiceRooms() {
  * wrote it: app lib/live/room-bus reportSignal). Never fails the caller: false when it didn't go out.
  */
 export const roomPacket = (room, packet) =>
-  roomService('SendData', { room, data: Buffer.from(JSON.stringify(packet)).toString('base64'), kind: 'RELIABLE' }, { roomAdmin: true, room }).catch(
+  // File addresses as the phones load them (core.mjs filesOut), like every HTTP answer: a look's new photo must load
+  // on networks that can't reach the storage's own address.
+  roomService('SendData', { room, data: Buffer.from(filesOut(JSON.stringify(packet))).toString('base64'), kind: 'RELIABLE' }, { roomAdmin: true, room }).catch(
     (e) => (console.error('livekit SendData', packet?.type, room, String(e).slice(0, 200)), false),
   );
+
+/**
+ * The server rooms (`oda-…`) a person's voice is in now: room_presence, and, because LiveKit's webhooks may not reach
+ * us (then room_presence stays empty), every open room LiveKit says they are in (GetParticipant answers 404 for a room
+ * they aren't in). Used to tell the rooms a person's look changed (economy.mjs announceLook).
+ */
+export async function voiceRoomsOf(uid) {
+  const rooms = new Set((await db.query("SELECT DISTINCT room FROM room_presence WHERE identity = $1 AND room LIKE 'oda-%'", [uid])).rows.map((x) => x.room));
+  const others = (await openVoiceRooms()).filter((room) => room.startsWith('oda-') && !rooms.has(room));
+  const there = await Promise.all(others.map((room) => roomService('GetParticipant', { room, identity: uid }, { roomAdmin: true, room }).then(() => true, () => false)));
+  others.forEach((room, i) => there[i] && rooms.add(room));
+  return [...rooms];
+}
 
 /** Tells the phones in a server room to read the room again (level, mic count, layout). Best effort. */
 export function announceRoom(room) {

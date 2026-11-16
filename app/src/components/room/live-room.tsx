@@ -72,6 +72,7 @@ import { SalonArt, salonArt } from '@/components/games/fx/salon-art';
 import { GamePanel, type OpenGame } from '@/components/games/game-panel';
 import type { CasinoGame } from '@/data/games';
 import { BAR_BTN, ChatLine, GiftAnimation, MicBtn, REACTION_MS, RESULT_MS, RoomSoundBtn, RoundBtn, Seat, type ChatMsg, type RoomRole, type SeatReactionData } from '@/components/room/parts';
+import { micFxWave } from '@/components/room/voice-wave';
 import { type StaffMark } from '@/components/room/role-mark';
 import { CrossPkInvitePrompt, PkBoard, PkSetupSheet, SoloPkPill, TeamArena, type ArenaSlot } from '@/components/room/pk';
 import { CrownScreen, PkResultScreen } from '@/components/room/pk-result';
@@ -986,6 +987,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const lookIds = real ? [...seatedOthers, ...audience.map((u) => u.id), ...(bossId && bossId !== 'me' ? [bossId] : [])].map((u) => toServer(u) ?? '').filter(Boolean) : [];
   const looksVersion = useLooks(lookIds, real);
   const lookFor = (uid: string): Look | undefined => (real && uid !== 'me' ? lookOf(toServer(uid)) : undefined);
+  // A worn mic effect drawn as the seat's ring (voice-wave micFxWave); off with the "Mikrofon efekti" setting.
+  const micWave = (fx: string | null | undefined) => (settings.micAnim && !settings.effectsOff && fx ? micFxWave(animById(fx)?.motion) : null);
   // Someone here puts on or takes off a frame, buys an item or changes their photo: the server tells the room at once,
   // and their mic and Balkon face are drawn with it (lib/live/looks), with no leaving and coming back.
   useEffect(() => (real ? onServerLook(id, putLook) : undefined), [real, id]);
@@ -1590,26 +1593,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     freeAnimAt.current.set(from, now);
     return true;
   };
-  // Others' mic effects in a server room: while they talk on a mic, their effect (their shop look) plays at their seat.
-  const othersMicFx = real && !settings.effectsOff && settings.micAnim && !settings.reduceMotion && visible;
-  const talkingKey = real ? [...speaking].filter((u) => u !== 'me' && (seatedOthers.includes(u) || u === bossId)).sort().join(',') : '';
-  useEffect(() => {
-    if (!othersMicFx || !talkingKey) return;
-    const play = () => {
-      for (const uid of talkingKey.split(',')) {
-        const fx = lookOf(toServer(uid))?.micfx;
-        if (fx) playRoomAnim(id, uid, fx, `mic:${uid}:${nowMs()}`);
-      }
-    };
-    play();
-    const t = setInterval(play, 1_800);
-    return () => clearInterval(t);
-  }, [othersMicFx, talkingKey, id]);
-  // Mic effect follows actual talking (polled by the layer; never charges, never sends anything).
-  const speakingMe = useRef(false);
-  useEffect(() => {
-    speakingMe.current = speaking.has('me');
-  }, [speaking]);
+  // Mic effects (the shop's 'micfx') are drawn by the seat's speaking ring now (components/room/voice-wave micFxWave),
+  // the same size for everyone and inside the seat, not in a layer over the room.
 
   // Seat emoji: plays over the sender's avatar, then clears itself (unless replaced by a newer one).
   const react = (uid: string, emoji: string, more?: Pick<SeatReactionData, 'art' | 'pre' | 'badge' | 'badgeAt' | 'ms'>) => {
@@ -3488,14 +3473,11 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // The stage doesn't scroll (components/room/fit-stage): its mics are as big as the height the chat leaves them
   // allows (lib/seat-fit). Few mics: big faces; many: smaller ones, and all of them still fit. A chosen layout keeps
   // its rows; the classic grid also picks how many mics go to a row. The mic strip and a team PK keep their sizes.
-  const fitOpts = { boss: bossOn, pk: !!pk && pk.status !== 'invite' };
+  // Every seat keeps the line its PK points go on (lib/seat-fit PK_LINE), so a Normal PK starting or ending doesn't
+  // move or resize a single mic; a cross-room PK's board is added to the stage like any board and the chat gives way.
+  const fitOpts: FitOpts = { boss: bossOn };
   const plan = layout ? layoutPlan(layout.layoutSchema, win.width, theme === 'pk') : null;
-  const fitWith = (o: FitOpts) => (h: number, like?: Fitted) => (layout && plan ? fitLayout(layout.layoutSchema, plan, h, o, like) : fitGrid(allSeats.length - 1, win.width, h, o, like));
-  const stageFit = strip || teamPk ? null : fitWith(fitOpts);
-  // A PK (its board, the points under the names) is added to the stage: the mics keep the sizes they have without
-  // it and the chat gives way (components/room/fit-stage).
-  const pkBoardOn = !!pk && !teamPk;
-  const calmFit = stageFit && pkBoardOn ? fitWith({ boss: bossOn }) : null;
+  const stageFit = strip || teamPk ? null : (h: number, like?: Fitted) => (layout && plan ? fitLayout(layout.layoutSchema, plan, h, fitOpts, like) : fitGrid(allSeats.length - 1, win.width, h, fitOpts, like));
   // The strip's mics: a tenth of the row each, so ten fit and fewer stay together on the left.
   const stripW = Math.floor((Math.min(win.width, 640) - 16) / 10);
   const stripSlot: ArenaSlot = { width: stripW, size: Math.max(24, Math.min(34, stripW - 8)) };
@@ -3511,7 +3493,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         index={i}
         userId={uid}
         gender={uid === 'me' ? (app.me.showGender === false ? null : (app.me.gender ?? null)) : uid ? lookFor(uid)?.gender : undefined}
-        wave={uid === 'me' ? equipped.wave : uid ? lookFor(uid)?.wave : undefined}
+        wave={uid === 'me' ? (equipped.wave ?? micWave(app.micFx)) : uid ? (lookFor(uid)?.wave ?? micWave(lookFor(uid)?.micfx)) : undefined}
         host={host}
         vipLevel={uid === 'me' ? vipLevel : (uid ? (lookFor(uid)?.vipLevel ?? 0) : 0)}
         frameId={uid === 'me' ? equipped.frame : uid ? (lookFor(uid)?.frame ?? undefined) : undefined}
@@ -3726,7 +3708,6 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
               closes the panel (as does the back button). */}
           <FitStage
             fit={stageFit}
-            calm={calmFit}
             pkTop={pk?.kind === 'cross' ? <PkBoard pk={pk} viewerRoomId={id} canManage={canManage && !offline} /> : null}
             box={steadyBox(roomH, headerH, controlsH)}
             floor={strip ? 0 : 120}
@@ -4379,7 +4360,6 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           originOf={originOf}
           lite={settings.lowData}
           off={settings.effectsOff}
-          micEffect={{ animationId: app.micFx, active: settings.micAnim && amSeated && sending && !callActive, isSpeaking: () => speakingMe.current }}
           onFullscreen={playAnimFx}
         />
       )}

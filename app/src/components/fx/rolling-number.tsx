@@ -15,6 +15,7 @@ export function RollingNumber({
   format = trNumber,
   duration = 700,
   numberOfLines,
+  shrink,
 }: {
   value: number;
   style?: StyleProp<TextStyle>;
@@ -22,6 +23,8 @@ export function RollingNumber({
   /** How long a roll takes (ms). */
   duration?: number;
   numberOfLines?: number;
+  /** One line that shrinks its letters (down to this share) instead of ever being cut with "…". */
+  shrink?: number;
 }) {
   const { reduceMotion } = useSettings();
   const [shown, setShown] = useState(value);
@@ -45,7 +48,7 @@ export function RollingNumber({
     return () => cancelAnimationFrame(frame);
   }, [value, duration, reduceMotion]);
   return (
-    <Text style={[{ fontVariant: ['tabular-nums'] }, style]} numberOfLines={numberOfLines}>
+    <Text style={[{ fontVariant: ['tabular-nums'] }, style]} numberOfLines={shrink ? 1 : numberOfLines} adjustsFontSizeToFit={!!shrink} minimumFontScale={shrink}>
       {format(reduceMotion ? value : shown)}
     </Text>
   );

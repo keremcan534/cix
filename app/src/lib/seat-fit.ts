@@ -15,18 +15,23 @@ export const ROW_GAP = 10;
 const SIDE = 14;
 /** The Patron seat: its ring, the tag on it and the name under it. */
 const BOSS_H = 98;
-/** The points pill under a name while a PK runs. */
-const PK_ROOM = 24;
-/** The Patron seat with its points pill while a PK runs (its holder is on a mic for the PK too). */
-const bossHeight = (o: FitOpts) => BOSS_H + (o.pk ? PK_ROOM : 0);
+/**
+ * The line under every name where a PK's points pill goes (lib/pk pkPillBox). Every room keeps it, with or without a
+ * PK (güncelleme 6): a PK starting or ending never moves, shrinks or spreads the mics, the way the owner sees it in
+ * other apps. Without a PK it is a little air under the names. It sits right under the name (the name's line has its
+ * own air below its letters), so it costs 15 px a row.
+ */
+export const PK_LINE = 15;
+/** The Patron seat with its points line (its holder is on a mic for a PK too). */
+const bossHeight = () => BOSS_H + PK_LINE;
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 
 /** A seat's name grows a little with its face; its line height is fixed, so a row's height is known here. */
 export const nameSize = (face: number) => (face >= 72 ? 14 : face >= 54 ? 13 : 12);
 export const nameLine = (face: number) => nameSize(face) + 5;
-/** A seat: the face, the 4 px gap and the name; while a PK runs, the points pill too. */
-export const seatHeight = (face: number, pk = false) => face + 4 + nameLine(face) + (pk ? PK_ROOM : 0);
+/** A seat: the face, the 4 px gap, the name and the points line under it (kept with or without a PK). */
+export const seatHeight = (face: number) => face + 4 + nameLine(face) + PK_LINE;
 export const hostFaceOf = (face: number) => Math.min(HOST_MAX, Math.round(face * 1.2));
 
 /** The biggest face from `max` down to FACE_MIN whose stage (`heightAt`) fits `height`; FACE_MIN when none does. */
@@ -36,8 +41,8 @@ export function fitFace(heightAt: (face: number) => number, height: number, max:
   return FACE_MIN;
 }
 
-/** What every stage shape is told: the Patron seat is on, a PK is running (the points pill under the names). */
-export type FitOpts = { boss?: boolean; pk?: boolean };
+/** What every stage shape is told: the Patron seat is on. A PK changes nothing: its points line is always kept. */
+export type FitOpts = { boss?: boolean };
 /**
  * Seats fitted to a height: the mic face, the host's (alone on its row), the width a mic takes, the columns (the
  * classic grid; 0 for a layout, whose rows the schema sets) and the height they take.
@@ -65,8 +70,8 @@ function gridAt(guests: number, w: number, cols: number, face: number, o: FitOpt
   const rows = Math.ceil(guests / cols);
   // Beside the Patron seat the host is at most the boss seat's ring; alone on its row a little bigger than the rest.
   const host = o.boss ? Math.min(hostFaceOf(face), 70) : hostFaceOf(face);
-  const top = o.boss ? Math.max(bossHeight(o), seatHeight(host, o.pk)) : seatHeight(host, o.pk);
-  return { cols, slot: gridSlot(w, cols, face), face, host, height: 8 + top + rows * (ROW_GAP + seatHeight(face, o.pk)) };
+  const top = o.boss ? Math.max(bossHeight(), seatHeight(host)) : seatHeight(host);
+  return { cols, slot: gridSlot(w, cols, face), face, host, height: 8 + top + rows * (ROW_GAP + seatHeight(face)) };
 }
 
 /** Fits beats doesn't; then the bigger face; then the one that fills the height more. None fits: the shortest. */
@@ -80,8 +85,8 @@ function better(a: Fitted, b: Fitted, height: number) {
 
 /**
  * The columns and faces with which `guests` mics (and the host's row) fit `height` best. With `like` (the room as
- * it is without its PK) the columns stay and the faces are at most that big: a PK adds to the stage, it doesn't
- * rearrange it.
+ * it is without a board over it) the columns stay and the faces are at most that big: a board adds to the stage, it
+ * doesn't rearrange it.
  */
 export function fitGrid(guests: number, width: number, height: number, o: FitOpts = {}, like?: Fitted): Fitted {
   const w = gridWidth(width);
@@ -151,39 +156,39 @@ export function layoutSizes(plan: LayoutPlan, face: number) {
 
 /** The layout's height with mic faces of `face` px (the Patron seat's row above it included). */
 export function layoutHeight(s: LayoutSchema, plan: LayoutPlan, face: number, o: FitOpts = {}): number {
-  const boss = o.boss ? bossHeight(o) + 6 : 0;
+  const boss = o.boss ? bossHeight() + 6 : 0;
   if (plan.sided) {
     // The big video and the side column (60 px seats, 38 px faces) as StageLayout draws them; rows under it as usual.
     const side = s.slots.filter((x) => x.area === 'side');
     const sideCols = side.length > 5 ? 2 : 1;
     const bigH = Math.round(clamp((plan.inner - 60 * sideCols - 8) * 0.95, 150, 320));
     const sideRows = Math.ceil(side.length / sideCols);
-    const block = Math.max(bigH, sideRows * seatHeight(38, o.pk) + (sideRows - 1) * 6);
-    return boss + 8 + block + rowsHeight(s, plan, face, o, 1);
+    const block = Math.max(bigH, sideRows * seatHeight(38) + (sideRows - 1) * 6);
+    return boss + 8 + block + rowsHeight(s, plan, face, 1);
   }
-  return boss + 8 + rowsHeight(s, plan, face, o, 0);
+  return boss + 8 + rowsHeight(s, plan, face, 0);
 }
 
-function rowsHeight(s: LayoutSchema, plan: LayoutPlan, face: number, o: FitOpts, from: number) {
+function rowsHeight(s: LayoutSchema, plan: LayoutPlan, face: number, from: number) {
   const sizes = layoutSizes(plan, face);
   let h = 0;
   for (let r = from; r < s.rows; r++) {
     const xs = s.slots.filter((x) => x.area === 'stage' && x.row === r);
     if (!xs.length) continue;
-    h += ROW_GAP * (r > 0 ? 1 : 0) + rowHeight(xs, plan, sizes, o);
+    h += ROW_GAP * (r > 0 ? 1 : 0) + rowHeight(xs, plan, sizes);
   }
   return h;
 }
 
-function rowHeight(xs: LayoutSlot[], plan: LayoutPlan, sizes: ReturnType<typeof layoutSizes>, o: FitOpts) {
+function rowHeight(xs: LayoutSlot[], plan: LayoutPlan, sizes: ReturnType<typeof layoutSizes>) {
   if (xs.every((x) => x.kind === 'video')) return videoTile(plan, xs.length).h;
   const lone = xs.length === 1 && xs[0].host;
   const tallest = xs.some((x) => x.kind === 'main') ? sizes.main.size : lone ? sizes.host.size : sizes.mic.size;
   // A team row in a PK room sits in a band: padding and border (12) and the team's name over it (18 + 4).
-  return seatHeight(tallest, o.pk) + (plan.bands && xs[0].team ? 34 : 0);
+  return seatHeight(tallest) + (plan.bands && xs[0].team ? 34 : 0);
 }
 
-/** The mic face with which a layout fits `height` best; at most `like`'s (the room without its PK), as in fitGrid. */
+/** The mic face with which a layout fits `height` best; at most `like`'s (the room without its boards), as in fitGrid. */
 export function fitLayout(s: LayoutSchema, plan: LayoutPlan, height: number, o: FitOpts = {}, like?: Fitted): Fitted {
   const face = fitFace((f) => layoutHeight(s, plan, f, o), height, like ? Math.min(plan.maxFace, like.face) : plan.maxFace);
   return { face, host: hostFaceOf(face), slot: plan.micW, cols: 0, height: layoutHeight(s, plan, face, o) };

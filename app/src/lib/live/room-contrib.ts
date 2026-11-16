@@ -16,6 +16,8 @@ const EVERY_MS = 20_000;
 const AFTER_GIFT_MS = 900;
 /** The room's top bar: read every minute, and after gifts at most once in this long (everyone in the room reads it). */
 const TOP_EVERY_MS = 60_000;
+/** A failed top-three read is tried again after this (then twice and three times as long). */
+const RETRY_MS = 5_000;
 const TOP_GAP_MS = 10_000;
 const kept = new Map<string, LiveContrib>();
 const keep = (key: string, r: api.RoomContribBody) => {
@@ -79,7 +81,8 @@ export function useRoomTop(roomId: string, enabled: boolean, bump?: unknown): st
   useEffect(() => {
     if (!enabled) return;
     let on = true;
-    const load = () => {
+    let again: ReturnType<typeof setTimeout> | undefined;
+    const load = (tries = 0) => {
       lastRead.current = Date.now();
       api.roomContrib(roomId, 'sent', 'day').then(
         (r) => {
@@ -87,14 +90,19 @@ export function useRoomTop(roomId: string, enabled: boolean, bump?: unknown): st
           keep(key, r);
           setSeen((n) => n + 1);
         },
-        () => {},
+        // A failed read (a phone just in, a slow start) is tried again soon, not only at the next minute (güncelleme 6:
+        // "the ranking doesn't show for new accounts").
+        () => {
+          if (on && tries < 3) again = setTimeout(() => load(tries + 1), RETRY_MS * (tries + 1));
+        },
       );
     };
     load();
-    const t = setInterval(load, TOP_EVERY_MS);
+    const t = setInterval(() => load(), TOP_EVERY_MS);
     return () => {
       on = false;
       clearInterval(t);
+      clearTimeout(again);
     };
   }, [roomId, enabled, key, round]);
   const lastBump = useRef(bump);

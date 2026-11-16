@@ -75,10 +75,11 @@ describe('Katkı sıralaması', () => {
     assert.equal(resetNote('week'), 'Her pazartesi 00:00’da yenilenir · Türkiye saati');
     assert.equal(emptyNote('sent', 'day'), 'Bugün henüz hediye gönderilmedi');
     assert.equal(emptyNote('received', 'hour'), 'Bu saat henüz hediye alan yok');
-    assert.equal(contribAmount(12_450), '12.450');
-    assert.equal(contribAmount(999_999), '999.999');
-    assert.equal(contribAmount(1_250_000), '1,25 Mn');
-    assert.equal(contribAmount(12_340_000), '12,3 Mn');
+    assert.equal(contribAmount(940), '940');
+    assert.equal(contribAmount(12_450), '12.45k');
+    assert.equal(contribAmount(999_999), '999.99k', 'aşağı yuvarlanır');
+    assert.equal(contribAmount(1_250_000), '1.25m');
+    assert.equal(contribAmount(12_340_000), '12.34m');
   });
 
   test('kürsü ekrana sığar: telefonda tam genişlik, tablette ortada; herkes kendi basamağında', () => {

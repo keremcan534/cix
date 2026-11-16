@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 
 import { Text, TextInput } from '@/components/text';
@@ -392,11 +392,10 @@ export function EffectsSheet({
   setRoomFx: (p: Partial<{ giftEffects: boolean }>) => void;
 }) {
   const all = settings.effectsOff;
-  // Read each time the sheet opens or the switch moves: whether the AI cleaning really runs (real voice only).
-  const denoiseNote = useMemo(
-    () => (visible && AI_DENOISE && engineInfo().capabilities.realAudio ? denoiseLine(settings.micDenoise, aiDenoiseStatus()) : null),
-    [visible, settings.micDenoise],
-  );
+  // Read every second while the sheet is open: whether the AI cleaning runs right now (real voice only). The count of
+  // cleaned frames only grows, so "working" is it growing since the last read (güncelleme 6: a one-off read kept
+  // saying "working" from a mic that was on minutes ago).
+  const denoiseNote = useDenoiseNote(visible && AI_DENOISE && engineInfo().capabilities.realAudio, settings.micDenoise);
   return (
     <Sheet visible={visible} onClose={onClose} title="Efektler ve ses" art={ROOM_ICON_ART.sound}>
       <Text style={styles.dim}>Yalnızca bu telefonda geçerlidir. Odadakilerin duyduğu, hediyeler ve kayıtlar aynı kalır.</Text>
@@ -655,3 +654,24 @@ const styles = StyleSheet.create({
   vol: { backgroundColor: colors.cardAlt, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 5 },
   picked: { backgroundColor: 'rgba(251,191,36,0.15)', borderRadius: 10, paddingHorizontal: 6 },
 });
+
+/** The line under "Mikrofon denoise", read again every second while `active` (lib/mic-denoise denoiseLine). */
+function useDenoiseNote(active: boolean, on: boolean) {
+  const [line, setLine] = useState<ReturnType<typeof denoiseLine>>(null);
+  useEffect(() => {
+    if (!active) return;
+    let before: number | undefined;
+    const read = () => {
+      const status = aiDenoiseStatus();
+      setLine(denoiseLine(on, status, before));
+      before = status?.frames;
+    };
+    const first = setTimeout(read, 0);
+    const t = setInterval(read, 1_000);
+    return () => {
+      clearTimeout(first);
+      clearInterval(t);
+    };
+  }, [active, on]);
+  return active ? line : null;
+}

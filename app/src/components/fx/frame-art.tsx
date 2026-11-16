@@ -6,7 +6,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Animated, Easing, View, type ImageSourcePropType } from 'react-native';
 
 import { FRAME_ART_SIZES, type FrameArtSize } from '@/data/frame-art';
-import { ART_BREATHE, artFit, artScaleIn, type SeatRoom } from '@/lib/seat-cell';
+import { ART_BREATHE, artFit, seatArt, type SeatRoom } from '@/lib/seat-cell';
 
 type Art = FrameArtSize & { src: ImageSourcePropType; glow: string };
 const made = (id: string, src: ImageSourcePropType, glow: string): Art => ({ ...FRAME_ART_SIZES[id], src, glow });
@@ -42,9 +42,27 @@ export function ArtFrame({ art, size, still, maxScale = 1.8, room, children }: {
     loop.start();
     return () => loop.stop();
   }, [t, still]);
-  // Avatar radius = hole radius (+4% tucked under the ring).
-  const { frame, avatar } = artFit(art, size, room ? Math.min(maxScale, artScaleIn(art, size, room)) : maxScale);
+  // On a seat (güncelleme 6) the photo keeps the seat's full size, like every unframed face, and the picture keeps to
+  // the seat's cell (lib/seat-cell seatArt): smaller, its ring over the photo's edge, and cut at the cell's edge if a
+  // crown or the gems still reach past it. Elsewhere: avatar radius = hole radius (+4% tucked under the ring).
+  const seat = room ? seatArt(art, size, room) : null;
+  const { frame, avatar } = seat ? { frame: seat.frame, avatar: size } : artFit(art, size, maxScale);
   const inset = (size - avatar) / 2;
+  const picture = (
+    <Animated.Image
+      source={art.src}
+      resizeMode="contain"
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        width: frame,
+        height: frame,
+        left: (size - frame) / 2 - (seat?.clip ? seat.box.left : 0),
+        top: (size - frame) / 2 - (seat?.clip ? seat.box.top : 0),
+        transform: [{ scale: still ? 1 : t.interpolate({ inputRange: [0, 1], outputRange: [1, ART_BREATHE] }) }],
+      }}
+    />
+  );
   return (
     <View style={{ width: size, height: size }}>
       <Animated.View
@@ -61,19 +79,13 @@ export function ArtFrame({ art, size, still, maxScale = 1.8, room, children }: {
         }}
       />
       <View style={{ position: 'absolute', left: inset, top: inset, width: avatar, height: avatar, borderRadius: avatar / 2, overflow: 'hidden' }}>{children}</View>
-      <Animated.Image
-        source={art.src}
-        resizeMode="contain"
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          width: frame,
-          height: frame,
-          left: (size - frame) / 2,
-          top: (size - frame) / 2,
-          transform: [{ scale: still ? 1 : t.interpolate({ inputRange: [0, 1], outputRange: [1, ART_BREATHE] }) }],
-        }}
-      />
+      {seat?.clip ? (
+        <View pointerEvents="none" style={{ position: 'absolute', ...seat.box, overflow: 'hidden' }}>
+          {picture}
+        </View>
+      ) : (
+        picture
+      )}
     </View>
   );
 }

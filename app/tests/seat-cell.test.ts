@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 
 import { COSMETICS } from '@/data/catalog';
 import { FRAME_ART_SIZES } from '@/data/frame-art';
-import { ART_BREATHE, NAME_GAP, RING_GAP, artFit, artScaleIn, ringOf, ringReach, seatRoom } from '@/lib/seat-cell';
+import { ART_BREATHE, NAME_GAP, RING_GAP, RING_OVER, artFit, artScaleIn, ringOf, ringReach, seatArt, seatRoom } from '@/lib/seat-cell';
 import { FACE_MAX, FACE_MIN, ROW_GAP, fitGrid, gridSlot, layoutPlan } from '@/lib/seat-fit';
 import { ROOM_LAYOUTS } from '@/data/room-layouts';
 
@@ -49,6 +49,26 @@ describe('Koltuk çerçeveleri', () => {
         assert.ok(avatar <= size + 1e-9, `${at}: fotoğraf yüzden büyük`);
         // The photo shrinks for the widest pictures but stays a face, not a dot.
         assert.ok(avatar >= size * 0.41, `${at}: fotoğraf ${avatar.toFixed(1)} px`);
+      }
+    }
+  });
+
+  test('güncelleme 6: koltukta fotoğraf hiç küçülmez; çerçeve halkası fotoğrafın en çok %20’sini örter, taşan kısım hücrede kesilir', () => {
+    for (const { size, slot } of seats()) {
+      const room = seatRoom(size, slot);
+      for (const [id, art] of Object.entries(FRAME_ART_SIZES)) {
+        const at = `${id}, yüz ${size}, yuva ${slot}`;
+        const { frame, clip, box } = seatArt(art, size, room);
+        // The ring's hole is at least 80% of the photo's radius and never bigger than the photo (tucked a little under).
+        const hole = art.hole * frame;
+        assert.ok(hole >= (1 - RING_OVER) * (size / 2) - 1e-9, `${at}: halka fotoğrafın ${(100 - (hole / (size / 2)) * 100).toFixed(0)}%’ini örter`);
+        assert.ok(hole <= size / 2 + 1e-9, `${at}: fotoğrafla halka arasında boşluk`);
+        // What isn't cut stays in the cell; what would reach past it is cut at the cell's edge (never onto the name).
+        const big = frame * ART_BREATHE;
+        const inside = art.reach.x * big <= size / 2 + room.side + 0.6 && art.reach.top * big <= size / 2 + room.top + 0.6 && art.reach.bottom * big <= size / 2 + room.bottom + 3 + 0.6;
+        assert.ok(clip || inside, `${at}: kesilmeden taşar`);
+        assert.ok(box.top + box.height <= size + room.bottom + 3 + 1e-9, `${at}: kesim ismin harflerine iner`);
+        assert.ok(box.width <= slot, `${at}: kesim yuvadan geniş`);
       }
     }
   });

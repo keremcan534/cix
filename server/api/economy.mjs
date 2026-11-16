@@ -23,7 +23,7 @@ import { FREE_MICFX, MAX_AHEAD_DAYS, PAID_ONLY, SHOP, SHOP_PAUSED, SLOTS, labelO
 import { packByName, packItem, packSkus } from './emoji.mjs';
 import { live } from './live-settings.mjs';
 // live.mjs imports rooms.mjs, which imports this file; the functions are only used inside handlers.
-import { roomPacket, roomService } from './live.mjs';
+import { roomPacket, roomService, voiceRoomsOf } from './live.mjs';
 import { paidCoins, spendCoins } from './wallet.mjs';
 import { wealthPoints } from './wheel.mjs';
 
@@ -246,7 +246,8 @@ export async function looksOf(ids, q = db) {
  */
 export async function announceLook(uid, name) {
   try {
-    const rooms = (await db.query("SELECT DISTINCT room FROM room_presence WHERE identity = $1 AND room LIKE 'oda-%'", [uid])).rows.map((x) => x.room);
+    // Not room_presence alone: without LiveKit's webhooks it is empty and nobody would hear of the change (live.mjs).
+    const rooms = await voiceRoomsOf(uid);
     if (!rooms.length) return;
     const look = (await looksOf([uid]))[uid];
     if (!look) return;

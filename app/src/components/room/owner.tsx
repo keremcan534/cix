@@ -42,6 +42,8 @@ import { defaultMicQueue } from '@/lib/room-invites';
 import { BOSS_SEAT_DEFAULTS, bossHeadline, bossRules, type BossCfg, type BossMode } from '@/lib/patron-seat';
 import type { Result } from '@/lib/room-presence';
 import { useSheetMax } from '@/lib/sheet-space';
+import { PK_LINE } from '@/lib/seat-fit';
+import { compact } from '@/lib/compact';
 import type { MyRoom } from '@/store';
 import { SCRIM, colors, edge, gradient } from '@/theme';
 import { Photo } from '@/components/photo';
@@ -50,7 +52,6 @@ export type GiftLogRow = { id: string; from: string; to: string; emoji: string; 
 type Opt<T> = { value: T; label: string; sub?: string; disabled?: boolean; art?: number };
 
 const fmtMinutes = (m: number) => (m < 60 ? `${m} dk` : `${Math.floor(m / 60)} sa ${m % 60} dk`);
-const compact = (n: number) => (n >= 1_000_000 ? `${(n / 1_000_000).toFixed(2)}m` : n >= 10_000 ? `${(n / 1_000).toFixed(1)}k` : n.toLocaleString('tr-TR'));
 
 // --- Generic sheets -------------------------------------------------------------
 // The modal is edge to edge on Android: the sheet rises above the keyboard as a whole and keeps its last row
@@ -1183,7 +1184,8 @@ export function BossSeat({
       <Text style={{ color: '#fff', fontSize: 12, maxWidth: 90 }} numberOfLines={1}>
         {u ? (userId === 'me' ? 'Sen' : u.name) : 'Patron Koltuğu'}
       </Text>
-      {u && pkPoints !== undefined && <PkPoints value={pkPoints} still={still} width={96} />}
+      {/* Its points line is kept like every mic's (lib/seat-fit PK_LINE): a PK starting moves nothing. */}
+      <View style={{ height: PK_LINE, marginTop: -4, alignItems: 'center' }}>{u && pkPoints !== undefined && <PkPoints value={pkPoints} still={still} width={96} />}</View>
     </Pressable>
   );
 }

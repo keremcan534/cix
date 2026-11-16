@@ -1336,9 +1336,15 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
         setOwnedAnims((o) => new Set(o).add(animationId));
       }
       setMicFx(animationId);
+      // Others draw my mic effect from the server's look: the choice goes there too (güncelleme 6; it stayed on this
+      // phone, so everyone saw the last one bought or none).
+      liveEquip('micfx', animationId);
       return null;
     },
-    setMicFx,
+    setMicFx: (animationId: string | null) => {
+      setMicFx(animationId);
+      liveEquip('micfx', animationId);
+    },
     starter,
     claimStarter: (reward) => {
       if (starter.claimed) return;

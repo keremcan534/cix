@@ -24,9 +24,10 @@ import { RoleMark, type StaffMark } from '@/components/room/role-mark';
 import { VOICE_RING, VoiceWave } from '@/components/room/voice-wave';
 import { BondBubble, BondChip, BondLink } from '@/components/room/room-bonds';
 import type { RoomBond } from '@/data/bonds';
-import { nameLine, nameSize } from '@/lib/seat-fit';
+import { PK_LINE, nameLine, nameSize } from '@/lib/seat-fit';
 import { ringReach, seatRoom } from '@/lib/seat-cell';
 import { PILL_GAP, pkPillBox, pkPointsText } from '@/lib/pk';
+import { compact } from '@/lib/compact';
 import { levelsLive, voiceLevel } from '@/lib/live/voice-level';
 import { RollingNumber } from '@/components/fx/rolling-number';
 import { BounceBadge } from '@/components/fx/bounce-badge';
@@ -236,7 +237,8 @@ export function Seat({
             {user?.verified && !small && <VerifiedBadge size={11} />}
           </View>
         )}
-        {user && pkPoints !== undefined && !mini && <PkPoints value={pkPoints} still={still} width={slotWidth} />}
+        {/* The points line is kept under every name, PK or not (lib/seat-fit PK_LINE): a PK starting moves nothing. */}
+        {!mini && <View style={styles.pkLine}>{user && pkPoints !== undefined && <PkPoints value={pkPoints} still={still} width={slotWidth} />}</View>}
       </Animated.View>
       {user && bondLink && !mini && <BondLink bond={bondLink.bond} size={size} gap={bondLink.gap} />}
     </Pressable>
@@ -246,10 +248,11 @@ export function Seat({
 /** Big gifts get a stronger (still short) bump. */
 const BIG_PK_GIFT = 1_000;
 /**
- * PK points under a seat, sized to the seat's `width` (lib/pk pkPillBox): the whole number while it fits, else its
- * short form (16,4B), the gift icon where there is room for it, so it reads on every mic layout. When the value grows,
- * the pill bumps once and a small "+N" rises and fades (≈0.5 s, native driver only). Several gifts in a row just
- * restart it, so a burst stays cheap.
+ * PK points under a seat (lib/pk pkPillBox): a pill of one fixed width for the seat, with the score always in its short
+ * form (61.99k, 1.25m; fewer decimals where the seat is narrow), the gift icon where there is room for it. However big
+ * the score gets the pill keeps its size and the seats stay where they are; the text shrinks rather than ever being
+ * cut. When the value grows, the pill bumps once and a small "+N" rises and fades (≈0.5 s, native driver only).
+ * Several gifts in a row just restart it, so a burst stays cheap.
  */
 export function PkPoints({ value, still, width = 64 }: { value: number; still?: boolean; width?: number }) {
   const [shown, setShown] = useState(value);
@@ -272,10 +275,15 @@ export function PkPoints({ value, still, width = 64 }: { value: number; still?: 
   return (
     <View style={styles.pkWrap}>
       <Animated.View
-        style={[styles.pkPill, { paddingHorizontal: box.pad, maxWidth: width - 2 }, big && styles.pkPillBig, { transform: [{ scale: v.interpolate({ inputRange: [0, 0.3, 1], outputRange: [1, big ? 1.35 : 1.18, 1] }) }] }]}
+        style={[
+          styles.pkPill,
+          { width: box.width, height: box.height, paddingHorizontal: box.pad },
+          big && styles.pkPillBig,
+          { transform: [{ scale: v.interpolate({ inputRange: [0, 0.3, 1], outputRange: [1, big ? 1.25 : 1.12, 1] }) }] },
+        ]}
       >
         {box.icon && <Icon3D name="gift" size={box.size} />}
-        <RollingNumber value={value} duration={500} format={(n) => pkPointsText(n, box.room, box.size * scale)} numberOfLines={1} style={[styles.pkText, { fontSize: box.size, lineHeight: box.size + 4 }]} />
+        <RollingNumber value={value} duration={500} format={(n) => pkPointsText(n, box.chars)} shrink={0.7} style={[styles.pkText, { fontSize: box.size, lineHeight: box.size + 2 }]} />
       </Animated.View>
       {delta && !still && (
         <Animated.Text
@@ -283,7 +291,7 @@ export function PkPoints({ value, still, width = 64 }: { value: number; still?: 
           pointerEvents="none"
           style={[styles.pkDelta, big && { color: colors.gold, fontSize: 14 }, { opacity: v.interpolate({ inputRange: [0, 0.15, 0.8, 1], outputRange: [0, 1, 1, 0] }), transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [0, -18] }) }] }]}
         >
-          +{pkPointsText(delta.n, width - 12, (big ? 14 : 12) * scale)}
+          +{compact(delta.n)}
         </Animated.Text>
       )}
     </View>
@@ -731,8 +739,10 @@ const styles = StyleSheet.create({
   mutedBadge: { position: 'absolute', right: 0, bottom: 0, backgroundColor: colors.red, borderRadius: 10, padding: 3 },
   selfMutedBadge: { backgroundColor: '#475569' },
   invitedSeat: { borderColor: colors.gold, backgroundColor: 'rgba(246,189,96,0.12)' },
-  pkWrap: { alignItems: 'center', marginTop: -1 },
-  pkPill: { flexDirection: 'row', alignItems: 'center', gap: PILL_GAP, backgroundColor: 'rgba(246,189,96,0.18)', borderColor: 'rgba(246,189,96,0.55)', borderWidth: 1, borderRadius: 999, paddingVertical: 1 },
+  // The line under the name the PK pill goes on: the same height in every room, PK or not (lib/seat-fit PK_LINE).
+  pkLine: { height: PK_LINE, marginTop: -4, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'flex-start' },
+  pkWrap: { alignItems: 'center' },
+  pkPill: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: PILL_GAP, backgroundColor: 'rgba(246,189,96,0.18)', borderColor: 'rgba(246,189,96,0.55)', borderWidth: 1, borderRadius: 999 },
   pkPillBig: { backgroundColor: 'rgba(246,189,96,0.3)' },
   pkText: { color: colors.gold, fontSize: 12, fontWeight: '800', fontVariant: ['tabular-nums'] },
   pkDelta: { position: 'absolute', top: -14, color: '#FDE7C2', fontWeight: '900', fontSize: 12 },

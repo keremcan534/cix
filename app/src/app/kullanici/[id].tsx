@@ -140,7 +140,8 @@ export default function UserProfile() {
         .catch(() => {});
     read();
     if (isMe) {
-      loadMe()
+      // My own profile: a sign-up photo the server never got goes up now (lib/live/profile loadMe).
+      loadMe(me.avatar)
         .then((p) => alive && updateMe(p))
         .catch(() => {});
     }

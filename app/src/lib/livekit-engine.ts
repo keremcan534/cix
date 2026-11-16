@@ -131,7 +131,8 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
       await r.connect(cfg.url, token);
       if (room !== r) return void r.disconnect();
       // The AI denoise goes into the mic's path once the voice engine has started (Android; no-op elsewhere).
-      setAiDenoise(denoise);
+      // Not in "Ham mikrofon": it used to come back on for singers at every room they joined (güncelleme 6).
+      setAiDenoise(denoise && !raw);
       // Browsers block sound until a user gesture; opening a room is one, so this usually succeeds at once.
       await r.startAudio().catch(() => {});
       if (s.publishing) setMic(r, true);
