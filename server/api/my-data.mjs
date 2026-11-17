@@ -5,7 +5,7 @@
 //
 // Every table that holds my personal data is read here, in one read-only snapshot: profile and sign-in, sessions and
 // devices, follows and blocks, the direct messages I sent and received, Anlar, gifts sent and received, Çantam, the wallet
-// (ledger, coin lots, diamond locks, purchases, VIP subscriptions, Jeton Noktası transfers, withdrawals, shop items, paid 1v1 minutes),
+// (ledger, coin lots, diamond locks, purchases, VIP subscriptions, Jeton Noktası transfers, withdrawals, shop items, level drops, paid 1v1 minutes),
 // games, rooms, Etkinlik Merkezi (my events, places and the reminders sent to me), family, bonds, agency, visits, reports I made, sanctions on me and my appeals, support tickets, the
 // spending limit and Similar Ekibi notices written to me.
 // Other people appear only as I already see them in the app: their id and name where I deal with them (a message, a
@@ -238,6 +238,17 @@ export async function exportOf(c, uid) {
       revokedWhy: x.revoked_why ?? null,
       at: x.created_at,
     })),
+    // Seviye düşmesi (levels-admin.mjs): each drop, and the Cömertlik / Yankı points the drops took off.
+    levelDrops: await all('SELECT system, from_level, to_level, points_before, points_after, idle_days, created_at FROM level_drops WHERE user_id = $1 ORDER BY id', (x) => ({
+      system: x.system,
+      fromLevel: x.from_level,
+      toLevel: x.to_level,
+      pointsBefore: num(x.points_before),
+      pointsAfter: num(x.points_after),
+      idleDays: x.idle_days,
+      at: x.created_at,
+    })),
+    levelOffsets: await all('SELECT system, points FROM level_offsets WHERE user_id = $1 ORDER BY system', (x) => ({ system: x.system, points: num(x.points) })),
     paidOneOnOne: await all(
       `SELECT p.kind, p.coins, p.payer, p.earner, p.created_at, o.id AS other, o.name AS other_name
          FROM paid_events p LEFT JOIN users o ON o.id = CASE WHEN p.payer = $1 THEN p.earner ELSE p.payer END

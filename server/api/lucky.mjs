@@ -34,7 +34,7 @@ import { roomLevel } from './rooms.mjs';
 import { announceBoss, bossGift } from './boss-seat.mjs';
 import { audit } from './sanctions.mjs';
 import { creditCoins, giftCoins, spendCoins } from './wallet.mjs';
-import { NEED_LEVEL, NEED_POINTS, wealthPoints } from './wheel.mjs';
+import { casinoNeed, wealthPoints } from './wheel.mjs';
 
 /** People one send can go to (everyone on the mics of the biggest room, with room to spare). */
 const MAX_TO = 20;
@@ -122,8 +122,8 @@ export const luckyRoutes = {
       announceFrom: config.announceFrom,
       share: SHARE,
       counts: GIFT_COUNTS,
-      needLevel: NEED_LEVEL,
-      allowed: points >= NEED_POINTS,
+      needLevel: casinoNeed().level,
+      allowed: points >= casinoNeed().points,
       minAge: MIN_AGE,
       gameCoins: Number(me.game_coins),
       mine: mine.rows.map(sendOut),
@@ -153,7 +153,8 @@ export const luckyRoutes = {
     const before = await seen();
     if (before) return answer(before, true);
     if (!me.birth_date || ageOf(me.birth_date) < MIN_AGE) throw new HttpError(403, `Şanslı hediyeler ${MIN_AGE} yaş ve üzeri içindir`);
-    if ((await wealthPoints(db, me.id)) < NEED_POINTS) throw new HttpError(403, `Şanslı hediyeler Cömertlik Lv.${NEED_LEVEL} ve üstü için`);
+    const need = casinoNeed();
+    if ((await wealthPoints(db, me.id)) < need.points) throw new HttpError(403, `Şanslı hediyeler Cömertlik Lv.${need.level} ve üstü için`);
     for (const t of to) if (await blockedBetween(me.id, t)) throw new HttpError(403, 'Bu kişiye hediye gönderemezsin');
 
     let row;

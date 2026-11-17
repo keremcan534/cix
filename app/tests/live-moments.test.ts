@@ -90,9 +90,11 @@ describe('Anlar sunucudan', () => {
   test('paylaşım Yankı Lv.5 ile açılır: telefonun eğrisi sunucunun 250 puanıyla aynı', async () => {
     const { CHARM_XP } = await import('@/data/charm');
     assert.equal(CHARM_XP[5], 250);
-    const server = fs.readFileSync(path.join(import.meta.dirname, '../../server/api/moments.mjs'), 'utf8');
-    assert.match(server, /POST_LEVEL = 5;/);
-    assert.match(server, /MOMENT_CHARM \?\? 250\)/);
+    // The server's default (Seviye ayarları, levels.mjs) until the panel moves it; a phone that reads the settings
+    // follows the panel (catalog levels=1).
+    const server = fs.readFileSync(path.join(import.meta.dirname, '../../server/api/levels.mjs'), 'utf8');
+    assert.match(server, /perk\('moments_post', 5\)/);
+    assert.match(server, /gate\('charm', 'moments_post', 5\)/);
   });
 
   test('akış paylaşım iznini getirir; Yankı yetmeyince ret ne kadar kaldığını söyler', async () => {

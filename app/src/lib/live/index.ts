@@ -226,6 +226,22 @@ export function liveEquip(slot: string, sku: string | null) {
   api.equipShop(slot, sku).catch(() => {});
 }
 
+/**
+ * Mirrors a shop buy the store already took locally, at the price (and Rütbe days) the phone showed (api.shopBuy). A
+ * refusal re-reads the real balance, and a moved price or tier the catalog too; `refused` hears the server's sentence.
+ */
+export function liveShopBuy(sku: string, price: number, days: number | undefined, refused: (message: string) => void) {
+  if (!liveMode() || !myId) return;
+  api
+    .shopBuy(sku, price, days)
+    .then((r) => applied(r))
+    .catch((e: unknown) => {
+      if (e instanceof api.ApiError && e.status === 409 && (e.data.code === 'price_changed' || e.data.code === 'update_required')) void refreshLiveCatalog();
+      refreshWallet().catch(() => {});
+      refused(e instanceof Error && e.message ? e.message : 'Satın alma tamamlanamadı; jetonun yerinde.');
+    });
+}
+
 /** Mirrors a purchase the store already took locally; a refusal re-reads the real balance. */
 export function liveSpend(n: number, reason: string) {
   if (!liveMode() || !myId) return;

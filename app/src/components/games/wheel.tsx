@@ -23,10 +23,11 @@ import { RimBulbs, SpinBlur, WheelPointer, useWheelSpin, type WheelSpin as SpinH
 import { useWinFx } from '@/components/games/fx/win-fx';
 import { BalancePill } from '@/components/games/slot-kit';
 import { userById } from '@/data/mock';
+import { casinoLevelOf } from '@/lib/levels-live-core';
+import { useLevels } from '@/lib/live/levels-live';
 import {
   WHEEL_BIG_MILLI,
   WHEEL_COUNTS,
-  WHEEL_NEED_LEVEL,
   WHEEL_SLICES,
   WHEEL_TIERS,
   WHEEL_TIER_IDS,
@@ -77,6 +78,8 @@ const ago = (at: string) => {
 export function WheelPlayer({ entry }: { entry: Entry }) {
   const app = useApp();
   const { wealthLevel, coins, gameCoins, settings } = app;
+  // The Cömertlik level Oyun Salonu opens at, as Seviye ve VIP ayarları set it (the server checks it again).
+  const needLevel = casinoLevelOf(useLevels());
   const still = settings.reduceMotion;
   const dims = useWindowDimensions();
   const [tier, setTier] = useState<WheelTierId>('kiyi');
@@ -122,8 +125,8 @@ export function WheelPlayer({ entry }: { entry: Entry }) {
     };
   }, [wealthLevel, reload]);
 
-  if (wealthLevel < WHEEL_NEED_LEVEL || (view && !view.allowed)) {
-    return <CasinoLock reason={`Rüzgâr Gülü, Cömertlik Seviyesi ${WHEEL_NEED_LEVEL} ve üstü üyeler içindir. Senin seviyen: Lv.${wealthLevel}.`} needWealth={WHEEL_NEED_LEVEL} />;
+  if (wealthLevel < needLevel || (view && !view.allowed)) {
+    return <CasinoLock reason={`Rüzgâr Gülü, Cömertlik Seviyesi ${needLevel} ve üstü üyeler içindir. Senin seviyen: Lv.${wealthLevel}.`} needWealth={needLevel} />;
   }
   if (!view) {
     return (
@@ -311,7 +314,7 @@ export function WheelPlayer({ entry }: { entry: Entry }) {
         <View style={{ gap: 5 }}>
           <Text style={r.head}>JACKPOT ve sınırlar</Text>
           <Text style={r.note}>
-            {"Her turun %1,5'i o alanın fonuna eklenir; JACKPOT dilimine gelen fonun tamamını alır. Oynanan her 100 jetonun ortalama 40'ı kazanç olarak döner. Tur ücreti önce oyun jetonundan düşer."} Cömertlik Lv.{WHEEL_NEED_LEVEL} ve üstü için açıktır; günlük üst sınır {n(view.dailyLimit)} jeton, bugün kalan {n(left)}.
+            {"Her turun %1,5'i o alanın fonuna eklenir; JACKPOT dilimine gelen fonun tamamını alır. Oynanan her 100 jetonun ortalama 40'ı kazanç olarak döner. Tur ücreti önce oyun jetonundan düşer."} Cömertlik Lv.{needLevel} ve üstü için açıktır; günlük üst sınır {n(view.dailyLimit)} jeton, bugün kalan {n(left)}.
             {entry.from === 'room' ? ' Oyun açıkken mikrofonun ve koltuğun aynen kalır.' : ''}
           </Text>
         </View>

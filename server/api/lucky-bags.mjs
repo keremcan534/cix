@@ -19,7 +19,7 @@
 // Putting coins in a bag never counts
 // for Cömertlik (wheel.mjs wealthPoints: "çantası"); reward coins ('odul') can't go in a bag (spendCoins 'paid').
 import { recordIncome } from './agency-lib.mjs';
-import { svipLevel } from './catalog.mjs';
+import { svipLevel, vipItemNeed } from './levels.mjs';
 import { checkShownPrice, giftNameOf, giftOf } from './custom-gifts.mjs';
 import { HttpError, auth, blockedBetween, claimRef, db, env, int, limit, once, readJson, tx } from './core.mjs';
 import { announceGift, liveKitRoom, ROOM } from './gifts.mjs';
@@ -232,7 +232,9 @@ export const luckyBagRoutes = {
       // server's price; checkShownPrice below, once the ref is claimed.
       gift = giftOf(b.giftId);
       if (!gift || live().giftsHidden.has(gift.id)) throw new HttpError(400, 'Bu hediye artık yok');
-      if (gift.minSvip && svipLevel(Number(u.svip_xp)) < gift.minSvip) throw new HttpError(403, `${gift.name} VIP ${gift.minSvip} ve üstü için`);
+      // Its own VIP level and at least the one Seviye ayarları open `vip_gifts` at (as POST /api/gifts/send).
+      const needVip = vipItemNeed('vip_gifts', gift.minSvip);
+      if (needVip && svipLevel(u.svip_xp) < needVip) throw new HttpError(403, `${gift.name} VIP ${needVip} ve üstü için`);
       units = int(b.count, 1, 10_000);
       if (!units || !BAG_RULES.giftCounts.includes(units)) throw new HttpError(400, `Hediye adedi ${BAG_RULES.giftCounts.join(', ')} olabilir`);
       if (!packets || !BAG_RULES.giftPackets.includes(packets)) throw new HttpError(400, `Pay sayısı ${BAG_RULES.giftPackets.join(', ')} olabilir`);

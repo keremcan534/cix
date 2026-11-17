@@ -6,12 +6,15 @@
 //   POST /api/vip/subscribe { platform: 'ios', productId, transactionId }
 //   POST /api/vip/subscribe { platform: 'test', productId, transactionId } (ALLOW_TEST_TOPUP=1 only)
 //
-// Plans: catalog.mjs VIP_SUBS (vip_7d, vip_30d, vip_90d), store subscriptions that renew on their own. Each store
+// Plans: catalog.mjs VIP_SUBS (vip_7d, vip_30d, vip_90d), store subscriptions that renew on their own; which are shown
+// in the app, their words and the price written there are Seviye ayarları (levels.mjs `sub`, catalog levels=1), the
+// price paid is the store's (Play Console). `plans` here stays every product (an older app buys by product). Each store
 // subscription is one row (vip_subscriptions, 065): Google's purchase token, Apple's original transaction id or the
 // test transaction id, unique per platform, so it never counts for two accounts. A person's subscription runs to the
 // latest end of their rows that aren't revoked (users.vip_sub_until, kept in step by syncUntil; GET /api/me
-// vipSubUntil). It opens Profiline bakanlar (social.mjs seesVisitors) and, besides VIP 1+, Seviyeleri gizle
-// (profiles.mjs). VIP 1–10 (SVIP) and Rütbe are separate and stay as they are.
+// vipSubUntil). It opens the perks Seviye ayarları give Abonelik (levels.mjs hasPerk: Profiline bakanlar,
+// social.mjs seesVisitors, and Seviyeleri gizle, profiles.mjs, until the panel changes them). VIP (SVIP) and Rütbe are
+// separate.
 //
 // Google Play: the token is read with the Play Developer API (purchases.subscriptionsv2). It must hold the product
 // asked for and be active, in its grace period, or cancelled but not ended yet (renewal turned off: it was paid

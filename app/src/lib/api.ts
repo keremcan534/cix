@@ -1008,6 +1008,12 @@ export async function countContactRefusal(category: string, place: string) {
 export const earnings = () => call<ServerEarnings>('GET', '/api/wallet/earnings');
 /** An in-app purchase paid with coins (VIP, store items, game entries): the server takes the coins once. */
 export const spend = (amount: number, reason: string, ref = newRef()) => call<{ user: ServerUser; replay: boolean }>('POST', '/api/wallet/spend', { amount, reason, ref });
+/**
+ * A shop buy at the price this phone showed (and, for a Rütbe tier, the days it showed): POST /api/shop/buy. A moved
+ * price or tier is a 409 price_changed (nothing taken); the server charges its own price.
+ */
+export const shopBuy = (sku: string, price: number, days?: number, ref = newRef()) =>
+  call<{ user: ServerUser; replay: boolean; economy: unknown }>('POST', '/api/shop/buy', { sku, price, ...(days ? { days } : {}), ref });
 /** Wears a shop item I own in its slot, or takes it off (sku null); others see it in GET /api/looks. */
 export const equipShop = (slot: string, sku: string | null) => call<{ economy: unknown }>('POST', '/api/shop/equip', { slot, sku });
 /** Çevir. `usdTry`: the rate the screen showed; the server never gives less than it, and answers 409 rate_changed

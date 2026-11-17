@@ -24,6 +24,9 @@
 // The emoji panel's packs and stickers (Yönetim › Emojiler, server/api/emoji.mjs) come with it too (emoji=1, `emoji`,
 // lib/emoji-live-core); lib/live/emoji-live hands them to the screens.
 //
+// Seviye ve VIP ayarları (the finance panel's Seviyeler, server/api/levels.mjs) too (levels=1, `levels`,
+// lib/levels-live-core): VIP, Rütbe, Cömertlik, Yankı and Abonelik as set there; lib/live/levels-live hands them out.
+//
 // Screens: useLiveCatalog() re-renders when it changes; giftShelf(cat) (or visibleGifts(list, cat) for a fixed list),
 // liveRules(cat) and activeCampaign(Date.now(), cat) read it (without `cat`, the current copy outside React).
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -34,6 +37,7 @@ import { GIFTS, type Gift, type GiftCat } from '@/data/mock';
 import { RULES, type Rules } from '@/data/rules';
 import { selfExchangeRate } from '@/lib/coins-bank';
 import { parseLiveEmoji, type LiveEmoji } from '@/lib/emoji-live-core';
+import { parseLiveLevels, type LiveLevels } from '@/lib/levels-live-core';
 import { parseFxList, type FxVideo } from '@/lib/fx-videos-core';
 import { parseCatalog, type CatalogPack } from '@/lib/live/billing-core';
 
@@ -74,6 +78,8 @@ export type LiveCatalog = {
   app: Record<string, AppGiftEdit>;
   /** The emoji panel's packs as they are now (emoji=1); null from an older server: the app's own packs. */
   emoji: LiveEmoji | null;
+  /** Seviye ve VIP ayarları (levels=1); null from an older server: the app's own tables. */
+  levels: LiveLevels | null;
 };
 
 // --- Reading the server's answer, without trusting it ----------------------------------------------------
@@ -179,6 +185,7 @@ export function parseLiveCatalog(raw: unknown): LiveCatalog {
     shelf: r.giftsFormat === 2 ? shelfOf(r.gifts, app, remote) : null,
     app,
     emoji: parseLiveEmoji(r.emoji),
+    levels: parseLiveLevels(r.levels),
   };
 }
 
@@ -209,11 +216,13 @@ export function parseSavedLiveCatalog(raw: string | null): { catalog: LiveCatalo
       shelf,
       app,
       emoji: parseLiveEmoji(r.emoji),
+      levels: parseLiveLevels(r.levels),
     },
     // A copy an older app saved counts as old: the next poll reads the catalog again. One from before the videos were
     // listed (no fx), or from before the shelves were (no shelf): that app hid the gifts put back on the shelves
     // (data/gifts-paused), and an updated phone would go on hiding them until the copy was ten minutes old.
-    fetchedAt: 'fx' in r && 'shelf' in r && typeof r.fetchedAt === 'number' && Number.isFinite(r.fetchedAt) ? r.fetchedAt : 0,
+    // One from before the level settings (no levels) too: the levels would stay the compiled ones until it was old.
+    fetchedAt: 'fx' in r && 'shelf' in r && 'levels' in r && typeof r.fetchedAt === 'number' && Number.isFinite(r.fetchedAt) ? r.fetchedAt : 0,
   };
 }
 
@@ -374,8 +383,9 @@ export function fetchLiveCatalog(): Promise<unknown> {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
     try {
-      // gifts=2: the whole story about the app's own gifts too; emoji=1: the emoji panel's packs (server/api/gifts.mjs).
-      const res = await fetch(`${BASE}/api/catalog?gifts=2&emoji=1`, { signal: ctrl.signal });
+      // gifts=2: the whole story about the app's own gifts too; emoji=1: the emoji panel's packs; levels=1: Seviye ve
+      // VIP ayarları (server/api/gifts.mjs).
+      const res = await fetch(`${BASE}/api/catalog?gifts=2&emoji=1&levels=1`, { signal: ctrl.signal });
       if (!res.ok) throw new Error(`Sunucu hatası (${res.status})`);
       const body: unknown = await res.json();
       fetchedAt = Date.now();
@@ -404,7 +414,7 @@ export const liveCatalogStale = (now = Date.now()) => !current || now - fetchedA
 /** The server named its current Çevir rate (409 rate_changed): the screens show it before the catalog is read again. */
 export function noteLiveRate(usdTry: unknown) {
   if (!validRate(usdTry)) return;
-  publish({ ...(current ?? { v: 0, giftIds: null, packs: [], campaign: null, fx: null, remote: [], shelf: null, app: {}, emoji: null }), usdTry });
+  publish({ ...(current ?? { v: 0, giftIds: null, packs: [], campaign: null, fx: null, remote: [], shelf: null, app: {}, emoji: null, levels: null }), usdTry });
 }
 
 const subscribe = (l: () => void) => {

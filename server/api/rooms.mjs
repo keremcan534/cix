@@ -35,7 +35,8 @@ import { HttpError, LIVE_SANCTION, SANCTION_SELECT, UUID, auth, blockedBetween, 
 import { announceRoom, deleteVoiceRoom, presenceTracked, removeFromVoice, roomService, voiceCounts } from './live.mjs';
 import { applySanction, audit, liftSanction, refreshVoice } from './sanctions.mjs';
 import { applyRules, memberCap, rulesOf } from './room-rules.mjs';
-import { ROOM_COVERS, ROOM_THEMES, vipLevelOf } from './catalog.mjs';
+import { ROOM_COVERS, ROOM_THEMES } from './catalog.mjs';
+import { hasPerk } from './levels.mjs';
 import { statusOf } from './economy.mjs';
 // music.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
 import { clearRoomMusic, roomMusic } from './music.mjs';
@@ -65,11 +66,12 @@ export const roomLevel = (xp) => ROOM_XP_THRESHOLDS.filter((t) => Number(xp) >= 
 /** The public room number the app shows as "ID" (app data/catalog roomCode). */
 export const roomCode = (id) => String(10_000_000 + [...id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 9_000_000, 7));
 const LAYOUT = /^[A-Za-z0-9_-]{1,40}$/;
-// A password lock needs a Lv.4 room or any VIP level (app data/catalog LOCK_MIN_LEVEL).
+// A password lock needs a Lv.4 room (app data/catalog LOCK_MIN_LEVEL) or the `room_password` perk where Seviye
+// ayarları give it (VIP 1 and every Rütbe tier until the panel moves it, levels.mjs).
 const LOCK_MIN_LEVEL = 4;
 async function mayLock(me) {
   if (roomLevel(me.room_xp ?? 0) >= LOCK_MIN_LEVEL) return;
-  if (vipLevelOf(me.svip_xp, (await statusOf(db, me.id)).noble?.tier) >= 1) return;
+  if (hasPerk('room_password', { svipXp: me.svip_xp, nobleTier: (await statusOf(db, me.id)).noble?.tier })) return;
   throw new HttpError(403, `Oda kilidi Lv.${LOCK_MIN_LEVEL} odada veya VIP ile açılır`);
 }
 

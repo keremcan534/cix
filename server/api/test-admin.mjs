@@ -1,5 +1,5 @@
 // Test server only (ALLOW_TEST_TOPUP=1): admin accounts are at the top of everything, so the owner can try every
-// feature. Their Cömertlik and Yankı points read as the last step of WEALTH_XP / CHARM_XP (wheel.mjs wealthPointsOf,
+// feature. Their Cömertlik and Yankı points read as the top level of Seviye ayarları (levels.mjs topPoints; wheel.mjs wealthPointsOf,
 // wallet.mjs charmPointsOf: every gate and level shown); coins, SVIP, rank and room XP are filled on GET /api/me
 // (index.mjs fillTestAdmin). Rankings read their own sums and stay as they are. TEST_ADMIN_MAX=0 turns it off (the
 // tests' default, test/harness.mjs). Off in production, where ALLOW_TEST_TOPUP is 0.

@@ -49,7 +49,7 @@ import { paidGamesOpen, wealthPoints, wheelRoutes } from './wheel.mjs';
 import { casinoRoutes } from './casino.mjs';
 import { roomXpRoutes } from './room-xp.mjs';
 import { roomGameRoutes } from './room-games.mjs';
-import { EXCHANGE, SHOP, SVIP_XP, exchangeCoins } from './catalog.mjs';
+import { EXCHANGE, SHOP, exchangeCoins } from './catalog.mjs';
 import { financeSyncRoutes, startFinanceSync, stopFinanceSync } from './finance-sync.mjs';
 import { FILE_PATH, HttpError, RawText, allow, auth, claimRef, clientIp, db, env, filesOut, int, migrate, once, readJson, sha, tx, userId } from './core.mjs';
 import { giftRoutes } from './gifts.mjs';
@@ -57,6 +57,8 @@ import { auditPanel, panelOf, panelUser } from './panel.mjs';
 import { sendArt } from './art.mjs';
 import { customGiftRoutes, refreshCustomGifts, sendCustomFx, startCustomGifts, stopCustomGifts } from './custom-gifts.mjs';
 import { emojiRoutes, refreshEmoji, startEmoji, stopEmoji } from './emoji.mjs';
+import { refreshLevels, startLevels, stopLevels, topPoints } from './levels.mjs';
+import { levelRoutes, startLevelDecay, stopLevelDecay } from './levels-admin.mjs';
 import { FX_PATH, sendFx } from './fx.mjs';
 import { jetonRoutes } from './jeton.mjs';
 import { liveRoutes } from './live.mjs';
@@ -159,7 +161,8 @@ const RANKED = `SELECT 1 FROM entitlements WHERE user_id = $1 AND sku = $2 AND r
  */
 async function fillTestAdmin(u) {
   if (!TEST_ADMIN || u.role !== 'admin') return false;
-  const svipTop = SVIP_XP.at(-1);
+  // The top VIP level as Seviye ayarları have it.
+  const svipTop = topPoints('vip');
   const roomTop = ROOM_XP_THRESHOLDS.at(-1);
   const full = (x) => Number(x.coins) >= ADMIN_COINS_MIN && Number(x.svip_xp) >= svipTop && Number(x.room_xp) >= roomTop;
   if (full(u) && (await db.query(RANKED, [u.id, ADMIN_RANK.sku])).rowCount) return false;
@@ -303,6 +306,7 @@ const routes = {
   ...giftRoutes,
   ...customGiftRoutes,
   ...emojiRoutes,
+  ...levelRoutes,
   ...backpackRoutes,
   ...pkRoutes,
   ...crossPkRoutes,
@@ -496,6 +500,8 @@ function shutdown(signal) {
   stopStaffSweep();
   stopCustomGifts();
   stopEmoji();
+  stopLevels();
+  stopLevelDecay();
   server.close();
   const started = Date.now();
   const wait = setInterval(async () => {
@@ -512,6 +518,7 @@ await migrate();
 await refreshLive();
 await refreshCustomGifts();
 await refreshEmoji();
+await refreshLevels();
 server.listen(PORT, '127.0.0.1', () => console.log(`api on 127.0.0.1:${PORT} version ${VERSION}${TEST_TOPUP ? ' (test top-up on)' : ''}`));
 startFinanceSync();
 startRefundSync();
@@ -528,3 +535,5 @@ startBossSweep();
 startStaffSweep();
 startCustomGifts();
 startEmoji();
+startLevels();
+startLevelDecay();

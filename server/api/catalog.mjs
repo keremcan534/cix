@@ -164,7 +164,10 @@ export const wholesaleTl = (coins) => Math.round((coins / COINS_PER_TL) * (1 - E
 export const WITHDRAW = { minDiamonds: 50_000, maxDiamonds: 5_000_000, weeklyDiamonds: 10_000_000 };
 export const diamondValueUsd = (diamonds) => Math.floor((diamonds / EXCHANGE.diamondsPerUsd) * 100) / 100;
 
-/** SVIP level n needs SVIP_XP[n - 1] points (1 purchased coin = 1 point). */
+/**
+ * SVIP level n needs SVIP_XP[n - 1] points (1 purchased coin = 1 point): the compiled values, as the app has them. The
+ * server decides with Seviye ayarları (levels.mjs svipLevel), which start from these.
+ */
 export const SVIP_XP = [500_000, 1_250_000, 2_500_000, 4_000_000, 7_500_000, 15_000_000, 40_000_000, 100_000_000, 210_000_000, 400_000_000];
 export const svipLevel = (xp) => SVIP_XP.filter((t) => xp >= t).length;
 
@@ -244,7 +247,7 @@ export const PAID_ONLY = ['specialId'];
 export const FREE_MICFX = ['an-mic-wave'];
 /** A timed term may not end further ahead than this. */
 export const MAX_AHEAD_DAYS = 365;
-/** VIP level as the app shows it (store.tsx): the higher of the SVIP level and three per noble tier, at most 15. */
+/** VIP level as the app shows it (store.tsx) by the compiled values; the server's is levels.mjs vipLevelOf. */
 export const vipLevelOf = (svipXp, nobleTier) => Math.min(15, Math.max(svipLevel(Number(svipXp) || 0), (nobleTier ?? 0) * 3));
 /** The history line of a shop charge. Never 'Uygulama içi:' (the old apps' free-text spends). */
 export function labelOf(item) {

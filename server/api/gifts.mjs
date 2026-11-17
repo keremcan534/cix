@@ -1,6 +1,6 @@
 // Gifts at the server's price, and the rankings they feed.
 //
-//   GET  /api/catalog[?gifts=2][&emoji=1]                         → { gifts, counts, packs, vipPlans, svipXp, purchases, campaign, exchange, fx, v, emoji? }
+//   GET  /api/catalog[?gifts=2][&emoji=1][&levels=1]              → { gifts, counts, packs, vipPlans, svipXp, purchases, campaign, exchange, fx, v, emoji?, levels? }
 //   POST /api/gifts/send  { to, giftId, count, price?, room?, place?, ref } → { user, replay, total }  (place: chat|moment|profile|family)
 //   GET  /api/rankings?board=wealth|charm|agency&period=day|week|month → { rows }  (agency: rows carry agency, not user)
 //
@@ -18,12 +18,15 @@
 // checkShownPrice refuses a gift whose price moved meanwhile, and one of the app's re-priced gifts from an older app.
 // gifts=2 in the catalog: the phone draws what the server says about the app's own gifts too (name, emoji, price,
 // shelf, order, icon) and trusts its list alone (giftsFormat: 2); without it the re-priced ones are left out.
+// levels=1: Seviye ve VIP ayarları as the finance panel set them (levels.mjs levelsPayload); `v` grows with them too.
+// A members-only gift needs its own VIP level and at least the one the settings open `vip_gifts` at (vipItemNeed).
 // A gift sent in a server room is announced to the room's voice connection from here, after it is paid
 // (LiveKit SendData, so no phone can fake one); the phones draw only these, never a peer's own claim.
 import { recordIncome } from './agency-lib.mjs';
 import { addBondCoins } from './bonds.mjs';
 import { HttpError, auth, blockedBetween, claimRef, db, env, int, once, readJson, userId } from './core.mjs';
-import { EXCHANGE, GIFT_COUNTS, PACKS, SVIP_XP, VIP_SUBS, svipLevel } from './catalog.mjs';
+import { EXCHANGE, GIFT_COUNTS, PACKS, VIP_SUBS } from './catalog.mjs';
+import { docsNow, levelsPayload, levelsRev, svipLevel, vipItemNeed } from './levels.mjs';
 import { catalogGifts, checkShownPrice, customGiftsRev, giftFx, giftOf, replacedClips } from './custom-gifts.mjs';
 import { emojiCatalog, emojiRev } from './emoji.mjs';
 import { fxCatalog } from './fx.mjs';
@@ -118,8 +121,11 @@ export const giftRoutes = {
       counts: GIFT_COUNTS,
       packs: PACKS.filter((p) => !s.packsHidden.has(p.id)).map(({ id, productId, coins, firstBonus }) => ({ id, productId, coins, firstBonus })),
       // Abonelik's store products (vip.mjs), sold through the same stores as the packs (`purchases`).
+      // Every store product, shown or not (an older app shows its own plans and buys by product; which are shown and
+      // their words are in `levels.sub`).
       vipPlans: VIP_SUBS.map(({ productId, days }) => ({ productId, days })),
-      svipXp: SVIP_XP,
+      // The VIP levels' points as Seviye ayarları have them (an older app counts with its own).
+      svipXp: docsNow().vip.levels.map((l) => l.points),
       // Which packs the app may offer: free test packs, and the stores this server can verify.
       purchases: purchaseOptions(),
       // Only while it runs by the server's clock; a purchase gets it by the store's purchase time (purchases.mjs).
@@ -129,8 +135,11 @@ export const giftRoutes = {
       fx: [...fxCatalog(s.giftsHidden, replacedClips()), ...giftFx(s.giftsHidden)],
       // The emoji panel's packs and stickers as they are now (emoji.mjs): only for an app that asks (emoji=1).
       ...(url?.searchParams.get('emoji') === '1' ? { emoji: emojiCatalog() } : {}),
-      // Grows with every live settings save and every change in Yönetim › Hediyeler and Emojiler (as /api/config's).
-      v: s.v + customGiftsRev() + emojiRev(),
+      // Seviye ve VIP ayarları (levels.mjs): only for an app that asks (levels=1).
+      ...(url?.searchParams.get('levels') === '1' ? { levels: levelsPayload() } : {}),
+      // Grows with every live settings save, every change in Yönetim › Hediyeler and Emojiler, and every Seviye
+      // ayarları save (as /api/config's).
+      v: s.v + customGiftsRev() + emojiRev() + levelsRev(),
     };
   },
 
@@ -151,7 +160,8 @@ export const giftRoutes = {
     if (room !== null && !ROOM.test(room)) throw new HttpError(400, 'Geçersiz oda');
     // Outside a room, where it was sent (Gelir's sources); older apps send none.
     const place = room === null && PLACES.includes(b.place) ? b.place : null;
-    if (gift.minSvip && svipLevel(Number(u.svip_xp)) < gift.minSvip) throw new HttpError(403, `${gift.name} VIP ${gift.minSvip} ve üstü için`);
+    const needVip = vipItemNeed('vip_gifts', gift.minSvip);
+    if (needVip && svipLevel(u.svip_xp) < needVip) throw new HttpError(403, `${gift.name} VIP ${needVip} ve üstü için`);
     if (await blockedBetween(u.id, to)) throw new HttpError(403, 'Bu kişiye hediye gönderemezsin');
     const total = gift.price * count;
     const label = count > 1 ? `${gift.name} ×${count}` : gift.name;

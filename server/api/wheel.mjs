@@ -14,16 +14,25 @@ import crypto from 'node:crypto';
 
 import { HttpError, REF, auth, db, env, limit, move, readJson, selfUser, tx } from './core.mjs';
 import { live } from './live-settings.mjs';
-import { WEALTH_XP } from './profile-rules.mjs';
+import { casinoNeed, topPoints, withOffsets } from './levels.mjs';
 import { TEST_ADMIN, withTopFor } from './test-admin.mjs';
 import { spendCoins } from './wallet.mjs';
 import { COUNTS, SLICES, TIERS, WEIGHT_TOTAL, jackpotSeed, playSpins } from './wheel-rules.mjs';
 
 export { COUNTS, SLICES, TIERS };
 
-/** Cömertlik Lv.2 starts at 35 points (app/src/data/wealth.ts WEALTH_XP). */
-export const NEED_LEVEL = 2;
-export const NEED_POINTS = 35;
+/**
+ * The Cömertlik level the coin games need and the points it starts at, as Seviye ayarları have it (levels.mjs; Lv.2,
+ * 35 points until the panel moves it). Read on every call.
+ */
+export { casinoNeed };
+/**
+ * Spending that counts for Cömertlik (ledger alias `l`): coins spent, not coin games, not coins handed on, not a
+ * Jeton Noktası selling coins on, not coins taken back for a refund. levels-admin.mjs reads the same rows to see who
+ * has been inactive.
+ */
+export const COUNTED_SPEND = `l.currency = 'coin' AND l.amount < 0 AND l.reason !~ '· tur' AND l.reason !~* '(zar düellosu|zarf|çantası|transfer|jeton gönder)'
+        AND l.reason !~ '^(Jeton Noktası satışı|İade:)'`;
 /**
  * Who the coin games (this wheel and Oyun Salonu) are for right now: admin accounts only, until the live setting
  * casino_open says everyone. Read on every call, like the level; the level still applies to whoever it lets in.
@@ -60,14 +69,13 @@ export async function wealthPointsOf(c, ids) {
                             FROM jsonb_array_elements(coalesce(l.detail->'lots', '[]'::jsonb)) p
                             LEFT JOIN coin_lots k ON k.id = (p->>'lot')::bigint
                            WHERE p->>'channel' IN ('odul', 'ugurlu') OR k.refunded_by IS NOT NULL) x ON true
-      WHERE l.user_id = ANY($1::uuid[]) AND l.currency = 'coin' AND l.amount < 0 AND l.reason !~ '· tur' AND l.reason !~* '(zar düellosu|zarf|çantası|transfer|jeton gönder)'
-        AND l.reason !~ '^(Jeton Noktası satışı|İade:)'
+      WHERE l.user_id = ANY($1::uuid[]) AND ${COUNTED_SPEND}
       GROUP BY l.user_id`,
     [ids],
   );
-  const points = new Map(r.rows.map((x) => [x.user_id, Number(x.n)]));
-  // Test server: admins at the top level (test-admin.mjs).
-  return TEST_ADMIN ? withTopFor(c, ids, points, WEALTH_XP.at(-1)) : points;
+  // Less what level drops took off (levels-admin.mjs); test server: admins at the top level (test-admin.mjs).
+  const points = await withOffsets(c, 'wealth', new Map(r.rows.map((x) => [x.user_id, Number(x.n)])));
+  return TEST_ADMIN ? withTopFor(c, ids, points, topPoints('wealth')) : points;
 }
 
 async function funds(c, lock = null) {
@@ -117,8 +125,8 @@ export const wheelRoutes = {
       slices: SLICES,
       dailyLimit: DAILY,
       playedToday: played,
-      needLevel: NEED_LEVEL,
-      allowed: paidGamesOpen(me) && points >= NEED_POINTS,
+      needLevel: casinoNeed().level,
+      allowed: paidGamesOpen(me) && points >= casinoNeed().points,
       gameCoins: Number(me.game_coins),
       winners: winners.rows.map((r) => ({ ...person(r), tier: r.tier, payout: Number(r.payout), jackpot: Number(r.jackpot), best: r.best_milli, at: r.created_at })),
       board: board.rows.map((r) => ({ ...person(r), total: Number(r.total) })),
@@ -145,7 +153,8 @@ export const wheelRoutes = {
     const before = await seen();
     if (before) return answer(before, true);
     needPaidGames(me);
-    if ((await wealthPoints(db, me.id)) < NEED_POINTS) throw new HttpError(403, `Rüzgâr Gülü Cömertlik Lv.${NEED_LEVEL} ve üstü için`);
+    const need = casinoNeed();
+    if ((await wealthPoints(db, me.id)) < need.points) throw new HttpError(403, `Rüzgâr Gülü Cömertlik Lv.${need.level} ve üstü için`);
     const t = TIERS[tier];
     const cost = t.price * count;
     let row;
