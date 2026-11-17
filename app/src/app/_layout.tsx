@@ -135,6 +135,8 @@ function RootStack() {
           <Stack.Screen name="gelir/detay" />
           <Stack.Screen name="davet" />
           <Stack.Screen name="seviye" />
+          <Stack.Screen name="koruma/index" />
+          <Stack.Screen name="koruma/kurallar" />
           <Stack.Screen name="kabile/index" />
           <Stack.Screen name="kabile/sohbet" />
           <Stack.Screen name="kabile/merkez" />

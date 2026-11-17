@@ -103,6 +103,8 @@ export const PANEL_ROUTES = new Set([
   'GET /api/admin/finance-sync',
   // Kullanıcılar (admin.mjs, referrals.mjs): search, ban and lifting it, room level, deleting, an invite's coins back.
   'GET /api/admin/users',
+  // An account by the person's own number, for every field of the panel that takes an account (public-no.mjs).
+  'GET /api/admin/lookup',
   'POST /api/admin/users/delete',
   'POST /api/admin/users/room-level',
   'POST /api/admin/ban',

@@ -1,9 +1,13 @@
 // The person card in a room: tapping someone on a mic, on the balcony list or in the chat opens it from the bottom.
-// Who they are (photo, name, age, agency, Aile, followers, the heart between us) and what I can do: send a gift,
-// mention them in the chat (@bahset), follow, message, open the full profile. Room staff get "Yönet" for their
-// actions on them. Live mode: the follow state, the counts and the heart are the server's (lib/live/profile,
-// lib/live/one-on-one), as on the profile screen.
+// The designer's card (components/person-showcase): their photo in their own shop frame, name with their Yankı level
+// and the heart between us, gender and age, their mic and room role, agency and Aile, interests, the three walls
+// (İlişki Duvarı, Hediye Duvarı, Koruma: each opens that part of their profile), followers, and what I can do: send a
+// gift, mention them in the chat (@bahset), follow, message, open the full profile. Room staff get "Yönet" for their
+// actions on them. Live mode: the follow state, the counts, the levels and the heart are the server's
+// (lib/live/profile, lib/live/one-on-one), as on the profile screen; their frame is the one the room read
+// (lib/live/looks).
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -11,18 +15,23 @@ import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/text';
 import { HeartBadge } from '@/components/heart-level';
 import { heartOf, usePair } from '@/components/one-on-one-bar';
-import { AffiliationPills, GenderChip } from '@/components/profile-badges';
+import { GenderChip } from '@/components/profile-badges';
+import { ActionTiles, ClubPills, InterestRow, LevelPill, ManageRow, SHOW, WallLinks, type WallKey } from '@/components/person-showcase';
 import { useSheetBottom } from '@/components/room/parts';
-import { Avatar, VipBadge } from '@/components/ui';
+import { FramedAvatar, VipBadge } from '@/components/ui';
 import { userById } from '@/data/mock';
+import { wealthCharmOf } from '@/data/profile';
 import { showAlert } from '@/lib/alert';
 import { liveMode, message, toServer } from '@/lib/live';
+import { lookOf } from '@/lib/live/looks';
 import { followOnServer, loadPublicProfile } from '@/lib/live/profile';
 import { useSheetMax } from '@/lib/sheet-space';
 import { useApp } from '@/store';
-import { SCRIM, colors, edge } from '@/theme';
+import { SCRIM, edge } from '@/theme';
 
 const fmt = (n: number) => n.toLocaleString('tr-TR');
+/** The profile tab each wall opens (the Koruma banner sits on the profile's first tab). */
+const WALL_TAB: Record<WallKey, string> = { iliski: 'iliski', hediye: 'onur', koruma: 'profil' };
 
 export type PersonCardProps = {
   uid: string;
@@ -37,20 +46,21 @@ export type PersonCardProps = {
 };
 
 export function PersonCard({ uid, note, onClose, onGift, onMention, onReport, onManage }: PersonCardProps) {
-  const { following, toggleFollow, takeServerSocial, blocked } = useApp();
+  const { following, toggleFollow, takeServerSocial, blocked, equipped, vipLevel, charmLevel } = useApp();
   const u = userById(uid);
+  const isMe = uid === 'me';
   const serverId = liveMode() ? toServer(uid) : null;
-  // Live mode: the server's counts for this person (null until read).
-  const [counts, setCounts] = useState<{ id: string; followers: number; isFollowing: boolean } | null>(null);
+  // Live mode: the server's counts and Yankı level for this person (null until read; a level they hide stays null).
+  const [counts, setCounts] = useState<{ id: string; followers: number; isFollowing: boolean; charm: number | null } | null>(null);
   const [busy, setBusy] = useState(false);
   // The heart between us (the demo: its sample heart), beside their name once it has a level.
-  const { pair } = usePair(uid, !!serverId && uid !== 'me');
-  const heart = uid === 'me' ? null : heartOf(uid, pair);
+  const { pair } = usePair(uid, !!serverId && !isMe);
+  const heart = isMe ? null : heartOf(uid, pair);
   useEffect(() => {
     if (!serverId) return;
     let on = true;
     loadPublicProfile(serverId).then(
-      (c) => on && setCounts({ id: serverId, followers: c.followers, isFollowing: c.isFollowing }),
+      (c) => on && setCounts({ id: serverId, followers: c.followers, isFollowing: c.isFollowing, charm: c.levels?.charm ?? null }),
       () => {},
     );
     return () => {
@@ -60,6 +70,11 @@ export function PersonCard({ uid, note, onClose, onGift, onMention, onReport, on
   const mine = counts && counts.id === serverId ? counts : null;
   const isFollowing = mine ? mine.isFollowing : following.has(uid);
   const isBlocked = blocked.has(uid);
+  const charm = isMe ? charmLevel : serverId ? (mine?.charm ?? null) : wealthCharmOf(uid).charm;
+  // Their own shop frame: mine from the store, someone else's as the room read it (none until read).
+  const look = !isMe && serverId ? lookOf(serverId) : undefined;
+  const frameId = isMe ? equipped.frame : (look?.frame ?? undefined);
+  const vip = isMe ? vipLevel : (look?.vipLevel ?? 0);
   const paddingBottom = useSheetBottom(18);
   // It stops at the room's Balkon line (lib/sheet-space): who they are scrolls, the buttons stay in sight.
   const maxHeight = useSheetMax(0.9);
@@ -87,44 +102,51 @@ export function PersonCard({ uid, note, onClose, onGift, onMention, onReport, on
       setBusy(false);
     }
   };
+  const openWall = (w: WallKey) => {
+    onClose();
+    router.push({ pathname: '/kullanici/[id]', params: { id: uid, tab: WALL_TAB[w] } });
+  };
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={s.backdrop} onPress={onClose} accessibilityLabel="Kapat" />
-      <View style={[s.sheet, { maxHeight, paddingBottom }]}>
+      <LinearGradient colors={['#3A1638', SHOW.panel, SHOW.bg]} style={[s.sheet, { maxHeight, paddingBottom }]}>
         <View style={s.handle} />
         <View style={s.head}>
-          <Avatar uri={u.avatar} name={u.name} size={64} ring={u.vip} />
-          <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
+          <View style={s.avatar}>
+            <FramedAvatar uri={u.avatar} size={78} vipLevel={vip} frameId={frameId ?? undefined} artScale={1.6} />
+          </View>
+          <View style={{ flex: 1, minWidth: 0, gap: 6 }}>
             <View style={s.row}>
               <Text style={s.name} numberOfLines={1}>
                 {u.name}
               </Text>
+              {charm !== null && <LevelPill level={charm} />}
+            </View>
+            <View style={[s.row, { flexWrap: 'wrap' }]}>
+              <GenderChip user={u} size="md" />
               {u.vip && <VipBadge />}
               {heart && heart.level > 0 && <HeartBadge level={heart.level} />}
             </View>
-            <View style={[s.row, { flexWrap: 'wrap' }]}>
-              <GenderChip user={u} />
-              {!!u.username && <Text style={s.dim}>@{u.username}</Text>}
-            </View>
             {!!note && (
-              <Text style={s.dim} numberOfLines={1}>
-                {note}
-              </Text>
+              <View style={s.row}>
+                <Ionicons name="leaf" size={13} color={SHOW.gold} style={{ transform: [{ scaleX: -1 }] }} />
+                <Text style={s.note} numberOfLines={1}>
+                  {note}
+                </Text>
+                <Ionicons name="leaf" size={13} color={SHOW.gold} />
+              </View>
             )}
           </View>
-          <Pressable onPress={onClose} hitSlop={8} accessibilityLabel="Kapat">
-            <Ionicons name="close" size={22} color={colors.textDim} />
+          <Pressable onPress={onClose} hitSlop={10} style={s.close} accessibilityRole="button" accessibilityLabel="Kapat">
+            <Ionicons name="close" size={26} color={SHOW.dim} />
           </Pressable>
         </View>
 
         <ScrollView contentContainerStyle={{ gap: 12 }}>
-          <AffiliationPills user={u} />
-          {!!u.bio && (
-            <Text style={s.bio} numberOfLines={2}>
-              {u.bio}
-            </Text>
-          )}
+          <ClubPills user={u} onOpen={onClose} />
+          <InterestRow interests={u.interests} />
+          <WallLinks onOpen={openWall} />
           {mine && (
             <Text style={s.dim}>
               <Text style={s.strong}>{fmt(mine.followers)}</Text> takipçi
@@ -132,57 +154,36 @@ export function PersonCard({ uid, note, onClose, onGift, onMention, onReport, on
           )}
         </ScrollView>
 
-        <View style={s.actions}>
-          <Action icon="gift" label="Hediye" tint={colors.gold} onPress={act(() => onGift(uid))} />
-          <Action icon="at" label="Bahset" onPress={act(() => onMention(uid))} />
-          <Action icon={isFollowing ? 'person-remove-outline' : 'person-add'} label={isFollowing ? 'Takiptesin' : 'Takip et'} on={isFollowing} disabled={busy} onPress={() => void follow()} />
-          <Action icon="chatbubble-ellipses" label="Mesaj" onPress={act(() => router.push(`/sohbet/${uid}`))} />
-        </View>
-        <View style={s.links}>
-          <Link icon="person-circle-outline" label="Profili gör" onPress={act(() => router.push(`/kullanici/${uid}`))} />
-          {onManage && <Link icon="shield-half-outline" label="Yönet" onPress={act(onManage)} />}
-          <Link icon="flag-outline" label="Şikâyet et" onPress={act(() => onReport(uid))} />
-        </View>
-      </View>
+        <ActionTiles
+          tiles={[
+            { icon: 'gift', label: 'Hediye', tint: SHOW.gold, onPress: act(() => onGift(uid)) },
+            { icon: 'at', label: 'Bahset', onPress: act(() => onMention(uid)) },
+            { icon: isFollowing ? 'person-remove-outline' : 'person-add-outline', label: isFollowing ? 'Takiptesin' : 'Takip et', on: isFollowing, disabled: busy, onPress: () => void follow() },
+            { icon: 'chatbubble-ellipses', label: 'Mesaj', onPress: act(() => router.push(`/sohbet/${uid}`)) },
+          ]}
+        />
+        <ManageRow
+          items={[
+            { icon: 'person-circle-outline', label: 'Profili gör', onPress: act(() => router.push(`/kullanici/${uid}`)) },
+            ...(onManage ? [{ icon: 'shield-half-outline' as const, label: 'Yönet', onPress: act(onManage) }] : []),
+            { icon: 'flag-outline', label: 'Şikâyet et', onPress: act(() => onReport(uid)) },
+          ]}
+        />
+      </LinearGradient>
     </Modal>
-  );
-}
-
-function Action({ icon, label, onPress, tint, on, disabled }: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void; tint?: string; on?: boolean; disabled?: boolean }) {
-  return (
-    <Pressable style={[s.action, on && s.actionOn, disabled && { opacity: 0.5 }]} onPress={onPress} disabled={disabled} accessibilityRole="button" accessibilityLabel={label}>
-      <Ionicons name={icon} size={22} color={tint ?? colors.text} />
-      <Text style={s.actionText} numberOfLines={1}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
-function Link({ icon, label, onPress }: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void }) {
-  return (
-    <Pressable style={s.link} onPress={onPress} hitSlop={4} accessibilityRole="button" accessibilityLabel={label}>
-      <Ionicons name={icon} size={16} color={colors.textDim} />
-      <Text style={s.linkText}>{label}</Text>
-    </Pressable>
   );
 }
 
 const s = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: SCRIM },
-  sheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 16, paddingTop: 8, gap: 12, ...edge.sheet },
-  handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border },
+  sheet: { borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingHorizontal: 16, paddingTop: 8, gap: 14, borderWidth: 1, borderBottomWidth: 0, borderColor: 'rgba(255,212,117,0.45)', ...edge.sheet },
+  handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.25)' },
   head: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  avatar: { width: 96, height: 96, alignItems: 'center', justifyContent: 'center' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  name: { color: colors.text, fontSize: 18, fontWeight: '800', flexShrink: 1 },
-  dim: { color: colors.textDim, fontSize: 13 },
-  strong: { color: colors.text, fontWeight: '800' },
-  bio: { color: colors.text, fontSize: 14, lineHeight: 20 },
-  actions: { flexDirection: 'row', gap: 8 },
-  action: { flex: 1, alignItems: 'center', gap: 5, paddingVertical: 12, borderRadius: 16, backgroundColor: colors.cardAlt, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
-  actionOn: { borderColor: colors.primary },
-  actionText: { color: colors.text, fontSize: 12, fontWeight: '700' },
-  links: { flexDirection: 'row', justifyContent: 'space-around', paddingTop: 2 },
-  link: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 6, paddingHorizontal: 8 },
-  linkText: { color: colors.textDim, fontSize: 13, fontWeight: '700' },
+  name: { color: SHOW.text, fontSize: 22, fontWeight: '900', flexShrink: 1 },
+  note: { color: SHOW.dim, fontSize: 14, flexShrink: 1 },
+  close: { alignSelf: 'flex-start', width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginRight: -8 },
+  dim: { color: SHOW.dim, fontSize: 15 },
+  strong: { color: SHOW.text, fontWeight: '800' },
 });

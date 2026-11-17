@@ -63,7 +63,11 @@ const PROTOTYPE_ROOMS = env.ALLOW_PROTOTYPE_ROOMS === '1';
 export const ROOM_XP_THRESHOLDS = [0, 100, 300, 600, 1_000, 1_600, 2_400, 3_400, 4_800, 6_500, 8_500, 11_000, 14_000, 18_000, 23_000];
 export const ROOM_MAX_LEVEL = ROOM_XP_THRESHOLDS.length;
 export const roomLevel = (xp) => ROOM_XP_THRESHOLDS.filter((t) => Number(xp) >= t).length || 1;
-/** The public room number the app shows as "ID" (app data/catalog roomCode). */
+/**
+ * The room number older apps show as "ID" (app data/catalog roomCode): a hash of this room's own id, so not unique and
+ * new every time its owner opens it again. A room's ID now is its owner's own number (out `code`, public-no.mjs);
+ * this one is still found while its room is open (public-no.mjs whoIs).
+ */
 export const roomCode = (id) => String(10_000_000 + [...id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 9_000_000, 7));
 const LAYOUT = /^[A-Za-z0-9_-]{1,40}$/;
 // A password lock needs a Lv.4 room (app data/catalog LOCK_MIN_LEVEL) or the `room_password` perk where Seviye
@@ -77,7 +81,9 @@ async function mayLock(me) {
 
 const out = (r) => ({
   id: r.id,
-  owner: { id: r.owner, name: r.owner_name, avatarUrl: r.owner_avatar ?? null },
+  // The room's ID: its owner's own number (the same however often it opens; an older app shows roomCode instead).
+  code: r.owner_public_no === null || r.owner_public_no === undefined ? roomCode(r.id) : String(r.owner_public_no),
+  owner: { id: r.owner, name: r.owner_name, avatarUrl: r.owner_avatar ?? null, publicNo: r.owner_public_no === null || r.owner_public_no === undefined ? null : String(r.owner_public_no) },
   title: r.title,
   announcement: r.announcement,
   roomType: r.room_type,
@@ -110,7 +116,7 @@ const out = (r) => ({
   ...bossOf(r),
 });
 /** Listeners: LiveKit's own count when it can be read (withVoiceCounts), else its webhooks (live.mjs room_presence). */
-const SELECT = `SELECT r.*, u.name AS owner_name, u.avatar_url AS owner_avatar, u.room_xp AS owner_room_xp,
+const SELECT = `SELECT r.*, u.name AS owner_name, u.avatar_url AS owner_avatar, u.room_xp AS owner_room_xp, u.public_no AS owner_public_no,
                        b.name AS boss_name, b.avatar_url AS boss_avatar,
                        (SELECT count(*) FROM room_presence p WHERE p.room = 'oda-' || r.id::text) AS listeners,
                        d.pick AS bg_pick, d.custom_url AS bg_custom_url, d.custom_until AS bg_custom_until, d.custom_until > now() AS bg_custom_live,

@@ -20,6 +20,7 @@ import { HttpError, SANCTION_SELECT, auth, db, limit, profileOf, sanctionView, s
 import { spendLimitOf } from './spend-limit.mjs';
 import { ticketsOf } from './support.mjs';
 import { referralDataOf } from './referrals.mjs';
+import { guardsOfUser } from './guards.mjs';
 
 export const EXPORT_HOURS = 24;
 
@@ -531,6 +532,8 @@ export async function exportOf(c, uid) {
     `SELECT v.visitor_id, u.name, v.visits, v.last_at FROM profile_visits v JOIN users u ON u.id = v.visitor_id
       WHERE v.owner_id = $1 AND v.last_at > now() - interval '7 days' AND u.deleted_at IS NULL AND ${NOT_BLOCKED('v.visitor_id')} ORDER BY v.last_at DESC`,
   );
+  // Koruma (guards.mjs): whom I guard, who guards me (ended ones too) and my settings.
+  const guard = await guardsOfUser(c, uid);
   const visits = {
     made: await all('SELECT v.owner_id, u.name, v.visits, v.last_at FROM profile_visits v JOIN users u ON u.id = v.owner_id WHERE v.visitor_id = $1 ORDER BY v.last_at DESC', (x) => ({
       profile: person(x.owner_id, x.name),
@@ -633,6 +636,7 @@ export async function exportOf(c, uid) {
     rooms,
     family,
     bonds,
+    guard,
     agency,
     visits,
     profileMore,

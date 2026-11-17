@@ -49,7 +49,7 @@ export function RefundsSection() {
               value={draft}
               onChangeText={setDraft}
               onSubmitEditing={() => setSearch(draft)}
-              placeholder="Sipariş no (GPA…), alım no veya hesap kimliği"
+              placeholder="Sipariş no (GPA…), alım no veya kişinin ID’si"
               placeholderTextColor={colors.textDim}
               style={s.input}
               autoCapitalize="none"

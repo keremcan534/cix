@@ -2,14 +2,15 @@ name: Yetki ver
 
 # Gives a server account a staff role. Staff accounts are set in the database (docs/SUNUCU.md); this runs
 # that one UPDATE on the server, so nobody needs SSH. Run by hand: Actions › "Yetki ver" › Run workflow, with
-# the account's "Hesap kimliği" (app: Ayarlar › Sunucu hesabı). The server checks the role on every call; the
-# app reads it at start, so the account restarts the app to see Ayarlar › Yönetim.
+# the 12-digit ID on the person's profile in the app (their own number, server/api/public-no.mjs) or the account's
+# id. The server checks the role on every call; the app reads it at start, so the account restarts the app to see
+# Ayarlar › Yönetim.
 # Logs are public: nothing from .env or the server's secrets is printed.
 on:
   workflow_dispatch:
     inputs:
       user_id:
-        description: 'Hesap kimliği (Ayarlar › Sunucu hesabı)'
+        description: 'Kişinin ID’si (uygulamada profilinde, 12 hane) ya da hesap kimliği'
         required: true
       role:
         description: 'Yetki'
@@ -31,12 +32,17 @@ jobs:
       ROLE: ${{ inputs.role }}
       ACTOR: ${{ github.actor }}
     steps:
-      # Only a well-formed id and a known role go any further, so nothing else reaches the server's shell or SQL.
+      # Only a well-formed number or id and a known role go any further, so nothing else reaches the server's shell
+      # or SQL. An "ID" in front and spaces ("ID 1048 2930 1457") are dropped.
       - name: Check the input
         run: |
-          USER_ID=$(printf '%s' "$USER_ID" | tr -d '[:space:]')
-          if ! printf '%s' "$USER_ID" | grep -Eq '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'; then
-            echo "::error::Hesap kimliği geçersiz: Ayarlar › Sunucu hesabı'ndaki kimliği aynen yapıştır."; exit 1
+          USER_ID=$(printf '%s' "$USER_ID" | tr -d '[:space:]' | sed -E 's/^[Ii][Dd]:?//')
+          if printf '%s' "$USER_ID" | grep -Eq '^[0-9]{12}$'; then
+            echo "ACCOUNT_BY=number" >> "$GITHUB_ENV"
+          elif printf '%s' "$USER_ID" | grep -Eq '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'; then
+            echo "ACCOUNT_BY=id" >> "$GITHUB_ENV"
+          else
+            echo "::error::Kimlik geçersiz: kişinin profilindeki 12 haneli ID'yi (ya da hesap kimliğini) aynen yaz."; exit 1
           fi
           case "$ROLE" in admin|moderator|user) ;; *) echo "::error::Bilinmeyen yetki"; exit 1 ;; esac
           if ! printf '%s' "$ACTOR" | grep -Eq '^[A-Za-z0-9-]{1,39}(\[bot\])?$'; then echo "::error::Unexpected actor"; exit 1; fi
@@ -49,8 +55,10 @@ jobs:
           install -m 700 -d ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
           ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          # The account by its own number (users.public_no, 082) or by its id; one of two fixed texts.
+          if [ "$ACCOUNT_BY" = number ]; then MATCH="public_no = :'uid'::bigint"; else MATCH="id = :'uid'::uuid"; fi
           SQL="WITH u AS (
-                 UPDATE users SET role = :'role' WHERE id = :'uid'::uuid AND deleted_at IS NULL RETURNING id
+                 UPDATE users SET role = :'role' WHERE $MATCH AND deleted_at IS NULL RETURNING id
                ), a AS (
                  INSERT INTO audit_events (action, target, detail)
                  SELECT 'role_set', id, jsonb_build_object('role', :'role', 'via', 'github-actions', 'by', :'by') FROM u
@@ -61,5 +69,5 @@ jobs:
             echo "Yetki verildi: $ROLE. Hesap uygulamayı kapatıp açınca Ayarlar › Yönetim görünür." >> "$GITHUB_STEP_SUMMARY"
             echo "Done: role set to $ROLE"
           else
-            echo "::error::Bu kimlikle açık bir hesap bulunamadı (sonuç: ${n:-boş}). Kimliği kontrol et."; exit 1
+            echo "::error::Bu ID ya da kimlikle açık bir hesap bulunamadı (sonuç: ${n:-boş}). Kişinin profilindeki ID'yi kontrol et."; exit 1
           fi

@@ -19,6 +19,7 @@ import type { Outcome } from '@/lib/casino-odds';
 import { noteContactStrike, type ContactStrike } from '@/lib/contact-filter';
 import { deviceInfo } from '@/lib/device-info';
 import { forgetRoomPassword, roomPassword } from '@/lib/live/room-password';
+import { parseLookup } from '@/lib/public-no';
 import type { CardsMove, CardsSeen } from '@/lib/room-games/cards';
 import type { FourMove, FourState } from '@/lib/room-games/four';
 import type { LudoMode, LudoMove, LudoState } from '@/lib/room-games/ludo';
@@ -549,7 +550,9 @@ export async function storageRefusal(res: Response): Promise<string> {
 export const liveRooms = () => call<{ rooms: { room: string; listeners: number }[] }>('GET', '/api/rooms/live').then((r) => r.rooms);
 
 // --- Live mode (lib/live): profile, people, rooms, messages, follows and the Gelir wallet on the server.
-export type ServerProfile = { username: string | null; gender: 'Kadın' | 'Erkek' | null; age: number | null; city: string | null; bio: string; interests: string[]; avatarUrl: string | null };
+/** `publicNo`: the person's own number (server/api/public-no.mjs), their profile's ID and their room's; an older
+ *  server sends none (the app then makes one from the id, data/profile displayId). */
+export type ServerProfile = { username: string | null; gender: 'Kadın' | 'Erkek' | null; age: number | null; city: string | null; bio: string; interests: string[]; avatarUrl: string | null; publicNo?: string | null };
 /** `genderHidden`: I chose "Gizli" (others don't get my gender; I still do). */
 export type ServerMe = ServerUser & ServerProfile & { role?: string; genderHidden?: boolean };
 /** How far someone is from me by our two profile cities (server/api/city-coords.mjs), rounded: never a location.
@@ -558,12 +561,14 @@ export type CityDistance = { km: number; sameCity: boolean };
 /** `followers` / `following`: totals; `oneWay`: the same without the people who follow each other (friends), as the
  *  profile shows them (lib/follow-ties tieCounts; an older server sends none). */
 export type PublicUser = { id: string; name: string } & ServerProfile & { followers: number; following: number; oneWay?: { followers: number; following: number }; isFollowing: boolean; blockedByMe: boolean } & Partial<ProfileMore> & { distance?: CityDistance | null };
-export type UserCard = { id: string; name: string; avatarUrl: string | null };
+export type UserCard = { id: string; name: string; avatarUrl: string | null; publicNo?: string | null };
 /** `level` / `xp`: the owner's room level, earned on the server from gifts in their room. `micCount` / `layoutId`:
  *  the mics and layout the owner or a room admin chose (null = the default). `lockedSeats`: mics the staff locked;
  *  `micQueue`: members ask for a mic and the staff let them up. */
 export type ServerRoom = {
   id: string;
+  /** The room's ID: its owner's own number, the same however often it opens (an older server sends none). */
+  code?: string;
   owner: UserCard;
   title: string;
   announcement: string;
@@ -665,6 +670,12 @@ export type ProfilePatch = { name?: string; gender?: 'Kadın' | 'Erkek'; birthDa
 export const updateProfile = (p: ProfilePatch) => call<{ user: ServerMe }>('PATCH', '/api/me', p).then((r) => r.user);
 /** Someone's agency (an approved one they stream in now) and family, on their profile. */
 export type ProfileTies = { agency: { id: string; name: string } | null; family: { id: string; name: string; role: 'owner' | 'helper' | 'member' } | null };
+/**
+ * Someone by the number they gave me (server/api/public-no.mjs): their own 12-digit ID (their room's too), a special
+ * ID they have, or an open room's older 8-digit ID; their room if it is open. 404: nobody (an older server: no such
+ * call, also 404); a malformed answer: null.
+ */
+export const lookup = (no: string) => call<unknown>('GET', `/api/lookup?no=${encodeURIComponent(no)}`).then(parseLookup);
 /** `visit`: opened on the profile screen, so it counts as a visit (Profil ziyaretçileri); a person card doesn't. */
 export const userProfile = (id: string, visit = false) =>
   call<{ user: PublicUser } & Partial<ProfileTies>>('GET', `/api/user?id=${encodeURIComponent(id)}${visit ? '&visit=1' : ''}`).then((r) => ({ ...r.user, agency: r.agency ?? null, family: r.family ?? null }));
@@ -1489,3 +1500,10 @@ export function rollbackLive(body: LiveRollbackBody & { dryRun?: false }): Promi
 export function rollbackLive(body: LiveRollbackBody & { dryRun?: boolean }) {
   return call<LivePreview | LiveSaved>('POST', '/api/admin/live-settings/rollback', body);
 }
+
+// --- Koruma (server/api/guards.mjs) ------------------------------------------------------------------------------
+// Read with lib/guard-core's parsers: the answers are taken as unknown.
+export const guardArea = (user: string) => call<unknown>('GET', `/api/guard?user=${encodeURIComponent(user)}`);
+export const guardMine = () => call<unknown>('GET', '/api/guard/me');
+export const guardEnd = (ward: string) => call<{ ended: boolean }>('POST', '/api/guard/end', { ward });
+export const guardSettings = (body: { off?: boolean; threshold?: number }) => call<{ settings: unknown }>('POST', '/api/guard/settings', body);

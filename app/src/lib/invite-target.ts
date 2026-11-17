@@ -1,7 +1,8 @@
 // Who "Yayıncı davet et" (Ajans → Ofis → Yayıncılar) is meant for: the owner types what the app shows them, the
 // profile ID number ("ID:123456789012"), a server account id, or a username (@name). The server's invite takes a
-// user id or a username (server/api/agency.mjs POST /api/agency/invite), so a profile number is matched against
-// the people the phone can list first. Pure, for node --test.
+// user id or a username (server/api/agency.mjs POST /api/agency/invite), so a profile number is first looked up on
+// the server (GET /api/lookup); an older server can't, and then it is matched against the people the phone can
+// list. Pure, for node --test.
 
 export type InviteInput = { kind: 'user'; id: string } | { kind: 'public'; publicId: string; username: string } | { kind: 'username'; username: string };
 
@@ -19,11 +20,12 @@ export function parseInviteInput(raw: string): InviteInput | null {
   return { kind: 'username', username };
 }
 
-/** The people whose profile ID is `publicId` (`idOf` is the app's own displayId), each once. */
-export function pickByPublicId<T extends { id: string }>(publicId: string, people: readonly T[], idOf: (id: string) => string): T[] {
+/** The people whose profile ID is `publicId` (`idOf` gives the ID the app shows for a person: data/profile
+ *  publicIdOf), each once. */
+export function pickByPublicId<T extends { id: string }>(publicId: string, people: readonly T[], idOf: (p: T) => string | null): T[] {
   const seen = new Set<string>();
   return people.filter((p) => {
-    if (seen.has(p.id) || idOf(p.id) !== publicId) return false;
+    if (seen.has(p.id) || idOf(p) !== publicId) return false;
     seen.add(p.id);
     return true;
   });

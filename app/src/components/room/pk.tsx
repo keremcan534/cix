@@ -13,7 +13,7 @@ import { Icon3D } from '@/components/Icon3D';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { useSheetBottom } from '@/components/room/parts';
 import { CloseBtn, Crest, GlowButton, GoldRim, NamePlate, PK, PkBackdrop, RankBadge, Ribbon, RingFace, TeamBanner, TimerPill, VsBadge } from '@/components/room/pk-premium';
-import { roomCode } from '@/data/catalog';
+import { roomIdText } from '@/data/catalog';
 import { roomById, userById } from '@/data/mock';
 import { IS_DEMO } from '@/lib/build';
 import { compact } from '@/lib/compact';
@@ -320,7 +320,7 @@ export function PkSetupSheet({ visible, roomId, starterId, micUsers, offline, on
                           {r.title}
                         </Text>
                         <Text style={st.dim}>
-                          ID {live ? roomCode(r.id) : r.id} · {r.listeners} kişi · Lv.{r.level ?? 1}
+                          ID {live ? roomIdText(r) : r.id} · {r.listeners} kişi · Lv.{r.level ?? 1}
                         </Text>
                       </View>
                       <Pressable style={[st.invite, (offline || busy || !config.crossPkEnabled) && st.disabled]} disabled={offline || busy || !config.crossPkEnabled} onPress={() => void invite(r.id)} accessibilityLabel={`${r.title} odasını PK’ya davet et`}>

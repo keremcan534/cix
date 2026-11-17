@@ -564,8 +564,13 @@ export const BOSS_SEAT_MIN_LEVEL = 3;
 /** Boss seat goes to the session's top gifter once they pass this many coins. */
 export const BOSS_SEAT_MIN_COINS = 1_000;
 export const MIC_COUNT_OPTIONS = [5, 8, 10, 12, 15];
-/** Stable public room number shown as "ID". */
+/**
+ * The room number an older server's rooms show as "ID": a hash of the room's own id, so not unique and new every time
+ * its owner opens it again. The server now gives a room's ID itself (its owner's own number): roomIdText.
+ */
 export const roomCode = (id: string) => String(10_000_000 + ([...id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 9_000_000, 7)));
+/** A room's ID as people see it: the server's (its owner's own number, lib/live roomOf `code`), else roomCode. */
+export const roomIdText = (r: { id: string; code?: string }) => (r.code && /^\d{12}$/.test(r.code) ? r.code : roomCode(r.id));
 
 // Oda Süslemesi › Ücretsiz: the backgrounds drawn behind a room's stage, each opened by the room's level (the server
 // checks it: server/api/catalog.mjs ROOM_COVERS). The pictures are the app's own sea scenes

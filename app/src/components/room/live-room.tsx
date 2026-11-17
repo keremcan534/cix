@@ -91,11 +91,11 @@ import { useRoomBonds } from '@/components/room/room-bonds';
 import { BOND_KINDS, bondTint, bubbleBondOf, jointEntries, micLinkOf, roomBondKey, type JointState, type RoomBond } from '@/data/bonds';
 import { Avatar } from '@/components/ui';
 import { AGENCIES } from '@/data/agency';
-import { BOSS_SEAT_MIN_LEVEL, COSMETICS, MUSIC_CATALOG, STANDARD_EMOJI, adminCapacity, cosmeticById, djCapacity, memberLimit, micCapacity, roomCode, roomLevel, roomTypeInfo, ROOM_LEVEL_REWARDS, type RoomTheme, type Track } from '@/data/catalog';
+import { BOSS_SEAT_MIN_LEVEL, COSMETICS, MUSIC_CATALOG, STANDARD_EMOJI, adminCapacity, cosmeticById, djCapacity, memberLimit, micCapacity, roomIdText, roomLevel, roomTypeInfo, ROOM_LEVEL_REWARDS, type RoomTheme, type Track } from '@/data/catalog';
 import { FAMILIES, INCOMING_GIFT_POOL, vipTier } from '@/data/economy';
 import { GATES, nobleInfo } from '@/data/status';
 import { LUCKY_RECIPIENT_SHARE, RULES, luckyHostDiamonds, pct } from '@/data/rules';
-import { BOT_LINES, GIFTS, ME, USERS, isServerId, roomById, userById, type Gift } from '@/data/mock';
+import { BOT_LINES, GIFTS, ME, USERS, isServerId, roomById, serverRoomCode, userById, type Gift } from '@/data/mock';
 import * as api from '@/lib/api';
 import { isLiveRoom, isLockedRoom, liveGift, liveMode, liveRoomAnimation, message as errorText, myServerId, putRoomAnswer, refreshServerRoom, rememberUser, toLocal, toServer, updateServerRoom } from '@/lib/live';
 import { liveBackpackGift } from '@/lib/live/backpack';
@@ -3058,7 +3058,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       if (offlineBlocked()) return;
       // My chat shows the room card; the message itself is the invite line with the room's number (lib/room-social).
       const ref = api.newRef();
-      const text = roomShareText(title, roomCode(id));
+      const text = roomShareText(title, roomIdText({ id, code: serverRoomCode(id) }));
       sendMessage(uid, text, true, { roomId: id, title, cover }, ref);
       setSharedTo((s) => new Set(s).add(uid));
       liveDm(uid, text, ref, (r) => {

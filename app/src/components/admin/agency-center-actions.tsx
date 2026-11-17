@@ -15,8 +15,9 @@ import { Text, TextInput } from '@/components/text';
 import { Button } from '@/components/ui';
 import { centerNet, errorText, runAction, type TreeNode } from '@/lib/agency-net';
 import { showAlert } from '@/lib/alert';
-import { ApiError } from '@/lib/api';
+import { ApiError, lookup } from '@/lib/api';
 import { sanctionSearch } from '@/lib/live/admin';
+import { serverNo } from '@/lib/public-no';
 import { SCRIM, colors, edge, fonts, radius, semantic, space } from '@/theme';
 
 type Person = { id: string; name: string; sub?: string };
@@ -164,15 +165,18 @@ function PersonPick({ value, onChange }: { value: Person | null; onChange: (p: P
           .map((u) => ({
             id: u.id,
             name: u.name,
-            sub: ROLE_TEXT[u.role] ?? 'Üye',
+            sub: `${ROLE_TEXT[u.role] ?? 'Üye'}${serverNo(u.publicNo) ? ` · ID ${serverNo(u.publicNo)}` : ''}`,
           })),
       );
       if (!users.length) setNote('Kimse bulunamadı.');
     } catch (e) {
-      // Without the search right an account id still works: the server checks it when the action is sent.
+      // Without the search right the ID on someone's profile (or an account id) still works: the server checks the
+      // person when the action is sent.
+      const hit = UUID.test(t) ? null : await lookup(t).catch(() => null);
       if (UUID.test(t)) setRows([{ id: t.toLowerCase(), name: 'Hesap kimliği', sub: t.toLowerCase() }]);
+      else if (hit) setRows([{ id: hit.user.id, name: hit.user.name, sub: hit.user.publicNo ? `ID ${hit.user.publicNo}` : 'Üye' }]);
       else setRows([]);
-      setNote(e instanceof ApiError && e.status === 403 ? 'Kişi aramak için Yaptırımlar görüntüleme yetkisi gerekir; hesap kimliğini yapıştırabilirsin.' : errorText(e));
+      if (!hit) setNote(e instanceof ApiError && e.status === 403 ? 'Kişi aramak için Yaptırımlar görüntüleme yetkisi gerekir; kişinin profilindeki ID’yi yazabilirsin.' : errorText(e));
     }
     setBusy(false);
   };
@@ -200,7 +204,7 @@ function PersonPick({ value, onChange }: { value: Person | null; onChange: (p: P
           value={q}
           onChangeText={setQ}
           onSubmitEditing={look}
-          placeholder="Ad, kullanıcı adı, telefon veya hesap kimliği"
+          placeholder="Ad, kullanıcı adı, telefon veya kişinin ID’si"
           placeholderTextColor={colors.textDim}
           autoCapitalize="none"
           style={[ns.input, { flex: 1 }]}

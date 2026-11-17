@@ -21,7 +21,7 @@ Ekran adları: **Profil** = `src/app/kullanici/[id].tsx`, **Ayarlar** = `src/app
 |---|---|---|---|
 | Profil fotoğrafı | 2 | 🆕 değiştirme | Kendi profilinde avatara dokun veya *Profili düzenle → Fotoğrafı değiştir*. Yeni fotoğraf önce incelemeye düşer ("İncelemede"); onaylanana kadar başkaları eski fotoğrafı görür. |
 | Kullanıcı adı (@handle) | 2 | 🆕 | Benzersiz; 3–20 karakter, harfle başlar, a-z 0-9 . _ kullanılır. Ayrılmış adlar (admin, destek, similarclub…) ve alınmış adlar reddedilir. Kopyalanabilir. |
-| Benzersiz kullanıcı ID'si | 2 | ✓ | 12 haneli, değiştirilemez, kopyalanabilir. ID'yi sunucu üretmeli. |
+| Benzersiz kullanıcı ID'si | 2 | ✓ | 12 haneli, değiştirilemez, kopyalanabilir. Sunucu üretir (`users.public_no`, [`KIMLIK_NUMARASI.md`](KIMLIK_NUMARASI.md)); odanın ID'si sahibinin ID'si. |
 | Görünen ad / takma ad | 2 | ✓ (kurallar 🆕) | En fazla 20 karakter, küfür filtresi. |
 | Doğum tarihi / yaş | 2 | 🆕 tarih düzenleme | GG.AA.YYYY olarak girilir, 18 yaş altı reddedilir. Doğum tarihini yalnızca sahibi görür, diğerleri sadece yaşı görür. Not: kayıt ekranı şu an sadece doğum yılını soruyor. |
 | Cinsiyet (isteğe bağlı) | 2 | 🆕 gizleme, 🆕 görünürlük | Kadın / Erkek / Belirtmek istemiyorum. Rozette simge, cinsiyet ve yaş yazar (örn. "♂ Erkek · 24"); ayrıca *Temel Bilgiler → Cinsiyet*. Gizlenirse başkaları rozette sadece yaşı görür, satır gösterilmez. Sahibi kendi cinsiyetini soluk ve göz kapalı simgesiyle görür. Profil sekmesinde de rozet var. |

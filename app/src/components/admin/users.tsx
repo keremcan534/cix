@@ -12,6 +12,7 @@ import { ROOM_XP_THRESHOLDS } from '@/data/catalog';
 import { ago, fmtDate } from '@/lib/admin-format';
 import { copyText } from '@/lib/clipboard';
 import * as admin from '@/lib/live/admin';
+import { serverNo } from '@/lib/public-no';
 import { makeStyles, radius, space, useTheme } from '@/theme';
 
 import { ItemCard, Line, LoadState, Notice, SectionScroll, StatusPill, confirmThen, useAdmin, useLoad } from './parts';
@@ -70,7 +71,7 @@ export function UsersSection() {
             value={draft}
             onChangeText={setDraft}
             onSubmitEditing={() => setSearch(draft)}
-            placeholder="Ad, kullanıcı adı, e-posta, hesap kimliği veya oda ID"
+            placeholder="Ad, kullanıcı adı, e-posta veya ID (kişinin ya da odasının)"
             placeholderTextColor={colors.textDim}
             style={s.input}
             autoCapitalize="none"
@@ -169,6 +170,7 @@ function UserCard({ u, onDone }: { u: admin.AdminUser; onDone: () => void }) {
       <Line label="Giriş" value={signIn} />
       <Line label="Kayıt" value={`${fmtDate(u.createdAt)} · ${ago(u.createdAt)}`} />
       <Line label="Oda" value={u.room ? `ID ${u.room.code} · Lv.${roomLevel}` : `Oda açmadı · Lv.${roomLevel}`} />
+      {serverNo(u.publicNo) && <Line label="ID" value={serverNo(u.publicNo)!} mono onCopy={() => copyText(serverNo(u.publicNo)!, 'ID')} />}
       <Line label="Kimlik" value={u.id} mono onCopy={() => copyText(u.id, 'Hesap kimliği')} />
     </ItemCard>
   );

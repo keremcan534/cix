@@ -13,10 +13,12 @@
 //   GET  /api/admin/users?q=&offset=   → { users, total, tests }  (50 a page; tests: the smoke-test accounts)
 //   POST /api/admin/users/delete { id } | { tests: true } → { deleted }
 //   POST /api/admin/users/room-level { id, level }  (1–15)  → { level, xp }   sets the owner's room level
-// The search also takes a room's 8-digit ID (the number the app shows on the room): its owner is listed.
+// The search also takes a number (public-no.mjs whoIs): someone's own (their profile's ID and their room's), a special
+// ID, or an older app's 8-digit room ID, of a room closed since too: that person is listed.
 // A staff account and your own can't be deleted here. `tests: true` deletes the accounts smoke-test.mjs makes:
 // named "Test A" or "Test B", development sign-in only (no Google or e-mail), role user.
-import { HttpError, LIVE_SANCTION, SANCTION_SELECT, auth, db, int, readJson, tx, userId } from './core.mjs';
+import { HttpError, LIVE_SANCTION, SANCTION_SELECT, auth, db, int, publicNoOf, readJson, tx, userId } from './core.mjs';
+import { whoIs } from './public-no.mjs';
 import { applySanction, audit, liftSanction, mayLift, permsOf } from './sanctions.mjs';
 import { eraseAccount } from './social.mjs';
 import { removeUserFiles } from './media.mjs';
@@ -113,13 +115,14 @@ export const adminRoutes = {
     const q = (url.searchParams.get('q') ?? '').trim().slice(0, 80);
     const offset = Math.max(0, Math.min(100000, Number(url.searchParams.get('offset')) || 0));
     const like = `%${q.replace(/[%_\\]/g, (m) => `\\${m}`)}%`;
-    // A room ID is a hash of the room's uuid (rooms.mjs roomCode), so it is matched here, not in SQL.
-    const owners = /^\d{8}$/.test(q) ? (await db.query('SELECT id, owner FROM rooms')).rows.filter((r) => roomCode(r.id) === q).map((r) => r.owner) : [];
+    // A number: someone's own (their profile's ID, their room's), a special ID, or an older app's room ID (public-no.mjs).
+    const found = /^[\d\s-]{1,20}$/.test(q) ? await whoIs(q, db, { anyRoom: true }) : null;
+    const owners = found ? [found.id] : [];
     const where = `u.deleted_at IS NULL AND ($1 = '' OR u.name ILIKE $2 OR u.username ILIKE $2 OR u.id::text = $1 OR u.id = ANY($3::uuid[])
       OR EXISTS (SELECT 1 FROM auth_identities i WHERE i.user_id = u.id AND i.email ILIKE $2))`;
     const [rows, count] = await Promise.all([
       db.query(
-        `SELECT u.id, u.name, u.username, u.role, u.created_at, u.room_xp,
+        `SELECT u.id, u.name, u.username, u.role, u.created_at, u.room_xp, u.public_no,
                 coalesce((SELECT array_agg(i.provider ORDER BY i.provider) FROM auth_identities i WHERE i.user_id = u.id), '{}') AS sign_in,
                 (SELECT r.id FROM rooms r WHERE r.owner = u.id ORDER BY (r.closed_at IS NULL) DESC, r.created_at DESC LIMIT 1) AS room_id,
                 (${TEST_ACCOUNT}) AS test
@@ -131,14 +134,15 @@ export const adminRoutes = {
     return {
       users: rows.rows.map((x) => ({
         id: x.id,
+        publicNo: publicNoOf(x),
         name: x.name,
         username: x.username,
         role: x.role,
         createdAt: x.created_at,
         signIn: x.sign_in,
         test: x.test,
-        // Their room (the open one, else the latest) and its level, which is the owner's.
-        room: x.room_id ? { id: x.room_id, code: roomCode(x.room_id) } : null,
+        // Their room (the open one, else the latest), its ID (the owner's own number) and its level, the owner's.
+        room: x.room_id ? { id: x.room_id, code: publicNoOf(x) ?? roomCode(x.room_id) } : null,
         roomLevel: roomLevel(x.room_xp),
       })),
       total: Number(count.rows[0].n),

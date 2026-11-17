@@ -221,6 +221,21 @@ export const GIFT_SHOWS: GiftShow[] = [
       { part: 'govde', draw: 'Kanatsız kartal gövdesi ve başı, önden: beyaz baş, altın gaga, kahverengi-altın göğüs.', motion: 'float', x: 0.5, y: 0.5, size: 0.42 },
     ],
   },
+  {
+    // Koruma (server/api/guards.mjs, docs/KORUMA.md): cheap, but it starts a Koruma, so the room sees it.
+    giftId: 'koruma',
+    slug: 'koruma-karti',
+    durationMs: 4600,
+    enter: 'zoom',
+    glow: CORAL,
+    sparkle: 'glints',
+    parts: [
+      { part: 'hale', draw: 'Pembe-altın ışık halkası: ince parlak çember ve yumuşak ışıma.', motion: 'pulse', x: 0.5, y: 0.5, size: 0.86 },
+      wingL(0.3, 0.52, 0.34, 'Tek bir küçük beyaz-pembe kanat (sol kanat), omzu sağda.'),
+      wingR(0.7, 0.52, 0.34, 'Aynı kanat (sağ tarafa aynalanır).'),
+      { part: 'kart', draw: 'Kanatsız pembe koruma kartı: altın çerçeveli, ortasında altın bir kalp ve kalbin üstünde küçük beyaz kalkan.', motion: 'float', x: 0.5, y: 0.5, size: 0.6 },
+    ],
+  },
 ];
 
 const BY_ID = new Map(GIFT_SHOWS.map((s) => [s.giftId, s]));

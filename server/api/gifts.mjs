@@ -40,6 +40,7 @@ import { giftCoins } from './wallet.mjs';
 import { announceRoom, roomService } from './live.mjs';
 import { roomLevel } from './rooms.mjs';
 import { announceBoss, bossGift } from './boss-seat.mjs';
+import { GUARD_CARD, guardStarted, startGuard } from './guards.mjs';
 
 export const ROOM = /^[A-Za-z0-9_-]{1,64}$/;
 const BOARDS = { wealth: 'sender', charm: 'recipient' };
@@ -172,6 +173,7 @@ export const giftRoutes = {
     let eventId = null;
     let levelUp = false;
     let boss = [];
+    let guardNew = false;
     const out = await once(u.id, 'coin', b.ref, async (c) => {
       // Lock both rows in id order so two people gifting each other at once can't deadlock.
       const locked = await c.query('SELECT id FROM users WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL ORDER BY id FOR UPDATE', [[u.id, to]]);
@@ -181,6 +183,8 @@ export const giftRoutes = {
       if (s.giftsHidden.has(gift.id)) throw new HttpError(400, 'Bu hediye artık yok');
       // The price the phone showed (none from an older app): a gift whose price moved is refused, nothing moves.
       checkShownPrice(gift, b.price);
+      // Koruma Kartı (guards.mjs): starts a Koruma before the gift's row, so its coins are the first points.
+      if (gift.id === GUARD_CARD) guardNew = await startGuard(c, u.id, to);
       const g = await c.query('INSERT INTO gift_events (sender, recipient, gift_id, count, unit_price, total, room, place, ref) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id', [
         u.id,
         to,
@@ -232,6 +236,7 @@ export const giftRoutes = {
     // Patron koltuğu: the room hears who sat, took it or whose time ended.
     if (!out.replay && lkRoom) await announceBoss(lkRoom.slice(4), boss);
     if (!out.replay && !room) notify([to], { title: 'Hediye geldi', body: `${u.name} sana ${label} gönderdi`, data: { type: 'gift', from: u.id } });
+    if (!out.replay && guardNew) guardStarted(u, to);
     if (!out.replay) return { ...out, total };
     // A replay reports what that ref sent, not this body's gift and count (0: the ref was no gift).
     const sent = (await db.query('SELECT total FROM gift_events WHERE sender = $1 AND ref = $2', [u.id, b.ref])).rows[0];

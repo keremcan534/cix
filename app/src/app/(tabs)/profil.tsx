@@ -8,11 +8,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '@/components/text';
 import { AffiliationPills, GenderChip } from '@/components/profile-badges';
 import { FramedAvatar, LevelChips, VerifiedBadge } from '@/components/ui';
-import { cosmeticById, roomCode, roomLevel } from '@/data/catalog';
+import { cosmeticById, roomCode, roomIdText, roomLevel } from '@/data/catalog';
 import { VisitorsSheet, useProfileVisitors } from '@/components/visitors-sheet';
 import { FollowListSheet, MY_LISTS } from '@/components/follow-list-sheet';
 import { FOLLOWS_ME, userById } from '@/data/mock';
-import { displayId } from '@/data/profile';
+import { publicIdOf } from '@/data/profile';
 import { NOBLE_TIERS, SVIP_LEVELS, nobleInfo } from '@/data/status';
 import { Art } from '@/components/Art';
 import { confirmLogout, showAlert } from '@/lib/alert';
@@ -100,9 +100,10 @@ export default function ProfileScreen() {
     if (ziyaretciler) router.setParams({ ziyaretciler: undefined });
   }, [ziyaretciler]);
   const completion = myCompletion(me, live);
-  // My public id: the one others see on my profile (data/profile displayId of my server id); none until known.
+  // My public id: the one others see on my profile, my own number from the server (an older server: the one made
+  // from my server id, data/profile publicIdOf); none until known.
   const serverId = server.stats?.serverId ?? myServerId();
-  const publicId = specialId ? specialId.name.replace('ID ', '') : live ? (serverId ? displayId(serverId) : null) : '10284731';
+  const publicId = specialId ? specialId.name.replace('ID ', '') : live ? publicIdOf(me, serverId) : '10284731';
 
   const main: Item[] = [
     { icon: 'diamond-outline', img: 'diamond', label: 'Gelir', onPress: () => router.push('/gelir') },
@@ -118,6 +119,8 @@ export default function ProfileScreen() {
     // Etkinlik Merkezi on Odamın Etkinlikleri: my places, the ones that passed, my rooms' events.
     { icon: 'calendar-outline', label: 'Etkinliklerim', onPress: () => openEvents({ tab: 'mine' }) },
     { icon: 'ribbon-outline', img: 'crown', label: 'Cömertlik ve Yankı', onPress: () => router.push('/seviye') },
+    // Koruma is the server's (lib/live/guard): who guards me, whom I guard, my threshold.
+    ...(live ? [{ icon: 'shield-half-outline', img: 'heart', label: 'Benim Koruma', onPress: () => router.push('/koruma') } satisfies Item] : []),
   ];
   // Live: agency rows follow my membership on the server (none shows until it is read).
   const hasAgency = live ? (server.agency === undefined ? null : !!server.agency) : !!agencyId;
@@ -221,7 +224,7 @@ export default function ProfileScreen() {
                 {ownRoom ? ownRoom.title || 'Odam' : 'Odanı aç'}
               </Text>
               <Text style={{ color: colors.textDim, fontSize: 12 }} numberOfLines={1}>
-                {ownRoom ? `Odam · ID ${roomCode(ownRoom.id)} · ${ownRoom.listeners.toLocaleString('tr-TR')} kişi içeride` : 'Hemen aç, arkadaşlarını çağır.'}
+                {ownRoom ? `Odam · ID ${roomIdText(ownRoom)} · ${ownRoom.listeners.toLocaleString('tr-TR')} kişi içeride` : 'Hemen aç, arkadaşlarını çağır.'}
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.textDim} />

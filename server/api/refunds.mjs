@@ -4,7 +4,8 @@
 // admin's button (jeton.mjs refundPurchase): coins and still-locked diamonds back, agency commission reversed.
 //
 //   POST /api/admin/purchases/voided-sync (admin) → { checked, refunded, unknown, failed, subscriptionsEnded }   (one round now)
-//   GET  /api/admin/purchases?q=          (admin) → { purchases, googleSync }   (find one to refund by hand)
+//   GET  /api/admin/purchases?q=          (admin) → { purchases, googleSync }   (find one to refund by hand: purchase no,
+//        store order no, account id or the 12-digit ID on the person's profile)
 //
 // A purchase already refunded is skipped, so reading the same voided purchase twice changes nothing. The
 // cursor (store_refund_sync) is the newest voided time seen, read again with a day of overlap; Google keeps 30
@@ -16,6 +17,7 @@ import { PACK_BY_PRODUCT } from './catalog.mjs';
 import { refundPurchase } from './jeton.mjs';
 import { googleAccessToken, googleAppUrl } from './purchases.mjs';
 import { endVoidedSubscription } from './vip.mjs';
+import { whoIs } from './public-no.mjs';
 
 const EVERY_MIN = Number(env.GOOGLE_VOIDED_POLL_MIN ?? 60);
 const DAYS_BACK = 30;
@@ -122,8 +124,12 @@ async function admin(req) {
  */
 async function findPurchases(q) {
   const term = String(q ?? '').trim().slice(0, 200);
+  // The 12-digit ID on someone's profile (public-no.mjs): their purchases too.
+  const person = /^\d{12}$/.test(term) ? await whoIs(term) : null;
   const [where, args] = /^\d{1,15}$/.test(term)
-    ? ['p.id = $1 OR p.transaction_id = $2', [Number(term), term]]
+    ? person
+      ? ['p.id = $1 OR p.transaction_id = $2 OR p.user_id = $3', [Number(term), term, person.id]]
+      : ['p.id = $1 OR p.transaction_id = $2', [Number(term), term]]
     : UUID.test(term.toLowerCase())
       ? ['p.user_id = $1', [term.toLowerCase()]]
       : term

@@ -4,6 +4,8 @@ import { IS_DEMO } from '@/lib/build';
 export type User = {
   id: string;
   name: string;
+  /** Live mode: the person's own number from the server (their profile's ID, their room's), when it sent one. */
+  publicNo?: string;
   age: number;
   city: string;
   distanceKm: number;
@@ -50,6 +52,8 @@ export type RoomRulesLike = {
 };
 export type Room = {
   id: string;
+  /** Live mode: the room's ID as the server gives it (its owner's own number), when it sent one. */
+  code?: string;
   title: string;
   category: Category;
   cover: string;
@@ -276,6 +280,8 @@ export function setServerFace(id: string, avatar: string | null) {
   if (u && u.avatar !== (avatar ?? NO_PHOTO)) serverUsers.set(id, { ...u, avatar: avatar ?? NO_PHOTO });
 }
 export const putServerRoom = (r: Room) => void serverRooms.set(r.id, r);
+/** A server room's ID as the server gave it (its owner's own number); undefined for a room it didn't (or not read). */
+export const serverRoomCode = (id: string) => serverRooms.get(id)?.code;
 export const serverUserKnown = (id: string) => serverUsers.has(id);
 export const serverRoomKnown = (id: string) => serverRooms.has(id);
 
@@ -378,6 +384,8 @@ export const GIFTS: Gift[] = [
   couple('c11', 'Lunapark Randevusu', '🎡', 49_950, '3D'),
   couple('c12', 'Aşk Ateşi', '❤️‍🔥', 1_999),
   couple('c13', 'Pırlanta Yüzük', '💍', 19_999, 'music'),
+  // Koruma (server/api/guards.mjs): sending it makes the sender the receiver's guardian.
+  couple('koruma', 'Koruma Kartı', '🛡️', 999),
   // --- Ayrıcalık (SVIP-gated) ---
   { id: 'v1', name: 'Zümrüt Saat', emoji: '⌚', price: 4_950, cat: 'privilege', minSvip: 2 },
   { id: 'v2', name: 'Gizemli Gül', emoji: '🥀', price: 350, cat: 'privilege', minSvip: 2 },

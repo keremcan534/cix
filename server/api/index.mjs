@@ -35,6 +35,7 @@ import http from 'node:http';
 // First, so its console.error hook is in place before anything else runs.
 import { failed } from './reporting.mjs';
 import { adminRoutes } from './admin.mjs';
+import { lookupRoutes } from './public-no.mjs';
 import { alertRoutes, warningCodes } from './alerts.mjs';
 import { CONFIG_CACHE, configRoutes, gate } from './features.mjs';
 import { agencyRoutes } from './agency.mjs';
@@ -60,6 +61,7 @@ import { emojiRoutes, refreshEmoji, startEmoji, stopEmoji } from './emoji.mjs';
 import { refreshLevels, startLevels, stopLevels, topPoints } from './levels.mjs';
 import { levelRoutes, startLevelDecay, stopLevelDecay } from './levels-admin.mjs';
 import { refreshShopItems, sendShopFx, shopRoutes, startShopItems, stopShopItems } from './shop-items.mjs';
+import { guardRoutes, startGuardSweep, stopGuardSweep } from './guards.mjs';
 import { FX_PATH, sendFx } from './fx.mjs';
 import { jetonRoutes } from './jeton.mjs';
 import { liveRoutes } from './live.mjs';
@@ -313,6 +315,7 @@ const routes = {
   ...emojiRoutes,
   ...levelRoutes,
   ...shopRoutes,
+  ...guardRoutes,
   ...backpackRoutes,
   ...pkRoutes,
   ...crossPkRoutes,
@@ -356,6 +359,7 @@ const routes = {
   ...bossSeatRoutes,
   ...roomRoutes,
   ...adminRoutes,
+  ...lookupRoutes,
   ...financeSyncRoutes,
   ...agencyRoutes,
   ...agencyAdminRoutes,
@@ -509,6 +513,7 @@ function shutdown(signal) {
   stopEmoji();
   stopLevels();
   stopLevelDecay();
+  stopGuardSweep();
   stopShopItems();
   server.close();
   const started = Date.now();
@@ -546,5 +551,6 @@ startCustomGifts();
 startEmoji();
 startLevels();
 startLevelDecay();
+startGuardSweep();
 startShopItems();
 startSeatColorSweep();

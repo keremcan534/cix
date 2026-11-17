@@ -105,13 +105,16 @@ describe('Oda seviyesi, mikrofonlar ve düzen', () => {
     assert.equal((await call('GET', `/api/room?id=${room}`, null, member.session))[1].room.xp, 210);
   });
 
-  test('yönetici odayı 8 haneli ID ile bulur ve Lv. MAX yapar; kayıt düşer, odaya haber gider', async () => {
+  test('yönetici odayı ID ile bulur (sahibinin numarası; eski uygulamanın 8 haneli ID’si de) ve Lv. MAX yapar; kayıt düşer, odaya haber gider', async () => {
     const code = appRoomCode(room);
     assert.match(code, /^\d{8}$/);
     assert.equal((await call('GET', `/api/admin/users?q=${code}`, null, member.session))[0], 403);
     const [, found] = await call('GET', `/api/admin/users?q=${code}`, null, boss.session);
     assert.deepEqual(found.users.map((u) => u.id), [owner.user.id]);
-    assert.deepEqual(found.users[0].room, { id: room, code });
+    const no = found.users[0].publicNo;
+    assert.match(no, /^\d{12}$/);
+    assert.deepEqual(found.users[0].room, { id: room, code: no }, 'odanın ID’si sahibinin numarası');
+    assert.deepEqual((await call('GET', `/api/admin/users?q=${no}`, null, boss.session))[1].users.map((u) => u.id), [owner.user.id]);
     assert.equal(found.users[0].roomLevel, 2);
 
     assert.equal((await call('POST', '/api/admin/users/room-level', { id: owner.user.id, level: 15 }, owner.session))[0], 403, 'oda sahibi kendi seviyesini değiştiremez');

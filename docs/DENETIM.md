@@ -119,6 +119,9 @@ modunda olması, hata takibi olmaması ve kırık kodun birleşmeden önce yakal
   - Sabah rapor.
 - **Medya dağıtımı:** Fotoğraf ve videolar bugün API sunucusundan geçiyor. Kullanıcı artınca Cloudflare (CDN) önüne alınmalı.
 - **Yatay büyüme:** Birden fazla API sunucusu, ayrı veritabanı, LiveKit kümesi.
+- **Kimlik numarası sınırı:** Kişi ID'lerinin bugünkü biçiminde yaklaşık 1.010.000 hesaplık yer var. 900 bin hesaba
+  yaklaşmadan biçim, iletişim filtresinin kullanıcı ID'si kuralıyla birlikte genişletilmeli
+  ([`KIMLIK_NUMARASI.md`](KIMLIK_NUMARASI.md)).
 
 ---
 

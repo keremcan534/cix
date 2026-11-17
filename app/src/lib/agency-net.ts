@@ -6,9 +6,9 @@
 // A live build never does: when its server cannot be reached the panels say so and offer a retry.
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { displayId } from '@/data/profile';
+import { publicIdOf } from '@/data/profile';
 import { AGENCY_LEDGER_LABEL } from '@/lib/admin-format';
-import { ApiError, apiEnabled, apiRequest, discover, ensureSignedIn, followingList, newRef } from '@/lib/api';
+import { ApiError, apiEnabled, apiRequest, discover, ensureSignedIn, followingList, lookup, newRef } from '@/lib/api';
 import { showAlert } from '@/lib/alert';
 import { refusalTitle } from '@/lib/contact-filter';
 import { parseInviteInput, pickByPublicId } from '@/lib/invite-target';
@@ -491,17 +491,20 @@ export function useNet<T>(name: string, load: () => Promise<T>, demo: () => T, d
 
 /**
  * "Yayıncı davet et": `raw` is what the owner typed: the profile ID the app shows ("ID:…"), an account id or a
- * username. The server knows only account ids and usernames, so a profile ID is looked up among the people this
- * phone can list (followed accounts and Keşfet) and, when no one matches, tried as a username. "Kullanıcı
- * bulunamadı" comes back only after both ways found no one.
+ * username. The invite takes account ids and usernames, so a profile ID is first looked up on the server
+ * (GET /api/lookup); an older server can't, and then it is looked up among the people this phone can list (followed
+ * accounts and Keşfet) and, when no one matches, tried as a username. "Kullanıcı bulunamadı" comes back only after
+ * every way found no one.
  */
 export async function inviteStreamer(agencyId: string, raw: string, note?: string) {
   const t = parseInviteInput(raw);
   if (!t) throw new ApiError(400, 'Profil ID’sini ya da kullanıcı adını yaz.');
   if (t.kind === 'user') return agencyNet.invite(agencyId, { user: t.id }, note);
   if (t.kind === 'public') {
+    const who = await personByNumber(t.publicId);
+    if (who) return agencyNet.invite(agencyId, { user: who.id }, note);
     const [following, nearby] = await Promise.all([followingList().catch(() => []), discover().catch(() => [])]);
-    const hits = pickByPublicId(t.publicId, [...following, ...nearby], displayId);
+    const hits = pickByPublicId(t.publicId, [...following, ...nearby], (u) => publicIdOf(u, u.id));
     if (hits.length === 1) return agencyNet.invite(agencyId, { user: hits[0].id }, note);
   }
   try {
@@ -513,17 +516,29 @@ export async function inviteStreamer(agencyId: string, raw: string, note?: strin
   }
 }
 
+/** Someone by their own number (GET /api/lookup); null when nobody has it, or the server is older and can't tell. */
+async function personByNumber(no: string): Promise<{ id: string; name: string; avatarUrl: string | null } | null> {
+  try {
+    return (await lookup(no))?.user ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Live "Yayıncı davet et" search over what the owner typed. A name (as the app shows it) or a username is looked up
- * on the server. A profile ID number has no server lookup (people see their own on their profile and may pass it
- * on), so it is matched among the people this phone can list (followed accounts and Keşfet), else searched as text.
+ * on the server, and so is a profile ID number (everyone's own, server/api/public-no.mjs). An older server can't look
+ * a number up: then it is matched among the people this phone can list (followed accounts and Keşfet), else searched
+ * as text.
  */
 export async function findInvitees(agencyId: string, raw: string): Promise<Invitee[]> {
   const t = parseInviteInput(raw);
   if (!t || t.kind === 'user') return [];
   if (t.kind === 'public') {
+    const who = await personByNumber(t.publicId);
+    if (who) return [{ id: who.id, name: who.name, username: null, avatarUrl: who.avatarUrl ?? null, agency: null }];
     const [following, nearby] = await Promise.all([followingList().catch(() => []), discover().catch(() => [])]);
-    const hits = pickByPublicId(t.publicId, [...following, ...nearby], displayId);
+    const hits = pickByPublicId(t.publicId, [...following, ...nearby], (u) => publicIdOf(u, u.id));
     if (hits.length) return hits.map((u) => ({ id: u.id, name: u.name, username: null, avatarUrl: u.avatarUrl ?? null, agency: null }));
   }
   return agencyNet.inviteSearch(agencyId, t.username);

@@ -15,6 +15,7 @@ import { useEffect, useSyncExternalStore } from 'react';
 import * as api from '@/lib/api';
 import { ROOM_THEMES, roomCoverUrl } from '@/data/catalog';
 import { isServerId, putServerRoom, putServerUser, type Room, type User } from '@/data/mock';
+import { serverNo } from '@/lib/public-no';
 import { putLevels } from '@/lib/live/levels';
 import { putDistance } from '@/lib/live/distances';
 import { giftById, liveRules, noteLiveRate, rateChangedMessage, refreshLiveCatalog } from '@/lib/live/catalog-live';
@@ -261,9 +262,9 @@ export function liveSpend(n: number, reason: string) {
 
 // --- People ----------------------------------------------------------------------------------------------
 /** Someone from a server list (room owner, message, LiveKit participant), known by name until their profile loads. */
-export function rememberUser(c: { id: string; name: string; avatarUrl?: string | null }) {
+export function rememberUser(c: { id: string; name: string; avatarUrl?: string | null; publicNo?: string | null }) {
   if (c.id === myId) return;
-  putServerUser({ id: c.id, name: c.name, ...(c.avatarUrl ? { avatar: c.avatarUrl } : {}) });
+  putServerUser({ id: c.id, name: c.name, ...(c.avatarUrl ? { avatar: c.avatarUrl } : {}), ...(serverNo(c.publicNo) ? { publicNo: serverNo(c.publicNo)! } : {}) });
 }
 
 /** A full profile (age, city, interests, follow state) from the server. */
@@ -357,6 +358,8 @@ export function roomOf(r: api.ServerRoom): Room {
   else locked.delete(r.id);
   const room: Room = {
     id: r.id,
+    // Its ID: the owner's own number (an older server sends none: data/catalog roomIdText makes one).
+    ...(serverNo(r.code) && { code: serverNo(r.code)! }),
     title: r.title,
     category: 'Sohbet',
     // Oda kapağı: the uploaded card picture, else what the lists showed before it existed.
