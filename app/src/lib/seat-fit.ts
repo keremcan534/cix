@@ -1,12 +1,25 @@
-// How big the faces on a room's mics are. The stage doesn't scroll: its mics take the height the room's chat
-// leaves them (few mics: big faces, up to FACE_MAX; many: smaller ones, down to FACE_MIN), and when the faces are
-// as big as they get the chat takes the rest, so no empty band opens. Only when even the smallest faces don't fit
-// does the chat give way. Pure (no drawing), so the sizes are unit tested; the seats draw with these numbers.
+// How big the faces on a room's mics are. As in other apps, every mic count gets the same face (FACE_STD): 2 mics
+// or 20, the rows change, the faces, names and points under them don't, and the chat takes the height the stage
+// leaves. Only when a row is too narrow for it (six to a row) or the phone too short (the stage would leave the chat
+// less than its least) are the faces smaller, down to FACE_MIN. Pure (no drawing), so the sizes are unit tested; the
+// seats draw with these numbers.
 import type { LayoutSchema, LayoutSlot } from '@/data/room-layouts';
 
 /** The smallest and the biggest face on a mic (px). */
 export const FACE_MIN = 30;
 export const FACE_MAX = 96;
+/**
+ * The face on every stage, whatever its mic count or layout (the owners' video of another app, Nov 2026: the mics
+ * there keep their size from 2 to 24 and only the rows change). Before, the faces filled the stage's height (96 px
+ * with 5 mics, 30 with 20), so every change of the mic count resized the seats, their frames and their names.
+ */
+export const FACE_STD = 52;
+/**
+ * A mic's slot past its face: the room for its frame and the gap to the next face. Every row has the same step
+ * (FACE_STD + SLOT_PAD, or its share of a narrow row), four or five to a row alike, and the slots follow the faces:
+ * a smaller face (a short phone) closes the row up instead of leaving wide gaps between the seats.
+ */
+const SLOT_PAD = 26;
 /** The host's face when it has a row of its own (and a couple room's main seats'): a little bigger. */
 const HOST_MAX = 112;
 /** Between two rows of seats (the stage's and the classic grid's row gap). */
@@ -61,47 +74,56 @@ export const easedChange = (a: Fitted, b: Fitted) => a.cols !== b.cols || Math.a
 const gridWidth = (width: number) => Math.max(200, Math.min(width, 640) - 16);
 
 /**
- * The width one mic takes: never more than its share of the row, and no wider than its face and a short gap, so a
- * row of small faces stays together in the middle instead of spreading over the whole screen.
+ * The width one mic takes: its face and SLOT_PAD, or its share of the row when the row is narrower. The rows stay
+ * together in the middle, the same step for four or five to a row, so a new mic count doesn't spread or squeeze them.
  */
-export const gridSlot = (w: number, cols: number, face: number) => Math.min(Math.floor(w / cols), Math.round(face * 1.25) + 16);
+export const gridSlot = (w: number, cols: number, face: number) => Math.min(Math.floor(w / cols), face + SLOT_PAD);
 
-function gridAt(guests: number, w: number, cols: number, face: number, o: FitOpts): Fitted {
-  const rows = Math.ceil(guests / cols);
-  // Beside the Patron seat the host is at most the boss seat's ring; alone on its row a little bigger than the rest.
-  const host = o.boss ? Math.min(hostFaceOf(face), 70) : hostFaceOf(face);
-  const top = o.boss ? Math.max(bossHeight(), seatHeight(host)) : seatHeight(host);
-  return { cols, slot: gridSlot(w, cols, face), face, host, height: 8 + top + rows * (ROW_GAP + seatHeight(face)) };
-}
-
-/** Fits beats doesn't; then the bigger face; then the one that fills the height more. None fits: the shortest. */
-function better(a: Fitted, b: Fitted, height: number) {
-  const fa = a.height <= height;
-  const fb = b.height <= height;
-  if (fa !== fb) return fa;
-  if (!fa) return a.height < b.height;
-  return a.face > b.face || (a.face === b.face && a.height > b.height);
+function gridAt(seats: number, w: number, cols: number, face: number, o: FitOpts): Fitted {
+  const rows = Math.ceil(seats / cols);
+  // The Patron seat has the row above the mics to itself; the host's mic is the grid's first, as big as the rest.
+  const top = o.boss ? bossHeight() + ROW_GAP : 0;
+  return { cols, slot: gridSlot(w, cols, face), face, host: face, height: 8 + top + rows * seatHeight(face) + Math.max(0, rows - 1) * ROW_GAP };
 }
 
 /**
- * The columns and faces with which `guests` mics (and the host's row) fit `height` best. With `like` (the room as
- * it is without a board over it) the columns stay and the faces are at most that big: a board adds to the stage, it
- * doesn't rearrange it.
+ * The classic grid's columns for `seats` mics (the host's among them), so that every row is full and the stage is
+ * symmetric, as in other apps (the owners' video, Nov 2026): up to five in one row; then four (8, 12, 16), five (10,
+ * 15, 20, 25), three (6, 9) or six (18, 24, 30) to a row. A count none of them fills (7, 11, 13…) gets four or five
+ * (six past twenty), whichever leaves the last row fullest, then the fewer rows; that row sits in the middle
+ * (live-room guestGrid).
  */
-export function fitGrid(guests: number, width: number, height: number, o: FitOpts = {}, like?: Fitted): Fitted {
+export function gridCols(seats: number): number {
+  if (seats <= 5) return Math.max(1, seats);
+  const fills = (cols: number, rows: number) => seats % cols === 0 && seats / cols <= rows;
+  if (fills(4, 4)) return 4;
+  if (fills(5, 5)) return 5;
+  if (fills(3, 3)) return 3;
+  if (fills(6, 6)) return 6;
+  const empty = (cols: number) => Math.ceil(seats / cols) * cols - seats;
+  const [a, b] = seats > 20 ? [5, 6] : [4, 5];
+  return empty(b) < empty(a) || (empty(b) === empty(a) && Math.ceil(seats / b) < Math.ceil(seats / a)) ? b : a;
+}
+
+/**
+ * The classic grid for `seats` mics (the Patron seat's row above them) in `height`: gridCols' columns with FACE_STD
+ * faces, smaller only when the row is narrow or the height can't hold them. When even the smallest faces don't fit,
+ * more to a row (the shortest stage). With `like` (the room as it is without a board over it) the columns stay and the
+ * faces are at most that big: a board adds to the stage, it doesn't rearrange it.
+ */
+export function fitGrid(seats: number, width: number, height: number, o: FitOpts = {}, like?: Fitted): Fitted {
   const w = gridWidth(width);
-  if (like && like.cols >= 3) {
-    const max = Math.min(FACE_MAX, Math.floor(w / like.cols) - SIDE, like.face);
-    return gridAt(guests, w, like.cols, fitFace((f) => gridAt(guests, w, like.cols, f, o).height, height, max), o);
+  const widest = (cols: number) => Math.min(FACE_STD, Math.floor(w / cols) - SIDE);
+  const at = (cols: number, max: number) => gridAt(seats, w, cols, fitFace((f) => gridAt(seats, w, cols, f, o).height, height, max), o);
+  if (like && like.cols >= 1) return at(like.cols, Math.min(widest(like.cols), like.face));
+  const most = Math.max(3, Math.min(8, Math.floor(w / (FACE_MIN + SIDE))));
+  const cols = Math.min(gridCols(seats), most);
+  let best = at(cols, widest(cols));
+  for (let more = Math.max(cols + 1, 4); best.height > height && more <= Math.min(most, Math.max(seats, cols)); more++) {
+    const shorter = gridAt(seats, w, more, FACE_MIN, o);
+    if (shorter.height < best.height) best = shorter;
   }
-  const most = Math.max(3, Math.min(8, Math.floor(w / (FACE_MIN + SIDE)), guests));
-  let best: Fitted | null = null;
-  for (let cols = 3; cols <= most; cols++) {
-    const max = Math.min(FACE_MAX, Math.floor(w / cols) - SIDE);
-    const at = gridAt(guests, w, cols, fitFace((f) => gridAt(guests, w, cols, f, o).height, height, max), o);
-    if (!best || better(at, best, height)) best = at;
-  }
-  return best!;
+  return best;
 }
 
 // ── A chosen layout (data/room-layouts): its rows as the schema draws them (components/room/stage-layout) ──
@@ -111,7 +133,8 @@ const PAD = 12;
 
 export type LayoutPlan = {
   inner: number;
-  /** The gap between two mics of a row and the width each mic takes. */
+  /** The gap between two mics of a row (none: the room between faces is in their slots, as in the classic grid) and
+   * the width each mic takes. */
   micGap: number;
   micW: number;
   /** The biggest mic face the rows' width allows. */
@@ -132,11 +155,12 @@ export function layoutPlan(s: LayoutSchema, width: number, pkRoom: boolean): Lay
   const inner = Math.max(240, Math.min(width, 640) - PAD * 2);
   const stage = s.slots.filter((x) => x.area === 'stage');
   const bands = pkRoom && stage.some((x) => x.team);
-  // The widest mic row must fit on one line together with the gaps between its seats; six across get a narrower gap.
+  // The widest mic row must fit on one line. Each mic takes the classic grid's step (FACE_STD + SLOT_PAD) or its share
+  // of a narrower row, so a layout's rows look like the classic grid's: the same faces, the same gaps.
   const micCols = Math.max(3, ...[...Array(s.rows).keys()].map((r) => stage.filter((x) => x.row === r && x.kind === 'mic').length));
-  const micGap = micCols >= 6 ? 4 : 8;
+  const micGap = 0;
   const rowW = inner - (bands ? 12 : 0);
-  const micW = Math.floor(clamp((rowW - (micCols - 1) * micGap) / micCols, 40, FACE_MAX + 2 * SIDE));
+  const micW = Math.floor(clamp(rowW / micCols, 40, FACE_STD + SLOT_PAD));
   // Seven team mics on a narrow phone leave less than a face and its margins: they keep the smallest face.
   return { inner, micGap, micW, maxFace: Math.max(FACE_MIN, Math.min(FACE_MAX, micW - SIDE)), bands, sided: s.slots.some((x) => x.area === 'side') };
 }
@@ -146,9 +170,10 @@ export function layoutSizes(plan: LayoutPlan, face: number) {
   const host = hostFaceOf(face);
   const mainW = Math.round(clamp(plan.inner / 3, 84, 120));
   return {
-    mic: { width: plan.micW, size: face },
+    // A smaller face (a short phone) takes a narrower slot: the row closes up, no wide gaps open.
+    mic: { width: Math.min(plan.micW, face + SLOT_PAD), size: face },
     /** The host alone on its row. */
-    host: { width: Math.max(plan.micW, host + 2 * SIDE), size: host },
+    host: { width: Math.max(Math.min(plan.micW, face + SLOT_PAD), host + 2 * SIDE), size: host },
     /** A couple room's two main seats. */
     main: { width: mainW, size: Math.min(host, mainW - 20) },
   };
@@ -188,8 +213,11 @@ function rowHeight(xs: LayoutSlot[], plan: LayoutPlan, sizes: ReturnType<typeof 
   return seatHeight(tallest) + (plan.bands && xs[0].team ? 34 : 0);
 }
 
-/** The mic face with which a layout fits `height` best; at most `like`'s (the room without its boards), as in fitGrid. */
+/**
+ * A layout's mic face: FACE_STD (or what its widest row allows), smaller only when `height` can't hold it; at most
+ * `like`'s (the room without its boards), as in fitGrid.
+ */
 export function fitLayout(s: LayoutSchema, plan: LayoutPlan, height: number, o: FitOpts = {}, like?: Fitted): Fitted {
-  const face = fitFace((f) => layoutHeight(s, plan, f, o), height, like ? Math.min(plan.maxFace, like.face) : plan.maxFace);
-  return { face, host: hostFaceOf(face), slot: plan.micW, cols: 0, height: layoutHeight(s, plan, face, o) };
+  const face = fitFace((f) => layoutHeight(s, plan, f, o), height, Math.min(FACE_STD, plan.maxFace, like ? like.face : FACE_MAX));
+  return { face, host: hostFaceOf(face), slot: layoutSizes(plan, face).mic.width, cols: 0, height: layoutHeight(s, plan, face, o) };
 }

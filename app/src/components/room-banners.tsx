@@ -10,7 +10,7 @@ import { Image, Pressable, ScrollView, View, useWindowDimensions, type NativeScr
 import { Text } from '@/components/text';
 import { FloatIcon } from '@/components/fx/float';
 import { Gloss, PressableScale } from '@/components/fx/surface';
-import { Icon3D, type Icon3DName } from '@/components/Icon3D';
+import { Icon3D, icon3dSource, type Icon3DName } from '@/components/Icon3D';
 import { Avatar } from '@/components/ui';
 import { AGENCIES } from '@/data/agency';
 import { LEADERBOARDS } from '@/data/economy';
@@ -39,7 +39,18 @@ const BOARD: Record<BoardKey, { title: string; sub: string; art: number; unit: I
 };
 /** A management event without its own picture: a cup and a calendar leaf in the corner. */
 const EVENT_ART: number = require('../../assets/banners/banner-etkinlik-varsayilan.png');
-const EVENT_TINT = ['#2563EB', '#5B21B6'] as const;
+const TEAM_ART: number = require('../../assets/banners/mesaj-similar-ekibi.png');
+/**
+ * A notice without its own picture: its kind's colours and picture (the calendar and cup for an event, the team's
+ * megaphone for an update or an announcement, the gift for a reward, the list for a rule), so each reads at a glance.
+ */
+const KIND_LOOK: Record<TeamKind, { tint: readonly [string, string]; art: number; hue: string }> = {
+  event: { tint: ['#2563EB', '#5B21B6'], art: EVENT_ART, hue: '#A5B4FC' },
+  update: { tint: ['#0E7490', '#4338CA'], art: TEAM_ART, hue: '#67E8F9' },
+  notice: { tint: ['#DB2777', '#6D28D9'], art: TEAM_ART, hue: '#F9A8D4' },
+  reward: { tint: ['#D97706', '#BE185D'], art: icon3dSource('gift'), hue: '#FDE68A' },
+  rule: { tint: ['#0F766E', '#1E40AF'], art: icon3dSource('tasks'), hue: '#99F6E4' },
+};
 const EVERY_MS = 5500;
 
 /** 12.400 → "12,4 B"; 1.250.000 → "1,3 Mn". */
@@ -156,6 +167,7 @@ function EventCard({ s, live }: { s: EventSlide; live: boolean }) {
   const styles = useStyles();
   const href = noticeHref(s.link, live);
   const label = TEAM_KIND_LABEL[s.tag];
+  const look = KIND_LOOK[s.tag] ?? KIND_LOOK.notice;
   return (
     <PressableScale to={0.98} disabled={!href} onPress={href ? () => router.push(href as Href) : undefined} accessibilityRole={href ? 'button' : undefined} accessibilityLabel={`${label}: ${s.title}`}>
       <View style={styles.fill}>
@@ -165,19 +177,24 @@ function EventCard({ s, live }: { s: EventSlide; live: boolean }) {
             <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.72)']} start={{ x: 0, y: 0.2 }} end={{ x: 0, y: 1 }} style={styles.cover} />
           </>
         ) : (
-          <LinearGradient colors={EVENT_TINT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.cover} />
+          <>
+            <LinearGradient colors={look.tint} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.cover} />
+            {/* The kind's picture, big and faint, behind the words: the card is full, not a plain field of colour. */}
+            <Image source={look.art} style={styles.ghost} resizeMode="contain" accessibilityIgnoresInvertColors />
+          </>
         )}
         <Gloss radius={18} strength={0.16} />
-        <View style={styles.eventBody}>
-          <View style={{ flex: 1, gap: 6, justifyContent: 'flex-end' }}>
+        {/* With a picture the words sit on its dark foot; without one, in the middle beside the kind's picture. */}
+        <View style={[styles.eventBody, !s.image && styles.eventBodyPlain]}>
+          <View style={{ flex: 1, gap: 6, justifyContent: s.image ? 'flex-end' : 'center' }}>
             <View style={styles.tag}>
               <Text style={styles.tagText}>{label}</Text>
             </View>
-            <Text style={styles.eventTitle} numberOfLines={2}>
+            <Text style={[styles.eventTitle, !s.image && styles.eventTitlePlain]} numberOfLines={2}>
               {s.title}
             </Text>
             {!!s.body && (
-              <Text style={styles.eventSub} numberOfLines={2}>
+              <Text style={styles.eventSub} numberOfLines={s.image ? 2 : 3}>
                 {s.body}
               </Text>
             )}
@@ -185,7 +202,7 @@ function EventCard({ s, live }: { s: EventSlide; live: boolean }) {
           {s.image ? (
             href && <Ionicons name="chevron-forward-circle" size={28} color="rgba(255,255,255,0.9)" />
           ) : (
-            <FloatIcon source={EVENT_ART} size={64} hue="#A5B4FC" bob />
+            <FloatIcon source={look.art} size={88} hue={look.hue} bob />
           )}
         </View>
       </View>
@@ -283,9 +300,12 @@ const useStyles = makeStyles(({ colors }) => ({
   dotOn: { width: 16, backgroundColor: colors.text },
 
   eventBody: { flex: 1, flexDirection: 'row', alignItems: 'flex-end', gap: 10 },
+  eventBodyPlain: { alignItems: 'center' },
+  ghost: { position: 'absolute', right: -26, bottom: -30, width: 190, height: 190, opacity: 0.14, transform: [{ rotate: '-12deg' }] },
   tag: { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.2)' },
   tagText: { color: '#fff', fontSize: 12, fontWeight: '800' },
   eventTitle: { color: '#fff', fontSize: 19, lineHeight: 24, fontFamily: fonts.display },
+  eventTitlePlain: { fontSize: 22, lineHeight: 27 },
   eventSub: { color: 'rgba(255,255,255,0.86)', fontSize: 13, lineHeight: 18 },
 
   boardHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },

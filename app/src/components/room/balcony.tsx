@@ -168,7 +168,7 @@ export function ParticipantsSheet({
                   {offline && (
                     <View style={s.notice}>
                       <Ionicons name="cloud-offline-outline" size={16} color={colors.gold} />
-                      <Text style={[s.dim, { flex: 1, color: '#FDE7C2' }]}>Bağlantı yok: liste son alınan durumu gösteriyor; işlemler bağlantı dönünce yapılabilir.</Text>
+                      <Text style={[s.dim, { flex: 1, color: '#FDE7C2' }]}>Bağlantı yok; liste güncel olmayabilir.</Text>
                     </View>
                   )}
                   {hiddenMe && (

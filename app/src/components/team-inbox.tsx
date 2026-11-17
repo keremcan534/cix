@@ -4,7 +4,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, type Href } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, Modal, RefreshControl, View } from 'react-native';
+import { ActivityIndicator, FlatList, Image, Modal, Pressable, RefreshControl, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
@@ -132,12 +132,10 @@ function InboxBody({ onClose, onUnread }: { onClose: () => void; onUnread: (n: n
               />
             ) : undefined
           }
-          ListHeaderComponent={<Text style={s.intro}>Etkinlikler, güncellemeler, ödüller ve kurallar: yönetimin sana ve herkese gönderdikleri burada.</Text>}
           ListEmptyComponent={
             <View style={s.center}>
               <Ionicons name="megaphone-outline" size={36} color={colors.textDim} />
               <Text style={s.emptyTitle}>Henüz duyuru yok</Text>
-              <Text style={s.emptyText}>Yönetim bir şey paylaştığında burada görünecek.</Text>
             </View>
           }
           ListFooterComponent={busy && items.length ? <ActivityIndicator color={colors.textDim} style={{ marginTop: space.md }} /> : undefined}
@@ -148,44 +146,52 @@ function InboxBody({ onClose, onUnread }: { onClose: () => void; onUnread: (n: n
   );
 }
 
+/** Each kind's colour (the Odalar banner's, components/room-banners): its symbol sits on it. */
+const KIND_COLOR: Record<TeamKind, string> = { event: '#4F46E5', update: '#0891B2', notice: '#DB2777', reward: '#D97706', rule: '#0F766E' };
+
+/** One notice: the kind's symbol, the title and the time on one line, the words, its picture; a tap opens its link. */
 function NoticeCard({ n, href, onOpen }: { n: TeamNotice; href: string | undefined; onOpen: (href: string) => void }) {
-  const { semantic } = useTheme();
+  const { colors } = useTheme();
   const s = useStyles();
+  const color = KIND_COLOR[n.kind] ?? KIND_COLOR.notice;
   return (
-    <View style={s.card}>
+    <Pressable
+      style={({ pressed }) => [s.card, pressed && href ? { opacity: 0.85 } : null]}
+      disabled={!href}
+      onPress={href ? () => onOpen(href) : undefined}
+      accessibilityRole={href ? 'button' : undefined}
+      accessibilityLabel={`${TEAM_KIND_LABEL[n.kind]}${n.personal ? ', sana özel' : ''}: ${n.title}`}
+    >
       <View style={s.head}>
-        <View style={s.kind}>
-          <Ionicons name={KIND_ICON[n.kind]} size={13} color={semantic.tonalText} />
-          <Text style={s.kindText}>{TEAM_KIND_LABEL[n.kind]}</Text>
+        <View style={[s.badge, { backgroundColor: color }]}>
+          <Ionicons name={KIND_ICON[n.kind]} size={18} color="#fff" />
         </View>
-        {n.personal && (
-          <View style={[s.kind, s.mine]}>
-            <Text style={[s.kindText, s.mineText]}>Sana özel</Text>
-          </View>
-        )}
-        <Text style={s.when}>{ago(n.createdAt)}</Text>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={s.title} numberOfLines={2}>
+            {n.title}
+          </Text>
+          <Text style={s.meta}>
+            {n.personal ? 'Sana özel · ' : `${TEAM_KIND_LABEL[n.kind]} · `}
+            {ago(n.createdAt)}
+          </Text>
+        </View>
+        {href && <Ionicons name="chevron-forward" size={18} color={colors.textDim} />}
       </View>
-      {!!n.imageUrl && <Image source={{ uri: n.imageUrl }} style={s.image} resizeMode="cover" accessibilityIgnoresInvertColors />}
-      <Text style={s.title}>{n.title}</Text>
       {!!n.body && <Text style={s.body}>{n.body}</Text>}
-      {href && <Button title="Aç" icon="arrow-forward" small variant="tonal" style={{ alignSelf: 'flex-start' }} onPress={() => onOpen(href)} />}
-    </View>
+      {!!n.imageUrl && <Image source={{ uri: n.imageUrl }} style={s.image} resizeMode="cover" accessibilityIgnoresInvertColors />}
+    </Pressable>
   );
 }
 
-const useStyles = makeStyles(({ colors, semantic, lift }) => ({
+const useStyles = makeStyles(({ colors, lift }) => ({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: space.sm, padding: space.xxl, minHeight: 280 },
   emptyTitle: { color: colors.text, fontSize: 16, fontWeight: '800', textAlign: 'center' },
   emptyText: { color: colors.textDim, fontSize: 13, lineHeight: 19, textAlign: 'center' },
-  intro: { color: colors.textDim, fontSize: 13, lineHeight: 19 },
-  card: { backgroundColor: colors.card, borderRadius: radius.lg, padding: space.lg, gap: space.sm, ...lift },
-  head: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  kind: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill, backgroundColor: semantic.tonal },
-  kindText: { color: semantic.tonalText, fontSize: 12, fontWeight: '800' },
-  mine: { backgroundColor: semantic.action },
-  mineText: { color: semantic.actionInk },
-  when: { marginLeft: 'auto', color: colors.textDim, fontSize: 12 },
+  card: { backgroundColor: colors.card, borderRadius: radius.lg, padding: space.md, gap: space.sm, ...lift },
+  head: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  badge: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  meta: { color: colors.textDim, fontSize: 12, marginTop: 1 },
   image: { width: '100%', aspectRatio: 2, borderRadius: radius.md, backgroundColor: colors.cardAlt },
-  title: { color: colors.text, fontSize: 16, lineHeight: 21, fontWeight: '800' },
+  title: { color: colors.text, fontSize: 15, lineHeight: 20, fontWeight: '800' },
   body: { color: colors.textDim, fontSize: 14, lineHeight: 20 },
 }));

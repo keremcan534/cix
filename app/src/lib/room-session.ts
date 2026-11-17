@@ -139,7 +139,7 @@ export const MIC_BLOCK_LABEL: Record<Exclude<MicBlock, null>, string> = {
   permission: 'Mikrofon izni yok',
   phone_call: 'Telefon görüşmesi sürüyor',
   focus_loss: 'Ses başka bir uygulamada',
-  background: 'Uygulama arka planda; bu sürümde arka plan sesi yok',
+  background: 'Uygulama arka planda',
   connection: 'Oda bağlantısı yok',
 };
 /** The in-room connection line (SessionBanner); null while the connection is fine. `retry`: offer "Yeniden dene". */
@@ -154,8 +154,8 @@ export function connectionLine(s: RoomSession, offline: boolean): ConnectionLine
     if (s.status === 'connecting') return { text: offline ? 'İnternet bağlantısı yok · bağlanılıyor…' : 'Bağlanılıyor…', bad: false, retry: false };
     return null;
   }
-  if (s.status === 'disconnected') return { text: 'Oda bağlantısı kesildi. Sayılar ve liste son alınan durumu gösteriyor.', bad: true, retry: true };
-  if (s.status === 'reconnecting' || offline) return { text: `Bağlantı koptu · yeniden bağlanılıyor${attempt}. Sayılar ve liste son alınan durumu gösteriyor.`, bad: false, retry: s.status === 'reconnecting' };
+  if (s.status === 'disconnected') return { text: 'Oda bağlantısı kesildi.', bad: true, retry: true };
+  if (s.status === 'reconnecting' || offline) return { text: `Bağlantı koptu · yeniden bağlanılıyor${attempt}.`, bad: false, retry: s.status === 'reconnecting' };
   return null;
 }
 /** The engine always follows the session: one place decides whether the mic track is published and how loud the room plays. */
@@ -215,7 +215,7 @@ function start(roomId: string, info: { title: string; cover: string; via?: strin
   engine.connect(roomId);
   emit({ session, switchTo: null, recovery: null });
   persist({ roomId, title: info.title });
-  if (info.recovered) notify('Odaya yeniden bağlandın. Uygulama kapandığı için güvenlik amacıyla mikrofonun kapalı başladı.');
+  if (info.recovered) notify('Odaya döndün; mikrofonun kapalı.');
   connectTimer = setTimeout(() => {
     connectTimer = undefined;
     if (state.session?.roomId !== roomId || state.session.status !== 'connecting') return;
@@ -346,7 +346,7 @@ export function onAppState(next: 'active' | 'background') {
   }
   const wasSuspended = s.audioSuspended;
   patchSession({ appState: 'active', audioSuspended: false });
-  if (wasSuspended) notify('Uygulama arka plandayken oda sesi duraklatıldı (bu sürümde arka plan sesi yok). Oda üyeliğin ve mikrofon ayarın korundu.', 'warn');
+  if (wasSuspended) notify('Uygulama arka plandayken oda sesi durdu.', 'warn');
   if (!isOnline()) lostConnection();
 }
 
@@ -364,7 +364,7 @@ function scheduleRetry() {
   const delay = RECONNECT_DELAYS[s.reconnectAttempt];
   if (delay === undefined) {
     patchSession({ status: 'disconnected' });
-    notify('Oda bağlantısı kurulamadı. Ağ dönünce yeniden denenecek; istersen şimdi yeniden dene.', 'warn');
+    notify('Oda bağlantısı kurulamadı.', 'warn');
     return;
   }
   retryTimer = setTimeout(() => {
@@ -439,9 +439,9 @@ export function engineEvent(roomId: string, e: EngineEvent) {
       const chat = !e.canChat;
       if (s.sanctionMuted === mic && s.sanctionChat === chat) return;
       patchSession({ sanctionMuted: mic, sanctionChat: chat });
-      if (mic && !s.sanctionMuted) notify('Sesli susturma uygulandı: bu sürede mikrofonun açılamaz.', 'warn');
-      else if (!mic && s.sanctionMuted) notify('Sesli susturman bitti. Mikrofonu yeniden açabilirsin.');
-      if (chat && !s.sanctionChat) notify('Yazılı susturma uygulandı: bu sürede oda sohbetine yazamazsın.', 'warn');
+      if (mic && !s.sanctionMuted) notify('Sesli susturma uygulandı; mikrofon açılamaz.', 'warn');
+      else if (!mic && s.sanctionMuted) notify('Sesli susturman bitti.');
+      if (chat && !s.sanctionChat) notify('Yazılı susturma uygulandı; sohbete yazamazsın.', 'warn');
       else if (!chat && s.sanctionChat) notify('Yazılı susturman bitti.');
       return;
     }
@@ -459,7 +459,7 @@ export function phoneCall(active: boolean) {
   if (s.interruption !== 'phone_call') return;
   const hadMic = s.micWant;
   patchSession({ interruption: null, micWant: false });
-  notify(hadMic ? 'Telefon görüşmesi bitti, oda sesi devam ediyor. Güvenlik için mikrofonun kapatıldı.' : 'Telefon görüşmesi bitti, oda sesi devam ediyor.');
+  notify(hadMic ? 'Telefon görüşmesi bitti; mikrofonun kapatıldı.' : 'Telefon görüşmesi bitti.');
 }
 /** Short audio focus loss (another app plays a sound): audio and mic resume as they were. */
 export function audioFocus(lost: boolean) {
@@ -480,7 +480,7 @@ export function setPermission(granted: boolean) {
   const permission = granted ? 'granted' : 'denied';
   if (s.permission === permission) return;
   patchSession({ permission });
-  if (!granted) notify('Mikrofon izni kaldırıldı. Konuşmak için telefon ayarlarından izin ver; dinlemeye devam ediyorsun.', 'warn');
+  if (!granted) notify('Mikrofon izni kaldırıldı; konuşmak için ayarlardan izin ver.', 'warn');
 }
 
 // --- Restart recovery ------------------------------------------------------------------------------------

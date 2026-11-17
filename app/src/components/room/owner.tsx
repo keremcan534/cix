@@ -762,11 +762,11 @@ export function RoomSettingsScreen({
           {live?.canLock ? (
             <LiveLock live={live} lockOpen={lockOpen} level={level} />
           ) : live ? (
-            <Row label="Oda kilitli" value={live.locked ? 'Kilitli' : 'Açık'} hint="Oda kilidini ve şifreyi yalnızca oda sahibi değiştirir" />
+            <Row label="Oda kilitli" value={live.locked ? 'Kilitli' : 'Açık'} hint="Yalnız oda sahibi değiştirir" />
           ) : (
             <Row
               label="Oda kilitli"
-              hint={`Oda seviyesi >=${LOCK_MIN_LEVEL} veya soyluluk açılarak kilit açılır`}
+              hint={lockOpen ? undefined : `Lv.${LOCK_MIN_LEVEL} ya da VIP ile açılır`}
               toggle={{ value: room.locked, onChange: (v) => update({ locked: v }) }}
               locked={lockOpen ? undefined : `Oda kilidi Lv.${LOCK_MIN_LEVEL} odada veya VIP (soyluluk) ile açılır. Şu an Lv.${level}.`}
             />
@@ -783,7 +783,7 @@ export function RoomSettingsScreen({
               />
             </View>
           )}
-          <Row label="Oda Günlüğü" hint="Susturma, indirme, çıkarma ve ayar değişiklikleri (bu oturum)" onPress={() => setPicker('log')} />
+          <Row label="Oda Günlüğü" onPress={() => setPicker('log')} />
           <Row label={`Oda seviyesi`} value={`Lv.${level}`} valueArt={roomLevelArt(level)} onPress={() => setPicker('level')} />
 
           {look?.available && (
@@ -791,14 +791,12 @@ export function RoomSettingsScreen({
               <Section title="Görünüm" />
               <Row
                 label="Oda Süslemesi"
-                hint="Odanın arka planı: ücretsiz, ücretli ya da kendi görselin"
                 value={look.decorLabel}
                 onPress={() => setPicker('decor')}
                 locked={look.canEdit ? undefined : 'Oda süslemesini oda sahibi veya Süper Yönetici değiştirir.'}
               />
               <Row
                 label="Oda Kapağı"
-                hint="Oda listelerinde ve oda kartında görünen resim"
                 value={look.coverLabel}
                 onPress={() => setPicker('cover')}
                 locked={look.canEdit ? undefined : 'Oda kapağını oda sahibi veya Süper Yönetici değiştirir.'}
@@ -811,19 +809,19 @@ export function RoomSettingsScreen({
           {classicActive && <Row label="Klasik düzen mikrofon sayısı" value={`${Math.min(room.micCount, maxMics)} mikrofon`} onPress={() => setPicker('mics')} />}
           <Row
             label="Mikrofon kuyruğu"
-            hint={(live ? live.micQueue : room.micQueue) ? 'Açık: boş mikrofona çıkmak isteyen el kaldırır, sahip veya yönetici onaylar' : 'Kapalı: herkes boş mikrofona onay beklemeden çıkar'}
+            hint={(live ? live.micQueue : room.micQueue) ? 'El kaldıran, onayla çıkar' : 'Herkes doğrudan çıkar'}
             toggle={{ value: live ? live.micQueue : room.micQueue, onChange: (v) => (live ? live.setMicQueue(v) : update({ micQueue: v })) }}
           />
           <Row
             label="Mikrofon izni"
-            hint={`Oda seviyesi >= ${MIC_PERMISSION_MIN_LEVEL} açılır`}
+            hint={micPermOpen ? undefined : `Lv.${MIC_PERMISSION_MIN_LEVEL}'te açılır`}
             value={room.micPermission === 'members' ? 'Oda üyeleri' : 'Herkes'}
             onPress={() => setPicker('micPerm')}
             locked={ownerLock ?? (micPermOpen ? undefined : `Mikrofon izni Lv.${MIC_PERMISSION_MIN_LEVEL} odada açılır.`)}
           />
           <Row
             label="Patron Koltuğu"
-            hint={`Oda seviyesi >= ${BOSS_SEAT_MIN_LEVEL} açılır · ${room.bossMode === 'invite' ? 'koltuğa oda sahibi oturtur' : `tek seferde ${bossCfg.coins.toLocaleString('tr-TR')} jeton gönderen oturur`}`}
+            hint={bossOpen ? (room.bossMode === 'invite' ? 'Oda sahibi oturtur' : `${bossCfg.coins.toLocaleString('tr-TR')} jetonla oturulur`) : `Lv.${BOSS_SEAT_MIN_LEVEL}'te açılır`}
             toggle={{ value: room.bossSeat && bossOpen, onChange: (v) => update({ bossSeat: v }) }}
             locked={ownerLock ?? (bossOpen ? undefined : `Patron koltuğu Lv.${BOSS_SEAT_MIN_LEVEL} odada açılır.`)}
           />
@@ -836,7 +834,6 @@ export function RoomSettingsScreen({
           <Row label="Oda üyelerini yönet" value={who[room.manageMembers]} onPress={() => setPicker('manageMembers')} locked={ownerLock} />
           <Row
             label="Otomatik eleme"
-            hint="Oda üyeleri standartlara uymadığında otomatik olarak odadan çıkarılır (yöneticiler hariç)"
             value={room.autoRemoveDays ? `${room.autoRemoveDays} gün gelmeyen` : 'Açılmadı'}
             onPress={() => setPicker('autoRemove')}
             locked={ownerLock}
@@ -848,14 +845,13 @@ export function RoomSettingsScreen({
           <Section title="Gizlilik & Güvenlik" />
           <Row label="Oda kara listesi" value={String(blacklist.length)} onPress={() => setPicker('blacklist')} />
           <Row
-            label="Profil Sayfasında Oda Görünürlüğü"
-            hint="Etkinleştirildiğinde odanız profil sayfanızda görüntülenecektir"
+            label="Profilimde göster"
             toggle={{ value: room.profileVisible, onChange: (v) => update({ profileVisible: v }) }}
             locked={ownerLock}
           />
           <Row
-            label="Video Odası Gizlilik Koruması"
-            hint="Etkinleştirildiğinde odada ekran görüntüsü alma ve ekran kaydı engellenir"
+            label="Ekran kaydını engelle"
+            hint="Video odasında ekran görüntüsü ve kayıt alınamaz"
             toggle={{ value: room.videoPrivacy, onChange: (v) => update({ videoPrivacy: v }) }}
             locked={ownerLock}
           />
@@ -890,8 +886,8 @@ export function RoomSettingsScreen({
       <ChoiceSheet
         visible={picker === 'mics'}
         title="Klasik düzen mikrofon sayısı"
-        desc={`Klasik düzende en fazla ${maxMics} mikrofon açılabilir (ajans odası 15, Lv.8'de +2). Yeni sınırın dışında oturan konuşmacı varsa sayı azaltılmaz.`}
-        options={MIC_COUNT_OPTIONS.map((n) => ({ value: n, label: `${n} mikrofon`, disabled: n > maxMics, sub: n > maxMics ? 'Oda seviyesi veya ajans odası gerekir' : undefined }))}
+        desc={`En fazla ${maxMics} mikrofon`}
+        options={MIC_COUNT_OPTIONS.map((n) => ({ value: n, label: `${n} mikrofon`, disabled: n > maxMics, sub: n > maxMics ? 'Oda seviyesiyle açılır' : undefined }))}
         value={Math.min(room.micCount, maxMics)}
         onPick={(v) => {
           const r = onClassicMics(v);
@@ -960,7 +956,7 @@ export function RoomSettingsScreen({
       <ChoiceSheet
         visible={picker === 'autoRemove'}
         title="Oda üyelerinin otomatik elemesi"
-        desc={'Aşağıdaki kriterleri karşılayan normal kullanıcılar otomatik olarak odadan çıkarılır, oda sahibi ve yöneticiler etkilenmez\nEleme zamanı: Her gün saat 0’da (UTC+3)'}
+        desc="Her gün 00:00'da; sahip ve yöneticiler hariç"
         options={[
           { value: 0, label: 'Açılmadı' },
           { value: 7, label: 'Odaya giriş yapılmamış (7 gün)', sub: 'Üyeler son 7 gündür bu odaya girmedi' },
@@ -1081,7 +1077,7 @@ function LiveLock({ live, lockOpen, level }: { live: LiveRoomSettings; lockOpen:
     <>
       <Row
         label="Oda kilitli"
-        hint={live.locked ? 'Odaya girmek için şifre gerekir (sahip ve yöneticiler hariç)' : `Oda seviyesi >=${LOCK_MIN_LEVEL} veya soyluluk açılarak kilit açılır`}
+        hint={live.locked ? 'Girişte şifre sorulur' : undefined}
         toggle={{
           value: on,
           onChange: (v) => {

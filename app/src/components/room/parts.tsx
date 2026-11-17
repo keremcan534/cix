@@ -20,7 +20,7 @@ import { HOST_FRAME_SCALE, SEAT_ART, SEAT_COLOR_ART } from '@/components/RoomArt
 import type { SeatColorId } from '@/data/seat-colors';
 import { Gloss, Shine, useSpringPress } from '@/components/fx/surface';
 import { Photo } from '@/components/photo';
-import { RoleMark, type StaffMark } from '@/components/room/role-mark';
+import { RoleIcon, type StaffMark } from '@/components/room/role-mark';
 import { VOICE_RING, VoiceWave } from '@/components/room/voice-wave';
 import { BondBubble, BondChip, BondLink } from '@/components/room/room-bonds';
 import type { RoomBond } from '@/data/bonds';
@@ -82,7 +82,7 @@ export function Seat({
   frameId?: string;
   speaking: boolean;
   muted: boolean;
-  /** The staff mark on the avatar (components/room/role-mark). */
+  /** The staff mark, before the name (components/room/role-mark RoleIcon), never on the photo. */
   staff?: StaffMark | null;
   /** The room's color for its empty mics (data/seat-colors); none: turquoise. */
   seatColor?: SeatColorId | null;
@@ -150,7 +150,13 @@ export function Seat({
   // Small faces: a smaller icon and no badge by the name. The name grows a little with the face (lib/seat-fit, which
   // sizes the stage by the same numbers) and may be as wide as the seat's slot.
   const small = size < 46;
-  const name = { fontSize: nameSize(size), lineHeight: nameLine(size), maxWidth: slotWidth ? slotWidth - 6 : 64 };
+  // The host's crown and the staff mark sit before the name, the blue tick after it (only where the slot has room for
+  // it: five to a row it would leave the name three letters); the name gives them its room, so the line stays inside
+  // the seat's slot.
+  const mark = nameSize(size) + 2;
+  const tick = !!user?.verified && !small && (!slotWidth || slotWidth >= 84);
+  const marks = (host ? mark + 3 : 0) + (user && staff ? mark + 3 : 0) + (tick ? 14 : 0);
+  const name = { fontSize: nameSize(size), lineHeight: nameLine(size), maxWidth: Math.max(24, (slotWidth ? slotWidth - 6 : 64) - marks) };
   // An empty or locked seat is its picture (a pending invite keeps the gold bubble); the host's own photo sits in the
   // gold host frame unless they wear a VIP or shop frame.
   const art = seatColor ? SEAT_COLOR_ART[seatColor] : SEAT_ART;
@@ -223,19 +229,19 @@ export function Seat({
               <Ionicons name={modMuted ? 'mic-off' : 'mic-off-outline'} size={10} color="#fff" />
             </View>
           )}
-          {user && <RoleMark mark={staff} edge={colors.bg} style={{ left: -2, bottom: -2 }} />}
           {reaction && user && <SeatReaction key={reaction.key} emoji={reaction.emoji} art={reaction.art} pre={reaction.pre} badge={reaction.badge} badgeAt={reaction.badgeAt} ms={reaction.ms} size={size} still={still} />}
         </Animated.View>
         {mini ? (
-          // Küçült: only the mic's number (the host's crown), so the strip stays one short line per row.
-          <View style={styles.miniLabel}>{host ? <Icon3D name="crown" size={11} /> : <Text style={styles.miniNum}>{index + 1}</Text>}</View>
+          // Küçült: only the mic's number (the host's crown, a staff member's mark), so the strip stays one short line per row.
+          <View style={styles.miniLabel}>{host ? <Icon3D name="crown" size={11} /> : user && staff ? <RoleIcon mark={staff} size={11} /> : <Text style={styles.miniNum}>{index + 1}</Text>}</View>
         ) : (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-            {host && <Icon3D name="crown" size={14} />}
+            {host && <Icon3D name="crown" size={mark} />}
+            {user && <RoleIcon mark={staff} size={mark} />}
             <Text style={[styles.seatName, name, !user && { color: colors.textDim, fontWeight: '500' }]} numberOfLines={1}>
               {user ? user.name : invitee && !locked ? 'Davet' : `${index + 1}`}
             </Text>
-            {user?.verified && !small && <VerifiedBadge size={11} />}
+            {tick && <VerifiedBadge size={11} />}
           </View>
         )}
         {/* The points line is kept under every name, PK or not (lib/seat-fit PK_LINE): a PK starting moves nothing. */}
@@ -284,7 +290,8 @@ export function PkPoints({ value, still, width = 64 }: { value: number; still?: 
         ]}
       >
         {box.icon && <Icon3D name="gift" size={box.size} />}
-        <RollingNumber value={value} duration={500} format={(n) => pkPointsText(n, box.chars)} shrink={0.7} style={[styles.pkText, { fontSize: box.size, lineHeight: box.size + 2 }]} />
+        {/* The short form already fits the pill; the shrink is only a margin, so the number stays readable. */}
+        <RollingNumber value={value} duration={500} format={(n) => pkPointsText(n, box.chars)} shrink={0.9} style={[styles.pkText, { fontSize: box.size, lineHeight: box.size + 2 }]} />
       </Animated.View>
       {delta && !still && (
         <Animated.Text

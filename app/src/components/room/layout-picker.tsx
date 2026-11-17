@@ -188,7 +188,7 @@ export function LayoutPickerSheet({
             <Text style={st.classicText}>{classicLabel}</Text>
             {layoutId === null && <Ionicons name="checkmark-circle" size={18} color={semantic.action} />}
           </Pressable>
-          <Text style={st.foot}>Kilitli düzenler oda seviyesi yükselince açılır. Mikrofon sayısı azalırken yeni sınırın dışında oturan biri varsa değişiklik yapılmaz. Kapatmak odayı değiştirmez.</Text>
+          <Text style={st.foot}>Kilitli düzenler oda seviyesiyle açılır.</Text>
         </ScrollView>
       </View>
     </Modal>

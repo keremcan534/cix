@@ -105,7 +105,7 @@ function AppearancePicker() {
 }
 
 const ONE_ACCOUNT_RULE =
-  'Kişi başına tek hesap kuralı: aynı cihaz, telefon veya IBAN ile açılmış birden fazla hesap risk incelemesine alınır; ödüller ve hak edişler inceleme bitene kadar bekletilir.';
+  'Kişi başına tek hesap: aynı cihaz, telefon ya da IBAN ile açılan hesaplar incelenir; ödemeler bu sürede bekler.';
 // The demo's prototype promises (SMS on a new device, re-verification). The server does neither, so a live build
 // does not say them.
 const DEMO_SESSIONS_FOOTER = `Yeni cihaz veya alışılmadık konumdan girişte bildirim gönderilir ve SMS doğrulaması istenir. Para çekme, IBAN değişikliği ve ajans transferi gibi hassas işlemlerde yeniden doğrulama yapılır. ${ONE_ACCOUNT_RULE}`;
@@ -153,7 +153,7 @@ export default function SettingsScreen() {
   const askExport = () =>
     showAlert(
       'Verilerimin kopyası',
-      'Sunucuda hesabınla ilgili tutulan kişisel veriler bir JSON dosyası olarak hazırlanır; dosyayı kaydedebilir veya paylaşabilirsin. Dosya kişisel verilerini içerir, yalnızca güvendiğin yere kaydet. 24 saatte bir alınabilir.',
+      'Kişisel verilerin JSON dosyası olarak hazırlanır. Yalnız güvendiğin yere kaydet. 24 saatte bir alınabilir.',
       [
         { text: 'Vazgeç', style: 'cancel' },
         {
@@ -296,7 +296,7 @@ export default function SettingsScreen() {
         {live ? (
           <LiveSpendLimit />
         ) : (
-          <ListGroup label="Harcama" footer="Limit dolduğunda hediye, mağaza ve oyun harcamaları gece yarısına kadar durdurulur. Limit artışı 24 saat sonra geçerli olur.">
+          <ListGroup label="Harcama" footer="Limit dolunca harcamalar gece yarısına kadar durur. Artış 24 saat sonra geçerli olur.">
             <ListBlock title="Günlük harcama limiti">
               <ChoiceChips
                 value={settings.dailySpendLimit}
@@ -318,7 +318,7 @@ export default function SettingsScreen() {
                 by our two cities (lib/live/distances). Nothing is sent to the server, so it does not promise who can
                 find me. */}
             <ListGroup label="Keşfet">
-              <Toggle k="cityDiscovery" icon="location-outline" title="Yakındakileri göster" subtitle="Keşfet'teki Yakındaki sekmesi ve kişilerin sana uzaklığı, profilindeki şehre göre gösterilir. Kesin konumun kullanılmaz." />
+              <Toggle k="cityDiscovery" icon="location-outline" title="Yakındakileri göster" subtitle="Profilindeki şehre göre; kesin konum kullanılmaz." />
             </ListGroup>
           </>
         )}
@@ -330,7 +330,7 @@ export default function SettingsScreen() {
             k="profilePublic"
             icon="globe-outline"
             title="Profilim herkese açık"
-            subtitle={live ? 'Kapalıyken yaşını, şehrini, hakkında yazını ve ilgi alanlarını yalnızca takip ettiğin kişiler görür. Takip listelerini her zaman yalnızca sen görürsün.' : undefined}
+            subtitle={live ? 'Kapalıyken profil bilgilerini yalnız takip ettiklerin görür.' : undefined}
           />
           <PrivacyToggle k="showOnline" icon="radio-button-on-outline" title="Çevrimiçi durumumu göster" subtitle={live ? 'Kapalıyken çevrimiçi ve son görülme bilgin kimseye gösterilmez.' : undefined} />
           <PrivacyToggle k="showLastSeen" icon="time-outline" title="Son görülme bilgimi göster" subtitle="Kapatırsan başkalarının son görülmesini de göremezsin." />
@@ -338,12 +338,12 @@ export default function SettingsScreen() {
             k="showCurrentRoom"
             icon="mic-outline"
             title="Bulunduğum odayı profilimde göster"
-            subtitle={live ? 'Kapalıyken bulunduğun oda başkalarına gösterilmez (Aile’deki “Birlikte oynuyor” dahil).' : "Kapalıyken profilinden odana 'Git' ile gelinemez."}
+            subtitle={live ? 'Kapalıyken bulunduğun oda kimseye gösterilmez.' : "Kapalıyken profilinden odana 'Git' ile gelinemez."}
           />
           {!live && (
             <>
-              <Toggle k="luckyAnnounce" icon="megaphone-outline" title="Kazançlarımda adım görünsün" subtitle="Şanslı hediye ve oyun kazançları tüm odalarda duyurulur. Kapalıyken “Bir kullanıcı kazandı” yazar." />
-              <Toggle k="cityDiscovery" icon="location-outline" title="Aynı şehirde keşfedilebilir ol" subtitle="Varsayılan kapalı. Kesin konum yerine sadece şehir kullanılır." />
+              <Toggle k="luckyAnnounce" icon="megaphone-outline" title="Kazançlarımda adım görünsün" subtitle="Kapalıyken “Bir kullanıcı kazandı” yazar." />
+              <Toggle k="cityDiscovery" icon="location-outline" title="Aynı şehirde keşfedilebilir ol" subtitle="Yalnız şehir kullanılır." />
               <Toggle
                 k="invisibleEntry"
                 icon="eye-off-outline"
@@ -358,7 +358,7 @@ export default function SettingsScreen() {
               icon="refresh-outline"
               tone="neutral"
               title="Eski ayarları sıfırla"
-              subtitle="Bu telefonda daha önce değiştirdiğin gizli giriş ve kazanç duyurusu ayarları varsayılana döner."
+              subtitle="Gizli giriş ve kazanç duyurusu ayarları varsayılana döner."
               onPress={resetPrivacy}
               chevron={false}
             />
@@ -367,7 +367,7 @@ export default function SettingsScreen() {
 
         <ListGroup
           label="Kimler ulaşabilir"
-          footer={live ? 'Engellediğin kişiler bu seçimlerden bağımsız olarak sana ulaşamaz. Yazdığın kişi sana cevap yazabilir; son 24 saatte aradığın kişi seni geri arayabilir.' : undefined}
+          footer={live ? 'Engellediklerin hiç ulaşamaz; yazdığın ya da aradığın kişi sana dönebilir.' : undefined}
         >
           <ListBlock title="Bana kimler mesaj gönderebilir?">
             <ChoiceChips value={settings.dmFrom} options={Object.entries(DM_FROM_LABEL) as [DmFrom, string][]} onChange={(v) => setPrivacy('dmFrom', v)} />
@@ -430,12 +430,12 @@ export default function SettingsScreen() {
           )}
         </ListGroup>
 
-        <ListGroup label="Görünüm ve erişilebilirlik" footer="Sistem, telefonunun açık veya koyu ayarını izler. Odalar, oyunlar ve aramalar her temada koyu kalır.">
+        <ListGroup label="Görünüm ve erişilebilirlik" footer="Odalar, oyunlar ve aramalar her temada koyu kalır.">
           <AppearancePicker />
-          <Toggle k="effectsOff" icon="sparkles-outline" title="Animasyon ve giriş efektlerini kapat" subtitle="Hediye animasyonları ve giriş efektleri gösterilmez; oda işlevleri devam eder." />
-          <Toggle k="haptics" icon="pulse-outline" title="Dokunuş titreşimi" subtitle="Butona basınca, mikrofonu açınca ve hediye gönderince telefon hafifçe titrer." />
+          <Toggle k="effectsOff" icon="sparkles-outline" title="Animasyon ve giriş efektlerini kapat" />
+          <Toggle k="haptics" icon="pulse-outline" title="Dokunuş titreşimi" />
           <Toggle k="reduceMotion" icon="contrast-outline" title="Hareketi azalt" subtitle="Geçişler ve titreşimli efektler sadeleştirilir." />
-          <Toggle k="lowData" icon="cellular-outline" title="Düşük veri modu" subtitle="Kapak görselleri düşük çözünürlükte, otomatik oynatma kapalı, ses kalitesi bağlantıya göre düşürülür." />
+          <Toggle k="lowData" icon="cellular-outline" title="Düşük veri modu" subtitle="Düşük çözünürlük, otomatik oynatma kapalı." />
         </ListGroup>
 
         <ListGroup label="Bildirimler" footer="Güvenlik ve ödeme bildirimleri kapatılamaz ve ertelenmez.">
@@ -514,7 +514,7 @@ export default function SettingsScreen() {
               icon="download-outline"
               tone="neutral"
               title={exporting ? 'Verilerin hazırlanıyor…' : 'Verilerimin kopyasını iste'}
-              subtitle="UK GDPR veri erişim hakkı · JSON dosyası olarak kaydet veya paylaş · 24 saatte bir"
+              subtitle="JSON dosyası · 24 saatte bir"
               onPress={exporting ? undefined : askExport}
               chevron={false}
             />

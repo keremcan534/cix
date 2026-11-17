@@ -187,11 +187,10 @@ import { MuteBanner, useStopped } from '@/components/sanction-screen';
 import { refreshSanctions, showSanction } from '@/lib/sanctions';
 
 const DAILY_DICE = 20;
-const BOT_TIPS = [
-  'Oda kuralları: saygılı ol, spam ve hakaret yok. Şikâyet için ⋯ menüsünü kullan.',
-  'Koltuğa geçmek için boş bir koltuğa dokun; bu odada istekle oturuluyor.',
-  'Hediyeler yayıncıya elmas olarak yazılır ve oda seviyesini yükseltir.',
-];
+// Short: the rules are the chat's first line already (ROOM_RULES_NOTICE), the bot doesn't repeat them.
+const BOT_TIPS = ['Mikrofona geçmek için boş bir koltuğa dokun.', 'Hediyeler oda seviyesini yükseltir.'];
+/** How often the room's bot says a tip: rarely, so the chat stays the people's. */
+const BOT_EVERY_MS = 5 * 60_000;
 const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
 const rollDie = () => 1 + Math.floor(Math.random() * 6);
 const msgId = () => String(Date.now() + Math.random());
@@ -223,9 +222,8 @@ type ComboSpec = { lucky: boolean; giftId: string; to: string[]; each: number };
 const sameCombo = (a: ComboSpec, b: ComboSpec) => a.lucky === b.lucky && a.giftId === b.giftId && a.each === b.each && a.to.join() === b.to.join();
 /** Taps on the wheel while its send is on the way wait for it; past this many more, a tap is not kept. */
 const COMBO_MORE = 10;
-/** SimilarClub's own community rules, the first line of the chat on every entry (my screen only). */
-const ROOM_RULES_NOTICE =
-  "SimilarClub'a hoş geldin! Müstehcen, şiddet içeren, kumar ya da yasa dışı ticaretle ilgili içerik ve 18 yaş altına yönelik her türlü zararlı paylaşım yasaktır. Kurala aykırı bir şey görürsen kişinin kartından şikâyet et; ekibimiz en kısa sürede inceler. İyi sohbetler!";
+/** SimilarClub's own community rules, the first line of the chat on every entry (my screen only): short and plain. */
+const ROOM_RULES_NOTICE = 'Müstehcen, şiddet, kumar ve yasa dışı içerik yasak. Görürsen kişinin kartından şikâyet et.';
 /** Arrival time of a room event (called from handlers and effects, never while rendering). */
 const stamp = () => Date.now();
 const QUESTIONS = ['Türkiye\'nin en kalabalık şehri?', 'En sevdiğiniz film hangisi?', 'Yarın etkinlik var mı?', 'Hangi şarkıyı çalalım?', 'Nasıl yönetici olunur?'];
@@ -235,7 +233,7 @@ const pad = (s: (string | null)[], n: number) => (s.length >= n ? s.slice(0, n) 
 /** Actions need the server: while offline nothing is sent, charged or changed. */
 const offlineBlocked = () => {
   if (isOnline()) return false;
-  showAlert('Bağlantı yok', 'Bu işlem bağlantı geri gelince yapılabilir. Hiçbir şey gönderilmedi, jeton düşülmedi.');
+  showAlert('Bağlantı yok', 'Bağlantı gelince tekrar dene. Jeton düşülmedi.');
   return true;
 };
 
@@ -572,10 +570,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     ...(announcement ? [{ id: 'ann', system: true, text: `📢 ${announcement}` }] : []),
     ...(botOn ? [{ id: 'bot0', bot: true, text: `Merhaba ${ME.name}! ${BOT_TIPS[0]}` }] : []),
     ...(entryInfo && !invisible ? [{ id: 'vip', system: true, text: entryInfo.text }] : []),
-    ...(joinedInCall ? [{ id: 'incall', system: true, text: '📞 Bire bir görüşmedesin; odaya dinleyici olarak katıldın. Görüşme bitince mikrofon isteyebilirsin.' }] : []),
+    ...(joinedInCall ? [{ id: 'incall', system: true, text: '📞 Görüşmedesin: odada dinleyicisin.' }] : []),
     // Arrived by following someone from a profile / agency / tribe chat.
     ...(via && !invisible ? [{ id: 'via', system: true, text: `👣 ${ME.name}, ${userById(via).name} kişisini takip ederek odaya girdi` }] : []),
-    ...(invisible ? [{ id: 'inv', system: true, text: '👻 Gizli girişle girdin. Diğer kullanıcılar katıldığını görmez; moderasyon kayıtlarında görünürsün.' }] : []),
+    ...(invisible ? [{ id: 'inv', system: true, text: '👻 Gizli girdin; seni yalnız moderasyon görür.' }] : []),
   ]);
   const [draft, setDraft] = useState('');
   // Why the line in the input did not go out (contact details, lib/contact-filter); cleared when it is edited.
@@ -950,12 +948,12 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             id: msgId(),
             system: true,
             at: Date.now(),
-            text: `📞 Bire bir görüşmeye geçtin: ${wasSeated ? 'mikrofon koltuğundan indin, ' : ''}${hadCam ? 'oda kameran kapatıldı, ' : ''}odada dinleyici olarak kalıyorsun.`,
+            text: `📞 Görüşmedesin${wasSeated ? ', mikrofondan indin' : ''}${hadCam ? ', kameran kapandı' : ''}; odada dinleyicisin.`,
           },
         ]),
       );
     } else {
-      setMessages((m) => mergeFeed(m, [{ id: msgId(), system: true, at: Date.now(), text: '✅ Görüşme bitti. Hâlâ odadasın; istersen yeniden mikrofon isteyebilir veya kameranı açabilirsin.' }]));
+      setMessages((m) => mergeFeed(m, [{ id: msgId(), system: true, at: Date.now(), text: '✅ Görüşme bitti.' }]));
     }
   }
   /** Room mic/seat/camera controls are locked while a call holds the devices. */
@@ -1535,7 +1533,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // Labeled system bot with periodic tips (owner can switch it off).
   useEffect(() => {
     if (!botOn) return;
-    const t = setInterval(() => addMsg({ bot: true, text: pick(BOT_TIPS) }), 45_000);
+    const t = setInterval(() => addMsg({ bot: true, text: pick(BOT_TIPS) }), BOT_EVERY_MS);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [botOn]);
@@ -1999,7 +1997,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       const text: Partial<Record<typeof lastPk.status, string>> = {
         invite: `📨 ${label} daveti gönderildi · ${lastPk.durationMin} dk`,
         prep: `⏳ ${label} hazırlanıyor · ${lastPk.durationMin} dk`,
-        active: lastPk.mode === 'solo' ? `🎤 ${label} başladı! Mikrofondakilere gelen hediyeler kendi puanlarına yazılır.` : `⚔️ ${label} başladı! Hediyeler takımına puan kazandırır.`,
+        active: lastPk.mode === 'solo' ? `🎤 ${label} başladı!` : `⚔️ ${label} başladı!`,
         done: `🏁 ${label} bitti · sonuç sunucuda kesinleşti`,
         cancelled: `✖️ ${label} başlamadı/iptal edildi`,
       };
@@ -2159,7 +2157,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         // The server took them out of the voice room; the short ban here keeps them off this screen meanwhile.
         kick(id, 'me', uid, KICK_BAN_MIN);
         staff.reload();
-        addMsg({ system: true, text: `${u.name} odadan çıkarıldı · ${KICK_BAN_MIN} dk giriş yasağı (denetim kaydına yazıldı)` });
+        addMsg({ system: true, text: `${u.name} odadan çıkarıldı · ${KICK_BAN_MIN} dk giriş yasağı` });
         logMod('Odadan çıkardı', u.name, `${KICK_BAN_MIN} dk giriş yasağı`);
       });
     }
@@ -2169,7 +2167,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       return showAlert('Odadan çıkarılamadı', r.reason);
     }
     setBans((b) => [...b.filter((x) => x.userId !== uid), { userId: uid, until: `${KICK_BAN_MIN} dk` }]);
-    addMsg({ system: true, text: `${u.name} odadan çıkarıldı · ${KICK_BAN_MIN} dk giriş yasağı (denetim kaydına yazıldı)` });
+    addMsg({ system: true, text: `${u.name} odadan çıkarıldı · ${KICK_BAN_MIN} dk giriş yasağı` });
     logMod('Odadan çıkardı', u.name, `${KICK_BAN_MIN} dk giriş yasağı`);
   };
   // Test panel: the host removes me, as the server would, so the session ends for a reason I didn't choose.
@@ -2179,7 +2177,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     if (!r.ok) showAlert('Yapılamadı', r.reason);
   };
   const confirmKick = (uid: string) =>
-    showAlert('Odadan çıkarılsın mı?', `${userById(uid).name} odadan çıkarılır ve ${KICK_BAN_MIN} dk tekrar giremez. Bu kalıcı engelleme değildir.`, [
+    showAlert('Odadan çıkarılsın mı?', `${userById(uid).name} ${KICK_BAN_MIN} dk odaya giremez.`, [
       { text: 'Vazgeç', style: 'cancel' },
       { text: 'Odadan çıkar', style: 'destructive', onPress: () => kickFromRoom(uid) },
     ]);
@@ -2272,7 +2270,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     const target = toServer(uid);
     if (!target || offlineBlocked()) return;
     const name = userById(uid).name;
-    if (on && djIds.length >= djCapacity(level)) return showAlert('DJ kontenjanı dolu', `Lv.${level} odada en fazla ${djCapacity(level)} DJ olabilir. Oda seviyesi yükseldikçe artar.`);
+    if (on && djIds.length >= djCapacity(level)) return showAlert('DJ kontenjanı dolu', `Lv.${level} odada en fazla ${djCapacity(level)} DJ olur.`);
     staffAction('DJ değişmedi', () => roomSetDj(id, target, on), () => {
       staff.reload();
       logMod(on ? 'DJ yaptı' : 'DJ’likten aldı', name);
@@ -2522,7 +2520,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           dividerBefore: true,
           onPress: () => {
             logMod('Reddedilen deneme: üst role müdahale', u.name);
-            showAlert('Yetki yok', `${targetRole === 'owner' ? 'Oda sahibini' : 'Aynı veya üst rolü'} mikrofondan indiremez, odadan atamaz ya da susturamazsın. Bu deneme denetim kaydına yazıldı.`);
+            showAlert('Yetki yok', `${targetRole === 'owner' ? 'Oda sahibini' : 'Aynı veya üst rolü'} indiremez, atamaz, susturamazsın.`);
           },
         });
       // Plain members need no role word; the match fits in the menu's one-line title instead.
@@ -2554,7 +2552,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       ];
       return openSeatMenu(index, `${index + 1}. koltuk · ${locked ? 'kilitli' : 'boş'}`, items);
     }
-    if (lockedSeats.includes(index)) return showAlert('Bu mikrofon kilitli', 'Oda yönetimi bu koltuğu kilitledi. Boş başka bir koltuk seçebilir veya el kaldırabilirsin.');
+    if (lockedSeats.includes(index)) return showAlert('Bu mikrofon kilitli', 'Başka bir koltuk seç.');
     if (myRole === 'member' && micPermission === 'members' && membership !== 'member') {
       showAlert('Mikrofon yalnızca oda üyelerine açık', 'Bu odada mikrofon almak için önce oda üyesi olmalısın.', [
         { text: 'Vazgeç', style: 'cancel' },
@@ -2573,11 +2571,11 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     if (real)
       return queueCall('El kaldırılamadı', { action: 'join' }, (q) => {
         const pos = q.indexOf(myServerId() ?? '');
-        addMsg({ system: true, text: `🙋 Mikrofon isteğin oda yönetimine gitti${pos >= 0 ? ` · sıran: ${pos + 1}` : ''} · onay bekleniyor` });
+        addMsg({ system: true, text: `🙋 Mikrofon isteğin gitti${pos >= 0 ? ` · sıran: ${pos + 1}` : ''}` });
       });
     const pos = rollDie() % 3 + 1;
     setMyQueuePos(pos);
-    addMsg({ system: true, text: `🙋 Mikrofon isteğin oda yönetimine gönderildi · sıran: ${pos + 1} · onay bekleniyor` });
+    addMsg({ system: true, text: `🙋 Mikrofon isteğin gitti · sıran: ${pos + 1}` });
   };
 
   // The big mic button for a listener: take a free mic, or raise a hand when all are taken.
@@ -3089,7 +3087,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     if (!check.ok) return showAlert('Davet gönderilemedi', check.reason);
     if (!info.count) return showAlert('Davet edilecek takipçi yok', 'Odanın hesabını takip eden biri olunca davet gönderebilirsin.');
     const owner = hostId === 'me' ? 'Hesabının' : `${userById(hostId).name} hesabının`;
-    showAlert('Takipçiler davet edilsin mi?', `${owner} ${info.count.toLocaleString('tr-TR')} takipçisine oda daveti bildirimi gider. Bu oda için 24 saatte bir gönderilebilir.`, [
+    showAlert('Takipçiler davet edilsin mi?', `${owner} ${info.count.toLocaleString('tr-TR')} takipçisine davet gider. Günde bir kez.`, [
       { text: 'Vazgeç', style: 'cancel' },
       {
         text: 'Davet gönder',
@@ -3117,7 +3115,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     if (!check.ok) return showAlert('Davet gönderilemedi', check.reason);
     const count = followerCount(hostId);
     const owner = hostId === 'me' ? 'Hesabının' : `${userById(hostId).name} hesabının`;
-    showAlert('Takipçiler davet edilsin mi?', `${owner} ${count.toLocaleString('tr-TR')} takipçisine oda daveti bildirimi gider. Bu oda için 24 saatte bir gönderilebilir.`, [
+    showAlert('Takipçiler davet edilsin mi?', `${owner} ${count.toLocaleString('tr-TR')} takipçisine davet gider. Günde bir kez.`, [
       { text: 'Vazgeç', style: 'cancel' },
       {
         text: 'Davet gönder',
@@ -3147,7 +3145,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     if (!g || !g.active) return;
     setPanel(null);
     if (!g.playable) return showAlert(g.name, 'Bu oyun yakında geliyor.');
-    if (g.startBy === 'owner_mod' && myRole === 'member') return showAlert('Masayı oda yönetimi açar', `${g.name} masasını oda sahibi veya yöneticiler başlatır. Açık bir masaya davetle katılabilirsin.`);
+    if (g.startBy === 'owner_mod' && myRole === 'member') return showAlert('Masayı oda yönetimi açar', `Açık bir ${g.name} masasına davetle katılabilirsin.`);
     setGame({ kind: 'room', id: g.id });
     setGameMin(false);
     // A server room's table opens on the server; the room hears of it from there (useTableNews).
@@ -3186,7 +3184,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           {
             title: 'Oda Oyunları · ücretsiz',
             variant: 'tile',
-            note: canManage ? 'Masayı sen açarsın, herkes katılır · oyun açıkken mikrofonun ve koltuğun aynen kalır' : 'Oda yönetiminin açtığı masaya otur · mikrofonun ve koltuğun aynen kalır',
+            note: canManage ? 'Masayı aç, herkes katılsın' : 'Açık masaya otur',
             items: gameCatalog.roomGames
               .filter((g) => g.active && (!real || !g.playable || isTableGame(g.id)))
               .map((g) => ({ key: `rg-${g.id}`, label: g.name, emoji: g.emoji, art: gameArtOf(g.id), hue: gameHueOf(g.id), badge: g.playable ? undefined : ('SOON' as const), onPress: () => openRoomGame(g.id) })),
@@ -3483,14 +3481,14 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // A team PK keeps its arena (the teams need their sides).
   const [seatsSmall, setSeatsSmall] = useState(() => isLargeChat(getChatShare()));
   const strip = seatsSmall && !teamPk;
-  // The stage doesn't scroll (components/room/fit-stage): its mics are as big as the height the chat leaves them
-  // allows (lib/seat-fit). Few mics: big faces; many: smaller ones, and all of them still fit. A chosen layout keeps
-  // its rows; the classic grid also picks how many mics go to a row. The mic strip and a team PK keep their sizes.
+  // The stage (components/room/fit-stage): every mic count gets the same faces (lib/seat-fit FACE_STD), smaller only
+  // when the phone is too short for them, and the chat takes the rest. A chosen layout keeps its rows; the classic
+  // grid picks how many mics go to a row (full rows). The mic strip and a team PK keep their sizes.
   // Every seat keeps the line its PK points go on (lib/seat-fit PK_LINE), so a Normal PK starting or ending doesn't
   // move or resize a single mic; a cross-room PK's board is added to the stage like any board and the chat gives way.
   const fitOpts: FitOpts = { boss: bossOn };
   const plan = layout ? layoutPlan(layout.layoutSchema, win.width, theme === 'pk') : null;
-  const stageFit = strip || teamPk ? null : (h: number, like?: Fitted) => (layout && plan ? fitLayout(layout.layoutSchema, plan, h, fitOpts, like) : fitGrid(allSeats.length - 1, win.width, h, fitOpts, like));
+  const stageFit = strip || teamPk ? null : (h: number, like?: Fitted) => (layout && plan ? fitLayout(layout.layoutSchema, plan, h, fitOpts, like) : fitGrid(allSeats.length, win.width, h, fitOpts, like));
   // The strip's mics: a tenth of the row each, so ten fit and fewer stay together on the left.
   const stripW = Math.floor((Math.min(win.width, 640) - 16) / 10);
   const stripSlot: ArenaSlot = { width: stripW, size: Math.max(24, Math.min(34, stripW - 8)) };
@@ -3571,20 +3569,16 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       </>
     ) : (
       <View style={styles.seatGrid}>
-        {/* Seat 0 has a row of its own (beside the Patron seat when there is one), a little bigger than the rest. */}
-        {bossOn ? (
+        {/* The Patron seat has the row above the mics to itself, in the middle. */}
+        {bossOn && (
           <View style={styles.topRow}>
-            {renderSeat(0, { host: true, compact: true, grid: { width: 96, size: f.host } })}
             <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} reaction={bossReaction} still={settings.reduceMotion} anchor={bossAnchor} pkPoints={pkPointsOf(bossId)} />
           </View>
-        ) : (
-          <View style={styles.hostRow}>{renderSeat(0, { grid: { width: Math.max(96, f.host + 28), size: f.host } })}</View>
         )}
-        {/* The others `f.cols` to a row (equal widths, no gap), the rows together in the middle. */}
+        {/* Every mic, the host's first, `f.cols` to a row (equal widths, no gap): full rows, the same seats for every
+            mic count (lib/seat-fit gridCols), so the stage is symmetric and a new count only adds or takes rows. */}
         <View style={[styles.guestGrid, { width: f.cols * f.slot }]}>
-          {allSeats.map((_, i) =>
-            i === 0 ? null : renderSeat(i, { grid: { width: f.slot, size: f.face }, next: i + 1 < allSeats.length && (i - 1) % f.cols !== f.cols - 1 ? { index: i + 1, gap: 0 } : undefined }),
-          )}
+          {allSeats.map((_, i) => renderSeat(i, { grid: { width: f.slot, size: f.face }, next: i + 1 < allSeats.length && i % f.cols !== f.cols - 1 ? { index: i + 1, gap: 0 } : undefined }))}
         </View>
       </View>
     );
@@ -3806,7 +3800,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                   fill
                   onClose={() => setEmojiOpen(false)}
                   onAnimate={sendAnim}
-                  hint={amSeated ? 'Seçtiğin emoji koltuğundaki avatarının üzerinde oynar.' : 'Koltukta değilsin: emoji mesajına eklenir. Mikrofona geçince avatarının üzerinde oynar.'}
+                  hint={amSeated ? undefined : 'Koltukta değilsin; emoji mesaja eklenir.'}
                   onPick={(e) => {
                     // A Hamle pick does something (lib/room-moves); it is never a chat sticker.
                     if (isMovePick(stickerIdOf(e))) {
@@ -4524,8 +4518,9 @@ const styles = StyleSheet.create({
   topRow: { width: '100%', flexDirection: 'row', justifyContent: 'center', alignItems: 'flex-start', gap: 28 },
   topAvatar: { borderWidth: 2, borderRadius: 14 },
   seatGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', paddingHorizontal: 8, paddingTop: 8, rowGap: 10 },
-  hostRow: { width: '100%', alignItems: 'center' },
-  guestGrid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 10 },
+  // Full rows for every mic count (lib/seat-fit gridCols); a count no row length fills keeps its short last row in the
+  // middle, so the stage stays symmetric.
+  guestGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', rowGap: 10 },
   // Küçült: the mics as one short strip (ten to a row, from the left), the chat takes the rest.
   micStrip: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-start', paddingHorizontal: 8, paddingTop: 6, paddingBottom: 2, rowGap: 6 },
   bottom: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 8 },

@@ -28,15 +28,17 @@ export const steadyBox = (roomH: number, headerH: number, controlsH: number) => 
 export const STAGE_PAD = 4;
 
 /**
- * The mics' sizes on the stage: as they are in the room with no boards and no PK (`calm`; `fit` when there's no PK),
- * kept while the boards and banners, a PK's board and the points under the names take what the chat can give (down
- * to its least); only past that do the faces get smaller. `fit(height, like)` sizes them for a height, in `like`'s
- * columns with faces at most its size (lib/seat-fit). `box`: the room's steady share (steadyBox), so a keyboard,
- * the emoji panel or a note over the controls never comes into it.
+ * The mics' sizes on the stage: the same in every room and for every mic count (lib/seat-fit FACE_STD) as long as the
+ * stage can hold them with the chat at its least, so a change of the mic count or the layout only adds or takes rows
+ * (the owners, Nov 2026: seats shrinking to leave the chat its chosen height opened wide gaps between them). As they
+ * are with no boards and no PK (`calm`; `fit` when there's no PK), kept while the boards and banners, a PK's board
+ * and the points under the names take what the chat can give (down to its least); only past that do the faces get
+ * smaller. `fit(height, like)` sizes them for a height, in `like`'s columns with faces at most its size. `box`: the
+ * room's steady share (steadyBox), so a keyboard, the emoji panel or a note over the controls never comes into it.
  */
 export function fitMics<F>(fit: (height: number, like?: F) => F, calm: ((height: number) => F) | null | undefined, box: number, bar: number, basis: number, boards: number): F {
-  const base = box - bar - basis - STAGE_PAD;
-  return fit(base - boards + Math.max(0, basis - CHAT_LEAST), (calm ?? fit)(base));
+  const most = box - bar - STAGE_PAD - Math.min(basis, CHAT_LEAST);
+  return fit(most - boards, (calm ?? fit)(most));
 }
 
 /**

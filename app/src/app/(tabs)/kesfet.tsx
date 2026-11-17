@@ -202,7 +202,7 @@ export default function DiscoverScreen() {
               <StateIcon name="location-outline" tone="social" />
               <Text style={{ color: colors.text, fontWeight: '800', fontSize: 16, textAlign: 'center' }}>Yakındakileri görmek için şehir bazlı keşfi aç</Text>
               <Text style={{ color: colors.textDim, textAlign: 'center', fontSize: 13 }}>
-                Kesin konumun paylaşılmaz; sadece şehrin kullanılır. Ayarlardan istediğin zaman kapatabilirsin.
+                Yalnız şehrin kullanılır; kesin konumun paylaşılmaz.
               </Text>
               <Pressable style={styles.optInBtn} onPress={() => setSetting('cityDiscovery', true)}>
                 <Text style={{ color: '#fff', fontWeight: '800' }}>Şehir bazlı keşfi aç</Text>

@@ -197,11 +197,11 @@ export function PkSetupSheet({ visible, roomId, starterId, micUsers, offline, on
               ))}
             </View>
             <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ gap: 12, paddingBottom: 12 }} keyboardShouldPersistTaps="handled">
-              {offline && <Notice icon="cloud-offline-outline" text="Bağlantı yok. PK başlatmak için bağlantının dönmesini bekle." warn />}
+              {offline && <Notice icon="cloud-offline-outline" text="Bağlantı yok." warn />}
               {tab === 'room' && (
                 <View style={st.modes}>
-                  <ModeCard tone="pink" on={mode === 'solo'} off={soloOff} art="pk-normal-pk" title="Normal PK" sub="Herkes kendi adına mikrofon puanıyla yarışır." onPress={() => setMode('solo')} />
-                  <ModeCard tone="blue" on={mode === 'team'} off={teamOff} art="pk-takim-pk" title="Takım PK" sub="Kırmızı ve Mavi olmak üzere iki takıma ayrılır." onPress={() => setMode('team')} />
+                  <ModeCard tone="pink" on={mode === 'solo'} off={soloOff} art="pk-normal-pk" title="Normal PK" sub="Herkes kendi adına" onPress={() => setMode('solo')} />
+                  <ModeCard tone="blue" on={mode === 'team'} off={teamOff} art="pk-takim-pk" title="Takım PK" sub="Kırmızı ve Mavi takım" onPress={() => setMode('team')} />
                   <View pointerEvents="none" style={st.vsAt}>
                     <VsBadge size={46} />
                   </View>
@@ -226,10 +226,10 @@ export function PkSetupSheet({ visible, roomId, starterId, micUsers, offline, on
                       ))}
                     </View>
                   ) : (
-                    <Notice icon="information-circle-outline" text="Mikrofonda henüz kimse yok. PK’yı yine de başlatabilirsin: mikrofona geçen herkes katılır." />
+                    <Notice icon="information-circle-outline" text="Mikrofonda kimse yok; geçen herkes katılır." />
                   )}
                   <Text style={st.dim}>
-                    Her kişi aldığı hediyelerin {live ? 'jeton değeriyle' : 'PK puanıyla'} yarışır; en yüksek puan kazanır. PK sırasında mikrofona geçen kişi de o andan itibaren katılır; mikrofondan inen kişinin puanı kalır.
+                    En yüksek {live ? 'hediye değeri' : 'PK puanı'} kazanır.
                   </Text>
                 </>
               )}
@@ -267,8 +267,8 @@ export function PkSetupSheet({ visible, roomId, starterId, micUsers, offline, on
                       <>
                         <Text style={st.dim}>
                           {micUsers.length
-                            ? `Mikrofondaki ${micUsers.length} kişi sunucuda rastgele ve eşit sayıda iki takıma ayrılır (tek sayıda fark en fazla 1). Başlatmadan önce dağılımı görürsün.`
-                            : 'Mikrofonda henüz kimse yok. Takımlar boş başlar; mikrofona geçen herkes bir takıma girer.'}
+                            ? `Mikrofondaki ${micUsers.length} kişi rastgele iki takıma ayrılır.`
+                            : 'Mikrofonda kimse yok; geçen herkes bir takıma girer.'}
                         </Text>
                         <Pressable style={st.secondary} onPress={draw} accessibilityLabel="Takımları oluştur">
                           <Text style={st.secondaryText}>Takımları oluştur</Text>
@@ -297,12 +297,12 @@ export function PkSetupSheet({ visible, roomId, starterId, micUsers, offline, on
                         </View>
                       ))}
                       <TeamPreview red={manual.red} blue={manual.blue} names={config.teamNames} colors={config.teamColors} />
-                      {imbalance && <Notice icon="alert-circle-outline" text={`Takımlar dengesiz (${manual.red.length}–${manual.blue.length}). Mümkünse farkı en fazla 1 kişiye indir.`} warn />}
+                      {imbalance && <Notice icon="alert-circle-outline" text={`Takımlar dengesiz (${manual.red.length}–${manual.blue.length}).`} warn />}
                       {unassigned.length > 0 && <Text style={st.dim}>Takım seçilmeyenler PK’ya katılmaz: {unassigned.map(nameOf).join(', ')}</Text>}
                     </>
                   )}
                   <Text style={st.dim}>
-                    Takım başına en fazla {config.teamMax} kişi · PK sırasında mikrofona geçen kişi, kişi sayısı az olan takıma girer (eşitse rastgele) · hediyeyi alan kişi ve takımı puan kazanır
+                    Takım başına en fazla {config.teamMax} kişi
                   </Text>
                 </>
               )}

@@ -229,7 +229,7 @@ export default function UserProfile() {
       try {
         takePhotos(await addAlbumPhoto(asset));
         successHaptic();
-        showAlert('Fotoğraf eklendi', 'Albüm fotoğrafları da topluluk kurallarına göre denetlenir.');
+        showAlert('Fotoğraf eklendi');
       } catch (e) {
         errorHaptic();
         showAlert('Fotoğraf yüklenemedi', message(e));
@@ -238,7 +238,7 @@ export default function UserProfile() {
       }
     } else if (forAlbum) {
       updateMe({ photos: [asset.uri, ...(me.photos ?? [])].slice(0, LIMITS.photos) });
-      showAlert('Fotoğraf eklendi', 'Albüm fotoğrafları da topluluk kurallarına göre denetlenir.');
+      showAlert('Fotoğraf eklendi');
     } else if (live) {
       // Live mode: the photo goes to the server's storage and becomes my avatar there, so other phones see it.
       // This phone shows it only once the server saved it.
@@ -246,7 +246,7 @@ export default function UserProfile() {
       try {
         updateMe(await uploadAvatar(asset));
         successHaptic();
-        showAlert('Profil fotoğrafın güncellendi', 'Yeni fotoğrafın artık profilinde görünüyor.');
+        showAlert('Profil fotoğrafın güncellendi');
       } catch (e) {
         errorHaptic();
         showAlert('Fotoğraf yüklenemedi', message(e));
@@ -255,7 +255,7 @@ export default function UserProfile() {
       }
     } else {
       submitAvatar(asset.uri);
-      showAlert('Fotoğraf incelemede', 'Yeni profil fotoğrafın kısa bir kontrolden sonra herkese görünecek. Bu sırada eski fotoğrafın görünür.');
+      showAlert('Fotoğraf incelemede', 'Kısa bir kontrolden sonra görünecek.');
     }
   };
 
@@ -406,7 +406,7 @@ export default function UserProfile() {
   // Blocking also ends the follows both ways (on the server too), so it asks first; unblocking doesn't.
   const blockUser = () => {
     if (isBlocked) return toggleBlock(user.id);
-    showAlert(`${user.name} kişisini engellemek istiyor musun?`, 'Birbirinize mesaj atamaz, birbirinizi takip edemezsiniz; aranızdaki takipler de kalkar. Engeli istediğin zaman kaldırabilirsin.', [
+    showAlert(`${user.name} kişisini engellemek istiyor musun?`, 'Birbirinize yazamaz, takip edemezsiniz; takipler kalkar.', [
       { text: 'Vazgeç', style: 'cancel' },
       { text: 'Engelle', style: 'destructive', onPress: () => toggleBlock(user.id) },
     ]);
@@ -692,7 +692,7 @@ export default function UserProfile() {
               />
               <InfoBox
                 icon="shield-checkmark"
-                text={user.verified ? 'Gerçek kişi doğrulandı · mavi rozet aktif' : isMe ? 'Bir kere doğrula, kalıcı bağlantı' : 'Bu kullanıcı henüz doğrulanmadı.'}
+                text={user.verified ? 'Gerçek kişi doğrulandı · mavi rozet aktif' : isMe ? 'Selfie ile doğrula, mavi rozet al' : 'Bu kullanıcı henüz doğrulanmadı.'}
               />
             </View>
 
@@ -1010,7 +1010,7 @@ export default function UserProfile() {
           onPress: () => {
             const no = createTicket('Şikâyet', `${user.name} (${user.id}) · ${r}`);
             logSafety('Şikâyet etti', user.id, `${r} · #${no}`);
-            showAlert('Şikâyet alındı', `Talep #${no} · "${r}". İnceleme sonucu bildirim olarak gelir; durumu Destek ekranından izleyebilirsin.`);
+            showAlert('Şikâyet alındı', `Talep #${no}. Sonuç bildirim olarak gelir.`);
           },
         }))}
       />
@@ -1064,7 +1064,7 @@ function Guardian({ guardian }: { guardian: { userId: string; points: number } |
       onPress={() =>
         g
           ? router.push(`/kullanici/${g.id}`)
-          : showAlert('Baş Destekçi', 'Bu profilin henüz baş destekçisi yok. Hayran kulübünde en çok destek veren kişi Baş Destekçi olur.')
+          : showAlert('Baş Destekçi', 'En çok destek veren kişi Baş Destekçi olur.')
       }
       accessibilityLabel="Baş Destekçi"
     >
@@ -1611,14 +1611,14 @@ function EditSheet({
               <TextInput value={bio} onChangeText={setBio} maxLength={LIMITS.bio} multiline style={[styles.input, { minHeight: 70, textAlignVertical: 'top' }]} placeholder="Kendini anlat" placeholderTextColor={colors.textDim} />
             </Field>
             {birthLocked ? (
-              <Field label="Doğum tarihi" hint="Doğum tarihi bir kez girilir; değiştirmek için destekle iletişime geç. Diğerleri yalnızca yaşını görür.">
+              <Field label="Doğum tarihi" hint="Değiştirmek için Destek'e yaz. Diğerleri yalnız yaşını görür.">
                 <View style={[styles.row, styles.input]}>
                   <Ionicons name="lock-closed" size={14} color={colors.textDim} />
                   <Text style={{ color: colors.textDim, fontSize: 15 }}>{user.birthDate ? formatTrDate(user.birthDate) : `${serverAge ?? user.age} yaş`}</Text>
                 </View>
               </Field>
             ) : (
-              <Field label="Doğum tarihi" error={errors.birth} hint="Bir kez girilir, sonra değiştirilemez. Yalnızca sen görürsün; diğerleri sadece yaşını görür.">
+              <Field label="Doğum tarihi" error={errors.birth} hint="Bir kez girilir. Diğerleri yalnız yaşını görür.">
                 <TextInput value={birth} onChangeText={setBirth} keyboardType="numbers-and-punctuation" maxLength={10} style={styles.input} placeholder="GG.AA.YYYY" placeholderTextColor={colors.textDim} />
               </Field>
             )}
