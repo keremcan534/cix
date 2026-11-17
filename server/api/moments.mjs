@@ -11,8 +11,8 @@
 //   POST /api/moments/comment/delete { id }                            → { deleted: true }  (its writer, the post's writer or staff)
 //   POST /api/moments/comment/like   { id, like }                      → { liked, likes }
 //
-// Posting needs Yankı Lv.5 (POST_CHARM points: diamonds received in gifts, wallet.mjs charmPoints); staff may always
-// post. Commenting and liking are open to everyone. Posts and comments also go through the spam filter
+// Posting needs the Yankı level Seviye ayarları give `moments_post` (Lv.5 until the panel moves it, postNeed: the
+// diamonds received in gifts, wallet.mjs charmPoints); staff may always post. Commenting and liking are open to everyone. Posts and comments also go through the spam filter
 // (spam-filter.mjs: swearing, sexual text, ads and other apps), refused with 400 code text_blocked.
 //
 // Nobody sees the posts and comments of someone either side has blocked, of a deleted account or of a banned one.
@@ -26,6 +26,7 @@ import { notify } from './push.mjs';
 import { assertMay } from './sanctions.mjs';
 import { SPAM_MESSAGES, checkSpam } from './spam-filter.mjs';
 import { charmPoints } from './wallet.mjs';
+import { momentsNeed } from './levels.mjs';
 import { removeFiles, verifyUpload } from './media.mjs';
 import { distancesFrom } from './distances.mjs';
 import { hiddenFrom } from './privacy.mjs';
@@ -37,17 +38,21 @@ const TABS = ['recent', 'popular', 'friends'];
 
 const isStaff = (u) => u.role === 'moderator' || u.role === 'admin';
 
-/** Yankı Lv.5 starts at 250 points (app/src/data/charm.ts CHARM_XP). MOMENT_CHARM: tests post without it. */
-export const POST_LEVEL = 5;
-export const POST_CHARM = (() => {
-  const n = Number(env.MOMENT_CHARM ?? 250);
-  return Number.isSafeInteger(n) && n >= 0 ? n : 250;
-})();
+/**
+ * The Yankı level posting needs and the points it starts at, as Seviye ayarları have it (levels.mjs momentsNeed: Lv.5,
+ * 250 points until the panel moves it). MOMENT_CHARM (points): tests post without it.
+ */
+const OVERRIDE = env.MOMENT_CHARM === undefined ? null : Number(env.MOMENT_CHARM);
+export const postNeed = () => {
+  const need = momentsNeed();
+  return Number.isSafeInteger(OVERRIDE) && OVERRIDE >= 0 ? { level: need.level, points: OVERRIDE } : need;
+};
 
-/** Whether `me` may post: staff always, others from Yankı Lv.5. */
+/** Whether `me` may post: staff always, others from the Yankı level the settings ask. */
 async function posting(me) {
   const points = await charmPoints(db, me.id);
-  return { allowed: isStaff(me) || points >= POST_CHARM, needLevel: POST_LEVEL, need: POST_CHARM, points };
+  const need = postNeed();
+  return { allowed: isStaff(me) || points >= need.points, needLevel: need.level, need: need.points, points };
 }
 
 /** Refuses swearing, sexual text and ads (spam-filter.mjs); `field` is the request's key. Returns `s`. */
@@ -166,7 +171,7 @@ export const momentRoutes = {
     const me = await auth(req);
     await assertMay(me, 'post');
     const may = await posting(me);
-    if (!may.allowed) throw Object.assign(new HttpError(403, `Anlar'da paylaşım Yankı Lv.${POST_LEVEL} ve üstü için`), { extra: { code: 'charm', ...may } });
+    if (!may.allowed) throw Object.assign(new HttpError(403, `Anlar'da paylaşım Yankı Lv.${may.needLevel} ve üstü için`), { extra: { code: 'charm', ...may } });
     const b = await readJson(req);
     if (!REF.test(b.ref ?? '')) throw new HttpError(400, 'Geçersiz istek kimliği');
     const image = photoOf(b.imageUrl, me);

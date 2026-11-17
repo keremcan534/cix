@@ -15,7 +15,7 @@
 // pool, winnings are paid only from the pool, and a round whose top prize the pool can't cover is refused before
 // anything is taken. A slot's JACKPOT share moves from the pool into its fund; a line of wilds wins bet / top stake
 // of the fund.
-// Open from Cömertlik Lv.2 (wheel.mjs NEED_POINTS), checked on every round; to admin accounts only until the live
+// Open from Cömertlik Lv.2 (Seviye ayarları can move it: wheel.mjs casinoNeed), checked on every round; to admin accounts only until the live
 // setting casino_open opens the coin games to everyone (wheel.mjs paidGamesOpen). Per person: a daily ceiling per game
 // (live setting casino_daily_rounds × the game's top stake) and a rate limit. Live settings also switch single games
 // off (casino_off) and cap the stake (casino_max_bet); Acil durum's Oyunlar stops them all (features.mjs).
@@ -25,7 +25,7 @@ import crypto from 'node:crypto';
 import { HttpError, REF, auth, db, limit, move, readJson, selfUser, tx } from './core.mjs';
 import { live } from './live-settings.mjs';
 import { spendCoins } from './wallet.mjs';
-import { NEED_LEVEL, NEED_POINTS, needPaidGames, paidGamesOpen, wealthPoints } from './wheel.mjs';
+import { casinoNeed, needPaidGames, paidGamesOpen, wealthPoints } from './wheel.mjs';
 import {
   BOARDS,
   GAMES,
@@ -184,8 +184,8 @@ export const casinoRoutes = {
         playedToday: played.get(g.id) ?? 0,
         jackpot: funds[g.id] ?? null,
       })),
-      needLevel: NEED_LEVEL,
-      allowed: open && points >= NEED_POINTS,
+      needLevel: casinoNeed().level,
+      allowed: open && points >= casinoNeed().points,
       gameCoins: Number(me.game_coins),
       mine: mine.rows.map((r) => roundOut(r)),
     };
@@ -232,7 +232,8 @@ export const casinoRoutes = {
       if (!PICKS[g.id].includes(p)) throw new HttpError(400, 'Geçersiz seçim');
       pick = p || null;
     }
-    if ((await wealthPoints(db, me.id)) < NEED_POINTS) throw new HttpError(403, `${g.name}, Cömertlik Lv.${NEED_LEVEL} ve üstü üyeler içindir`);
+    const need = casinoNeed();
+    if ((await wealthPoints(db, me.id)) < need.points) throw new HttpError(403, `${g.name}, Cömertlik Lv.${need.level} ve üstü üyeler içindir`);
     const daily = dailyOf(g, s);
     let row;
     try {

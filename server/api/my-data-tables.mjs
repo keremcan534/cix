@@ -15,7 +15,7 @@ export const EXPORTED = [
   'room_poll_votes', 'room_follower_invites', 'room_follows', 'room_open_notices',
   'backpack_items', 'backpack_moves', 'referral_codes', 'referrals', 'casino_rounds', 'room_decor',
   'events', 'event_reservations', 'event_participants', 'event_reminders_sent', 'event_reminder_optout',
-  'agency_assistants', 'agency_assistant_ledger',
+  'agency_assistants', 'agency_assistant_ledger', 'level_drops', 'level_offsets',
 ];
 
 /** Tables that point at an account but are not that person's to receive, with the reason. */
@@ -30,6 +30,7 @@ export const NOT_EXPORTED = {
   staff_roles: 'platform roles, set by staff',
   staff_assignments: 'staff roles in agencies, set by staff',
   live_settings: 'platform settings, set by staff',
+  level_settings: 'platform settings, set by staff (Seviye ayarları: which staff member saved them)',
   custom_gifts: 'the gift catalog, kept by staff (which admin added or changed a gift)',
   emoji_packs: 'the emoji panel’s packs, kept by staff (which admin added or changed a pack)',
   emoji_stickers: 'the emoji panel’s stickers, kept by staff (which admin added or changed a sticker)',

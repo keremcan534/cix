@@ -25,12 +25,13 @@
 // other people (core.mjs profileOf, moments, families). Everything here goes with the account (social.mjs
 // eraseAccount; the album files with media.mjs removeUserFiles). Someone who blocked me can't be read.
 import { HttpError, auth, db, env, int, limit, publicText, readJson, subActive, tx, userId } from './core.mjs';
-import { GIFTS, vipLevelOf } from './catalog.mjs';
+import { GIFTS } from './catalog.mjs';
+import { charmLevel, hasPerk, levelsRev, wealthLevel } from './levels.mjs';
 import { customGiftIds } from './custom-gifts.mjs';
 import { LIVE, announceLook, statusOf } from './economy.mjs';
 import { topBoard } from './gifts.mjs';
 import { removeFiles, verifyUpload } from './media.mjs';
-import { ALBUM_MAX, CHARM_XP, COUNTRIES, EDUCATION, EXTRA_LIMITS as L, LANGUAGES, MEDAL_RULES, RELATIONSHIP, TAGS, TITLE_RULES, WEALTH_XP, ZODIACS, levelFrom } from './profile-rules.mjs';
+import { ALBUM_MAX, COUNTRIES, EDUCATION, EXTRA_LIMITS as L, LANGUAGES, MEDAL_RULES, RELATIONSHIP, TAGS, TITLE_RULES, ZODIACS } from './profile-rules.mjs';
 import { roomLevel } from './rooms.mjs';
 import { charmPointsOf } from './wallet.mjs';
 import { wealthPointsOf } from './wheel.mjs';
@@ -59,14 +60,16 @@ export async function levelsOf(ids, { fresh = false } = {}) {
   const need = [];
   for (const id of new Set(ids)) {
     const c = cached.get(id);
-    if (!fresh && c && now - c.at < CACHE_MS) out[id] = c.levels;
+    // A Seviye ayarları save (levelsRev) makes every kept level old.
+    if (!fresh && c && now - c.at < CACHE_MS && c.rev === levelsRev()) out[id] = c.levels;
     else need.push(id);
   }
   if (need.length) {
     const [wealth, charm] = await Promise.all([wealthPointsOf(db, need), charmPointsOf(db, need)]);
     for (const id of need) {
-      out[id] = { wealth: levelFrom(WEALTH_XP, wealth.get(id) ?? 0), charm: levelFrom(CHARM_XP, charm.get(id) ?? 0) };
-      cached.set(id, { at: now, levels: out[id] });
+      // By the thresholds Seviye ayarları have now (levels.mjs).
+      out[id] = { wealth: wealthLevel(wealth.get(id) ?? 0), charm: charmLevel(charm.get(id) ?? 0) };
+      cached.set(id, { at: now, rev: levelsRev(), levels: out[id] });
     }
     // The cache holds only recent people: old entries go when it grows.
     if (cached.size > 5000) for (const [id, c] of cached) if (now - c.at >= CACHE_MS) cached.delete(id);
@@ -99,8 +102,8 @@ export async function countriesOf(ids) {
   return Object.fromEntries(r.rows.map((x) => [x.user_id, x.country]));
 }
 
-/** Who may hide their levels: VIP 1 and up (SVIP level or Rütbe), or a running Abonelik. */
-const mayHideLevels = (u, nobleTier) => vipLevelOf(u.svip_xp, nobleTier) >= 1 || subActive(u);
+/** Who may hide their levels: "Seviyeleri gizle" where Seviye ayarları give it (VIP 1, any Rütbe tier, a running Abonelik until the panel moves it). */
+const mayHideLevels = (u, nobleTier) => hasPerk('hide_levels', { svipXp: u.svip_xp, nobleTier, sub: subActive(u) });
 
 /** Who of `ids` hides which level from others now: they chose to, and they may (else it shows again). */
 async function hiddenOf(ids) {

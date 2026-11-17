@@ -1,4 +1,4 @@
-// Anlar posting opens at Yankı Lv.5 (moments.mjs POST_CHARM, 250 points: the diamonds received in gifts,
+// Anlar posting opens at Yankı Lv.5 (levels.mjs momentsNeed until the panel moves it, 250 points: the diamonds received in gifts,
 // wallet.mjs charmPoints); staff may always post, and anyone may comment. The app's Yankı curve starts Lv.5 at the
 // same 250 (app/tests/live-moments.test.ts).
 import { describe, test } from 'node:test';

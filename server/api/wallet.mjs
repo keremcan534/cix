@@ -13,7 +13,7 @@
 // diamonds count in the balance but can't be exchanged, sold or withdrawn; a store refund inside the lock
 // takes them back (jeton.mjs).
 import { HttpError, auth, db, env, move } from './core.mjs';
-import { CHARM_XP } from './profile-rules.mjs';
+import { topPoints, withOffsets } from './levels.mjs';
 import { assertUnderLimit, countSpent } from './spend-limit.mjs';
 import { TEST_ADMIN, withTopFor } from './test-admin.mjs';
 
@@ -210,9 +210,9 @@ export async function charmPointsOf(c, ids) {
       GROUP BY user_id`,
     [ids],
   );
-  const points = new Map(r.rows.map((x) => [x.user_id, Math.max(0, Number(x.n))]));
-  // Test server: admins at the top level (test-admin.mjs).
-  return TEST_ADMIN ? withTopFor(c, ids, points, CHARM_XP.at(-1)) : points;
+  // Less what level drops took off (levels-admin.mjs); test server: admins at the top level (test-admin.mjs).
+  const points = await withOffsets(c, 'charm', new Map(r.rows.map((x) => [x.user_id, Math.max(0, Number(x.n))])));
+  return TEST_ADMIN ? withTopFor(c, ids, points, topPoints('charm')) : points;
 }
 
 /** An account's diamonds: all of them, those still locked, and those that may leave. */

@@ -4,8 +4,8 @@
 // they import catalog.mjs. The defaults are today's constants and .env values, so an empty live_settings table
 // changes nothing. The table, the in-memory snapshot and the admin routes are in live-settings.mjs.
 //
-// Never here, by design (they change only with a deploy): the Cömertlik Lv.2 gate (wheel.mjs NEED_LEVEL /
-// NEED_POINTS, casino visibility), the age limits, diamondsPerUsd and the 1:1 coin-to-diamond ratio, diamond lock
+// Never here, by design (they change only with a deploy or elsewhere): level thresholds, perks and the Cömertlik gate
+// of the coin games (Seviye ayarları, levels.mjs), casino visibility, the age limits, diamondsPerUsd and the 1:1 coin-to-diamond ratio, diamond lock
 // hours, test and sandbox flags, TEST_DAILY, pack coins / product ids / TL prices (Play Console owns the price),
 // gift prices (installed apps show the compiled price), the SMS provider and every secret.
 //

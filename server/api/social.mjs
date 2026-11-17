@@ -18,7 +18,7 @@ import { withSignIn } from './auth.mjs';
 import { notify } from './push.mjs';
 import { autoFromReports } from './sanctions.mjs';
 import { announceLook, looksOf, revokeAllForDelete } from './economy.mjs';
-import { svipLevel } from './catalog.mjs';
+import { hasPerk } from './levels.mjs';
 import { familyOf, leaveFamily } from './families.mjs';
 import { dropFromQueues } from './music.mjs';
 import { removeFiles, removeUserFiles, verifyUpload } from './media.mjs';
@@ -66,18 +66,16 @@ async function liveUser(id) {
   return r.rows[0];
 }
 
-/** "Sessiz ziyaret" (silent visit): from this VIP (SVIP) level on, opening a profile leaves no trace (app data/status). */
-export const SILENT_VISIT_SVIP = 7;
 /** At most this many visit notices a minute for one profile: many accounts opening it at once don't flood its phone. */
 const VISIT_NOTICE_BURST = 5;
 let visitsPrunedAt = 0;
 
 /**
- * Whether `user` (a users row) may see who opened their profile: the Abonelik's "Profiline bakanları gör", only while
- * the subscription runs (vip.mjs; VIP 1–10 and Rütbe don't open it). Without it they see that someone came and when,
- * never who.
+ * Whether `user` (a users row) may see who opened their profile: "Profiline bakanları gör" where Seviye ayarları give
+ * it (levels.mjs: the Abonelik while it runs, vip.mjs; a VIP level only if the panel adds it there). Without it they
+ * see that someone came and when, never who.
  */
-export const seesVisitors = (user) => subActive(user);
+export const seesVisitors = (user) => hasPerk('visitors', { svipXp: user.svip_xp, sub: subActive(user) });
 
 /**
  * `me` opened `owner`'s profile. A visit within 10 minutes of the last one counts once; after a week without one
@@ -86,7 +84,8 @@ export const seesVisitors = (user) => subActive(user);
  * Once an hour, rows past the week (and a day) go.
  */
 async function recordVisit(owner, me) {
-  if (svipLevel(Number(me.svip_xp) || 0) >= SILENT_VISIT_SVIP) return;
+  // "Sessiz ziyaret" (silent visit): where Seviye ayarları give it (VIP 7 until the panel moves it) no trace is left.
+  if (hasPerk('silent_visit', { svipXp: me.svip_xp })) return;
   const r = await db.query(
     `INSERT INTO profile_visits (owner_id, visitor_id, notified_at) VALUES ($1, $2, now())
      ON CONFLICT (owner_id, visitor_id) DO UPDATE SET
@@ -138,6 +137,9 @@ export async function eraseAccount(c, id, phone) {
     await c.query('DELETE FROM follows WHERE follower = $1 OR followee = $1', [id]);
     await c.query('DELETE FROM blocks WHERE blocker = $1 OR blocked = $1', [id]);
     await c.query('DELETE FROM profile_visits WHERE owner_id = $1 OR visitor_id = $1', [id]);
+    // Their level drops and what the drops took off (levels-admin.mjs): no accounting record, nobody else's.
+    await c.query('DELETE FROM level_drops WHERE user_id = $1', [id]);
+    await c.query('DELETE FROM level_offsets WHERE user_id = $1', [id]);
     // Gizlilik choices and the "Arama geçmişini temizle" mark (privacy.mjs, call-log.mjs).
     await c.query('DELETE FROM privacy_settings WHERE user_id = $1', [id]);
     await c.query('DELETE FROM call_history_cleared WHERE user_id = $1', [id]);

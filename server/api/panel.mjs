@@ -54,6 +54,12 @@ export const PANEL_ROUTES = new Set([
   'POST /api/admin/emoji/stickers/delete',
   'POST /api/admin/emoji/stickers/order',
   'POST /api/admin/emoji/fetch',
+  // Seviyeler (levels-admin.mjs): VIP, Rütbe, Cömertlik, Yankı and Abonelik settings, the change preview, level drops.
+  'GET /api/admin/levels',
+  'POST /api/admin/levels/preview',
+  'POST /api/admin/levels/save',
+  'POST /api/admin/levels/reset',
+  'GET /api/admin/levels/drops',
   // Para çekme (withdraw.mjs).
   'GET /api/admin/withdrawals',
   'POST /api/admin/withdrawals/decide',
