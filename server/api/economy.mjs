@@ -1,6 +1,8 @@
 // Ekonomi: the server owns what people buy in Mağaza (frames, entries, rides, bubbles, special IDs, sticker packs,
 // mic effects) and noble rank. One entitlements row per grant (migrations/020_economy.sql); a row is live while it
-// is not revoked, has started and has not ended, checked against now() on every read, with no job.
+// is not revoked, has started and has not ended, checked against now() on every read, with no job. What someone
+// owns is their Çantam (docs/CANTA.md): bought in Çarşı, given by the staff, or a reward (grantReward: an event they
+// attended, a task, a level or VIP reached; 085 `source` and `origin`), each item with where it came from.
 //
 //   GET  /api/economy                                   → economy (below)
 //   POST /api/shop/buy     { sku, price, days?, ref }   → { user, replay, economy }   (days: a Rütbe tier's, as shown)
@@ -28,7 +30,8 @@
 import { HttpError, REF, UUID, auth, claimRef, clientIp, db, env, int, limit, once, readJson, text, tx, userId } from './core.mjs';
 import { FREE_MICFX, MAX_AHEAD_DAYS, PAID_ONLY, SHOP, SHOP_PAUSED, SLOTS, labelOf } from './catalog.mjs';
 import { nobleItem, vipItemNeed, vipLevelOf } from './levels.mjs';
-import { ownShopSkus, shopItem } from './shop-items.mjs';
+import { allShopItems, ownShopSkus, shopItem } from './shop-items.mjs';
+import { claimLevelRewards } from './level-rewards.mjs';
 import { packByName, packItem, packSkus } from './emoji.mjs';
 import { live } from './live-settings.mjs';
 // live.mjs imports rooms.mjs, which imports this file; the functions are only used inside handlers.
@@ -61,7 +64,7 @@ const audit = (c, actor, action, target, detail, ip) =>
  */
 export async function statusOf(q, uid) {
   const r = await q.query(
-    `SELECT n.now, e.sku, e.kind, e.tier, e.starts_at, e.ends_at FROM (SELECT now() AS now) n
+    `SELECT n.now, e.sku, e.kind, e.tier, e.starts_at, e.ends_at, e.source, e.origin FROM (SELECT now() AS now) n
        LEFT JOIN entitlements e ON e.user_id = $1 AND e.revoked_at IS NULL AND (e.ends_at IS NULL OR e.ends_at > n.now)
       ORDER BY e.starts_at, e.id`,
     [uid],
@@ -74,11 +77,14 @@ export async function statusOf(q, uid) {
     const at = rows.findIndex((x) => x.starts_at.getTime() <= now);
     if (at < 0) continue;
     let until = rows[at].ends_at?.getTime() ?? null;
+    // Where it came from (Çantam): the last grant that makes up the term now.
+    let last = rows[at];
     for (const x of rows.slice(at + 1)) {
       if (until === null || x.starts_at.getTime() > until) break;
       until = x.ends_at === null ? null : Math.max(until, x.ends_at.getTime());
+      last = x;
     }
-    items.set(sku, { sku, kind: rows[at].kind, tier: rows[at].tier, until });
+    items.set(sku, { sku, kind: rows[at].kind, tier: rows[at].tier, until, source: last.source, origin: last.origin ?? null });
   }
   const top = [...items.values()].filter((x) => x.kind === 'noble').sort((a, b) => b.tier - a.tier)[0];
   return { now, bySku, items, noble: top ? { tier: top.tier, until: top.until } : null };
@@ -109,7 +115,7 @@ function startOf(item, st, mode, days = item.days) {
  * the stored ends (no rounding to milliseconds). A special ID someone else got first is 'taken': the partial
  * unique index makes the second insert wait, and DO NOTHING then skips it.
  */
-export async function grantInTx(c, uid, item, { ref, source, price, mode = 'buy', actor = null, days = item.days }) {
+export async function grantInTx(c, uid, item, { ref, source, price, mode = 'buy', actor = null, days = item.days, origin = null }) {
   await c.query('SELECT 1 FROM users WHERE id = $1 FOR UPDATE', [uid]);
   startOf(item, await statusOf(c, uid), mode, days);
   const taken = () => err(409, 'Bu numara başka birinde', 'taken');
@@ -118,15 +124,72 @@ export async function grantInTx(c, uid, item, { ref, source, price, mode = 'buy'
     if (other.rowCount) throw taken();
   }
   const r = await c.query(
-    `INSERT INTO entitlements (user_id, sku, kind, tier, price, starts_at, ends_at, source, ref, actor)
-     SELECT $1, $2, $3, $4, $5, s, CASE WHEN $6::int IS NULL THEN NULL ELSE s + make_interval(days => $6::int) END, $7, $8, $9
+    `INSERT INTO entitlements (user_id, sku, kind, tier, price, starts_at, ends_at, source, ref, actor, origin)
+     SELECT $1, $2, $3, $4, $5, s, CASE WHEN $6::int IS NULL THEN NULL ELSE s + make_interval(days => $6::int) END, $7, $8, $9, $10
        FROM (SELECT CASE WHEN $6::int IS NULL THEN now()
                     ELSE greatest(now(), (SELECT max(ends_at) FROM entitlements WHERE user_id = $1 AND sku = $2 AND revoked_at IS NULL)) END AS s) x
      ON CONFLICT DO NOTHING RETURNING id`,
-    [uid, item.sku, item.kind, item.tier, price, days, source, ref, actor],
+    [uid, item.sku, item.kind, item.tier, price, days, source, ref, actor, origin],
   );
   if (!r.rowCount) throw item.kind === 'specialId' ? taken() : err(409, 'Zaten sahipsin', 'owned');
   return Number(r.rows[0].id);
+}
+
+/** Where a reward comes from (entitlements.source; Çarşı's are buy, bridge, migrate, the staff's admin). */
+export const REWARD_SOURCES = Object.freeze(['event', 'task', 'level']);
+/** What a reward can give: what the shop has, as it is now (the admins' own, one off the shelf too), and sticker packs. */
+const REWARD_KINDS = new Set(['frame', 'entry', 'ride', 'bubble', 'wave', 'micfx', 'sticker']);
+/** The item a reward of `sku` gives, or null: never a special ID, a noble rank or a room's background. */
+export function rewardItem(sku) {
+  if (typeof sku !== 'string') return null;
+  const pack = packItem(sku, { any: true });
+  const item = pack !== undefined ? pack : (shopItem(sku) ?? SHOP.get(sku));
+  return item && REWARD_KINDS.has(item.kind) ? item : null;
+}
+
+/**
+ * A reward into someone's Çantam (docs/CANTA.md): `sku` for `days` (left out: the shop's term; an item sold for good
+ * stays for good), at no cost, in the caller's transaction, after the term they already have. Once per `ref`
+ * (server-made, with a ':'): a replay adds nothing. Nothing either when they have it for good already or the term
+ * would reach past MAX_AHEAD_DAYS. `origin`: a few words for the bag (the event's title, "VIP 5"). True when given.
+ */
+export async function grantReward(c, uid, sku, { days, source, ref, origin = null }) {
+  if (!REWARD_SOURCES.includes(source)) throw new Error(`grantReward: unknown source ${source}`);
+  const item = rewardItem(sku);
+  if (!item) return false;
+  if ((await c.query('SELECT 1 FROM entitlements WHERE user_id = $1 AND ref = $2', [uid, ref])).rowCount) return false;
+  const term = item.days === null ? null : (days ?? item.days);
+  try {
+    await grantInTx(c, uid, item, { ref, source, price: 0, mode: 'reward', days: term, origin: origin ? String(origin).trim().slice(0, 60) || null : null });
+    return true;
+  } catch (e) {
+    if (['owned', 'too_far'].includes(e?.extra?.code)) return false;
+    throw e;
+  }
+}
+
+/** What the panel may give as a reward (Seviye ödülleri, an event's reward), and how it names each kind. */
+const PICKABLE = ['frame', 'entry', 'ride', 'bubble', 'wave'];
+export const REWARD_KIND_NAME = Object.freeze({ frame: 'Çerçeve', entry: 'Giriş efekti', ride: 'Binek', bubble: 'Sohbet balonu', wave: 'Ses dalgası', micfx: 'Mikrofon efekti', sticker: 'Çıkartma paketi' });
+/** The panel's choices for a reward: the shop's frames, entry effects, rides, bubbles and waves as they are now. */
+export function rewardChoices() {
+  const out = new Map();
+  for (const x of allShopItems()) out.set(x.sku, x);
+  for (const x of SHOP.values()) if (!out.has(x.sku)) out.set(x.sku, x);
+  return [...out.values()]
+    .map((x) => rewardItem(x.sku))
+    .filter((x) => x && PICKABLE.includes(x.kind))
+    .map((x) => ({ sku: x.sku, kind: x.kind, kindName: REWARD_KIND_NAME[x.kind], name: x.name, days: x.days ?? null }));
+}
+/** The panel's reward of `sku` for `days` (empty: the shop's term): the item and the days to keep, or a 400 saying what to fix. */
+export function pickReward(sku, days) {
+  const item = rewardItem(sku);
+  if (!item || !PICKABLE.includes(item.kind)) throw new HttpError(400, 'Ödül bir çerçeve, giriş efekti, binek, sohbet balonu ya da ses dalgası olmalı');
+  if (days === undefined || days === null || days === 0 || days === '') return { item, days: null };
+  if (item.days === null) throw new HttpError(400, `${item.name} süresiz satılıyor; ödülü de süresizdir, gün verilmez`);
+  const n = int(days, 1, MAX_AHEAD_DAYS);
+  if (n === null) throw new HttpError(400, `Gün 1–${MAX_AHEAD_DAYS} arasında olmalı (boş: mağazadaki süresi)`);
+  return { item, days: n };
 }
 
 /**
@@ -222,7 +285,8 @@ export async function economyOf(uid, q = db) {
       .map(sellable)
       .filter(Boolean)
       .map(({ sku, kind, name, price, days, minVip }) => ({ sku, kind, name, price, days, minVip })),
-    items: [...st.items.values()].map((x) => ({ sku: x.sku, kind: x.kind, until: iso(x.until) })),
+    // source and origin: where it came from, for Çantam (an older app reads sku, kind and until only).
+    items: [...st.items.values()].map((x) => ({ sku: x.sku, kind: x.kind, until: iso(x.until), source: x.source, ...(x.origin ? { origin: x.origin } : {}) })),
     equipped: wornOf(u.equipped, (slot, sku) => st.items.get(sku)?.kind === slot),
     noble: st.noble && { tier: st.noble.tier, until: iso(st.noble.until) },
     vipLevel: vipLevelOf(u.svip_xp, st.noble?.tier),
@@ -367,6 +431,7 @@ const itemOf = (e, now) => ({
   startsAt: e.starts_at,
   endsAt: e.ends_at,
   source: e.source,
+  origin: e.origin ?? null,
   ref: e.ref,
   actor: e.actor,
   revokedAt: e.revoked_at,
@@ -379,7 +444,15 @@ const dbNow = async (q) => (await q.query('SELECT now() AS now')).rows[0].now;
 export const economyRoutes = {
   async 'GET /api/economy'(req) {
     const u = await auth(req);
-    return economyOf(u.id);
+    const now = await economyOf(u.id);
+    // Seviye ödülleri: a level reached since the last read puts its items in Çantam first (level-rewards.mjs). A
+    // failure there never keeps someone from their own items: the next read tries again.
+    try {
+      if (await claimLevelRewards(u.id, now.vipLevel)) return economyOf(u.id);
+    } catch (e) {
+      console.error('level rewards failed', String(e?.message ?? e).slice(0, 200));
+    }
+    return now;
   },
 
   async 'POST /api/shop/buy'(req) {

@@ -10,8 +10,11 @@
 // a chat bubble's look (two colours, the text's colour, and a picture
 // stretched with its corners kept: nineSlice); a voice wave's look (a style components/room/voice-wave draws, its
 // colours, and for the sparkle style a picture for its sparks). Anything malformed is left out (a bubble's picture
-// alone: its colours stay); no list at all (an older server, demo) is the compiled shop.
+// alone: its colours stay); no list at all (an older server, demo) is the compiled shop. The rooms' seat colors come in
+// the same list (kind seat: a name, a price for some days, a colour; data/seat-colors) and are kept apart, as a room's
+// owner buys one for the room, not a person for themselves.
 import type { Cosmetic, CosmeticKind } from '@/data/catalog';
+import type { SeatColor } from '@/data/seat-colors';
 
 /** How the name comes in and goes (server/api/shop-items.mjs PLATE_ANIMS): at once, fading, growing, rising. */
 export const PLATE_ANIMS = ['none', 'fade', 'zoom', 'rise'] as const;
@@ -82,7 +85,8 @@ export type ShopItem = {
    */
   look?: BubbleLook | WaveLook;
 };
-export type LiveShop = { items: ShopItem[] };
+/** `seats`: the rooms' seat colors (kind seat), apart from what a person buys; none from an older server. */
+export type LiveShop = { items: ShopItem[]; seats: SeatColor[] };
 
 const obj = (x: unknown): Record<string, unknown> => (x && typeof x === 'object' && !Array.isArray(x) ? (x as Record<string, unknown>) : {});
 const SKU = /^[a-z][a-z0-9-]{1,31}$/;
@@ -174,14 +178,40 @@ export function parseWaveLook(raw: unknown): WaveLook | null {
   return { style, colors: colors as string[], ...(art ? { art } : {}) };
 }
 
+/**
+ * A seat color as the server sends it (kind seat: `sku`, its look's color, `default`) or as the phone keeps it
+ * (data/seat-colors SeatColor: `id`, `color`, `isDefault`); null when malformed. Only the default is free.
+ */
+function seatOf(raw: unknown): SeatColor | null {
+  const r = obj(raw);
+  const id = r.sku ?? r.id;
+  const name = typeof r.name === 'string' && r.name.trim() && r.name.length <= 24 ? r.name.trim() : null;
+  const isDefault = r.default === true || r.isDefault === true;
+  const price = typeof r.price === 'number' && Number.isSafeInteger(r.price) && (isDefault ? r.price === 0 : r.price >= 1) ? r.price : null;
+  const days = r.days === null ? null : typeof r.days === 'number' && Number.isSafeInteger(r.days) && r.days >= 1 && r.days <= 365 ? r.days : undefined;
+  const color = hex(obj(r.look).color ?? r.color);
+  if (typeof id !== 'string' || !SKU.test(id) || !name || price === null || days === undefined || !color) return null;
+  return { id, name, price, days, color, ...(r.off === true ? { off: true as const } : {}), ...(isDefault ? { isDefault: true as const } : {}) };
+}
+
 /** GET /api/catalog `shop` (shop=1); null when there is none (an older server). Malformed items are left out. */
 export function parseLiveShop(raw: unknown): LiveShop | null {
   const list = obj(raw).items;
   if (!Array.isArray(list)) return null;
   const seen = new Set<string>();
   const items: ShopItem[] = [];
+  const seats: SeatColor[] = [];
+  const addSeat = (x: unknown) => {
+    const s = seatOf(x);
+    if (!s || seats.some((o) => o.id === s.id) || (s.isDefault && seats.some((o) => o.isDefault)) || seats.length >= 100) return;
+    seats.push(s);
+  };
   for (const x of list.slice(0, 500)) {
     const r = obj(x);
+    if (r.kind === 'seat') {
+      addSeat(r);
+      continue;
+    }
     const kind = (SHOP_LIST_KINDS as readonly unknown[]).includes(r.kind) ? (r.kind as ListKind) : null;
     const name = typeof r.name === 'string' && r.name.trim() && r.name.length <= 24 ? r.name.trim() : null;
     const price = typeof r.price === 'number' && Number.isSafeInteger(r.price) && r.price >= 1 ? r.price : null;
@@ -226,7 +256,10 @@ export function parseLiveShop(raw: unknown): LiveShop | null {
       ...(wave ? { look: wave } : {}),
     });
   }
-  return { items };
+  // The phone's copy keeps them apart from a person's items.
+  const kept = obj(raw).seats;
+  if (Array.isArray(kept)) kept.slice(0, 100).forEach(addSeat);
+  return { items, seats };
 }
 
 const OWN_EMOJI: Record<ListKind, string> = { frame: '🖼️', entry: '✨', bubble: '💬', wave: '🔊' };

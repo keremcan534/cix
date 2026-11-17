@@ -227,7 +227,7 @@ export async function exportOf(c, uid) {
       at: x.created_at,
       decidedAt: x.decided_at,
     })),
-    shopItems: await all('SELECT sku, kind, tier, price, starts_at, ends_at, source, revoked_at, revoked_why, created_at FROM entitlements WHERE user_id = $1 ORDER BY id', (x) => ({
+    shopItems: await all('SELECT sku, kind, tier, price, starts_at, ends_at, source, origin, revoked_at, revoked_why, created_at FROM entitlements WHERE user_id = $1 ORDER BY id', (x) => ({
       sku: x.sku,
       kind: x.kind,
       tier: x.tier,
@@ -235,6 +235,7 @@ export async function exportOf(c, uid) {
       startsAt: x.starts_at,
       endsAt: x.ends_at,
       source: x.source,
+      origin: x.origin ?? null,
       revokedAt: x.revoked_at,
       revokedWhy: x.revoked_why ?? null,
       at: x.created_at,

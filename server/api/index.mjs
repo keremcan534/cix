@@ -67,6 +67,8 @@ import { jetonRoutes } from './jeton.mjs';
 import { liveRoutes } from './live.mjs';
 import { luckyRoutes } from './lucky.mjs';
 import { economyRoutes, grantInTx } from './economy.mjs';
+import { levelRewardRoutes } from './level-rewards.mjs';
+import { taskRewardRoutes } from './task-rewards.mjs';
 import { familyRoutes } from './families.mjs';
 import { familyMoreRoutes } from './family-more.mjs';
 import { exchangeOk } from './live-registry.mjs';
@@ -93,7 +95,7 @@ import { teamRoutes } from './team.mjs';
 import { TEST_ADMIN } from './test-admin.mjs';
 import { musicRoutes } from './music.mjs';
 import { roomVideoRoutes } from './room-video.mjs';
-import { roomSeatColorRoutes } from './room-seat-color.mjs';
+import { roomSeatColorRoutes, startSeatColorSweep } from './room-seat-color.mjs';
 import { roomFxRoutes } from './room-fx.mjs';
 import { roomEventRoutes } from './room-events.mjs';
 import { eventRoutes, startEventSweep, stopEventSweep } from './events.mjs';
@@ -300,6 +302,8 @@ const routes = {
   ...walletRoutes,
   ...walletInfoRoutes,
   ...economyRoutes,
+  ...levelRewardRoutes,
+  ...taskRewardRoutes,
   ...withdrawRoutes,
   ...jetonRoutes,
   ...refundSyncRoutes,
@@ -549,3 +553,4 @@ startLevels();
 startLevelDecay();
 startGuardSweep();
 startShopItems();
+startSeatColorSweep();

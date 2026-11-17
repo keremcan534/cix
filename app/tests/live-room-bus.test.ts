@@ -128,7 +128,9 @@ test('oda durumu (düzen, mikrofon sayısı, kuyruk) oda bilgisinden gelir; bozu
     video: null,
     seatColor: 'pembe',
   });
-  assert.deepEqual(parseRoomState('{"layoutId":5,"micCount":0,"micQueue":false,"queue":[1,"",null,"u3"],"seatColor":"mor"}'), { layoutId: null, micCount: null, micQueue: false, queue: ['u3'], music: null, video: null, seatColor: null });
+  assert.deepEqual(parseRoomState('{"layoutId":5,"micCount":0,"micQueue":false,"queue":[1,"",null,"u3"],"seatColor":"Mor renk"}'), { layoutId: null, micCount: null, micQueue: false, queue: ['u3'], music: null, video: null, seatColor: null });
+  // A color the panel added ('sc…') is kept by its id: the shop's list (data/seat-colors) says how it looks.
+  assert.equal(parseRoomState('{"micQueue":false,"seatColor":"sc12"}')!.seatColor, 'sc12');
   assert.deepEqual(parseRoomState(`{"layoutId":"${'x'.repeat(41)}","micCount":2.5,"micQueue":false,"queue":"u1"}`), { layoutId: null, micCount: null, micQueue: false, queue: [], music: null, video: null, seatColor: null });
 
   reportRoomMeta('oda-d', '{"lockedSeats":[1],"layoutId":null,"micCount":8,"micQueue":true,"queue":["u9"]}');

@@ -503,11 +503,18 @@ export const vipStatus = () => call<{ until: string | null; autoRenewing: boolea
 export const roomAnimation = (room: string, animationId: string, ref = newRef()) =>
   call<{ user: ServerUser; replay: boolean; eventId: number; price: number }>('POST', '/api/rooms/animation', { room, animationId, ref });
 
-/** Koltuk rengi (server/api/room-seat-color.mjs): the room's empty-mic color and the colors it has bought. */
-export const roomSeatColor = (room: string) => call<{ color: string; owned: string[] }>('GET', `/api/rooms/seat-color?room=${encodeURIComponent(room)}`);
-/** Sets it (owner only); a paid color the room doesn't have yet is bought with my coins, once. */
-export const setRoomSeatColor = (room: string, color: string, ref = newRef()) =>
-  call<{ color: string; owned: string[]; price: number; user?: ServerUser; replay?: boolean }>('POST', '/api/rooms/seat-color', { room, color, ref });
+/**
+ * Koltuk rengi (server/api/room-seat-color.mjs): the room's empty-mic color, the colors it has now and when each of
+ * them runs out (`until`, ISO times; none: for good; an older server sends none).
+ */
+export type RoomSeatColors = { color: string; owned: string[]; until?: Record<string, string> };
+export const roomSeatColor = (room: string) => call<RoomSeatColors>('GET', `/api/rooms/seat-color?room=${encodeURIComponent(room)}`);
+/**
+ * Sets it (owner only); a paid color the room doesn't have is bought with my coins, once, at the price and for the
+ * days this phone showed (null: for good): another price or days now is a 409 price_changed, nothing taken.
+ */
+export const setRoomSeatColor = (room: string, color: string, shown: { price: number; days: number | null }, ref = newRef()) =>
+  call<RoomSeatColors & { price: number; user?: ServerUser; replay?: boolean }>('POST', '/api/rooms/seat-color', { room, color, price: shown.price, days: shown.days ?? 0, ref });
 
 /** This phone's push token: an Expo one, or Firebase's own (kind 'fcm', lib/push), which the server sends to through Firebase. */
 export const registerPush = (token: string, platform: 'ios' | 'android' | 'web', kind: 'expo' | 'fcm' = 'expo') =>
@@ -827,6 +834,9 @@ export type EventItem = {
   came: number;
   /** My place: confirmed, cancelled, attended, missed (null: none). */
   mine: 'confirmed' | 'waiting' | 'cancelled' | 'attended' | 'missed' | null;
+  /** What everyone who comes gets in Çantam when it ends (the team's; older servers leave it out): `days` null for
+   *  good, `given` to how many once given. */
+  reward?: { sku: string; kind: string; name: string; days: number | null; given?: number } | null;
 };
 export type EventDetail = EventItem & {
   rules: string;
@@ -1025,6 +1035,11 @@ export const spend = (amount: number, reason: string, ref = newRef()) => call<{ 
  */
 export const shopBuy = (sku: string, price: number, days?: number, ref = newRef()) =>
   call<{ user: ServerUser; replay: boolean; economy: unknown }>('POST', '/api/shop/buy', { sku, price, ...(days ? { days } : {}), ref });
+/**
+ * What I own, until when and where each came from (Çantam, lib/bag-core parses it); reading it also gives me the
+ * level rewards I've reached (server/api/level-rewards.mjs).
+ */
+export const economy = () => call<unknown>('GET', '/api/economy');
 /** Wears a shop item I own in its slot, or takes it off (sku null); others see it in GET /api/looks. */
 export const equipShop = (slot: string, sku: string | null) => call<{ economy: unknown }>('POST', '/api/shop/equip', { slot, sku });
 /** Çevir. `usdTry`: the rate the screen showed; the server never gives less than it, and answers 409 rate_changed
@@ -1071,9 +1086,11 @@ export const myHearts = () => call<{ hearts: { id: string; points: number; level
 export type ServerCallStats = { calls: number; minutes: number; diamonds: number };
 export const myCallStats = () => call<{ week: ServerCallStats }>('GET', '/api/me/call-stats').then((r) => r.week);
 /** Görevler › "1 görüntülü arama yap" today, as the server counts it. */
-export type ServerCallTask = { goal: number; done: number; reward: number; minSeconds: number; claimed: boolean };
+/** `items`: what the task also puts in Çantam (Görev ödülleri, server/api/task-rewards.mjs; older servers leave it out). */
+export type ServerCallTask = { goal: number; done: number; reward: number; minSeconds: number; claimed: boolean; items?: unknown };
 export const myCallTask = () => call<{ task: ServerCallTask }>('GET', '/api/me/call-task').then((r) => r.task);
-export const claimCallTask = () => call<{ user: ServerUser; replay: boolean; task: ServerCallTask; backpack?: { giftId: string; count: number } | null }>('POST', '/api/me/call-task/claim', {});
+export const claimCallTask = () =>
+  call<{ user: ServerUser; replay: boolean; task: ServerCallTask; backpack?: { giftId: string; count: number } | null; items?: unknown }>('POST', '/api/me/call-task/claim', {});
 // Room social (server/api/room-social.mjs): mic invites, the room poll, upcoming events, my rooms, follower invites.
 export type MicInviteStatus = 'pending' | 'accepted' | 'declined' | 'expired' | 'failed' | 'cancelled';
 /** `expiresIn`: ms left to answer by the server's clock (0 once answered); `seat` null: any free mic. */

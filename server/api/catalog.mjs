@@ -259,19 +259,28 @@ export function labelOf(item) {
   return `Mağaza: ${item.name}${item.days ? ` (${item.days} gün)` : ''}`;
 }
 
-// --- Koltuk rengi (room-seat-color.mjs): the color of a room's empty mics, bought once per room by its owner and
-// kept; turquoise is the free default. In step with the app (app/src/data/catalog.ts SEAT_COLORS); the catalog test
-// fails when they drift.
-/** [id, name, price in coins] */
+// --- Koltuk rengi (room-seat-color.mjs): the color of a room's empty mics, bought for the room by its owner; silver
+// is the free default (the owner's request, 17 Nov: soft colors, light pink, khaki, silver for every room). The app
+// draws a seat in any color (its cushion tinted, its gold kept), so Yönetim › Mağaza › Koltuk renkleri changes these
+// (name, price, days, color) and adds more (shop-items.mjs kind seat). In step with the app (app/src/data/
+// seat-colors.ts SEAT_COLORS); the catalog test fails when they drift.
+/** [id, name, price in coins, color] */
 const SEAT_COLOR_ROWS = [
-  ['turkuaz', 'Turkuaz', 0],
-  ['pembe', 'Pembe', 2_000],
-  ['kirmizi', 'Kırmızı', 2_000],
-  ['turuncu', 'Turuncu', 2_000],
-  ['yesil', 'Yeşil', 2_000],
-  ['gumus', 'Gümüş', 3_000],
+  ['gumus', 'Gümüş', 0, '#D5DAE1'],
+  ['pembe', 'Açık Pembe', 2_000, '#F4B6C8'],
+  ['kirmizi', 'Kırmızı', 2_000, '#D2453F'],
+  ['turuncu', 'Turuncu', 2_000, '#EE9447'],
+  ['yesil', 'Haki', 2_000, '#9C9A6A'],
+  ['turkuaz', 'Turkuaz', 2_000, '#46B3B0'],
 ];
-export const SEAT_COLORS = new Map(SEAT_COLOR_ROWS.map(([id, name, price]) => [id, Object.freeze({ id, name, price })]));
+export const SEAT_COLORS = new Map(SEAT_COLOR_ROWS.map(([id, name, price, color]) => [id, Object.freeze({ id, name, price, color })]));
+/** Every room's color until its owner picks another (stored as none). */
+export const SEAT_DEFAULT = 'gumus';
+/**
+ * What an older app shows for each color (its compiled list, before the panel): it sends no price, so it may buy a
+ * color only while the server's price is this one and the color is kept for good; else it is told to update.
+ */
+export const SEAT_PRICES_OLD_APP = Object.freeze({ turkuaz: 0, pembe: 2_000, kirmizi: 2_000, turuncu: 2_000, yesil: 2_000, gumus: 3_000 });
 
 // --- Hareketli in rooms (room-fx.mjs): the paid room animations, in step with the app (app/src/data/animations.ts
 // rows of type reaction, gift and fullscreen with a price); tests/server-catalog.test.ts fails when they drift.

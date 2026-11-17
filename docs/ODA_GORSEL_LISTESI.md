@@ -36,12 +36,12 @@ Bunlar şeffaf arka planlı, kare (512 × 512 px) PNG olmalı.
 
 | Dosya adı | Ne çizilecek |
 |---|---|
-| `koltuk-bos.png` | Boş koltuk: yuvarlak, cam görünümlü, üstten hafif ışık alan küçük bir puf/koltuk; ortada küçük "+" yok (kod ekliyor) |
+| `koltuk-bos.png` | Boş koltuk: yuvarlak, cam görünümlü, üstten hafif ışık alan küçük bir puf/koltuk; ortada küçük "+" yok (kod ekliyor). Minder tek ve açık renk, süsleri altın |
 | `koltuk-kilitli.png` | Aynı koltuk, üstünde küçük altın kilit |
 | `koltuk-ev-sahibi-cercevesi.png` | Ev sahibi avatarının çevresine geçen ince altın çerçeve, üstte küçük taç; ortası tamamen boş (avatar oraya gelecek) |
 
 ## Teslimden sonra
 
 - Arka planlar `app/assets/room/` klasörüne konur ve `StageBackdrop` içindeki tema eşlemesine eklenir.
-- Koltuk görselleri `components/room/parts.tsx` içindeki boş/kilitli koltuk çizimiyle değiştirilir.
+- Boş ve kilitli koltuk `app/scripts/seat-layers.py` ile üç katmana ayrılır (`koltuk-{bos,kilitli}-{renk,isik,altin}.png`): uygulama minderi odanın koltuk rengine boyar, altını aynı bırakır (`components/room/seat-pouf`, [`MAGAZA_YONETIMI.md`](MAGAZA_YONETIMI.md) Koltuk renkleri). Katmanlar panelin `web/img` klasörüne de kopyalanır.
 - Telif: ChatGPT çıktısının ticari kullanım koşulları kontrol edilmeli; başka uygulamaların görsellerinden kopya istenmemeli.

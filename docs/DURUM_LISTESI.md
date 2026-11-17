@@ -76,6 +76,17 @@ Son güncelleme: preview-96 sonrası (Küçült, çanta yağmuru, @bahset düzel
 - **Eski APK'lar:** kendi mağazasını gösterir; değişen eşyayı alamaz ("uygulamayı güncelle"), yeni eşyaları görmez.
 - Ayrıntı: [`MAGAZA_YONETIMI.md`](MAGAZA_YONETIMI.md).
 
+## Çarşı ve Çantam (yeni APK)
+
+- **Çarşı:** Mağaza'nın yeni adı. Binek sekmesi kalktı; binekler Giriş efektleri sekmesinde (bir giriş efekti ve bir binek birlikte takılır).
+- **Çantam (Profil › Çantam):** kişinin bütün eşyaları sekmelerle (Hediyeler, Çerçeveler, Giriş efektleri, Sohbet balonları, Ses dalgaları); her birinde kalan gün, nereden geldiği ve Kullan.
+  - Eşyalar artık sunucudan okunur: başka telefonda alınan ya da yetkilinin verdiği eşya da görünür.
+- **Seviye ödülleri:** panelde bir VIP, Cömertlik ya da Yankı seviyesine eşya bağlanır (Seviye ve VIP › Seviye ve görev ödülleri); o seviyeye gelen Çantam'ında bulur.
+- **Etkinlik ödülleri:** panelde bir etkinliğe eşya bağlanır (Etkinlikler › Ödül); etkinlik sürerken odaya giren herkes etkinlik bitince Çantam'ında bulur. Etkinlik sayfasında "Katılım ödülü" satırı.
+- **Görev ödülleri:** panelde günlük "1 görüntülü arama yap" görevine eşya bağlanır (Seviye ve görev ödülleri › Görev); görevin ödülünü alan Çantam'ında bulur. Görevler ekranında eşyanın adı görünür.
+- **Eski APK'lar:** Çantam yok, Binek sekmesi durur; seviye ödülleri güncelleyince gelir.
+- Ayrıntı: [`CANTA.md`](CANTA.md).
+
 ## Seviye ve VIP ayarları (yeni APK)
 
 - **Çalışıyor (yeni APK):** VIP, Rütbe, Cömertlik, Yankı ve Abonelik finans panelinden (Seviye ve VIP › Seviyeler ve VIP) ayarlanıyor; telefon ayarı katalogla alıyor.

@@ -121,6 +121,7 @@ function RootStack() {
           <Stack.Screen name="ajans/ofis" />
           <Stack.Screen name="ajans/merkez" />
           <Stack.Screen name="magaza" />
+          <Stack.Screen name="canta" />
           <Stack.Screen name="bildirimler" />
           <Stack.Screen name="destek" />
           <Stack.Screen name="ayarlar" />

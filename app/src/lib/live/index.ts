@@ -196,11 +196,19 @@ export async function liveRoomAnimation(room: string, animationId: string) {
   return applied(await once(`anim:${room}:${animationId}`, (ref) => api.roomAnimation(room, animationId, ref)), 'Animasyon');
 }
 
-/** The room's empty-mic color (server/api/room-seat-color.mjs); a paid one the room lacks is bought with my coins. */
-export async function liveSetSeatColor(room: string, color: string) {
-  const r = await once(`seatcolor:${room}:${color}`, (ref) => api.setRoomSeatColor(room, color, ref));
-  if (r.user) applied({ ...r, user: r.user }, 'Koltuk rengi');
-  return r;
+/**
+ * The room's empty-mic color (server/api/room-seat-color.mjs); a paid one the room lacks is bought with my coins at
+ * the price and days the sheet showed. A moved one (409 price_changed) costs nothing: the shop's list is read again.
+ */
+export async function liveSetSeatColor(room: string, color: string, shown: { price: number; days: number | null }) {
+  try {
+    const r = await once(`seatcolor:${room}:${color}`, (ref) => api.setRoomSeatColor(room, color, shown, ref));
+    if (r.user) applied({ ...r, user: r.user }, 'Koltuk rengi');
+    return r;
+  } catch (e) {
+    if (e instanceof api.ApiError && e.status === 409 && (e.data.code === 'price_changed' || e.data.code === 'update_required')) void refreshLiveCatalog();
+    throw e;
+  }
 }
 
 /** Signed out: the next account on this phone starts without this one's id, balance or pending request ids. */

@@ -48,7 +48,7 @@
 // asks: it shows its compiled shop and buys by the app's names and prices, refused (update_required, nothing taken)
 // when an item's price or days moved; it draws nothing for an admin's item someone wears.
 import { HttpError, auth, clientIp, db, env, int, limit, readJson, text, tx } from './core.mjs';
-import { SHOP, SHOP_PAUSED } from './catalog.mjs';
+import { SEAT_COLORS, SEAT_DEFAULT, SHOP, SHOP_PAUSED } from './catalog.mjs';
 import { addVideoTable, canConvert, canSvga, imageInfo, kickJobs, videoOf } from './custom-gifts.mjs';
 import { FX_PATH } from './fx.mjs';
 import { keyOf, kindMax, readStored, removeFiles, sendFile, storageOn, verifyUpload } from './media.mjs';
@@ -60,10 +60,16 @@ const positive = (v, d) => {
 };
 const POLL_MS = positive(env.SHOP_ITEMS_POLL_MS, 5000);
 
-export const SHOP_KINDS = Object.freeze(['frame', 'entry', 'bubble', 'wave']);
-const KIND_NAME = { frame: 'Çerçeve', entry: 'Giriş efekti', bubble: 'Sohbet balonu', wave: 'Ses dalgası' };
+/**
+ * `seat`: a room's seat color (room-seat-color.mjs). A room's owner buys it for the room, not a person for themselves:
+ * the shop a person buys from (shopItem, ownShopSkus: economy.mjs) never has it; seatItem has.
+ */
+export const SHOP_KINDS = Object.freeze(['frame', 'entry', 'bubble', 'wave', 'seat']);
+const KIND_NAME = { frame: 'Çerçeve', entry: 'Giriş efekti', bubble: 'Sohbet balonu', wave: 'Ses dalgası', seat: 'Koltuk rengi' };
 /** An admin's item's id: this and a number. */
-const PREFIX = { frame: 'sf', entry: 'se', bubble: 'sb', wave: 'sw' };
+const PREFIX = { frame: 'sf', entry: 'se', bubble: 'sb', wave: 'sw', seat: 'sc' };
+/** The color a new seat color starts with until the panel changes it (the default's). */
+const SEAT_COLOR_START = SEAT_COLORS.get(SEAT_DEFAULT).color;
 /**
  * The voice waves' styles the app draws (components/room/voice-wave), and how many colours each takes: a ring that
  * glows with the voice; two rings, the outer one going further with it; a ring turning in its colours; a ring with a
@@ -157,8 +163,10 @@ export const SHOP_LIMITS = Object.freeze({
   waveStyles: WAVE_STYLES,
   itemsMax: 200,
 });
-const OWN_ID = /^s[febw][0-9]{1,9}$/;
-const APP_ITEMS = [...SHOP.values()].filter((x) => SHOP_KINDS.includes(x.kind));
+const OWN_ID = /^s[febwc][0-9]{1,9}$/;
+/** The app's seat colors as the shop's items: kept for good unless the panel gives them days, the default free. */
+const APP_SEATS = [...SEAT_COLORS.values()].map((c) => Object.freeze({ sku: c.id, kind: 'seat', name: c.name, price: c.price, days: null, minVip: 0, color: c.color }));
+const APP_ITEMS = [...[...SHOP.values()].filter((x) => SHOP_KINDS.includes(x.kind)), ...APP_SEATS];
 const APP_BY_ID = new Map(APP_ITEMS.map((x) => [x.sku, x]));
 /** Where the app's items sit until someone moves them: after the admins' own, in the app's order. */
 const APP_SORT = new Map(APP_ITEMS.map((x, i) => [x.sku, 1000 + i]));
@@ -251,7 +259,8 @@ const appItemOf = (base, o) =>
     art: null,
     video: null,
     plate: null,
-    look: null,
+    // A seat color's look is its color, the panel's or the app's (the app draws every seat from it).
+    look: base.kind === 'seat' ? (o?.look ?? Object.freeze({ color: base.color })) : null,
     icon: null,
     job: null,
     row: o ?? null,
@@ -285,10 +294,23 @@ export function allShopItems() {
   memo = { snap, list, byId: new Map(list.map((x) => [x.sku, x])) };
   return list;
 }
-/** A frame, entry effect, bubble or wave as it is now (on the shelf or not), or undefined (another kind, unknown, deleted). */
-export const shopItem = (sku) => (typeof sku === 'string' ? (allShopItems(), memo.byId.get(sku)) : undefined);
-/** The admins' own items that aren't deleted (economy.mjs lists them with the shop's). */
-export const ownShopSkus = () => allShopItems().filter((x) => !x.builtin).map((x) => x.sku);
+/** Any item of the list as it is now (on the shelf or not), or undefined (unknown, deleted): the panel's. */
+const itemOf = (sku) => (typeof sku === 'string' ? (allShopItems(), memo.byId.get(sku)) : undefined);
+/**
+ * A frame, entry effect, bubble or wave as it is now (on the shelf or not), or undefined (a seat color, another kind,
+ * unknown, deleted): what a person buys and wears (economy.mjs).
+ */
+export const shopItem = (sku) => {
+  const x = itemOf(sku);
+  return x?.kind === 'seat' ? undefined : x;
+};
+/** The admins' own items that aren't deleted, seat colors left out (economy.mjs lists them with the shop's). */
+export const ownShopSkus = () => allShopItems().filter((x) => !x.builtin && x.kind !== 'seat').map((x) => x.sku);
+/** A seat color as it is now (on the shelf or not), or undefined (room-seat-color.mjs). */
+export const seatItem = (id) => {
+  const x = itemOf(id);
+  return x?.kind === 'seat' ? x : undefined;
+};
 
 const fxUrl = (sku, v) => `${FX_PATH}s/${sku}.mp4?v=${v}`;
 /** An admin's bubble or wave as the phones draw it: its colours (and style), and its picture with how to stretch it. */
@@ -320,6 +342,8 @@ export function shopCatalog() {
         : {}),
       ...(x.kind === 'entry' && x.video ? { video: true, plate: x.plate, ...(x.icon ? { icon: { url: x.icon.url } } : {}) } : {}),
       ...(!x.builtin && x.look && (x.kind === 'bubble' || x.kind === 'wave') ? { look: lookOut(x) } : {}),
+      // A seat color: its color, and which one every room has for free (an older app skips the kind).
+      ...(x.kind === 'seat' ? { look: { color: x.look.color }, ...(x.sku === SEAT_DEFAULT ? { default: true } : {}) } : {}),
     })),
   };
 }
@@ -348,9 +372,16 @@ const audited = (c, a, action, detail, req) =>
   c.query('INSERT INTO audit_events (actor, action, target, detail, ip) VALUES ($1, $2, NULL, $3, $4)', [a.id, action, JSON.stringify({ ...detail, ...panelDetail(a) }), clientIp(req)]);
 
 const kindOf = (v) => {
-  if (!SHOP_KINDS.includes(v)) throw bad('Tür çerçeve (frame), giriş efekti (entry), sohbet balonu (bubble) ya da ses dalgası (wave) olmalı');
+  if (!SHOP_KINDS.includes(v)) throw bad('Tür çerçeve (frame), giriş efekti (entry), sohbet balonu (bubble), ses dalgası (wave) ya da koltuk rengi (seat) olmalı');
   return v;
 };
+/** A seat color's look: the cushion's color (the app tints the seat with it, the gold stays). */
+function seatLookOf(v) {
+  const o = v && typeof v === 'object' && !Array.isArray(v) ? v : null;
+  if (!o) throw bad('Koltuk renginin görünüşü geçersiz');
+  if (typeof o.color !== 'string' || !/^#[0-9A-Fa-f]{6}$/.test(o.color)) throw bad('Koltuk rengi: renk #RRGGBB biçiminde olmalı');
+  return { color: o.color.toUpperCase() };
+}
 const nameOf = (v) => text(v, SHOP_LIMITS.nameMin, SHOP_LIMITS.nameMax, 'Ad').replace(/\s+/g, ' ');
 const priceOf = (v) => {
   const n = int(v, 1, SHOP_LIMITS.priceMax);
@@ -575,7 +606,7 @@ const idOf = (v) => {
   throw bad('Geçersiz eşya');
 };
 const liveItem = (id) => {
-  const x = shopItem(id);
+  const x = itemOf(id);
   if (!x) throw new HttpError(404, 'Eşya bulunamadı');
   return x;
 };
@@ -611,17 +642,22 @@ const appRow = (c, id, actor) =>
   c.query('INSERT INTO shop_items (id, builtin, kind, created_by, updated_by) VALUES ($1, true, $2, $3, $3) ON CONFLICT (id) DO NOTHING', [id, APP_BY_ID.get(id).kind, actor]);
 const auditOf = (r) => r && Object.fromEntries(Object.entries(r).filter(([k]) => !['created_at', 'updated_at', 'created_by', 'updated_by', 'rev', 'job_at', 'job_tries'].includes(k)));
 
-/** How many people have each item now (entitlements, economy.mjs). */
+/** How many people have each item now (entitlements, economy.mjs), and how many rooms each seat color (bought, not run out). */
 async function owners(skus = null) {
   const r = await db.query(
     `SELECT e.sku, count(DISTINCT e.user_id)::int AS n FROM entitlements e
       WHERE e.kind = ANY($1::text[]) AND e.revoked_at IS NULL AND e.starts_at <= now() AND (e.ends_at IS NULL OR e.ends_at > now())
-        AND ($2::text[] IS NULL OR e.sku = ANY($2::text[])) GROUP BY e.sku`,
+        AND ($2::text[] IS NULL OR e.sku = ANY($2::text[])) GROUP BY e.sku
+     UNION ALL
+     SELECT s.color, count(*)::int FROM room_seat_colors s
+      WHERE (s.ends_at IS NULL OR s.ends_at > now()) AND ($2::text[] IS NULL OR s.color = ANY($2::text[])) GROUP BY s.color`,
     [SHOP_KINDS, skus],
   );
   return new Map(r.rows.map((x) => [x.sku, x.n]));
 }
-const CHANGED = ['name', 'price', 'days', 'minVip', 'enabled'];
+/** Rooms that have a seat color now (bought, not run out). */
+const roomsWith = async (c, id) => (await c.query('SELECT count(*)::int AS n FROM room_seat_colors WHERE color = $1 AND (ends_at IS NULL OR ends_at > now())', [id])).rows[0].n;
+const CHANGED = ['name', 'price', 'days', 'minVip', 'enabled', 'look'];
 const changedOf = (r) => (r ? CHANGED.filter((k) => r[k] !== null && r[k] !== undefined) : []);
 /** An item as the panel shows it. */
 function itemView(x, owned) {
@@ -645,7 +681,13 @@ function itemView(x, owned) {
     look: x.look,
     icon: x.icon ? { url: x.icon.url, px: x.icon.px } : null,
     job: x.job,
-    ...(base ? { original: { name: base.name, price: base.price, days: base.days, minVip: base.minVip, enabled: !SHOP_PAUSED.has(base.sku) }, changed: changedOf(x.row) } : {}),
+    ...(base
+      ? {
+          original: { name: base.name, price: base.price, days: base.days, minVip: base.minVip, enabled: !SHOP_PAUSED.has(base.sku), ...(base.kind === 'seat' ? { look: { color: base.color } } : {}) },
+          changed: changedOf(x.row),
+        }
+      : {}),
+    ...(x.kind === 'seat' && x.sku === SEAT_DEFAULT ? { default: true } : {}),
     updatedAt: x.row?.updatedAt ?? null,
   };
 }
@@ -654,19 +696,25 @@ async function adminItems() {
   return allShopItems().map((x) => itemView(x, owned));
 }
 const oneItem = async (id) => {
-  const x = shopItem(id);
+  const x = itemOf(id);
   return x ? itemView(x, await owners([id])) : null;
 };
 /** The place before every item of `kind` (a new one goes first). */
 const firstSort = (kind) => Math.min(1, ...allShopItems().filter((x) => x.kind === kind).map((x) => x.sort)) - 1;
 
-const RESET = ['name', 'price', 'days', 'minVip', 'enabled', 'sort'];
-const COLUMN = { name: 'name', price: 'price', days: 'days', minVip: 'min_vip', enabled: 'enabled', sort: 'sort' };
+const RESET = ['name', 'price', 'days', 'minVip', 'enabled', 'sort', 'look'];
+const COLUMN = { name: 'name', price: 'price', days: 'days', minVip: 'min_vip', enabled: 'enabled', sort: 'sort', look: 'look' };
 
 export const shopRoutes = {
   async 'GET /api/admin/shop'(req) {
     await admin(req);
-    return { items: await adminItems(), limits: { ...SHOP_LIMITS, plateDefault: PLATE_DEFAULT, lookDefault: LOOK_DEFAULT }, storage: storageOn(), convert: await canConvert(), svga: await canSvga() };
+    return {
+      items: await adminItems(),
+      limits: { ...SHOP_LIMITS, plateDefault: PLATE_DEFAULT, lookDefault: { ...LOOK_DEFAULT, seat: { color: SEAT_COLOR_START } }, seatDefault: SEAT_DEFAULT },
+      storage: storageOn(),
+      convert: await canConvert(),
+      svga: await canSvga(),
+    };
   },
 
   /**
@@ -682,6 +730,7 @@ export const shopRoutes = {
     const price = priceOf(b.price);
     const days = daysOf(b.days);
     const minVip = vipOf(b.minVip ?? 0);
+    if (kind === 'seat' && minVip) throw bad('Koltuk renginde VIP seviyesi olmaz: rengi oda sahibi odası için alır');
     const enabled = b.enabled === undefined ? true : boolOf(b.enabled, 'Açık / kapalı');
     nameFree(kind, name, null);
     if (allShopItems().filter((x) => !x.builtin).length >= SHOP_LIMITS.itemsMax) throw bad(`En fazla ${SHOP_LIMITS.itemsMax} eşya eklenebilir`);
@@ -693,7 +742,7 @@ export const shopRoutes = {
     let icon = null;
     let motion = null;
     let at = null;
-    if (kind !== 'bubble' && kind !== 'wave' && b.look !== undefined) throw bad(`${KIND_NAME[kind]} için renk ve stil buradan değil, resmiyle ya da videosuyla gelir`);
+    if (kind !== 'bubble' && kind !== 'wave' && kind !== 'seat' && b.look !== undefined) throw bad(`${KIND_NAME[kind]} için renk ve stil buradan değil, resmiyle ya da videosuyla gelir`);
     if (kind !== 'entry' && b.icon !== undefined && b.icon !== null) throw bad(`${KIND_NAME[kind]} mağazada kendi görünüşüyle durur; ikon yalnız giriş efektine eklenir`);
     if (kind !== 'frame' && b.motion !== undefined && b.motion !== null) throw bad('Hareketli hali yalnız çerçevede olur');
     if (kind === 'frame') {
@@ -708,6 +757,10 @@ export const shopRoutes = {
       if (!video) throw bad('Giriş efektinin videosunu önce yükle');
       plate = plateOf(b.plate === undefined ? PLATE_DEFAULT : b.plate);
       if (b.icon !== undefined && b.icon !== null) icon = await iconArt(b.icon);
+    } else if (kind === 'seat') {
+      if (b.art !== undefined || b.video !== undefined || b.plate !== undefined || b.hole !== undefined || b.holeX !== undefined || b.holeY !== undefined)
+        throw bad('Koltuk renginin resmi, videosu ya da plakası olmaz: yalnız rengi');
+      look = seatLookOf(b.look ?? { color: SEAT_COLOR_START });
     } else {
       if (b.video !== undefined || b.plate !== undefined || b.hole !== undefined || b.holeX !== undefined || b.holeY !== undefined) throw bad(`${KIND_NAME[kind]} için video, isim plakası ya da fotoğraf alanı olmaz`);
       ({ look, art } = await lookAndArt(kind, b.look, b.art ?? null, null));
@@ -746,13 +799,25 @@ export const shopRoutes = {
       cols.name = nameOf(b.name);
       nameFree(cur.kind, cols.name, id);
     }
-    if (b.price !== undefined) cols.price = priceOf(b.price);
-    if (b.days !== undefined) cols.days = daysOf(b.days);
+    // Every room's free default seat color stays free, for good and on the shelf: its name and color change.
+    const isDefault = cur.kind === 'seat' && id === SEAT_DEFAULT;
+    if (isDefault && b.price !== undefined && Number(b.price) !== 0) throw bad(`${cur.name} her odanın ücretsiz rengidir; fiyatı olmaz`);
+    if (isDefault && b.days !== undefined && Number(b.days) !== 0) throw bad(`${cur.name} her odanın rengidir; süresi olmaz`);
+    if (isDefault && b.enabled === false) throw bad(`${cur.name} her odanın varsayılan rengidir; satıştan kalkmaz`);
+    if (cur.kind === 'seat' && b.minVip !== undefined && Number(b.minVip) !== 0) throw bad('Koltuk renginde VIP seviyesi olmaz: rengi oda sahibi odası için alır');
+    if (b.price !== undefined && !isDefault) cols.price = priceOf(b.price);
+    if (b.days !== undefined && !isDefault) cols.days = daysOf(b.days);
     if (b.minVip !== undefined) cols.min_vip = vipOf(b.minVip);
     if (b.enabled !== undefined) cols.enabled = boolOf(b.enabled, 'Açık / kapalı');
     const drop = [];
     if (cur.builtin) {
-      if (['art', 'hole', 'holeX', 'holeY', 'video', 'plate', 'look', 'icon', 'motion'].some((k) => b[k] !== undefined)) throw bad('Uygulamanın kendi eşyasının görseli buradan değişmez; yeni görselle kendi eşyanı ekle');
+      // An app's seat color is drawn from its color, so its color changes too; nothing else of the app's own.
+      const visuals = ['art', 'hole', 'holeX', 'holeY', 'video', 'plate', 'look', 'icon', 'motion'].filter((k) => !(cur.kind === 'seat' && k === 'look'));
+      if (visuals.some((k) => b[k] !== undefined)) throw bad('Uygulamanın kendi eşyasının görseli buradan değişmez; yeni görselle kendi eşyanı ekle');
+      if (cur.kind === 'seat' && b.look !== undefined) cols.look = seatLookOf(b.look);
+    } else if (cur.kind === 'seat') {
+      if (['art', 'hole', 'holeX', 'holeY', 'video', 'plate', 'icon', 'motion'].some((k) => b[k] !== undefined && b[k] !== null)) throw bad('Koltuk renginin resmi, videosu ya da plakası olmaz: yalnız rengi');
+      if (b.look !== undefined) cols.look = seatLookOf(b.look);
     } else if (cur.kind !== 'entry' && b.icon !== undefined && b.icon !== null) {
       throw bad(`${KIND_NAME[cur.kind]} mağazada kendi görünüşüyle durur; ikon yalnız giriş efektine eklenir`);
     } else if (cur.kind !== 'frame' && b.motion !== undefined && b.motion !== null) {
@@ -861,6 +926,10 @@ export const shopRoutes = {
     const files = await tx(async (c) => {
       const cur = (await c.query('SELECT * FROM shop_items WHERE id = $1 AND deleted_at IS NULL FOR UPDATE', [id])).rows[0];
       if (!cur) throw new HttpError(404, 'Eşya bulunamadı');
+      if (cur.kind === 'seat') {
+        const rooms = await roomsWith(c, id);
+        if (rooms) throw new HttpError(409, `Bu renk ${fmt(rooms)} odada var; silinemez. Satıştan kaldırmak için kapat (odalar süresi bitene kadar kullanır).`);
+      }
       const n = (
         await c.query("SELECT count(DISTINCT user_id)::int AS n FROM entitlements WHERE sku = $1 AND revoked_at IS NULL AND (ends_at IS NULL OR ends_at > now())", [id])
       ).rows[0].n;

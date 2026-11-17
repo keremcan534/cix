@@ -40,6 +40,19 @@
 
 **Rapor nasıl sayar:** dönemde başvurusu yapılan ya da başlangıç saati gelen etkinlikler (taslaklar sayılmaz). Etkinlik, onaylanan (incelemede onay almış; sonra iptal edilse de), reddedilen, iptal edilen, yer ayırtma (iptal edilenler hariç), katılımcı (odada bulunan herkes), katılım oranı (biten etkinliklerde yer ayırtıp gelen / yer ayırtan), ortalama katılım (başlayan etkinlik başına), en çok katılım alan 5 tür, nasıl bitti (düzenleyen, süre, oda kapandı, başlatılmadı, yönetim) ve dönemdeki son 20 başlangıç/bitiş kaydı.
 
+## Katılım ödülü (Çantam)
+
+Sahibin isteği (17 Kasım): etkinliklerden kazanılan çerçeve, giriş efekti, sohbet balonu, ses dalgası kişinin Çantam'ına gelsin ([`CANTA.md`](CANTA.md)).
+
+- **Kim bağlar:** yalnız yönetim, panelde **Duyuru ve etkinlik › Etkinlikler** › etkinliğin satırında **Ödül** (yetki `app.events`). Oda sahibi ödül veremez (bedava eşya platformun kararı).
+- **Ne:** bir çerçeve, giriş efekti, binek, sohbet balonu ya da ses dalgası; isteğe bağlı gün (boş: Çarşı'daki süresi).
+- **Ne zaman değişir:** taslak, incelemede, yaklaşan ya da süren etkinlikte; bitince değişmez.
+- **Kim alır:** etkinlik sürerken odaya giren herkes (katılımcı sayısına giren; başlatan da). Kısa süre girip çıkan da alır.
+- **Ne zaman:** etkinlik bitince (düzenleyen bitirince hemen, süre dolunca ya da oda kapanınca birkaç saniye içinde). Kişi Similar Ekibi'nde "Etkinlik ödülü" notu ve bildirim alır.
+- Herkes bir kez alır; sunucu yeniden başlasa da ikinci kez verilmez. Yayından kaldırılan ya da hiç başlamayan etkinlik ödül vermez.
+- Uygulamada etkinliğin sayfasında "Katılım ödülü" satırı (ne kazanılır; bitince kaç kişi kazandı). Eski APK bu satırı göstermez; ödül yine verilir, güncelleyince Çantam'da görünür.
+- Teknik: `086_event_rewards.sql` (`events.reward_sku`, `reward_days`, `reward_by`, `reward_given`, `reward_done_at`), `POST /api/admin/events/reward` `{id, sku | null, days?}` (`event_log` `reward`, `audit_events` `event.reward`), `events.mjs` `rewardEvents`. Test: `server/api/test/canta.test.mjs`.
+
 ## Sonraya kalanlar
 
 - **Aşama 5:** temaya özel çerçeve ve sohbet balonu ("kıyafet"), yarışma sıralaması, gelişmiş istatistikler (gün/saat dağılımı, oda karşılaştırma, rapor dışa aktarma), bekleme listesi (`waiting` durumu hazır), takvimden tarih seçme.
