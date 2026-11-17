@@ -138,7 +138,7 @@ function demoSpin(tier: WheelTierId, count: WheelCount, wallet: WheelWallet, now
   const cost = wheelCost(tier, count);
   const today = istanbulDay(now);
   const played = demo.played.day === today ? demo.played.coins : 0;
-  if (played + cost > WHEEL_DAILY) {
+  if (WHEEL_DAILY && played + cost > WHEEL_DAILY) {
     return { ok: false, reason: `Rüzgâr Gülü'nde günlük sınır ${WHEEL_DAILY.toLocaleString('tr-TR')} jeton. Bugün kalan: ${Math.max(0, WHEEL_DAILY - played).toLocaleString('tr-TR')}` };
   }
   const fromGame = Math.min(wallet.gameCoins, cost);

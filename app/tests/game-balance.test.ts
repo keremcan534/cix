@@ -111,8 +111,8 @@ describe('Bahis kademeleri', () => {
     }
   });
 
-  test('günlük limit en yüksek bahisle en az bir tura izin verir; 250 altı bahis reddedilir', () => {
-    for (const g of CASINO_GAMES) assert.ok(g.dailyLimit >= g.bets[g.bets.length - 1], g.id);
+  test('günlük limit yok (0) ya da en yüksek bahisle en az bir tura izin verir; 250 altı bahis reddedilir', () => {
+    for (const g of CASINO_GAMES) assert.ok(g.dailyLimit === 0 || g.dailyLimit >= g.bets[g.bets.length - 1], g.id);
     deps(1_000, 0);
     const r = playCasino('wheel', 100, '', profile, 'req-stake-low');
     assert.equal(r.ok, false);

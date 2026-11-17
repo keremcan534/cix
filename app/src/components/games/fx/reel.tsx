@@ -1,7 +1,9 @@
 // One slot reel that really rolls: a column of symbols slides down behind a window, runs at full speed and settles
 // on its result with a small overshoot (lib/reel-plan). `spin()` lets it run while the round is still being asked
 // for; `land()` brings it to the result and resolves when it rests. The result is decided before the reel moves:
-// this only shows it. One native-driven value per run, so five reels cost five animations.
+// this only shows it. One native-driven value per run, so five reels cost five animations. At full speed the symbols
+// are a blur (stretched along the reel, and blurred where the phone can: Android 12+, the web); they come sharp as
+// the reel settles. A winning symbol beats with the others and glows behind.
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from 'react';
 import { Animated, Easing, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
@@ -58,6 +60,8 @@ export function Reel({
   const step = cell + gap;
   const [run, setRun] = useState<Run>(() => ({ id: 0, col: symbols, y: new Animated.Value(0) }));
   const [moving, setMoving] = useState(false);
+  // Running at full speed (not yet settling): the symbols are a blur.
+  const [fast, setFast] = useState(false);
   const at = useRef(run);
   const anim = useRef<Animated.CompositeAnimation | null>(null);
   const offset = useRef(0);
@@ -86,6 +90,7 @@ export function Reel({
       offset.current += WAIT_SYMBOLS;
       const r = start([...fly, ...seen], -WAIT_SYMBOLS * step);
       setMoving(true);
+      setFast(true);
       anim.current = Animated.timing(r.y, { toValue: 0, duration: (WAIT_SYMBOLS * step) / pace.speed, easing: Easing.linear, useNativeDriver: true });
       anim.current.start();
     },
@@ -94,6 +99,7 @@ export function Reel({
         if (still) {
           start(to, 0);
           setMoving(false);
+          setFast(false);
           return resolve();
         }
         // At rest the window is the top of the column; mid-run it is somewhere in it, and at that speed nobody
@@ -105,29 +111,38 @@ export function Reel({
         const settle = Math.min(pace.settle, plan.filler + rows) * step;
         const r = start([...to, ...fly, ...seen], -travel);
         setMoving(true);
-        anim.current = Animated.sequence([
-          Animated.timing(r.y, { toValue: -settle, duration: Math.max(1, plan.runMs), easing: Easing.linear, useNativeDriver: true }),
-          Animated.timing(r.y, { toValue: 0, duration: Math.max(1, plan.settleMs), easing: Easing.out(Easing.back(SETTLE_BACK)), useNativeDriver: true }),
-        ]);
+        setFast(true);
+        // The run at full speed, then the settle, the symbols sharp again for it.
+        const settleRun = Animated.timing(r.y, { toValue: 0, duration: Math.max(1, plan.settleMs), easing: Easing.out(Easing.back(SETTLE_BACK)), useNativeDriver: true });
+        anim.current = Animated.timing(r.y, { toValue: -settle, duration: Math.max(1, plan.runMs), easing: Easing.linear, useNativeDriver: true });
         anim.current.start(({ finished }) => {
-          if (!alive.current) return resolve();
-          // A newer run took over: that one answers for the reel now.
-          if (finished && at.current.id === r.id) setMoving(false);
-          resolve();
+          // Stopped (a newer run took over, or the screen closed): that one answers for the reel now.
+          if (!alive.current || !finished || at.current.id !== r.id) return resolve();
+          setFast(false);
+          anim.current = settleRun;
+          settleRun.start(({ finished: rested }) => {
+            if (!alive.current) return resolve();
+            if (rested && at.current.id === r.id) setMoving(false);
+            resolve();
+          });
         });
       });
     },
   }));
 
   const beat = pulse?.interpolate({ inputRange: [0, 1], outputRange: [1, 1.13] });
+  // Lit only while the symbols beat: a game beats them for a real win, never for money back under the stake.
+  const glow = pulse?.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
   return (
     <View style={[s.window, { height: rows * step - gap }]}>
-      <Animated.View style={{ transform: [{ translateY: run.y }] }}>
+      <Animated.View style={[{ transform: [{ translateY: run.y }] }, fast && s.blur]}>
         {run.col.map((sym, i) => {
           const rest = !moving && i < rows;
           const on = rest && !!lit?.[i];
           return (
-            <Animated.View key={`${run.id}-${i}`} style={[s.cell, { height: cell, marginBottom: gap }, on && (litStyle ?? s.on), rest && dim && !on && s.dim, on && beat ? { transform: [{ scale: beat }] } : null]}>
+            <Animated.View key={`${run.id}-${i}`} style={[s.cell, { height: cell, marginBottom: gap }, on && (litStyle ?? s.on), rest && dim && !on && s.dim, on && beat ? { transform: [{ scale: beat }] } : null, fast && s.streak]}>
+              {/* The win's light behind the symbol, breathing with the beat. */}
+              {on && glow && <Animated.View pointerEvents="none" style={[s.halo, { opacity: glow }]} />}
               {render(sym, moving)}
             </Animated.View>
           );
@@ -144,5 +159,10 @@ const s = StyleSheet.create({
   cell: { alignItems: 'center', justifyContent: 'center', borderRadius: 9, borderWidth: 2, borderColor: 'transparent' },
   on: { borderColor: '#FDE047', backgroundColor: 'rgba(253,224,71,0.24)' },
   dim: { opacity: 0.32 },
+  // A symbol flying past: drawn longer along the reel and a little faint; the column blurred where it can be
+  // (the string form: the web build takes no other; a phone without it just shows the stretch).
+  streak: { transform: [{ scaleY: 1.16 }], opacity: 0.88 },
+  blur: { filter: 'blur(1.6px)' },
+  halo: { position: 'absolute', left: 3, right: 3, top: 3, bottom: 3, borderRadius: 999, backgroundColor: 'rgba(255,214,90,0.22)', boxShadow: '0 0 18px 6px rgba(255,196,60,0.7)' },
   shade: { position: 'absolute', left: 0, right: 0 },
 });

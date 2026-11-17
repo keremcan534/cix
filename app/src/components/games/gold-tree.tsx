@@ -291,7 +291,9 @@ export function GoldTreePlayer({ entry }: { entry: Entry }) {
           <View style={t.skinHead}>{paytable}</View>
           <View style={t.area} onLayout={area.onLayout}>
             {fit && cellW > 0 && (
-              <View style={{ width: fit.fw, alignItems: 'center' }}>
+              // Out of the flow: the area's height stays the free height the machine is fitted to (fx/slot-skin
+              // fitSkin), never the machine's own, which would grow it past the phone's height.
+              <View style={{ position: 'absolute', width: fit.fw, alignItems: 'center' }}>
                 <View style={{ width: fit.fw, height: fit.fh }}>
                   {/* The reels fill the cabinet's window and run a little under its edge; the cabinet is drawn over them. */}
                   <LinearGradient colors={skin.reels} style={[t.skinWindow, { left: fit.win.x - 2, top: fit.win.y - 2, width: fit.win.w + 4, height: fit.win.h + 4, padding: SKIN_PAD + 2, borderRadius: windowRadius(skin), overflow: skin.frame ? 'visible' : 'hidden' }]} accessibilityLabel={`Orta çizgi: ${grid.map((c) => c[1]).join(', ')}`}>

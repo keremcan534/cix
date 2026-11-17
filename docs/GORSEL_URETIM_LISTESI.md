@@ -13,7 +13,7 @@ Uygulamada emoji kalmayacak; aşağıdaki her satır sizin üreteceğiniz **bir 
 - Bölüm 1–3'te zayıf kalanlar: `animasyon-ejderha.png` ve `animasyon-kategori-fantastik.png` düz siluet; `tepki-temel-kahkaha` = `tepki-eglence-yerlere-yattim` ve `tepki-vip-elmas` = `tepki-vip-kristal` aynı görsel. Kahkaha ve Elmas bağlı; Yerlere Yattım ve Kristal ücretli pakette kopya satılmasın diye çıkarıldı, yenileri gelince `components/ReactionArt.tsx` ve `data/catalog.ts` STICKER_PACKS'e geri eklenir.
 - **Emoji / çıkartma ayrımı:** standart Unicode emojiler herkese ücretsiz (`STANDARD_EMOJI`); bölüm 3'teki çizimler artık satılan çıkartmalardır (`STICKER_PACKS`). Temel ücretsizdi; Güncelleme 4'te emoji panelinden ve mağazadan kalktı, gönderilmiş Temel çıkartmaları yine çizilir. Çıkartma mesajda `⟦kimlik⟧` olarak gider, emoji yazmak çıkartma göstermez.
 
-**Toplam 676 görsel.** Öncelik (bölüm 1–15, 556 görsel): P1 143 (çok görünen, para kazandıran) · P2 192 · P3 160 · P4 61 (küçük arayüz simgeleri). Bölüm 16 ve sonrasının öncelikleri kendi tablolarında yazılı.
+**Toplam 679 görsel.** Öncelik (bölüm 1–15, 556 görsel): P1 143 (çok görünen, para kazandıran) · P2 192 · P3 160 · P4 61 (küçük arayüz simgeleri). Bölüm 16 ve sonrasının öncelikleri kendi tablolarında yazılı.
 
 | Bölüm | Adet |
 |---|---|
@@ -41,6 +41,7 @@ Uygulamada emoji kalmayacak; aşağıdaki her satır sizin üreteceğiniz **bir 
 | 22. Oda katkı sıralaması | 4 |
 | 23. Kalp seviyesi (birebir) | 7 |
 | 24. Kızıl Yedi deneme paketi | 13 |
+| 25. Kazanç gösterisi levhaları | 3 |
 
 ## ChatGPT ile üretim
 
@@ -935,3 +936,15 @@ Bir oyunun baştan sona gerçek görsellerle giydirilmesi için deneme: Kızıl 
 | 16 | `parilti.png` | Parıltı | Dört köşeli altın parıltı | gösteride yanıp sönen parıltılar | ✅ teslim edildi, bağlandı · 128 × 128 |
 
 Gösteri eşikleri (bahsin katı olarak): tablo 100× yazsa da bu çizgi bahsidir; tur bahsi 5 çizgiye bölündüğü için üç 7 turun **20,6 katını** öder ve makinenin bir turda ödeyebileceği en yüksek tutar 25,3 kattır (50 kat hiç gelmez). Bu yüzden **JACKPOT ≥ 20 kat** (pratikte yalnız bir çizgide üç 7), **Büyük Kazanç ≥ 10 kat** (ör. iki elmas çizgisi); altı küçük kutlama (birkaç jeton ve tutar). Oranlar, ödemeler ve bahisler değişmedi.
+
+## 25. Kazanç gösterisi levhaları (3)
+
+Oyun Salonu'nun kazanç kutlaması yenilendi (`app/src/components/games/fx/win-fx.tsx`, `docs/OYUN_MERKEZI.md` › Sunum katmanı): büyük kazançta tutar sayılırken başlık BÜYÜK KAZANÇ → DEV KAZANÇ → EFSANE KAZANÇ diye yükselir; her yükselişte ekran parlar, bir halka yayılır, jetonlar ortadan saçılır ve ses çalar. Bugün başlık, kodla çizilen renkli bir şeridin üstünde düz yazı; gösterinin en sade kalan yeri bu. Aşağıdaki üç levha şeridin yerine geçer. Kızıl Yedi'nin `jackpot-levha.png` levhasıyla (§24 #12) aynı aile: kalın, parlak 3D harfler, altın kenar; harfler levhanın parçası (genel stil metnindeki "yazı yok" kuralı bu bölümde geçerli değil). **Türkçe harflere dikkat:** Ü'nün iki noktası ve Ç'nin çengeli eksiksiz olmalı; ChatGPT bunları sık bozar, teslimde bakılır. Mor ve mor-pembe gradyan yok; şeffaf arka plan; yaklaşık 3:1 yatay (ör. 1536 × 512 üretin, uygulamaya 900 × 300 olarak konur); telefonda 280–320 px genişlikte, koyu zeminde okunmalı. Bize özgü olsun: başka oyunların "BIG WIN" levhalarından kopya alınmasın.
+
+| # | Görsel | Ne çizilecek | Dosya adı | Öncelik |
+|---|---|---|---|---|
+| 1 | Büyük Kazanç levhası | "BÜYÜK KAZANÇ" yazılı levha: altın-turuncu parlak harfler, ince altın kenar, harflerin arkasında küçük bir ışık patlaması | `kazanc-levha-buyuk.png` | P1 |
+| 2 | Dev Kazanç levhası | "DEV KAZANÇ" yazılı levha: turuncudan yakut kırmızısına geçen harfler, alt kenarından yükselen alevler, kenarlarda birkaç altın jeton; birincisinden daha gösterişli | `kazanc-levha-dev.png` | P1 |
+| 3 | Efsane Kazanç levhası | "EFSANE KAZANÇ" yazılı levha: turkuaz (#13D9DF) ve altın harfler, kristal gibi parlayan yüzey, çevresinde küçük şimşekler ve parıltılar; üçünün en gösterişlisi | `kazanc-levha-efsane.png` | P1 |
+
+Teslimden sonra: dosyalar `app/assets/art/` içine konur ve `app/src/components/games/fx/salon-art.tsx` listesine eklenir → `fx/win-fx.tsx` içindeki şerit (`ribbon`) her kademede kendi levhasıyla değişir (başlık yükselince yeni levha yaylanarak gelir); `fx/jackpot-show.tsx` (Kızıl Yedi) aynı levhaları kullanır. JACKPOT levhası, ışık huzmeleri, jeton ve parıltı zaten var (§24 #12–16); tutar kodla yazılmaya devam eder.

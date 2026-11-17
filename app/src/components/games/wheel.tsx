@@ -141,6 +141,8 @@ export function WheelPlayer({ entry }: { entry: Entry }) {
     );
   }
 
+  // No daily limit (0, the server's default): the wallet row shows what was played today instead of what is left.
+  const limited = view.dailyLimit > 0;
   const left = Math.max(0, view.dailyLimit - view.playedToday);
   // The wheel takes what the stage's other rows and the controls leave of the phone's height (in a room the panel
   // is a sheet over the lower part), within the stage's width.
@@ -281,8 +283,9 @@ export function WheelPlayer({ entry }: { entry: Entry }) {
         <View style={w.wallet}>
           <BalancePill shown={held} />
           <Text style={w.left}>
-            Bugün kalan{'\n'}
-            <Text style={{ color: colors.text, fontWeight: '800' }}>{n(left)}</Text>
+            {limited ? 'Bugün kalan' : 'Bugün oynanan'}
+            {'\n'}
+            <Text style={{ color: colors.text, fontWeight: '800' }}>{n(limited ? left : view.playedToday)}</Text>
           </Text>
         </View>
       </View>
@@ -314,7 +317,7 @@ export function WheelPlayer({ entry }: { entry: Entry }) {
         <View style={{ gap: 5 }}>
           <Text style={r.head}>JACKPOT ve sınırlar</Text>
           <Text style={r.note}>
-            {"Her turun %1,5'i o alanın fonuna eklenir; JACKPOT dilimine gelen fonun tamamını alır. Oynanan her 100 jetonun ortalama 40'ı kazanç olarak döner. Tur ücreti önce oyun jetonundan düşer."} Cömertlik Lv.{needLevel} ve üstü için açıktır; günlük üst sınır {n(view.dailyLimit)} jeton, bugün kalan {n(left)}.
+            {"Her turun %1,5'i o alanın fonuna eklenir; JACKPOT dilimine gelen fonun tamamını alır. Oynanan her 100 jetonun ortalama 40'ı kazanç olarak döner. Tur ücreti önce oyun jetonundan düşer."} Cömertlik Lv.{needLevel} ve üstü için açıktır; {limited ? `günlük üst sınır ${n(view.dailyLimit)} jeton, bugün kalan ${n(left)}.` : 'günlük üst sınır yok.'}
             {entry.from === 'room' ? ' Oyun açıkken mikrofonun ve koltuğun aynen kalır.' : ''}
           </Text>
         </View>

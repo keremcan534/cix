@@ -67,7 +67,7 @@ describe('Oyun Salonu oranları', () => {
     }
   });
 
-  test('bahisler 250’den başlar, en çok 25.000; günlük sınır 40 tur', () => {
+  test('bahisler 250’den başlar, en çok 25.000', () => {
     for (const g of GAMES) {
       assert.equal(g.bets[0], 250, g.id);
       assert.ok(topStake(g) <= 25_000, g.id);
@@ -95,17 +95,20 @@ describe('Oyun Salonu oranları', () => {
 describe('Oyun Salonu canlı ayarları', () => {
   const refused = (fn) => assert.throws(fn, (e) => e instanceof LiveError);
   test('varsayılanlar demodaki değerler; sınırlar', () => {
-    assert.deepEqual([DEFAULTS.casino_off, DEFAULTS.casino_max_bet, DEFAULTS.casino_daily_rounds], [[], 25_000, 40]);
+    // No daily limit by default (the owners removed it); Canlı ayarlar can set one again.
+    assert.deepEqual([DEFAULTS.casino_off, DEFAULTS.casino_max_bet, DEFAULTS.casino_daily_rounds], [[], 25_000, 0]);
     assert.deepEqual(validate('casino_off', ['neon', 'slot']), ['slot', 'neon']);
     assert.equal(validate('casino_off', []), null);
     refused(() => validate('casino_off', ['wheel']));
     assert.equal(validate('casino_max_bet', 1000), 1000);
     for (const v of [0, 249, 300, 25_250, '1000']) refused(() => validate('casino_max_bet', v));
-    for (const v of [0, 201, 1.5]) refused(() => validate('casino_daily_rounds', v));
+    for (const v of [-1, 201, 1.5]) refused(() => validate('casino_daily_rounds', v));
+    assert.equal(validate('casino_daily_rounds', 40), 40);
+    assert.equal(validate('casino_daily_rounds', 0), 0, '0 = sınırsız (varsayılan)');
     assert.equal(isBig('casino_daily_rounds', 40, 81), true);
     assert.equal(isBig('casino_daily_rounds', 40, 80), false);
     const s = snapshotOf([{ key: 'casino_off', value: ['fish'] }, { key: 'casino_max_bet', value: 5000 }]);
-    assert.deepEqual([[...s.casinoOff], s.casinoMaxBet, s.casinoDailyRounds], [['fish'], 5000, 40]);
+    assert.deepEqual([[...s.casinoOff], s.casinoMaxBet, s.casinoDailyRounds], [['fish'], 5000, 0]);
   });
 });
 
@@ -129,7 +132,8 @@ describe('Oyun Salonu sunucuda', () => {
     assert.equal(info.allowed, true);
     assert.deepEqual(
       info.games.map((g) => [g.id, g.active, g.bets, g.dailyLimit, g.jackpot]),
-      GAMES.map((g) => [g.id, true, g.bets, 40 * topStake(g), JACKPOT_SEEDS[g.id] ?? null]),
+      // dailyLimit 0: no daily limit by default.
+      GAMES.map((g) => [g.id, true, g.bets, 0, JACKPOT_SEEDS[g.id] ?? null]),
     );
     let u = await me(a.session);
     for (const g of GAMES) {
@@ -240,7 +244,7 @@ describe('Oyun Salonu sunucuda', () => {
     assert.equal((await play(a.session, { game: 'goldtree', bet: 250 }))[1].fund, null);
   });
 
-  test('canlı ayarlar: oyun kapatılır, en yüksek bahis ve günlük sınır değişir', async () => {
+  test('canlı ayarlar: oyun kapatılır, en yüksek bahis ve günlük sınır değişir; varsayılan: günlük sınır yok', async () => {
     const a = await player('G', 30000);
     await setLive({ casino_off: ['fish'], casino_max_bet: 1000, casino_daily_rounds: 2 });
     const [, info] = await call('GET', '/api/casino', null, a.session);
@@ -259,6 +263,10 @@ describe('Oyun Salonu sunucuda', () => {
     assert.match(why2.error, /günlük sınır 2\.000 jeton/);
     await setLive({ casino_off: null, casino_max_bet: null, casino_daily_rounds: null });
     assert.equal((await play(a.session, { game: 'fish', bet: 250, pick: 'clown' }))[0], 200);
+    // Back to the default: no daily limit, so the round refused above now plays.
+    assert.equal((await call('GET', '/api/casino', null, a.session))[1].games.find((g) => g.id === 'olympus').dailyLimit, 0);
+    assert.equal((await play(a.session, { game: 'olympus', bet: 250 }))[0], 200, 'sınır kalkınca aynı tur oynanır');
+    assert.equal((await call('GET', '/api/wheel', null, a.session))[1].dailyLimit, 0, "Rüzgâr Gülü'nde de WHEEL_DAILY yoksa sınır yok");
     // Acil durum's Oyunlar stops every game, Rüzgâr Gülü with them.
     await setLive({ features_off: ['games'] });
     assert.equal((await play(a.session, { game: 'goldtree', bet: 250 }))[0], 503);

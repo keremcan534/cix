@@ -18,7 +18,7 @@ Oyun Salonu'nun özgün çark oyunu. Adı, dilimleri, alanları ve ekranı bize 
 - Ücret önce **oyun jetonundan**, yetmezse **jetondan** düşer.
 - Kazanç her zaman **oyun jetonudur**. Oyun jetonu yalnızca oyunlarda kullanılır; hediye edilemez, elmasa ya da paraya çevrilemez.
 - **Cömertlik Lv.2'nin altında** oyun hiç görünmez (Oyun Salonu ile aynı kural). Sunucu da seviyeyi her istekte yeniden kontrol eder.
-- **Günlük sınır:** kişi başı günde en fazla 1.000.000 jetonluk tur (İstanbul saatiyle gün). Sunucuda `WHEEL_DAILY` ile değişir.
+- **Günlük sınır:** yok (sahipler kaldırdı, Kasım 2026). Sunucuda `WHEEL_DAILY` (jeton) yazılırsa kişi başı günde en fazla o kadarlık tur oynanır (İstanbul saatiyle gün). Sınır yokken çarkın altında "Bugün kalan" yerine "Bugün oynanan" görünür; eski uygulamalar "Bugün kalan 0" gösterir ama oynatır.
 
 ## Dilimler ve şanslar
 
@@ -45,10 +45,10 @@ Oyun Salonu'nun özgün çark oyunu. Adı, dilimleri, alanları ve ekranı bize 
 ## Sonuç sunucuda belirlenir
 
 - Canlı modda uygulama sadece `POST /api/wheel/spin` gönderir: alan, tur sayısı ve tekrar kimliği (`ref`).
-- Sunucu sırayla şunları yapar: seviyeyi kontrol eder, günlük sınırı kontrol eder, ücreti düşer, sonucu kendi rastgele sayısıyla çeker, kazancı yatırır.
+- Sunucu sırayla şunları yapar: seviyeyi kontrol eder, konmuşsa günlük sınırı kontrol eder, ücreti düşer, sonucu kendi rastgele sayısıyla çeker, kazancı yatırır.
 - Aynı `ref` ile tekrar gelen istek aynı sonucu döndürür; ikinci kez ücret düşülmez.
 - Çark animasyonu yalnızca sunucunun söylediği dilimi gösterir: bir JACKPOT varsa onda, yoksa en iyi dilimde durur.
-- `GET /api/wheel` şunları verir: fonlar, günlük sınır ve bugün oynanan, son kazananlar, bugünün sıralaması ve kişinin kendi geçmişi.
+- `GET /api/wheel` şunları verir: fonlar, günlük sınır (0: yok) ve bugün oynanan, son kazananlar, bugünün sıralaması ve kişinin kendi geçmişi.
 - Demo modda (sunucu yokken) aynı kurallar uygulamada çalışır. Kazananlar ve sıralama sabit örnek kişilerdir.
 
 ## Kod nerede

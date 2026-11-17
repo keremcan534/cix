@@ -782,13 +782,16 @@ export const REGISTRY = {
   casino_daily_rounds: {
     field: 'casinoDailyRounds',
     group: 'Oyun Salonu',
-    label: 'Günlük sınır (en yüksek bahisle tur)',
-    help: 'Bir kişinin bir oyunda bir günde oynayabileceği jeton: oyunun en yüksek bahsiyle bu kadar tur. 40 ile Yörünge’de günde 1.000.000 jeton.',
+    label: 'Günlük sınır (en yüksek bahisle tur, 0 = sınırsız)',
+    help: 'Bir kişinin bir oyunda bir günde oynayabileceği jeton: oyunun en yüksek bahsiyle bu kadar tur. 0 (varsayılan): sınır yok. 40 ile Yörünge’de günde 1.000.000 jeton.',
     type: 'int',
-    bounds: { min: 1, max: 200, step: 1, big: 80 },
+    bounds: { min: 0, max: 200, step: 1, big: 80 },
     parse: (v) => wholeOf(v, REGISTRY.casino_daily_rounds.bounds, 'Günlük sınır'),
     big: (before, after) => after !== null && after > REGISTRY.casino_daily_rounds.bounds.big,
-    impact: (before, after) => `Bir oyunda günde en çok ${fmt(before)} → ${fmt(after)} tur (en yüksek bahisle); Yörünge’de ${fmt(before * CASINO_TOP)} → ${fmt(after * CASINO_TOP)} jeton.`,
+    impact: (before, after) => {
+      const rounds = (n) => (n ? `en çok ${fmt(n)} tur (en yüksek bahisle; Yörünge’de ${fmt(n * CASINO_TOP)} jeton)` : 'sınırsız');
+      return `Bir oyunda günde ${rounds(before)} → ${rounds(after)}.`;
+    },
   },
   // Canlı Yörünge (rocket-live.mjs): unlike the other games' odds, its share can move, because the app shows no paytable
   // for it: the crash points of a round are drawn with the share the round opened with, and the "?" page reads it.

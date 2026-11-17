@@ -2,7 +2,8 @@
 // JACKPOT plaque as it springs in with a shine, the coin pile rises, gold coins burst out of it and rain down
 // (fx/coins with the skin's coin), sparkles twinkle and the amount counts up on the win plate; then it closes
 // itself. A Büyük Kazanç is the same pieces, lighter and shorter: its title on the shared Büyük Kazanç plaque
-// (fx/salon-art) instead of the JACKPOT one, and no pile. A tap ends it early.
+// (fx/salon-art) instead of the JACKPOT one, and no pile; its title climbs with the amount (DEV, EFSANE KAZANÇ) with a
+// pop and a fanfare at each step. A tap ends it early.
 // "Animasyonları azalt" and "Efektleri kapat" show it still: everything in place, the amount at once, no coins.
 // Native-driven Animated only (the count-up is the text). Decoration: the round was settled before it starts.
 import { useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -15,8 +16,9 @@ import { salonArt } from '@/components/games/fx/salon-art';
 import { SkinOverlay, type SlotSkin } from '@/components/games/fx/slot-skin';
 import { Text } from '@/components/text';
 import { playSfx } from '@/lib/game-sound';
-import { pressHaptic, successHaptic } from '@/lib/haptics';
+import { heavyHaptic, rumbleHaptic, successHaptic } from '@/lib/haptics';
 import { rollAt } from '@/lib/motion';
+import { WIN_TITLE, winStageAt, winTierOf } from '@/lib/win-tier';
 import { useSettings } from '@/store';
 import { fonts } from '@/theme';
 
@@ -89,6 +91,20 @@ function JackpotShow({ skin, kind, amount, bet, onDone }: { skin: SlotSkin; kind
   const [out] = useState(() => new Animated.Value(0));
   const [count, setCount] = useState(calm ? amount : 0);
   const [burst, setBurst] = useState(false);
+  // A Büyük Kazanç's title climbs with the amount on show (DEV, EFSANE KAZANÇ: lib/win-tier winStageAt); each step
+  // pops the title and sounds a fanfare.
+  const final = winTierOf(amount, bet) ?? 'big';
+  const stage = jackpot ? 'jackpot' : calm ? final : winStageAt(count, bet, final === 'small' ? 'big' : final);
+  const [step] = useState(() => new Animated.Value(1));
+  const shownStage = useRef(stage);
+  useEffect(() => {
+    if (shownStage.current === stage) return;
+    shownStage.current = stage;
+    step.setValue(1.35);
+    Animated.spring(step, { toValue: 1, friction: 4, tension: 120, useNativeDriver: true }).start();
+    playSfx('levelup', 0.85);
+    heavyHaptic();
+  }, [stage, step]);
   const closing = useRef(false);
   const done = useRef(onDone);
   useEffect(() => {
@@ -105,6 +121,9 @@ function JackpotShow({ skin, kind, amount, bet, onDone }: { skin: SlotSkin; kind
   useEffect(() => {
     successHaptic();
     playSfx(jackpot ? 'jackpot' : 'winBig', 1);
+    playSfx('coins', 0.45);
+    // A JACKPOT makes the phone tremble.
+    if (jackpot) rumbleHaptic([90, 120, 170]);
     const end = setTimeout(close, ms);
     if (calm) return () => clearTimeout(end);
     // 1. the dim, 2. the plaque (or the title) springs in over turning rays, 3. the pile rises and bursts.
@@ -149,7 +168,8 @@ function JackpotShow({ skin, kind, amount, bet, onDone }: { skin: SlotSkin; kind
       if (t < 1) frame = requestAnimationFrame(step);
       else {
         playSfx('coin', 0.8);
-        pressHaptic();
+        playSfx('impact', 0.55);
+        heavyHaptic();
       }
     };
     frame = requestAnimationFrame(step);
@@ -167,7 +187,7 @@ function JackpotShow({ skin, kind, amount, bet, onDone }: { skin: SlotSkin; kind
   const pileH = pileW / art.pile.aspect;
   const rayS = Math.min(Math.max(w, h) * 0.95, 620);
   const x = bet > 0 ? Math.floor(amount / bet) : 0;
-  const title = jackpot ? 'JACKPOT' : 'BÜYÜK KAZANÇ';
+  const title = jackpot ? 'JACKPOT' : WIN_TITLE[stage === 'small' ? 'big' : stage];
   const fade = out.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
   const popIn = { opacity: pop.interpolate({ inputRange: [0, 0.35], outputRange: [0, 1], extrapolate: 'clamp' as const }), transform: [{ scale: pop.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }) }] };
 
@@ -230,16 +250,18 @@ function JackpotShow({ skin, kind, amount, bet, onDone }: { skin: SlotSkin; kind
               ) : BIG_PLAQUE !== undefined ? (
                 <View style={{ width: plaqueW, height: plaqueH, justifyContent: 'center' }}>
                   <Image source={BIG_PLAQUE} style={[s.abs, { left: 0, top: (plaqueH - plaqueW / BIG_ASPECT) / 2, width: plaqueW, height: plaqueW / BIG_ASPECT }]} resizeMode="contain" />
-                  <Text style={[s.title, { fontSize: Math.round(plaqueW * 0.085), marginHorizontal: plaqueW * 0.12 }]} numberOfLines={1} adjustsFontSizeToFit>
-                    {title}
-                  </Text>
+                  <Animated.View style={{ transform: [{ scale: step }] }}>
+                    <Text style={[s.title, { fontSize: Math.round(plaqueW * 0.085), marginHorizontal: plaqueW * 0.12 }]} numberOfLines={1} adjustsFontSizeToFit>
+                      {title}
+                    </Text>
+                  </Animated.View>
                 </View>
               ) : (
-                <View style={{ height: plaqueH, justifyContent: 'center' }}>
+                <Animated.View style={{ height: plaqueH, justifyContent: 'center', transform: [{ scale: step }] }}>
                   <Text style={[s.title, { fontSize: Math.round(plaqueW * 0.11) }]} numberOfLines={1} adjustsFontSizeToFit>
                     {title}
                   </Text>
-                </View>
+                </Animated.View>
               )}
             </Animated.View>
             <Animated.View style={[{ marginTop: 14, alignItems: 'center' }, popIn]}>
@@ -256,7 +278,7 @@ function JackpotShow({ skin, kind, amount, bet, onDone }: { skin: SlotSkin; kind
           </View>
         </>
       )}
-      <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityRole="button" accessibilityLabel={`${title}, ${amount} jeton. Kapatmak için dokun`} />
+      <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityRole="button" accessibilityLabel={`${jackpot ? 'JACKPOT' : WIN_TITLE[final === 'small' ? 'big' : final]}, ${amount} jeton. Kapatmak için dokun`} />
     </Animated.View>
   );
 }

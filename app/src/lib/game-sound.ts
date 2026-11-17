@@ -29,12 +29,17 @@ const SRC = {
   shot: require('../../assets/sfx/shot.wav'),
   splash: require('../../assets/sfx/splash.wav'),
   fanfare: require('../../assets/sfx/fanfare.wav'),
+  // A win's show (components/games/fx/win-fx, jackpot-show): its title stepping up, a blow, coins pouring, the count.
+  levelup: require('../../assets/sfx/levelup.wav'),
+  impact: require('../../assets/sfx/impact.wav'),
+  coins: require('../../assets/sfx/coins.wav'),
+  riser: require('../../assets/sfx/riser.wav'),
 } as const;
 export type Sfx = keyof typeof SRC;
 export const SFX_NAMES = Object.keys(SRC) as Sfx[];
 
 /** Sounds that follow each other faster than they end keep this many players, so one doesn't cut the other off. */
-const VOICES: Partial<Record<Sfx, number>> = { tick: 3, coin: 3, stop: 2, chip: 2, move: 2, card: 2, shot: 2 };
+const VOICES: Partial<Record<Sfx, number>> = { tick: 3, coin: 3, stop: 2, chip: 2, move: 2, card: 2, shot: 2, impact: 2, levelup: 2 };
 
 // Synced from Settings.gameVolume by the store; module-level so plain event handlers can call playSfx.
 let volume = 0.4;

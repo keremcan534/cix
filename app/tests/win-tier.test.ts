@@ -2,7 +2,7 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { BIG_WIN_X, WIN_SHOW, WIN_TITLE, coinPaths, winTierOf } from '@/lib/win-tier';
+import { BIG_WIN_X, WIN_SHOW, WIN_TITLE, coinPaths, winStageAt, winTierOf } from '@/lib/win-tier';
 
 describe('Kazanç kademesi', () => {
   test('bahsin katına göre; tutara göre değil', () => {
@@ -42,5 +42,37 @@ describe('Kazanç kademesi', () => {
       }
     }
     assert.deepEqual(coinPaths(0, 'rain'), []);
+  });
+  test('büyük kazançta başlık sayılan tutarla yükselir: Büyük → Dev → Efsane, kazancın kendi kademesini geçmez', () => {
+    const bet = 1000;
+    // A 60-stake win counting up.
+    assert.equal(winStageAt(0, bet, 'epic'), 'big', 'sayım başlarken Büyük Kazanç');
+    assert.equal(winStageAt(bet * 3, bet, 'epic'), 'big');
+    assert.equal(winStageAt(bet * 15, bet, 'epic'), 'mega');
+    assert.equal(winStageAt(bet * 39, bet, 'epic'), 'mega');
+    assert.equal(winStageAt(bet * 40, bet, 'epic'), 'epic');
+    // Never past the win's own tier, never down to "small", and a JACKPOT or a small win keeps its own.
+    assert.equal(winStageAt(bet * 25, bet, 'big'), 'big', 'kazancın kendi kademesini geçmez');
+    assert.equal(winStageAt(bet * 60, bet, 'mega'), 'mega');
+    assert.equal(winStageAt(bet * 2, bet, 'mega'), 'big');
+    assert.equal(winStageAt(bet * 2, bet, 'jackpot'), 'jackpot');
+    assert.equal(winStageAt(bet * 2, bet, 'small'), 'small');
+  });
+  test('patlama: jetonlar ortadan her yöne saçılır, hemen çıkar', () => {
+    let seed = 7;
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+    const ps = coinPaths(40, 'burst', rnd);
+    assert.equal(ps.length, 40);
+    const quarters = new Set<number>();
+    for (const p of ps) {
+      assert.equal(p.x0, 0.5, 'ortadan çıkar');
+      assert.ok(p.delay >= 0 && p.delay < 0.1, 'hemen');
+      assert.ok(p.dy !== undefined);
+      const dx = p.x1 - 0.5;
+      const dy = p.dy!;
+      assert.ok(Math.hypot(dx, dy / 0.8) >= 0.55 - 1e-9, 'sahnenin kenarına kadar uçar');
+      quarters.add((dx >= 0 ? 1 : 0) + (dy >= 0 ? 2 : 0));
+    }
+    assert.equal(quarters.size, 4, 'dört yöne de');
   });
 });

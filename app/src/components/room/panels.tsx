@@ -291,7 +291,7 @@ export function EnvelopeDrop({ from, seconds, onGrab }: { from: string; seconds:
 
 // --- Dice mini game ----------------------------------------------------------------
 const DIE: ArtName[] = ['zar-zar-yuzu-1', 'zar-zar-yuzu-2', 'zar-zar-yuzu-3', 'zar-zar-yuzu-4', 'zar-zar-yuzu-5', 'zar-zar-yuzu-6'];
-export function DiceModal({ visible, onClose, onPlay, playsLeft }: { visible: boolean; onClose: () => void; onPlay: (bet: number) => { me: number; them: number; opponent: string } | null; playsLeft: number }) {
+export function DiceModal({ visible, onClose, onPlay }: { visible: boolean; onClose: () => void; onPlay: (bet: number) => { me: number; them: number; opponent: string } | null }) {
   const [bet, setBet] = useState(10);
   const [result, setResult] = useState<{ me: number; them: number; opponent: string } | null>(null);
   return (
@@ -300,9 +300,9 @@ export function DiceModal({ visible, onClose, onPlay, playsLeft }: { visible: bo
       onClose={onClose}
       title="Zar Düellosu"
       art={ROOM_ICON_ART.diceDuel}
-      foot={<GradientButton title={`At · 🪙 ${bet}`} icon="dice" onPress={() => setResult(onPlay(bet))} style={{ opacity: playsLeft ? 1 : 0.4 }} />}
+      foot={<GradientButton title={`At · 🪙 ${bet}`} icon="dice" onPress={() => setResult(onPlay(bet))} />}
     >
-      <Text style={styles.dim}>Odadaki rastgele biriyle zar at; rakibinden en az 3 fazla atarsan bahsinin 2,4 katı oyun bakiyene yazılır (yalnızca oyunlarda kullanılır). Oyunlarda oynanan jetonun %60&apos;ı kasaya kalır, %40&apos;ı kazananlara dağılır. 18+ · Günlük {playsLeft} hak kaldı. Sonuç sunucuda belirlenir.</Text>
+      <Text style={styles.dim}>Odadaki rastgele biriyle zar at; rakibinden en az 3 fazla atarsan bahsinin 2,4 katı oyun bakiyene yazılır (yalnızca oyunlarda kullanılır). Oyunlarda oynanan jetonun %60&apos;ı kasaya kalır, %40&apos;ı kazananlara dağılır. 18+ · Sonuç sunucuda belirlenir.</Text>
       <View style={{ flexDirection: 'row', gap: 8, marginVertical: 12 }}>
         {[10, 50, 100].map((n) => (
           <Pressable key={n} onPress={() => setBet(n)} style={[styles.chip, bet === n && { borderColor: colors.primaryText }]}>

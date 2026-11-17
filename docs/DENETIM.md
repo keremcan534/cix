@@ -22,7 +22,10 @@ modunda olması, hata takibi olmaması ve kırık kodun birleşmeden önce yakal
 - **Oyun Salonu** kazancı ayrı oyun jetonuna gidiyor (`casino.mjs`, `game_coins`), bu daha güvenli. Ama bahis satın
   alınan jetonla da yapılabiliyor. Varsayılan olarak yalnız yöneticilere açık. Kasım 2026'da Yörünge canlı ve çok
   oyunculu oldu (`rocket-live.mjs`, herkes aynı roketi izler): aynı anahtarın arkasında, ama kasa payı canlı ayardan
-  düşürülebiliyor (varsayılan %60) ve oyunun çekiciliği arttı; hukuk sorusu onu da kapsar.
+  düşürülebiliyor (varsayılan %60) ve oyunun çekiciliği arttı; hukuk sorusu onu da kapsar. Oyun başına günlük sınır (Oyun Salonu,
+  Rüzgâr Gülü, Zar Düellosu) Kasım 2026'da sahiplerin isteğiyle kaldırıldı: bir kişinin bir günde oynayabileceği
+  jetonun üst sınırı yok; yalnız kişinin kendi koyduğu harcama limiti duruyor. Canlı ayarlar › Oyun Salonu › Günlük
+  sınır (ve `WHEEL_DAILY`) ile yeniden konabilir.
 - **Öneri:** İlk sürümde Şanslı hediye kapalı olsun, ya da kazancı nakde dönmeyen ayrı bir bakiyeye gitsin (Oyun
   Salonu gibi). Kararı bir avukat görüşüyle siz verin; kapatma ya da ayrı bakiye işini Claude yapar.
 

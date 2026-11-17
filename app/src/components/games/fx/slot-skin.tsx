@@ -22,10 +22,12 @@ export type SlotSkin = {
   backdrop: number;
   veil: readonly [string, string, ...string[]];
   /**
-   * The cabinet, drawn over the reels. `window`: its transparent opening, as parts of the picture. A machine whose
-   * cabinet hasn't come has none: its reels stand in a drawn box with a `rim` of its colour.
+   * The cabinet, drawn over the reels. `window`: its transparent opening, as parts of the picture. `stretch`: the
+   * bands (top, bottom as parts of its height, inside the opening's) where its sides are plain, so they can be drawn
+   * taller to give a low window square cells (fitSkin). A machine whose cabinet hasn't come has none: its reels stand
+   * in a drawn box with a `rim` of its colour.
    */
-  frame?: SkinPic & { window: SkinWindow };
+  frame?: SkinPic & { window: SkinWindow; stretch?: readonly (readonly [number, number])[] };
   rim?: string;
   /** Inside the window, behind the symbols. */
   reels: readonly [string, string, ...string[]];
@@ -65,6 +67,8 @@ const SHARED = {
 const FUND_SHOW = { jackpotX: Number.POSITIVE_INFINITY, bigX: 10, ...SHARED };
 /** A frame's opening from its picture's alpha: the picture's size, then x, y, width, height of the opening (px). */
 const opening = (w: number, h: number, x: number, y: number, ow: number, oh: number): SkinWindow => ({ x: x / w, y: y / h, w: ow / w, h: oh / h });
+/** A frame's plain bands from its picture: the picture's height, then each band's top and bottom (px). */
+const bands = (h: number, ...ys: [number, number][]) => ys.map(([top, bottom]) => [top / h, bottom / h] as const);
 
 export const SLOT_SKINS: Partial<Record<LineSlotId | 'goldtree', SlotSkin>> = {
   super777: {
@@ -90,7 +94,7 @@ export const SLOT_SKINS: Partial<Record<LineSlotId | 'goldtree', SlotSkin>> = {
   jackpot: {
     backdrop: pic('hazine-kulesi-arka-plan'),
     veil: ['rgba(12,6,4,0.55)', 'rgba(12,6,4,0.28)', 'rgba(12,6,4,0.45)', 'rgba(12,6,4,0.82)'],
-    frame: { src: pic('hazine-kulesi-cerceve'), aspect: 768 / 691, window: opening(768, 691, 85, 257, 594, 353) },
+    frame: { src: pic('hazine-kulesi-cerceve'), aspect: 768 / 691, window: opening(768, 691, 85, 257, 594, 353), stretch: bands(691, [340, 520]) },
     reels: ['#1A0C08', '#2A140C', '#1A0C08'],
     // Kiraz and 7 are Kızıl Yedi's (the Hazine Kulesi pack was drawn to match them).
     symbols: {
@@ -109,7 +113,7 @@ export const SLOT_SKINS: Partial<Record<LineSlotId | 'goldtree', SlotSkin>> = {
   jungle: {
     backdrop: pic('vahsi-patika-arka-plan'),
     veil: ['rgba(4,10,4,0.55)', 'rgba(4,10,4,0.28)', 'rgba(4,10,4,0.45)', 'rgba(4,10,4,0.82)'],
-    frame: { src: pic('vahsi-patika-cerceve'), aspect: 768 / 499, window: opening(768, 499, 62, 170, 639, 245) },
+    frame: { src: pic('vahsi-patika-cerceve'), aspect: 768 / 499, window: opening(768, 499, 62, 170, 639, 245), stretch: bands(499, [195, 395]) },
     reels: ['#0A170C', '#132A16', '#0A170C'],
     symbols: {
       ten: pic('patika-10'),
@@ -152,7 +156,8 @@ export const SLOT_SKINS: Partial<Record<LineSlotId | 'goldtree', SlotSkin>> = {
   spellbook: {
     backdrop: pic('kayip-parsomen-arka-plan'),
     veil: ['rgba(2,10,10,0.55)', 'rgba(2,10,10,0.28)', 'rgba(2,10,10,0.45)', 'rgba(2,10,10,0.82)'],
-    frame: { src: pic('kayip-parsomen-cerceve'), aspect: 768 / 503, window: opening(768, 503, 36, 144, 697, 249) },
+    // Its sides' gems (the corners and the middle) keep their shape: the plain lengths between them stretch.
+    frame: { src: pic('kayip-parsomen-cerceve'), aspect: 768 / 503, window: opening(768, 503, 36, 144, 697, 249), stretch: bands(503, [158, 245], [290, 368]) },
     reels: ['#061412', '#0D2421', '#061412'],
     symbols: {
       candle: pic('parsomen-mum'),
@@ -172,7 +177,7 @@ export const SLOT_SKINS: Partial<Record<LineSlotId | 'goldtree', SlotSkin>> = {
   neon: {
     backdrop: pic('neon-bulvar-arka-plan'),
     veil: ['rgba(2,6,16,0.55)', 'rgba(2,6,16,0.28)', 'rgba(2,6,16,0.45)', 'rgba(2,6,16,0.82)'],
-    frame: { src: pic('neon-bulvar-cerceve'), aspect: 768 / 543, window: opening(768, 543, 42, 155, 684, 307) },
+    frame: { src: pic('neon-bulvar-cerceve'), aspect: 768 / 543, window: opening(768, 543, 42, 155, 684, 307), stretch: bands(543, [185, 425]) },
     reels: ['#03060F', '#0A1426', '#03060F'],
     symbols: {
       j: pic('neon-j'),
@@ -193,7 +198,7 @@ export const SLOT_SKINS: Partial<Record<LineSlotId | 'goldtree', SlotSkin>> = {
   goldtree: {
     backdrop: pic('bereket-agaci-arka-plan'),
     veil: ['rgba(10,4,4,0.55)', 'rgba(10,4,4,0.28)', 'rgba(10,4,4,0.45)', 'rgba(10,4,4,0.82)'],
-    frame: { src: pic('bereket-agaci-cerceve'), aspect: 718 / 768, window: opening(718, 768, 98, 269, 521, 370) },
+    frame: { src: pic('bereket-agaci-cerceve'), aspect: 718 / 768, window: opening(718, 768, 98, 269, 521, 370), stretch: bands(768, [310, 590]) },
     reels: ['#1C0A0A', '#2E1210', '#1C0A0A'],
     symbols: {
       tree: pic('bereket-agac'),
@@ -212,17 +217,24 @@ export const slotSkinOf = (id: string): SlotSkin | undefined => SLOT_SKINS[id as
 /** A machine without a cabinet picture: its drawn box, a little wider than the reels' cells, the reels inside. */
 const DRAWN_WINDOW: SkinWindow = { x: 0.025, y: 0.035, w: 0.95, h: 0.93 };
 /** The cabinet's shape and opening: its picture's, or the drawn box's for `reels` × `rows` near-square cells. */
-const frameOf = (skin: SlotSkin, reels: number, rows: number): { aspect: number; window: SkinWindow } => skin.frame ?? { aspect: (reels / rows) * 1.05, window: DRAWN_WINDOW };
+const frameOf = (skin: SlotSkin, reels: number, rows: number): Omit<NonNullable<SlotSkin['frame']>, 'src'> => skin.frame ?? { aspect: (reels / rows) * 1.05, window: DRAWN_WINDOW };
 
 /** Between two symbols and two reels of a skinned machine, its window's inner margin and a reel's rim (px). */
 export const SKIN_GAP = 3;
 export const SKIN_PAD = 3;
 export const SKIN_RIM = 1.5;
 
+/** How much taller a cabinet's plain bands may be drawn, and how much taller than wide its cells may grow (fitSkin). */
+const MAX_STRETCH = 2.5;
+const tallest = (reels: number) => (reels === 3 ? 1.2 : 1.5);
+
 export type SkinFit = ReturnType<typeof fitSkin>;
 /**
  * A skinned machine in the area it is given: the win plate under the cabinet, the cabinet as large as the rest
- * allows, the reels in its window.
+ * allows, the reels in its window. Most cabinets open a wide, low window (5 reels of 3 rows), which left the symbols
+ * small and the phone's height empty: with height to spare, the picture's plain bands (`stretch`) are drawn taller,
+ * so the window is too, up to cells a little taller than wide. `drawn` is the picture's own height at this width,
+ * `stretch` how much its bands grew.
  */
 export function fitSkin(skin: SlotSkin, w: number, h: number, reels: number, rows: number) {
   const frame = frameOf(skin, reels, rows);
@@ -231,14 +243,20 @@ export function fitSkin(skin: SlotSkin, w: number, h: number, reels: number, row
   // Short of height, the plate stands over the cabinet's base (up to this much of it); with room, under it.
   const most = Math.round(plateH * 0.42);
   const fw = Math.floor(Math.min(w, (h - plateH + most) * frame.aspect));
-  const fh = Math.round(fw / frame.aspect);
-  const lap = Math.max(0, Math.min(most, fh + plateH - h));
+  const drawn = Math.round(fw / frame.aspect);
   const f = frame.window;
-  const win = { x: f.x * fw, y: f.y * fh, w: f.w * fw, h: f.h * fh };
-  const reelW = Math.floor((win.w - 2 * SKIN_PAD - (reels - 1) * SKIN_GAP) / reels);
+  const reelW = Math.floor((f.w * fw - 2 * SKIN_PAD - (reels - 1) * SKIN_GAP) / reels);
+  // A drawn box (no cabinet picture yet) is plain all the way: its whole window may grow.
+  const band = skin.frame ? (frame.stretch ?? []).reduce((a, [top, bottom]) => a + bottom - top, 0) * drawn : f.h * drawn;
+  // The window's height for the tallest cells, and the height the area has beyond the picture (the plate stays clear).
+  const tall = rows * Math.round((reelW - 2 * SKIN_RIM) * tallest(reels)) + (rows - 1) * SKIN_GAP + 2 * SKIN_PAD + 2 * SKIN_RIM;
+  const grow = band > 0 ? Math.floor(Math.max(0, Math.min(tall - f.h * drawn, h - plateH - drawn, band * (MAX_STRETCH - 1)))) : 0;
+  const fh = drawn + grow;
+  const lap = Math.max(0, Math.min(most, fh + plateH - h));
+  const win = { x: f.x * fw, y: f.y * drawn, w: f.w * fw, h: f.h * drawn + grow };
   const cellH = Math.floor((win.h - 2 * SKIN_PAD - 2 * SKIN_RIM - (rows - 1) * SKIN_GAP) / rows);
   const symSize = Math.round(Math.min(reelW - 2 * SKIN_RIM, cellH) * 0.96);
-  return { plateW, plateH, lap, fw, fh, win, reelW, cellH, symSize };
+  return { plateW, plateH, lap, fw, fh, drawn, stretch: grow > 0 ? 1 + grow / band : 1, win, reelW, cellH, symSize };
 }
 
 /** How round the reels' window is: square in a cabinet picture's opening, rounded in a drawn box. */
@@ -246,8 +264,29 @@ export const windowRadius = (skin: SlotSkin) => (skin.frame ? 0 : 14);
 
 /** The cabinet over the reels: its picture, or the drawn box's rim for a machine without one. Touches pass through. */
 export function SkinCabinet({ skin, fit }: { skin: SlotSkin; fit: SkinFit }) {
-  if (skin.frame) return <Image source={skin.frame.src} style={{ position: 'absolute', left: 0, top: 0, width: fit.fw, height: fit.fh }} resizeMode="stretch" pointerEvents="none" accessibilityIgnoresInvertColors />;
-  return <View style={[p.rim, { left: fit.win.x - 4, top: fit.win.y - 4, width: fit.win.w + 8, height: fit.win.h + 8, borderColor: skin.rim ?? SALON.gold }]} pointerEvents="none" />;
+  const frame = skin.frame;
+  if (!frame) return <View style={[p.rim, { left: fit.win.x - 4, top: fit.win.y - 4, width: fit.win.w + 8, height: fit.win.h + 8, borderColor: skin.rim ?? SALON.gold }]} pointerEvents="none" />;
+  if (fit.stretch === 1 || !frame.stretch?.length) return <Image source={frame.src} style={{ position: 'absolute', left: 0, top: 0, width: fit.fw, height: fit.fh }} resizeMode="stretch" pointerEvents="none" accessibilityIgnoresInvertColors />;
+  // Drawn taller: the picture in strips, its plain bands (every other strip) stretched, the rest as drawn. A strip
+  // reaches a pixel into the next, so no seam shows between them.
+  const cuts = [0, ...frame.stretch.flat(), 1];
+  const strips: ReactNode[] = [];
+  let top = 0;
+  for (let i = 0; i + 1 < cuts.length; i++) {
+    const k = i % 2 ? fit.stretch : 1;
+    const height = (cuts[i + 1] - cuts[i]) * fit.drawn * k;
+    strips.push(
+      <View key={i} style={{ position: 'absolute', left: 0, top, width: fit.fw, height: height + (i + 2 < cuts.length ? 1 : 0), overflow: 'hidden' }}>
+        <Image source={frame.src} style={{ position: 'absolute', left: 0, top: -cuts[i] * fit.drawn * k, width: fit.fw, height: fit.drawn * k }} resizeMode="stretch" accessibilityIgnoresInvertColors />
+      </View>,
+    );
+    top += height;
+  }
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      {strips}
+    </View>
+  );
 }
 
 /** Where a skinned machine's big show is drawn: over the whole game panel (games/game-panel), header included. */

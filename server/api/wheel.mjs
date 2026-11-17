@@ -1,6 +1,6 @@
 // Rüzgâr Gülü: the wheel game of the Oyun Salonu, played on the server (docs/RUZGAR_GULU.md).
 //
-//   GET  /api/wheel                         → { tiers, counts, slices, dailyLimit, playedToday, needLevel, allowed,
+//   GET  /api/wheel                         → { tiers, counts, slices, dailyLimit (0: none), playedToday, needLevel, allowed,
 //                                               gameCoins, winners, board, mine }
 //   POST /api/wheel/spin { tier, count, ref } → { spin, user, replay }
 //
@@ -9,7 +9,8 @@
 // exchanged or withdrawn. Odds and the JACKPOT funds: wheel-rules.mjs. The draw is crypto.randomInt here; the app
 // only plays back the result.
 // Open from Cömertlik Lv.2 (35 coins spent on gifts and purchases; coin games and hand-outs don't count), checked
-// here on every request. A daily limit per person (WHEEL_DAILY coins) caps what one can play.
+// here on every request. A daily limit per person caps what one can play only when WHEEL_DAILY (coins) sets one; unset,
+// there is none (the owners removed it in Nov 2026).
 import crypto from 'node:crypto';
 
 import { HttpError, REF, auth, db, env, limit, move, readJson, selfUser, tx } from './core.mjs';
@@ -43,9 +44,10 @@ const STAFF_ONLY = 'Jetonlu oyunlar şu an yalnızca yöneticilere açık';
 export function needPaidGames(user, s = live()) {
   if (!paidGamesOpen(user, s)) throw new HttpError(403, STAFF_ONLY);
 }
+/** The coins one person may play a day; 0 (WHEEL_DAILY unset) is no limit. */
 export const DAILY = (() => {
-  const n = Number(env.WHEEL_DAILY ?? 1_000_000);
-  return Number.isSafeInteger(n) && n > 0 ? n : 1_000_000;
+  const n = Number(env.WHEEL_DAILY ?? 0);
+  return Number.isSafeInteger(n) && n > 0 ? n : 0;
 })();
 /** A request whose best slice is at least this (thousandths of the price) or a JACKPOT goes on the winners' list. */
 const BIG_MILLI = 10_000;
@@ -162,8 +164,10 @@ export const wheelRoutes = {
       row = await tx(async (c) => {
         const u = (await c.query('SELECT coins, game_coins FROM users WHERE id = $1 FOR UPDATE', [me.id])).rows[0];
         if ((await c.query('SELECT 1 FROM wheel_spins WHERE user_id = $1 AND ref = $2', [me.id, ref])).rowCount) throw Object.assign(new Error('replay'), { code: '23505' });
-        const played = await playedToday(c, me.id);
-        if (played + cost > DAILY) throw new HttpError(409, `Rüzgâr Gülü'nde günlük sınır ${DAILY.toLocaleString('tr-TR')} jeton. Bugün kalan: ${Math.max(0, DAILY - played).toLocaleString('tr-TR')}`);
+        if (DAILY) {
+          const played = await playedToday(c, me.id);
+          if (played + cost > DAILY) throw new HttpError(409, `Rüzgâr Gülü'nde günlük sınır ${DAILY.toLocaleString('tr-TR')} jeton. Bugün kalan: ${Math.max(0, DAILY - played).toLocaleString('tr-TR')}`);
+        }
         const fromGame = Math.min(Number(u.game_coins), cost);
         const fromCoins = cost - fromGame;
         if (Number(u.coins) < fromCoins) throw new HttpError(409, 'Yetersiz jeton');

@@ -282,7 +282,7 @@ export function valueText(key: LiveKey, v: LiveValue, { stored = false, names = 
     case 'casino_max_bet':
       return typeof v === 'number' ? `${fmtNum(v)} jeton` : String(v);
     case 'casino_daily_rounds':
-      return typeof v === 'number' ? `En yüksek bahisle ${fmtNum(v)} tur` : String(v);
+      return typeof v === 'number' ? (v ? `En yüksek bahisle ${fmtNum(v)} tur` : 'Sınırsız') : String(v);
     case 'rocket_house_pct':
       return typeof v === 'number' ? `Kasaya %${v}, oyunculara %${100 - v}` : String(v);
     case 'room_decor_off':
