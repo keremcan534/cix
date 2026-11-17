@@ -694,7 +694,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     charmRef.current += n;
     setCharmXp(charmRef.current);
     const after = charmLevelOf(charmRef.current);
-    if (after > before) notify({ kind: 'system', icon: 'rose', title: `Yankı seviyen Lv.${after} oldu`, body: charmBonusPct(after) > charmBonusPct(before) ? `Hediye kazanç bonusun artık %${charmBonusPct(after)}.` : 'Keşfette daha üst sıralarda görüneceksin.', href: '/seviye?tab=charm' });
+    if (after > before) notify({ kind: 'system', icon: 'rose', title: `Yankı seviyen Lv.${after} oldu`, body: 'Ana Sayfa’da daha üst sıralarda görüneceksin.', href: '/seviye?tab=charm' });
   };
 
   // Read the ref, not `settings`: timers and room intervals call a notify captured renders ago, and a snooze or

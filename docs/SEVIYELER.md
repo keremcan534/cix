@@ -1,5 +1,7 @@
 # Cömertlik ve Yankı Seviyeleri
 
+> **Güncelleme 6 (17 Kasım):** Aşağıdaki "Açtıkları" listelerinin çoğu henüz yapılmadı; uygulama artık yalnız çalışanları gösteriyor (Cömertlik: seviye rozeti; Yankı: rozet, Ana Sayfa'da öne çıkma, Lv.5'te Anlar paylaşımı). Yankı kazanç bonusu sunucuda yok. Ayrıntı: [`GUNCELLEME_6.md`](GUNCELLEME_6.md).
+
 "Kullanıcı Seviyesi" ekranının yerini **Cömertlik Seviyesi** ve **Yankı Seviyesi** sekmeleri aldı (`/seviye`, Yankı için `/seviye?tab=charm`).
 
 Ekranlar SimilarClub'ın koyu temasında, kendi amblem ve metinleriyle tasarlandı.

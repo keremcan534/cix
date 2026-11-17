@@ -376,7 +376,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // "Oda işlevlerini yönet": music, polls, goals, events can be limited to the owner.
   const canFunctions = myRole === 'owner' || (myRole === 'admin' && functionsBy === 'admins');
   const botOn = real ? !!liveRules?.bot : isOwn ? settings.roomBot : true;
-  const invisible = settings.invisibleEntry && GATES.invisibleEntry(nobleTier);
+  // Hidden entry is the demo's only: a server room doesn't hide anyone yet, so its note ("others won't see you") would
+  // be false there (güncelleme 6; the Rütbe page no longer lists it).
+  const invisible = !real && settings.invisibleEntry && GATES.invisibleEntry(nobleTier);
   const roomType = isOwn ? myRoom.roomType : (base!.roomType ?? 'free');
   const typeInfo = roomTypeInfo(roomType);
   // Seat locks: saved for my own room; in a server room the server keeps them; in other rooms I moderate they

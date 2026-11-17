@@ -6,7 +6,7 @@ import { Platform, Pressable, ScrollView, StyleSheet, Switch, View, useWindowDim
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
-import { NOBLE_DAYS, NOBLE_RIGHTS, NOBLE_TIERS, SVIP_LEVELS, SVIP_RIGHTS, VIP_COMPARE, VIP_GIFT_PACK, VIP_PERKS, VIP_PLANS } from '@/data/status';
+import { NOBLE_DAYS, NOBLE_SHOWN, NOBLE_TIERS, SVIP_LEVELS, SVIP_SHOWN, VIP_COMPARE, VIP_PERKS, VIP_PLANS } from '@/data/status';
 import { goBack } from '@/lib/nav';
 import { showAlert } from '@/lib/alert';
 import { openLegal } from '@/lib/legal';
@@ -159,22 +159,20 @@ function Svip() {
       <View style={styles.rightsTitleRow}>
         <Art name="svip-svip-isareti" size={22} />
         <Text style={[styles.rightsTitle, { marginVertical: 0 }]}>
-          VIP {lv.level} hakları {lv.rights}/{SVIP_RIGHTS.length}
+          VIP {lv.level} hakları {SVIP_SHOWN.filter((r) => r.level <= lv.level).length}/{SVIP_SHOWN.length}
         </Text>
         <Art name="svip-svip-isareti" size={22} />
       </View>
       <View style={styles.grid}>
-        {SVIP_RIGHTS.map((r, i) => {
-          const on = i < lv.rights;
+        {/* Only the rights the real app gives today (güncelleme 6); each opens at its own level. */}
+        {SVIP_SHOWN.map((r) => {
+          const on = r.level <= lv.level;
           return (
             <Pressable
               key={r.name}
               style={styles.rightCell}
               accessibilityState={{ disabled: !on }}
-              onPress={() => {
-                const need = SVIP_LEVELS.find((x) => x.rights > i);
-                showAlert(r.name, on ? `VIP ${lv.level} ile kullanabilirsin.` : need ? `VIP ${need.level} ile açılır.` : 'Yakında.');
-              }}>
+              onPress={() => showAlert(r.name, on ? `VIP ${lv.level} ile kullanabilirsin.` : `VIP ${r.level} ile açılır.`)}>
               {/* Locked: only the art fades; the name stays readable (textDim). */}
               <View style={[styles.rightIcon, !on && { opacity: 0.38 }]}>
                 {r.art ? <Art name={r.art} size={34} /> : <Text style={{ fontSize: 26 }}>{r.emoji}</Text>}
@@ -332,25 +330,7 @@ function Vip() {
           ))}
         </ScrollView>
         <Dots count={perkPages} index={perkPage} />
-        <View style={styles.giftBox}>
-          <Text style={{ color: colors.text, fontWeight: '800', fontSize: 15 }}>
-            Hoş Geldin Kutusu <Text style={{ color: gold }}>({VIP_GIFT_PACK.length})</Text>
-          </Text>
-          {/* Two per row, so nothing hides off the card's edge. */}
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: 12 }}>
-            {VIP_GIFT_PACK.map((g) => (
-              <View key={g.name} style={{ width: '50%', flexDirection: 'row', alignItems: 'center', gap: 10, paddingRight: 8 }}>
-                <Art name={g.art} size={40} />
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: gold, fontWeight: '700' }} numberOfLines={2}>
-                    {g.name}
-                  </Text>
-                  <Text style={{ color: colors.textDim, fontSize: 12 }}>{`${g.days} gün · ${g.qty} adet`}</Text>
-                </View>
-              </View>
-            ))}
-          </View>
-        </View>
+        {/* "Hoş Geldin Kutusu" comes back once the server grants it (güncelleme 6). */}
       </View>
 
       <Text style={[styles.h1, { marginTop: 8 }]}>Ayrıcalık Karşılaştırması</Text>
@@ -462,7 +442,7 @@ function Noble() {
       ]);
     showAlert(`${t.name} rütbesi`, `${NOBLE_DAYS} gün · 🪙 ${fmt(t.price)}. Onaylıyor musun?`, [
       { text: 'Vazgeç', style: 'cancel' },
-      { text: 'Al', onPress: () => buyNoble(t.tier) && showAlert(`${t.emoji} ${t.name} oldun!`, `${t.rights} hak açıldı.`) },
+      { text: 'Al', onPress: () => buyNoble(t.tier) && showAlert(`${t.emoji} ${t.name} oldun!`, `${NOBLE_SHOWN.filter((r) => r.level <= t.tier).length} hak açıldı.`) },
     ]);
   };
   return (
@@ -482,20 +462,18 @@ function Noble() {
           {owned && <Text style={[styles.cardText, { color: gold, marginTop: 8 }]}>✓ Aktif · {nobleDays} gün kaldı</Text>}
         </View>
         <Text style={[styles.rightsTitle, { color: gold }]}>
-          Rütbe hakları {t.rights}/{NOBLE_RIGHTS.length}
+          Rütbe hakları {NOBLE_SHOWN.filter((r) => r.level <= t.tier).length}/{NOBLE_SHOWN.length}
         </Text>
         <View style={styles.grid}>
-          {NOBLE_RIGHTS.map((r, i) => {
-            const on = i < t.rights;
+          {NOBLE_SHOWN.map((r) => {
+            const on = r.level <= t.tier;
+            const need = NOBLE_TIERS.find((x) => x.tier === r.level);
             return (
               <Pressable
                 key={r.name}
                 style={[styles.rightCell, { backgroundColor: 'transparent', borderWidth: 0 }]}
                 accessibilityState={{ disabled: !on }}
-                onPress={() => {
-                  const need = NOBLE_TIERS.find((x) => x.rights > i);
-                  showAlert(r.name, on ? `${t.name} ile kullanabilirsin.` : need ? `${need.name} rütbesiyle açılır.` : '');
-                }}>
+                onPress={() => showAlert(r.name, on ? `${t.name} ile kullanabilirsin.` : need ? `${need.name} rütbesiyle açılır.` : '')}>
                 <View style={!on && { opacity: 0.35 }}>{r.art ? <Art name={r.art} size={44} /> : <Text style={{ fontSize: 34 }}>{r.emoji}</Text>}</View>
                 <Text style={[styles.rightName, { color: on ? gold : colors.textDim }]} numberOfLines={2}>
                   {r.name}

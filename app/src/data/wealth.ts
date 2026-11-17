@@ -46,7 +46,10 @@ export type LevelIcon = 'leaf' | 'diamond-outline' | 'diamond' | 'flower' | 'rib
  */
 export type LevelTier = { from: number; to: number; name: string; icon: LevelIcon; colors: [string, string]; ink: string; art?: ArtName; emblem?: ArtName };
 export type WealthTier = LevelTier;
-export type LevelPerk = { key: string; title: string; detail: string; emoji: string; art?: ArtName; from: number; kind: 'privilege' | 'costume' };
+/** `soon`: not built yet in the real app; the level screen leaves it out until it is (güncelleme 6). */
+export type LevelPerk = { key: string; title: string; detail: string; emoji: string; art?: ArtName; from: number; kind: 'privilege' | 'costume'; soon?: boolean };
+/** The perks the level screen shows: the ones the app really gives. */
+export const shownPerks = (perks: LevelPerk[]) => perks.filter((p) => !p.soon);
 export const WEALTH_TIERS: WealthTier[] = [
   { from: 0, to: 4, name: 'Kuvars', icon: 'leaf', colors: ['#2DD4BF', '#0F766E'], ink: '#ECFEFF', art: 'comertlik-simge-kuvars', emblem: 'comertlik-amblem-kuvars' },
   { from: 5, to: 9, name: 'Opal', icon: 'diamond-outline', colors: ['#38BDF8', '#1D4ED8'], ink: '#EFF6FF', art: 'comertlik-simge-opal', emblem: 'comertlik-amblem-opal' },
@@ -65,14 +68,14 @@ export const wealthTier = (level: number) => WEALTH_TIERS.find((t) => level >= t
 export type WealthPerk = LevelPerk;
 /** What a level opens. Each perk applies from its level up. */
 export const WEALTH_PERKS: WealthPerk[] = [
-  { key: 'badge', title: 'Seviye rozeti', detail: 'Profilde, odada ve sohbette adının yanında', emoji: '🏅', art: 'ayricalik-seviye-rozeti', from: 1, kind: 'privilege' },
-  { key: 'rank', title: 'Öne çıkma', detail: 'Oda dinleyici listesinde ve aramalarda üst sıralar', emoji: '⬆️', art: 'ayricalik-one-cikma', from: 1, kind: 'privilege' },
-  { key: 'gift', title: 'Seviye hediyesi', detail: 'Hediye panelinde seviyene özel hediye', emoji: '🎁', art: 'ayricalik-seviye-hediyesi', from: 3, kind: 'privilege' },
-  { key: 'notice', title: 'Odada seviye duyurusu', detail: 'Seviye atladığında bulunduğun odada duyurulur', emoji: '📣', art: 'ayricalik-odada-seviye-duyurusu', from: 10, kind: 'privilege' },
-  { key: 'broadcast', title: 'Platform duyurusu', detail: 'Seviye atlaman tüm platformda kayan yazıyla görünür', emoji: '📡', art: 'ayricalik-platform-duyurusu', from: 33, kind: 'privilege' },
-  { key: 'entry', title: 'Giriş efekti', detail: 'Odaya girişte seviye renginde efekt', emoji: '✨', art: 'ayricalik-giris-efekti', from: 5, kind: 'costume' },
-  { key: 'medal', title: 'Seviye madalyası', detail: 'Profil vitrininde seviye grubunun amblemi', emoji: '🎖️', art: 'ayricalik-seviye-madalyasi', from: 10, kind: 'costume' },
-  { key: 'frame', title: 'Profil çerçevesi', detail: 'Seviye grubunun renklerinde avatar çerçevesi', emoji: '🖼️', art: 'ayricalik-profil-cercevesi', from: 20, kind: 'costume' },
+  { key: 'badge', title: 'Seviye rozeti', detail: 'Profilinde adının yanında', emoji: '🏅', art: 'ayricalik-seviye-rozeti', from: 1, kind: 'privilege' },
+  { key: 'rank', title: 'Öne çıkma', detail: 'Oda dinleyici listesinde ve aramalarda üst sıralar', emoji: '⬆️', art: 'ayricalik-one-cikma', from: 1, kind: 'privilege', soon: true },
+  { key: 'gift', title: 'Seviye hediyesi', detail: 'Hediye panelinde seviyene özel hediye', emoji: '🎁', art: 'ayricalik-seviye-hediyesi', from: 3, kind: 'privilege', soon: true },
+  { key: 'notice', title: 'Odada seviye duyurusu', detail: 'Seviye atladığında bulunduğun odada duyurulur', emoji: '📣', art: 'ayricalik-odada-seviye-duyurusu', from: 10, kind: 'privilege', soon: true },
+  { key: 'broadcast', title: 'Platform duyurusu', detail: 'Seviye atlaman tüm platformda kayan yazıyla görünür', emoji: '📡', art: 'ayricalik-platform-duyurusu', from: 33, kind: 'privilege', soon: true },
+  { key: 'entry', title: 'Giriş efekti', detail: 'Odaya girişte seviye renginde efekt', emoji: '✨', art: 'ayricalik-giris-efekti', from: 5, kind: 'costume', soon: true },
+  { key: 'medal', title: 'Seviye madalyası', detail: 'Profil vitrininde seviye grubunun amblemi', emoji: '🎖️', art: 'ayricalik-seviye-madalyasi', from: 10, kind: 'costume', soon: true },
+  { key: 'frame', title: 'Profil çerçevesi', detail: 'Seviye grubunun renklerinde avatar çerçevesi', emoji: '🖼️', art: 'ayricalik-profil-cercevesi', from: 20, kind: 'costume', soon: true },
 ];
 
 /** Level gift names by group (shown in the perk card). */
