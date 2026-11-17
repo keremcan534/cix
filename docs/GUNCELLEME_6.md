@@ -38,8 +38,8 @@ Sahibin gönderdiği tasarıma göre, açık ve koyu temada aynı pembe cam gör
 - "İyi günler, Ad" el sallayan bir şeritte, sağda kalpler.
 - Dört parlak kutu tek sırada: Hemen Tanış, Canlı Odalar, Aile, Jeton Kazan.
 - Listeler (Ana Sayfa, Yakındakiler, Öne çıkanlar…) ile Sıralama ve ülke düğmeleri bir cam çubukta; seçili liste kendi hapında.
-- Her kişi pembe cam bir kartta: fotoğraf, isim ve Yankı rozeti, yaş, benzerlik ve ilgi alanları; yanında Selam ya da Sohbet ve Takip et / Takipte.
-- Alt menü ekranın kenarından biraz içeride yüzen pembe cam bir çubuk; seçili sekmenin simgesi ve adı pembe hapta.
+- Her kişi pembe cam bir kartta: fotoğraf, isim ve Yankı rozeti, yaş ve benzerlik; yanında Selam ya da Sohbet ve Takip et / Takipte. (İlgi alanları 17 Kasım'da müşterinin notuyla karttan kalktı; bkz. [TASARIM_DENETIMI.md](TASARIM_DENETIMI.md).)
+- Alt menü pembe cam bir çubuk; seçili sekmenin simgesi ve adı pembe hapta. (17 Kasım: yüzen çubuk ekranın altına oturtuldu, müşteri "oturmuyor" demişti.)
 
 ## Çalışmayan haklar gizlendi (17 Kasım)
 

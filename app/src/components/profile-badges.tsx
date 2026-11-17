@@ -16,7 +16,7 @@ import { useMyServerAgency } from '@/lib/live/me-stats';
 import { useTies } from '@/lib/live/profile';
 import { AGENCY_ROLE_TEXT } from '@/lib/me-view';
 import { useApp } from '@/store';
-import { makeStyles, themes, useTheme } from '@/theme';
+import { glass, makeStyles, themes, useTheme } from '@/theme';
 
 // Gender fills carry white text and are the same in both schemes.
 export const FEMALE_FILL = themes.dark.semantic.socialFill;
@@ -131,7 +131,8 @@ export function useStaffBadge(userId: string, theirRole?: 'admin' | 'moderator' 
 const publicRole = (r: AgencyRole) => (r === 'owner' ? ROLE_LABEL.owner : ROLE_LABEL.member);
 
 /** Compact pills under the name. Empty affiliations are hidden for others; the owner gets a soft "join" prompt. */
-export function AffiliationPills({ user }: { user: User }) {
+/** `glassy`: light glass pills (the profile header of the client's design), the same in either scheme. */
+export function AffiliationPills({ user, glassy }: { user: User; glassy?: boolean }) {
   const styles = useStyles();
   const { agency, kabile, known } = useAffiliations(user);
   const isMe = user.id === 'me';
@@ -139,25 +140,27 @@ export function AffiliationPills({ user }: { user: User }) {
   return (
     <View style={styles.pills}>
       {agency ? (
-        <Pill icon="business" label={agency.name} emoji={agency.emoji} a11y={`Ajans: ${agency.name}, ${agency.sub}`} href={agency.href} />
+        <Pill icon="business" label={agency.name} emoji={agency.emoji} a11y={`Ajans: ${agency.name}, ${agency.sub}`} href={agency.href} glassy={glassy} />
       ) : (
-        isMe && known && <Pill icon="business" label="Ajans yok · Katıl" empty a11y="Ajans: yok. Ajansa katıl" href="/ajans" />
+        isMe && known && <Pill icon="business" label="Ajans yok · Katıl" empty a11y="Ajans: yok. Ajansa katıl" href="/ajans" glassy={glassy} />
       )}
       {kabile ? (
-        <Pill icon="people" label={kabile.name} emoji={kabile.emoji} a11y={`Aile: ${kabile.name}, ${kabile.sub}`} href={kabile.href} />
+        <Pill icon="people" label={kabile.name} emoji={kabile.emoji} a11y={`Aile: ${kabile.name}, ${kabile.sub}`} href={kabile.href} glassy={glassy} />
       ) : (
-        isMe && known && <Pill icon="people" label="Aile yok · Katıl" empty a11y="Aile: yok. Bir aileye katıl" href={KABILE_ROUTES.profile} />
+        isMe && known && <Pill icon="people" label="Aile yok · Katıl" empty a11y="Aile: yok. Bir aileye katıl" href={KABILE_ROUTES.profile} glassy={glassy} />
       )}
     </View>
   );
 }
 
-function Pill({ icon, emoji, label, a11y, href, empty }: { icon: keyof typeof Ionicons.glyphMap; emoji?: string; label: string; a11y: string; href?: Href; empty?: boolean }) {
-  const { colors } = useTheme();
+function Pill({ icon, emoji, label, a11y, href, empty, glassy }: { icon: keyof typeof Ionicons.glyphMap; emoji?: string; label: string; a11y: string; href?: Href; empty?: boolean; glassy?: boolean }) {
+  const { colors: themed } = useTheme();
   const styles = useStyles();
+  // On glass: deep ink on the light pill, whatever the scheme.
+  const colors = glassy ? { primaryText: glass.deep, textDim: glass.plum } : themed;
   return (
     <Pressable
-      style={[styles.pill, empty && styles.emptyPill]}
+      style={[styles.pill, glassy && styles.glassPill, empty && (glassy ? styles.glassEmpty : styles.emptyPill)]}
       onPress={href ? () => router.push(href) : undefined}
       disabled={!href}
       hitSlop={4}
@@ -166,7 +169,7 @@ function Pill({ icon, emoji, label, a11y, href, empty }: { icon: keyof typeof Io
     >
       <Ionicons name={icon} size={12} color={empty ? colors.textDim : colors.primaryText} />
       {emoji && <Text style={{ fontSize: 12 }}>{emoji}</Text>}
-      <Text style={[styles.pillText, empty && { color: colors.textDim, fontWeight: '600' }]} numberOfLines={1}>
+      <Text style={[styles.pillText, glassy && { color: glass.ink }, empty && { color: colors.textDim, fontWeight: '600' }]} numberOfLines={1}>
         {label}
       </Text>
       {href && !empty && <Ionicons name="chevron-forward" size={12} color={colors.textDim} />}
@@ -186,5 +189,8 @@ const useStyles = makeStyles(({ colors }) => ({
   pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   pill: { flexDirection: 'row', alignItems: 'center', gap: 4, maxWidth: '100%', backgroundColor: colors.cardAlt, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 4 },
   emptyPill: { backgroundColor: 'transparent', borderWidth: 1, borderStyle: 'dashed', borderColor: colors.border },
+  glassPill: { backgroundColor: glass.fill, borderWidth: 1, borderColor: glass.rim, paddingHorizontal: 11, paddingVertical: 5 },
+  // Empty on glass keeps its light fill (plum on the dark page would be too faint), with a dashed edge.
+  glassEmpty: { borderStyle: 'dashed', borderColor: glass.line },
   pillText: { color: colors.text, fontSize: 12, fontWeight: '700', flexShrink: 1 },
 }));

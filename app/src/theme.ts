@@ -309,3 +309,32 @@ export const type = { caption: 12, body: 14, bodyL: 16, title: 18, h2: 22, amoun
  * picks the weight file from fontWeight. Set no fontWeight with these: the face is the weight.
  */
 export const fonts = { display: 'JakartaExtraBold', displayBold: 'JakartaBold' } as const;
+
+/**
+ * The pink glass of the owner's designs (Ana Sayfa, the profile, the bottom bar), the same in either scheme: deep
+ * ink on light glass. Text contrast (WCAG AA): ink and deep pass everywhere here, plum passes on fill, white, tint
+ * and well; pink is for icons, rings and large text only (3.2:1 on tint), never small text.
+ */
+export const glass = {
+  /** Text and numbers. */
+  ink: '#2B0A1C',
+  /** Headings and the chosen item's name. */
+  deep: '#8E1450',
+  /** Secondary text, labels and icons that are not chosen. */
+  plum: '#7A4A63',
+  /** Accent: underlines, rings, chosen icons. */
+  pink: '#E0287D',
+  /** Bars and outer cards. */
+  fill: '#FFF0F7',
+  /** Inner cards, chips and pills. */
+  white: '#FFFFFF',
+  /** The chosen pill; section headings. */
+  tint: '#F9D0E4',
+  /** Icon wells and photo placeholders. */
+  well: '#FBE3EE',
+  /** Hairlines between rows and chip borders. */
+  line: 'rgba(226,150,192,0.55)',
+  /** The glass's white rim. */
+  rim: 'rgba(255,255,255,0.9)',
+  shadow: '0 4px 14px rgba(120,20,70,0.2)',
+} as const;
