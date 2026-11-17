@@ -133,6 +133,33 @@ describe('Mağaza: sunucunun listesi', () => {
     assert.deepEqual(merged.find((c) => c.id === 'se5')!.remote, { video: true, plate: PLATE_READ, icon: { url: ICON } });
     assert.equal(merged.find((c) => c.id === 'en-dragon')!.remote, undefined);
   });
+
+  test('ekibin hareketli çerçevesi: durağan resim, delik ve hareketli WebP gelir; bozuk hareketli adres düşer, resim kalır', () => {
+    const MOVE = 'https://130-61-230-94.sslip.io/api/media/f/shopframe/00000000-0000-4000-8000-000000000004/imparator.webp';
+    const shop = parseLiveShop({
+      items: [
+        { sku: 'sf7', kind: 'frame', name: 'İmparator', price: 900, days: 30, minVip: 0, art: { url: ART, hole: 0.27, motion: { url: MOVE } } },
+        { sku: 'sf8', kind: 'frame', name: 'Bozuk Hareket', price: 900, days: 30, minVip: 0, art: { url: ART, hole: 0.27, motion: { url: 'javascript:alert(1)' } } },
+      ],
+    })!;
+    assert.deepEqual(shop.items.map((x) => x.art), [{ url: ART, hole: 0.27, motion: { url: MOVE } }, { url: ART, hole: 0.27 }]);
+    assert.deepEqual(parseLiveShop(JSON.parse(JSON.stringify(shop))), shop, 'telefondaki kopya aynı okunur');
+    assert.deepEqual(mergeShop(COSMETICS, shop).find((c) => c.id === 'sf7')!.remote, { art: { url: ART, hole: 0.27, motion: { url: MOVE } } });
+  });
+
+  test('çerçevenin deliği ortada değilse yeri gelir; resmin dışına taşıtan ya da bozuk yer atlanır, fotoğraf ortalanır', () => {
+    const frame = (sku: string, art: object) => ({ sku, kind: 'frame', name: `Çerçeve ${sku}`, price: 900, days: 30, minVip: 0, art: { url: ART, ...art } });
+    const shop = parseLiveShop({
+      items: [
+        frame('sf9', { hole: 0.29, at: { x: 0.467, y: 0.42 } }),
+        frame('sf10', { hole: 0.27, at: { x: 0.9, y: 0.5 } }),
+        frame('sf11', { hole: 0.4, at: { x: 0.5, y: 0.32 } }),
+        frame('sf12', { hole: 0.27, at: { x: '0.5', y: 0.45 } }),
+      ],
+    })!;
+    assert.deepEqual(shop.items.map((x) => x.art?.at), [{ x: 0.467, y: 0.42 }, undefined, undefined, undefined]);
+    assert.deepEqual(mergeShop(COSMETICS, shop).find((c) => c.id === 'sf9')!.remote, { art: { url: ART, hole: 0.29, at: { x: 0.467, y: 0.42 } } });
+  });
 });
 
 describe('Mağaza: sohbet balonları ve ses dalgaları', () => {

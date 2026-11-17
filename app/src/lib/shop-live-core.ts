@@ -67,7 +67,11 @@ export type ShopItem = {
   minVip: number;
   builtin: boolean;
   off: boolean;
-  art?: { url: string; hole: number };
+  /**
+   * An admin's frame: its still picture, the hole (its radius; `at`: its centre when it isn't the picture's middle, as
+   * shares of the picture), and the animated WebP the app plays when it has one.
+   */
+  art?: { url: string; hole: number; at?: { x: number; y: number }; motion?: { url: string } };
   video?: boolean;
   plate?: Plate | null;
   /** An admin's entry effect's picture in the shop. */
@@ -185,7 +189,16 @@ export function parseLiveShop(raw: unknown): LiveShop | null {
     const minVip = typeof r.minVip === 'number' && Number.isSafeInteger(r.minVip) && r.minVip >= 0 && r.minVip <= 15 ? r.minVip : null;
     if (typeof r.sku !== 'string' || !SKU.test(r.sku) || seen.has(r.sku) || !kind || !name || price === null || days === undefined || minVip === null) continue;
     const a = obj(r.art);
-    const art = kind === 'frame' && typeof a.url === 'string' && ART_URL.test(a.url) && share(a.hole, 0.1, 0.45) !== null ? { url: a.url, hole: a.hole as number } : undefined;
+    const m = obj(a.motion);
+    const motion = typeof m.url === 'string' && ART_URL.test(m.url) ? { motion: { url: m.url } } : {};
+    const hole = share(a.hole, 0.1, 0.45);
+    // The hole's centre, when the server says it isn't the middle; one that would put the photo past the picture's
+    // edge is left out (the photo is centred, as an older app does).
+    const c = obj(a.at);
+    const cx = share(c.x, 0.3, 0.7);
+    const cy = share(c.y, 0.3, 0.7);
+    const at = hole !== null && cx !== null && cy !== null && [cx, cy].every((n) => n - hole >= -0.001 && n + hole <= 1.001) ? { at: { x: cx, y: cy } } : {};
+    const art = kind === 'frame' && typeof a.url === 'string' && ART_URL.test(a.url) && hole !== null ? { url: a.url, hole, ...at, ...motion } : undefined;
     const builtin = r.builtin === true;
     const bubble = !builtin && kind === 'bubble' ? parseBubbleLook(r.look) : null;
     const wave = !builtin && kind === 'wave' ? parseWaveLook(r.look) : null;

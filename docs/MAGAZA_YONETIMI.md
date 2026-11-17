@@ -20,8 +20,15 @@ Dört sekme var: **Giriş efektleri**, **Çerçeveler**, **Sohbet balonları** v
 
   Resimleri, animasyonları ve renkleri uygulamanın içinde; onlar buradan değişmez.
 - **Yeni çerçeve:**
-  - Saydam, kare PNG ya da WebP (128–1024 px, en çok 4 MB).
-  - Fotoğraf ortadaki boşluğa oturur. Boşluğun büyüklüğü önizlemede örnek fotoğrafla kaydırıcıdan ayarlanır.
+  - **Çerçeve resmi:** durağan, saydam, kare PNG ya da WebP (128–1024 px, en çok 4 MB). Hareketli bir WebP buraya kabul edilmez.
+  - Fotoğraf çerçevenin halkasına oturur. Resim seçilince halkanın içindeki en büyük saydam daire ölçülür: büyüklüğü ve yeri. Halka resmin ortasında değilse (üstte taç, altta isim levhası) fotoğraf halkaya kayar. Önizlemede örnek fotoğrafla üç kaydırıcıdan (büyüklük, yatay, dikey) ince ayar yapılır; "Resimden yeniden ölç" ölçümü tekrarlar.
+  - Eski APK'lar fotoğrafı her zaman resmin ortasına koyar; halkası ortada olmayan çerçeve onlarda biraz kayık görünür.
+  - **Hareketli hali (isteğe bağlı):** aynı çerçevenin hareketli WebP'si (saydam, kare, 128–512 px, en çok 3 MB). Yeni APK onu oynatır. Durağan resim kalır: eski APK'lar, Düşük veri modu, "hareketi azalt" ve listelerdeki küçük fotoğraflar (48 noktadan küçük) onu gösterir. Kaldırılınca durağan resim kalır.
+- **Toplu çerçeve ekle** (Çerçeveler sekmesi): tasarımcının klasörü seçilir.
+  - Her çerçevenin durağan PNG'si (önizleme) ve hareketli WebP'si dosya adından eşleştirilir (`02_imparator.webp` ve `02_imparator_onizleme.png`). GIF ve SVGA kullanılmaz.
+  - Adlar dosya adından yapılır (`altin_tac` → "Altın Taç"); fotoğrafın yeri ve büyüklüğü her resmin halkasından ölçülür. Ad ve büyüklük kartında, yer eklendikten sonra çerçevenin düzenleme penceresinde düzeltilebilir. Uygulamada ya da listede olan bir ad kartında uyarılır.
+  - Fiyat, süre, VIP seviyesi ve satışta olup olmadığı hepsine birden verilir. Eklenen çerçeveler mağazanın başına, dosya numarasının sırasıyla dizilir.
+  - Eklenemeyenin sebebi kartında yazar; tekrar basınca yalnız eklenmemiş olanlar gönderilir. Yükleme sınırına takılırsa yarım dakika bekleyip devam eder.
 - **Yeni giriş efekti:**
   - **Video:** hazır yığılmış MP4, ya da saydam WebM, ProRes 4444 .mov veya SVGA. Bunları uygulamanın sunucusu hediyelerdeki gibi telefon videosuna çevirir. Çevrilene kadar eski video oynar.
   - **İsim plakası:** odaya girenin adının yazılacağı yer. Ayarlar: yatay ve dikey yer, genişlik, yazı boyu, renk, kalın.
@@ -52,6 +59,9 @@ Dört sekme var: **Giriş efektleri**, **Çerçeveler**, **Sohbet balonları** v
 
 ## Tasarımcı için
 
+- **Hareketli çerçeve:** hareketli WebP (saydam, döngülü, kare, 256 px önerilir, en çok 512 px ve 3 MB) ve aynı çerçevenin durağan PNG'si. Ortadaki fotoğraf alanı ikisinde de aynı ve saydam olmalı.
+- **Halka:** kapalı, yuvarlak ve mümkünse resmin ortasında olsun. Ortada değilse panel yerini ölçer ve fotoğrafı oraya koyar; ama oval ya da açık bir halkaya yuvarlak fotoğraf oturmaz, halkanın içine giren süs (kurt başı, kanat) fotoğrafın üstünü kapatır. Halkanın altına yazı koymayın; ters ya da bozuk yazı tasarımda düzeltilmeli. GIF'in saydam kenarları tırtıklı çıkar; SVGA'yı uygulama oynatamaz. Bir odada çok koltuk aynı anda oynar: dosyaları küçük tutun.
+
 - Giriş animasyonunda **isim alanını boş bırakın**; isim plakası ve çerçeve animasyonda olabilir, yazıyı uygulama yazar.
 - Animasyon 540 × 960 kareye göre hazırlanır (dikey). Plakanın yeri bu kareye göre verilir. Telefon videoyu ekrana sığdırır, ad videodaki yere oturur.
 - Saydam olmayan (arka planlı) video ancak "Arka planlı tam ekran" seçilirse kabul edilir; yoksa odada kutu gibi görünür.
@@ -66,12 +76,13 @@ Dört sekme var: **Giriş efektleri**, **Çerçeveler**, **Sohbet balonları** v
 - **Yeni APK:**
   - Mağazayı sunucudan gösterir: sıra, ad, fiyat, süre ve sizin eklediğiniz eşyalar.
   - Gösterdiği fiyat ve günle satın alır. Fiyat ya da gün arada değiştiyse alım reddedilir, jeton düşmez.
-  - Sizin çerçevenizi fotoğrafın çevresine çizer.
+  - Sizin çerçevenizi fotoğrafın çevresine çizer; hareketli hali varsa onu oynatır (48 noktadan büyük fotoğraflarda; Düşük veri modunda ve "hareketi azalt" açıkken durağan).
   - Sizin giriş efektinizin videosunu indirir ve odaya girenin adını plakaya yazar. Video henüz telefonda değilse ya da "hareketi azalt" açıksa alışılmış giriş bandı çıkar.
   - Yazının görünüşünü (büyük harf, harf aralığı, gölge, kontur, bant) ve zamanını panelden okur. "Ad yazılsın" kapalıysa yalnız video oynar. Mağazada efektin ikonunu gösterir.
   - Sizin sohbet balonunuzu odadaki sohbette çizer: renkleriyle ya da resmiyle, köşeler bozulmadan.
   - Sizin ses dalganızı konuşanın koltuğunda çizer; dalga sese göre büyür.
 - **Eski APK'lar:**
+  - Hareketli çerçeveden önceki APK'lar çerçevenin durağan resmini gösterir.
   - Kendi içindeki mağazayı gösterir.
   - Panelde fiyatı ya da süresi değişmiş bir eşyayı alamaz, "uygulamayı güncelle" görür. Satıştan kaldırılmış eşya için "artık satışta değil" görür.
   - Sizin eklediğiniz eşyaları göremez. Onları takan birini görünce çerçeve, giriş efekti, balon ya da dalga çizmez; düz halini gösterir.
@@ -80,7 +91,7 @@ Dört sekme var: **Giriş efektleri**, **Çerçeveler**, **Sohbet balonları** v
 
 ## Teknik
 
-- **Tablo:** `076_shop_items`, `077_shop_bubbles_waves` (balon ve dalga; görünüş `look` sütununda), `078_shop_entry_icons` (giriş efektinin ikonu, `icon_url`).
+- **Tablo:** `076_shop_items`, `077_shop_bubbles_waves` (balon ve dalga; görünüş `look` sütununda), `078_shop_entry_icons` (giriş efektinin ikonu, `icon_url`), `079_shop_frame_motion` (çerçevenin hareketli hali, `motion_url`, katalogda `art.motion`; deliğin yeri, `hole_x` / `hole_y`, katalogda `art.at`, ortadaysa yok).
 - **İsim plakası (`plate`):** `x`, `y`, `w`, `size`, `color`, `bold`; yeni alanlar `show`, `upper`, `spacing`, `shadow` (`{ color, size }` ya da `null`), `outline` (`{ color, size }` ya da `null`), `back` (`{ color, alpha }` ya da `null`), `from`, `to` (saniye), `anim` (`none` / `fade` / `zoom` / `rise`). Gönderilmeyen alan varsayılanını alır (`PLATE_DEFAULT`); eski kayıtlarda olmayan alanları telefon ve panel varsayılanla okur.
 - **Sunucu:**
   - `shop-items.mjs`: panel uçları ve telefonlara giden liste (`GET /api/catalog?shop=1` `shop`).
@@ -88,6 +99,8 @@ Dört sekme var: **Giriş efektleri**, **Çerçeveler**, **Sohbet balonları** v
   - Video çevirme hediyelerle aynı iş: `custom-gifts.mjs` iki tabloyu sırayla çevirir.
   - Balon ve dalga resimleri de `shopframe` yüklemesiyle gelir; boyutu ve saydamlığı kullanımına göre `shop-items.mjs`'de denetlenir.
 - **Satış:** `economy.mjs` eşyayı panelin değerleriyle satar.
+- **Hareketli WebP telefonda:** Expo şablonu React Native'in `<Image>`'ında hareketli WebP'yi kapalı getirir (`expo.webp.animated=false`). `plugins/with-animated-webp` onu açar (Fresco animated-webp); yeni APK gerekir.
+- **Yükleme sınırı:** yönetici hesabı dakikada 120 dosya yükleyebilir (diğerleri 20); 24 çerçevelik bir set 48 dosyadır.
 - **Uygulama:**
   - `lib/shop-live-core.ts`: listeyi okur, uygulamanın eşyalarıyla birleştirir, plakanın ekrandaki yerini ve balon resminin dokuz parçasını hesaplar. Telefon okuduğu listeyi saklar ve yeniden açılınca aynı kodla okur; bu yüzden liste sunucunun biçiminde saklanır.
   - `data/catalog` `cosmeticById` panelin değerlerini verir.

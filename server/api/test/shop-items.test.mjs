@@ -71,6 +71,35 @@ const buy = (sku, price, days, who = alice) => call('POST', '/api/shop/buy', { s
 /** An older app's buy: the compiled name and price in a free-text spend (economy.mjs bridge). */
 const oldBuy = (name, price, who = alice) => call('POST', '/api/wallet/spend', { amount: price, reason: `Mağaza: ${name}`, ref: `o-${rnd()}` }, who.session);
 const frameArt = (o) => upload(admin, 'shopframe', png(256, 256, o), 'image/png');
+/**
+ * An animated WebP as the shop reads it: VP8X (its size, the alpha and animation flags), ANIM and a few ANMF frames,
+ * each a tiny VP8L picture. The shop checks the header; nothing here decodes the frames.
+ */
+function animatedWebp(w, h, { alpha = true, frames = 3 } = {}) {
+  const chunk = (tag, body) => {
+    const head = Buffer.alloc(8);
+    head.write(tag, 0, 'latin1');
+    head.writeUInt32LE(body.length, 4);
+    return Buffer.concat([head, body, Buffer.alloc(body.length % 2)]);
+  };
+  const vp8x = Buffer.alloc(10);
+  vp8x[0] = (alpha ? 0x10 : 0) | 0x02;
+  vp8x.writeUIntLE(w - 1, 4, 3);
+  vp8x.writeUIntLE(h - 1, 7, 3);
+  const frame = () => {
+    const head = Buffer.alloc(16);
+    head.writeUIntLE(w - 1, 6, 3);
+    head.writeUIntLE(h - 1, 9, 3);
+    head.writeUIntLE(120, 12, 3);
+    return chunk('ANMF', Buffer.concat([head, chunk('VP8L', Buffer.from([0x2f, 0, 0, 0, 0]))]));
+  };
+  const body = Buffer.concat([Buffer.from('WEBP', 'latin1'), chunk('VP8X', vp8x), chunk('ANIM', Buffer.alloc(6)), ...Array.from({ length: frames }, frame)]);
+  const riff = Buffer.alloc(8);
+  riff.write('RIFF', 0, 'latin1');
+  riff.writeUInt32LE(body.length, 4);
+  return Buffer.concat([riff, body]);
+}
+const motionArt = (w = 256, h = w, o) => upload(admin, 'shopframe', animatedWebp(w, h, o), 'image/webp');
 /** Waits until the item's conversion is over and the catalog lists its video; its panel view. */
 async function settled(id, ms = 60_000) {
   const end = Date.now() + ms;
@@ -186,6 +215,47 @@ describe('Yönetim › Mağaza', () => {
     const changed = (await ok(post('/update', { id: f.id, art, hole: 0.28 }), 'yeni resim')).item;
     assert.deepEqual([changed.art.url, changed.art.hole], [art, 0.28]);
     await refused(post('/update', { id: f.id, plate: { x: 0.5 } }), 400, /olmaz/);
+  });
+
+  test('hareketli çerçeve: durağan resmin yanında hareketli WebP; yeni telefon hareketliyi, eski telefon durağanı çizer', async () => {
+    await freshAdmin();
+    const still = await frameArt();
+    const moving = await motionArt();
+    const add = (more) => post('', { kind: 'frame', name: 'İmparator', price: 900, days: 30, ...more });
+    // Each in its place: the moving one isn't the frame's picture, a still one isn't its moving version.
+    await refused(add({ art: moving }), 400, /hareketli: onu "Hareketli hali"ne/);
+    await refused(add({ art: still, motion: await frameArt() }), 400, /hareketli bir WebP olmalı/);
+    await refused(add({ art: still, motion: await motionArt(256, 256, { alpha: false }) }), 400, /saydamlık/);
+    await refused(add({ art: still, motion: await motionArt(1024) }), 400, /128–512 piksel/);
+    await refused(add({ art: still, motion: await motionArt(256, 200) }), 400, /kare/);
+    await refused(post('', { kind: 'bubble', name: 'Hareketli Balon', price: 100, days: 7, motion: moving }), 400, /yalnız çerçevede/);
+
+    // The photo goes where the ring is: a designer's ring under a crown is often higher than the picture's middle.
+    await refused(add({ art: still, hole: 0.27, holeX: 0.9, holeY: 0.5 }), 400, /Fotoğrafın yeri/);
+    await refused(add({ art: still, hole: 0.27, holeX: 0.5 }), 400, /Fotoğrafın yeri/);
+    await refused(add({ art: still, hole: 0.4, holeX: 0.5, holeY: 0.35 }), 400, /taşıyor/);
+    await refused(post('', { kind: 'bubble', name: 'Yerli Balon', price: 100, days: 7, holeX: 0.5, holeY: 0.5 }), 400, /fotoğraf alanı olmaz/);
+
+    const f = (await ok(add({ art: still, hole: 0.27, holeX: 0.5, holeY: 0.42, motion: moving }), 'hareketli çerçeve')).item;
+    assert.deepEqual([f.art.url, f.art.hole, f.art.at, f.art.motion.url, f.art.motion.px], [still, 0.27, { x: 0.5, y: 0.42 }, moving, 256]);
+    assert.ok(f.art.motion.bytes > 0);
+    // Phones: the hole's place and the moving version beside the still picture an older app draws (centred).
+    assert.deepEqual((await inCatalog(f.id)).art, { url: still, hole: 0.27, at: { x: 0.5, y: 0.42 }, motion: { url: moving } });
+    // A bigger hole must still fit where it is; the middle is no place at all for the phones.
+    await refused(post('/update', { id: f.id, hole: 0.45 }), 400, /taşıyor/);
+    assert.deepEqual((await ok(post('/update', { id: f.id, holeX: 0.5, holeY: 0.5 }), 'ortaya')).item.art.at, { x: 0.5, y: 0.5 });
+    assert.equal((await inCatalog(f.id)).art.at, undefined);
+    // A new moving version replaces the old one; null leaves the still picture alone.
+    const moving2 = await motionArt(320);
+    assert.equal((await ok(post('/update', { id: f.id, motion: moving2 }), 'yeni hareketli')).item.art.motion.px, 320);
+    const bare = (await ok(post('/update', { id: f.id, motion: null }), 'hareketsiz')).item;
+    assert.deepEqual([bare.art.url, bare.art.motion], [still, null]);
+    assert.deepEqual((await inCatalog(f.id)).art, { url: still, hole: 0.27 });
+    await refused(post('/update', { id: 'fr-neon', motion: moving }), 400, /görseli buradan değişmez/);
+    await refused(post('/update', { id: 'fr-neon', holeX: 0.5, holeY: 0.4 }), 400, /görseli buradan değişmez/);
+
+    // Staff add a set at once: 24 frames are 48 files, past the 20 a minute anyone else may upload.
+    for (let i = 0; i < 30; i++) await ok(call('POST', '/api/media/upload-url', { kind: 'shopframe', contentType: 'image/png', size: 1000 }, admin.session), `yükleme ${i + 1}`);
   });
 
   test('yeni giriş efekti: hazır video ve isim plakası; katalogda video ve plaka, sunucudan oynatılır; sırası değişir', { skip: NO_FFMPEG }, async () => {

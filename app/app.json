@@ -86,6 +86,7 @@
       ],
       "./plugins/with-android-release-build",
       "./plugins/with-app-self-update",
+      "./plugins/with-animated-webp",
       "expo-secure-store",
       [
         "expo-notifications",

@@ -519,7 +519,8 @@ export const mediaRoutes = {
   async 'POST /api/media/upload-url'(req) {
     const u = await auth(req);
     if (!env.S3_ENDPOINT || !env.S3_BUCKET || !env.S3_KEY || !env.S3_SECRET || !env.S3_PUBLIC_URL) throw new HttpError(503, 'Fotoğraf yükleme henüz açık değil');
-    limit(`media:${u.id}`, 20, 'Çok fazla yükleme, biraz bekle');
+    // Staff upload in bulk (a set of 24 frames, each a still and a moving picture, from the panel's Mağaza).
+    limit(`media:${u.id}`, u.role === 'admin' ? 120 : 20, 'Çok fazla yükleme, biraz bekle');
     const { kind, contentType, size } = await readJson(req);
     const k = typeof kind === 'string' && Object.hasOwn(KINDS, kind) ? KINDS[kind] : null;
     if (!k) throw new HttpError(400, 'Geçersiz yükleme türü');
