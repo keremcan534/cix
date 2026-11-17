@@ -70,7 +70,14 @@ export function startApi(extraEnv = {}, { moneyCheck = true } = {}) {
     // PUBLIC_URL 'self': the address phones open stored files at is this API's own (core.mjs servedFiles).
     if (env.PUBLIC_URL === 'self') env.PUBLIC_URL = base;
     for (const k of Object.keys(env)) if (env[k] === undefined || env[k] === null) delete env[k];
-    h.api = spawn(process.execPath, [path.join(import.meta.dirname, '..', 'index.mjs')], { env, stdio: ['ignore', 'pipe', 'inherit'] });
+    h.env = env;
+    await run();
+  });
+
+  /** Starts the API process; resolves once it listens. */
+  async function run() {
+    const from = h.logs.length;
+    h.api = spawn(process.execPath, [path.join(import.meta.dirname, '..', 'index.mjs')], { env: h.env, stdio: ['ignore', 'pipe', 'inherit'] });
     let buf = '';
     h.api.stdout.on('data', (d) => {
       buf += String(d);
@@ -79,10 +86,18 @@ export function startApi(extraEnv = {}, { moneyCheck = true } = {}) {
       h.logs.push(...lines);
     });
     await new Promise((resolve, reject) => {
-      const t = setInterval(() => h.logs.some((l) => l.includes('api on')) && (clearInterval(t), resolve()), 20);
+      const t = setInterval(() => h.logs.slice(from).some((l) => l.includes('api on')) && (clearInterval(t), resolve()), 20);
       h.api.on('exit', (code) => (clearInterval(t), reject(new Error(`api exited ${code}`))));
     });
-  });
+  }
+
+  /** Stops the API and starts it again on the same database, as a deploy does in the middle of things. */
+  h.restart = async () => {
+    const exited = new Promise((r) => h.api.once('exit', r));
+    h.api.kill();
+    await exited;
+    await run();
+  };
 
   after(async () => {
     let problems = [];

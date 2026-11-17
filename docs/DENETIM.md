@@ -20,7 +20,9 @@ modunda olması, hata takibi olmaması ve kırık kodun birleşmeden önce yakal
   Türkiye'de de lisans gerekir. Kodda varsayılan olarak **açık** (Cömertlik Lv.2 ve 18 yaş şartıyla). Panelin "Şanslı
   hediye ayarı" sayfasından paket paket kapatılabiliyor.
 - **Oyun Salonu** kazancı ayrı oyun jetonuna gidiyor (`casino.mjs`, `game_coins`), bu daha güvenli. Ama bahis satın
-  alınan jetonla da yapılabiliyor. Varsayılan olarak yalnız yöneticilere açık.
+  alınan jetonla da yapılabiliyor. Varsayılan olarak yalnız yöneticilere açık. Kasım 2026'da Yörünge canlı ve çok
+  oyunculu oldu (`rocket-live.mjs`, herkes aynı roketi izler): aynı anahtarın arkasında, ama kasa payı canlı ayardan
+  düşürülebiliyor (varsayılan %60) ve oyunun çekiciliği arttı; hukuk sorusu onu da kapsar.
 - **Öneri:** İlk sürümde Şanslı hediye kapalı olsun, ya da kazancı nakde dönmeyen ayrı bir bakiyeye gitsin (Oyun
   Salonu gibi). Kararı bir avukat görüşüyle siz verin; kapatma ya da ayrı bakiye işini Claude yapar.
 

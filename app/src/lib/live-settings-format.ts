@@ -83,6 +83,9 @@ export function bigChange(key: LiveKey, before: LiveValue, after: LiveValue): bo
       return typeof after === 'number' && after > BACKPACK_BIG;
     case 'casino_daily_rounds':
       return typeof after === 'number' && after > 80;
+    case 'rocket_house_pct':
+      // Giving Canlı Yörünge's players more back.
+      return typeof after === 'number' && typeof before === 'number' && after < before;
     case 'min_version':
       return after !== null;
     case 'dm_price':
@@ -143,9 +146,10 @@ export const ROOM_NUMBER_KEYS: { key: RoomKey; unit: string }[] = [
 ];
 
 /** Oyun Salonu's numbers in the order the admin card shows them, with each one's unit. */
-export const CASINO_NUMBER_KEYS: { key: 'casino_max_bet' | 'casino_daily_rounds'; unit: string }[] = [
+export const CASINO_NUMBER_KEYS: { key: 'casino_max_bet' | 'casino_daily_rounds' | 'rocket_house_pct'; unit: string }[] = [
   { key: 'casino_max_bet', unit: ' jeton' },
   { key: 'casino_daily_rounds', unit: '' },
+  { key: 'rocket_house_pct', unit: ' %' },
 ];
 
 /** The 1v1 settings in the order the admin card shows them, with each one's unit. */
@@ -267,6 +271,8 @@ export function valueText(key: LiveKey, v: LiveValue, { stored = false, names = 
       return typeof v === 'number' ? `${fmtNum(v)} jeton` : String(v);
     case 'casino_daily_rounds':
       return typeof v === 'number' ? `En yüksek bahisle ${fmtNum(v)} tur` : String(v);
+    case 'rocket_house_pct':
+      return typeof v === 'number' ? `Kasaya %${v}, oyunculara %${100 - v}` : String(v);
     case 'room_decor_off':
       return Array.isArray(v) && v.length ? `Kapalı: ${v.map((k) => DECOR_LABEL[k] ?? k).join(', ')}` : 'Hepsi açık';
     case 'room_bg_custom_price':

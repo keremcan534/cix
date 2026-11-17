@@ -299,7 +299,7 @@ export const FlightLayer = memo(function FlightLayer({ geo, flight, flick }: { g
 const SPARKS = Array.from({ length: 12 }, (_, i) => ({ deg: i * 30 + (i % 2 ? 11 : -7), far: 46 + ((i * 37) % 34), size: 3 + (i % 3) }));
 
 /** The rocket blowing up: a burst of light, two rings opening, sparks thrown out and smoke left hanging. */
-function Explosion({ x, y, fx }: { x: number; y: number; fx: Animated.Value }) {
+export function Explosion({ x, y, fx }: { x: number; y: number; fx: Animated.Value }) {
   return (
     <View style={{ position: 'absolute', left: x, top: y }}>
       {[0, 1, 2].map((i) => (

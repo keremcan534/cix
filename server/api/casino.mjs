@@ -2,7 +2,7 @@
 // Balon Avı, Yörünge, Kızıl Yedi, Vahşi Patika, Bereket Ağacı, Lezzet Çarkı, Sihir Destesi, Konfeti Kutusu, Kayıp
 // Parşömen, Neon Bulvar), played on the server like Rüzgâr Gülü (wheel.mjs).
 //
-//   GET  /api/casino                                                → { games, needLevel, allowed, gameCoins, mine }
+//   GET  /api/casino                                                → { games, needLevel, allowed, gameCoins, mine, rocketLive }
 //   POST /api/casino/play { game, bet, pick?, bets?, place?, ref }  → { round, user, replay, fund }
 //   GET  /api/admin/casino/report                                   → { book, jackpots, periods } (admin role)
 //
@@ -20,6 +20,8 @@
 // (live setting casino_daily_rounds × the game's top stake) and a rate limit. Live settings also switch single games
 // off (casino_off) and cap the stake (casino_max_bet); Acil durum's Oyunlar stops them all (features.mjs).
 // Kept: the rounds, 180 days (the history and the daily limit), deleted with the account (social.mjs eraseAccount).
+// Yörünge is also played live by everyone at once (rocket-live.mjs, `rocketLive` here tells the app): its fuel is kept
+// here as rounds of 'rocket' too. A round here stays the one-player Yörünge that older apps play.
 import crypto from 'node:crypto';
 
 import { HttpError, REF, auth, db, limit, move, readJson, selfUser, tx } from './core.mjs';
@@ -52,13 +54,13 @@ import {
 /** Rounds per person per minute (Balon Avı's Oto shoots about one a second). */
 const RATE = 90;
 const RETENTION_DAYS = 180;
-const DAY_START = `(date_trunc('day', now() AT TIME ZONE 'Europe/Istanbul') AT TIME ZONE 'Europe/Istanbul')`;
+export const DAY_START = `(date_trunc('day', now() AT TIME ZONE 'Europe/Istanbul') AT TIME ZONE 'Europe/Istanbul')`;
 const fmt = (n) => n.toLocaleString('tr-TR');
-const POOL_LOW = 'Ödül havuzu şu an bu bahsin en yüksek ödülünü karşılayamıyor. Daha küçük bir bahisle dene; jetonun düşülmedi.';
+export const POOL_LOW = 'Ödül havuzu şu an bu bahsin en yüksek ödülünü karşılayamıyor. Daha küçük bir bahisle dene; jetonun düşülmedi.';
 
 /** A game's daily ceiling per person, in coins played. */
 export const dailyOf = (g, s = live()) => s.casinoDailyRounds * topStake(g);
-const isOn = (g, s) => !s.casinoOff.has(g.id) && !s.featuresOff.has('games');
+export const isOn = (g, s) => !s.casinoOff.has(g.id) && !s.featuresOff.has('games');
 
 const roundOut = (r, withOutcome = false) => ({
   id: Number(r.id),
@@ -127,6 +129,7 @@ export const casinoRoutes = {
    * Yönetim › Oyun Salonu raporu (admin role): the house book (everything played, the house's 60 %, the payout pool,
    * what it paid and its opening advance), each slot's JACKPOT fund, and per period and per game the rounds,
    * players, coins played, winnings paid and the house's part. Rounds are kept 180 days; the book is since the start.
+   * Canlı Yörünge's fuel carries the house part its round booked (its share is a live setting); the rest is 60 %.
    */
   async 'GET /api/admin/casino/report'(req) {
     const me = await auth(req);
@@ -137,7 +140,8 @@ export const casinoRoutes = {
       jackpots(db),
       ...PERIODS.map(([, since]) =>
         db.query(
-          `SELECT game, count(*) AS rounds, count(DISTINCT user_id) AS players, coalesce(sum(bet), 0) AS wagered, coalesce(sum(payout), 0) AS paid
+          `SELECT game, count(*) AS rounds, count(DISTINCT user_id) AS players, coalesce(sum(bet), 0) AS wagered, coalesce(sum(payout), 0) AS paid,
+                  coalesce(sum(house), 0) AS booked, coalesce(sum(bet) FILTER (WHERE house IS NULL), 0) AS unbooked
              FROM casino_rounds WHERE created_at >= ${since} GROUP BY game`,
         ),
       ),
@@ -153,7 +157,7 @@ export const casinoRoutes = {
           const games = GAMES.map((g) => {
             const r = rows.get(g.id);
             const wagered = num(r?.wagered);
-            return { id: g.id, name: g.name, rounds: num(r?.rounds), players: num(r?.players), wagered, paid: num(r?.paid), house: houseShare(wagered) };
+            return { id: g.id, name: g.name, rounds: num(r?.rounds), players: num(r?.players), wagered, paid: num(r?.paid), house: num(r?.booked) + houseShare(num(r?.unbooked)) };
           });
           const sum = (k) => games.reduce((a, g) => a + g[k], 0);
           return [key, { rounds: sum('rounds'), wagered: sum('wagered'), paid: sum('paid'), house: sum('house'), games }];
@@ -188,6 +192,8 @@ export const casinoRoutes = {
       allowed: open && points >= casinoNeed().points,
       gameCoins: Number(me.game_coins),
       mine: mine.rows.map((r) => roundOut(r)),
+      // Yörünge is played live here (rocket-live.mjs): an app that knows it opens that screen instead.
+      rocketLive: true,
     };
   },
 

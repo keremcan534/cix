@@ -67,9 +67,10 @@ export const POOL_SEED = 2_000_000;
 export const JACKPOT_SEEDS: Record<string, number> = { jackpot: 100_000, jungle: 1_000_000, pinata: 500_000, spellbook: 800_000, neon: 2_000_000 };
 /** Small wins of these games are not announced in every room (a shot in Balon Avı is a round of its own). */
 const ANNOUNCE_MIN: Partial<Record<CasinoGame['id'], number>> = { fish: 20, rocket: 10 };
-type State = { roomGames: RoomGame[]; casino: CasinoGame[]; history: HistoryRow[]; spentByDay: Record<string, number>; bank: CasinoBank };
+/** `rocketLive`: the server plays Yörünge live, everyone at once (lib/live/rocket-live); the demo and an older server don't. */
+type State = { roomGames: RoomGame[]; casino: CasinoGame[]; history: HistoryRow[]; spentByDay: Record<string, number>; bank: CasinoBank; rocketLive: boolean };
 const freshBank = (): CasinoBank => ({ wagered: 0, house: 0, pool: POOL_SEED, paid: 0, seed: POOL_SEED, jackpots: { ...JACKPOT_SEEDS } });
-let state: State = { roomGames: ROOM_GAMES, casino: CASINO_GAMES, history: [], spentByDay: {}, bank: freshBank() };
+let state: State = { roomGames: ROOM_GAMES, casino: CASINO_GAMES, history: [], spentByDay: {}, bank: freshBank(), rocketLive: false };
 const listeners = new Set<() => void>();
 const emit = (patch: Partial<State>) => {
   state = { ...state, ...patch };
@@ -280,9 +281,10 @@ export type LiveCasinoGame = { id: string; active: boolean; bets: number[]; dail
  * Puts the server's word into the store the screens read: each game's switch, stakes and daily limit (a game the
  * server doesn't play is off), my history, the JACKPOT funds. Only lib/live/casino calls it; the demo never does.
  */
-export function applyLiveCasino(p: { games?: LiveCasinoGame[]; history?: HistoryRow[]; jackpots?: Record<string, number> }) {
+export function applyLiveCasino(p: { games?: LiveCasinoGame[]; history?: HistoryRow[]; jackpots?: Record<string, number>; rocketLive?: boolean }) {
   const games = p.games;
   emit({
+    ...(p.rocketLive !== undefined && { rocketLive: p.rocketLive }),
     ...(games && {
       casino: state.casino.map((g) => {
         const x = games.find((y) => y.id === g.id);
@@ -327,5 +329,5 @@ export function playDuel(bet: number): { ok: true; me: number; them: number; pay
 /** Test support: forget rounds, limits and the house book. */
 export function resetGames() {
   results.clear();
-  state = { roomGames: ROOM_GAMES, casino: CASINO_GAMES, history: [], spentByDay: {}, bank: freshBank() };
+  state = { roomGames: ROOM_GAMES, casino: CASINO_GAMES, history: [], spentByDay: {}, bank: freshBank(), rocketLive: false };
 }

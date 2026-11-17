@@ -1,5 +1,6 @@
 // Many people moving money at once, in random order (docs/PARA_DENETIMI.md): top-ups, purchases, gifts, Çevir,
-// bonds, Şanslı çanta, the shop, Oyun Salonu, Jeton Noktası sales and diamond sales, store refunds, with some
+// bonds, Şanslı çanta, the shop, Oyun Salonu (Canlı Yörünge's fuel and escapes too), Jeton Noktası sales and diamond
+// sales, store refunds, with some
 // requests sent twice at the same moment. Whatever the order, no request may fail with a server error, and the
 // harness's money checks after this file (money-check.mjs) must find every coin and diamond where the ledger says.
 import { describe, test } from 'node:test';
@@ -8,7 +9,8 @@ import assert from 'node:assert/strict';
 import { rnd, startApi } from './harness.mjs';
 
 // Locks of 0 days: gifted diamonds can leave at once, so Çevir and diamond sales run on them too.
-const h = startApi({ BOND_SWEEP_MS: '200', BAG_SWEEP_MS: '200', LOCK_DAYS_STORE: '0', LOCK_DAYS_JETON: '0', TEST_TOPUP_DAILY: '100000000', AGENCY_JOBS: '0' });
+// Canlı Yörünge's rounds run fast: a 0,4 s window and a climb of e^(3t).
+const h = startApi({ BOND_SWEEP_MS: '200', BAG_SWEEP_MS: '200', LOCK_DAYS_STORE: '0', LOCK_DAYS_JETON: '0', TEST_TOPUP_DAILY: '100000000', AGENCY_JOBS: '0', ROCKET_BET_MS: '400', ROCKET_IGNITE_MS: '0', ROCKET_PAUSE_MS: '100', ROCKET_RATE: '3' });
 const { call, signUp } = h;
 const q = async (sql, args) => (await h.sql.query(sql, args)).rows;
 const ok = async (p, what) => {
@@ -76,6 +78,16 @@ describe('Para: aynı anda rastgele işlemler', () => {
         return ['mağaza', 'POST', '/api/shop/buy', { sku, price, ref: rnd(6) }, u.session];
       }],
       [6, async (u) => ['oyun', 'POST', '/api/casino/play', { game: 'jackpot', bet: 250, ref: rnd(8) }, u.session]],
+      // Canlı Yörünge: fuel into the open round, an escape from the one in the air (the screen's read finds the round).
+      [4, async (u) => {
+        const round = (await call('GET', '/api/casino/rocket', null, u.session))[1]?.round?.id;
+        return round ? ['roket yakıtı', 'POST', '/api/casino/rocket/bet', { round, bet: pick([250, 500]), ...(random() < 0.5 && { auto: pick([1.2, 1.5, 2]) }), ref: rnd(8) }, u.session] : null;
+      }],
+      [3, async () => {
+        const [f] = await q("SELECT c.user_id, c.live_round FROM casino_rounds c JOIN rocket_rounds r ON r.id = c.live_round WHERE r.state = 'fly' AND c.cashed IS NULL ORDER BY random() LIMIT 1");
+        const u = f && people.find((x) => x.user.id === f.user_id);
+        return u ? ['roket kaçışı', 'POST', '/api/casino/rocket/escape', { round: Number(f.live_round) }, u.session] : null;
+      }],
       [4, async (u) => ['jeton noktası satışı', 'POST', '/api/jeton/transfer', { to: u.user.id, coins: pick([500, 1500]), paymentRef: 'HAVALE-1', ref: rnd(6) }, bank.session]],
       [4, async (u) => ['elmas bozdurma', 'POST', '/api/jeton/sell-diamonds', { bank: bank.user.id, diamonds: pick([500, 1000]), ref: rnd(6) }, u.session]],
       [3, async () => {
@@ -122,7 +134,9 @@ describe('Para: aynı anda rastgele işlemler', () => {
     await q("UPDATE lucky_bags SET closes_at = now() - interval '1 second' WHERE status = 'open'");
     await q("UPDATE bonds SET expires_at = now() - interval '1 second' WHERE status = 'pending'");
     for (let i = 0; i < 50; i++) {
-      const [w] = await q("SELECT (SELECT count(*) FROM lucky_bags WHERE status = 'open') + (SELECT count(*) FROM bonds WHERE status = 'pending') AS n");
+      const [w] = await q(
+        "SELECT (SELECT count(*) FROM lucky_bags WHERE status = 'open') + (SELECT count(*) FROM bonds WHERE status = 'pending') + (SELECT count(*) FROM rocket_rounds WHERE state IN ('fly', 'settling')) AS n",
+      );
       if (Number(w.n) === 0) break;
       await new Promise((r) => setTimeout(r, 100));
     }
