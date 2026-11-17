@@ -276,7 +276,7 @@ export default function MessagesScreen() {
               </Text>
             ) : undefined
           }
-          ListEmptyComponent={<Text style={styles.empty}>{'Henüz arkadaşın yok. Karşılıklı takipleştiğin kişiler burada görünür.'}</Text>}
+          ListEmptyComponent={<Text style={styles.empty}>{'Karşılıklı takipleştiğin kişiler burada görünür.'}</Text>}
           renderItem={({ item }) => <FriendRow friend={item} />}
         />
       )}

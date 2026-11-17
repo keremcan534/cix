@@ -60,6 +60,14 @@ export const PANEL_ROUTES = new Set([
   'POST /api/admin/levels/save',
   'POST /api/admin/levels/reset',
   'GET /api/admin/levels/drops',
+  // Seviye ve görev ödülleri (level-rewards.mjs, task-rewards.mjs): an item for a level of VIP, Cömertlik or Yankı, or
+  // for a task.
+  'GET /api/admin/level-rewards',
+  'POST /api/admin/level-rewards',
+  'POST /api/admin/level-rewards/delete',
+  'GET /api/admin/task-rewards',
+  'POST /api/admin/task-rewards',
+  'POST /api/admin/task-rewards/delete',
   // Mağaza (shop-items.mjs): frames and entry effects, the app's own and the admins' (uploads shopframe, giftvideo,
   // giftsource).
   'GET /api/admin/shop',
@@ -118,6 +126,7 @@ export const PANEL_ROUTES = new Set([
   'GET /api/admin/events',
   'POST /api/admin/events/review',
   'POST /api/admin/events/remove',
+  'POST /api/admin/events/reward',
   'GET /api/admin/events/categories',
   'POST /api/admin/events/categories',
   'POST /api/admin/events/categories/remove',

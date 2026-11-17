@@ -574,7 +574,7 @@ describe('Koltuk altındaki PK puanı her mikrofon düzeninde okunur', () => {
     const widths = new Set<number>([40, 44, 56, 60, 64, 80, 96]);
     for (const phone of [320, 360, 390, 412, 430])
       for (const l of ROOM_LAYOUTS) for (const pkRoom of [false, true]) widths.add(layoutPlan(l.layoutSchema, phone, pkRoom).micW);
-    for (const phone of [320, 360, 390, 412]) for (const mics of [4, 10, 15]) for (const h of [200, 300, 420]) widths.add(fitGrid(mics - 1, phone, h).slot);
+    for (const phone of [320, 360, 390, 412]) for (const mics of [4, 10, 15]) for (const h of [200, 300, 420]) widths.add(fitGrid(mics, phone, h).slot);
     for (const width of widths)
       for (const scale of [1, 1.15]) {
         const box = pkPillBox(width, scale);

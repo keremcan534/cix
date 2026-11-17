@@ -1,5 +1,6 @@
-// The small mark on a room staff member's avatar, one look per role so they read apart at a glance: the owner's
-// crown, a Süper Yönetici's star, a Yönetici's shield and a DJ's headphones. Used on the mics and in the member list.
+// The small mark of a room staff member, one look per role so they read apart at a glance: the owner's crown, a
+// Süper Yönetici's star, a Yönetici's shield and a DJ's headphones. On the avatar in the member list (RoleMark); on
+// the mics before the name (RoleIcon), so it never covers the photo or its frame whatever the seat's size.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
@@ -26,6 +27,18 @@ export function RoleMark({ mark, edge = '#24232B', style }: { mark: StaffMark | 
   );
 }
 
+/** The mark in a line of text, `size` px (a mic's name: the name's size and a little more). */
+export function RoleIcon({ mark, size = 14 }: { mark: StaffMark | null | undefined; size?: number }) {
+  if (!mark) return null;
+  const m = STAFF_MARK[mark];
+  return (
+    <View style={[styles.inline, m.icon ? { width: size, height: size, borderRadius: size / 2, backgroundColor: m.bg } : null]} accessibilityLabel={m.label}>
+      {m.icon ? <Ionicons name={m.icon} size={Math.round(size * 0.66)} color={m.fg} /> : <Icon3D name="crown" size={size} />}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   mark: { position: 'absolute', left: -3, bottom: -3, borderRadius: 10, padding: 3, borderWidth: 1.5 },
+  inline: { alignItems: 'center', justifyContent: 'center' },
 });

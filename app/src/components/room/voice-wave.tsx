@@ -1,14 +1,18 @@
 // Ses dalgası: the ring around a speaker's seat, which grows and glows with their voice (lib/live/voice-level). With no
 // wave worn it is the plain ring in the speaker's gender color (parts VOICE_RING). The paid ones (the shop's 'wave'
-// slot, server/api/catalog.mjs; data/catalog.ts COSMETICS) are drawn here in code and follow the same voice level.
+// slot, server/api/catalog.mjs; data/catalog.ts COSMETICS) are drawn here in code and follow the same voice level: the
+// app's own four, and the ones the team adds in Yönetim › Mağaza (data/catalog remote.wave: one of the same styles in
+// its own colours, the sparkle style's sparks maybe a picture). Each app's wave is one of those styles too (OWN_LOOKS).
 // Every wave is drawn the same way and the same size (lib/seat-cell ringOf): behind the face and its frame, just
 // outside the face (never on the photo), and the voice takes it at most `reach` px further out. So a speaker's ring
 // looks the same on their own phone and on everyone else's whatever frame they wear, and never runs over the next seat.
 import { useEffect, useState } from 'react';
-import { Animated, Easing, StyleSheet, View, type ViewStyle } from 'react-native';
+import { Animated, Easing, Image, StyleSheet, View, type ViewStyle } from 'react-native';
 
 import { Photo } from '@/components/photo';
+import { cosmeticById } from '@/data/catalog';
 import { ringOf } from '@/lib/seat-cell';
+import type { WaveLook } from '@/lib/shop-live-core';
 import { semantic } from '@/theme';
 
 /** The speaking ring's color: pink for women, blue for men, white when the gender isn't known or is hidden. */
@@ -36,6 +40,18 @@ const FLAME = ['#FF8A3D', '#FF3B30'] as const;
 const GOLD = '#F6BD60';
 // No purple: red, yellow, turquoise and blue round the ring.
 const RAINBOW = ['#FF3B30', '#FFD60A', '#13D9DF', '#3D9BFF'] as const;
+/** The app's own waves as styles: Parıltı is the speaker's own ring with white sparks. */
+const OWN_LOOKS: Record<WaveId, (voice: string) => WaveLook> = {
+  'wv-sparkle': (voice) => ({ style: 'sparkle', colors: [voice, '#FFFFFF'] }),
+  'wv-flame': () => ({ style: 'double', colors: FLAME }),
+  'wv-rainbow': () => ({ style: 'spin', colors: RAINBOW }),
+  'wv-gold': () => ({ style: 'ripple', colors: [GOLD] }),
+};
+/** How the worn wave is drawn: the app's own, or the team's (taken off the shelf too); null is the plain ring. */
+export function waveLookOf(wave: string | null | undefined, voice: string): WaveLook | null {
+  if (isWave(wave)) return OWN_LOOKS[wave](voice);
+  return (wave ? cosmeticById(wave)?.remote?.wave : undefined) ?? null;
+}
 
 const glow = (c: string, r: number) => `0 0 ${r}px ${c}CC`;
 
@@ -55,13 +71,15 @@ type Props = {
 };
 
 export function VoiceWave({ wave, size, color, level, still, reach = Math.round(size / 7) }: Props) {
-  const kind = isWave(wave) ? wave : null;
-  // One clock for the styles that move on their own (the sparks' orbit, the rainbow's turn, the gold ripple).
+  const look = waveLookOf(wave, color);
+  const kind = look?.style ?? null;
+  const c = look?.colors ?? [color];
+  // One clock for the styles that move on their own (the sparks' orbit, the turning colours, the ripple).
   const [clock] = useState(() => new Animated.Value(0));
-  const moving = !still && kind !== null && kind !== 'wv-flame';
+  const moving = !still && (kind === 'sparkle' || kind === 'spin' || kind === 'ripple');
   useEffect(() => {
     if (!moving) return;
-    const ms = kind === 'wv-gold' ? 1_300 : kind === 'wv-rainbow' ? 3_200 : 2_600;
+    const ms = kind === 'ripple' ? 1_300 : kind === 'spin' ? 3_200 : 2_600;
     const loop = Animated.loop(Animated.timing(clock, { toValue: 1, duration: ms, easing: Easing.linear, useNativeDriver: true }));
     loop.start();
     return () => {
@@ -80,61 +98,74 @@ export function VoiceWave({ wave, size, color, level, still, reach = Math.round(
   const ring = (c: string, width = w): ViewStyle => ({ ...box, borderWidth: width, borderColor: c, boxShadow: glow(c, blur) });
   const spin = clock.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
 
-  if (kind === 'wv-rainbow')
+  if (kind === 'spin') {
+    // A ring turning in its colours (Gökkuşağı: four), round its four sides: a ring, not a disc, so none of it shows on
+    // the photo or inside a frame.
+    const side = (i: number) => c[i % c.length];
     return (
-      // A turning ring in four colors: a ring, not a disc, so none of it shows on the photo or inside a frame.
       <Animated.View
         pointerEvents="none"
         style={[
           box,
-          { borderWidth: w, borderTopColor: RAINBOW[0], borderRightColor: RAINBOW[1], borderBottomColor: RAINBOW[2], borderLeftColor: RAINBOW[3], boxShadow: glow(RAINBOW[1], blur) },
+          { borderWidth: w, borderTopColor: side(0), borderRightColor: side(1), borderBottomColor: side(2), borderLeftColor: side(3), boxShadow: glow(side(1), blur) },
           { opacity: fade, transform: [{ scale: grow }, { rotate: spin }] },
         ]}
       />
     );
+  }
 
-  if (kind === 'wv-flame') {
-    // The orange ring on the face and a red one that the voice takes further out; both stay inside the reach.
+  if (kind === 'double') {
+    // The first colour's ring on the face and the second's that the voice takes further out (Alev: orange and red); both
+    // stay inside the reach.
     const half = 1 + (max - 1) / 2;
     const inner = still ? 1 : at(1, half);
     const outer = still ? half : at(1 + (max - 1) * 0.35, max);
     const outerFade = still ? 0.6 : at(0.25, 0.9);
     return (
       <>
-        <Animated.View pointerEvents="none" style={[ring(FLAME[1], Math.max(1.5, w - 1)), { opacity: outerFade, transform: [{ scale: outer }] }]} />
-        <Animated.View pointerEvents="none" style={[ring(FLAME[0]), { opacity: fade, transform: [{ scale: inner }] }]} />
+        <Animated.View pointerEvents="none" style={[ring(c[1] ?? c[0], Math.max(1.5, w - 1)), { opacity: outerFade, transform: [{ scale: outer }] }]} />
+        <Animated.View pointerEvents="none" style={[ring(c[0]), { opacity: fade, transform: [{ scale: inner }] }]} />
       </>
     );
   }
 
-  if (kind === 'wv-gold')
+  if (kind === 'ripple')
     return (
       <>
         {!still && (
-          // A ripple that leaves the ring and fades out by the edge of the reach, again and again.
+          // A ripple that leaves the ring and fades out by the edge of the reach, again and again (Altın Halka).
           <Animated.View
             pointerEvents="none"
             style={[
-              ring(GOLD, 1.5),
+              ring(c[0], 1.5),
               { opacity: clock.interpolate({ inputRange: [0, 1], outputRange: [0.85, 0] }), transform: [{ scale: clock.interpolate({ inputRange: [0, 1], outputRange: [1, max] }) }] },
             ]}
           />
         )}
-        <Animated.View pointerEvents="none" style={[ring(GOLD, w + 1), { opacity: fade, transform: [{ scale: grow }] }]} />
+        <Animated.View pointerEvents="none" style={[ring(c[0], w + 1), { opacity: fade, transform: [{ scale: grow }] }]} />
       </>
     );
 
-  const plain = <Animated.View pointerEvents="none" style={[ring(color), { opacity: fade, transform: [{ scale: grow }] }]} />;
-  if (kind !== 'wv-sparkle') return plain;
-  // Parıltı: the plain ring with four white sparks turning on it.
+  // The plain ring: the speaker's colour with no wave, the wave's own colour for the ring style and the sparkle's ring.
+  const plain = <Animated.View pointerEvents="none" style={[ring(c[0]), { opacity: fade, transform: [{ scale: grow }] }]} />;
+  if (kind !== 'sparkle') return plain;
+  // Parıltı: the ring with four sparks turning on it, in the second colour (the app's: white) or the team's picture.
   const dot = Math.max(3, Math.round(size / 12));
+  const tint = c[1] ?? '#FFFFFF';
+  const pic = look?.art?.url;
+  const shape = Math.max(8, Math.round(size / 6));
   return (
     <>
       {plain}
       <Animated.View pointerEvents="none" style={[box, { transform: [{ scale: grow }, { rotate: spin }] }]}>
         {[0, 90, 180, 270].map((deg) => (
           <View key={deg} style={[StyleSheet.absoluteFill, { alignItems: 'center', transform: [{ rotate: `${deg}deg` }] }]}>
-            <View style={{ width: dot, height: dot, borderRadius: dot / 2, backgroundColor: '#FFFFFF', boxShadow: glow('#FFFFFF', 6) }} />
+            {pic ? (
+              // The picture sits on the ring, centred on it as the dot is.
+              <Image source={{ uri: pic }} resizeMode="contain" style={{ width: shape, height: shape, marginTop: (dot - shape) / 2 }} />
+            ) : (
+              <View style={{ width: dot, height: dot, borderRadius: dot / 2, backgroundColor: tint, boxShadow: glow(tint, 6) }} />
+            )}
           </View>
         ))}
       </Animated.View>

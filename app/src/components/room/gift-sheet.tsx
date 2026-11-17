@@ -251,28 +251,28 @@ export function GiftSheet({
   const topOdds = isLucky ? (lg.tiers.find((t) => t.mult === top)?.weight ?? 0) : 0;
   // Footer state: exactly one message and one primary action at a time.
   const footer = !targets.length
-    ? { tone: 'info' as const, text: roomIds.length ? 'Hediyeyi kime göndereceğini yukarıdan seç.' : 'Odada hediye gönderebileceğin kimse yok.', cta: 'Önce alıcı seç', disabled: true }
+    ? { tone: 'info' as const, text: roomIds.length ? 'Yukarıdan alıcı seç.' : 'Odada hediye gönderebileceğin kimse yok.', cta: 'Önce alıcı seç', disabled: true }
     : !onShelf
-      ? { tone: 'info' as const, text: shelf === 'lucky' ? 'Şu an gönderilebilecek Şanslı hediye yok.' : 'Bu rafta gönderilecek hediye yok. Başka bir raftan seç.', cta: 'Önce hediye seç', disabled: true }
+      ? { tone: 'info' as const, text: shelf === 'lucky' ? 'Şu an gönderilebilecek Şanslı hediye yok.' : 'Bu rafta hediye yok.', cta: 'Önce hediye seç', disabled: true }
     : isLucky
       ? luckyBlock
         ? { tone: 'lock' as const, text: luckyBlock, cta: 'Şu an gönderilemez', disabled: true }
         : total > coins
-          ? { tone: 'warn' as const, text: `Bakiyen ${fmt(coins)} jeton. Bu gönderim için ${fmt(total - coins)} jeton eksik.`, cta: 'Jeton yükle', variant: 'money' as const }
+          ? { tone: 'warn' as const, text: `${fmt(total - coins)} jeton eksik.`, cta: 'Jeton yükle', variant: 'money' as const }
           : overLimit
             ? { tone: 'lock' as const, text: overLimit, cta: 'Günlük limiti aşıyor', disabled: true }
-          : { tone: 'info' as const, text: `${count * targets.length > 1 ? `Her hediye için ayrı çekiliş yapılır. ` : ''}En yüksek ödül ×${fmt(top)} = ${fmt(lg.price * top)} jeton (olasılık ${oddsLabel(topOdds)}). Ödül garanti değildir. Sonra sağ alttaki çarka basarak aynı gönderimi tekrarlayabilirsin.`, cta: `Gönder · ${fmt(total)}`, variant: 'money' as const }
+          : { tone: 'info' as const, text: `${count * targets.length > 1 ? `Her hediye için ayrı çekiliş yapılır. ` : ''}En yüksek ödül ×${fmt(top)} = ${fmt(lg.price * top)} jeton (olasılık ${oddsLabel(topOdds)}). Ödül garanti değildir.`, cta: `Gönder · ${fmt(total)}`, variant: 'money' as const }
     : locked
-      ? { tone: 'lock' as const, text: `${gift.name}, VIP ${gift.minSvip} ve üzerine özel. Senin seviyen: VIP ${svipLevel}.`, cta: 'VIP ayrıcalıklarını gör', variant: 'tonal' as const, onPress: goVip }
+      ? { tone: 'lock' as const, text: `VIP ${gift.minSvip} ve üzerine özel (sen VIP ${svipLevel}).`, cta: 'VIP ayrıcalıklarını gör', variant: 'tonal' as const, onPress: goVip }
       : bagShort
-        ? { tone: 'warn' as const, text: `Çantanda ${bag[gift.id] ?? 0} adet var, bu gönderim için ${bagNeed} adet gerekiyor.`, cta: 'Adedi azalt', variant: 'tonal' as const, onPress: () => setCountOpen(true) }
+        ? { tone: 'warn' as const, text: `Çantanda ${bag[gift.id] ?? 0} adet var, ${bagNeed} gerekli.`, cta: 'Adedi azalt', variant: 'tonal' as const, onPress: () => setCountOpen(true) }
         : fromBag
           ? { tone: 'info' as const, text: `${sourceOf(gift.id)} · jeton harcanmaz.`, cta: 'Ücretsiz gönder', variant: 'hero' as const }
           : short > 0
-            ? { tone: 'warn' as const, text: `Bakiyen ${fmt(coins)} jeton. Bu gönderim için ${fmt(short)} jeton eksik.`, cta: 'Jeton yükle', variant: 'money' as const }
+            ? { tone: 'warn' as const, text: `${fmt(short)} jeton eksik.`, cta: 'Jeton yükle', variant: 'money' as const }
             : overLimit
               ? { tone: 'lock' as const, text: overLimit, cta: 'Günlük limiti aşıyor', disabled: true }
-            : { tone: 'info' as const, text: `Gönderimden sonra kalan bakiye: ${fmt(coins - total)} jeton`, cta: `Gönder · ${fmt(total)}`, variant: 'money' as const };
+            : { tone: 'info' as const, text: `Kalan: ${fmt(coins - total)} jeton`, cta: `Gönder · ${fmt(total)}`, variant: 'money' as const };
 
   const sortBtn =
     shelf !== 'fav' && shelf !== 'bag' && shelf !== 'lucky' ? (

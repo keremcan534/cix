@@ -219,7 +219,8 @@ const useStyles = makeStyles(({ colors, semantic }) => ({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, minHeight: 52 },
   wealthBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 20, paddingLeft: 2, paddingRight: 8, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)' },
   wealthDot: { width: 15, height: 15, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.85)', alignItems: 'center', justifyContent: 'center' },
-  wealthNum: { fontSize: 12, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  // No font padding (Android): it sat the level low in the round chip, beside the centred dot.
+  wealthNum: { fontSize: 12, fontWeight: '900', fontVariant: ['tabular-nums'], includeFontPadding: false, textAlignVertical: 'center' },
   levelChip: { borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
   levelChipText: { fontSize: 12, fontWeight: '800' },
   textLink: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start' },

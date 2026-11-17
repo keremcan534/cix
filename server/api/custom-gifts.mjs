@@ -300,29 +300,35 @@ class FileError extends Error {
   }
 }
 
-/** A PNG's or WebP's size and whether it can be transparent, from its first bytes; null for anything else. */
+/**
+ * A PNG's or WebP's size, whether it can be transparent and whether it moves (an animated WebP, an APNG), from its
+ * first bytes; null for anything else.
+ */
 export function imageInfo(b) {
   if (b.length >= 33 && b.readUInt32BE(0) === 0x89504e47 && b.readUInt32BE(4) === 0x0d0a1a0a && b.toString('latin1', 12, 16) === 'IHDR') {
     const type = b[25];
-    // Grey + alpha, RGBA, or a palette / colour key with a tRNS chunk before the pixels.
+    // Grey + alpha, RGBA, or a palette / colour key with a tRNS chunk before the pixels; an APNG's acTL comes before
+    // them too.
     let alpha = type === 4 || type === 6;
-    for (let p = 8; !alpha && p + 8 <= b.length; ) {
+    let animated = false;
+    for (let p = 8; p + 8 <= b.length; ) {
       const len = b.readUInt32BE(p);
       const name = b.toString('latin1', p + 4, p + 8);
       if (name === 'tRNS') alpha = true;
+      if (name === 'acTL') animated = true;
       if (name === 'IDAT' || name === 'IEND') break;
       p += 12 + len;
     }
-    return { type: 'png', width: b.readUInt32BE(16), height: b.readUInt32BE(20), alpha };
+    return { type: 'png', width: b.readUInt32BE(16), height: b.readUInt32BE(20), alpha, animated };
   }
   if (b.length >= 30 && b.toString('latin1', 0, 4) === 'RIFF' && b.toString('latin1', 8, 12) === 'WEBP') {
     const chunk = b.toString('latin1', 12, 16);
-    if (chunk === 'VP8X') return { type: 'webp', width: 1 + b.readUIntLE(24, 3), height: 1 + b.readUIntLE(27, 3), alpha: (b[20] & 0x10) !== 0 };
+    if (chunk === 'VP8X') return { type: 'webp', width: 1 + b.readUIntLE(24, 3), height: 1 + b.readUIntLE(27, 3), alpha: (b[20] & 0x10) !== 0, animated: (b[20] & 0x02) !== 0 };
     if (chunk === 'VP8L' && b[20] === 0x2f) {
       const bits = b.readUInt32LE(21);
-      return { type: 'webp', width: 1 + (bits & 0x3fff), height: 1 + ((bits >>> 14) & 0x3fff), alpha: ((bits >>> 28) & 1) === 1 };
+      return { type: 'webp', width: 1 + (bits & 0x3fff), height: 1 + ((bits >>> 14) & 0x3fff), alpha: ((bits >>> 28) & 1) === 1, animated: false };
     }
-    if (chunk === 'VP8 ' && b.readUIntBE(23, 3) === 0x9d012a) return { type: 'webp', width: b.readUInt16LE(26) & 0x3fff, height: b.readUInt16LE(28) & 0x3fff, alpha: false };
+    if (chunk === 'VP8 ' && b.readUIntBE(23, 3) === 0x9d012a) return { type: 'webp', width: b.readUInt16LE(26) & 0x3fff, height: b.readUInt16LE(28) & 0x3fff, alpha: false, animated: false };
   }
   return null;
 }

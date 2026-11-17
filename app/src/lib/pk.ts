@@ -786,7 +786,8 @@ export type PkPillBox = {
  */
 export function pkPillBox(slot: number, scale = 1): PkPillBox {
   const width = Math.max(30, Math.min(72, Math.floor(slot) - 4));
-  const size = width >= 60 ? 11 : width >= 46 ? 10 : 9;
+  // Never smaller than 10 px, however narrow the seat: a narrow pill takes fewer characters instead (1.2m, 169k).
+  const size = width >= 60 ? 11 : 10;
   const pad = size === 11 ? 5 : 3;
   const per = CHAR_EM * size * Math.max(1, scale);
   const inner = width - 2 - 2 * pad;

@@ -8,8 +8,16 @@ import { Animated, Easing, View, type ImageSourcePropType } from 'react-native';
 import { cosmeticById } from '@/data/catalog';
 import { FRAME_ART_SIZES, type FrameArtSize } from '@/data/frame-art';
 import { ART_BREATHE, artFit, seatArt, type SeatRoom } from '@/lib/seat-cell';
+import { useSettings } from '@/store';
 
-type Art = FrameArtSize & { src: ImageSourcePropType; glow: string };
+/**
+ * `motion`: the team's moving frame (an animated WebP, Yönetim › Mağaza) played instead of the still `src`; `at`: where
+ * the hole's centre is in the picture when it isn't the middle (a ring under a crown is higher), so the picture is
+ * moved to put the hole on the photo.
+ */
+type Art = FrameArtSize & { src: ImageSourcePropType; glow: string; motion?: ImageSourcePropType; at?: { x: number; y: number } };
+/** The smallest photo a moving frame plays round: in a list's small rows the still one is drawn. */
+const MOVING_MIN = 48;
 const made = (id: string, src: ImageSourcePropType, glow: string): Art => ({ ...FRAME_ART_SIZES[id], src, glow });
 const ART: Record<string, Art> = {
   'fr-silver': made('fr-silver', require('../../../assets/frames/fr-silver.png'), '#CBD5E1'),
@@ -21,17 +29,28 @@ const ART: Record<string, Art> = {
   'fr-wing-coral': made('fr-wing-coral', require('../../../assets/frames/fr-wing-coral.png'), '#FF6576'),
   'fr-wing-sky': made('fr-wing-sky', require('../../../assets/frames/fr-wing-sky.png'), '#13D9DF'),
 };
-/** The team's own frames (Yönetim › Mağaza, data/catalog `remote.art`), made once per picture: the whole picture is reach. */
+/**
+ * The team's own frames (Yönetim › Mağaza, data/catalog `remote.art`), made once per picture: the whole picture is
+ * reach, from the hole's centre; a moving one has its animated WebP too.
+ */
 const remote = new Map<string, Art>();
 export const frameArtOf = (id?: string): Art | undefined => {
   if (!id) return undefined;
   if (ART[id]) return ART[id];
   const r = cosmeticById(id)?.remote?.art;
   if (!r) return undefined;
-  const key = `${r.url}|${r.hole}`;
+  const at = r.at ?? { x: 0.5, y: 0.5 };
+  const key = `${r.url}|${r.hole}|${at.x},${at.y}|${r.motion?.url ?? ''}`;
   let art = remote.get(key);
   if (!art) {
-    art = { hole: r.hole, reach: { x: 0.5, top: 0.5, bottom: 0.5 }, src: { uri: r.url }, glow: '#F6BD60' };
+    art = {
+      hole: r.hole,
+      reach: { x: Math.max(at.x, 1 - at.x), top: at.y, bottom: 1 - at.y },
+      src: { uri: r.url },
+      glow: '#F6BD60',
+      ...(r.at ? { at: r.at } : {}),
+      ...(r.motion ? { motion: { uri: r.motion.url } } : {}),
+    };
     remote.set(key, art);
   }
   return art;
@@ -46,6 +65,10 @@ export const frameArtOf = (id?: string): Art | undefined => {
  */
 export function ArtFrame({ art, size, still, maxScale = 1.8, room, children }: { art: Art; size: number; still?: boolean; maxScale?: number; room?: SeatRoom; children: ReactNode }) {
   const [t] = useState(() => new Animated.Value(0));
+  // A moving frame plays its own animation instead of breathing; "hareketi azalt", "Düşük veri modu" (its file isn't
+  // fetched) and a small photo draw the still picture, as an older app does.
+  const { lowData } = useSettings();
+  const moving = !!art.motion && !still && !lowData && size >= MOVING_MIN;
   useEffect(() => {
     if (still) return;
     const loop = Animated.loop(
@@ -65,16 +88,17 @@ export function ArtFrame({ art, size, still, maxScale = 1.8, room, children }: {
   const inset = (size - avatar) / 2;
   const picture = (
     <Animated.Image
-      source={art.src}
+      source={moving ? art.motion! : art.src}
       resizeMode="contain"
       pointerEvents="none"
       style={{
         position: 'absolute',
         width: frame,
         height: frame,
-        left: (size - frame) / 2 - (seat?.clip ? seat.box.left : 0),
-        top: (size - frame) / 2 - (seat?.clip ? seat.box.top : 0),
-        transform: [{ scale: still ? 1 : t.interpolate({ inputRange: [0, 1], outputRange: [1, ART_BREATHE] }) }],
+        // The hole's centre on the photo's centre (the picture's middle unless `at` says otherwise).
+        left: size / 2 - (art.at?.x ?? 0.5) * frame - (seat?.clip ? seat.box.left : 0),
+        top: size / 2 - (art.at?.y ?? 0.5) * frame - (seat?.clip ? seat.box.top : 0),
+        transform: [{ scale: still || moving ? 1 : t.interpolate({ inputRange: [0, 1], outputRange: [1, ART_BREATHE] }) }],
       }}
     />
   );

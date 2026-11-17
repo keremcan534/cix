@@ -145,7 +145,7 @@ export default function RoomsScreen() {
       : mineTab === 'recent'
         ? 'Henüz bir odaya girmedin.'
         : mineTab === 'joined'
-          ? 'Üyesi olduğun ya da takip ettiğin oda yok. Bir odayı takip etmek için oda adının yanındaki kalbe dokun.'
+          ? 'Üye olduğun ya da takip ettiğin oda yok.'
           : 'Takip ettiğin kimse şu an oda açmamış.';
 
   const header = (
@@ -209,7 +209,7 @@ export default function RoomsScreen() {
                 // Live: my room as the server has it, or the way to open one (the create sheet at /oda/yeni).
                 <MyRoomCard
                   title={myLive?.title ?? 'Odanı aç'}
-                  announcement={myLive ? (myLive.announcement ?? '') : 'Ad, tür ve istersen şifre seç; odan hemen açılsın.'}
+                  announcement={myLive ? (myLive.announcement ?? '') : 'Hemen aç, arkadaşlarını çağır.'}
                   cover=""
                   locked={!!myLive && isLockedRoom(myLive.id)}
                   avatar={me.avatar}
@@ -239,6 +239,15 @@ export default function RoomsScreen() {
               <Text style={styles.errorTitle}>Bağlantı kurulamadı</Text>
               <Text style={styles.errorText}>Odalar şu an yüklenemedi. İnternetini kontrol edip tekrar dene.</Text>
               <Button title="Tekrar dene" icon="refresh" small variant="tonal" onPress={reloadServerRooms} />
+            </View>
+          ) : main === 'mine' && recRooms.length > 0 ? (
+            // Nothing of mine yet: a short line, then a few open rooms, so the page isn't left empty.
+            <View style={{ gap: 12 }}>
+              <Text style={[styles.empty, { paddingVertical: 12 }]}>{emptyText}</Text>
+              <Text style={styles.section}>Şu an popüler</Text>
+              {recRooms.slice(0, 4).map((r) => (
+                <RoomRow key={r.id} room={r} match={similarity(me, userById(r.hostId)).score} />
+              ))}
             </View>
           ) : (
             <Text style={styles.empty}>{emptyText}</Text>

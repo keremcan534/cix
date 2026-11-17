@@ -1,4 +1,5 @@
 // Catalogs for the prototype: cosmetics, emoji and sticker packs, room levels, music, support.
+import type { BubbleLook, Plate, WaveLook } from '@/lib/shop-live-core';
 
 // --- Cosmetics store ---------------------------------------------------------
 export type CosmeticKind = 'frame' | 'entry' | 'ride' | 'bubble' | 'specialId' | 'wave';
@@ -24,13 +25,18 @@ export type Cosmetic = {
   retired?: true;
   /**
    * An item the team added in Yönetim › Mağaza (lib/shop-live-core): its frame picture (`art`, the empty centre's
-   * radius as a share of its width), or its entry clip (`video`: in the catalog's fx as entry <id>) and the name plate
-   * the entering person's name is written on.
+   * radius as a share of its width), its entry clip (`video`: in the catalog's fx as entry <id>) and the name plate
+   * the entering person's name is written on, its chat bubble's look (`bubble`) or its voice wave's (`wave`).
    */
   remote?: {
-    art?: { url: string; hole: number };
+    /** A frame's still picture and hole (`at`: its centre when it isn't the middle), and its animated WebP (`motion`). */
+    art?: { url: string; hole: number; at?: { x: number; y: number }; motion?: { url: string } };
     video?: true;
-    plate?: { x: number; y: number; w: number; size: number; color: string; bold: boolean } | null;
+    plate?: Plate | null;
+    /** An entry effect's picture in the shop, above its banner. */
+    icon?: { url: string };
+    bubble?: BubbleLook;
+    wave?: WaveLook;
   };
 };
 

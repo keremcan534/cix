@@ -184,7 +184,7 @@ const toSheet = (c: live.LiveComment): MomentComment => ({ id: c.id, userId: toL
 function charmGate(p: live.Posting) {
   showAlert(
     `Yankı Lv.${p.needLevel} gerekli`,
-    `Anlar'da paylaşım Yankı Lv.${p.needLevel} ve üstü için. Yankı puanın: ${p.points.toLocaleString('tr-TR')} / ${p.need.toLocaleString('tr-TR')}. Hediye aldıkça Yankı'n yükselir. Bu sırada anları beğenip yorum yapabilirsin.`,
+    `Paylaşım Yankı Lv.${p.needLevel} ile açılır. Yankı puanın: ${p.points.toLocaleString('tr-TR')} / ${p.need.toLocaleString('tr-TR')}.`,
     [
       { text: 'Tamam', style: 'cancel' },
       { text: 'Yankı seviyem', onPress: () => router.push('/seviye?tab=charm') },
@@ -339,7 +339,7 @@ function LiveMoments() {
     ]);
 
   const block = (localId: string, name: string) =>
-    showAlert(`${name} engellensin mi?`, 'Anlarını ve yorumlarını görmezsin, sana mesaj gönderemez. Engeli istediğin zaman kaldırabilirsin.', [
+    showAlert(`${name} engellensin mi?`, 'Anlarını görmezsin, sana yazamaz.', [
       { text: 'Vazgeç', style: 'cancel' },
       { text: 'Engelle', style: 'destructive', onPress: () => toggleBlock(localId) },
     ]);

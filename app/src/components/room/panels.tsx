@@ -331,7 +331,7 @@ export function DiceModal({ visible, onClose, onPlay, playsLeft }: { visible: bo
 export function RequestsModal({ visible, onClose, requests, onAccept, onReject, freeSeats }: { visible: boolean; onClose: () => void; requests: string[]; onAccept: (id: string) => void; onReject: (id: string) => void; freeSeats: number }) {
   return (
     <Sheet visible={visible} onClose={onClose} title={`Konuşmacı kuyruğu (${requests.length})`} art={artSource('oda-konusmaci-kuyrugu-el-kaldir')}>
-      <Text style={styles.dim}>Sıra geliş sırasına göre. Boş mikrofon: {freeSeats}. Mikrofon doluysa kabul edilen kişi bekleme listesinde kalır.</Text>
+      <Text style={styles.dim}>Boş mikrofon: {freeSeats}</Text>
       {requests.length === 0 && <Text style={styles.dim}>Bekleyen istek yok.</Text>}
       {requests.map((id, i) => (
         <View key={id} style={styles.row}>

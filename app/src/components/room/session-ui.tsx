@@ -351,7 +351,7 @@ export function RecoveryCard({ roomId, title }: { roomId: string; title: string 
         <Text style={s.miniTitle} numberOfLines={1}>
           “{title}” odasındaydın
         </Text>
-        <Text style={s.recoveryText}>Uygulama kapandığı için ses bağlantısı sona erdi. Yeniden bağlanırsan mikrofonun kapalı başlar.</Text>
+        <Text style={s.recoveryText}>Bağlantı koptu. Dönersen mikrofonun kapalı başlar.</Text>
         <View style={{ flexDirection: 'row', gap: space.sm, marginTop: space.sm }}>
           <Pressable style={[s.smallBtn, { backgroundColor: semantic.action }]} onPress={() => router.push({ pathname: '/oda/[id]', params: { id: roomId } })} accessibilityRole="button">
             <Text style={[s.smallBtnText, { color: semantic.actionInk }]}>Yeniden bağlan</Text>
@@ -392,9 +392,9 @@ export function SessionBanner({ session }: { session: RoomSession }) {
   if (line && (session.status !== 'connecting' || offline || slowJoin)) {
     text = line.text;
     if (line.bad) tone = 'bad';
-  } else if (session.interruption === 'phone_call') text = 'Telefon görüşmesi sürüyor: oda sesi ve mikrofonun duraklatıldı.';
-  else if (session.interruption === 'focus_loss') text = 'Ses başka bir uygulamada; geri gelince oda sesi kaldığı yerden sürer.';
-  else if (block === 'permission') text = 'Mikrofon izni yok: dinlemeye devam ediyorsun. Konuşmak için telefon ayarlarından mikrofon izni ver.';
+  } else if (session.interruption === 'phone_call') text = 'Telefon görüşmesi: oda sesi duraklatıldı.';
+  else if (session.interruption === 'focus_loss') text = 'Ses başka bir uygulamada.';
+  else if (block === 'permission') text = 'Mikrofon izni yok; konuşmak için ayarlardan izin ver.';
   if (!text) return null;
   const canRetry = !!line?.retry;
   return (

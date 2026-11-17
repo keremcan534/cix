@@ -183,7 +183,9 @@ const useStyles = makeStyles(({ colors }) => ({
   chipMd: { height: 25, borderRadius: 13, paddingHorizontal: 9, paddingVertical: 0 },
   hiddenChip: { opacity: 0.6 },
   ageChip: { backgroundColor: colors.cardAlt },
-  chipText: { color: '#fff', fontSize: 12, fontWeight: '800' },
+  // Android puts the font's extra top space over the letters (includeFontPadding), which sat the age low in the short
+  // chip beside its symbol; without it the number is centred as on the web.
+  chipText: { color: '#fff', fontSize: 12, fontWeight: '800', includeFontPadding: false, textAlignVertical: 'center' },
   chipTextMd: { fontSize: 14 },
   ageChipText: { color: colors.text },
   pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },

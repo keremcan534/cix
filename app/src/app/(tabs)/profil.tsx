@@ -112,9 +112,9 @@ export default function ProfileScreen() {
       icon: 'checkmark-circle-outline',
       label: 'Kimlik Doğrulamam',
       dot: !me.verified,
-      onPress: () => showAlert(me.verified ? 'Gerçek kişi doğrulandı' : 'Doğrulama gerekli', me.verified ? 'Selfie doğrulaman tamamlandı. Para çekme ve davet ödülleri için gereklidir.' : 'Para çekmek ve davet ödülü almak için selfie ile gerçek kişi doğrulaması yap.'),
+      onPress: () => showAlert(me.verified ? 'Gerçek kişi doğrulandı' : 'Doğrulama gerekli', me.verified ? 'Selfie doğrulaman tamam.' : 'Para çekmek ve davet ödülü için selfie doğrulaması yap.'),
     },
-    { icon: 'bag-handle-outline', img: 'gift', label: 'Çantam', dot: inventory.size > 0, onPress: () => router.push('/magaza') },
+    { icon: 'bag-handle-outline', img: 'gift', label: 'Çantam', dot: inventory.size > 0, onPress: () => router.push('/canta') },
     // Etkinlik Merkezi on Odamın Etkinlikleri: my places, the ones that passed, my rooms' events.
     { icon: 'calendar-outline', label: 'Etkinliklerim', onPress: () => openEvents({ tab: 'mine' }) },
     { icon: 'ribbon-outline', img: 'crown', label: 'Cömertlik ve Yankı', onPress: () => router.push('/seviye') },
@@ -221,7 +221,7 @@ export default function ProfileScreen() {
                 {ownRoom ? ownRoom.title || 'Odam' : 'Odanı aç'}
               </Text>
               <Text style={{ color: colors.textDim, fontSize: 12 }} numberOfLines={1}>
-                {ownRoom ? `Odam · ID ${roomCode(ownRoom.id)} · ${ownRoom.listeners.toLocaleString('tr-TR')} kişi içeride` : 'Ad, tür ve istersen şifre seç; odan hemen açılsın.'}
+                {ownRoom ? `Odam · ID ${roomCode(ownRoom.id)} · ${ownRoom.listeners.toLocaleString('tr-TR')} kişi içeride` : 'Hemen aç, arkadaşlarını çağır.'}
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.textDim} />

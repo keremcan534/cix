@@ -17,6 +17,7 @@ import { claimLiveCallTask, useLiveCallTask } from '@/lib/live/call-log';
 import { useRewards } from '@/lib/live/rewards';
 import { inviteBannerText } from '@/lib/invite-view';
 import { showAlert } from '@/lib/alert';
+import { taskItemNames } from '@/lib/bag-core';
 import { useApp } from '@/store';
 import { fonts, makeStyles, useTheme } from '@/theme';
 import { Icon3D, type Icon3DName } from '@/components/Icon3D';
@@ -139,6 +140,8 @@ export default function TaskCenter() {
             const progress = server ? Math.min(liveCallTask?.done ?? 0, goal) : Math.min(stats[t.key], t.goal);
             const complete = progress >= goal;
             const claimed = server ? !!liveCallTask?.claimed : claimedTasks.has(t.id);
+            // Live: the items the task also puts in Çantam (Görev ödülleri in the panel).
+            const items = server ? taskItemNames(liveCallTask?.items) : [];
             const claim = () => {
               if (!server) {
                 claimTask(t.id);
@@ -147,7 +150,8 @@ export default function TaskCenter() {
               void claimLiveCallTask()
                 .then((r) => {
                   const g = r.gift ? giftById(r.gift.giftId) : undefined;
-                  if (r.paid) setReward({ icon: 'tasks', title: `${t.title} tamamlandı${g && r.gift ? ` · çantana ${g.name} ×${r.gift.count}` : ''}`, amount: r.task.reward });
+                  const bag = [...(g && r.gift ? [`${g.name} ×${r.gift.count}`] : []), ...r.items];
+                  if (r.paid) setReward({ icon: 'tasks', title: `${t.title} tamamlandı${bag.length ? ` · çantana ${bag.join(', ')}` : ''}`, amount: r.task.reward });
                 })
                 .catch((e) => showAlert('Ödül alınamadı', message(e)));
             };
@@ -175,6 +179,12 @@ export default function TaskCenter() {
                           <GiftArt giftId={bagGift.id} emoji={bagGift.emoji} size={16} textStyle={{ fontSize: 13 }} />
                           <Text style={styles.taskReward}>×{bagSource.count}</Text>
                         </View>
+                      )}
+                      {server && items.length > 0 && (
+                        <Text style={styles.taskReward} numberOfLines={1} accessibilityLabel={`ve Çantam’a ${items.join(', ')}`}>
+                          {' '}
+                          + {items.join(', ')}
+                        </Text>
                       )}
                       <Text style={[styles.dim, { marginLeft: 'auto' }]}>
                         {progress}/{goal}

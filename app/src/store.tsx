@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { Appearance as SystemAppearance, useColorScheme } from 'react-native';
 
 import { agencyByCode, type AgencyRole } from '@/data/agency';
-import { FREE_PACK_IDS, cosmeticById, ROOM_THEMES, ROOM_TYPES, type CosmeticKind, type RoomTheme, type RoomType, type TicketCategory } from '@/data/catalog';
+import { COSMETIC_KINDS, FREE_PACK_IDS, cosmeticById, ROOM_THEMES, ROOM_TYPES, type CosmeticKind, type RoomTheme, type RoomType, type TicketCategory } from '@/data/catalog';
 import {
   CHECKIN_REWARDS,
   TASKS,
@@ -29,6 +29,7 @@ import { setHapticsEnabled } from '@/lib/haptics';
 import { setNoiseSuppression, setRawMic } from '@/lib/room-session';
 import { CONVERSATIONS, ME, isServerId, type Conversation, type EventShareCard, type RoomInviteCard, type User } from '@/data/mock';
 import { giftById, liveCatalog } from '@/lib/live/catalog-live';
+import { SHOP_LIST_KINDS } from '@/lib/shop-live-core';
 import { livePack } from '@/lib/live/emoji-live';
 import type { ServerEarnings, ServerUser } from '@/lib/api';
 import { block as serverBlock, follow } from '@/lib/api';
@@ -171,6 +172,11 @@ type AppState = {
   equipped: Partial<Record<CosmeticKind, string>>;
   buyCosmetic: (id: string) => string | null;
   equip: (id: string | null, kind: CosmeticKind) => void;
+  /**
+   * Live: items the server says I own (Çantam, lib/live/bag) that this phone didn't know yet (a reward, a staff gift,
+   * something bought on another phone) are added; what the phone has is kept.
+   */
+  takeServerItems: (items: { sku: string; kind: string }[]) => void;
   /** Bought sticker pack ids (persisted under the old name, so earlier purchases carry over). */
   emojiPacks: Set<string>;
   /** Owned, free, or opened by the user's VIP level. */
@@ -933,10 +939,11 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       if (inventory.has(id)) return 'Zaten sahipsin';
       if (item.minVip && vipLevel < item.minVip) return `Bu ürün VIP ${item.minVip} ve üzeri için`;
       const was = { equipped: equipped[item.kind] };
-      // A frame or entry effect of the server's shop: bought at the price and days shown (POST /api/shop/buy); the
-      // older apps' spend would refuse one the panel changed or added. A refusal takes it back and says why.
+      // A frame, entry effect, bubble or wave of the server's shop: bought at the price and days shown (POST
+      // /api/shop/buy); the older apps' spend would refuse one the panel changed or added. A refusal takes it back and
+      // says why.
       const mirror =
-        liveCatalog()?.shop && (item.kind === 'frame' || item.kind === 'entry')
+        liveCatalog()?.shop && (SHOP_LIST_KINDS as readonly string[]).includes(item.kind)
           ? () =>
               liveShopBuy(id, item.price, item.days ?? 0, (message) => {
                 setInventory((s) => {
@@ -952,6 +959,12 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       setInventory((s) => new Set(s).add(id));
       setEquipped((e) => ({ ...e, [item.kind]: id }));
       return null;
+    },
+    takeServerItems: (items) => {
+      // The kinds this list holds (sticker packs, mic effects and ranks have their own).
+      const kinds = new Set<string>(COSMETIC_KINDS.map((k) => k.kind));
+      const add = items.filter((x) => kinds.has(x.kind) && !inventory.has(x.sku)).map((x) => x.sku);
+      if (add.length) setInventory((s) => new Set([...s, ...add]));
     },
     equip: (id, kind) => {
       setEquipped((e) => ({ ...e, [kind]: id ?? undefined }));

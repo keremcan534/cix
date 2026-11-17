@@ -16,11 +16,12 @@ import { micHaptic, pressHaptic, tapHaptic } from '@/lib/haptics';
 import { SCRIM, colors, edge, fonts, semantic } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
 import { Art } from '@/components/Art';
-import { HOST_FRAME_SCALE, SEAT_ART, SEAT_COLOR_ART } from '@/components/RoomArt';
-import type { SeatColorId } from '@/data/seat-colors';
+import { HOST_FRAME_SCALE, SEAT_ART } from '@/components/RoomArt';
+import { seatColorOf, type SeatColorId } from '@/data/seat-colors';
+import { SeatPouf } from '@/components/room/seat-pouf';
 import { Gloss, Shine, useSpringPress } from '@/components/fx/surface';
 import { Photo } from '@/components/photo';
-import { RoleMark, type StaffMark } from '@/components/room/role-mark';
+import { RoleIcon, type StaffMark } from '@/components/room/role-mark';
 import { VOICE_RING, VoiceWave } from '@/components/room/voice-wave';
 import { BondBubble, BondChip, BondLink } from '@/components/room/room-bonds';
 import type { RoomBond } from '@/data/bonds';
@@ -32,6 +33,7 @@ import { levelsLive, voiceLevel } from '@/lib/live/voice-level';
 import { RollingNumber } from '@/components/fx/rolling-number';
 import { BounceBadge } from '@/components/fx/bounce-badge';
 import { AssetView } from '@/components/fx/anim-player';
+import { ShopBubble } from '@/components/fx/shop-bubble';
 import type { Asset } from '@/data/animations';
 
 export type ChatMsg = FeedMsg;
@@ -81,9 +83,9 @@ export function Seat({
   frameId?: string;
   speaking: boolean;
   muted: boolean;
-  /** The staff mark on the avatar (components/room/role-mark). */
+  /** The staff mark, before the name (components/room/role-mark RoleIcon), never on the photo. */
   staff?: StaffMark | null;
-  /** The room's color for its empty mics (data/seat-colors); none: turquoise. */
+  /** The room's color for its empty mics (data/seat-colors); none or unknown: the default (silver). */
   seatColor?: SeatColorId | null;
   locked?: boolean;
   /** Host seat sharing the top row (e.g. with the boss seat). */
@@ -149,11 +151,16 @@ export function Seat({
   // Small faces: a smaller icon and no badge by the name. The name grows a little with the face (lib/seat-fit, which
   // sizes the stage by the same numbers) and may be as wide as the seat's slot.
   const small = size < 46;
-  const name = { fontSize: nameSize(size), lineHeight: nameLine(size), maxWidth: slotWidth ? slotWidth - 6 : 64 };
-  // An empty or locked seat is its picture (a pending invite keeps the gold bubble); the host's own photo sits in the
-  // gold host frame unless they wear a VIP or shop frame.
-  const art = seatColor ? SEAT_COLOR_ART[seatColor] : SEAT_ART;
-  const seatArt = user ? undefined : locked ? art.locked : invitee ? undefined : art.empty;
+  // The host's crown and the staff mark sit before the name, the blue tick after it (only where the slot has room for
+  // it: five to a row it would leave the name three letters); the name gives them its room, so the line stays inside
+  // the seat's slot.
+  const mark = nameSize(size) + 2;
+  const tick = !!user?.verified && !small && (!slotWidth || slotWidth >= 84);
+  const marks = (host ? mark + 3 : 0) + (user && staff ? mark + 3 : 0) + (tick ? 14 : 0);
+  const name = { fontSize: nameSize(size), lineHeight: nameLine(size), maxWidth: Math.max(24, (slotWidth ? slotWidth - 6 : 64) - marks) };
+  // An empty or locked seat is the pouf in the room's seat color (a pending invite keeps the gold bubble); the host's
+  // own photo sits in the gold host frame unless they wear a VIP or shop frame.
+  const pouf = !user && (locked || !invitee);
   const hostFrame = host && !mini ? SEAT_ART.hostFrame : undefined;
   const frameSize = Math.round(size * HOST_FRAME_SCALE);
   const muteText = modMuted ? ', yönetim tarafından susturuldu' : muted ? ', mikrofonu kapalı' : '';
@@ -192,13 +199,13 @@ export function Seat({
                 />
               )}
             </>
-          ) : seatArt !== undefined ? (
+          ) : pouf ? (
             <View style={{ width: size, height: size }}>
-              <Image source={seatArt} style={{ width: size, height: size }} resizeMode="contain" accessibilityIgnoresInvertColors />
+              <SeatPouf color={seatColorOf(seatColor).color} locked={locked} size={size} />
               {!locked && (
-                // The "+" on the seat's dark front, under its gold band.
+                // The "+" on the seat's shaded front, under its gold band; its shadow keeps it seen on a light color.
                 <View pointerEvents="none" style={[StyleSheet.absoluteFill, { top: size * 0.36, alignItems: 'center', justifyContent: 'center' }]}>
-                  <Ionicons name="add" size={mini ? 12 : Math.round(Math.max(13, Math.min(24, size * 0.28)))} color="rgba(255,255,255,0.85)" />
+                  <Ionicons name="add" size={mini ? 12 : Math.round(Math.max(13, Math.min(24, size * 0.28)))} color="rgba(255,255,255,0.9)" style={styles.seatPlus} />
                 </View>
               )}
             </View>
@@ -222,19 +229,19 @@ export function Seat({
               <Ionicons name={modMuted ? 'mic-off' : 'mic-off-outline'} size={10} color="#fff" />
             </View>
           )}
-          {user && <RoleMark mark={staff} edge={colors.bg} style={{ left: -2, bottom: -2 }} />}
           {reaction && user && <SeatReaction key={reaction.key} emoji={reaction.emoji} art={reaction.art} pre={reaction.pre} badge={reaction.badge} badgeAt={reaction.badgeAt} ms={reaction.ms} size={size} still={still} />}
         </Animated.View>
         {mini ? (
-          // Küçült: only the mic's number (the host's crown), so the strip stays one short line per row.
-          <View style={styles.miniLabel}>{host ? <Icon3D name="crown" size={11} /> : <Text style={styles.miniNum}>{index + 1}</Text>}</View>
+          // Küçült: only the mic's number (the host's crown, a staff member's mark), so the strip stays one short line per row.
+          <View style={styles.miniLabel}>{host ? <Icon3D name="crown" size={11} /> : user && staff ? <RoleIcon mark={staff} size={11} /> : <Text style={styles.miniNum}>{index + 1}</Text>}</View>
         ) : (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-            {host && <Icon3D name="crown" size={14} />}
+            {host && <Icon3D name="crown" size={mark} />}
+            {user && <RoleIcon mark={staff} size={mark} />}
             <Text style={[styles.seatName, name, !user && { color: colors.textDim, fontWeight: '500' }]} numberOfLines={1}>
               {user ? user.name : invitee && !locked ? 'Davet' : `${index + 1}`}
             </Text>
-            {user?.verified && !small && <VerifiedBadge size={11} />}
+            {tick && <VerifiedBadge size={11} />}
           </View>
         )}
         {/* The points line is kept under every name, PK or not (lib/seat-fit PK_LINE): a PK starting moves nothing. */}
@@ -283,7 +290,8 @@ export function PkPoints({ value, still, width = 64 }: { value: number; still?: 
         ]}
       >
         {box.icon && <Icon3D name="gift" size={box.size} />}
-        <RollingNumber value={value} duration={500} format={(n) => pkPointsText(n, box.chars)} shrink={0.7} style={[styles.pkText, { fontSize: box.size, lineHeight: box.size + 2 }]} />
+        {/* The short form already fits the pill; the shrink is only a margin, so the number stays readable. */}
+        <RollingNumber value={value} duration={500} format={(n) => pkPointsText(n, box.chars)} shrink={0.9} style={[styles.pkText, { fontSize: box.size, lineHeight: box.size + 2 }]} />
       </Animated.View>
       {delta && !still && (
         <Animated.Text
@@ -500,6 +508,8 @@ export function ChatLine({
   }
   const u = userById(msg.userId!);
   const bubble = msg.userId === 'me' ? cosmeticById(bubbleId) : msg.userId && !msg.system && !msg.bot && bubbleOf ? cosmeticById(bubbleOf(msg.userId)) : undefined;
+  // One the team added (Yönetim › Mağaza): its colours or picture, and its text colour.
+  const shopLook = bubble?.remote?.bubble;
   const nameColor = msg.userId === 'me' ? colors.gold : '#FFC2DC';
   const stickers = stickersOf(msg.text);
   // Avatar, name above, text in its own bubble: who said what reads at a glance, like a group chat.
@@ -510,10 +520,14 @@ export function ChatLine({
       ))}
     </View>
   ) : (
-    <EmojiText text={messagePreview(msg.text)} style={styles.chatText} mentions={mentionNames} me={myName} />
+    <EmojiText text={messagePreview(msg.text)} style={shopLook ? [styles.chatText, { color: shopLook.text }] : styles.chatText} mentions={mentionNames} me={myName} />
   );
   const bubbleView = stickers ? (
     body
+  ) : shopLook ? (
+    <ShopBubble look={shopLook} style={styles.chatBubble}>
+      {body}
+    </ShopBubble>
   ) : bubble?.color ? (
     <LinearGradient colors={bubble.color} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.chatBubble}>
       {body}
@@ -739,6 +753,7 @@ const styles = StyleSheet.create({
   mutedBadge: { position: 'absolute', right: 0, bottom: 0, backgroundColor: colors.red, borderRadius: 10, padding: 3 },
   selfMutedBadge: { backgroundColor: '#475569' },
   invitedSeat: { borderColor: colors.gold, backgroundColor: 'rgba(246,189,96,0.12)' },
+  seatPlus: { textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   // The line under the name the PK pill goes on: the same height in every room, PK or not (lib/seat-fit PK_LINE).
   pkLine: { height: PK_LINE, marginTop: -4, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'flex-start' },
   pkWrap: { alignItems: 'center' },
