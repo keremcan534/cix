@@ -14,7 +14,11 @@ import { Avatar, Button, FramedAvatar, GradientButton, LevelChips, VerifiedBadge
 import { COSMETICS, FAN_LEVELS, cosmeticById, fanLevel, roomLevel, ROOM_LEVEL_ICONS } from '@/data/catalog';
 import { callPrice } from '@/data/economy';
 import { FOLLOWS_ME, INTERESTS, MOMENTS, ROOMS, userById, type Gift, type Moment, type Room, type User } from '@/data/mock';
-import { giftShelf, useLiveCatalog } from '@/lib/live/catalog-live';
+import { giftById, giftShelf, useLiveCatalog } from '@/lib/live/catalog-live';
+import { EMPTY_AREA, loadGuardArea, sendGuardCard } from '@/lib/live/guard';
+import { GUARD_CARD, guardPoints, type GuardArea } from '@/lib/guard-core';
+import { GiftWallBanner, GuardBadge, GuardBanner, RelationshipBanner } from '@/components/person-showcase';
+import { bondDays } from '@/data/bonds';
 import { privacyOf } from '@/data/privacy';
 import { countryArt } from '@/data/rooms-ui';
 import { COUNTRIES } from '@/data/social-ui';
@@ -79,12 +83,15 @@ const TABS: { id: Tab; label: string }[] = [
 type Sheet = 'none' | 'more' | 'report' | 'call' | 'gift';
 /** My Takip ettiklerim / Takipçilerim (friends are Mesajlar › Arkadaşlarım). */
 type OneWay = Exclude<TieSide, 'friends'>;
+// The clock read at render for day counts (react-hooks/purity allows a named helper).
+const nowMs = () => Date.now();
 const NO_SHOWCASE = showcaseView({ gifts: [], rides: [], entries: [], medals: [], titles: [] });
 const BAR_H = 52;
 const TAB_H = 48;
 
 export default function UserProfile() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  // `tab`: the part a wall link opens (the room's person card: Bağlar, Vitrin).
+  const { id, tab: tabParam } = useLocalSearchParams<{ id: string; tab?: string }>();
   const {
     me, following, toggleFollow, takeServerSocial, blocked, toggleBlock, createTicket, fanClubs, addFanPoints, myRoom, notify, updateMe, spendCoins, spendBlock, bump, settings, vipLevel, svipLevel, equipped, inventory, giftWall: wallOf, recordGift,
     coins, diamonds, wealthXp, charmXp, wealthLevel, charmLevel, vipDays, vipSubUntil, stats, logSafety, pendingAvatar, submitAvatar,
@@ -261,7 +268,7 @@ export default function UserProfile() {
     }
   };
 
-  const [tab, setTab] = useState<Tab>('profil');
+  const [tab, setTab] = useState<Tab>(() => TABS.find((t) => t.id === tabParam)?.id ?? 'profil');
   const [sheet, setSheet] = useState<Sheet>('none');
   // A live build: what the two of us are on the server (1v1): the heart between us, and (with calls in this build)
   // what a call costs and which are open. Read again after a gift.
@@ -275,12 +282,14 @@ export default function UserProfile() {
   const [list, setList] = useState<OneWay | null>(null);
   const [collapsed, setCollapsed] = useState(false);
 
-  // Live mode: the Vitrin as the server has it (gift wall, rides, entry effects, medals, titles), read when the tab
-  // opens and again after a gift; kept with the id it is for. 'failed': no answer (Tekrar dene).
+  // Live mode: the Vitrin as the server has it (gift wall, rides, entry effects, medals, titles), read when the profile
+  // opens (the Hediye Duvarı banner shows it), again when its tab opens and after a gift; kept with the id it is for.
+  // 'failed': no answer (Tekrar dene).
   const [showcase, setShowcase] = useState<{ id: string; view: ShowcaseView | 'failed' } | null>(null);
+  const vitrinOpen = tab === 'onur';
   const [showcaseTry, setShowcaseTry] = useState(0);
   useEffect(() => {
-    if (!serverId || tab !== 'onur') return;
+    if (!serverId) return;
     let alive = true;
     loadShowcase(serverId)
       .then((view) => alive && setShowcase({ id: serverId, view }))
@@ -289,7 +298,7 @@ export default function UserProfile() {
     return () => {
       alive = false;
     };
-  }, [serverId, tab, reloads, showcaseTry]);
+  }, [serverId, vitrinOpen, reloads, showcaseTry]);
   // Nobody on the server to read (a sample person, or me before sign-in): an empty Vitrin, never the demo's.
   const liveShowcase = !serverId ? NO_SHOWCASE : showcase && showcase.id === serverId ? showcase.view : null;
 
@@ -300,6 +309,54 @@ export default function UserProfile() {
   const giftTotal = giftWall.reduce((s, g) => s + g.count, 0);
   // Live mode: the catalog gifts they received, counted by the server (null until read).
   const giftCount = live ? (counts?.giftsReceived ?? null) : giftTotal;
+
+  // Live mode: the Koruma area (server/api/guards.mjs): their top guardian over their threshold, whom they guard
+  // most, and my own Koruma of them; kept with the id it is for. A sample person has none.
+  const [guardRead, setGuardRead] = useState<{ id: string; area: GuardArea } | null>(null);
+  useEffect(() => {
+    if (!serverId) return;
+    let alive = true;
+    loadGuardArea(id).then(
+      (area) => alive && setGuardRead({ id: serverId, area }),
+      () => {},
+    );
+    return () => {
+      alive = false;
+    };
+  }, [serverId, id, reloads]);
+  const guardArea = guardRead && guardRead.id === serverId ? guardRead.area : EMPTY_AREA;
+  const cardPrice = giftById(GUARD_CARD)?.price ?? null;
+  const sendCard = async () => {
+    try {
+      await sendGuardCard(id);
+      setReloads((n) => n + 1);
+      showAlert('Koruma başladı', `Artık ${user.name} kişisinin koruyucususun. Ona gönderdiğin her hediye koruma puanı getirir.`);
+    } catch (e) {
+      showAlert('Gönderilemedi', message(e));
+    }
+  };
+  // The Koruma banner: mine opens Benim Koruma; someone else's shows my Koruma of them or offers the card.
+  const openGuard = () => {
+    if (isMe) return router.push('/koruma');
+    if (!serverId) return showAlert('Koruma', 'Koruma canlı sunucuda çalışır.');
+    const rules = { text: 'Kurallar', onPress: () => router.push('/koruma/kurallar') };
+    const mine = guardArea.mine;
+    if (mine) return showAlert('Koruma', `${user.name} kişisini ${mine.days} gündür koruyorsun · ${guardPoints(mine.points)} puan. Ona gönderdiğin her hediye puan getirir.`, [rules, { text: 'Benim Koruma', onPress: () => router.push('/koruma') }, { text: 'Tamam', style: 'cancel' }]);
+    if (guardArea.off) return showAlert('Koruma kapalı', `${user.name} korumayı kapatmış: kimse yeni koruyucusu olamaz.`, [rules, { text: 'Tamam', style: 'cancel' }]);
+    if (isBlocked) return showAlert('Şu an yapılamıyor', `${user.name} kişisini engelledin.`);
+    showAlert('Koruma Kartı', `${user.name} kişisine Koruma Kartı gönder${cardPrice ? ` (${cardPrice.toLocaleString('tr-TR')} jeton)` : ''}: onun koruyucusu olursun, kartın jetonu ilk koruma puanın olur.`, [
+      rules,
+      { text: 'Vazgeç', style: 'cancel' },
+      { text: 'Gönder', onPress: () => void sendCard() },
+    ]);
+  };
+  // İlişki Duvarı: their top bond's partner and its days; Hediye Duvarı: the gifts they received most, and how many
+  // kinds (live: once the Vitrin is read).
+  const bondPartner = topBondShown ? userById(topBondShown.partnerId) : null;
+  const bondDaysNow = topBondShown ? bondDays(topBondShown.since, nowMs()) : 0;
+  const wallAll = live ? (liveShowcase && liveShowcase !== 'failed' ? liveShowcase.giftWall : null) : giftWall;
+  const wallTop = (wallAll ?? []).filter((g) => g.count > 0).sort((a, b) => b.count - a.count).slice(0, 3).map((g) => ({ giftId: g.id, emoji: g.emoji }));
+  const wallLit = wallAll ? wallAll.filter((g) => g.count > 0).length : null;
 
   const followPoints = () => {
     if (!club?.history.some((h) => h.text === 'Takip ettin')) addFanPoints(user.id, 10, 'Takip ettin');
@@ -550,12 +607,16 @@ export default function UserProfile() {
                   <Ionicons name="person" size={84} color="#F2B5D0" style={{ marginBottom: -12 }} />
                 </View>
               )}
-              {/* Live mode: the guardian (top fan-club supporter) isn't on the server yet. */}
-              {!live && (
+              {/* Live mode: their top Koruma guardian (server/api/guards.mjs); the demo keeps its sample supporter. */}
+              {!live ? (
                 <View style={styles.guardianOver}>
                   <Guardian guardian={guardian} />
                 </View>
-              )}
+              ) : guardArea.guardian ? (
+                <View style={styles.guardianOver}>
+                  <GuardBadge person={guardArea.guardian} onPress={() => router.push(`/kullanici/${guardArea.guardian!.id}`)} />
+                </View>
+              ) : null}
             </View>
           </View>
           {isMe && pendingAvatar && <Text style={styles.reviewNote}>⏳ Yeni fotoğraf incelemede · şimdilik yalnızca sen görüyorsun</Text>}
@@ -666,6 +727,13 @@ export default function UserProfile() {
               {presence.kind === 'room' && <Text style={styles.presenceGo}>Git</Text>}
             </Pressable>
           )}
+        </View>
+
+        {/* The designer's three walls (components/person-showcase): each opens its part. */}
+        <View style={styles.walls}>
+          <RelationshipBanner owner={user.avatar} partner={bondPartner && { uri: bondPartner.avatar, name: bondPartner.name }} days={bondDaysNow || null} onPress={() => setTab('iliski')} />
+          <GiftWallBanner top={wallTop} lit={wallLit} total={wallAll?.length ?? null} received={giftCount} onPress={() => setTab('onur')} />
+          <GuardBanner guardian={guardArea.guardian} ward={guardArea.ward} off={guardArea.off} onPress={openGuard} />
         </View>
 
         <View onLayout={(e) => setTabY(e.nativeEvent.layout.y)}>
@@ -1736,6 +1804,7 @@ const useStyles = makeStyles(({ colors, semantic, lift, ink, dark, edge }) => ({
   coverCard: { flex: 1, height: 108, borderRadius: 20, overflow: 'hidden', backgroundColor: glass.well, borderWidth: 1.5, borderColor: glass.rim, boxShadow: glass.shadow },
   coverEmpty: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'flex-end', backgroundColor: glass.well },
   guardianOver: { position: 'absolute', right: 0, top: -10 },
+  walls: { paddingHorizontal: 16, gap: 12, marginTop: 12, marginBottom: 4 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   namePill: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', maxWidth: '100%', backgroundColor: glass.fill, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 4, borderWidth: 1.5, borderColor: glass.rim, boxShadow: glass.shadow },
   name: { color: glass.ink, fontSize: 22, fontFamily: fonts.display, flexShrink: 1 },

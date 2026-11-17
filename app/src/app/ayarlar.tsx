@@ -353,6 +353,8 @@ export default function SettingsScreen() {
               />
             </>
           )}
+          {/* Koruma off and the threshold are kept on the server; they are set on Benim Koruma (app/koruma). */}
+          {live && <ListRow icon="shield-half-outline" title="Koruma" subtitle="Korumayı kapat ya da koruma alanı eşiğini ayarla." onPress={() => router.push({ pathname: '/koruma', params: { ayar: '1' } })} />}
           {stalePrivacy && (
             <ListRow
               icon="refresh-outline"

@@ -61,6 +61,7 @@ import { emojiRoutes, refreshEmoji, startEmoji, stopEmoji } from './emoji.mjs';
 import { refreshLevels, startLevels, stopLevels, topPoints } from './levels.mjs';
 import { levelRoutes, startLevelDecay, stopLevelDecay } from './levels-admin.mjs';
 import { refreshShopItems, sendShopFx, shopRoutes, startShopItems, stopShopItems } from './shop-items.mjs';
+import { guardRoutes, startGuardSweep, stopGuardSweep } from './guards.mjs';
 import { FX_PATH, sendFx } from './fx.mjs';
 import { jetonRoutes } from './jeton.mjs';
 import { liveRoutes } from './live.mjs';
@@ -310,6 +311,7 @@ const routes = {
   ...emojiRoutes,
   ...levelRoutes,
   ...shopRoutes,
+  ...guardRoutes,
   ...backpackRoutes,
   ...pkRoutes,
   ...crossPkRoutes,
@@ -507,6 +509,7 @@ function shutdown(signal) {
   stopEmoji();
   stopLevels();
   stopLevelDecay();
+  stopGuardSweep();
   stopShopItems();
   server.close();
   const started = Date.now();
@@ -544,4 +547,5 @@ startCustomGifts();
 startEmoji();
 startLevels();
 startLevelDecay();
+startGuardSweep();
 startShopItems();

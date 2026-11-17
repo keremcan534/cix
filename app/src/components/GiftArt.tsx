@@ -55,6 +55,7 @@ const ART: Record<string, Art> = {
   c1: { sm: require('../../assets/gifts/192/hediye-can-dostum.png'), lg: require('../../assets/gifts/512/hediye-can-dostum.png') },
   c2: { sm: require('../../assets/gifts/192/hediye-dilek-kavanozu.png'), lg: require('../../assets/gifts/512/hediye-dilek-kavanozu.png') },
   c3: { sm: require('../../assets/gifts/192/hediye-masal-kalesi.png'), lg: require('../../assets/gifts/512/hediye-masal-kalesi.png') },
+  koruma: { sm: require('../../assets/gifts/192/hediye-koruma-karti.png'), lg: require('../../assets/gifts/512/hediye-koruma-karti.png') },
   c4: { sm: require('../../assets/gifts/192/hediye-ask-mektubu.png'), lg: require('../../assets/gifts/512/hediye-ask-mektubu.png') },
   c5: { sm: require('../../assets/gifts/192/hediye-sevgi-tatlisi.png'), lg: require('../../assets/gifts/512/hediye-sevgi-tatlisi.png') },
   c6: { sm: require('../../assets/gifts/192/hediye-yildiz-faytonu.png'), lg: require('../../assets/gifts/512/hediye-yildiz-faytonu.png') },

@@ -143,3 +143,13 @@ Toplam 33 dosya.
 | 32 | `kartal-kanat.png` | Tek bir açık kartal kanadı (sol kanat): kahverengi-altın tüyler, omzu sağ üstte. | 2 kez kullanılır, çırpar |
 | 33 | `kartal-govde.png` | Kanatsız kartal gövdesi ve başı, önden: beyaz baş, altın gaga, kahverengi-altın göğüs. | süzülür |
 
+### Koruma Kartı (`koruma`)
+
+Pahalı bir hediye değil ama koruma başlatır (`docs/KORUMA.md`): gönderilince odada gösteriyle oynar. Bugün kendi 512 px resmiyle oynuyor (kodla çizildi); parçalar gelirse daha canlı olur.
+
+| # | Dosya | Çizilecek | Hareket |
+| --- | --- | --- | --- |
+| 34 | `koruma-karti-hale.png` | Pembe-altın ışık halkası: ince parlak çember ve yumuşak ışıma. | nabız gibi büyür |
+| 35 | `koruma-karti-kart.png` | Kanatsız pembe koruma kartı: altın çerçeveli, ortasında altın bir kalp ve kalbin üstünde küçük beyaz kalkan. | süzülür |
+| 36 | `koruma-karti-kanat.png` | Tek bir küçük beyaz-pembe kanat (sol kanat), omzu sağda. | 2 kez kullanılır, çırpar |
+

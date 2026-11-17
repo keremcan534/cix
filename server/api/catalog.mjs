@@ -59,6 +59,8 @@ const GIFT_ROWS = [
   ['c11', 'Lunapark Randevusu', '🎡', 49_950, 'couple'],
   ['c12', 'Aşk Ateşi', '❤️‍🔥', 1_999, 'couple'],
   ['c13', 'Pırlanta Yüzük', '💍', 19_999, 'couple'],
+  // Koruma (guards.mjs): sending it makes the sender the receiver's guardian.
+  ['koruma', 'Koruma Kartı', '🛡️', 999, 'couple'],
   ['v1', 'Zümrüt Saat', '⌚', 4_950, 'privilege', 2],
   ['v2', 'Gizemli Gül', '🥀', 350, 'privilege', 2],
   ['v3', 'Sihirli Şapka', '🎩', 19_950, 'privilege', 3],

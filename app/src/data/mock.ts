@@ -384,6 +384,8 @@ export const GIFTS: Gift[] = [
   couple('c11', 'Lunapark Randevusu', '🎡', 49_950, '3D'),
   couple('c12', 'Aşk Ateşi', '❤️‍🔥', 1_999),
   couple('c13', 'Pırlanta Yüzük', '💍', 19_999, 'music'),
+  // Koruma (server/api/guards.mjs): sending it makes the sender the receiver's guardian.
+  couple('koruma', 'Koruma Kartı', '🛡️', 999),
   // --- Ayrıcalık (SVIP-gated) ---
   { id: 'v1', name: 'Zümrüt Saat', emoji: '⌚', price: 4_950, cat: 'privilege', minSvip: 2 },
   { id: 'v2', name: 'Gizemli Gül', emoji: '🥀', price: 350, cat: 'privilege', minSvip: 2 },

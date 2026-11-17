@@ -155,7 +155,7 @@ describe('Yönetim › Hediyeler: uygulamanın kendi hediyeleri', () => {
 
   test('raf ve VIP: Özel rafa taşınan VIP ister, rafının başına geçer; geri alınınca yerine döner', async () => {
     const couple = shelf(await newApp(), 'couple');
-    assert.deepEqual(couple, ['c3', 'c6', 'c8', 'c13'], 'İkili: duraklatılmamış olanlar, uygulamanın sırasıyla');
+    assert.deepEqual(couple, ['c3', 'c6', 'c8', 'c13', 'koruma'], 'İkili: duraklatılmamış olanlar, uygulamanın sırasıyla');
     const g = (await update({ id: 'c3', cat: 'privilege', minSvip: 4 })).gift;
     assert.deepEqual([g.cat, g.minSvip], ['privilege', 4]);
     assert.deepEqual(g.changed, ['cat']);

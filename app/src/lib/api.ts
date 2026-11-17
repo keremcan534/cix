@@ -1483,3 +1483,10 @@ export function rollbackLive(body: LiveRollbackBody & { dryRun?: false }): Promi
 export function rollbackLive(body: LiveRollbackBody & { dryRun?: boolean }) {
   return call<LivePreview | LiveSaved>('POST', '/api/admin/live-settings/rollback', body);
 }
+
+// --- Koruma (server/api/guards.mjs) ------------------------------------------------------------------------------
+// Read with lib/guard-core's parsers: the answers are taken as unknown.
+export const guardArea = (user: string) => call<unknown>('GET', `/api/guard?user=${encodeURIComponent(user)}`);
+export const guardMine = () => call<unknown>('GET', '/api/guard/me');
+export const guardEnd = (ward: string) => call<{ ended: boolean }>('POST', '/api/guard/end', { ward });
+export const guardSettings = (body: { off?: boolean; threshold?: number }) => call<{ settings: unknown }>('POST', '/api/guard/settings', body);

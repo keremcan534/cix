@@ -119,6 +119,8 @@ export default function ProfileScreen() {
     // Etkinlik Merkezi on Odamın Etkinlikleri: my places, the ones that passed, my rooms' events.
     { icon: 'calendar-outline', label: 'Etkinliklerim', onPress: () => openEvents({ tab: 'mine' }) },
     { icon: 'ribbon-outline', img: 'crown', label: 'Cömertlik ve Yankı', onPress: () => router.push('/seviye') },
+    // Koruma is the server's (lib/live/guard): who guards me, whom I guard, my threshold.
+    ...(live ? [{ icon: 'shield-half-outline', img: 'heart', label: 'Benim Koruma', onPress: () => router.push('/koruma') } satisfies Item] : []),
   ];
   // Live: agency rows follow my membership on the server (none shows until it is read).
   const hasAgency = live ? (server.agency === undefined ? null : !!server.agency) : !!agencyId;
