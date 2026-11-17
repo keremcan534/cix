@@ -384,7 +384,10 @@ export function ActionButton({ onPress, disabled, busy, count, icon = 'sync', lo
   return (
     <Pressable onPress={onPress} onPressIn={press.onPressIn} onPressOut={press.onPressOut} disabled={disabled} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled: !!disabled, busy: !!busy }} hitSlop={6}>
       <Animated.View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center', transform: [{ scale: press.scale }] }}>
-        <Animated.Image source={GLOW} style={[st.halo, { width: size * 2, height: size * 2, tintColor: look.ring[1], opacity: breath.interpolate({ inputRange: [0, 1], outputRange: [quiet ? 0.32 : 0.28, 0.6] }) }]} />
+        {/* The halo spreads well past the button: it takes no taps, or the bet's − above it would start a round. */}
+        <View style={st.halo} pointerEvents="none">
+          <Animated.Image source={GLOW} style={{ width: size * 2, height: size * 2, tintColor: look.ring[1], opacity: breath.interpolate({ inputRange: [0, 1], outputRange: [quiet ? 0.32 : 0.28, 0.6] }) }} />
+        </View>
         {art !== undefined ? (
           <View style={[st.artButton, { width: size, height: size }, disabled && !busy && { opacity: 0.6 }]}>
             <Image source={art} resizeMode="contain" style={{ width: size * 1.08, height: size * 1.08 }} accessibilityIgnoresInvertColors />
