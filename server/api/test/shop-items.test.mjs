@@ -1,7 +1,8 @@
-// Yönetim › Mağaza (shop-items.mjs, 076): the shop's frames and entry effects from the panel. The app's own change (name,
-// price, days, VIP level, on/off, order) and go back to the app's values; the admins add frames (a transparent PNG
-// around the photo) and entry effects (a video, ready or converted on the server, and the name plate the entering
-// person's name is written on). The catalog (?shop=1) hands phones what to draw; the shop sells at the values set here
+// Yönetim › Mağaza (shop-items.mjs, 076, 077): the shop's frames, entry effects, chat bubbles and voice waves from the
+// panel. The app's own change (name, price, days, VIP level, on/off, order) and go back to the app's values; the admins
+// add frames (a transparent PNG around the photo), entry effects (a video, ready or converted on the server, and the
+// name plate the entering person's name is written on), bubbles (colours, and a picture stretched with its corners
+// kept) and waves (a style the app draws, its colours, and a picture for the sparkle style's sparks). The catalog (?shop=1) hands phones what to draw; the shop sells at the values set here
 // with the shown-price rule (a phone that showed the compiled row is told to update when the item moved), and nothing
 // is taken from a refused buy.
 import { after, before, describe, test } from 'node:test';
@@ -88,12 +89,13 @@ describe('Yönetim › Mağaza', () => {
     await ok(call('POST', '/api/wallet/test-topup', { amount: 100_000, ref: `t-${rnd()}` }, alice.session), 'yükleme');
   });
 
-  test('yalnız yönetici; uygulamanın çerçeveleri ve giriş efektleri listede, eski uygulamaya katalog aynı', async () => {
+  test('yalnız yönetici; uygulamanın çerçeveleri, giriş efektleri, balonları ve dalgaları listede, eski uygulamaya katalog aynı', async () => {
     const u = await h.signUp('Sıradan');
     await refused(call('GET', '/api/admin/shop', null, u.session), 403);
     await refused(call('POST', '/api/admin/shop/update', { id: 'fr-neon', price: 1 }, u.session), 403);
     const items = await panel();
-    const appOnes = [...SHOP.values()].filter((x) => x.kind === 'frame' || x.kind === 'entry');
+    const appOnes = [...SHOP.values()].filter((x) => ['frame', 'entry', 'bubble', 'wave'].includes(x.kind));
+    assert.ok(appOnes.some((x) => x.kind === 'bubble') && appOnes.some((x) => x.kind === 'wave'));
     assert.deepEqual(items.map((x) => x.id).sort(), appOnes.map((x) => x.sku).sort());
     const neon = items.find((x) => x.id === 'fr-neon');
     assert.deepEqual([neon.builtin, neon.name, neon.price, neon.days, neon.changed], [true, SHOP.get('fr-neon').name, SHOP.get('fr-neon').price, SHOP.get('fr-neon').days, []]);
@@ -237,5 +239,94 @@ describe('Yönetim › Mağaza', () => {
     assert.equal(c.shop.items.some((x) => x.sku === e.id), false);
     assert.equal(c.fx.some((x) => x.id === e.id), false);
     assert.equal((await fetch(`${h.base}/api/fx/s/${e.id}.mp4`)).status, 404);
+  });
+
+  test('sohbet balonu: uygulamanınki değişir; yeni balon renkleriyle, resmi köşeleri korunarak; satılır, odada görünür', async () => {
+    await freshAdmin();
+    // The app's own: name, price and days, not its look.
+    const candy = SHOP.get('bb-candy');
+    await refused(post('/update', { id: 'bb-candy', look: { colors: ['#000000', '#FFFFFF'] } }), 400, /görseli buradan değişmez/);
+    await ok(post('/update', { id: 'bb-candy', price: candy.price + 30 }), 'fiyat');
+    assert.deepEqual(await inCatalog('bb-candy'), { sku: 'bb-candy', kind: 'bubble', name: candy.name, price: candy.price + 30, days: candy.days, minVip: 0, builtin: true });
+    await refused(oldBuy(candy.name, candy.price + 30), 409, /güncelle/);
+    await ok(post('/reset', { id: 'bb-candy' }), 'orijinal');
+
+    // Colours only.
+    await refused(post('', { kind: 'bubble', name: 'Gece Mavisi', price: 300, days: 30, look: { colors: ['#0F172A'] } }), 400, /iki rengi/);
+    await refused(post('', { kind: 'bubble', name: 'Gece Mavisi', price: 300, days: 30, look: { colors: ['#0F172A', 'mavi'] } }), 400, /2\. rengi: renk/);
+    await refused(post('', { kind: 'bubble', name: candy.name, price: 300, days: 30 }), 409, /sohbet balonu zaten var/);
+    await refused(post('', { kind: 'bubble', name: 'Gece Mavisi', price: 300, days: 30, plate: { x: 0.5 } }), 400, /olmaz/);
+    const plain = (await ok(post('', { kind: 'bubble', name: 'Gece Mavisi', price: 300, days: 30, look: { colors: ['#0f172a', '#1e3a8a'], text: '#e0f2fe' } }), 'balon')).item;
+    assert.match(plain.id, /^sb[0-9]+$/);
+    assert.deepEqual(plain.look, { colors: ['#0F172A', '#1E3A8A'], text: '#E0F2FE' });
+    assert.deepEqual(await inCatalog(plain.id), { sku: plain.id, kind: 'bubble', name: 'Gece Mavisi', price: 300, days: 30, minVip: 0, look: { colors: ['#0F172A', '#1E3A8A'], text: '#E0F2FE' } });
+    const dflt = (await ok(post('', { kind: 'bubble', name: 'Varsayılan Balon', price: 100, days: 7 }), 'görünüşsüz')).item;
+    assert.deepEqual(dflt.look, { colors: ['#7C3AED', '#EC4899'], text: '#FFFFFF' });
+
+    // With a picture: its corners stay, the middle stretches; a third of each side unless the panel says.
+    const small = await upload(admin, 'shopframe', png(40, 40), 'image/png');
+    await refused(post('', { kind: 'bubble', name: 'Taçlı', price: 900, days: 30, art: small }), 400, /64–1024/);
+    const pic = await upload(admin, 'shopframe', png(300, 150), 'image/png');
+    await refused(post('', { kind: 'bubble', name: 'Taçlı', price: 900, days: 30, art: pic, look: { colors: ['#B45309', '#F59E0B'], slice: { t: 40, r: 150, b: 40, l: 149 } } }), 400, /sol ve sağ köşe/);
+    await refused(post('', { kind: 'bubble', name: 'Taçlı', price: 900, days: 30, art: pic, look: { colors: ['#B45309', '#F59E0B'], slice: { t: 0, r: 60, b: 40, l: 60 } } }), 400, /üst köşe/);
+    const crowned = (await ok(post('', { kind: 'bubble', name: 'Taçlı', price: 900, days: 30, art: pic }), 'resimli')).item;
+    assert.deepEqual(crowned.look.slice, { w: 300, h: 150, t: 50, r: 100, b: 50, l: 100 }, 'varsayılan köşeler');
+    const sliced = (await ok(post('/update', { id: crowned.id, look: { colors: ['#B45309', '#F59E0B'], text: '#1F1300', slice: { t: 40, r: 60, b: 40, l: 60 } } }), 'köşeler')).item;
+    assert.deepEqual([sliced.art.url, sliced.look.slice], [pic, { w: 300, h: 150, t: 40, r: 60, b: 40, l: 60 }]);
+    assert.deepEqual((await inCatalog(crowned.id)).look, { colors: ['#B45309', '#F59E0B'], text: '#1F1300', art: { url: pic, w: 300, h: 150, t: 40, r: 60, b: 40, l: 60 } });
+    // New colours keep the corners; a new picture of another size starts from its own default.
+    assert.deepEqual((await ok(post('/update', { id: crowned.id, look: { colors: ['#111111', '#222222'] } }), 'renk')).item.look.slice, sliced.look.slice);
+    const pic2 = await upload(admin, 'shopframe', png(240, 120), 'image/png');
+    assert.deepEqual((await ok(post('/update', { id: crowned.id, art: pic2 }), 'yeni resim')).item.look.slice, { w: 240, h: 120, t: 40, r: 80, b: 40, l: 80 });
+    // Picture taken away: the colours alone.
+    const bare = (await ok(post('/update', { id: crowned.id, art: null }), 'resimsiz')).item;
+    assert.deepEqual([bare.art, bare.look.slice], [null, undefined]);
+    assert.equal((await inCatalog(crowned.id)).look.art, undefined);
+
+    // Sold with the shown price and days, worn at once, seen by others in rooms.
+    await ok(buy(plain.id, 300, 30), 'alır');
+    assert.equal((await ok(call('GET', '/api/economy', null, alice.session), 'ekonomi')).equipped.bubble, plain.id);
+    const bob = await h.signUp('Balona Bakan');
+    assert.equal((await ok(call('GET', `/api/looks?ids=${alice.user.id}`, null, bob.session), 'görünüm')).looks[alice.user.id].bubble, plain.id);
+    await refused(post('/delete', { id: plain.id }), 409, /kişide var/);
+    await ok(post('/delete', { id: dflt.id }), 'sil');
+    assert.equal(await inCatalog(dflt.id), undefined);
+    const audit = (await h.sql.query("SELECT detail FROM audit_events WHERE action = 'shop.create' ORDER BY id DESC LIMIT 1")).rows[0].detail;
+    assert.equal(audit.after.kind, 'bubble');
+  });
+
+  test('ses dalgası: stil ve renkleri; Parıltı resimli; yanlış stil, renk sayısı ve resim reddedilir; satılır ve görünür', async () => {
+    await freshAdmin();
+    await refused(post('', { kind: 'wave', name: 'Okyanus', price: 2000, days: 0, look: { style: 'zigzag', colors: ['#00C2FF'] } }), 400, /stili/);
+    await refused(post('', { kind: 'wave', name: 'Okyanus', price: 2000, days: 0, look: { style: 'ring', colors: ['#00C2FF', '#0047FF'] } }), 400, /Halka 1 renk alır/);
+    await refused(post('', { kind: 'wave', name: 'Okyanus', price: 2000, days: 0, look: { style: 'spin', colors: ['#000000', '#111111', '#222222', '#333333', '#444444'] } }), 400, /2–4 renk/);
+    const spark = await upload(admin, 'shopframe', png(128, 128), 'image/png');
+    await refused(post('', { kind: 'wave', name: 'Okyanus', price: 2000, days: 0, art: spark, look: { style: 'ring', colors: ['#00C2FF'] } }), 400, /yalnız Parıltı/);
+    const w = (await ok(post('', { kind: 'wave', name: 'Okyanus', price: 2000, days: 0, look: { style: 'spin', colors: ['#00c2ff', '#0047ff', '#00ffb2'] } }), 'dalga')).item;
+    assert.match(w.id, /^sw[0-9]+$/);
+    assert.deepEqual(await inCatalog(w.id), { sku: w.id, kind: 'wave', name: 'Okyanus', price: 2000, days: null, minVip: 0, look: { style: 'spin', colors: ['#00C2FF', '#0047FF', '#00FFB2'] } });
+
+    // Sparkle with a picture for its sparks (transparent); a style that takes none can't keep it.
+    await refused(post('', { kind: 'wave', name: 'Kalpler', price: 3000, days: 0, art: await upload(admin, 'shopframe', png(128, 128, { alpha: false }), 'image/png'), look: { style: 'sparkle', colors: ['#FF5FA2', '#FFFFFF'] } }), 400, /saydamlık/);
+    const hearts = (await ok(post('', { kind: 'wave', name: 'Kalpler', price: 3000, days: 0, art: spark, look: { style: 'sparkle', colors: ['#ff5fa2', '#ffffff'] } }), 'parıltı')).item;
+    assert.deepEqual((await inCatalog(hearts.id)).look, { style: 'sparkle', colors: ['#FF5FA2', '#FFFFFF'], art: { url: spark } });
+    await refused(post('/update', { id: hearts.id, look: { style: 'ring', colors: ['#FF5FA2'] } }), 400, /yalnız Parıltı/);
+    const ring = (await ok(post('/update', { id: hearts.id, art: null, look: { style: 'ring', colors: ['#FF5FA2'] } }), 'halka')).item;
+    assert.deepEqual([ring.art, ring.look], [null, { style: 'ring', colors: ['#FF5FA2'] }]);
+
+    // The app's own wave: its days change; the new app buys with them, a phone that showed the compiled row updates.
+    const gold = SHOP.get('wv-gold');
+    await ok(post('/update', { id: 'wv-gold', days: 30 }), 'gün');
+    await refused(buy('wv-gold', gold.price), 409, /güncelle/);
+    await refused(oldBuy(gold.name, gold.price), 409, /güncelle/);
+    await ok(buy('wv-gold', gold.price, 30), 'yeni uygulama alır');
+    await ok(post('/reset', { id: 'wv-gold' }), 'orijinal');
+
+    await ok(buy(w.id, 2000, 0), 'süresiz alır');
+    const bob = await h.signUp('Dalgaya Bakan');
+    assert.equal((await ok(call('GET', `/api/looks?ids=${alice.user.id}`, null, bob.session), 'görünüm')).looks[alice.user.id].wave, w.id);
+    const waves = (await panel()).filter((x) => x.kind === 'wave').map((x) => x.id);
+    await ok(post('/order', { kind: 'wave', ids: [...waves].reverse() }), 'sıra');
+    assert.deepEqual((await catalog()).shop.items.filter((x) => x.kind === 'wave').map((x) => x.sku), [...waves].reverse());
   });
 });

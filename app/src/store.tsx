@@ -29,6 +29,7 @@ import { setHapticsEnabled } from '@/lib/haptics';
 import { setNoiseSuppression, setRawMic } from '@/lib/room-session';
 import { CONVERSATIONS, ME, isServerId, type Conversation, type EventShareCard, type RoomInviteCard, type User } from '@/data/mock';
 import { giftById, liveCatalog } from '@/lib/live/catalog-live';
+import { SHOP_LIST_KINDS } from '@/lib/shop-live-core';
 import { livePack } from '@/lib/live/emoji-live';
 import type { ServerEarnings, ServerUser } from '@/lib/api';
 import { block as serverBlock, follow } from '@/lib/api';
@@ -933,10 +934,11 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       if (inventory.has(id)) return 'Zaten sahipsin';
       if (item.minVip && vipLevel < item.minVip) return `Bu ürün VIP ${item.minVip} ve üzeri için`;
       const was = { equipped: equipped[item.kind] };
-      // A frame or entry effect of the server's shop: bought at the price and days shown (POST /api/shop/buy); the
-      // older apps' spend would refuse one the panel changed or added. A refusal takes it back and says why.
+      // A frame, entry effect, bubble or wave of the server's shop: bought at the price and days shown (POST
+      // /api/shop/buy); the older apps' spend would refuse one the panel changed or added. A refusal takes it back and
+      // says why.
       const mirror =
-        liveCatalog()?.shop && (item.kind === 'frame' || item.kind === 'entry')
+        liveCatalog()?.shop && (SHOP_LIST_KINDS as readonly string[]).includes(item.kind)
           ? () =>
               liveShopBuy(id, item.price, item.days ?? 0, (message) => {
                 setInventory((s) => {

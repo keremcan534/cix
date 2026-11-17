@@ -10,6 +10,7 @@ import { EntryEffect, ENTRY_LOOKS, type EntryFx, type EntryShow } from '@/compon
 import { PlateName, VideoFx, entryClipOf } from '@/components/fx/video-fx';
 import { GlossButton, Halo, hueAt } from '@/components/fx/float';
 import { ArtFrame, frameArtOf } from '@/components/fx/frame-art';
+import { ShopBubble } from '@/components/fx/shop-bubble';
 import { AnimatedFrame, type FrameFx } from '@/components/fx/frames';
 import { SCENES } from '@/components/fx/scenes';
 import { Backdrop, EdgeLight, PressableScale, glassChipOf } from '@/components/fx/surface';
@@ -267,6 +268,16 @@ function Preview({ item, avatar, voice, still }: { item: Cosmetic; avatar: strin
       </LinearGradient>
     );
   }
+  const shopBubble = item.kind === 'bubble' ? item.remote?.bubble : undefined;
+  if (shopBubble)
+    // One the team added: its colours, or its picture stretched round the message as in a room.
+    return (
+      <View style={{ height: 104, justifyContent: 'center', alignItems: 'center' }} accessibilityLabel={`${item.name} sohbet balonu`}>
+        <ShopBubble look={shopBubble} style={styles.shopBubblePreview}>
+          <Text style={{ color: shopBubble.text, fontSize: 13 }}>Merhaba! 👋</Text>
+        </ShopBubble>
+      </View>
+    );
   if (item.kind === 'bubble' && item.color) {
     const bubble = (
       <LinearGradient colors={item.color} style={[styles.bubblePreview, !!pic && styles.bubblePreviewSmall]}>
@@ -321,6 +332,8 @@ const useStyles = makeStyles((t) => ({
   frameInner: { flex: 1, borderRadius: 28, backgroundColor: t.colors.cardAlt, alignItems: 'center', justifyContent: 'center' },
   bubblePreview: { height: 64, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 16, marginVertical: 0 },
   bubblePreviewSmall: { height: 32 },
+  // The team's bubble as a room draws it (components/room/parts chatBubble): its own size round the message.
+  shopBubblePreview: { maxWidth: '100%', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 14, borderTopLeftRadius: 4 },
   idPreview: { color: t.colors.gold, fontSize: 30, fontWeight: '900', height: 64, textAlignVertical: 'center', letterSpacing: 2, paddingTop: 12 },
   idPreviewSmall: { fontSize: 20, height: 26, paddingTop: 0 },
   idArt: { width: 44, height: 44 },

@@ -32,6 +32,7 @@ import { levelsLive, voiceLevel } from '@/lib/live/voice-level';
 import { RollingNumber } from '@/components/fx/rolling-number';
 import { BounceBadge } from '@/components/fx/bounce-badge';
 import { AssetView } from '@/components/fx/anim-player';
+import { ShopBubble } from '@/components/fx/shop-bubble';
 import type { Asset } from '@/data/animations';
 
 export type ChatMsg = FeedMsg;
@@ -500,6 +501,8 @@ export function ChatLine({
   }
   const u = userById(msg.userId!);
   const bubble = msg.userId === 'me' ? cosmeticById(bubbleId) : msg.userId && !msg.system && !msg.bot && bubbleOf ? cosmeticById(bubbleOf(msg.userId)) : undefined;
+  // One the team added (Yönetim › Mağaza): its colours or picture, and its text colour.
+  const shopLook = bubble?.remote?.bubble;
   const nameColor = msg.userId === 'me' ? colors.gold : '#FFC2DC';
   const stickers = stickersOf(msg.text);
   // Avatar, name above, text in its own bubble: who said what reads at a glance, like a group chat.
@@ -510,10 +513,14 @@ export function ChatLine({
       ))}
     </View>
   ) : (
-    <EmojiText text={messagePreview(msg.text)} style={styles.chatText} mentions={mentionNames} me={myName} />
+    <EmojiText text={messagePreview(msg.text)} style={shopLook ? [styles.chatText, { color: shopLook.text }] : styles.chatText} mentions={mentionNames} me={myName} />
   );
   const bubbleView = stickers ? (
     body
+  ) : shopLook ? (
+    <ShopBubble look={shopLook} style={styles.chatBubble}>
+      {body}
+    </ShopBubble>
   ) : bubble?.color ? (
     <LinearGradient colors={bubble.color} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.chatBubble}>
       {body}

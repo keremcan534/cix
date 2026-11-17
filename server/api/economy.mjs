@@ -182,7 +182,8 @@ const boughtWith = async (uid, ref) =>
  */
 export function sellable(sku) {
   const pack = packItem(sku);
-  // A frame or entry effect as Yönetim › Mağaza has it (on the shelf or not there; the app's paused ones count as off).
+  // A frame, entry effect, chat bubble or voice wave as Yönetim › Mağaza has it (on the shelf or not there; the app's
+  // paused ones count as off).
   const own = pack === undefined ? shopItem(sku) : undefined;
   const item = pack !== undefined ? pack : own !== undefined ? own : typeof sku === 'string' ? SHOP.get(sku) : undefined;
   if (!item || live().shopHidden.has(sku) || (own ? !own.enabled : SHOP_PAUSED.has(sku))) return null;
@@ -450,7 +451,8 @@ export const economyRoutes = {
     // server sells it at now (a Rütbe tier as Seviye ayarları have it) after the ref claim.
     const base = itemOfReason(why);
     if (!base || n < base.price || (base.kind === 'specialId' && env.SHOP_SPECIAL_IDS !== '1')) throw updateRequired();
-    // What the server sells it as now: a Rütbe tier by Seviye ayarları, a frame or entry effect by Yönetim › Mağaza.
+    // What the server sells it as now: a Rütbe tier by Seviye ayarları, a frame, entry effect, bubble or wave by
+    // Yönetim › Mağaza.
     const own = shopItem(base.sku);
     if (live().shopHidden.has(base.sku) || (own ? !own.enabled : SHOP_PAUSED.has(base.sku))) throw new HttpError(409, 'Bu ürün artık satışta değil');
     const item = own ?? nobleItem(base);

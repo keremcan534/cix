@@ -1,20 +1,28 @@
-// Yönetim › Mağaza: the shop's profile frames and entry effects, changed and added from the finance panel without an
-// app update (docs/MAGAZA_YONETIMI.md).
+// Yönetim › Mağaza: the shop's profile frames, entry effects, chat bubbles and voice waves, changed and added from the
+// finance panel without an app update (docs/MAGAZA_YONETIMI.md).
 //
-// The app's own (catalog.mjs SHOP, kinds frame and entry, their sku as id) change the way the app's gifts and emoji
-// packs do: a row with their sku holds only what was changed (name, price, days, VIP level, on the shelf, order), every
-// NULL column "as in the app", and is never deleted; their pictures and clips stay the app's. The admins' own frames
-// ('sf' and a number) and entry effects ('se' and a number) are rows of their own (076):
+// The app's own (catalog.mjs SHOP, kinds frame, entry, bubble and wave, their sku as id) change the way the app's gifts
+// and emoji packs do: a row with their sku holds only what was changed (name, price, days, VIP level, on the shelf,
+// order), every NULL column "as in the app", and is never deleted; their pictures, clips and looks stay the app's. The
+// admins' own frames ('sf' and a number), entry effects ('se'), chat bubbles ('sb') and voice waves ('sw') are rows of
+// their own (076, 077):
 //   - a frame: its picture, a transparent PNG or WebP (media.mjs shopframe), square, its empty centre's radius as a
 //     share of its width (`hole`) so the photo sits inside it;
 //   - an entry effect: its video, a ready stacked MP4 or a transparent source (WebM, ProRes .mov, SVGA) the server
 //     turns into one, as a gift's (custom-gifts.mjs videoOf and its job), and its name plate (`plate`): where the
 //     entering person's name is written over it, as shares of the 540 × 960 frame (x, y: the centre; w: the widest
-//     the name may be, a long one is drawn smaller; size: the letters' height; colour; bold).
+//     the name may be, a long one is drawn smaller; size: the letters' height; colour; bold);
+//   - a chat bubble: its look (`look`): two colours (left to right) and the text's colour, and a picture if it has one
+//     (art_*, a PNG or WebP drawn as a nine-slice: `look.slice` has its size and how far in from each edge its corners
+//     go, kept as they are while the middle stretches round the message);
+//   - a voice wave: its look: a style the app draws (WAVE_STYLES: a ring, two rings, turning colours, a ripple, sparks
+//     turning on the ring) and its colours, and for the sparks a picture if it has one (art_*: a heart, a star).
+// Every picture is uploaded as a shop picture (media.mjs shopframe) and checked here for its use.
 //
 //   GET  /api/admin/shop                                   → { items, limits, storage, convert, svga }
-//   POST /api/admin/shop        { kind, name, price, days, minVip?, enabled?, art?, hole?, video?, plate? } → { item }
-//   POST /api/admin/shop/update { id, name?, price?, days?, minVip?, enabled?, art?, hole?, video?, plate? } → { item }
+//   POST /api/admin/shop        { kind, name, price, days, minVip?, enabled?, art?, hole?, video?, plate?, look? } → { item }
+//   POST /api/admin/shop/update { id, name?, price?, days?, minVip?, enabled?, art?, hole?, video?, plate?, look? } → { item }
+//        (a bubble's or wave's art: null takes its picture away)
 //        (an app's own item: name, price, days, minVip and enabled only)
 //   POST /api/admin/shop/reset  { id, fields? }   an app's item back to the app's values → { item }
 //        (fields: any of name, price, days, minVip, enabled, sort; none: all but its place)
@@ -22,10 +30,11 @@
 //   POST /api/admin/shop/order  { kind, ids }     the shop's order of that kind, every item of it → { items }
 // days: 0 sells it for good.
 //
-// What the phones get: GET /api/catalog?shop=1 → `shop: { items }` (shopCatalog): every frame and entry effect as it is
-// now, in order; one taken off the shelf has `off: true` (whoever has it still wears it and others still see it); an
-// admin's frame its `art` ({ url, hole }), an admin's entry effect `video: true` and its `plate`, its clip listed in
-// the catalog's `fx` as entry <id> (served at /api/fx/s/<id>.mp4). The catalog's and /api/config's `v` add
+// What the phones get: GET /api/catalog?shop=1 → `shop: { items }` (shopCatalog): every frame, entry effect, chat bubble
+// and voice wave as it is now, in order; one taken off the shelf has `off: true` (whoever has it still wears it and
+// others still see it); an admin's frame its `art` ({ url, hole }), an admin's entry effect `video: true` and its
+// `plate`, its clip listed in the catalog's `fx` as entry <id> (served at /api/fx/s/<id>.mp4), an admin's bubble or
+// wave its `look`. The app that first read this list (frames and entry effects) skips the other kinds. The catalog's and /api/config's `v` add
 // shopItemsRev(). The shop sells at the price, days and VIP level set here (economy.mjs sellable). An older app never
 // asks: it shows its compiled shop and buys by the app's names and prices, refused (update_required, nothing taken)
 // when an item's price or days moved; it draws nothing for an admin's item someone wears.
@@ -42,8 +51,27 @@ const positive = (v, d) => {
 };
 const POLL_MS = positive(env.SHOP_ITEMS_POLL_MS, 5000);
 
-export const SHOP_KINDS = Object.freeze(['frame', 'entry']);
-const KIND_NAME = { frame: 'Çerçeve', entry: 'Giriş efekti' };
+export const SHOP_KINDS = Object.freeze(['frame', 'entry', 'bubble', 'wave']);
+const KIND_NAME = { frame: 'Çerçeve', entry: 'Giriş efekti', bubble: 'Sohbet balonu', wave: 'Ses dalgası' };
+/** An admin's item's id: this and a number. */
+const PREFIX = { frame: 'sf', entry: 'se', bubble: 'sb', wave: 'sw' };
+/**
+ * The voice waves' styles the app draws (components/room/voice-wave), and how many colours each takes: a ring that
+ * glows with the voice; two rings, the outer one going further with it; a ring turning in its colours; a ring with a
+ * ripple leaving it again and again; a ring with four sparks turning on it (the second colour, or a picture).
+ */
+export const WAVE_STYLES = Object.freeze({
+  ring: Object.freeze({ name: 'Halka', colors: [1, 1] }),
+  double: Object.freeze({ name: 'Çift halka', colors: [2, 2] }),
+  spin: Object.freeze({ name: 'Dönen renkler', colors: [2, 4] }),
+  ripple: Object.freeze({ name: 'Yayılan halka', colors: [1, 1] }),
+  sparkle: Object.freeze({ name: 'Parıltı', colors: [2, 2] }),
+});
+/** The look a new bubble and wave get until the panel changes it. */
+export const LOOK_DEFAULT = Object.freeze({
+  bubble: Object.freeze({ colors: Object.freeze(['#7C3AED', '#EC4899']), text: '#FFFFFF' }),
+  wave: Object.freeze({ style: 'ring', colors: Object.freeze(['#3D9BFF']) }),
+});
 /** The plate a new entry effect gets until the panel moves it: centred, a little below the middle, white. */
 export const PLATE_DEFAULT = Object.freeze({ x: 0.5, y: 0.62, w: 0.6, size: 0.035, color: '#FFFFFF', bold: true });
 /** The rules the panel shows and every save checks. */
@@ -60,9 +88,18 @@ export const SHOP_LIMITS = Object.freeze({
   holeMax: 0.45,
   holeDefault: 0.25,
   plate: Object.freeze({ wMin: 0.1, wMax: 1, sizeMin: 0.015, sizeMax: 0.08 }),
+  // A bubble's picture: drawn at a third of its size (made at 3×, as a phone's screen), its corners as they are.
+  bubbleBytes: 1024 * 1024,
+  bubblePxMin: 64,
+  bubblePxMax: 1024,
+  // A wave's spark picture: drawn small, four of them turning on the ring.
+  sparkBytes: 512 * 1024,
+  sparkPxMin: 64,
+  sparkPxMax: 512,
+  waveStyles: WAVE_STYLES,
   itemsMax: 200,
 });
-const OWN_ID = /^s[fe][0-9]{1,9}$/;
+const OWN_ID = /^s[febw][0-9]{1,9}$/;
 const APP_ITEMS = [...SHOP.values()].filter((x) => SHOP_KINDS.includes(x.kind));
 const APP_BY_ID = new Map(APP_ITEMS.map((x) => [x.sku, x]));
 /** Where the app's items sit until someone moves them: after the admins' own, in the app's order. */
@@ -88,6 +125,7 @@ const rowOf = (r) =>
     art: r.art_url ? Object.freeze({ url: r.art_url, px: num(r.art_px), hole: Number(r.hole) }) : null,
     video: r.video_url ? Object.freeze({ url: r.video_url, bytes: num(r.video_bytes), ms: num(r.video_ms), v: r.video_v }) : null,
     plate: r.plate ?? null,
+    look: r.look ?? null,
     job: r.job_status ? Object.freeze({ status: r.job_status, error: r.job_error ?? null, preview: r.job_preview ?? null }) : null,
     deleted: !!r.deleted_at,
     updatedAt: r.updated_at,
@@ -146,6 +184,7 @@ const appItemOf = (base, o) =>
     art: null,
     video: null,
     plate: null,
+    look: null,
     job: null,
     row: o ?? null,
   });
@@ -164,27 +203,37 @@ const ownItemOf = (r) =>
     art: r.art,
     video: r.video,
     plate: r.plate,
+    look: r.look,
     job: r.job,
     row: r,
   });
 const bySort = (a, b) => a.sort - b.sort || Number(a.builtin) - Number(b.builtin) || (a.sku < b.sku ? -1 : a.sku > b.sku ? 1 : 0);
 let memo = { snap: null, list: [], byId: new Map() };
-/** Every frame and entry effect that isn't deleted, in the shop's order (kind by kind as the shop shows them). */
+/** Every item that isn't deleted, in the shop's order (kind by kind as the shop shows them). */
 export function allShopItems() {
   if (memo.snap === snap) return memo.list;
   const list = [...APP_ITEMS.map((b) => appItemOf(b, snap.rows.get(b.sku))), ...[...snap.rows.values()].filter((r) => !r.builtin && !r.deleted).map(ownItemOf)].sort(bySort);
   memo = { snap, list, byId: new Map(list.map((x) => [x.sku, x])) };
   return list;
 }
-/** A frame or entry effect as it is now (on the shelf or not), or undefined (another kind, unknown, deleted). */
+/** A frame, entry effect, bubble or wave as it is now (on the shelf or not), or undefined (another kind, unknown, deleted). */
 export const shopItem = (sku) => (typeof sku === 'string' ? (allShopItems(), memo.byId.get(sku)) : undefined);
 /** The admins' own items that aren't deleted (economy.mjs lists them with the shop's). */
 export const ownShopSkus = () => allShopItems().filter((x) => !x.builtin).map((x) => x.sku);
 
 const fxUrl = (sku, v) => `${FX_PATH}s/${sku}.mp4?v=${v}`;
+/** An admin's bubble or wave as the phones draw it: its colours (and style), and its picture with how to stretch it. */
+function lookOut(x) {
+  if (x.kind === 'bubble') {
+    const s = x.look.slice;
+    return { colors: x.look.colors, text: x.look.text, ...(x.art && s ? { art: { url: x.art.url, w: s.w, h: s.h, t: s.t, r: s.r, b: s.b, l: s.l } } : {}) };
+  }
+  return { style: x.look.style, colors: x.look.colors, ...(x.art ? { art: { url: x.art.url } } : {}) };
+}
 /**
- * GET /api/catalog `shop` (?shop=1): every frame and entry effect in its order as it is now; `off` for one taken off
- * the shelf; an admin's frame its picture, an admin's entry effect that it has a video (in `fx`) and its plate.
+ * GET /api/catalog `shop` (?shop=1): every item in its order as it is now; `off` for one taken off the shelf; an
+ * admin's frame its picture, an admin's entry effect that it has a video (in `fx`) and its plate, an admin's bubble or
+ * wave its look.
  */
 export function shopCatalog() {
   return {
@@ -197,8 +246,9 @@ export function shopCatalog() {
       minVip: x.minVip,
       ...(x.builtin ? { builtin: true } : {}),
       ...(x.enabled ? {} : { off: true }),
-      ...(x.art ? { art: { url: x.art.url, hole: x.art.hole } } : {}),
+      ...(x.kind === 'frame' && x.art ? { art: { url: x.art.url, hole: x.art.hole } } : {}),
       ...(x.kind === 'entry' && x.video ? { video: true, plate: x.plate } : {}),
+      ...(!x.builtin && x.look && (x.kind === 'bubble' || x.kind === 'wave') ? { look: lookOut(x) } : {}),
     })),
   };
 }
@@ -227,7 +277,7 @@ const audited = (c, a, action, detail, req) =>
   c.query('INSERT INTO audit_events (actor, action, target, detail, ip) VALUES ($1, $2, NULL, $3, $4)', [a.id, action, JSON.stringify({ ...detail, ...panelDetail(a) }), clientIp(req)]);
 
 const kindOf = (v) => {
-  if (!SHOP_KINDS.includes(v)) throw bad('Tür çerçeve (frame) ya da giriş efekti (entry) olmalı');
+  if (!SHOP_KINDS.includes(v)) throw bad('Tür çerçeve (frame), giriş efekti (entry), sohbet balonu (bubble) ya da ses dalgası (wave) olmalı');
   return v;
 };
 const nameOf = (v) => text(v, SHOP_LIMITS.nameMin, SHOP_LIMITS.nameMax, 'Ad').replace(/\s+/g, ' ');
@@ -272,17 +322,98 @@ export function plateOf(v) {
   if (o.bold !== undefined && typeof o.bold !== 'boolean') throw bad('İsim plakası: kalın yazı seçimi geçersiz');
   return { x: share('x', 0, 1, 'yatay yer'), y: share('y', 0, 1, 'dikey yer'), w: share('w', P.wMin, P.wMax, 'genişlik'), size: share('size', P.sizeMin, P.sizeMax, 'yazı boyu'), color, bold: o.bold !== false };
 }
-/** A frame's picture: uploaded as one, a transparent PNG or WebP, square or nearly, 128–1024 px. */
-async function frameArt(url) {
+/** A shop picture (uploaded as media.mjs shopframe), read and measured: a PNG or WebP of at most `max` bytes. */
+async function pictureOf(url, what, max) {
   const key = typeof url === 'string' ? keyOf(url) : null;
-  if (!key?.startsWith('shopframe/')) throw bad('Çerçeve resmini önce yükle');
+  if (!key?.startsWith('shopframe/')) throw bad(`${what} önce yükle`);
   await verifyUpload(url, 'shopframe');
-  const info = imageInfo(await readStored(key, SHOP_LIMITS.frameBytes));
-  if (!info) throw bad('Çerçeve resmi PNG ya da WebP olmalı');
+  const info = imageInfo(await readStored(key, max));
+  if (!info) throw bad(`${what} PNG ya da WebP olmalı`);
+  return info;
+}
+/** A frame's picture: a transparent PNG or WebP, square or nearly, 128–1024 px. */
+async function frameArt(url) {
+  const info = await pictureOf(url, 'Çerçeve resmini', SHOP_LIMITS.frameBytes);
   if (!info.alpha) throw bad('Çerçeve resminde saydamlık yok: ortası (fotoğrafın yeri) ve çevresi saydam olmalı');
   if (Math.abs(info.width - info.height) > Math.max(2, info.width * 0.02)) throw bad(`Çerçeve resmi kare olmalı (bu ${info.width} × ${info.height})`);
   if (info.width < SHOP_LIMITS.framePxMin || info.width > SHOP_LIMITS.framePxMax) throw bad(`Çerçeve resmi ${SHOP_LIMITS.framePxMin}–${SHOP_LIMITS.framePxMax} piksel olmalı (bu ${info.width})`);
   return { url, px: info.width };
+}
+/** A bubble's picture: a PNG or WebP, 64–1024 px each way, up to 1 MB; its width and height go into its slice. */
+async function bubbleArt(url) {
+  const info = await pictureOf(url, 'Balon resmini', SHOP_LIMITS.bubbleBytes);
+  const { bubblePxMin: lo, bubblePxMax: hi } = SHOP_LIMITS;
+  if (info.width < lo || info.height < lo || info.width > hi || info.height > hi) throw bad(`Balon resmi her yönde ${lo}–${hi} piksel olmalı (bu ${info.width} × ${info.height})`);
+  return { url, px: info.width, w: info.width, h: info.height };
+}
+/** A wave's spark picture: a transparent PNG or WebP, 64–512 px, up to 512 KB. */
+async function sparkArt(url) {
+  const info = await pictureOf(url, 'Parıltı resmini', SHOP_LIMITS.sparkBytes);
+  if (!info.alpha) throw bad('Parıltı resminde saydamlık yok: şeklin çevresi saydam olmalı');
+  const { sparkPxMin: lo, sparkPxMax: hi } = SHOP_LIMITS;
+  if (info.width < lo || info.height < lo || info.width > hi || info.height > hi) throw bad(`Parıltı resmi her yönde ${lo}–${hi} piksel olmalı (bu ${info.width} × ${info.height})`);
+  return { url, px: info.width };
+}
+const colorOf = (v, what) => {
+  if (typeof v === 'string' && /^#[0-9A-Fa-f]{6}$/.test(v)) return v.toUpperCase();
+  throw bad(`${what}: renk #RRGGBB biçiminde olmalı`);
+};
+const objOf = (v, what) => {
+  if (v && typeof v === 'object' && !Array.isArray(v)) return v;
+  throw bad(`${what} geçersiz`);
+};
+/** A bubble's colours: two (left to right; the same twice for one colour) and the text's. */
+function bubbleLookOf(v) {
+  const o = objOf(v, 'Balonun görünüşü');
+  if (!Array.isArray(o.colors) || o.colors.length !== 2) throw bad('Balonun iki rengi olmalı (tek renk için ikisi aynı)');
+  return { colors: o.colors.map((c, i) => colorOf(c, `Balonun ${i + 1}. rengi`)), text: colorOf(o.text ?? '#FFFFFF', 'Yazının rengi') };
+}
+/**
+ * How a bubble's picture is stretched: how far in (px of the picture) from each edge its corners go. They stay as they
+ * are; the middle between them stretches round the message, which is written there. Default: a third of each side.
+ */
+function sliceOf(v, w, h) {
+  const o = v === undefined || v === null ? { t: Math.floor(h / 3), r: Math.floor(w / 3), b: Math.floor(h / 3), l: Math.floor(w / 3) } : objOf(v, 'Balon resminin köşeleri');
+  const at = (k, what) => {
+    const n = Number(o[k]);
+    if (!Number.isSafeInteger(n) || n < 1) throw bad(`Balon resmi: ${what} en az 1 piksel olmalı`);
+    return n;
+  };
+  const s = { w, h, t: at('t', 'üst köşe'), r: at('r', 'sağ köşe'), b: at('b', 'alt köşe'), l: at('l', 'sol köşe') };
+  if (s.l + s.r > w - 2) throw bad(`Balon resmi: sol ve sağ köşe birlikte en çok ${w - 2} piksel olabilir; ortası uzar`);
+  if (s.t + s.b > h - 2) throw bad(`Balon resmi: üst ve alt köşe birlikte en çok ${h - 2} piksel olabilir; ortası uzar`);
+  return s;
+}
+/** A wave's style and its colours (as many as the style takes). */
+function waveLookOf(v) {
+  const o = objOf(v, 'Dalganın görünüşü');
+  const style = WAVE_STYLES[o.style] ? o.style : null;
+  if (!style) throw bad(`Dalganın stili şunlardan biri olmalı: ${Object.values(WAVE_STYLES).map((x) => x.name).join(', ')}`);
+  const [lo, hi] = WAVE_STYLES[style].colors;
+  if (!Array.isArray(o.colors) || o.colors.length < lo || o.colors.length > hi) throw bad(`${WAVE_STYLES[style].name} ${lo === hi ? lo : `${lo}–${hi}`} renk alır`);
+  return { style, colors: o.colors.map((c, i) => colorOf(c, `Dalganın ${i + 1}. rengi`)) };
+}
+/**
+ * A bubble's or wave's look and picture as they are to be saved. `sent`: the look the panel sent now (undefined: the
+ * one in use, or the default for a new item); `url`: the picture (null: none); `cur`: the item now, so a picture that
+ * stays isn't read again (its size is in its slice). A bubble's picture has its slice: the one sent now, else the one
+ * in use while the picture stays, else the default for the new picture. A wave's picture is its sparks', so only the
+ * sparkle style takes one.
+ */
+async function lookAndArt(kind, sent, url, cur) {
+  const lookIn = sent !== undefined ? sent : (cur?.look ?? LOOK_DEFAULT[kind]);
+  const same = url !== null && url === cur?.art?.url;
+  if (kind === 'bubble') {
+    const look = bubbleLookOf(lookIn);
+    if (url === null) return { look, art: null };
+    const pic = same ? { url, px: cur.art.px, w: cur.look.slice.w, h: cur.look.slice.h } : await bubbleArt(url);
+    look.slice = sliceOf(sent?.slice ?? (same ? cur.look.slice : undefined), pic.w, pic.h);
+    return { look, art: { url: pic.url, px: pic.px } };
+  }
+  const look = waveLookOf(lookIn);
+  if (url === null) return { look, art: null };
+  if (look.style !== 'sparkle') throw bad('Resim yalnız Parıltı stilinde kullanılır (halkada dönen şekiller); resmi kaldırın ya da stili Parıltı yapın');
+  return { look, art: same ? { url, px: cur.art.px } : await sparkArt(url) };
 }
 const idOf = (v) => {
   if (typeof v === 'string' && (OWN_ID.test(v) || APP_BY_ID.has(v))) return v;
@@ -313,7 +444,7 @@ async function setRow(c, id, cols, actor) {
   const sets = [];
   for (const [col, v] of Object.entries(cols)) {
     if (v === undefined) continue;
-    vals.push(col === 'plate' && v !== null ? JSON.stringify(v) : v);
+    vals.push((col === 'plate' || col === 'look') && v !== null ? JSON.stringify(v) : v);
     sets.push(`${col} = $${vals.length}`);
   }
   vals.push(actor);
@@ -354,6 +485,7 @@ function itemView(x, owned) {
     art: x.art ? { url: x.art.url, px: x.art.px, hole: x.art.hole } : null,
     video: x.video ? { url: fxUrl(x.sku, x.video.v), bytes: x.video.bytes, ms: x.video.ms } : null,
     plate: x.plate,
+    look: x.look,
     job: x.job,
     ...(base ? { original: { name: base.name, price: base.price, days: base.days, minVip: base.minVip, enabled: !SHOP_PAUSED.has(base.sku) }, changed: changedOf(x.row) } : {}),
     updatedAt: x.row?.updatedAt ?? null,
@@ -376,10 +508,13 @@ const COLUMN = { name: 'name', price: 'price', days: 'days', minVip: 'min_vip', 
 export const shopRoutes = {
   async 'GET /api/admin/shop'(req) {
     await admin(req);
-    return { items: await adminItems(), limits: { ...SHOP_LIMITS, plateDefault: PLATE_DEFAULT }, storage: storageOn(), convert: await canConvert(), svga: await canSvga() };
+    return { items: await adminItems(), limits: { ...SHOP_LIMITS, plateDefault: PLATE_DEFAULT, lookDefault: LOOK_DEFAULT }, storage: storageOn(), convert: await canConvert(), svga: await canSvga() };
   },
 
-  /** An admin's own frame (with its picture) or entry effect (with its video and name plate), first of its kind. */
+  /**
+   * An admin's own frame (with its picture), entry effect (with its video and name plate), chat bubble or voice wave
+   * (with its look, and a picture if it has one), first of its kind.
+   */
   async 'POST /api/admin/shop'(req) {
     const a = await admin(req);
     writeLimit(a);
@@ -396,27 +531,33 @@ export const shopRoutes = {
     let hole = null;
     let video = null;
     let plate = null;
+    let look = null;
+    if (kind !== 'bubble' && kind !== 'wave' && b.look !== undefined) throw bad(`${KIND_NAME[kind]} için renk ve stil buradan değil, resmiyle ya da videosuyla gelir`);
     if (kind === 'frame') {
       if (b.video !== undefined || b.plate !== undefined) throw bad('Çerçevenin videosu ya da isim plakası olmaz');
       art = await frameArt(b.art);
       hole = holeOf(b.hole ?? SHOP_LIMITS.holeDefault);
-    } else {
+    } else if (kind === 'entry') {
       if (b.art !== undefined || b.hole !== undefined) throw bad('Giriş efektinin çerçeve resmi olmaz');
       video = await videoOf(b.video ?? null);
       if (!video) throw bad('Giriş efektinin videosunu önce yükle');
       plate = plateOf(b.plate === undefined ? PLATE_DEFAULT : b.plate);
+    } else {
+      if (b.video !== undefined || b.plate !== undefined || b.hole !== undefined) throw bad(`${KIND_NAME[kind]} için video, isim plakası ya da fotoğraf alanı olmaz`);
+      ({ look, art } = await lookAndArt(kind, b.look, b.art ?? null, null));
     }
     const source = video?.kind === 'source' ? video : null;
     const stacked = video?.kind === 'stacked' ? video : null;
     const id = await saving(() =>
       tx(async (c) => {
-        const id = `${kind === 'frame' ? 'sf' : 'se'}${(await c.query("SELECT nextval('shop_item_no') AS n")).rows[0].n}`;
+        const id = `${PREFIX[kind]}${(await c.query("SELECT nextval('shop_item_no') AS n")).rows[0].n}`;
         const r = await c.query(
           `INSERT INTO shop_items (id, kind, name, price, days, min_vip, enabled, sort, art_url, art_px, hole, video_url, video_bytes, video_ms, video_v, plate,
-                                   job_status, job_source, job_fill, job_opaque, created_by, updated_by)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $21) RETURNING *`,
+                                   job_status, job_source, job_fill, job_opaque, look, created_by, updated_by)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $22) RETURNING *`,
           [id, kind, name, price, days, minVip, enabled, firstSort(kind), art?.url ?? null, art?.px ?? null, hole, stacked?.url ?? null, stacked?.bytes ?? null, stacked?.ms ?? null,
-            stacked?.v ?? null, plate ? JSON.stringify(plate) : null, source ? 'processing' : null, source?.url ?? null, source?.fill ?? null, source?.opaque === true, a.id],
+            stacked?.v ?? null, plate ? JSON.stringify(plate) : null, source ? 'processing' : null, source?.url ?? null, source?.fill ?? null, source?.opaque === true,
+            look ? JSON.stringify(look) : null, a.id],
         );
         await audited(c, a, 'shop.create', { item: id, before: null, after: auditOf(r.rows[0]) }, req);
         return id;
@@ -445,7 +586,19 @@ export const shopRoutes = {
     if (b.enabled !== undefined) cols.enabled = boolOf(b.enabled, 'Açık / kapalı');
     const drop = [];
     if (cur.builtin) {
-      if (['art', 'hole', 'video', 'plate'].some((k) => b[k] !== undefined)) throw bad('Uygulamanın kendi eşyasının görseli buradan değişmez; yeni görselle kendi eşyanı ekle');
+      if (['art', 'hole', 'video', 'plate', 'look'].some((k) => b[k] !== undefined)) throw bad('Uygulamanın kendi eşyasının görseli buradan değişmez; yeni görselle kendi eşyanı ekle');
+    } else if (cur.kind !== 'bubble' && cur.kind !== 'wave' && b.look !== undefined) {
+      throw bad(`${KIND_NAME[cur.kind]} için renk ve stil buradan değil, resmiyle ya da videosuyla gelir`);
+    } else if (cur.kind === 'bubble' || cur.kind === 'wave') {
+      if (b.video !== undefined || b.plate !== undefined || b.hole !== undefined) throw bad(`${KIND_NAME[cur.kind]} için video, isim plakası ya da fotoğraf alanı olmaz`);
+      if (b.look !== undefined || b.art !== undefined) {
+        const next = await lookAndArt(cur.kind, b.look, b.art === undefined ? (cur.art?.url ?? null) : b.art, cur);
+        cols.look = next.look;
+        if ((next.art?.url ?? null) !== (cur.art?.url ?? null)) {
+          Object.assign(cols, { art_url: next.art?.url ?? null, art_px: next.art?.px ?? null });
+          if (cur.art) drop.push(cur.art.url);
+        }
+      }
     } else if (cur.kind === 'frame') {
       if (b.video !== undefined || b.plate !== undefined) throw bad('Çerçevenin videosu ya da isim plakası olmaz');
       if (b.art !== undefined && b.art !== cur.art?.url) {

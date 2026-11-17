@@ -67,12 +67,14 @@ Son güncelleme: preview-96 sonrası (Küçült, çanta yağmuru, @bahset düzel
 
 ## Mağaza yönetimi (yeni APK)
 
-- **Çalışıyor (yeni APK):** çerçeveler ve giriş efektleri finans panelinden yönetiliyor (Hediye ve mağaza › Mağaza).
+- **Çalışıyor (yeni APK):** çerçeveler, giriş efektleri, sohbet balonları ve ses dalgaları finans panelinden yönetiliyor (Hediye ve mağaza › Mağaza).
   - Uygulamanın kendi eşyalarının adı, fiyatı, süresi, VIP seviyesi, satışta olup olmadığı ve sırası değişir.
   - Yeni çerçeve: saydam PNG yüklenir, fotoğrafın çevresine çizilir.
   - Yeni giriş efekti: video ya da SVGA yüklenir, odaya girenin adı isim plakasına yazılır.
+  - Yeni sohbet balonu: iki renk ve yazı rengi, ya da köşeleri bozulmadan uzayan bir resim.
+  - Yeni ses dalgası: beş stilden biri ve renkleri; Parıltı'da dönen şekil resim olabilir.
 - **Eski APK'lar:** kendi mağazasını gösterir; değişen eşyayı alamaz ("uygulamayı güncelle"), yeni eşyaları görmez.
-- **Sırada:** sohbet balonu ve ses dalgası. Ayrıntı: [`MAGAZA_YONETIMI.md`](MAGAZA_YONETIMI.md).
+- Ayrıntı: [`MAGAZA_YONETIMI.md`](MAGAZA_YONETIMI.md).
 
 ## Seviye ve VIP ayarları (yeni APK)
 
