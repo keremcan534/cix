@@ -232,7 +232,20 @@ async function launch(r0) {
         if (crash > cap) crash = cut = cap < 100 ? 0 : cap;
         reserve = crash > 100 ? fuels.reduce((n, f) => n + payoutOf(f.bet, crash), 0) : 0;
         await c.query('UPDATE casino_bank SET wagered = wagered + $1, house = house + $2, pool = $3, updated_at = now() WHERE id = 1', [total, house, free - reserve]);
-        await c.query('UPDATE casino_rounds x SET house = v.house FROM unnest($1::bigint[], $2::bigint[]) AS v(id, house) WHERE x.id = v.id', [fuels.map((f) => f.id), fuels.map((f) => f.house)]);
+        // One write per fuel row, the pad's loss with it: Postgres re-checks the user_id key (a share lock on the owner's
+        // account) when a row this transaction already wrote is written again, and an owner in another game holds their
+        // account while waiting for the bank this launch holds.
+        const ids = fuels.map((f) => f.id);
+        const houses = fuels.map((f) => f.house);
+        if (crash > 100) await c.query('UPDATE casino_rounds x SET house = v.house FROM unnest($1::bigint[], $2::bigint[]) AS v(id, house) WHERE x.id = v.id', [ids, houses]);
+        else {
+          await c.query('UPDATE casino_rounds x SET house = v.house, cashed = 0, detail = $3, outcome = x.outcome || $4 FROM unnest($1::bigint[], $2::bigint[]) AS v(id, house) WHERE x.id = v.id', [
+            ids,
+            houses,
+            `Canlı tur #${r0.id} · roket rampada patladı`,
+            JSON.stringify({ live: { round: r0.id, crash: 100 } }),
+          ]);
+        }
       }
       const launchAt = Date.now() + IGNITE_MS;
       const flies = crash > 100;
@@ -246,9 +259,6 @@ async function launch(r0) {
         reserve,
         flies ? null : at(launchAt),
       ]);
-      if (!flies && total > 0) {
-        await c.query(`UPDATE casino_rounds SET cashed = 0, detail = $2, outcome = outcome || $3 WHERE live_round = $1`, [r0.id, `Canlı tur #${r0.id} · roket rampada patladı`, JSON.stringify({ live: { round: r0.id, crash: 100 } })]);
-      }
       return { launchAt, crash, cut, flies };
     });
   } catch (e) {

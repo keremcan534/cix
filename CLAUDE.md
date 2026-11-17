@@ -106,3 +106,7 @@ cash-outs (para çekme, Jeton Noktası, agency payouts) are a legal question the
   could pre-use a server ref (`call-{id}-{n}`) and make call minutes free, and a store refund missed coins held in
   escrow (pending bonds, open bags). A refund locking accounts piecemeal deadlocked with gifts; only the concurrent
   random test found it. Escrow, server-made refs and lock order are where money bugs hide.
+- Live rocket launch (Nov 2026): it held the game bank and then wrote the same fuel rows twice. Postgres re-checks a
+  foreign key when a row this transaction already wrote is written again, so the second write waited for a share lock
+  on each owner's `users` row, while an owner playing another game held that row and waited for the bank. Under a
+  shared lock (bank, round), write a row once, or lock accounts before the shared row as every other route does.

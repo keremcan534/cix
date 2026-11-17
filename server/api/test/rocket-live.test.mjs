@@ -237,6 +237,25 @@ describe('Canlı Yörünge', () => {
     assert.equal(v.history[0], 100);
   });
 
+  test('rampada patlama, yakıt sahibi o an başka bir oyunda olsa da kalkar: kasa ile hesap birbirini beklemez', async () => {
+    const id = await nextRound(a.session);
+    await rig(id, 0);
+    await ok(fuel(a.session, id, { bet: 250 }));
+    // A game round of the same person across the launch: their account first, then the bank (casino.mjs).
+    const hold = await h.sql.connect();
+    try {
+      await hold.query('BEGIN');
+      await hold.query('SELECT 1 FROM users WHERE id = $1 FOR UPDATE', [a.user.id]);
+      await inState(id, ['done'], 5_000);
+      await hold.query("SET LOCAL lock_timeout = '3s'");
+      await hold.query('SELECT pool FROM casino_bank WHERE id = 1 FOR UPDATE');
+    } finally {
+      await hold.query('ROLLBACK');
+      hold.release();
+    }
+    assert.deepEqual((await fuels(id)).map((x) => [Number(x.cashed), Number(x.payout)]), [[0, 0]]);
+  });
+
   test('havuz yetmezse yakıt alınmaz; yetmediği yerde tırmanış kesilir', async () => {
     await q('UPDATE casino_bank SET pool = 1000 WHERE id = 1');
     let id = await nextRound(a.session);
