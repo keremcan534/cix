@@ -35,6 +35,7 @@ import http from 'node:http';
 // First, so its console.error hook is in place before anything else runs.
 import { failed } from './reporting.mjs';
 import { adminRoutes } from './admin.mjs';
+import { lookupRoutes } from './public-no.mjs';
 import { alertRoutes, warningCodes } from './alerts.mjs';
 import { CONFIG_CACHE, configRoutes, gate } from './features.mjs';
 import { agencyRoutes } from './agency.mjs';
@@ -352,6 +353,7 @@ const routes = {
   ...bossSeatRoutes,
   ...roomRoutes,
   ...adminRoutes,
+  ...lookupRoutes,
   ...financeSyncRoutes,
   ...agencyRoutes,
   ...agencyAdminRoutes,

@@ -24,7 +24,8 @@ import { presenceTracked, roomService } from './live.mjs';
 import { mayInvite } from './privacy.mjs';
 import { notify } from './push.mjs';
 // rooms.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
-import { ROOM_SELECT, roomCode, roomOut, withVoiceCounts } from './rooms.mjs';
+import { whoIs } from './public-no.mjs';
+import { ROOM_SELECT, roomOut, withVoiceCounts } from './rooms.mjs';
 
 /** The countdown after the answer (PK_PREP_MS only for tests, the same as Oda içi PK). */
 const PREP_MS = Number(env.PK_PREP_MS ?? 5_000);
@@ -208,16 +209,17 @@ export const crossPkRoutes = {
   /**
    * Open rooms the staff of `room` may invite now, fullest first (at most 50): not their own, not in a PK or an
    * invite, no block between their owner and me or my room's owner; once LiveKit's webhooks arrive, only rooms
-   * with someone in them. `q`: a room's 8-digit ID (as the room card shows it) or part of its name.
+   * with someone in them. `q`: a room's ID (its owner's own number; an older app's 8-digit one, public-no.mjs whoIs)
+   * or part of its name (a number that names nobody is looked for in the names too).
    */
   async 'GET /api/rooms/pk/cross/rooms'(req, url) {
     const me = await auth(req);
     const roomId = roomIdOf(url.searchParams.get('room'));
     const mine = await staffRoom(me, roomId);
     const q = String(url.searchParams.get('q') ?? '').trim().slice(0, 40);
-    const code = /^\d{8}$/.test(q) ? q : null;
-    const only = code ? (await db.query('SELECT id FROM rooms WHERE closed_at IS NULL')).rows.map((x) => x.id).filter((id) => roomCode(id) === code) : null;
-    const name = !code && q ? q.replace(/[\\%_]/g, '\\$&') : null;
+    const owner = /^[\d\s-]{1,20}$/.test(q) ? await whoIs(q) : null;
+    const only = owner ? (await db.query('SELECT id FROM rooms WHERE owner = $1 AND closed_at IS NULL', [owner.id])).rows.map((x) => x.id) : null;
+    const name = !owner && q ? q.replace(/[\\%_]/g, '\\$&') : null;
     const r = await db.query(
       `${ROOM_SELECT} WHERE r.closed_at IS NULL AND u.deleted_at IS NULL AND r.id <> $1
          AND ($4::uuid[] IS NULL OR r.id = ANY($4::uuid[]))

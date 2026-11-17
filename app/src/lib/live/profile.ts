@@ -11,6 +11,7 @@ import { useSyncExternalStore } from 'react';
 
 import * as api from '@/lib/api';
 import { putServerUser, type User } from '@/data/mock';
+import { serverNo } from '@/lib/public-no';
 import { putLevels } from '@/lib/live/levels';
 import { putDistance } from '@/lib/live/distances';
 import { extrasPatch, showcaseView, type ExtrasDraft, type ShowcaseView } from '@/lib/profile-more';
@@ -51,6 +52,8 @@ export function meFromServer(u: api.ServerMe): Partial<User> {
     ...(typeof u.age === 'number' && { age: u.age }),
     ...(u.avatarUrl && { avatar: u.avatarUrl }),
     ...(u.createdAt && { joinedAt: u.createdAt.slice(0, 10) }),
+    // My own number, the ID my profile shows (an older server sends none: data/profile publicIdOf).
+    ...(serverNo(u.publicNo) && { publicNo: serverNo(u.publicNo)! }),
   };
 }
 
@@ -99,6 +102,7 @@ export async function loadPublicProfile(serverId: string, mine = false, visit = 
       ...(p.extras ? { gender: p.gender ?? undefined, country: p.extras.country ?? undefined } : p.gender ? { gender: p.gender } : {}),
       ...(p.username && { username: p.username }),
       ...(p.avatarUrl && { avatar: p.avatarUrl }),
+      ...(serverNo(p.publicNo) && { publicNo: serverNo(p.publicNo)! }),
     });
   }
   return {

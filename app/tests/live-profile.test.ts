@@ -101,6 +101,13 @@ describe('Profilim sunucudan: demo değeri kalmaz', () => {
     assert.equal('age' in meFromServer({ ...SERVER_ME, age: null }), false);
   });
 
+  test('profil ID’m sunucunun verdiği numara; eski sunucu ya da bozuk değer: yok (ekran id’den yapar)', async () => {
+    const { meFromServer } = await profile();
+    assert.equal(meFromServer({ ...SERVER_ME, publicNo: '100000007919' }).publicNo, '100000007919');
+    assert.equal('publicNo' in meFromServer(SERVER_ME), false);
+    assert.equal('publicNo' in meFromServer({ ...SERVER_ME, publicNo: '12ab' }), false);
+  });
+
   test('loadMe GET /api/me okur', async () => {
     const { loadMe } = await profile();
     route = (s) => (s.path === '/api/me' ? { body: { user: { ...SERVER_ME, username: 'zeynep', avatarUrl: 'https://cdn.test/a.jpg' } } } : { status: 404 });
@@ -117,12 +124,13 @@ describe('Başkasının profili: gerçek sayılar', () => {
     const id = 'bbbbbbbb-0000-4000-8000-000000000002';
     route = (s) =>
       s.path === `/api/user?id=${id}`
-        ? { body: { user: { id, name: 'Elif', username: 'elif', gender: 'Kadın', age: 27, city: 'Ankara', bio: 'Selam', interests: ['☕ Kahve'], avatarUrl: null, followers: 3, following: 1, isFollowing: true, blockedByMe: false } } }
+        ? { body: { user: { id, name: 'Elif', username: 'elif', gender: 'Kadın', age: 27, city: 'Ankara', bio: 'Selam', interests: ['☕ Kahve'], avatarUrl: null, publicNo: '100000015838', followers: 3, following: 1, isFollowing: true, blockedByMe: false } } }
         : { status: 404 };
     assert.deepEqual(await loadPublicProfile(id), { followers: 3, following: 1, isFollowing: true, blockedByMe: false });
     const u = userById(id);
     assert.equal(u.name, 'Elif');
     assert.equal(u.age, 27);
+    assert.equal(u.publicNo, '100000015838', 'her own number, for the ID on her profile');
     assert.equal(u.city, 'Ankara');
     assert.equal(u.username, 'elif');
   });

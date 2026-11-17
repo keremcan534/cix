@@ -1,9 +1,11 @@
 /// <reference types="node" />
 // Ajans → Ofis → "Yayıncı davet et" (lib/invite-target): the owner can type the profile ID the app shows, an
-// account id or a username. A profile ID is matched only against people the phone can list.
+// account id or a username. The server looks a profile ID up (GET /api/lookup); an older one can't, and then it is
+// matched only against people the phone can list, by the ID the app shows for each.
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { displayId, publicIdOf } from '@/data/profile';
 import { parseInviteInput, pickByPublicId } from '@/lib/invite-target';
 
 describe('Yayıncı davet hedefi', () => {
@@ -22,10 +24,20 @@ describe('Yayıncı davet hedefi', () => {
   });
 
   test('profile ID matches each person once', () => {
-    const idOf = (id: string) => ({ u1: '111111111', u2: '222222222', u3: '111111111' })[id] ?? '';
+    const idOf = (p: { id: string }) => ({ u1: '111111111', u2: '222222222', u3: '111111111' })[p.id] ?? '';
     const people = [{ id: 'u1' }, { id: 'u2' }, { id: 'u1' }, { id: 'u3' }];
     assert.deepEqual(pickByPublicId('222222222', people, idOf), [{ id: 'u2' }]);
     assert.deepEqual(pickByPublicId('111111111', people, idOf).map((p) => p.id), ['u1', 'u3'], 'two hits: the caller asks for more');
     assert.deepEqual(pickByPublicId('999999999', people, idOf), []);
+  });
+
+  test('someone the server gave another number is matched by that number, not the one made from their id', () => {
+    const id = 'bbbbbbbb-0000-4000-8000-000000000002';
+    const idOf = (p: { id: string; publicNo?: string | null }) => publicIdOf(p, p.id);
+    const moved = { id, publicNo: '100000007919' };
+    assert.notEqual(displayId(id), '100000007919');
+    assert.deepEqual(pickByPublicId(displayId(id), [moved], idOf), [], 'their old-shaped number belongs to an older account');
+    assert.deepEqual(pickByPublicId('100000007919', [moved], idOf), [moved]);
+    assert.deepEqual(pickByPublicId(displayId(id), [{ id }], idOf), [{ id }], 'an older server sends no number: the one made from the id');
   });
 });

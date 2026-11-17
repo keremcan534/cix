@@ -28,11 +28,11 @@ import {
   ROOM_XP_THRESHOLDS,
   adminCapacity,
   memberLimit,
-  roomCode,
+  roomIdText,
   roomThemeInfo,
   type RoomTheme,
 } from '@/data/catalog';
-import { userById } from '@/data/mock';
+import { serverRoomCode, userById } from '@/data/mock';
 import { RULES, pct } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
 import { CONTACT_TITLE, contactRefusal } from '@/lib/contact-filter';
@@ -339,7 +339,7 @@ export function RoomInfoSheet({
                 {textEditor && <Ionicons name="create-outline" size={18} color={colors.textDim} />}
               </Pressable>
               <Text style={styles.dim}>
-                🇹🇷 │ {th.emoji} {th.name} │ ID {roomCode(roomId)}
+                🇹🇷 │ {th.emoji} {th.name} │ ID {roomIdText({ id: roomId, code: serverRoomCode(roomId) })}
               </Text>
             </View>
             <Pressable onPress={onSettings} hitSlop={8} accessibilityLabel="Oda ayarlarını aç">

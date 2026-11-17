@@ -306,6 +306,9 @@ describe('Yönetim paneli: satın alma bulma', () => {
     assert.deepEqual(byOrder.googleSync, { enabled: false, everyMin: 60, lastOkAt: null, lastError: null });
     assert.deepEqual((await ok(find(String(p.id)))).purchases.map((x) => x.id), [p.id]);
     assert.deepEqual((await ok(find(` ${buyer.user.id.toUpperCase()} `))).purchases.map((x) => x.id), [p.id], 'hesap kimliğiyle, boşluk ve büyük harf önemsiz');
+    const { publicNo } = (await ok(call('GET', '/api/me', null, buyer.session))).user;
+    assert.match(publicNo, /^\d{12}$/);
+    assert.deepEqual((await ok(find(publicNo))).purchases.map((x) => x.id), [p.id], 'profilindeki ID’yle');
     assert.equal((await ok(find('yok-boyle-bir-siparis'))).purchases.length, 0);
     assert.ok((await ok(find())).purchases.some((x) => x.id === p.id), 'boş arama son alımları verir');
 

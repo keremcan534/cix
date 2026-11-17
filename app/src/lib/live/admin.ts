@@ -213,7 +213,8 @@ export const paidAsInvitee = (a: WalletAudit) =>
 export const revokeReferral = (invitee: string, reason: string) => post<{ coins: { inviter: number; invitee: number } }>('/api/admin/referrals/revoke', { invitee, reason });
 
 // --- Sanctions (sanctions.mjs; shapes and wording in lib/sanction-format) ---------------------------------------
-export type SanctionSearchUser = { id: string; name: string; phone: string | null; role: string; deleted: boolean; liveSanctions: number; totalSanctions: number };
+/** `publicNo`: the ID on the person's profile (server/api/public-no.mjs); an older server sends none. */
+export type SanctionSearchUser = { id: string; name: string; publicNo?: string | null; phone: string | null; role: string; deleted: boolean; liveSanctions: number; totalSanctions: number };
 export type SanctionUserDetail = {
   user: { id: string; name: string; phone: string | null; role: string; createdAt: string; deleted: boolean };
   sanctions: StaffSanction[];
@@ -253,6 +254,8 @@ export const reviewDevice = (device: number, status: DeviceRisk, note: string) =
 export type AdminUser = {
   id: string;
   name: string;
+  /** The ID on the person's profile (server/api/public-no.mjs); an older server sends none. */
+  publicNo?: string | null;
   username: string | null;
   role: string;
   createdAt: string;

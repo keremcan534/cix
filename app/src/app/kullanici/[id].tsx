@@ -23,6 +23,7 @@ import {
   collectionProgress,
   displayId,
   giftWallOf,
+  publicIdOf,
   guardianOf,
   medalsOf,
   profileCompletion,
@@ -195,11 +196,12 @@ export default function UserProfile() {
   const friends = live ? (ties?.friends ?? null) : myDemo ? myDemo.friends.length : (user.age * 7) % 60;
   const loadList = (side: OneWay) =>
     live ? loadMyList(side) : (myDemo?.[side] ?? []).map(({ id: uid }) => { const u = userById(uid); return { id: u.id, name: u.name, avatarUrl: u.avatar || null }; });
-  // Live mode: their public ID, the one their own Ben tab shows: a special ID they wear, else the number made from
-  // their server id (data/profile displayId), which agency invites also take. Someone else's look is read here.
+  // Live mode: their public ID, the one their own Ben tab shows: a special ID they wear, else their own number from
+  // the server (an older server: the one made from their server id, data/profile publicIdOf), which agency invites,
+  // the room search and the panel take. Someone else's look is read here.
   useLooks(serverId && !isMe ? [serverId] : [], live);
   const special = live ? cosmeticById(isMe ? equipped.specialId : lookOf(serverId)?.specialId) : undefined;
-  const publicId = !live ? displayId(user.id) : special?.kind === 'specialId' ? special.name.replace('ID ', '') : serverId ? displayId(serverId) : null;
+  const publicId = !live ? displayId(user.id) : special?.kind === 'specialId' ? special.name.replace('ID ', '') : publicIdOf(user, serverId);
   const can = (a: Action) => checkInteraction(a, user, { blocked, following, myAge: me.age });
   const guard = (a: Action, run: () => void) => {
     const c = can(a);

@@ -4,14 +4,22 @@ import type { ArtName } from '@/components/Art';
 import { COSMETICS } from '@/data/catalog';
 import { FAMILIES } from '@/data/economy';
 import { GIFTS, USERS, type Gift, type User } from '@/data/mock';
+import { serverNo } from '@/lib/public-no';
 
 /** Small stable hash of a string id. */
 export const seedOf = (id: string) => [...id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 1_000_003, 17);
 
 const pick = <T>(list: readonly T[], id: string, salt = 0) => list[(seedOf(id) + salt * 7) % list.length];
 
-/** 12-digit public ID. */
+/**
+ * The 12-digit public ID the app made from an account's id before the server gave everyone their own number. Not
+ * unique (about a million values); still what an older server's accounts show, and the number the server gave each
+ * account where it was free (server/api/migrations/082).
+ */
 export const displayId = (id: string) => String(100_000_000_000 + ((seedOf(id) * 7919) % 900_000_000_000));
+/** The ID a live profile shows: the server's own number for the account, else (an older server) the one made from its id. */
+export const publicIdOf = (u: { publicNo?: string | null } | null | undefined, serverId: string | null | undefined): string | null =>
+  serverNo(u?.publicNo) ?? (serverId ? displayId(serverId) : null);
 
 // --- Personal profile --------------------------------------------------------
 export const ZODIACS = ['Koç', 'Boğa', 'İkizler', 'Yengeç', 'Aslan', 'Başak', 'Terazi', 'Akrep', 'Yay', 'Oğlak', 'Kova', 'Balık'] as const;

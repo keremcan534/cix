@@ -14,7 +14,9 @@ import { Backdrop, DepthCard, EdgeLight, Glass, Gloss, PressableScale, Shine, gl
 import { icon3dSource } from '@/components/Icon3D';
 import { SimilarityChip } from '@/components/similarity';
 import { Avatar, Button } from '@/components/ui';
-import { roomCode } from '@/data/catalog';
+import { roomIdText } from '@/data/catalog';
+import { lookup } from '@/lib/api';
+import type { Lookup } from '@/lib/public-no';
 import { ROOMS, USERS, userById, type Room, type User } from '@/data/mock';
 import {
   COUNTRIES,
@@ -38,7 +40,7 @@ import { showAlert } from '@/lib/alert';
 import { closestRooms, type RoomMatch } from '@/lib/closest';
 import { similarity } from '@/lib/similarity';
 import { useApp } from '@/store';
-import { isLockedRoom, liveMode, message as errorText, oneOnOneOpen, reloadServerRooms, useServerRooms, useServerRoomsState } from '@/lib/live';
+import { isLockedRoom, liveMode, message as errorText, oneOnOneOpen, reloadServerRooms, rememberUser, toLocal, useServerRooms, useServerRoomsState } from '@/lib/live';
 import { setRoomFollow, useFollowedRooms } from '@/lib/live/room-follow';
 import { useJoinedRooms } from '@/lib/live/room-social';
 import { openEvents } from '@/components/events/open';
@@ -646,11 +648,37 @@ function RoomSearch({ visible, rooms, onClose }: { visible: boolean; rooms: Room
   const needle = q.trim().toLocaleLowerCase('tr-TR');
   const results = (
     needle
-      ? rooms.filter((r) => r.title.toLocaleLowerCase('tr-TR').includes(needle) || roomCode(r.id).includes(needle) || r.id === needle)
+      ? rooms.filter((r) => r.title.toLocaleLowerCase('tr-TR').includes(needle) || roomIdText(r).includes(needle) || r.id === needle)
       : rooms
   )
     .slice()
     .sort((a, b) => b.listeners - a.listeners);
+  // A number the list here doesn't have: the server knows everyone's (a room's ID is its owner's own number; an older
+  // app's room ID and a special ID too, server/api/public-no.mjs): who it is, and their room if it is open.
+  const digits = needle.replace(/[\s-]/g, '');
+  const askServer = liveMode() && /^\d{3,12}$/.test(digits) && results.length === 0;
+  const [found, setFound] = useState<{ no: string; hit: Lookup | null } | null>(null);
+  useEffect(() => {
+    if (!askServer) return;
+    let alive = true;
+    const t = setTimeout(() => {
+      lookup(digits).then(
+        (hit) => alive && setFound({ no: digits, hit }),
+        () => alive && setFound({ no: digits, hit: null }),
+      );
+    }, 350);
+    return () => {
+      alive = false;
+      clearTimeout(t);
+    };
+  }, [askServer, digits]);
+  const hit = askServer && found?.no === digits ? found.hit : undefined;
+  const openHit = (h: Lookup) => {
+    close();
+    if (h.room) return router.push(`/oda/${h.room.id}`);
+    rememberUser(h.user);
+    router.push(`/kullanici/${toLocal(h.user.id)}`);
+  };
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
       <Pressable style={styles.backdrop} onPress={close} />
@@ -673,7 +701,7 @@ function RoomSearch({ visible, rooms, onClose }: { visible: boolean; rooms: Room
             </Pressable>
           )}
         </View>
-        <Text style={styles.searchHint}>{needle ? `${results.length} sonuç` : 'Popüler odalar'}</Text>
+        <Text style={styles.searchHint}>{needle ? `${results.length + (hit ? 1 : 0)} sonuç` : 'Popüler odalar'}</Text>
         <ScrollView style={{ maxHeight: 380 }} keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: 6 }}>
           {results.map((r) => (
             <Pressable
@@ -692,7 +720,7 @@ function RoomSearch({ visible, rooms, onClose }: { visible: boolean; rooms: Room
                     {r.title}
                   </Text>
                 </View>
-                <Text style={styles.announce}>ID: {roomCode(r.id)}</Text>
+                <Text style={styles.announce}>ID: {roomIdText(r)}</Text>
               </View>
               <View style={styles.listeners}>
                 <Ionicons name="stats-chart" size={12} color={semantic.actionText} />
@@ -700,7 +728,21 @@ function RoomSearch({ visible, rooms, onClose }: { visible: boolean; rooms: Room
               </View>
             </Pressable>
           ))}
-          {results.length === 0 && <Text style={styles.empty}>Eşleşen oda bulunamadı.</Text>}
+          {hit && (
+            <Pressable style={({ pressed }) => [styles.searchRow, pressed && { backgroundColor: colors.cardAlt }]} onPress={() => openHit(hit)}>
+              <Photo uri={hit.user.avatarUrl ?? undefined} kind="face" seed={hit.user.id} style={styles.searchCover} />
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={styles.roomTitle} numberOfLines={1}>
+                  {hit.room ? hit.room.title : hit.user.name}
+                </Text>
+                <Text style={styles.announce} numberOfLines={1}>
+                  {hit.room ? `ID: ${hit.room.code ?? hit.user.publicNo ?? digits} · ${hit.user.name}` : `ID: ${hit.user.publicNo ?? digits} · odası şu an kapalı, profiline git`}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={colors.textDim} />
+            </Pressable>
+          )}
+          {results.length === 0 && !hit && <Text style={styles.empty}>{askServer && hit === undefined ? 'ID aranıyor…' : askServer ? 'Bu ID ile kimse bulunamadı.' : 'Eşleşen oda bulunamadı.'}</Text>}
         </ScrollView>
       </View>
     </Modal>

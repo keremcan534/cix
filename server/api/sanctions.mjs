@@ -14,7 +14,7 @@
 //
 // Staff (permissions below; users.role admin holds all, moderator a default set, admin_permissions adds more):
 //   GET  /api/admin/sanctions/meta                         → { reasons, types, presets, policies, perms }
-//   GET  /api/admin/sanctions/search?q=                    → { users }   (id, name, phone, device id #, sanction id #)
+//   GET  /api/admin/sanctions/search?q=                    → { users }   (id, name, phone, profile ID, device id #, sanction id #)
 //   GET  /api/admin/sanctions/user?id=                     → { user, sanctions, devices, appeals, audit, contactRefusals }
 //   GET  /api/admin/sanctions/pending                      → { sanctions }   (waiting for approval)
 //   POST /api/admin/sanctions        { user, type, reason, minutes|null, description?, note?, roomId?,
@@ -51,6 +51,7 @@ import {
   int,
   liveBan,
   newSession,
+  publicNoOf,
   readJson,
   sanctionView,
   sha,
@@ -60,6 +61,7 @@ import {
 } from './core.mjs';
 import { accessOf, permsOn, settingsAt } from './agency-lib.mjs';
 import { deleteVoiceRoom, openVoiceRooms, removeFromVoice, roomService } from './live.mjs';
+import { whoIs } from './public-no.mjs';
 
 export const TYPES = Object.keys(SANCTION_LABEL);
 const MUTES = ['mute_room_text', 'mute_room_voice', 'mute_global_text', 'mute_global_voice', 'mute_all'];
@@ -803,9 +805,13 @@ export const sanctionRoutes = {
       const r = await db.query('SELECT user_id FROM user_sanctions WHERE id = $1 UNION SELECT user_id FROM device_accounts WHERE device_id = $1', [n]);
       ids = r.rows.map((x) => x.user_id);
     }
+    // The ID on the person's profile (their own number; a special ID, an older app's room ID: public-no.mjs), a
+    // deleted account's too, as the rest of this search.
+    const owner = /^(ID\s*:?\s*)?[\d\s-]{1,20}$/i.test(q) ? await whoIs(q.replace(/^ID\s*:?/i, ''), db, { anyRoom: true, deleted: true }) : null;
+    if (owner) ids.push(owner.id);
     const digits = q.replace(/\D/g, '');
     const r = await db.query(
-      `SELECT u.id, u.name, u.phone, u.role, u.deleted_at,
+      `SELECT u.id, u.name, u.phone, u.role, u.deleted_at, u.public_no,
               (SELECT count(*) FROM user_sanctions s WHERE s.user_id = u.id AND ${LIVE_SANCTION}) AS live,
               (SELECT count(*) FROM user_sanctions s WHERE s.user_id = u.id) AS total
          FROM users u
@@ -815,7 +821,7 @@ export const sanctionRoutes = {
       [ids, `%${q.replace(/[%_\\]/g, (m) => `\\${m}`)}%`, digits],
     );
     return {
-      users: r.rows.map((x) => ({ id: x.id, name: x.name, phone: x.phone, role: x.role, deleted: !!x.deleted_at, liveSanctions: Number(x.live), totalSanctions: Number(x.total) })),
+      users: r.rows.map((x) => ({ id: x.id, name: x.name, publicNo: publicNoOf(x), phone: x.phone, role: x.role, deleted: !!x.deleted_at, liveSanctions: Number(x.live), totalSanctions: Number(x.total) })),
     };
   },
 

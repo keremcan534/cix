@@ -107,8 +107,14 @@ export function subUntil(u, now = Date.now()) {
 }
 /** Whether the person's VIP subscription runs now: Profiline bakanlar, Seviyeleri gizle. */
 export const subActive = (u, now = Date.now()) => subUntil(u, now) !== null;
+/**
+ * A person's own number (users.public_no, 082; public-no.mjs): the ID their profile shows, and their room's. A string:
+ * it is shown and copied, never counted. null for a row read without it.
+ */
+export const publicNoOf = (u) => (u?.public_no === null || u?.public_no === undefined ? null : String(u.public_no));
 /** What anyone may see about a person: never balances, birth date or role, nor a gender they chose to hide. */
 export const profileOf = (u) => ({
+  publicNo: publicNoOf(u),
   username: u.username ?? null,
   gender: u.gender_hidden ? null : (u.gender ?? null),
   age: u.birth_date ? ageOf(u.birth_date) : null,
