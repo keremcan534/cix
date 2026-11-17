@@ -16,8 +16,9 @@ import { micHaptic, pressHaptic, tapHaptic } from '@/lib/haptics';
 import { SCRIM, colors, edge, fonts, semantic } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
 import { Art } from '@/components/Art';
-import { HOST_FRAME_SCALE, SEAT_ART, SEAT_COLOR_ART } from '@/components/RoomArt';
-import type { SeatColorId } from '@/data/seat-colors';
+import { HOST_FRAME_SCALE, SEAT_ART } from '@/components/RoomArt';
+import { seatColorOf, type SeatColorId } from '@/data/seat-colors';
+import { SeatPouf } from '@/components/room/seat-pouf';
 import { Gloss, Shine, useSpringPress } from '@/components/fx/surface';
 import { Photo } from '@/components/photo';
 import { RoleIcon, type StaffMark } from '@/components/room/role-mark';
@@ -84,7 +85,7 @@ export function Seat({
   muted: boolean;
   /** The staff mark, before the name (components/room/role-mark RoleIcon), never on the photo. */
   staff?: StaffMark | null;
-  /** The room's color for its empty mics (data/seat-colors); none: turquoise. */
+  /** The room's color for its empty mics (data/seat-colors); none or unknown: the default (silver). */
   seatColor?: SeatColorId | null;
   locked?: boolean;
   /** Host seat sharing the top row (e.g. with the boss seat). */
@@ -157,10 +158,9 @@ export function Seat({
   const tick = !!user?.verified && !small && (!slotWidth || slotWidth >= 84);
   const marks = (host ? mark + 3 : 0) + (user && staff ? mark + 3 : 0) + (tick ? 14 : 0);
   const name = { fontSize: nameSize(size), lineHeight: nameLine(size), maxWidth: Math.max(24, (slotWidth ? slotWidth - 6 : 64) - marks) };
-  // An empty or locked seat is its picture (a pending invite keeps the gold bubble); the host's own photo sits in the
-  // gold host frame unless they wear a VIP or shop frame.
-  const art = seatColor ? SEAT_COLOR_ART[seatColor] : SEAT_ART;
-  const seatArt = user ? undefined : locked ? art.locked : invitee ? undefined : art.empty;
+  // An empty or locked seat is the pouf in the room's seat color (a pending invite keeps the gold bubble); the host's
+  // own photo sits in the gold host frame unless they wear a VIP or shop frame.
+  const pouf = !user && (locked || !invitee);
   const hostFrame = host && !mini ? SEAT_ART.hostFrame : undefined;
   const frameSize = Math.round(size * HOST_FRAME_SCALE);
   const muteText = modMuted ? ', yönetim tarafından susturuldu' : muted ? ', mikrofonu kapalı' : '';
@@ -199,13 +199,13 @@ export function Seat({
                 />
               )}
             </>
-          ) : seatArt !== undefined ? (
+          ) : pouf ? (
             <View style={{ width: size, height: size }}>
-              <Image source={seatArt} style={{ width: size, height: size }} resizeMode="contain" accessibilityIgnoresInvertColors />
+              <SeatPouf color={seatColorOf(seatColor).color} locked={locked} size={size} />
               {!locked && (
-                // The "+" on the seat's dark front, under its gold band.
+                // The "+" on the seat's shaded front, under its gold band; its shadow keeps it seen on a light color.
                 <View pointerEvents="none" style={[StyleSheet.absoluteFill, { top: size * 0.36, alignItems: 'center', justifyContent: 'center' }]}>
-                  <Ionicons name="add" size={mini ? 12 : Math.round(Math.max(13, Math.min(24, size * 0.28)))} color="rgba(255,255,255,0.85)" />
+                  <Ionicons name="add" size={mini ? 12 : Math.round(Math.max(13, Math.min(24, size * 0.28)))} color="rgba(255,255,255,0.9)" style={styles.seatPlus} />
                 </View>
               )}
             </View>
@@ -753,6 +753,7 @@ const styles = StyleSheet.create({
   mutedBadge: { position: 'absolute', right: 0, bottom: 0, backgroundColor: colors.red, borderRadius: 10, padding: 3 },
   selfMutedBadge: { backgroundColor: '#475569' },
   invitedSeat: { borderColor: colors.gold, backgroundColor: 'rgba(246,189,96,0.12)' },
+  seatPlus: { textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   // The line under the name the PK pill goes on: the same height in every room, PK or not (lib/seat-fit PK_LINE).
   pkLine: { height: PK_LINE, marginTop: -4, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'flex-start' },
   pkWrap: { alignItems: 'center' },

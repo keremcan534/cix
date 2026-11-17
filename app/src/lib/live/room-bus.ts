@@ -27,7 +27,7 @@
 //    own `seat` attribute changed by the server).
 import { useEffect, useRef, useSyncExternalStore } from 'react';
 
-import { isSeatColor, type SeatColorId } from '@/data/seat-colors';
+import { isSeatColorId, type SeatColorId } from '@/data/seat-colors';
 import type { Look } from '@/lib/live/looks';
 import type { BossNews } from '@/lib/patron-seat';
 import { parseMove, type Move } from '@/lib/room-moves';
@@ -70,7 +70,7 @@ export type RoomState = {
   queue: string[];
   music: RoomMusic | null;
   video: RoomVideo | null;
-  /** The empty mics' color (server/api/room-seat-color.mjs); null: the free turquoise. */
+  /** The empty mics' color (server/api/room-seat-color.mjs, data/seat-colors); null: none written (an older server). */
   seatColor: SeatColorId | null;
 };
 /**
@@ -159,7 +159,7 @@ export function parseRoomState(metadata: string | undefined): RoomState | null {
     const layoutId = typeof m.layoutId === 'string' && m.layoutId.length <= 40 ? m.layoutId : null;
     const micCount = Number.isInteger(m.micCount) && (m.micCount as number) >= 1 && (m.micCount as number) <= 99 ? (m.micCount as number) : null;
     const queue = Array.isArray(m.queue) ? [...new Set(m.queue.filter((x): x is string => typeof x === 'string' && !!x && x.length <= 64))].slice(0, 50) : [];
-    return { layoutId, micCount, micQueue: m.micQueue, queue, music: parseMusic(m.music), video: parseRoomVideo(m.video), seatColor: isSeatColor(m.seatColor) ? m.seatColor : null };
+    return { layoutId, micCount, micQueue: m.micQueue, queue, music: parseMusic(m.music), video: parseRoomVideo(m.video), seatColor: isSeatColorId(m.seatColor) ? m.seatColor : null };
   } catch {
     return null;
   }

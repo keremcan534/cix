@@ -35,7 +35,7 @@ import { HttpError, LIVE_SANCTION, SANCTION_SELECT, UUID, auth, blockedBetween, 
 import { announceRoom, deleteVoiceRoom, presenceTracked, removeFromVoice, roomService, voiceCounts } from './live.mjs';
 import { applySanction, audit, liftSanction, refreshVoice } from './sanctions.mjs';
 import { applyRules, memberCap, rulesOf } from './room-rules.mjs';
-import { ROOM_COVERS, ROOM_THEMES } from './catalog.mjs';
+import { ROOM_COVERS, ROOM_THEMES, SEAT_DEFAULT } from './catalog.mjs';
 import { hasPerk } from './levels.mjs';
 import { statusOf } from './economy.mjs';
 // music.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
@@ -167,7 +167,16 @@ const queueOf = async (roomId) =>
  */
 export async function pushRoomMeta(roomId) {
   try {
-    const r = (await db.query('SELECT locked_seats, layout_id, mic_count, mic_queue, video, seat_color FROM rooms WHERE id = $1', [roomId])).rows[0];
+    // The seat color only while the room has it (bought, not run out: room-seat-color.mjs); else the default.
+    const r = (
+      await db.query(
+        `SELECT locked_seats, layout_id, mic_count, mic_queue, video,
+                CASE WHEN EXISTS (SELECT 1 FROM room_seat_colors s WHERE s.room_id = rooms.id AND s.color = rooms.seat_color AND (s.ends_at IS NULL OR s.ends_at > now()))
+                     THEN seat_color END AS seat_color
+           FROM rooms WHERE id = $1`,
+        [roomId],
+      )
+    ).rows[0];
     if (!r) return false;
     // The music's files go out at this server's address, like every answer (core.mjs filesOut).
     const metadata = filesOut(
@@ -180,8 +189,8 @@ export async function pushRoomMeta(roomId) {
         music: await roomMusic(roomId),
         // The shared YouTube screen (room-video.mjs): checked when it was written.
         video: r.video ?? null,
-        // The empty mics' color (room-seat-color.mjs); null: the free turquoise.
-        seatColor: r.seat_color ?? null,
+        // The empty mics' color (room-seat-color.mjs), the default by its id: an older app drew none as turquoise.
+        seatColor: r.seat_color ?? SEAT_DEFAULT,
       }),
     );
     const name = liveKitName(roomId);

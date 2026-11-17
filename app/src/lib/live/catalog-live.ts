@@ -40,6 +40,7 @@ import { parseLiveEmoji, type LiveEmoji } from '@/lib/emoji-live-core';
 import { parseLiveLevels, type LiveLevels } from '@/lib/levels-live-core';
 import { mergeShop, parseLiveShop, type LiveShop } from '@/lib/shop-live-core';
 import { COSMETICS, setLiveCosmetics } from '@/data/catalog';
+import { setLiveSeatColors } from '@/data/seat-colors';
 import { parseFxList, type FxVideo } from '@/lib/fx-videos-core';
 import { parseCatalog, type CatalogPack } from '@/lib/live/billing-core';
 
@@ -228,7 +229,11 @@ export function parseSavedLiveCatalog(raw: string | null): { catalog: LiveCatalo
     // listed (no fx), or from before the shelves were (no shelf): that app hid the gifts put back on the shelves
     // (data/gifts-paused), and an updated phone would go on hiding them until the copy was ten minutes old.
     // One from before the level settings (no levels) too: the levels would stay the compiled ones until it was old.
-    fetchedAt: 'fx' in r && 'shelf' in r && 'levels' in r && 'shop' in r && typeof r.fetchedAt === 'number' && Number.isFinite(r.fetchedAt) ? r.fetchedAt : 0,
+    // And one whose shop came before the seat colors did (no seats): a room's color the panel added would be silver.
+    fetchedAt:
+      'fx' in r && 'shelf' in r && 'levels' in r && 'shop' in r && (r.shop === null || 'seats' in obj(r.shop)) && typeof r.fetchedAt === 'number' && Number.isFinite(r.fetchedAt)
+        ? r.fetchedAt
+        : 0,
   };
 }
 
@@ -350,8 +355,10 @@ const same = (a: LiveCatalog | null, b: LiveCatalog) => !!a && JSON.stringify(a)
 const publish = (next: LiveCatalog) => {
   if (same(current, next)) return;
   current = next;
-  // The shop's frames and entry effects for every screen that looks one up (data/catalog cosmeticById).
+  // The shop's frames and entry effects for every screen that looks one up (data/catalog cosmeticById), and the rooms'
+  // seat colors (data/seat-colors).
   setLiveCosmetics(next.shop ? mergeShop(COSMETICS, next.shop) : null);
+  setLiveSeatColors(next.shop?.seats ?? null);
   listeners.forEach((l) => l());
 };
 // Storage failures never matter here: the next answer replaces the copy.

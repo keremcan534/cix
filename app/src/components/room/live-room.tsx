@@ -114,7 +114,7 @@ import { followerInviteAt, inviteSeat as pickInviteSeat, roomShareText, serverIn
 import { liveDm } from '@/lib/live/messages';
 import { LiveMusicSheet, useRoomMusicPlayer } from '@/components/room/room-music';
 import { SeatColorSheet } from '@/components/room/seat-color-sheet';
-import { seatColorName } from '@/data/seat-colors';
+import { roomSeatColorShown, seatColorName } from '@/data/seat-colors';
 import { roomUnmute } from '@/lib/api';
 import { showAlert } from '@/lib/alert';
 import { checkText, messageRefusal, noteSent, refusalTitle } from '@/lib/contact-filter';
@@ -493,8 +493,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // The shared YouTube screen of a server room (lib/live/room-video): the server's video, from the metadata, on every
   // phone. My own change goes to the server; refused, the screen goes back to what the server has.
   const metaVideo = real ? (liveState?.video ?? null) : null;
-  // The empty mics' color the owner bought for the room (Koltuk rengi); null: the turquoise ones.
-  const seatColor = real ? (liveState?.seatColor ?? null) : null;
+  // The empty mics' color the owner bought for the room (Koltuk rengi); null: the default (silver). While the voice
+  // room's state is read again (joining, a dropped connection coming back) the last one seen, not a flash of silver.
+  const seatColor = real ? roomSeatColorShown(id, liveState?.seatColor) : null;
   const metaVideoKey = metaVideo ? `${metaVideo.videoId}:${metaVideo.status}:${metaVideo.position}:${metaVideo.updatedAt}` : 'none';
   useEffect(() => {
     if (real && liveState) applyServerVideo(id, metaVideo && videoPlayback(metaVideo), metaVideoKey);
@@ -3242,7 +3243,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                     ...(myRole === 'owner'
                       ? [
                           { key: 'djs', label: 'DJ’ler', value: `${djIds.length}/${djCapacity(level)}`, hint: 'Odada yalnızca müzik çalarlar; başka yetkileri yok', onPress: fromSettings(openDjs) },
-                          { key: 'seatColor', label: 'Koltuk rengi', value: seatColorName(seatColor), hint: 'Boş mikrofonların rengi; bir kez alınır, oda hep kullanır', onPress: fromSettings(() => setPanel('seatColor')) },
+                          { key: 'seatColor', label: 'Koltuk rengi', value: seatColorName(seatColor), hint: 'Boş mikrofonların rengi; odadaki herkes görür', onPress: fromSettings(() => setPanel('seatColor')) },
                         ]
                       : []),
                   ]

@@ -1,14 +1,16 @@
-# Mağaza yönetimi (çerçeveler, giriş efektleri, sohbet balonları, ses dalgaları)
+# Mağaza yönetimi (çerçeveler, giriş efektleri, sohbet balonları, ses dalgaları, koltuk renkleri)
 
 Müşterinin isteği (17 Kasım): giriş efekti, çerçeve, sohbet balonu, ses dalgası ve çıkartma paketleri için mağaza içeriğini düzenleyecek bir ekran. Giriş efektinde odaya girenin adı animasyonun üstünde yazmalı.
 
 Sahibin kararı: önce giriş efekti ve çerçeve (yayında), sonra sohbet balonu ve ses dalgası (bu bölüm).
 
+Sahibin isteği (17 Kasım, koltuk rengi): koltuk rengi kendi kendine değişmesin; cırtlak renk olmasın (pembe açık pembe, yeşil haki olsun; kırmızı ve turuncu kalsın); standart Gümüş, diğerleri ücretli; renklerin paleti, adı, fiyatı ve süresi panelden ayarlansın.
+
 Çıkartma paketleri zaten panelde: **Uygulama › Emojiler** ([`EMOJI_YONETIMI.md`](EMOJI_YONETIMI.md)).
 
 ## Panelde: Hediye ve mağaza › Mağaza
 
-Dört sekme var: **Giriş efektleri**, **Çerçeveler**, **Sohbet balonları** ve **Ses dalgaları**.
+Beş sekme var: **Giriş efektleri**, **Çerçeveler**, **Sohbet balonları**, **Ses dalgaları** ve **Koltuk renkleri**.
 
 - **Uygulamanın kendi eşyaları:** şunlar değişir ve "Orijinaline dön" ile geri gelir:
   - ad
@@ -51,6 +53,14 @@ Dört sekme var: **Giriş efektleri**, **Çerçeveler**, **Sohbet balonları** v
   - **Stil:** Halka (tek renk), Çift halka (iki renk; dıştaki sesle daha çok açılır), Dönen renkler (2–4 renk), Yayılan halka (tek renk), Parıltı (halka rengi ve dönen dört şekil).
   - **Parıltı resmi (isteğe bağlı):** saydam PNG ya da WebP, 64–512 px, en çok 512 KB. Kalp ya da yıldız gibi bir şekil; noktaların yerine döner.
   - **Önizleme:** konuşan bir yüzün çevresinde.
+- **Koltuk renkleri:** odadaki boş ve kilitli mikrofonların rengi. Oda sahibi rengi odası için alır, odadaki herkes görür.
+  - Her rengin adı, rengi, fiyatı ve süresi (gün; 0 = süresiz) değişir; uygulamanın altı renginin rengi de. **Yeni koltuk rengi** ile renk eklenir.
+  - **Renk:** renk seçici ve hazır yumuşak tonlar. Önizleme telefondaki gibidir: boş ve kilitli koltuk, minder seçilen renge boyanır, altın kenarı, ayakları ve kilidi aynı kalır.
+  - **Gümüş** her odanın ücretsiz, varsayılan rengidir: adı ve rengi değişir; fiyatı ve süresi olmaz, satıştan kalkmaz.
+  - Süreli bir rengin süresi bitince oda bir dakika içinde Gümüş'e döner. Süre içinde oda o renge ücretsiz geri döner.
+  - Fiyatı ya da süreyi değiştirmek önceden alanları etkilemez. Süre gelmeden önce alınmış renkler süresizdir.
+  - Kartta rengin kaç odada olduğu yazar. Bir odada olan renk silinmez; satıştan kaldırılır (alan odalar süresi bitene kadar kullanır).
+  - Renkte VIP seviyesi yoktur.
 - **Satıştan kaldırma ve silme:**
   - Satıştan kaldırılan eşya mağazada görünmez ve satılmaz. Sahibi kullanmaya devam eder; odada başkaları da görür.
   - Kimsede olmayan kendi eşyanız silinebilir; resmi ve videosu da silinir.
@@ -71,6 +81,7 @@ Dört sekme var: **Giriş efektleri**, **Çerçeveler**, **Sohbet balonları** v
   - Mesaj, köşe çizgilerinin arasındaki alana yazılır. Bu alan, yazı rengiyle okunacak kadar sade olsun.
   - Kenarları yuvarlak bir balon için çevresi saydam olmalı.
 - **Ses dalgası resmi:** tek bir küçük şekil (kalp, yıldız). Telefon dört tanesini halkanın üstünde döndürür.
+- **Koltuk:** koltuk resmi tek bir puftur; uygulama onu üç katmanla çizer (minderin şekli, ışığı ve gölgesi, altını) ve minderi panelden seçilen renge boyar. Yeni bir koltuk resmi gelirse `app/scripts/seat-layers.py` onu üç katmana ayırır (`app/assets/room/koltuk-{bos,kilitli}-{renk,isik,altin}.png`, panelde `web/img`). Minder tek renk ve açık tonlu olsun; altın süsler sarı-turuncu altın tonunda kalsın (betik altını renginden ayırır).
 
 ## Telefonlar
 
@@ -82,23 +93,26 @@ Dört sekme var: **Giriş efektleri**, **Çerçeveler**, **Sohbet balonları** v
   - Yazının görünüşünü (büyük harf, harf aralığı, gölge, kontur, bant) ve zamanını panelden okur. "Ad yazılsın" kapalıysa yalnız video oynar. Mağazada efektin ikonunu gösterir.
   - Sizin sohbet balonunuzu odadaki sohbette çizer: renkleriyle ya da resmiyle, köşeler bozulmadan.
   - Sizin ses dalganızı konuşanın koltuğunda çizer; dalga sese göre büyür.
+  - Koltuk renklerini panelden okur: adı, rengi, fiyatı ve süresi; sizin eklediğiniz renkler de. Kalan günü gösterir. Bağlantı bir an kopup dönerken koltuklar son rengi korur (önceden bir an varsayılan renge dönüp geri geliyordu).
 - **Eski APK'lar:**
   - Hareketli çerçeveden önceki APK'lar çerçevenin durağan resmini gösterir.
   - Kendi içindeki mağazayı gösterir.
   - Panelde fiyatı ya da süresi değişmiş bir eşyayı alamaz, "uygulamayı güncelle" görür. Satıştan kaldırılmış eşya için "artık satışta değil" görür.
   - Sizin eklediğiniz eşyaları göremez. Onları takan birini görünce çerçeve, giriş efekti, balon ya da dalga çizmez; düz halini gösterir.
   - Çerçeve ve giriş efektiyle çıkan APK (preview-172) balon ve dalga satırlarını atlar; kendi balonlarını ve dalgalarını gösterir.
+  - Koltuk renklerini kendi altı rengiyle ve eski resimleriyle gösterir; sizin eklediğiniz rengi bilmez, kendi varsayılanını (turkuaz) çizer. Gümüş'ü artık ücretsiz alır; panelde fiyatı ya da süresi değişen rengi ve artık ücretli olan Turkuaz'ı alamaz ("uygulamayı güncelle", jeton düşmez).
   - Yazı ayarlarından önceki APK'lar adı plakanın yerine, boyunda, renginde ve kalınlığında yazar. "Ad yazılsın" kapalı olsa da adı yazar. Büyük harf, harf aralığı, gölge, kontur, bant ve zamanı bilmez. İkonu göstermez.
 
 ## Teknik
 
-- **Tablo:** `076_shop_items`, `077_shop_bubbles_waves` (balon ve dalga; görünüş `look` sütununda), `078_shop_entry_icons` (giriş efektinin ikonu, `icon_url`), `079_shop_frame_motion` (çerçevenin hareketli hali, `motion_url`, katalogda `art.motion`; deliğin yeri, `hole_x` / `hole_y`, katalogda `art.at`, ortadaysa yok).
+- **Tablo:** `076_shop_items`, `077_shop_bubbles_waves` (balon ve dalga; görünüş `look` sütununda), `078_shop_entry_icons` (giriş efektinin ikonu, `icon_url`), `079_shop_frame_motion` (çerçevenin hareketli hali, `motion_url`, katalogda `art.motion`; deliğin yeri, `hole_x` / `hole_y`, katalogda `art.at`, ortadaysa yok), `083_seat_colors` (koltuk rengi türü `seat`, rengi `look`; `room_seat_colors.ends_at`: süreli rengin bitişi).
 - **İsim plakası (`plate`):** `x`, `y`, `w`, `size`, `color`, `bold`; yeni alanlar `show`, `upper`, `spacing`, `shadow` (`{ color, size }` ya da `null`), `outline` (`{ color, size }` ya da `null`), `back` (`{ color, alpha }` ya da `null`), `from`, `to` (saniye), `anim` (`none` / `fade` / `zoom` / `rise`). Gönderilmeyen alan varsayılanını alır (`PLATE_DEFAULT`); eski kayıtlarda olmayan alanları telefon ve panel varsayılanla okur.
 - **Sunucu:**
   - `shop-items.mjs`: panel uçları ve telefonlara giden liste (`GET /api/catalog?shop=1` `shop`).
   - Giriş efekti videoları `/api/fx/s/<id>.mp4` adresinden ve katalogun `fx` listesinden gelir.
   - Video çevirme hediyelerle aynı iş: `custom-gifts.mjs` iki tabloyu sırayla çevirir.
   - Balon ve dalga resimleri de `shopframe` yüklemesiyle gelir; boyutu ve saydamlığı kullanımına göre `shop-items.mjs`'de denetlenir.
+  - Koltuk rengi kişinin aldığı bir eşya değildir: kişinin mağazası (`economy.mjs`) onu satmaz; oda için `room-seat-color.mjs` satar ([`SUNUCU.md`](SUNUCU.md) Koltuk rengi).
 - **Satış:** `economy.mjs` eşyayı panelin değerleriyle satar.
 - **Hareketli WebP telefonda:** Expo şablonu React Native'in `<Image>`'ında hareketli WebP'yi kapalı getirir (`expo.webp.animated=false`). `plugins/with-animated-webp` onu açar (Fresco animated-webp); yeni APK gerekir.
 - **Yükleme sınırı:** yönetici hesabı dakikada 120 dosya yükleyebilir (diğerleri 20); 24 çerçevelik bir set 48 dosyadır.
@@ -107,9 +121,10 @@ Dört sekme var: **Giriş efektleri**, **Çerçeveler**, **Sohbet balonları** v
   - `data/catalog` `cosmeticById` panelin değerlerini verir.
   - Plakayı `components/fx/video-fx` `PlateName` çizer.
   - Balonu `components/fx/shop-bubble` çizer; dalgayı `components/room/voice-wave` çizer (uygulamanın dört dalgası da aynı stillerden).
+  - Koltuk renklerini `data/seat-colors` tutar (liste gelmeden uygulamanın altı rengi); koltuğu `components/room/seat-pouf` çizer (minder katmanı `tintColor` ile boyanır).
 - **Testler:**
-  - Sunucu: `test/shop-items.test.mjs`.
-  - Uygulama: `tests/shop-live.test.ts`.
+  - Sunucu: `test/shop-items.test.mjs`, `test/room-seat-color.test.mjs`.
+  - Uygulama: `tests/shop-live.test.ts`, `tests/seat-colors.test.ts`.
   - Panel: `tests/app-admin.test.ts`.
 
 ## Sırada

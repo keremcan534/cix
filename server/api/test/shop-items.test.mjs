@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { SHOP } from '../catalog.mjs';
+import { SEAT_COLORS, SHOP } from '../catalog.mjs';
 import { convertArgs } from '../custom-gifts.mjs';
 import { PLATE_DEFAULT } from '../shop-items.mjs';
 import { startApi } from './harness.mjs';
@@ -126,13 +126,14 @@ describe('Yönetim › Mağaza', () => {
     const items = await panel();
     const appOnes = [...SHOP.values()].filter((x) => ['frame', 'entry', 'bubble', 'wave'].includes(x.kind));
     assert.ok(appOnes.some((x) => x.kind === 'bubble') && appOnes.some((x) => x.kind === 'wave'));
-    assert.deepEqual(items.map((x) => x.id).sort(), appOnes.map((x) => x.sku).sort());
+    // The rooms' seat colors are on the list too (room-seat-color.test.mjs).
+    assert.deepEqual(items.map((x) => x.id).sort(), [...appOnes.map((x) => x.sku), ...SEAT_COLORS.keys()].sort());
     const neon = items.find((x) => x.id === 'fr-neon');
     assert.deepEqual([neon.builtin, neon.name, neon.price, neon.days, neon.changed], [true, SHOP.get('fr-neon').name, SHOP.get('fr-neon').price, SHOP.get('fr-neon').days, []]);
     const old = await catalog('');
     assert.equal(old.shop, undefined, 'eski uygulama istemez');
     const c = await catalog();
-    assert.equal(c.shop.items.length, appOnes.length);
+    assert.equal(c.shop.items.length, appOnes.length + SEAT_COLORS.size);
     assert.deepEqual(c.shop.items.find((x) => x.sku === 'en-dragon'), { sku: 'en-dragon', kind: 'entry', name: 'Ejderha', price: 3000, days: 30, minVip: 7, builtin: true });
   });
 

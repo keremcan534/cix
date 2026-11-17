@@ -7,7 +7,6 @@ import { Image, View, type StyleProp, type TextStyle } from 'react-native';
 
 import { Text } from '@/components/text';
 import type { RoomTheme, RoomType } from '@/data/catalog';
-import type { SeatColorId } from '@/data/seat-colors';
 
 export const ROOM_TYPE_ART: Record<RoomType, number> = {
   free: require('../../assets/room/oda-turu-serbest-sohbet.png'),
@@ -70,23 +69,22 @@ export const ROOM_ICON_ART = {
   join: require('../../assets/room/oda-oda-uyesi-ol.png'),
 } as const;
 
-// Mic seats (docs/ODA_GORSEL_LISTESI.md "Koltuk görselleri"): the empty and the locked seat (components/room/parts
-// Seat; the code adds the "+"), and the host's gold frame with its small crown. Partial: a seat with no picture here
-// keeps the glass bubble drawn in code.
-export const SEAT_ART: Partial<Record<'empty' | 'locked' | 'hostFrame', number>> = {
-  empty: require('../../assets/room/koltuk-bos.png'),
-  locked: require('../../assets/room/koltuk-kilitli.png'),
-  hostFrame: require('../../assets/room/koltuk-ev-sahibi-cercevesi.png'),
+// Mic seats (docs/ODA_GORSEL_LISTESI.md "Koltuk görselleri"): the empty and the locked seat, each in three layers
+// that components/room/seat-pouf stacks in the room's seat color (data/seat-colors): the cushion in white (tinted),
+// its light and shade, and its gold as it is (the code adds the "+"); and the host's gold frame with its small crown.
+export const SEAT_LAYERS: Record<'empty' | 'locked', { color: number; light: number; gold: number }> = {
+  empty: {
+    color: require('../../assets/room/koltuk-bos-renk.png'),
+    light: require('../../assets/room/koltuk-bos-isik.png'),
+    gold: require('../../assets/room/koltuk-bos-altin.png'),
+  },
+  locked: {
+    color: require('../../assets/room/koltuk-kilitli-renk.png'),
+    light: require('../../assets/room/koltuk-kilitli-isik.png'),
+    gold: require('../../assets/room/koltuk-kilitli-altin.png'),
+  },
 };
-/** Koltuk rengi (data/seat-colors): the empty and locked mic in each color; turquoise is SEAT_ART's own. */
-export const SEAT_COLOR_ART: Record<SeatColorId, { empty: number; locked: number }> = {
-  turkuaz: { empty: require('../../assets/room/koltuk-bos.png'), locked: require('../../assets/room/koltuk-kilitli.png') },
-  pembe: { empty: require('../../assets/room/koltuk-bos-pembe.png'), locked: require('../../assets/room/koltuk-kilitli-pembe.png') },
-  kirmizi: { empty: require('../../assets/room/koltuk-bos-kirmizi.png'), locked: require('../../assets/room/koltuk-kilitli-kirmizi.png') },
-  turuncu: { empty: require('../../assets/room/koltuk-bos-turuncu.png'), locked: require('../../assets/room/koltuk-kilitli-turuncu.png') },
-  yesil: { empty: require('../../assets/room/koltuk-bos-yesil.png'), locked: require('../../assets/room/koltuk-kilitli-yesil.png') },
-  gumus: { empty: require('../../assets/room/koltuk-bos-gumus.png'), locked: require('../../assets/room/koltuk-kilitli-gumus.png') },
-};
+export const SEAT_ART: { hostFrame: number } = { hostFrame: require('../../assets/room/koltuk-ev-sahibi-cercevesi.png') };
 /** The host frame's square picture is this many times the avatar: its ring sits on the photo's edge, the crown above. */
 export const HOST_FRAME_SCALE = 1.64;
 

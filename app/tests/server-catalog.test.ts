@@ -10,7 +10,7 @@ import { ANIMATION_SEED } from '@/data/animations';
 import { COSMETICS, ROOM_BACKGROUNDS, ROOM_THEMES, STICKER_PACKS, roomCoverUrl } from '@/data/catalog';
 import { GIFTS } from '@/data/mock';
 import { RULES } from '@/data/rules';
-import { SEAT_COLORS } from '@/data/seat-colors';
+import { SEAT_COLORS, SEAT_DEFAULT } from '@/data/seat-colors';
 import { convertDiamonds, diamondValueTl, exchangeOwnDiamonds, selfExchangeRate, wholesaleQuote } from '@/lib/coins-bank';
 import { NOBLE_DAYS, NOBLE_TIERS, RECHARGE_PACKS, SVIP_LEVELS, VIP_PLANS } from '@/data/status';
 import { vipProductOf } from '@/lib/live/vip-core';
@@ -104,8 +104,9 @@ describe('Sunucu kataloğu uygulamayla aynı', () => {
     assert.deepEqual(server.FREE_MICFX, free);
   });
 
-  test('koltuk renkleri: kimlik, ad ve fiyat', () => {
-    assert.deepEqual([...(server.SEAT_COLORS as Map<string, { id: string; name: string; price: number }>).values()], SEAT_COLORS.map((c) => ({ ...c })));
+  test('koltuk renkleri: kimlik, ad, fiyat ve renk', () => {
+    assert.deepEqual([...(server.SEAT_COLORS as Map<string, { id: string; name: string; price: number; color: string }>).values()], SEAT_COLORS.map((c) => ({ ...c })));
+    assert.equal(server.SEAT_DEFAULT, SEAT_DEFAULT);
   });
 
   test('hediye adetleri (hediye paneli)', () => {

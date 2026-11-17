@@ -502,11 +502,18 @@ export const vipStatus = () => call<{ until: string | null; autoRenewing: boolea
 export const roomAnimation = (room: string, animationId: string, ref = newRef()) =>
   call<{ user: ServerUser; replay: boolean; eventId: number; price: number }>('POST', '/api/rooms/animation', { room, animationId, ref });
 
-/** Koltuk rengi (server/api/room-seat-color.mjs): the room's empty-mic color and the colors it has bought. */
-export const roomSeatColor = (room: string) => call<{ color: string; owned: string[] }>('GET', `/api/rooms/seat-color?room=${encodeURIComponent(room)}`);
-/** Sets it (owner only); a paid color the room doesn't have yet is bought with my coins, once. */
-export const setRoomSeatColor = (room: string, color: string, ref = newRef()) =>
-  call<{ color: string; owned: string[]; price: number; user?: ServerUser; replay?: boolean }>('POST', '/api/rooms/seat-color', { room, color, ref });
+/**
+ * Koltuk rengi (server/api/room-seat-color.mjs): the room's empty-mic color, the colors it has now and when each of
+ * them runs out (`until`, ISO times; none: for good; an older server sends none).
+ */
+export type RoomSeatColors = { color: string; owned: string[]; until?: Record<string, string> };
+export const roomSeatColor = (room: string) => call<RoomSeatColors>('GET', `/api/rooms/seat-color?room=${encodeURIComponent(room)}`);
+/**
+ * Sets it (owner only); a paid color the room doesn't have is bought with my coins, once, at the price and for the
+ * days this phone showed (null: for good): another price or days now is a 409 price_changed, nothing taken.
+ */
+export const setRoomSeatColor = (room: string, color: string, shown: { price: number; days: number | null }, ref = newRef()) =>
+  call<RoomSeatColors & { price: number; user?: ServerUser; replay?: boolean }>('POST', '/api/rooms/seat-color', { room, color, price: shown.price, days: shown.days ?? 0, ref });
 
 /** This phone's push token: an Expo one, or Firebase's own (kind 'fcm', lib/push), which the server sends to through Firebase. */
 export const registerPush = (token: string, platform: 'ios' | 'android' | 'web', kind: 'expo' | 'fcm' = 'expo') =>
