@@ -8,6 +8,8 @@ import { cosmeticById } from '@/data/catalog';
 import { vipTier } from '@/data/economy';
 import { charmTier } from '@/data/charm';
 import { wealthTier, type LevelTier } from '@/data/wealth';
+import { tierFor, tiersOf } from '@/lib/levels-live-core';
+import { useLevels } from '@/lib/live/levels-live';
 import { AnimatedFrame, FRAME_LOOKS, type FrameFx } from '@/components/fx/frames';
 import { goBack } from '@/lib/nav';
 import { pressHaptic, tapHaptic } from '@/lib/haptics';
@@ -339,13 +341,15 @@ const CHIP: Record<ChipSize, { height: number; left: number; right: number; dot:
   lg: { height: 30, left: 4, right: 12, dot: 22, glyph: 13, text: 15 },
 };
 
-/** Cömertlik Seviyesi badge: the level group's colors and symbol plus the level number. */
+/** Cömertlik Seviyesi badge: the level group's colors and symbol plus the level number (groups as Seviye ve VIP ayarları name them). */
 export function WealthBadge({ level, size = 'sm' }: { level: number; size?: ChipSize }) {
-  return <TierBadge tier={wealthTier(level)} level={level} size={size} label={`Cömertlik seviyesi ${level}`} />;
+  const levels = useLevels();
+  return <TierBadge tier={levels?.wealth ? tierFor(tiersOf(levels, 'wealth'), level) : wealthTier(level)} level={level} size={size} label={`Cömertlik seviyesi ${level}`} />;
 }
 /** Yankı Seviyesi badge (same shape, its own colors and symbols). */
 export function CharmBadge({ level, size = 'sm' }: { level: number; size?: ChipSize }) {
-  return <TierBadge tier={charmTier(level)} level={level} size={size} label={`Yankı seviyesi ${level}`} />;
+  const levels = useLevels();
+  return <TierBadge tier={levels?.charm ? tierFor(tiersOf(levels, 'charm'), level) : charmTier(level)} level={level} size={size} label={`Yankı seviyesi ${level}`} />;
 }
 function TierBadge({ tier: t, level, size, label }: { tier: LevelTier; level: number; size: ChipSize; label: string }) {
   const styles = useStyles();

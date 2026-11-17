@@ -65,6 +65,16 @@ Son güncelleme: preview-96 sonrası (Küçült, çanta yağmuru, @bahset düzel
 - **Bildirimler:** Mesaj, hediye ve takip bildirimleri gelecek.
 - **Kurulum:** Kod hazır. Firebase dosyaları girilince açılır (aşağıda).
 
+## Seviye ve VIP ayarları (yeni APK)
+
+- **Çalışıyor (yeni APK):** VIP, Rütbe, Cömertlik, Yankı ve Abonelik finans panelinden (Seviye ve VIP › Seviyeler ve VIP) ayarlanıyor; telefon ayarı katalogla alıyor.
+  - VIP sayfası: seviye adları, puanları ve hangi hakkın hangi seviyede açıldığı.
+  - Abonelik: hangi paket görünür, etiketi, uygulamada yazan fiyat.
+  - Rütbe: kademe adı, fiyatı ve günü. Değişen kademe gösterilen fiyat ve günle alınır.
+  - Seviye sayfası: Cömertlik ve Yankı puanları, grup adları; seviye düşmesi açıksa kuralı yazar.
+- **Eski APK'lar:** seviyeyi kendi içindeki eşiklerle gösterir; sunucunun denetimleri herkes için ayara uyar. Panelde değişmiş Rütbe kademesini eski APK alamaz, "uygulamayı güncelle" görür.
+- Ayrıntı: [`SEVIYE_AYARLARI.md`](SEVIYE_AYARLARI.md).
+
 ## Paket 5'te gelenler
 
 - **Ajans kazançları:** Gerçek dosya olarak (Excel'de açılır) paylaşılıyor.

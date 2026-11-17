@@ -12,10 +12,10 @@ import {
 } from '@/data/economy';
 import { INITIAL_RBAC, type RbacState } from '@/data/rbac';
 import { animById, isLive } from '@/lib/animations';
-import { NOBLE_DAYS, RECHARGE_PACKS, SVIP_LEVELS, VIP_PLANS, nobleInfo, svipLevelOf } from '@/data/status';
+import { RECHARGE_PACKS, SVIP_LEVELS, VIP_PLANS } from '@/data/status';
 import { RULES, type Rules } from '@/data/rules';
-import { countsForWealth, wealthLevelOf } from '@/data/wealth';
-import { charmBonusPct, charmLevelOf } from '@/data/charm';
+import { countsForWealth } from '@/data/wealth';
+import { charmBonusPct } from '@/data/charm';
 import { showAlert } from '@/lib/alert';
 import { exchangeOwnDiamonds } from '@/lib/coins-bank';
 import { addLock, diamondSplit, fromServerLock, lockMs, lockedReason, locksFor, unlistedLocked, type DiamondLock } from '@/lib/diamond-locks';
@@ -32,7 +32,9 @@ import { giftById } from '@/lib/live/catalog-live';
 import { livePack } from '@/lib/live/emoji-live';
 import type { ServerEarnings, ServerUser } from '@/lib/api';
 import { block as serverBlock, follow } from '@/lib/api';
-import { bindWallet, forgetLiveAccount, liveEquip, liveMode, liveSpend, myServerId, rememberUser, toLocal, toServer } from '@/lib/live';
+import { bindWallet, forgetLiveAccount, liveEquip, liveMode, liveShopBuy, liveSpend, myServerId, rememberUser, toLocal, toServer } from '@/lib/live';
+import { charmLevelFor, nobleChanged, nobleTiersOf, svipLevelFor, wealthLevelFor } from '@/lib/levels-live-core';
+import { currentLevels, useLevels } from '@/lib/live/levels-live';
 import { forgetSeen, hideDms, markLiveRead } from '@/lib/live/messages';
 import { noteSpent, serverLimitBlock } from '@/lib/live/spend-limit';
 import { daysLeft, liveUntil } from '@/lib/live/vip-core';
@@ -616,7 +618,10 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   const subUntil = liveMode() ? liveUntil(vipSubUntil) : null;
   const vipDaysLeft = liveMode() ? daysLeft(subUntil) : vipDays;
   const [rbac, setRbac] = useState<RbacState>(INITIAL_RBAC);
-  const svipLevel = svipLevelOf(svipXp);
+  // VIP, Cömertlik and Yankı levels by Seviye ve VIP ayarları when the server sent them (lib/live/levels-live), else
+  // the compiled tables.
+  const levels = useLevels();
+  const svipLevel = svipLevelFor(levels, svipXp);
   const vipLevel = Math.min(15, Math.max(svipLevel, nobleTier * 3, vipDaysLeft > 0 ? 1 : 0));
   const [agencyId, setAgencyId] = useState<string | null>(s.agencyId ?? null);
   const [agencyRole, setAgencyRole] = useState<AgencyRole | null>(s.agencyRole ?? null);
@@ -688,12 +693,12 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     if (source === 'Hediye' && gift) recordGift('me', gift.id, gift.count);
     if (source !== 'Hediye' && source !== 'Arama') return;
     // Yankı (charm): gifts and calls from others raise it; gift diamonds also earn the level's bonus (own row).
-    const before = charmLevelOf(charmRef.current);
+    const before = charmLevelFor(currentLevels(), charmRef.current);
     const bonus = source === 'Hediye' ? Math.floor((n * charmBonusPct(before)) / 100) : 0;
     if (bonus > 0) creditDiamonds(bonus, 'Cazibe bonusu', fromId);
     charmRef.current += n;
     setCharmXp(charmRef.current);
-    const after = charmLevelOf(charmRef.current);
+    const after = charmLevelFor(currentLevels(), charmRef.current);
     if (after > before) notify({ kind: 'system', icon: 'rose', title: `Yankı seviyen Lv.${after} oldu`, body: 'Ana Sayfa’da daha üst sıralarda görüneceksin.', href: '/seviye?tab=charm' });
   };
 
@@ -731,7 +736,8 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     return `Günlük harcama limitin ${limit.toLocaleString('tr-TR')} jeton (Ayarlar > Harcama kontrolü). Bugün kalan: ${Math.max(0, limit - spentTodayRef.current).toLocaleString('tr-TR')} jeton.`;
   };
   const spendBlock = (n: number) => (coinsRef.current < n ? 'Yetersiz bakiye.' : limitBlock(n));
-  const spend = (n: number, reason = 'Harcama') => {
+  /** Takes `n` coins here and mirrors it on the server: api.spend, or `mirror` (a shop buy at the shown price). */
+  const spend = (n: number, reason = 'Harcama', mirror?: () => void) => {
     if (coinsRef.current < n) return false;
     const limited = limitBlock(n);
     if (limited) {
@@ -743,7 +749,8 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     // Live mode: the server takes the same coins (expected here, so its answer doesn't take them twice).
     if (liveMode() && myServerId() && serverBalRef.current) {
       serverBalRef.current = { ...serverBalRef.current, coins: serverBalRef.current.coins - n };
-      liveSpend(n, reason);
+      if (mirror) mirror();
+      else liveSpend(n, reason);
     }
     countSpend(n, reason);
     return true;
@@ -756,10 +763,10 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     setSpentToday(spentTodayRef.current);
     setSpentTotal((t) => t + n);
     if (countsForWealth(reason)) {
-      const before = wealthLevelOf(wealthRef.current);
+      const before = wealthLevelFor(currentLevels(), wealthRef.current);
       wealthRef.current += n;
       setWealthXp(wealthRef.current);
-      const after = wealthLevelOf(wealthRef.current);
+      const after = wealthLevelFor(currentLevels(), wealthRef.current);
       if (after > before) notify({ kind: 'system', icon: 'trending-up', title: `Cömertlik seviyen Lv.${after} oldu`, body: 'Yeni ayrıcalıklarını Cömertlik sayfasında gör.', href: '/seviye' });
     }
   };
@@ -912,7 +919,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     },
     spentTotal,
     wealthXp,
-    wealthLevel: wealthLevelOf(wealthXp),
+    wealthLevel: wealthLevelFor(levels, wealthXp),
     paidGames,
     ledger,
 
@@ -1008,7 +1015,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     diamondLocks,
     totalDiamonds,
     charmXp,
-    charmLevel: charmLevelOf(charmXp),
+    charmLevel: charmLevelFor(levels, charmXp),
     weekly,
     earnings,
     receiveDiamonds,
@@ -1090,10 +1097,24 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     nobleTier,
     nobleDays,
     buyNoble: (tier) => {
-      const t = nobleInfo(tier);
-      if (!t || !spend(t.price, `Rütbe: ${t.name} (${NOBLE_DAYS} gün)`)) return false;
+      // The tier as Seviye ve VIP ayarları sell it (name, price, days), else the compiled one.
+      const lv = currentLevels();
+      const t = nobleTiersOf(lv).find((x) => x.tier === tier);
+      if (!t) return false;
+      const was = { tier: nobleTier, days: nobleDays };
+      // A tier the finance panel changed: the server sells it at the price and days this phone showed (POST
+      // /api/shop/buy); the older apps' api.spend would refuse it. A refusal puts the rank back and says why.
+      const mirror = nobleChanged(lv, tier)
+        ? () =>
+            liveShopBuy(`noble-${tier}`, t.price, t.days, (message) => {
+              setNobleTier(was.tier);
+              setNobleDays(was.days);
+              showAlert('Rütbe alınamadı', message);
+            })
+        : undefined;
+      if (!spend(t.price, `Rütbe: ${t.name} (${t.days} gün)`, mirror)) return false;
       setNobleTier(tier);
-      setNobleDays(NOBLE_DAYS);
+      setNobleDays(t.days);
       return true;
     },
     rbac,

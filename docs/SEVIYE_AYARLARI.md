@@ -137,7 +137,12 @@ Nasıl işler:
    - Sunucu denetimlerinin ayardan okunması.
    - Düşme işi (kapalı), önizleme, denetim kaydı.
    - Panelde **Seviyeler** sayfası: VIP, Rütbe, Cömertlik, Yankı, Abonelik sekmeleri.
-2. **Uygulama (yeni APK):**
+2. **Uygulama (yeni APK):** yapıldı (17 Kasım).
+   - Telefon ayarları katalogla birlikte okur (`levels=1`), telefonda saklar; bozuk bir bölümde o bölüm için uygulamanın kendi tablosunu kullanır.
+   - Şunlar ayara uyar: VIP sayfası (seviye adları, puanları, hakları), Abonelik (görünen paketler, etiket, fiyat; üstü çizili fiyat 0 ise gösterilmez), Rütbe (ad, fiyat, gün, haklar), Seviye sayfası (puanlar, grup adları, haklar), seviye rozetleri, Oyun Salonu kilidi.
+   - Panelde değişmiş bir Rütbe kademesi gösterilen fiyat ve günle alınır (`POST /api/shop/buy`); ret gelirse rütbe geri alınır ve sebebi yazılır.
+   - Seviye düşmesi açıksa VIP ve Seviye sayfaları kuralı kendi cümlesiyle yazar; VIP kartında "kalıcı" yazmaz.
+   - Yerelde gerçek sunucuyla denendi: "Er" kademesi 20.000 jeton / 15 gün yapıldı; telefon 20.000 jetonla aldı, sunucu 15 gün verdi.
    - VIP, Seviye, profil ve mağaza ekranları ayarları sunucudan okur.
    - Kişinin kendi seviyesi sunucudan gelir.
    - Düşme kuralı açıksa sayfalarda yazar.

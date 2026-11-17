@@ -6,7 +6,8 @@ import { Platform, Pressable, ScrollView, StyleSheet, Switch, View, useWindowDim
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
-import { NOBLE_DAYS, NOBLE_SHOWN, NOBLE_TIERS, SVIP_LEVELS, SVIP_SHOWN, VIP_COMPARE, VIP_PERKS, VIP_PLANS } from '@/data/status';
+import { decayLineOf, nobleRightsOf, nobleTiersOf, subPlansOf, subRightsOf, vipLevelsOf, vipRightsOf } from '@/lib/levels-live-core';
+import { useLevels } from '@/lib/live/levels-live';
 import { goBack } from '@/lib/nav';
 import { showAlert } from '@/lib/alert';
 import { openLegal } from '@/lib/legal';
@@ -38,6 +39,7 @@ export default function PrivilegeCenter() {
   const [tab, setTab] = useState<Tab>(params.tab === 'vip' || params.tab === 'noble' ? params.tab : 'svip');
   const { colors } = useTheme();
   const styles = useStyles();
+  const levels = useLevels();
   return (
     <SafeAreaView style={styles.safe}>
       <Backdrop scene={SCENES.vip} />
@@ -58,7 +60,15 @@ export default function PrivilegeCenter() {
             </Pressable>
           ))}
         </View>
-        <Pressable onPress={() => showAlert('Ayrıcalıklar', 'VIP 1–10: yüklediğin her jeton 1 puan, seviyen hiç düşmez.\nAbonelik: 7 günlük, 1 aylık ya da 3 aylık VIP aboneliği.\nRütbe: jetonla alınır, 30 gün geçerli.\nTüm ayrıcalıklar sunucuda doğrulanır.')} hitSlop={10} accessibilityLabel="Yardım">
+        <Pressable
+          onPress={() =>
+            showAlert(
+              'Ayrıcalıklar',
+              `VIP: yüklediğin her jeton 1 puan${decayLineOf(levels, 'vip') ? '; uzun süre yükleme yapmazsan seviyen düşebilir' : ', seviyen hiç düşmez'}.\nAbonelik: VIP aboneliği, seçtiğin süre kadar.\nRütbe: jetonla alınır, kademenin süresi kadar geçerli.\nTüm ayrıcalıklar sunucuda doğrulanır.`,
+            )
+          }
+          hitSlop={10}
+          accessibilityLabel="Yardım">
           <Ionicons name="help-circle-outline" size={26} color={colors.text} />
         </Pressable>
       </View>
@@ -69,6 +79,12 @@ export default function PrivilegeCenter() {
 
 function Svip() {
   const { svipXp, svipLevel } = useApp();
+  // VIP levels and rights as Seviye ve VIP ayarları have them (the app's own until the server says).
+  const levels = useLevels();
+  const list = vipLevelsOf(levels);
+  const rights = vipRightsOf(levels);
+  const decay = decayLineOf(levels, 'vip');
+  const nameOf = (level: number) => list.find((x) => x.level === level)?.name ?? `VIP ${level}`;
   const styles = useStyles();
   const { colors } = useTheme();
   const { width } = useWindowDimensions();
@@ -84,7 +100,7 @@ function Svip() {
     setIndex(i);
     carousel.current?.scrollTo({ x: i * step, animated: true });
   };
-  const lv = SVIP_LEVELS[index];
+  const lv = list[Math.min(index, list.length - 1)];
   return (
     <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
       <View style={[styles.segment, { alignSelf: 'center', marginBottom: 12 }]}>
@@ -113,12 +129,12 @@ function Svip() {
           carousel.current?.scrollTo({ x: index * step, animated: false });
         }}
         contentContainerStyle={{ paddingHorizontal: 24, gap: 12 }}
-        onMomentumScrollEnd={(e) => setIndex(Math.max(0, Math.min(SVIP_LEVELS.length - 1, Math.round(e.nativeEvent.contentOffset.x / step))))}>
-        {SVIP_LEVELS.map((l, i) => {
+        onMomentumScrollEnd={(e) => setIndex(Math.max(0, Math.min(list.length - 1, Math.round(e.nativeEvent.contentOffset.x / step))))}>
+        {list.map((l, i) => {
           const locked = svipLevel < l.level;
           const isNext = svipLevel === l.level - 1;
           return (
-            <Pressable key={l.level} onPress={() => select(i)} style={{ width: cardW }} accessibilityLabel={`VIP ${l.level} kartı`}>
+            <Pressable key={l.level} onPress={() => select(i)} style={{ width: cardW }} accessibilityLabel={`${l.name} kartı`}>
               <LinearGradient colors={l.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.svipCard, index === i && { borderColor: GOLD }]}>
                 {locked && (
                   <View style={styles.lockChip}>
@@ -131,7 +147,7 @@ function Svip() {
                 <View style={styles.svipEmblem} pointerEvents="none">
                   {l.art ? <Art name={l.art} size={92} /> : <Text style={{ fontSize: 68 }}>{l.emoji}</Text>}
                 </View>
-                <Text style={styles.svipTitle}>VIP {l.level}</Text>
+                <Text style={styles.svipTitle}>{l.name}</Text>
                 {isNext ? (
                   <>
                     <Text style={styles.cardText}>
@@ -144,7 +160,7 @@ function Svip() {
                 ) : locked ? (
                   <Text style={styles.cardText}>Bu seviyeye {fmt(l.xp - svipXp)} puan kaldı</Text>
                 ) : (
-                  <Text style={[styles.cardText, { color: GOLD }]}>✓ Açıldı · kalıcı</Text>
+                  <Text style={[styles.cardText, { color: GOLD }]}>{decay ? '✓ Açıldı' : '✓ Açıldı · kalıcı'}</Text>
                 )}
                 {locked && (
                   <Pressable style={styles.loadBtn} onPress={() => router.push('/cuzdan')}>
@@ -159,20 +175,20 @@ function Svip() {
       <View style={styles.rightsTitleRow}>
         <Art name="svip-svip-isareti" size={22} />
         <Text style={[styles.rightsTitle, { marginVertical: 0 }]}>
-          VIP {lv.level} hakları {SVIP_SHOWN.filter((r) => r.level <= lv.level).length}/{SVIP_SHOWN.length}
+          {lv.name} hakları {rights.filter((r) => r.level <= lv.level).length}/{rights.length}
         </Text>
         <Art name="svip-svip-isareti" size={22} />
       </View>
       <View style={styles.grid}>
         {/* Only the rights the real app gives today (güncelleme 6); each opens at its own level. */}
-        {SVIP_SHOWN.map((r) => {
+        {rights.map((r) => {
           const on = r.level <= lv.level;
           return (
             <Pressable
               key={r.name}
               style={styles.rightCell}
               accessibilityState={{ disabled: !on }}
-              onPress={() => showAlert(r.name, on ? `VIP ${lv.level} ile kullanabilirsin.` : `VIP ${r.level} ile açılır.`)}>
+              onPress={() => showAlert(r.name, on ? `${lv.name} ile kullanabilirsin.` : `${nameOf(r.level)} ile açılır.`)}>
               {/* Locked: only the art fades; the name stays readable (textDim). */}
               <View style={[styles.rightIcon, !on && { opacity: 0.38 }]}>
                 {r.art ? <Art name={r.art} size={34} /> : <Text style={{ fontSize: 26 }}>{r.emoji}</Text>}
@@ -185,6 +201,7 @@ function Svip() {
         })}
       </View>
       <Text style={styles.note}>Yüklediğin her jeton 1 VIP puanı kazandırır. Bonus jetonlar ve hediye gelen jetonlar sayılmaz; iade edilen yüklemenin puanı geri alınır.</Text>
+      {decay && <Text style={styles.note}>Seviye düşmesi: {decay}</Text>}
     </ScrollView>
   );
 }
@@ -196,12 +213,17 @@ function Vip() {
   const gold = useGold();
   // Plan prices that are not selected: zinc on the night screen, slate on white cards.
   const soft = dark ? '#D4D4D8' : '#33425A';
-  const [plan, setPlan] = useState(VIP_PLANS[1].days);
+  // The plans and rights shown, as Seviye ve VIP ayarları have them (the price paid is the store's).
+  const levels = useLevels();
+  const plans = subPlansOf(levels);
+  const { compare, perks } = subRightsOf(levels);
+  // The month opens selected, as it always did; without it (hidden in the panel) the first plan shown.
+  const [plan, setPlan] = useState((plans.find((x) => x.days === 30) ?? plans[0]).days);
   const [perkPage, setPerkPage] = useState(0);
   const [pageW, setPageW] = useState(0);
-  const p = VIP_PLANS.find((x) => x.days === plan)!;
+  const p = plans.find((x) => x.days === plan) ?? plans[0];
   const store = Platform.OS === 'ios' ? 'App Store' : 'Google Play';
-  const perkPages = Math.ceil(VIP_PERKS.length / 4);
+  const perkPages = Math.ceil(perks.length / 4);
   const live = liveMode();
   // Live mode: the subscription is the server's (lib/live/vip): free on a test server, through Google Play otherwise;
   // the days left above come from the server's answer. The demo adds the days here.
@@ -276,7 +298,7 @@ function Vip() {
     setSetting(k, v);
   };
   // A grid of 2x2 perks per page, swiped horizontally.
-  const pages = Array.from({ length: perkPages }, (_, i) => VIP_PERKS.slice(i * 4, i * 4 + 4));
+  const pages = Array.from({ length: perkPages }, (_, i) => perks.slice(i * 4, i * 4 + 4));
   return (
     <ScrollView contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: 40 }}>
       {vipDays > 0 && <Text style={[styles.cardText, { color: gold, textAlign: 'center' }]}>👑 VIP aktif · {vipDays} gün kaldı</Text>}
@@ -286,15 +308,15 @@ function Vip() {
         </Text>
       )}
       <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-        {VIP_PLANS.map((x) => (
+        {plans.map((x) => (
           <Pressable key={x.days} onPress={() => setPlan(x.days)} style={[styles.plan, plan === x.days && styles.planOn]} accessibilityLabel={`VIP ${x.label}, ${x.tl} TL`}>
-            <Text style={styles.planTag}>%{x.save} daha uygun</Text>
+            {x.save > 0 && <Text style={styles.planTag}>%{x.save} daha uygun</Text>}
             <Text style={{ color: colors.textDim, fontSize: 15, marginTop: 10 }}>{x.label}</Text>
             <Text style={{ color: plan === x.days ? colors.text : soft, fontWeight: '900', fontSize: 26 }}>
               <Text style={{ fontSize: 11, fontWeight: '600' }}>TRY</Text>
               {fmt(x.tl)}
             </Text>
-            <Text style={{ color: colors.textDim, fontSize: 12, textDecorationLine: 'line-through' }}>TRY{fmt(x.was)}</Text>
+            {x.was > 0 && <Text style={{ color: colors.textDim, fontSize: 12, textDecorationLine: 'line-through' }}>TRY{fmt(x.was)}</Text>}
           </Pressable>
         ))}
       </View>
@@ -340,7 +362,7 @@ function Vip() {
           <Text style={[styles.th, styles.mid]}>VIP olmayan</Text>
           <Text style={[styles.th, styles.vipCol, { color: gold, fontSize: 20, fontStyle: 'italic', fontWeight: '900' }]}>VIP</Text>
         </View>
-        {VIP_COMPARE.map(([name, free, vip]) => (
+        {compare.map(([name, free, vip]) => (
           <View key={name} style={styles.tr}>
             <Text style={[styles.td, { flex: 1.1 }]}>{name}</Text>
             <CompareCell value={free} style={styles.mid} />
@@ -432,7 +454,11 @@ function Noble() {
   const styles = useStyles();
   const gold = useGold();
   const [sel, setSel] = useState(Math.max(1, nobleTier));
-  const t = NOBLE_TIERS[sel - 1];
+  // Tiers (name, price, days) and rights as Seviye ve VIP ayarları have them.
+  const levels = useLevels();
+  const tiers = nobleTiersOf(levels);
+  const rights = nobleRightsOf(levels);
+  const t = tiers[sel - 1];
   const owned = nobleTier >= sel;
   const buy = () => {
     if (coins < t.price)
@@ -440,16 +466,16 @@ function Noble() {
         { text: 'Vazgeç', style: 'cancel' },
         { text: 'Yükle', onPress: () => router.push('/cuzdan') },
       ]);
-    showAlert(`${t.name} rütbesi`, `${NOBLE_DAYS} gün · 🪙 ${fmt(t.price)}. Onaylıyor musun?`, [
+    showAlert(`${t.name} rütbesi`, `${t.days} gün · 🪙 ${fmt(t.price)}. Onaylıyor musun?`, [
       { text: 'Vazgeç', style: 'cancel' },
-      { text: 'Al', onPress: () => buyNoble(t.tier) && showAlert(`${t.emoji} ${t.name} oldun!`, `${NOBLE_SHOWN.filter((r) => r.level <= t.tier).length} hak açıldı.`) },
+      { text: 'Al', onPress: () => buyNoble(t.tier) && showAlert(`${t.emoji} ${t.name} oldun!`, `${rights.filter((r) => r.level <= t.tier).length} hak açıldı.`) },
     ]);
   };
   return (
     <View style={styles.noble}>
       <ScrollView contentContainerStyle={{ paddingBottom: 120 }}>
         <View style={styles.nobleTabs}>
-          {NOBLE_TIERS.map((x) => (
+          {tiers.map((x) => (
             <Pressable key={x.tier} onPress={() => setSel(x.tier)}>
               <Text style={[styles.nobleTab, sel === x.tier && styles.nobleTabOn]}>{x.name}</Text>
             </Pressable>
@@ -462,12 +488,12 @@ function Noble() {
           {owned && <Text style={[styles.cardText, { color: gold, marginTop: 8 }]}>✓ Aktif · {nobleDays} gün kaldı</Text>}
         </View>
         <Text style={[styles.rightsTitle, { color: gold }]}>
-          Rütbe hakları {NOBLE_SHOWN.filter((r) => r.level <= t.tier).length}/{NOBLE_SHOWN.length}
+          Rütbe hakları {rights.filter((r) => r.level <= t.tier).length}/{rights.length}
         </Text>
         <View style={styles.grid}>
-          {NOBLE_SHOWN.map((r) => {
+          {rights.map((r) => {
             const on = r.level <= t.tier;
-            const need = NOBLE_TIERS.find((x) => x.tier === r.level);
+            const need = tiers.find((x) => x.tier === r.level);
             return (
               <Pressable
                 key={r.name}
@@ -486,7 +512,7 @@ function Noble() {
       <View style={styles.bottomBar}>
         {owned && <Art name={t.art} size={28} style={{ marginRight: -6 }} />}
         <Text style={{ color: colors.text, fontWeight: '800', fontSize: 16, flex: 1 }}>
-          {owned ? `${t.name} aktif` : nobleTier > 0 ? `Yükselt: ${t.name} · 🪙 ${fmt(t.price)}` : `Kilidi açılmadı · 🪙 ${fmt(t.price)} / ${NOBLE_DAYS} gün`}
+          {owned ? `${t.name} aktif` : nobleTier > 0 ? `Yükselt: ${t.name} · 🪙 ${fmt(t.price)}` : `Kilidi açılmadı · 🪙 ${fmt(t.price)} / ${t.days} gün`}
         </Text>
         {!owned && (
           <Pressable onPress={buy} style={styles.alBtn} accessibilityLabel={`${t.name} al`}>

@@ -13,9 +13,10 @@ import { SCENES } from '@/components/fx/scenes';
 import { Backdrop } from '@/components/fx/surface';
 import { Art, type ArtName } from '@/components/Art';
 import { Avatar, CharmBadge, WealthBadge } from '@/components/ui';
-import { CHARM_PERKS, CHARM_TIERS, CHARM_XP, charmTier } from '@/data/charm';
-import { SVIP_LEVELS, nobleInfo } from '@/data/status';
-import { WEALTH_PERKS, WEALTH_TIERS, WEALTH_XP, levelGiftOf, shownPerks, wealthTier, type LevelPerk, type LevelTier } from '@/data/wealth';
+import { CHARM_PERKS } from '@/data/charm';
+import { charmTableOf, curvePerkFrom, decayLineOf, nobleTiersOf, tierFor, tiersOf, vipLevelsOf, wealthTableOf, type LiveLevels } from '@/lib/levels-live-core';
+import { useLevels } from '@/lib/live/levels-live';
+import { WEALTH_PERKS, levelGiftOf, shownPerks, type LevelPerk, type LevelTier } from '@/data/wealth';
 import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 import { goBack } from '@/lib/nav';
@@ -39,31 +40,48 @@ type System = {
   Badge: (p: { level: number; size?: 'sm' | 'lg' }) => ReactNode;
   perkDetail: (p: LevelPerk, level: number) => string;
 };
-const SYSTEMS: Record<Kind, System> = {
-  wealth: {
-    title: 'Cömertlik',
-    art: 'seviye-servet-seviyesi',
-    point: 'Cömertlik puanı',
-    table: WEALTH_XP,
-    tiers: WEALTH_TIERS,
-    // Only what the real app gives today (güncelleme 6); the rest come back as they're built.
-    perks: shownPerks(WEALTH_PERKS),
-    tierOf: wealthTier,
-    Badge: WealthBadge,
-    perkDetail: (p, level) => (p.key === 'gift' ? `${levelGiftOf(level)} · ${p.detail}` : p.detail),
-  },
-  charm: {
-    title: 'Yankı',
-    art: 'seviye-cazibe-seviyesi',
-    point: 'Yankı puanı',
-    table: CHARM_XP,
-    tiers: CHARM_TIERS,
-    perks: shownPerks(CHARM_PERKS),
-    tierOf: charmTier,
-    Badge: CharmBadge,
-    perkDetail: (p) => p.detail,
-  },
-};
+/**
+ * The perks a page lists: the app's own (only what it gives today, güncelleme 6) at the level Seviye ve VIP ayarları
+ * open them (one turned off there is left out); without settings, the app's levels. Oyun Salonu is not listed: a
+ * chance game with bought coins is not advertised as a reward (its gate is on its own screen).
+ */
+function perksOf(l: LiveLevels | null, kind: Kind): LevelPerk[] {
+  return shownPerks(kind === 'wealth' ? WEALTH_PERKS : CHARM_PERKS).flatMap((p) => {
+    const from = curvePerkFrom(l, kind, p.key);
+    if (from === undefined) return [p];
+    return from === null ? [] : [{ ...p, from }];
+  });
+}
+/** Both systems as Seviye ve VIP ayarları have them: points, groups and perks (else the app's own). */
+function systemsOf(l: LiveLevels | null): Record<Kind, System> {
+  const wealthTiers = tiersOf(l, 'wealth');
+  const charmTiers = tiersOf(l, 'charm');
+  return {
+    wealth: {
+      title: 'Cömertlik',
+      art: 'seviye-servet-seviyesi',
+      point: 'Cömertlik puanı',
+      table: wealthTableOf(l),
+      tiers: wealthTiers,
+      perks: perksOf(l, 'wealth'),
+      tierOf: (level) => tierFor(wealthTiers, level),
+      Badge: WealthBadge,
+      perkDetail: (p, level) => (p.key === 'gift' ? `${levelGiftOf(level)} · ${p.detail}` : p.detail),
+    },
+    charm: {
+      title: 'Yankı',
+      art: 'seviye-cazibe-seviyesi',
+      point: 'Yankı puanı',
+      table: charmTableOf(l),
+      tiers: charmTiers,
+      perks: perksOf(l, 'charm'),
+      tierOf: (level) => tierFor(charmTiers, level),
+      Badge: CharmBadge,
+      perkDetail: (p) => p.detail,
+    },
+  };
+}
+const SYSTEMS = systemsOf(null);
 
 export default function LevelsScreen() {
   const params = useLocalSearchParams<{ tab?: string }>();
@@ -105,7 +123,9 @@ export default function LevelsScreen() {
 }
 
 function LevelPane({ kind, xp, myLevel }: { kind: Kind; xp: number; myLevel: number }) {
-  const sys = SYSTEMS[kind];
+  const levels = useLevels();
+  const sys = systemsOf(levels)[kind];
+  const decay = decayLineOf(levels, kind);
   const { me, svipLevel, svipXp, nobleTier, nobleDays, vipDays } = useApp();
   const { colors, semantic, ink } = useTheme();
   const s = useStyles();
@@ -118,8 +138,9 @@ function LevelPane({ kind, xp, myLevel }: { kind: Kind; xp: number; myLevel: num
   const to = sys.table[next];
   const pct = myLevel >= max ? 1 : Math.min(1, (xp - from) / (to - from));
   const open = myLevel >= level;
-  const noble = nobleInfo(nobleTier);
-  const nextSvip = SVIP_LEVELS[svipLevel];
+  const noble = nobleTier ? nobleTiersOf(levels)[nobleTier - 1] : undefined;
+  const vipList = vipLevelsOf(levels);
+  const nextSvip = vipList[svipLevel];
   const Badge = sys.Badge;
   const firstCostume = sys.perks.filter((p) => p.kind === 'costume').reduce((m, p) => Math.min(m, p.from), 99);
 
@@ -164,6 +185,12 @@ function LevelPane({ kind, xp, myLevel }: { kind: Kind; xp: number; myLevel: num
           <Ionicons name={open ? 'checkmark-circle' : 'lock-closed'} size={16} color={open ? semantic.successText : colors.gold} />
           <Text style={s.statusText}>{open ? `Lv.${level} ayrıcalıkları açık.` : `Lv.${level} için ${fmt(sys.table[level] - xp)} ${sys.point.toLowerCase()} gerekiyor (toplam ${fmt(sys.table[level])}).`}</Text>
         </View>
+        {decay && (
+          <View style={s.status}>
+            <Ionicons name="time-outline" size={16} color={colors.gold} />
+            <Text style={s.statusText}>Seviye düşmesi: {decay}</Text>
+          </View>
+        )}
         <PerkGrid title={`Lv.${level} ayrıcalıkları`} perks={sys.perks.filter((p) => p.kind === 'privilege' && p.from <= level)} level={level} open={open} Badge={Badge} detail={sys.perkDetail} />
         {/* No look rewards are built yet (güncelleme 6): the section comes back with the first one. */}
         {firstCostume < 99 && (
@@ -174,7 +201,7 @@ function LevelPane({ kind, xp, myLevel }: { kind: Kind; xp: number; myLevel: num
           <Pressable onPress={() => router.push('/vip')} style={s.card} accessibilityLabel="Ayrıcalıklarım">
             <Text style={s.cardTitle}>Diğer ayrıcalıklarım</Text>
             <Text style={s.row}>
-              VIP seviyesi: {svipLevel ? `VIP ${svipLevel}` : 'Yok'} · {fmt(svipXp)} puan{nextSvip ? ` · VIP ${nextSvip.level} için ${fmt(nextSvip.xp - svipXp)}` : ''}
+              VIP seviyesi: {svipLevel ? (vipList[svipLevel - 1]?.name ?? `VIP ${svipLevel}`) : 'Yok'} · {fmt(svipXp)} puan{nextSvip ? ` · ${nextSvip.name} için ${fmt(nextSvip.xp - svipXp)}` : ''}
             </Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <Text style={s.row}>Rütbe:</Text>
@@ -270,7 +297,7 @@ const GUIDE: Record<Kind, { title: string; art?: ArtName; icon?: keyof typeof Io
 
 /** Plain-language guide and the full points table. */
 function Guide({ kind, visible, onClose }: { kind: Kind; visible: boolean; onClose: () => void }) {
-  const sys = SYSTEMS[kind];
+  const sys = systemsOf(useLevels())[kind];
   const Badge = sys.Badge;
   const { colors, ink } = useTheme();
   const s = useStyles();
