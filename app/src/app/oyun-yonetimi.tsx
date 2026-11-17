@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
 import { gameArtOf } from '@/components/GameArt';
+import { useWinFx } from '@/components/games/fx/win-fx';
 import { Card, Header } from '@/components/ui';
 import type { CasinoGame } from '@/data/games';
 import { resolve } from '@/data/rbac';
@@ -25,6 +26,36 @@ function Chips<T extends string | number>({ value, options, onChange }: { value:
     </View>
   );
 }
+/** The stake the preview's wins are counted against, and its wins as stakes paid. */
+const PREVIEW_BET = 1000;
+const PREVIEWS: [string, number, boolean?][] = [
+  ['Küçük ×3', 3],
+  ['Büyük ×8', 8],
+  ['Dev ×25', 25],
+  ['Efsane ×60', 60],
+  ['JACKPOT', 120, true],
+];
+
+/** The win celebrations every coin game shows (components/games/fx/win-fx), played on demand: seen without winning. */
+function WinPreview() {
+  const s = useStyles();
+  const win = useWinFx();
+  return (
+    <Card style={{ gap: 8 }}>
+      <Text style={s.title}>Kazanç efektleri</Text>
+      <Text style={s.dim}>Oyunlardaki kazanç kutlamaları, kazanmadan burada izlenir (bahis 1.000 jeton sayılır). Büyük kazançta başlık tutar arttıkça Büyük, Dev ve Efsane Kazanç diye yükselir.</Text>
+      <View style={s.chips}>
+        {PREVIEWS.map(([label, x, jackpot]) => (
+          <Pressable key={label} onPress={() => void win.celebrate({ amount: PREVIEW_BET * x, bet: PREVIEW_BET, jackpot })} style={s.chip} accessibilityRole="button" accessibilityLabel={`${label} kutlamasını göster`}>
+            <Text style={s.chipText}>{label}</Text>
+          </Pressable>
+        ))}
+      </View>
+      <View style={s.stage}>{win.layer}</View>
+    </Card>
+  );
+}
+
 function Row({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
   const s = useStyles();
   return (
@@ -107,6 +138,7 @@ export default function GameAdmin() {
           ))}
         {tab === 'casino' && (
           <>
+            <WinPreview />
             {casino.map((g) => (
               <Card key={g.id} style={{ gap: 8 }}>
                 <GameTitle id={g.id} emoji={g.emoji}>
@@ -170,4 +202,6 @@ const useStyles = makeStyles(({ colors, semantic, dark }) => ({
   chip: { borderRadius: 999, borderWidth: 1.5, borderColor: colors.border, paddingHorizontal: 12, paddingVertical: 6 },
   chipOn: { borderColor: semantic.actionText, backgroundColor: dark ? 'rgba(255,95,162,0.15)' : 'rgba(208,46,120,0.09)' },
   chipText: { color: colors.text, fontWeight: '700', fontSize: 12 },
+  // A game's stage for the preview: as dark as the games', as tall as a phone's game panel.
+  stage: { height: 380, borderRadius: 22, overflow: 'hidden', backgroundColor: '#0B1120' },
 }));

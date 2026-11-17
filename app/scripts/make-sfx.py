@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Game sound effects, made from code (no recording, no download): short tones, clicks and noise sweeps written as
-22.05 kHz mono WAV files into assets/sfx. They are stand-ins a sound designer's set can replace file for file
-(lib/game-sound.ts names them). Run: python3 scripts/make-sfx.py"""
+22.05 kHz mono WAV files into assets/sfx. The wins (win, win-big, jackpot, levelup, impact, coins, riser) are layered:
+drums, a brass-like section, bells, coins and a hall round them. They are stand-ins a sound designer's set can replace
+file for file (lib/game-sound.ts names them). Run: python3 scripts/make-sfx.py [name ...] (no names: all of them)."""
 import os
 import wave
 
@@ -98,6 +99,154 @@ def save(name, y, peak=0.8):
 
 
 C5, D5, E5, G5, A5, C6, D6, E6, G6, C7 = 523.25, 587.33, 659.25, 783.99, 880.0, 1046.5, 1174.66, 1318.5, 1568.0, 2093.0
+C3, C4, E4, F4, G4, A4, B4, F5, E7 = 130.81, 261.63, 329.63, 349.23, 392.0, 440.0, 493.88, 698.46, 2637.0
+
+# --- The win set. Each sound seeds its own noise (fresh), so one made alone comes out the same, and the sounds
+# above keep theirs.
+rng2 = np.random.default_rng(11)
+
+
+def fresh(seed):
+    global rng2
+    rng2 = np.random.default_rng(seed)
+
+
+def noise2(sec):
+    return rng2.uniform(-1, 1, int(SR * sec))
+
+
+def saw(freq, sec, cents=0.0):
+    """A band-limited sawtooth: its harmonics up to the top of the band."""
+    x = t(sec)
+    f = freq * 2 ** (cents / 1200)
+    k = np.arange(1, max(2, min(36, int(SR / 2.4 / f))) + 1)
+    return (np.sin(2 * np.pi * f * np.outer(x, k)) / k).sum(axis=1) * 0.6
+
+
+def brass(freq, sec, bright=4200):
+    """A brass-like note: two saws a little apart through a filter that opens on the attack and settles."""
+    x = t(sec)
+    y = saw(freq, sec, -7) + saw(freq, sec, 7)
+    y = lowpass(y, 900 + (bright - 900) * np.minimum(1, x / 0.04) * (0.55 + 0.45 * np.exp(-x * 5)))
+    amp = np.minimum(1, x / 0.018) * (0.82 + 0.18 * np.exp(-x * 7)) * np.clip((sec - x) / 0.09, 0, 1)
+    return y * amp * 0.45
+
+
+def chord(freqs, sec, voice=brass):
+    return sum(voice(f, sec) for f in freqs) / np.sqrt(len(freqs))
+
+
+def kick(sec=0.4):
+    """A deep drum: a falling sine and a click."""
+    x = t(sec)
+    body = np.sin(2 * np.pi * np.cumsum(46 + 120 * np.exp(-x * 26)) / SR) * np.exp(-x * 8)
+    return body + highpass(noise2(sec), 1800) * np.exp(-x * 140) * 0.4
+
+
+def snare(sec=0.16, gain=1.0):
+    x = t(sec)
+    return (np.sin(2 * np.pi * 185 * x) * np.exp(-x * 32) * 0.55 + highpass(noise2(sec), 1700) * np.exp(-x * 20)) * gain
+
+
+def crash(sec=1.4, gain=1.0):
+    """A cymbal: bright noise and a few metal partials, ringing out."""
+    x = t(sec)
+    metal = sum(np.sin(2 * np.pi * f * x + 6.28 * rng2.random()) for f in (3150, 4270, 5330, 6860, 7990)) * 0.07
+    return (highpass(noise2(sec), 4800) * 0.8 + metal) * np.exp(-x * 2.4) * np.minimum(1, x / 0.003) * gain
+
+
+def shimmer(sec, base=C7):
+    """High bells trembling over a held chord."""
+    x = t(sec)
+    y = np.sin(2 * np.pi * base * x) + np.sin(2 * np.pi * base * 1.5 * x) * 0.6 + np.sin(2 * np.pi * base * 2 * x) * 0.35
+    return y * (0.55 + 0.45 * np.sin(2 * np.pi * 9 * x)) * np.exp(-x * 1.3) * np.minimum(1, x / 0.08) * 0.14
+
+
+def ping(freq, sec=0.12):
+    """One coin."""
+    return tone(freq, sec, 11, 0.0005, ((1, 1.0), (1.47, 0.55), (2.09, 0.3), (2.78, 0.15)))
+
+
+def shower(sec, count, start=0.0, gain=0.3):
+    """Coins falling for `sec`, thick at first."""
+    return [(start + sec * rng2.random() ** 1.5, ping(2500 + 2600 * rng2.random()) * gain * (0.5 + 0.5 * rng2.random())) for _ in range(count)]
+
+
+def hall(y, mix=0.22, sec=1.1):
+    """A hall round a sound: a long, darkening noise tail convolved with it."""
+    x = t(sec)
+    ir = lowpass(noise2(sec), 3600) * np.exp(-x * 4.5)
+    n = len(y) + len(ir) - 1
+    wet = np.fft.irfft(np.fft.rfft(y, n) * np.fft.rfft(ir, n), n)
+    wet *= np.max(np.abs(y)) / max(1e-9, np.max(np.abs(wet)))
+    out = np.concatenate([y, np.zeros(len(ir) - 1)]) * (1 - mix) + wet * mix
+    # The tail ends where it can no longer be heard.
+    loud = np.nonzero(np.abs(out) > 0.004 * np.max(np.abs(out)))[0]
+    return out[: loud[-1] + int(SR * 0.02)] if len(loud) else out
+
+
+def small_win():
+    """A small win: a quick run of bells, a chord and a coin."""
+    fresh(21)
+    run = [(i * 0.07, bell(f, 0.34) * 0.8) for i, f in enumerate((C6, E6, G6, C7))]
+    return hall(at(run + [(0.28, chord((C6, E6, G6), 0.5, bell) * 0.8), (0.3, ping(4186, 0.14) * 0.35)], 0.8), 0.18, 0.8)
+
+
+def big_win():
+    """BÜYÜK KAZANÇ: a hit, a run up two octaves, then IV-V-I on the brass with the cymbal and coins."""
+    fresh(22)
+    run = [(0.1 + i * 0.07, bell(f, 0.3) * 0.5) for i, f in enumerate((C5, E5, G5, C6, E6, G6, C7, E7))]
+    section = [(0, chord((C4, E4, G4, C5), 0.32)), (0.72, chord((F4, A4, C5, F5), 0.22)), (0.96, chord((G4, B4, D5, G5), 0.22)), (1.2, chord((C4, E4, G4, C5, E5), 1.15))]
+    drums = [(0, kick()), (0, crash(1.0, 0.5)), (0.72, snare(0.16, 0.45)), (0.96, snare(0.16, 0.6)), (1.2, kick()), (1.2, crash(1.4, 0.65))]
+    return hall(at(run + section + drums + [(1.2, shimmer(1.3))] + shower(1.9, 16, 0.35, 0.22), 2.5))
+
+
+def jackpot_win():
+    """JACKPOT: a drum roll, a hit, a brass call over it, the big chord and a long shower of coins."""
+    rng.random(14)  # the draws the old jackpot made: the sounds after it keep their noise
+    fresh(23)
+    roll = [(0.6 * (1 - (1 - i / 16) ** 1.4), snare(0.1, 0.12 + 0.045 * i)) for i in range(16)]
+    call = [(0.62, C5, 0.16), (0.79, E5, 0.16), (0.96, G5, 0.16), (1.13, C6, 0.34), (1.5, G5, 0.16), (1.67, C6, 0.5)]
+    lead = [(s, at([(0, brass(f, d + 0.04) * 0.9), (0, bell(f, d + 0.3) * 0.3)], d + 0.3)) for s, f, d in call]
+    under = [(0.62, chord((C4, G4, C5), 0.5) * 0.55), (1.13, chord((F4, A4, C5), 0.32) * 0.5), (1.5, chord((G4, B4, D5), 0.45) * 0.5)]
+    hits = [(0.62, kick()), (0.62, crash(1.0, 0.55)), (1.13, snare(0.16, 0.5)), (1.5, snare(0.16, 0.6)), (2.05, kick() * 1.1), (2.05, crash(1.8, 0.75))]
+    final = [(2.05, chord((C4, G4, C5, E5, G5, C6), 1.55)), (2.05, shimmer(1.7))]
+    return hall(at(roll + lead + under + hits + final + shower(1.6, 34, 2.05, 0.24), 3.8), 0.24)
+
+
+def level_up():
+    """A step up the title: a short roll, a "ta-DAA" on the brass with the cymbal, a sparkle on top."""
+    fresh(24)
+    roll = [(0.05 * i * (1 - 0.06 * i), snare(0.11, 0.2 + 0.08 * i)) for i in range(5)]
+    call = [(0.24, chord((G4, B4, D5), 0.12) * 0.8), (0.36, chord((C5, E5, G5, C6), 0.72)), (0.36, kick()), (0.36, crash(0.9, 0.55))]
+    sparkle = [(0.36 + i * 0.055, bell(f, 0.3) * 0.33) for i, f in enumerate((C6, E6, G6, C7))]
+    return hall(at(roll + call + sparkle, 1.25))
+
+
+def impact():
+    """A blow: a deep hit, a brass stab and the cymbal."""
+    fresh(25)
+    return hall(at([(0, kick() * 1.15), (0, crash(0.85, 0.5)), (0, chord((C4, G4, C5, E5), 0.26) * 0.9)], 0.9), 0.18, 0.9)
+
+
+def coin_shower():
+    """Coins pouring out: a quick shower over a bright jingle."""
+    fresh(26)
+    x = t(1.7)
+    bed = highpass(noise2(1.7), 5200) * np.exp(-x * 2.2) * 0.06
+    return hall(at([(0, bed)] + shower(1.5, 44, 0, 0.32), 1.7), 0.16, 0.7)
+
+
+def riser():
+    """The amount climbing: a tone rising two octaves, opening up, with a hiss swelling under it."""
+    fresh(27)
+    sec = 2.4
+    x = t(sec)
+    phase = 2 * np.pi * np.cumsum(C3 * 4 ** (x / sec)) / SR
+    y = lowpass(sum(np.sin(k * phase) / k for k in range(1, 9)) * 0.6, 300 + 3800 * (x / sec) ** 1.6)
+    hiss = highpass(noise2(sec), 2600) * (x / sec) ** 2.2 * 0.3
+    return (y + hiss) * (0.15 + 0.85 * (x / sec) ** 1.3) * np.clip((sec - x) / 0.12, 0, 1)
+
 
 SOUNDS = {
     # A soft key press.
@@ -113,21 +262,11 @@ SOUNDS = {
     # A coin on coins.
     'coin': lambda: echo(tone(4186, 0.14, 9, 0.0005, ((1, 1.0), (1.47, 0.6), (2.09, 0.3))) * 0.9, 0.031, 0.35, 2),
     # A small win.
-    'win': lambda: echo(at([(0, bell(C6, 0.3)), (0.09, bell(E6, 0.3)), (0.18, bell(G6, 0.45))], 0.65), 0.09, 0.25, 2),
-    # A big win: a rising run and a held chord.
-    'win-big': lambda: echo(at([(0, bell(C5, 0.3)), (0.1, bell(E5, 0.3)), (0.2, bell(G5, 0.3)), (0.3, bell(C6, 0.35)), (0.42, bell(E6, 0.35)), (0.55, bell(G6, 0.9, 3) + bell(C6, 0.9, 3) * 0.7 + bell(E6, 0.9, 3) * 0.6)], 1.5), 0.11, 0.3, 3),
-    # The top prize: a fanfare over falling coins.
-    'jackpot': lambda: echo(
-        at(
-            [(i * 0.11, bell(f, 0.32)) for i, f in enumerate([C5, E5, G5, C6, G5, C6, E6, G6])]
-            + [(0.9, bell(C6, 1.2, 2.4) + bell(E6, 1.2, 2.4) * 0.8 + bell(G6, 1.2, 2.4) * 0.7 + bell(C7, 1.2, 2.4) * 0.4)]
-            + [(0.95 + i * 0.07, tone(3600 + 900 * rng.random(), 0.09, 10, 0.0005, ((1, 1.0), (1.47, 0.5))) * 0.35) for i in range(14)],
-            2.3,
-        ),
-        0.12,
-        0.3,
-        3,
-    ),
+    'win': small_win,
+    # A big win (BÜYÜK KAZANÇ), and the finale of a climbing one.
+    'win-big': big_win,
+    # The top prize.
+    'jackpot': jackpot_win,
     # A round lost: a short, low note. Kept quiet.
     'lose': lambda: sweep(300, 170, 0.22, 5, 0.004) * 0.6,
     # Something is about to land: a rising hum.
@@ -154,13 +293,28 @@ SOUNDS = {
     'splash': lambda: highpass(lowpass(noise(0.38), np.geomspace(6000, 900, int(SR * 0.38))), 500) * env(int(SR * 0.38), 0.004, 6) * 1.2,
     # A game won at a table: three quick notes.
     'fanfare': lambda: echo(at([(0, bell(G5, 0.22)), (0.13, bell(C6, 0.22)), (0.26, bell(E6, 0.22)), (0.39, bell(G6, 0.8, 3) + bell(C6, 0.8, 3) * 0.6)], 1.3), 0.1, 0.28, 3),
+    # A win's title stepping up (BÜYÜK → DEV → EFSANE KAZANÇ).
+    'levelup': level_up,
+    # A blow in a win's show (the title, the amount landing).
+    'impact': impact,
+    # Coins pouring out of a win.
+    'coins': coin_shower,
+    # A big win's amount counting up.
+    'riser': riser,
 }
 
 if __name__ == '__main__':
+    import sys
+
+    only = set(sys.argv[1:])
     os.makedirs(OUT, exist_ok=True)
     total = 0
     for name, make in SOUNDS.items():
-        sec = save(name, make())
+        # Every sound is made, in order, so each draws the same noise however many are written.
+        y = make()
+        if only and name not in only:
+            continue
+        sec = save(name, y)
         total += sec
         print(f'{name:10s} {sec:5.2f} s')
-    print(f'{len(SOUNDS)} sounds, {total:.1f} s')
+    print(f'{len(only) or len(SOUNDS)} sounds, {total:.1f} s')

@@ -38,23 +38,24 @@ Tur her zaman önce çözülür (canlıda sunucuda, denemede `lib/games.ts` içi
 
 | Dosya | Görevi |
 |---|---|
-| `src/lib/game-sound.ts`, `assets/sfx/*.wav` | 22 kısa oyun sesi (`playSfx('coin')`). Düzeyi oyun sesi ayarından gelir; odanın sesiyle karışır, onu kısmaz ve hata vermez. Sesler `scripts/make-sfx.py` ile kodla üretilmiş **yer tutuculardır**; lisanslı bir ses paketi aynı dosya adlarıyla konursa başka değişiklik gerekmez. |
+| `src/lib/game-sound.ts`, `assets/sfx/*.wav` | 26 kısa oyun sesi (`playSfx('coin')`). Düzeyi oyun sesi ayarından gelir; odanın sesiyle karışır, onu kısmaz ve hata vermez. Kazanç sesleri (`win`, `win-big`, `jackpot`, basamak sesi `levelup`, darbe `impact`, jeton sağanağı `coins`, sayarken yükselen `riser`) katmanlıdır: davul, nefesli akorlar, çanlar, jeton ve yankı. Hepsi `scripts/make-sfx.py` ile kodla üretilmiş **yer tutuculardır** (tek ses: `python scripts/make-sfx.py jackpot`); lisanslı bir ses paketi aynı dosya adlarıyla konursa başka değişiklik gerekmez. |
 | `src/lib/win-tier.ts` | Kazanç basamakları: bahsin 5, 15 ve 40 katı ile JACKPOT. **Bahsi geçmeyen ödeme kazanç sayılmaz.** |
-| `src/components/games/fx/win-fx.tsx`, `coins.tsx` | `useWinFx()`: basamağa göre kazanç kutlaması (başlık, sayan tutar, jeton fıskiyesi ya da yağmuru). |
-| `src/components/games/fx/reel.tsx`, `src/lib/reel-plan.ts` | Makara: sunucu cevabı beklenirken döner, soldan sağa sırayla durur, büyük ödül ihtimalinde son makaralar bekletir. |
+| `src/components/games/fx/win-fx.tsx`, `coins.tsx` | `useWinFx()`: basamağa göre kazanç kutlaması: başlık, sayan tutar, jeton fıskiyesi, yağmuru ve ortadan patlaması. Büyük kazançta tutar sayılırken başlık **Büyük → Dev → Efsane Kazanç** diye yükselir (kazancın kendi kademesini geçmez). Her darbede (başlangıç, her yükseliş, tutarın oturması) gösteri sarsılır ve öne vurur, ekran parlar, iki halka ve ışık çizgileri yayılır, ortadan jeton patlar; başlık yükseldikçe darbe sertleşir. Efsane ve JACKPOT'ta havai fişek patlar ve telefon titrer. Yükselen kazanç önce bir darbe ve sayarken yükselen bir sesle gerilim kurar (tutar plakası titrer), her basamakta fanfar çalar, tutar oturunca büyük kazanç müziği gelir. Titreşim, Ayarlar'daki titreşim seçeneğine uyar. Hepsi yönetimde **Oyun kataloğu › Oyun Salonu › Kazanç efektleri** kartında kazanmadan izlenir. |
+| `src/components/games/fx/reel.tsx`, `src/lib/reel-plan.ts` | Makara: sunucu cevabı beklenirken döner, soldan sağa sırayla durur, büyük ödül ihtimalinde son makaralar bekletir. Tam hızda semboller uzar ve bulanıklaşır (bulanıklık Android 12+ ve web'de; daha eski telefonda yalnız uzama), dururken netleşir. Kazanan sembol atarken arkası ışır. |
+| `src/components/games/fx/slot-skin.tsx`, `jackpot-show.tsx` | Gerçek görsellerle giydirilmiş makineler (Kızıl Yedi, Hazine Kulesi, Vahşi Patika, Kayıp Parşömen, Neon Bulvar, Bereket Ağacı; Konfeti Kutusu çizilmiş kutuda; `docs/GORSEL_URETIM_LISTESI.md` §24) ve onların JACKPOT / Büyük Kazanç gösterisi; başlık burada da tutar sayılırken yükselir. Çerçevelerin çoğu geniş ve alçak bir pencere açar; telefonda boş yükseklik kalınca çerçevenin düz yan kısımları (`stretch` bantları: süssüz direkler, neon borular) uzatılır, pencere genişliğinden biraz uzun hücrelere kadar büyür, semboller büyür ve ekran dolar. Süslü kısımlar (köşe taşları, aslan başı) uzamaz. Yeni bir çerçeve geldiğinde düz bantları da yazılmalı; yazılmazsa çerçeve eskisi gibi oranıyla çizilir. |
 | `src/components/games/fx/spin-plan.ts`, `wheel-stage.tsx`, `chips.tsx`, `flights.tsx` | Çarkın dönüş planı ve sahnesi, bahis fişleri, uçan fiş ve jetonlar. |
 | `src/components/games/fx/info-sheet.tsx` | Her oyunun "?" sayfası: nasıl oynanır, ödeme tablosu, oyun bakiyesi notu. Ekranda uzun açıklama durmaz. |
 | `src/components/games/fx/result-trail.tsx` | Son sonuçların şeridi. |
 | `src/components/games/slot-kit.tsx` | Bakiye kutusu (`BalancePill`), bahis seçici (`BetStepper`) ve makaralı oyunların ortak düğme bloğu (`SpinControls`). |
 
 Her oyunun uyduğu kurallar:
-- **Bahsin altında kalan ödeme kutlanmaz.** "ÖDEME 100" diye sade yazılır; jeton yağmaz, zafer sesi çalmaz, satır yeşile dönmez.
+- **Bahsin altında kalan ödeme kutlanmaz.** "ÖDEME 100" diye sade yazılır; jeton yağmaz, zafer sesi çalmaz, satır yeşile dönmez, sembolün arkası ışımaz.
 - **Bakiye sonuçtan önce değişmez.** Tur sürerken kutu bahsi düşülmüş tutarı gösterir; kazanç, ekranda görüldüğü anda eklenir.
-- **Hareketi azalt** ayarı açıkken uçuşlar, parlamalar ve jeton yağmuru atlanır; sonuç yine gösterilir.
+- **Hareketi azalt** ayarı açıkken uçuşlar, parlamalar, sarsıntı, makara bulanıklığı ve jeton yağmuru atlanır; başlık yükselmeden kazancın kendi kademesiyle gelir; sonuç yine gösterilir.
 - **Tek ses düğmesi** panel başlığındadır; sahnelerde ikinci bir düğme yoktur.
 - **360 × 780 ekranda** her oyun kaydırmadan sığar ve hiçbir yazı kesilmez (Playwright taramasıyla denetlenir).
 
-Görsellerin çoğu yer tutucudur (emoji, düz şekiller, Ionicons); çizilecekler `docs/GORSEL_URETIM_LISTESI.md` bölüm 15–18'de listelidir.
+Görsellerin çoğu yer tutucudur (emoji, düz şekiller, Ionicons); çizilecekler `docs/GORSEL_URETIM_LISTESI.md` bölüm 15–18'de, kazanç gösterisinin levhaları bölüm 25'te listelidir.
 
 ### Yeni oda oyunu eklemek
 
