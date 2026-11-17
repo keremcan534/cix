@@ -8,8 +8,11 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { roomCode } from '../rooms.mjs';
 import { startApi } from './harness.mjs';
+
+// rooms.mjs roomCode, the old 8-digit room ID (that module loads the LiveKit one, which needs keys, so it isn't
+// imported here; a different formula would fail the lookups below).
+const roomCode = (id) => String(10_000_000 + [...id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 9_000_000, 7));
 
 const h = startApi();
 const { call } = h;
@@ -32,8 +35,8 @@ const shaped = (n) => /^10[0-7]\d{9}$/.test(n) && (Number(n) - 100_000_000_000) 
 const lookup = (no, who) => call('GET', `/api/lookup?no=${encodeURIComponent(no)}`, null, who.session);
 // The app's copy (app/src/data/profile.ts seedOf and displayId): what older apps show must stay the server's.
 const profileSrc = fs.readFileSync(path.join(import.meta.dirname, '..', '..', '..', 'app', 'src', 'data', 'profile.ts'), 'utf8');
-const appSeedOf = new Function('id', `return ${/export const seedOf = \(id: string\) => (.+);\n/.exec(profileSrc)[1]}`);
-const appDisplayId = new Function('seedOf', 'id', `return ${/export const displayId = \(id: string\) => (.+);\n/.exec(profileSrc)[1]}`);
+const appSeedOf = new Function('id', `return ${/export const seedOf = \(id: string\) => (.+);\r?\n/.exec(profileSrc)[1]}`);
+const appDisplayId = new Function('seedOf', 'id', `return ${/export const displayId = \(id: string\) => (.+);\r?\n/.exec(profileSrc)[1]}`);
 
 describe('Herkesin kendi numarası', () => {
   test('uygulamanın formülü veritabanınınkiyle aynı (eski uygulamalar aynı numarayı gösterir)', async () => {
