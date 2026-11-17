@@ -1021,6 +1021,11 @@ export const spend = (amount: number, reason: string, ref = newRef()) => call<{ 
  */
 export const shopBuy = (sku: string, price: number, days?: number, ref = newRef()) =>
   call<{ user: ServerUser; replay: boolean; economy: unknown }>('POST', '/api/shop/buy', { sku, price, ...(days ? { days } : {}), ref });
+/**
+ * What I own, until when and where each came from (Çantam, lib/bag-core parses it); reading it also gives me the
+ * level rewards I've reached (server/api/level-rewards.mjs).
+ */
+export const economy = () => call<unknown>('GET', '/api/economy');
 /** Wears a shop item I own in its slot, or takes it off (sku null); others see it in GET /api/looks. */
 export const equipShop = (slot: string, sku: string | null) => call<{ economy: unknown }>('POST', '/api/shop/equip', { slot, sku });
 /** Çevir. `usdTry`: the rate the screen showed; the server never gives less than it, and answers 409 rate_changed

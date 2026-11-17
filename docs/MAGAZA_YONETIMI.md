@@ -129,5 +129,5 @@ Beş sekme var: **Giriş efektleri**, **Çerçeveler**, **Sohbet balonları**, *
 
 ## Sırada
 
-- **Seviyeye bağlı ödül:** VIP ve Rütbe seviyelerine çerçeve, giriş efekti, balon ve dalga bağlamak (Seviyeler ve VIP sayfasıyla).
+- ~~**Seviyeye bağlı ödül**~~ yapıldı: VIP, Cömertlik ve Yankı seviyelerine çerçeve, giriş efekti, binek, balon ve dalga (Seviye ve VIP › Seviye ödülleri, [`CANTA.md`](CANTA.md)). Rütbe satın alınan bir kademe olduğu için ödülü yok.
 - **Binek ve özel numara:** istenirse aynı sayfaya.

@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { Appearance as SystemAppearance, useColorScheme } from 'react-native';
 
 import { agencyByCode, type AgencyRole } from '@/data/agency';
-import { FREE_PACK_IDS, cosmeticById, ROOM_THEMES, ROOM_TYPES, type CosmeticKind, type RoomTheme, type RoomType, type TicketCategory } from '@/data/catalog';
+import { COSMETIC_KINDS, FREE_PACK_IDS, cosmeticById, ROOM_THEMES, ROOM_TYPES, type CosmeticKind, type RoomTheme, type RoomType, type TicketCategory } from '@/data/catalog';
 import {
   CHECKIN_REWARDS,
   TASKS,
@@ -172,6 +172,11 @@ type AppState = {
   equipped: Partial<Record<CosmeticKind, string>>;
   buyCosmetic: (id: string) => string | null;
   equip: (id: string | null, kind: CosmeticKind) => void;
+  /**
+   * Live: items the server says I own (Çantam, lib/live/bag) that this phone didn't know yet (a reward, a staff gift,
+   * something bought on another phone) are added; what the phone has is kept.
+   */
+  takeServerItems: (items: { sku: string; kind: string }[]) => void;
   /** Bought sticker pack ids (persisted under the old name, so earlier purchases carry over). */
   emojiPacks: Set<string>;
   /** Owned, free, or opened by the user's VIP level. */
@@ -954,6 +959,12 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       setInventory((s) => new Set(s).add(id));
       setEquipped((e) => ({ ...e, [item.kind]: id }));
       return null;
+    },
+    takeServerItems: (items) => {
+      // The kinds this list holds (sticker packs, mic effects and ranks have their own).
+      const kinds = new Set<string>(COSMETIC_KINDS.map((k) => k.kind));
+      const add = items.filter((x) => kinds.has(x.kind) && !inventory.has(x.sku)).map((x) => x.sku);
+      if (add.length) setInventory((s) => new Set([...s, ...add]));
     },
     equip: (id, kind) => {
       setEquipped((e) => ({ ...e, [kind]: id ?? undefined }));

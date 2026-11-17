@@ -65,6 +65,7 @@ import { jetonRoutes } from './jeton.mjs';
 import { liveRoutes } from './live.mjs';
 import { luckyRoutes } from './lucky.mjs';
 import { economyRoutes, grantInTx } from './economy.mjs';
+import { levelRewardRoutes } from './level-rewards.mjs';
 import { familyRoutes } from './families.mjs';
 import { familyMoreRoutes } from './family-more.mjs';
 import { exchangeOk } from './live-registry.mjs';
@@ -298,6 +299,7 @@ const routes = {
   ...walletRoutes,
   ...walletInfoRoutes,
   ...economyRoutes,
+  ...levelRewardRoutes,
   ...withdrawRoutes,
   ...jetonRoutes,
   ...refundSyncRoutes,
