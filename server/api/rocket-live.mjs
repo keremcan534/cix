@@ -525,8 +525,11 @@ export const rocketRoutes = {
         if (st?.state !== 'bet') throw new HttpError(409, 'Yakıt alımı kapandı, sıradaki turu bekle');
         const u = (await c.query('SELECT name, coins, game_coins FROM users WHERE id = $1 FOR UPDATE', [me.id])).rows[0];
         if ((await c.query('SELECT 1 FROM casino_rounds WHERE user_id = $1 AND ref = $2', [me.id, ref])).rowCount) throw Object.assign(new Error('replay'), { code: '23505' });
-        const played = Number((await c.query(`SELECT coalesce(sum(bet), 0) AS n FROM casino_rounds WHERE user_id = $1 AND game = 'rocket' AND created_at >= ${DAY_START}`, [me.id])).rows[0].n);
-        if (played + bet > daily) throw new HttpError(409, `${GAME.name} için günlük sınır ${fmt(daily)} jeton. Bugün kalan: ${fmt(Math.max(0, daily - played))}`);
+        // No daily limit unless Canlı ayarlar sets one (casino_daily_rounds 0: none), as in the other games.
+        if (daily) {
+          const played = Number((await c.query(`SELECT coalesce(sum(bet), 0) AS n FROM casino_rounds WHERE user_id = $1 AND game = 'rocket' AND created_at >= ${DAY_START}`, [me.id])).rows[0].n);
+          if (played + bet > daily) throw new HttpError(409, `${GAME.name} için günlük sınır ${fmt(daily)} jeton. Bugün kalan: ${fmt(Math.max(0, daily - played))}`);
+        }
         const mine = (await c.query('SELECT bet, auto FROM casino_rounds WHERE live_round = $1 AND user_id = $2 ORDER BY id', [r0.id, me.id])).rows;
         if (mine.length && (mine[0].auto === null ? null : Number(mine[0].auto)) !== auto) throw new HttpError(409, 'Otomatik kaçış bu turda ilk yakıtla belirlendi; sıradaki turda değiştirebilirsin');
         const fuel = mine.reduce((n, f) => n + Number(f.bet), 0);

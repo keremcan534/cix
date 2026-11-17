@@ -66,6 +66,5 @@ CREATE TABLE room_rocket_wins (
 );
 CREATE INDEX room_rocket_wins_user ON room_rocket_wins (user_id);
 
--- A shop item won from a rocket is an entitlement of its own source (price 0, like a staff grant).
-ALTER TABLE entitlements DROP CONSTRAINT entitlements_source_check;
-ALTER TABLE entitlements ADD CONSTRAINT entitlements_source_check CHECK (source IN ('buy', 'bridge', 'migrate', 'admin', 'rocket'));
+-- A shop item won from a rocket is an entitlement of its own source 'rocket' (price 0, like a staff grant): the allowed
+-- sources are set once for every branch in 091_entitlement_sources (this file runs after 085 on a server that has it).

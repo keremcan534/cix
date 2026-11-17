@@ -23,7 +23,8 @@ const lk = http.createServer((req, res) => {
 await new Promise((r) => lk.listen(LK_PORT, '127.0.0.1', r));
 after(() => new Promise((r) => (lk.closeAllConnections?.(), lk.close(r))));
 
-const h = startApi({ LIVEKIT_API_URL: `http://127.0.0.1:${LK_PORT}`, ROCKET_SWEEP_MS: '200', ROCKET_GRACE_S: '1', TEST_TOPUP_DAILY: '10000000' });
+// Işıltı off the shelf (the other tests' server sells everything, test/harness.mjs): a prize can't be an item not on sale.
+const h = startApi({ LIVEKIT_API_URL: `http://127.0.0.1:${LK_PORT}`, ROCKET_SWEEP_MS: '200', ROCKET_GRACE_S: '1', TEST_TOPUP_DAILY: '10000000', SHOP_PAUSED: 'en-sparkle' });
 const { call, signUp } = h;
 const ok = async (p, what) => {
   const [st, j] = await p;
@@ -182,10 +183,12 @@ describe('Oda roketi', () => {
   });
 
   test('aynı hediye iki kez sayılmaz; kalkışı ödenmemiş kalan seviyeyi süpürge öder', async () => {
-    const room2 = (await ok(call('POST', '/api/rooms', { title: `Roket 2 ${rnd(2)}` }, owner.session), 'oda')).room.id;
+    // A room of its own (one open room a person).
+    const owner2 = await signUp('Roket Odası Sahibi 2');
+    const room2 = (await ok(call('POST', '/api/rooms', { title: `Roket 2 ${rnd(2)}` }, owner2.session), 'oda')).room.id;
     const ref = rnd(8);
-    await gift(a, owner.user.id, room2, 'g5', 1, ref);
-    await gift(a, owner.user.id, room2, 'g5', 1, ref);
+    await gift(a, owner2.user.id, room2, 'g5', 1, ref);
+    await gift(a, owner2.user.id, room2, 'g5', 1, ref);
     assert.equal((await state(room2, a)).fuel, 500, 'tekrar istek bir kez');
     // A launch the gift's own call never paid (the process stopped): the sweep pays it.
     await h.sql.query(
@@ -203,8 +206,9 @@ describe('Oda roketi', () => {
   test('kapalıyken roket dolmaz; telefonlar kapalı olduğunu görür', async () => {
     const view = await ok(call('GET', '/api/admin/rocket', null, admin.session), 'ayarlar');
     await ok(call('POST', '/api/admin/rocket/config', { config: { ...view.config, enabled: false }, version: view.version }, admin.session), 'kapat');
-    const room3 = (await ok(call('POST', '/api/rooms', { title: `Roket 3 ${rnd(2)}` }, owner.session), 'oda')).room.id;
-    await gift(b, owner.user.id, room3, 'g5', 1);
+    const owner3 = await signUp('Roket Odası Sahibi 3');
+    const room3 = (await ok(call('POST', '/api/rooms', { title: `Roket 3 ${rnd(2)}` }, owner3.session), 'oda')).room.id;
+    await gift(b, owner3.user.id, room3, 'g5', 1);
     const s = await state(room3, b);
     assert.deepEqual([s.on, s.fuel], [false, 0]);
     await refused(call('GET', '/api/rooms/rocket?room=nope', null, b.session), 400);
