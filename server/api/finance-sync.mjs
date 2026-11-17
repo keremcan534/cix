@@ -11,7 +11,15 @@
 //    payment channel not defined there yet) goes to finance_sync_failed and is retried with a growing wait.
 //  - FINANCE_API_KEY empty → off. One API process per server, so a flag is enough to keep rounds apart.
 //
-//   GET /api/admin/finance-sync (admin) → { enabled, lastId, behind, lastOkAt, lastError, failed, failures }
+//   GET /api/admin/finance-sync (admin) → { enabled, lastId, behind, lastOkAt, lastError, failed, failures, usageDay, usageError }
+//
+// Voice and video minutes (media-minutes.mjs): once a (Turkey) day is over, its person-minutes go to the panel as
+// four usage events (USAGE_SERVICES: room speakers, room listeners, voice calls, video calls) of the provider
+// FINANCE_USAGE_PROVIDER (default `oracle`, which must be defined in the panel), keyed by service and day, so a day
+// sent twice is harmless; the panel's Tarifeler page prices them per person-minute. finance_sync.usage_day is the last
+// day sent, and a day counts as sent once all four are in. The panel's refusal (say the provider isn't defined yet)
+// stays in usage_error and the day is tried again the next round, without touching the money feed's health
+// (last_ok_at, which the stale alert watches).
 //
 // Ledger → panel:
 //   store purchase (Google/Apple)  → purchase (pack list price, TRY) [+ bonus_grant for the first-buy gift]
@@ -34,6 +42,7 @@
 //   included: the panel has no payout event type and records payouts itself), game coins.
 import { HttpError, auth, db, env } from './core.mjs';
 import { PACK_BY_PRODUCT } from './catalog.mjs';
+import { dayMinutes } from './media-minutes.mjs';
 
 const KEY = env.FINANCE_API_KEY ?? '';
 const URL_ = env.FINANCE_INGEST_URL || 'http://127.0.0.1:4300/api/ingest/events';
@@ -186,6 +195,41 @@ export async function syncOnce() {
   return sent;
 }
 
+const USAGE_PROVIDER = env.FINANCE_USAGE_PROVIDER || 'oracle';
+/** The panel's service key for each kind of a day's person-minutes (media-minutes.mjs dayMinutes). */
+export const USAGE_SERVICES = Object.freeze({ speaker: 'oda_konusan_dk', listener: 'oda_dinleyen_dk', call_voice: 'sesli_gorusme_dk', call_video: 'goruntulu_gorusme_dk' });
+/** A finished day's minutes as the panel's usage events, every kind even at 0 (measured, none), at the day's end in Turkey. */
+export const usageEventsOf = (day, minutes) =>
+  Object.entries(USAGE_SERVICES).map(([kind, service]) => ({
+    type: 'usage',
+    idempotency_key: `usage-${service}-${day}`,
+    occurred_at: `${day}T20:59:59Z`,
+    provider_code: USAGE_PROVIDER,
+    service,
+    period: day.slice(0, 7),
+    quantity: (minutes[kind] ?? 0).toFixed(2),
+    note: 'Similar Club ölçümü: kişi-dakika',
+  }));
+
+/** The finished days after the last one sent, oldest first, a month at most a round: each day's four events. */
+export async function syncUsage() {
+  const days = (
+    await db.query(
+      `SELECT to_char(d, 'YYYY-MM-DD') AS day
+         FROM finance_sync s,
+              generate_series((s.usage_day + 1)::timestamp, ((now() AT TIME ZONE 'Europe/Istanbul')::date - 1)::timestamp, interval '1 day') AS d
+        WHERE s.id = 1 ORDER BY d LIMIT 31`,
+    )
+  ).rows.map((r) => r.day);
+  for (const day of days) {
+    const results = await post(usageEventsOf(day, await dayMinutes(day)));
+    const refused = results.find((r) => r.status === 'error');
+    if (refused) throw new Error(`${day}: ${refused.error}`);
+    await db.query('UPDATE finance_sync SET usage_day = $1, usage_error = NULL WHERE id = 1', [day]);
+  }
+  return days.length;
+}
+
 let timer = null;
 let running = false;
 async function round() {
@@ -197,6 +241,13 @@ async function round() {
   } catch (e) {
     console.error('finance sync', e.message);
     await db.query('UPDATE finance_sync SET last_error = $1 WHERE id = 1', [String(e.message).slice(0, 500)]).catch(() => {});
+  }
+  // The minutes apart from the money: their trouble never makes the money feed look stale.
+  try {
+    await syncUsage();
+  } catch (e) {
+    console.error('finance sync usage', e.message);
+    await db.query('UPDATE finance_sync SET usage_error = $1 WHERE id = 1', [String(e.message).slice(0, 500)]).catch(() => {});
   } finally {
     running = false;
   }
@@ -216,10 +267,10 @@ export const financeSyncRoutes = {
   async 'GET /api/admin/finance-sync'(req) {
     const u = await auth(req);
     if (u.role !== 'admin') throw new HttpError(403, 'Yönetici hesabı gerekli');
-    const s = (await db.query('SELECT last_id, last_ok_at, last_error FROM finance_sync WHERE id = 1')).rows[0];
+    const s = (await db.query("SELECT last_id, last_ok_at, last_error, to_char(usage_day, 'YYYY-MM-DD') AS usage_day, usage_error FROM finance_sync WHERE id = 1")).rows[0];
     const behind = Number((await db.query('SELECT count(*) AS n FROM ledger WHERE id > $1', [s.last_id])).rows[0].n);
     const failures = (await db.query('SELECT key, error, attempts, next_try FROM finance_sync_failed ORDER BY created_at LIMIT 20')).rows;
     const failed = Number((await db.query('SELECT count(*) AS n FROM finance_sync_failed')).rows[0].n);
-    return { enabled: !!KEY, lastId: Number(s.last_id), behind, lastOkAt: s.last_ok_at, lastError: s.last_error, failed, failures };
+    return { enabled: !!KEY, lastId: Number(s.last_id), behind, lastOkAt: s.last_ok_at, lastError: s.last_error, failed, failures, usageDay: s.usage_day, usageError: s.usage_error };
   },
 };
