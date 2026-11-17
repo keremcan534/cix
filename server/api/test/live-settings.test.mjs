@@ -107,7 +107,7 @@ describe('nothing saved', () => {
         ...['heart_msg_points', 'heart_msg_daily', 'heart_grace_days', 'heart_half_days'],
         'backpack_call_task',
         ...['rewards_off', 'welcome_coins', 'invite_coins', 'invite_daily_cap'],
-        ...['casino_off', 'casino_open', 'casino_max_bet', 'casino_daily_rounds'],
+        ...['casino_off', 'casino_open', 'casino_max_bet', 'casino_daily_rounds', 'rocket_house_pct'],
         ...['room_decor_off', 'room_bg_custom_price', 'room_bg_custom_days'],
         ...['room_staff_away_minutes', 'boss_seat_coins', 'boss_seat_minutes'],
         ...['event_min_room_level', 'event_min_lead_minutes', 'event_max_minutes', 'event_max_capacity', 'event_grace_minutes', 'event_strike_limit', 'event_block_days', 'event_reminders_off'],

@@ -148,7 +148,8 @@ export function LiveSync() {
     const offLine = onLine((e) => {
       // Another person's win (lib/live/win-news): a banner in every room, nothing of mine to read again.
       if (takeWinEvent(e)) return;
-      if (e.type === 'call' || e.type === 'message_read') return;
+      // Canlı Yörünge's round (lib/live/rocket-live): its screen reads it, nothing else changed for me.
+      if (e.type === 'call' || e.type === 'message_read' || e.type === 'rocket') return;
       // Someone opened my profile (the server tells at most once a day per visitor): the counts and a notice.
       if (e.type === 'visit') {
         void visitLineNotice(typeof e.from === 'string' ? e.from : null)

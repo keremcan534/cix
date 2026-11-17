@@ -238,8 +238,9 @@ export async function retrySignIn(): Promise<boolean> {
 /** Any route of the API with this session (the agency panels go through lib/agency-net). */
 export const apiRequest = <T>(method: 'GET' | 'POST', path: string, body?: object) => call<T>(method, path, body);
 
-/** The live line, with the wins announced to everyone (server/api/live-line.mjs lineWin; lib/live/win-news). */
-const LIVE_LINE = '/api/live?wins=1';
+/** The live line, with the wins announced to everyone (server/api/live-line.mjs lineWin; lib/live/win-news) and Canlı
+ *  Yörünge's round while its screen is open (lineRocket; lib/live/rocket-live). */
+const LIVE_LINE = '/api/live?wins=1&rocket=1';
 /**
  * Opens my live line (lib/live/live-line): a request that stays open while the server writes events into it.
  * Null when there is no server or no session yet. Not compressed, so each event comes through as it is written.
@@ -1305,11 +1306,28 @@ export type ServerCasinoRound = {
   at: string;
   outcome?: Outcome;
 };
-export type ServerCasino = { games: ServerCasinoGame[]; needLevel: number; allowed: boolean; gameCoins: number; mine: ServerCasinoRound[] };
+/** `rocketLive`: the server plays Yörünge live, everyone at once (an older server leaves it out). */
+export type ServerCasino = { games: ServerCasinoGame[]; needLevel: number; allowed: boolean; gameCoins: number; mine: ServerCasinoRound[]; rocketLive?: boolean };
 export type CasinoPlayBody = { game: string; bet?: number; pick?: string; bets?: Record<string, number>; place: 'profile' | 'room' };
 export const casino = () => call<ServerCasino>('GET', '/api/casino');
 export const casinoPlay = (body: CasinoPlayBody, ref = newRef()) =>
   call<{ round: ServerCasinoRound & { outcome: Outcome }; user: ServerUser; replay: boolean; fund: number | null }>('POST', '/api/casino/play', { ...body, ref });
+// Canlı Yörünge (server/api/rocket-live.mjs): one round for everyone at once. The view is what every screen may see;
+// the live line brings it again at each change (type 'rocket', lib/live/rocket-live). Multipliers in hundredths
+// (215 is 2,15×), times in the server's milliseconds.
+export type RocketPhase = 'idle' | 'bet' | 'fly' | 'done';
+/** A person's fuel in the round: k (their key), n (masked name), b (fuel), a (automatic escape), c (where they left, 0 lost), p (paid). */
+export type RocketSeat = { k: number; n: string; b: number; a: number | null; c: number | null; p: number };
+export type RocketRound = { id: number; phase: RocketPhase; ret: number; betUntil: number; launchAt: number | null; crash: number | null; players: number; fuel: number };
+export type RocketView = { v: number; now: number; rate: number; round: RocketRound | null; players: RocketSeat[]; last: number[] };
+export type RocketMine = { k: number; fuel: number; onBoard: number; auto: number | null; cashed: number | null; payout: number };
+export type RocketGame = { active: boolean; allowed: boolean; needLevel: number; bets: number[]; maxFuel: number; dailyLimit: number; playedToday: number };
+export type ServerRocket = RocketView & { history: number[]; game: RocketGame; mine: RocketMine | null; user: ServerUser };
+export const rocket = () => call<ServerRocket>('GET', '/api/casino/rocket');
+/** Fuel into the open round; `auto` as a multiplier (2.15), null for none. */
+export const rocketFuel = (body: { round: number; bet: number; auto: number | null; place: 'profile' | 'room' }, ref = newRef()) =>
+  call<{ round: number; fuel: { id: number; bet: number }; mine: RocketMine | null; user: ServerUser; replay: boolean }>('POST', '/api/casino/rocket/bet', { ...body, ref });
+export const rocketEscape = (round: number) => call<{ round: number; x: number; fuel: number; payout: number; mine: RocketMine | null; user: ServerUser }>('POST', '/api/casino/rocket/escape', { round });
 /**
  * Oda oyunları at a table in a room (server/api/room-games.mjs): the room's one table, as I see it; `mySeat` −1 when I
  * watch. `TableCommon` is what every table carries. Each game adds its own fields, as the server's
@@ -1423,8 +1441,9 @@ export type EventKey =
 export type DecorKey = 'room_decor_off' | 'room_bg_custom_price' | 'room_bg_custom_days';
 /** Yeni üye ödülleri (server/api/live-registry.mjs): which rewards are off, and their amounts and daily cap. */
 export type RewardKey = 'rewards_off' | 'welcome_coins' | 'invite_coins' | 'invite_daily_cap';
-/** Oyun Salonu (server/api/live-registry.mjs, "Oyun Salonu"): games switched off, who the coin games are open to, the top stake, the daily limit. */
-export type CasinoKey = 'casino_off' | 'casino_open' | 'casino_max_bet' | 'casino_daily_rounds';
+/** Oyun Salonu (server/api/live-registry.mjs, "Oyun Salonu"): games switched off, who the coin games are open to, the top stake, the daily limit,
+ *  Canlı Yörünge's house share. */
+export type CasinoKey = 'casino_off' | 'casino_open' | 'casino_max_bet' | 'casino_daily_rounds' | 'rocket_house_pct';
 /** 1v1 and Eşleşme (server/api/live-registry.mjs, "Birebir ve eşleşme"): whole numbers. */
 export type OneOnOneKey =
   | 'dm_price'

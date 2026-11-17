@@ -19,7 +19,8 @@
 // Arkadaşını Getir, the welcome coins and which packs still carry the first-purchase gift: referrals.mjs.
 // Rüzgâr Gülü (the wheel game, played here): wheel.mjs.
 // Çantam (free gifts from rewards, sent without coins): backpack.mjs.
-// Rüzgâr Gülü (the wheel game, played here): wheel.mjs. The other Oyun Salonu games: casino.mjs. Sıralama's Oda XP board: room-xp.mjs.
+// Rüzgâr Gülü (the wheel game, played here): wheel.mjs. The other Oyun Salonu games: casino.mjs; Yörünge played live by
+// everyone at once: rocket-live.mjs. Sıralama's Oda XP board: room-xp.mjs.
 // A room's Katkı sıralaması (Cömertlik and Yankı by hour, day, week): room-contrib.mjs.
 // Oda oyunları at a table in a room (Ludo, Renk Kartları, XOX, Dört Taş): room-games.mjs.
 // Patron koltuğu: boss-seat.mjs. A room left without its owner and admins rests: room-autoclose.mjs.
@@ -48,6 +49,7 @@ import { backpackRoutes } from './backpack.mjs';
 import { bondRoutes, startBondSweep, stopBondSweep } from './bonds.mjs';
 import { paidGamesOpen, wealthPoints, wheelRoutes } from './wheel.mjs';
 import { casinoRoutes } from './casino.mjs';
+import { recoverRocket, rocketRoutes, stopRocket } from './rocket-live.mjs';
 import { roomXpRoutes } from './room-xp.mjs';
 import { roomGameRoutes } from './room-games.mjs';
 import { EXCHANGE, SHOP, exchangeCoins } from './catalog.mjs';
@@ -322,6 +324,7 @@ const routes = {
   ...bondRoutes,
   ...wheelRoutes,
   ...casinoRoutes,
+  ...rocketRoutes,
   ...roomXpRoutes,
   ...roomGameRoutes,
   ...luckyRoutes,
@@ -496,6 +499,7 @@ function shutdown(signal) {
   console.log(`${signal}: shutting down`);
   // Open live lines would hold the shutdown up; the phones reconnect to the next process.
   closeLines();
+  stopRocket();
   stopFinanceSync();
   stopRefundSync();
   stopVipRecheck();
@@ -533,6 +537,8 @@ await refreshCustomGifts();
 await refreshEmoji();
 await refreshLevels();
 await refreshShopItems();
+// A live Yörünge round the last process left in the air: its fuel goes back before anyone can play again.
+await recoverRocket();
 server.listen(PORT, '127.0.0.1', () => console.log(`api on 127.0.0.1:${PORT} version ${VERSION}${TEST_TOPUP ? ' (test top-up on)' : ''}`));
 startFinanceSync();
 startRefundSync();

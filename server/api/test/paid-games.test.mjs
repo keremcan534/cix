@@ -61,6 +61,13 @@ describe('Jetonlu oyunlar kime açık', () => {
     const [st2, j2] = await spin(p.session);
     assert.equal(st2, 403);
     assert.match(j2.error, /yönetici/);
+    // Canlı Yörünge: closed to them, and reading it starts no round.
+    const [, rocket] = await call('GET', '/api/casino/rocket', null, p.session);
+    assert.deepEqual([rocket.game.active, rocket.game.allowed, rocket.round], [false, false, null]);
+    const [st3, j3] = await call('POST', '/api/casino/rocket/bet', { round: 1, bet: 250, ref: rnd(8) }, p.session);
+    assert.equal(st3, 403);
+    assert.match(j3.error, /yönetici/);
+    assert.equal((await h.sql.query('SELECT count(*) AS n FROM rocket_rounds')).rows[0].n, '0');
     const u = await me(p.session);
     assert.deepEqual([u.coins, u.gameCoins], [5000, 0]);
     // A moderator is not an admin.

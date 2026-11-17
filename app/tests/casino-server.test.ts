@@ -119,6 +119,14 @@ describe('Canlı ayarlar paneli Oyun Salonu’nu sunucu gibi okur', () => {
     ])
       assert.equal(bigChange('casino_daily_rounds', before, after), registry.isBig('casino_daily_rounds', before, after), `${before} → ${after}`);
     assert.equal(bigChange('casino_max_bet', 25_000, 250), registry.isBig('casino_max_bet', 25_000, 250));
+    for (const [before, after] of [
+      [60, 40],
+      [60, 70],
+      [40, 60],
+      [60, null],
+    ])
+      assert.equal(bigChange('rocket_house_pct', before, after), registry.isBig('rocket_house_pct', before, after), `${before} → ${after}`);
+    assert.equal(valueText('rocket_house_pct', 60), 'Kasaya %60, oyunculara %40');
     assert.equal(valueText('casino_off', ['fish', 'neon'], { names: { game: (id) => rules.gameById(id)!.name } }), 'Kapalı: Balon Avı, Neon Bulvar');
     assert.equal(valueText('casino_off', []), 'Hepsi açık');
     assert.equal(valueText('casino_max_bet', 25_000), '25.000 jeton');

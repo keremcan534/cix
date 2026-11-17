@@ -15,6 +15,7 @@
 import { EXCHANGE, GIFTS, PACKS, SHOP, WITHDRAW, exchangeCoins } from './catalog.mjs';
 import { DAILY_ROUNDS as CASINO_DAILY_ROUNDS, GAMES as CASINO_GAMES, STAKES as CASINO_STAKES } from './casino-rules.mjs';
 import { REMINDER_KINDS, REMINDER_LABEL } from './event-rules.mjs';
+import { HOUSE_PCT as ROCKET_HOUSE_PCT } from './rocket-live-rules.mjs';
 
 /** Every feature that can be switched off (features.mjs ROUTES). `games` is mostly in the app; Rüzgâr Gülü is on the server. */
 export const FEATURES = ['gifts', 'purchases', 'topup', 'exchange', 'jeton', 'games', 'dm', 'rooms', 'withdraw', 'shop'];
@@ -108,6 +109,8 @@ export function defaultsOf(e = process.env) {
     // The coin games (Oyun Salonu, Rüzgâr Gülü) are for admin accounts only until they are opened to everyone
     // (the owner's decision). CASINO_OPEN=everyone in .env opens them without a row (the tests' API runs so).
     casino_open: e.CASINO_OPEN === 'everyone' ? ['everyone'] : [],
+    // Canlı Yörünge (rocket-live.mjs) keeps the house rule of every coin game until the owner moves it.
+    rocket_house_pct: ROCKET_HOUSE_PCT,
     // Oda süslemesi (room-decor.mjs): both paid parts on, Özel süsleme 5.000 jeton for 30 days.
     room_decor_off: [],
     ...Object.fromEntries(Object.entries(DECOR_AMOUNTS).map(([k, x]) => [k, x.default])),
@@ -787,6 +790,23 @@ export const REGISTRY = {
     big: (before, after) => after !== null && after > REGISTRY.casino_daily_rounds.bounds.big,
     impact: (before, after) => `Bir oyunda günde en çok ${fmt(before)} → ${fmt(after)} tur (en yüksek bahisle); Yörünge’de ${fmt(before * CASINO_TOP)} → ${fmt(after * CASINO_TOP)} jeton.`,
   },
+  // Canlı Yörünge (rocket-live.mjs): unlike the other games' odds, its share can move, because the app shows no paytable
+  // for it: the crash points of a round are drawn with the share the round opened with, and the "?" page reads it.
+  rocket_house_pct: {
+    field: 'rocketHousePct',
+    group: 'Oyun Salonu',
+    label: 'Canlı Yörünge: kasa payı (%)',
+    help: 'Canlı Yörünge’de oynanan jetonun kasada kalan yüzdesi; gerisi kazananlara döner. 60 ile her 100 jetonun ortalama 40’ı geri döner ve roket turların yaklaşık %60’ında kalkmadan patlar. Düştükçe roket daha sık kalkar ve daha yükseğe çıkar. Yeni değer bir sonraki turdan başlar. Diğer oyunların payı %60’tır, bu ayar onları değiştirmez.',
+    type: 'int',
+    bounds: { min: 3, max: 90, step: 1 },
+    parse: (v) => wholeOf(v, REGISTRY.rocket_house_pct.bounds, 'Canlı Yörünge kasa payı', ' (%)'),
+    // Giving the players more back is confirmed twice.
+    big: (before, after) => after !== null && after < before,
+    impact: (before, after) =>
+      before === after
+        ? 'Görünür bir etkisi yok.'
+        : `Canlı Yörünge’de kasa payı %${before} → %${after}: oyunculara ortalama %${100 - before} → %${100 - after} döner; roket her 100 turun yaklaşık ${before} → ${after} turunda kalkmadan patlar. Bir sonraki turdan başlar.`,
+  },
   ...decorEntries(),
   ...roomEntries(),
   ...eventEntries(),
@@ -866,7 +886,7 @@ const readOnlySet = (xs) => {
  *     withdrawWeekly, otpPerHour, dmPrice, callVoice, callVideo, callFree, callSeconds, callPlainVoice, callPlainVideo,
  *     matchVoice, matchVideo, matchFree, matchSeconds, heartVoice,
  *     heartVideo, heartMsg, heartMsgDaily, heartGrace, heartHalf, backpackCallTask, rewardsOff: Set, welcomeCoins, inviteCoins, inviteDailyCap, casinoOff: Set, casinoOpen: Set, casinoMaxBet,
- *     casinoDailyRounds, roomDecorOff: Set, roomBgCustomPrice, roomBgCustomDays, roomStaffAwayMinutes, bossSeatCoins,
+ *     casinoDailyRounds, rocketHousePct, roomDecorOff: Set, roomBgCustomPrice, roomBgCustomDays, roomStaffAwayMinutes, bossSeatCoins,
  *     bossSeatMinutes, eventMinRoomLevel, eventMinLead, eventMaxMinutes, eventMaxCapacity, eventGrace, eventStrikeLimit,
  *     eventBlockDays, eventRemindersOff: Set, luckyAnnounceMinCoins, invalid }
  */
@@ -910,6 +930,7 @@ export function snapshotOf(rows = [], e = process.env, { v = 0 } = {}) {
     casinoOpen: readOnlySet(val('casino_open')),
     casinoMaxBet: val('casino_max_bet'),
     casinoDailyRounds: val('casino_daily_rounds'),
+    rocketHousePct: val('rocket_house_pct'),
     roomDecorOff: readOnlySet(val('room_decor_off')),
     ...Object.fromEntries(Object.entries(DECOR_AMOUNTS).map(([k, x]) => [x.field, val(k)])),
     ...Object.fromEntries(Object.entries(ROOM_AMOUNTS).map(([k, x]) => [x.field, val(k)])),

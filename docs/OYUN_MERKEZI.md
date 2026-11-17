@@ -76,6 +76,20 @@ Eski uygulama sürümleri yeni masaları çizemez: oda oyunlarında sunucu ve uy
 - **Rapor:** Yönetim › Oyun Salonu (yalnız yönetici). Turlar 180 gün saklanır; kasa defteri başlangıçtan bu yanadır.
 - **Henüz yok (sonraki aşamalar, karar gerektirir):** oyuncu oranının panelden değiştirilmesi (60/40 kuralını değiştirir), Pachinko'ya özel Jackpot ve Fever modu, ikinci tahta, oda içi skor tablosu, düello ve turnuvalar.
 
+## Canlı Yörünge (herkes aynı roket)
+
+Yörünge, sunucusu destekleyen uygulamada **canlı ve çok oyunculu** oynanır (sunucuda `server/api/rocket-live.mjs` ve `rocket-live-rules.mjs`; uygulamada `components/games/rocket-live.tsx`, `lib/live/rocket-live.ts`, `lib/rocket-live.ts`). Demo sürümü ve bunu bilmeyen bir sunucu tek kişilik Yörünge'yi (hedefi önceden seçilen) gösterir; eski APK'lar da tek kişilik Yörünge'yi oynamaya devam eder. Örnek: sahibin gönderdiği başka bir uygulamanın "Rocket" oyunu (Kasım 2026); ad ve görseller bizim.
+
+- **Tur:** 10 saniyelik geri sayımda yakıt alınır: her bidona dokunuş bir bahis basamağıdır (250 – 25.000), bir turda kişi başı en çok `casino_max_bet`. Motor ateşlenir, roket 1,00×'tan tırmanır: çarpan t saniyede e^(0,075·t) (2× 9 sn, 10× 31 sn, 100× 61 sn). Oyuncu istediği an **Kaç**'a basar; isteğin sunucuya ulaştığı andaki çarpanla ödenir. **Oto kaç** (1,01×–1.000×) turun ilk yakıtıyla seçilir; roket o çarpana gelince kendiliğinden kaçar. Roket patlayınca kaçmayanların yakıtı gider. Patlamadan sonra 5 sn kürsü (en yüksek çarpanla kaçan ilk 3), sonra yeni tur. Turlar biri ekranı açınca başlar, kimse bakmayınca durur.
+- **Ekran:** geri sayım, rampadaki roket, herkesin yakıtı roketin yanına uçar (adlar maskeli: "Ahm**"), soldaki yakıt listesi (kaçanın kazancı yeşil, yananlar soluk), tırmanış izi ve tırmanışla büyüyen çarpan ölçeği, kaçanlar kendi çarpanlarında paraşütle iner, patlama, kürsü, son patlama noktaları şeridi ve **Tümü** (son 50 tur; son 10/20/50/100 turun 1–2×, 2–3×, 3–5×, 5–10×, 10×+ dağılımı). "?" sayfasında kurallar ve kasa payına göre ulaşma şansı tablosu.
+- **Kasa payı canlı ayar:** Canlı ayarlar › Oyun Salonu › **Canlı Yörünge: kasa payı (%)** (`rocket_house_pct`, 3–90, varsayılan 60; sahibin kararı, 17.11.2026). Patlama noktası tur açılırken bu payla çekilir: x çarpanına ulaşma şansı (100 − pay)% / x. Yani %60 payda **her 100 turun yaklaşık 60'ında roket kalkmadan patlar** (1,00×), 2×'e ulaşma şansı %20, 10×'a %4. Payı düşürmek iki kez onay ister; yeni pay bir sonraki turdan başlar. Diğer oyunların payı %60 kalır (uygulama onların ödeme tablolarını gösteriyor).
+- **Para:** yakıt, diğer oyunlar gibi önce oyun bakiyesinden sonra jetondan düşer (`spendCoins`, günlük harcama sınırı); kazanç oyun bakiyesine yazılır. Kalkışta turun yakıtı kasa defterine girer (kasa payı ve havuz) ve turun en çok ödeyebileceği tutar havuzdan turun ayrılmış payına geçer; havuz yetmezse roket o çarpanda patlar ("?" sayfasında yazar). Havuz turdaki yakıtın en az 2 katını ödeyemiyorsa yeni yakıt alınmaz.
+- **Adil oyun:** patlama noktası tur açılırken sunucuda çekilir ve patlayana kadar hiçbir telefona gitmez; tırmanışın hızı her turda aynıdır; otomatik kaçış hedefe varınca ödenir (önceden ödense roketin oraya varacağı anlaşılırdı).
+- **Sunucu yeniden başlarsa** (dağıtım): kalkmamış turun bütün yakıtı, havadaki turun kaçmamış yakıtı geldiği yere iade edilir; kaçanların ödemesi kalır.
+- **Yük:** ekran açıkken telefon turu canlı hattan alır (saniyede en çok birkaç olay, yalnız ekranı açık olanlara) ve 10 sn'de bir yeniden okur; hat kopuksa 2,5 sn'de bir. Herkese açmadan önce yük testi yapılmalı (yapılmadı).
+- **Testler:** `server/api/test/rocket-live.test.mjs` (kurallar, yakıt, elle ve otomatik kaçış, geç kalan kaçış, rampa, havuz kesmesi, kurallar ve reddetmeler, aynı istek, kasa payı ayarı, canlı hat, yeniden başlatmada iade; her dosyanın sonunda para denetimi), para karıştırma testinde yakıt ve kaçış, `app/tests/rocket-live.test.ts` (kuralların sunucuyla aynılığı, sunucu cevabının güvenli okunması, turun anı).
+- **Henüz yok:** ödüllü sıralama (videodaki kupa ve ödüller), her tur aynı yakıtı kendiliğinden koyan "otomatik yakıt", roket, bidon ve paraşüt için çizilmiş özel görseller (şimdilik Yörünge'nin mevcut roketi ve basit şekiller).
+
 ## En kritik kural: sesli sohbet kesintisiz
 
 - `lib/games.ts` ve oyun bileşenleri odaya, koltuğa, mikrofona ve görüşmeye **hiç dokunmaz**. Medya yöneticisi (`lib/media`) içe aktarılmaz.
@@ -191,7 +205,7 @@ Bu belgede **hiçbir sağlayıcı adı doğrulanmış değildir**. Kataloğun "s
 | `jackpot` | Hazine Kulesi |
 | `olympus` | Yıldız Avı |
 | `fish` | Balon Avı |
-| `rocket` | Yörünge |
+| `rocket` | Yörünge (canlı sürümü de aynı kimlikle) |
 | `super777` · `jungle` · `goldtree` | Kızıl Yedi · Vahşi Patika · Bereket Ağacı |
 | `foodwheel` · `magiccard` | Lezzet Çarkı · Sihir Destesi |
 | `pinata` · `spellbook` · `neon` | Konfeti Kutusu · Kayıp Parşömen · Neon Bulvar |

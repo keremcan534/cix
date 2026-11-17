@@ -19,7 +19,7 @@ import { LineSlotPlayer } from '@/components/games/line-slot';
 import { SkinBackdrop, SkinOverlay, slotSkinOf } from '@/components/games/fx/slot-skin';
 import { salonArt } from '@/components/games/fx/salon-art';
 import { FenerPlayer } from '@/components/games/fener';
-import { RocketPlayer } from '@/components/games/rocket';
+import { YorungePlayer } from '@/components/games/rocket-live';
 import { BilyePlayer } from '@/components/games/bilye';
 import { OkeyTable } from '@/components/games/okey';
 import { WheelPlayer } from '@/components/games/wheel';
@@ -52,7 +52,8 @@ const CASINO_SCREENS: Partial<Record<CasinoGame['id'], (p: { entry: Entry }) => 
   fortune: FortunePlayer,
   olympus: FenerPlayer,
   fish: FishPlayer,
-  rocket: RocketPlayer,
+  // Live and shared on a server that plays it so (rocket-live); the one-player screen otherwise.
+  rocket: YorungePlayer,
   goldtree: GoldTreePlayer,
   bilye: BilyePlayer,
 };

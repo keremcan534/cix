@@ -6,12 +6,14 @@
 //   GET /api/live   (Bearer)  → text/event-stream: "data: {"type":"message","from":"…"}" lines, a comment
 //                               every LIVE_BEAT_MS (20 s) so idle connections stay open and dead ones are found.
 //   GET /api/live?wins=1      the same, and the wins announced to everyone (lineWin): an app that shows them asks.
+//   GET /api/live?rocket=1    the same, and Canlı Yörünge's round while its screen is open (lineRocket, rocket-live.mjs).
 //
 // Server-Sent Events: plain HTTP, no extra package, and Caddy passes the stream through as it is written. An event
 // says only what changed (its type and ids, never a message's text or a name): the phone reads the thing itself
 // through the usual routes, with their usual checks, so a line can't show anyone anything they couldn't read.
-// One kind is different: a win announced to everyone ('win', lineWin) carries what its banner shows, since it is
-// public by design and a read by every phone after every win would cost far more than the line itself.
+// Two kinds are different: a win announced to everyone ('win', lineWin) carries what its banner shows, and Canlı
+// Yörünge's round ('rocket', lineRocket) what its screen shows (the climb, the fuel on board with masked names), since
+// both are public by design and a read by every phone after every change would cost far more than the line itself.
 // The lines live in this process's memory (one API process). The polls stay: they cover a line that is down.
 import { auth, limit } from './core.mjs';
 
@@ -19,6 +21,8 @@ import { auth, limit } from './core.mjs';
 const lines = new Map();
 /** The lines that asked for the wins (an older app would take each one for "read everything again"). */
 const winLines = new WeakSet();
+/** The lines of an app that shows Canlı Yörünge (an older one would take its events for "read everything again"). */
+const rocketLines = new WeakSet();
 const MAX_PER_USER = 3;
 const BEAT_MS = Number(process.env.LIVE_BEAT_MS) >= 50 ? Number(process.env.LIVE_BEAT_MS) : 20_000;
 
@@ -26,7 +30,9 @@ const BEAT_MS = Number(process.env.LIVE_BEAT_MS) >= 50 ? Number(process.env.LIVE
 export async function openLine(req, res) {
   const me = await auth(req);
   const id = String(me.id);
-  if (new URL(req.url ?? '/', 'http://line').searchParams.get('wins') === '1') winLines.add(res);
+  const ask = new URL(req.url ?? '/', 'http://line').searchParams;
+  if (ask.get('wins') === '1') winLines.add(res);
+  if (ask.get('rocket') === '1') rocketLines.add(res);
   // no-transform: nothing on the way (Caddy's compression) may hold the events back to pack them.
   res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-store, no-transform', 'X-Accel-Buffering': 'no' });
   res.write('retry: 3000\n: ok\n\n');
@@ -99,6 +105,25 @@ export function lineWin(win, skip = new Set()) {
     if (skip.has(uid)) continue;
     for (const res of mine) {
       if (!winLines.has(res)) continue;
+      try {
+        res.write(event);
+      } catch {
+        // A line that just broke: its 'close' removes it.
+      }
+    }
+  }
+}
+
+/**
+ * Canlı Yörünge's round (rocket-live.mjs) to these people's lines that asked for it: `round` is the screen's public
+ * view as JSON (the round, its fuel with masked names, the last crash points), written as it is. Never throws.
+ */
+export function lineRocket(userIds, round) {
+  if (!lines.size || typeof round !== 'string') return;
+  const event = `data: ${JSON.stringify({ type: 'rocket', round })}\n\n`;
+  for (const uid of new Set([...userIds].map(String))) {
+    for (const res of lines.get(uid) ?? []) {
+      if (!rocketLines.has(res)) continue;
       try {
         res.write(event);
       } catch {

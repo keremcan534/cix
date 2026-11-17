@@ -46,13 +46,15 @@ export function refreshCasino(): Promise<void> {
       r = await api.casino();
     } catch (e) {
       // A server without Oyun Salonu: no game is open, rather than games that would only answer "not found".
-      if (e instanceof api.ApiError && e.status === 404) applyLiveCasino({ games: [] });
+      if (e instanceof api.ApiError && e.status === 404) applyLiveCasino({ games: [], rocketLive: false });
       return;
     }
     // Signed in as someone else meanwhile: this answer was theirs.
     if (who !== myServerId()) return;
     applyLiveCasino({
       games: r.games,
+      // Yörünge live, everyone at once (lib/live/rocket-live), on a server that plays it.
+      rocketLive: r.rocketLive === true,
       history: r.mine.map((x) => historyRow(x)),
       jackpots: Object.fromEntries(r.games.flatMap((g) => (g.jackpot === null ? [] : [[g.id, g.jackpot]]))),
     });
