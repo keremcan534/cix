@@ -10,8 +10,8 @@ Sahibin kararları:
 - **Çantam'ın yeri:** Profil › Çantam, ayrı bir ekran.
 - **Çantam'a ne gelir:** Çarşı'dan alınanlar, yetkili hediyesi, etkinlik ödülü, görev ödülü, seviye ve VIP ödülü.
 
-Yapılış sırası: 1) Çantam, Çarşı ve ortak ödül yolu, 2) seviye ve VIP ödülleri (bu belge, yapıldı), 3) etkinlik
-ödülleri, 4) görev ödülleri.
+Yapılış sırası: 1) Çantam, Çarşı ve ortak ödül yolu, 2) seviye ve VIP ödülleri, 3) etkinlik ödülleri (üçü yapıldı),
+4) görev ödülleri.
 
 ## Uygulamada
 
@@ -62,10 +62,17 @@ Panelde **Seviye ve VIP › Seviye ödülleri** (yetki: `app.levels`, Seviyeler 
 - **Mağaza eşyaları (kişiye)** sayfası artık her eşyanın nereden geldiğini de yazar (satın aldı, yönetim verdi,
   seviye ödülü · VIP 5, etkinlik ödülü, görev ödülü).
 
+## Etkinlik ödülleri
+
+Panelde **Duyuru ve etkinlik › Etkinlikler** › etkinliğin satırında **Ödül** (yetki: `app.events`). Etkinlik sürerken
+odaya giren herkes, etkinlik bitince eşyayı Çantam'ında bulur ("Etkinlik ödülü · etkinliğin adı"), bir kez. Oda sahibi
+ödül bağlayamaz. Ayrıntı: [`ETKINLIK_MERKEZI.md`](ETKINLIK_MERKEZI.md) › Katılım ödülü.
+
 ## Eski APK'lar
 
 - Eski uygulamada Çantam ekranı yok; Mağaza'sında Binek sekmesi durur, "Mağaza" adıyla.
-- Eski uygulama çantayı sunucudan okumaz, bu yüzden seviye ödüllerini güncelleyince alır. Yetkilinin verdiği eşyayı
+- Eski uygulama çantayı sunucudan okumaz, bu yüzden seviye ödüllerini güncelleyince alır. Etkinlik ödülü eski APK'da
+  da verilir (etkinlik bitince sunucu verir); eski APK onu göstermez, güncelleyince Çantam'da görünür. Yetkilinin verdiği eşyayı
   da (önceden olduğu gibi) "sahip" göstermez; yeni APK gösterir.
 
 ## Veri
@@ -73,4 +80,6 @@ Panelde **Seviye ve VIP › Seviye ödülleri** (yetki: `app.levels`, Seviyeler 
 - `level_rewards` (ödüller; silinen satır geçmiş için kalır, `deleted_at`) ve `level_reward_claims` (kim hangi
   ödülü aldı ya da alamadı). İkisi de kişinin veri kopyasına girmez; verilen eşya zaten `entitlements` ile girer
   (`my-data.mjs`, kaynağı ve `origin`'iyle).
-- Göç: `085_bag_rewards.sql`.
+- Etkinlik ödülü `events` satırında (`reward_sku`, `reward_days`, kim bağladı, kaç kişiye verildi); verilen eşya
+  `entitlements`'ta `event:<etkinlik>` kimliğiyle.
+- Göç: `085_bag_rewards.sql`, `086_event_rewards.sql`.

@@ -122,6 +122,7 @@ export const PANEL_ROUTES = new Set([
   'GET /api/admin/events',
   'POST /api/admin/events/review',
   'POST /api/admin/events/remove',
+  'POST /api/admin/events/reward',
   'GET /api/admin/events/categories',
   'POST /api/admin/events/categories',
   'POST /api/admin/events/categories/remove',

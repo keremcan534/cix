@@ -823,6 +823,9 @@ export type EventItem = {
   came: number;
   /** My place: confirmed, cancelled, attended, missed (null: none). */
   mine: 'confirmed' | 'waiting' | 'cancelled' | 'attended' | 'missed' | null;
+  /** What everyone who comes gets in Çantam when it ends (the team's; older servers leave it out): `days` null for
+   *  good, `given` to how many once given. */
+  reward?: { sku: string; kind: string; name: string; days: number | null; given?: number } | null;
 };
 export type EventDetail = EventItem & {
   rules: string;

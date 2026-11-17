@@ -45,6 +45,19 @@ export function termText(until: number | null, now: number): string {
   return `${Math.ceil(left / DAY)} gün kaldı`;
 }
 
+/**
+ * An event's reward for those who come (server/api/events.mjs `reward`), as the event's page says it: what they will
+ * get, or once given how many got it. Null without one, a malformed one, or an event that won't give it.
+ */
+export function eventRewardText(e: { state: string; reward?: unknown }): string | null {
+  const r = obj(e.reward);
+  if (typeof r.name !== 'string' || !r.name.trim() || e.state === 'cancelled' || e.state === 'rejected') return null;
+  const name = r.name.trim().slice(0, 60);
+  const term = typeof r.days === 'number' && r.days > 0 ? `${Math.round(r.days)} gün` : 'kalıcı';
+  if (e.state === 'ended') return typeof r.given === 'number' && r.given > 0 ? `${r.given.toLocaleString('tr-TR')} kişi ${name} (${term}) kazandı; Çantam’a geldi.` : null;
+  return `Etkinlik sürerken odaya gelen herkes ${name} (${term}) kazanır; etkinlik bitince Çantam’a gelir.`;
+}
+
 /** Çantam's tabs of items (gifts have their own): rides are with the entry effects, as in Çarşı. */
 export const BAG_TABS = [
   { key: 'frame', label: 'Çerçeveler', kinds: ['frame'] },

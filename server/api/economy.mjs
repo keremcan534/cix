@@ -30,7 +30,7 @@
 import { HttpError, REF, UUID, auth, claimRef, clientIp, db, env, int, limit, once, readJson, text, tx, userId } from './core.mjs';
 import { FREE_MICFX, MAX_AHEAD_DAYS, PAID_ONLY, SHOP, SHOP_PAUSED, SLOTS, labelOf } from './catalog.mjs';
 import { nobleItem, vipItemNeed, vipLevelOf } from './levels.mjs';
-import { ownShopSkus, shopItem } from './shop-items.mjs';
+import { allShopItems, ownShopSkus, shopItem } from './shop-items.mjs';
 import { claimLevelRewards } from './level-rewards.mjs';
 import { packByName, packItem, packSkus } from './emoji.mjs';
 import { live } from './live-settings.mjs';
@@ -166,6 +166,30 @@ export async function grantReward(c, uid, sku, { days, source, ref, origin = nul
     if (['owned', 'too_far'].includes(e?.extra?.code)) return false;
     throw e;
   }
+}
+
+/** What the panel may give as a reward (Seviye ödülleri, an event's reward), and how it names each kind. */
+const PICKABLE = ['frame', 'entry', 'ride', 'bubble', 'wave'];
+export const REWARD_KIND_NAME = Object.freeze({ frame: 'Çerçeve', entry: 'Giriş efekti', ride: 'Binek', bubble: 'Sohbet balonu', wave: 'Ses dalgası', micfx: 'Mikrofon efekti', sticker: 'Çıkartma paketi' });
+/** The panel's choices for a reward: the shop's frames, entry effects, rides, bubbles and waves as they are now. */
+export function rewardChoices() {
+  const out = new Map();
+  for (const x of allShopItems()) out.set(x.sku, x);
+  for (const x of SHOP.values()) if (!out.has(x.sku)) out.set(x.sku, x);
+  return [...out.values()]
+    .map((x) => rewardItem(x.sku))
+    .filter((x) => x && PICKABLE.includes(x.kind))
+    .map((x) => ({ sku: x.sku, kind: x.kind, kindName: REWARD_KIND_NAME[x.kind], name: x.name, days: x.days ?? null }));
+}
+/** The panel's reward of `sku` for `days` (empty: the shop's term): the item and the days to keep, or a 400 saying what to fix. */
+export function pickReward(sku, days) {
+  const item = rewardItem(sku);
+  if (!item || !PICKABLE.includes(item.kind)) throw new HttpError(400, 'Ödül bir çerçeve, giriş efekti, binek, sohbet balonu ya da ses dalgası olmalı');
+  if (days === undefined || days === null || days === 0 || days === '') return { item, days: null };
+  if (item.days === null) throw new HttpError(400, `${item.name} süresiz satılıyor; ödülü de süresizdir, gün verilmez`);
+  const n = int(days, 1, MAX_AHEAD_DAYS);
+  if (n === null) throw new HttpError(400, `Gün 1–${MAX_AHEAD_DAYS} arasında olmalı (boş: mağazadaki süresi)`);
+  return { item, days: n };
 }
 
 /**

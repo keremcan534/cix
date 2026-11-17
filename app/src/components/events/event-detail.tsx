@@ -17,6 +17,7 @@ import { Text } from '@/components/text';
 import { Avatar, Button } from '@/components/ui';
 import { showAlert } from '@/lib/alert';
 import * as api from '@/lib/api';
+import { eventRewardText } from '@/lib/bag-core';
 import { END_TEXT, REMINDER_KINDS, elapsedText, lookOf, placesText, reminderLine, spanText, whenText } from '@/lib/events';
 import { SCRIM, makeStyles, useTheme } from '@/theme';
 
@@ -58,6 +59,7 @@ const ACTION_LABEL: Record<string, string> = {
   start: 'Başladı',
   end: 'Bitti',
   not_started: 'Zamanında başlatılmadı',
+  reward: 'Katılım ödülü değişti',
 };
 
 export function EventDetailView({ id, demo, onDemoReserve, onClose, onChanged, onEdit, onRoom }: Props) {
@@ -156,6 +158,7 @@ export function EventDetailView({ id, demo, onDemoReserve, onClose, onChanged, o
   // Reminders: an upcoming event I have a place at, on a server that sends any.
   const kinds = e?.reminders ?? [];
   const showRemind = !!e && e.state === 'upcoming' && e.mine === 'confirmed' && typeof e.remind === 'boolean' && kinds.length > 0;
+  const reward = e ? eventRewardText(e) : null;
   const shareable = !!e && (e.state === 'upcoming' || e.state === 'live');
   const start = e ? new Date(e.startsAt).getTime() : 0;
   const full = !!e && e.capacity !== null && e.reserved >= e.capacity && e.mine !== 'confirmed';
@@ -235,6 +238,7 @@ export function EventDetailView({ id, demo, onDemoReserve, onClose, onChanged, o
                 {e.state === 'ended' && e.endReason !== 'not_started' && (
                   <Notice icon="flag-outline" title="Etkinlik sona erdi" text={`${e.endReason ? END_TEXT[e.endReason] : 'Bitti'} · ${e.came.toLocaleString('tr-TR')} katılımcı`} />
                 )}
+                {reward && <Notice icon="gift-outline" title="Katılım ödülü" text={reward} />}
                 {showRemind && (
                   <ListGroup footer={e.remindersOff ? 'Tüm etkinlik hatırlatmaların Ayarlar › Bildirimler’de kapalı.' : (reminderLine(kinds) ?? undefined)}>
                     <ListSwitch icon="notifications-outline" title="Bu etkinliği hatırlat" value={!!e.remind && !e.remindersOff} disabled={busy || !!e.remindersOff} onChange={remind} />

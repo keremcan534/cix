@@ -24,6 +24,7 @@
 //   GET  /api/admin/events?status=&q=&skip=      → { events, counts, more }                 (admin)
 //   POST /api/admin/events/review { id, approve, reason? } → { event }                    (admin)
 //   POST /api/admin/events/remove { id, reason }           → { event }                    (admin)
+//   POST /api/admin/events/reward { id, sku | null, days? } → { event }                    (admin) who comes gets it
 //   GET  /api/admin/events/categories             → { categories }                          (admin)
 //   POST /api/admin/events/categories { id?, name, icon, theme, sort, active } → { category } (admin)
 //   POST /api/admin/events/categories/remove { id } → { removed }                            (admin)
@@ -38,6 +39,8 @@
 // event or for all), as a push that also reaches the open app (push.mjs notify) and a personal notice in Similar
 // Ekibi. event_reminders_sent keeps each one sent, so none goes twice. A cancelled event is told the same way.
 // Texts are public: they pass the contact filter (core.mjs publicText).
+// An event may carry a reward the team attaches in the panel (an item for Çantam, docs/CANTA.md): when it ends,
+// everyone who came gets it once (rewardEvents, beside the sweep). An event taken down or never started gives none.
 import {
   DAY,
   ENDED_LISTED_DAYS,
@@ -57,10 +60,13 @@ import {
   themeOf,
   windowOf,
 } from './event-rules.mjs';
-import { HttpError, UUID, auth, db, env, int, limit, publicText, readJson, text, tx } from './core.mjs';
+import { HttpError, UUID, auth, clientIp, db, env, int, limit, publicText, readJson, text, tx } from './core.mjs';
+// economy.mjs reaches this file through live.mjs; what it gives here is used only inside handlers and the sweep.
+import { grantReward, pickReward, rewardChoices, rewardItem } from './economy.mjs';
 import { announceRoom, openVoiceRooms, presenceTracked } from './live.mjs';
 import { live } from './live-settings.mjs';
 import { keyOf, verifyUpload } from './media.mjs';
+import { panelDetail } from './panel.mjs';
 import { notify } from './push.mjs';
 import { liveKitName, rankOf, roomLevel, roomRow } from './rooms.mjs';
 
@@ -118,7 +124,16 @@ function view(e) {
     reserved: e.reserved,
     came: e.came,
     mine: e.my_reservation ?? null,
+    reward: rewardView(e),
   };
+}
+
+/** What everyone who comes gets (the team's, in the panel), as Çantam will hold it; `given`: to how many, once given. */
+function rewardView(e) {
+  const item = e.reward_sku ? rewardItem(e.reward_sku) : null;
+  if (!item) return null;
+  const days = item.days === null ? null : (e.reward_days ?? item.days);
+  return { sku: item.sku, kind: item.kind, name: item.name, days, ...(e.reward_done_at ? { given: e.reward_given ?? 0 } : {}) };
 }
 
 /** An event id from a request (a number, or the string Postgres hands back), or a 400. */
@@ -382,8 +397,46 @@ export async function sweepEvents() {
     const room = await tx((c) => finish(c, id, closed ? 'room_closed' : 'time'));
     if (room) announceRoom(liveKitName(room));
   }
+  rewardEvents().catch((e) => console.error('event rewards', e.message));
   await remindEvents();
 }
+let rewarding = false;
+/**
+ * Gives the rewards of the events that ended: everyone who came (event_participants) finds the item in Çantam, once
+ * each (ref event:<id>, so a restart midway goes on where it stopped), and reads it in Similar Ekibi with a push. One
+ * run at a time and never awaited by the sweep, so a big event's many grants don't hold up starting and ending others.
+ * An event taken down (cancelled) or never started gives nothing.
+ */
+export async function rewardEvents() {
+  if (rewarding) return;
+  rewarding = true;
+  try {
+    const due = await db.query(
+      'SELECT id, title, status, started_at, reward_sku, reward_days FROM events WHERE reward_sku IS NOT NULL AND reward_done_at IS NULL AND ended_at IS NOT NULL ORDER BY ended_at LIMIT 10',
+    );
+    for (const e of due.rows) {
+      const item = rewardItem(e.reward_sku);
+      const ref = `event:${e.id}`;
+      const came = item && e.status === 'approved' && e.started_at;
+      const who = came ? (await db.query('SELECT user_id FROM event_participants WHERE event_id = $1 ORDER BY joined_at', [e.id])).rows.map((x) => x.user_id) : [];
+      const got = [];
+      // One person at a time: a grant holds that person's row, as their buys and gifts do.
+      for (const uid of who) {
+        if (await tx((c) => grantReward(c, uid, e.reward_sku, { days: e.reward_days ?? undefined, source: 'event', ref, origin: e.title }))) got.push(uid);
+      }
+      const given = who.length ? (await db.query('SELECT count(*)::int AS n FROM entitlements WHERE user_id = ANY($1::uuid[]) AND ref = $2', [who, ref])).rows[0].n : 0;
+      // A second server giving the same event at once (each person still gets it once): the last to finish counts all.
+      await db.query('UPDATE events SET reward_done_at = coalesce(reward_done_at, now()), reward_given = greatest(coalesce(reward_given, 0), $2) WHERE id = $1', [e.id, given]);
+      if (got.length) {
+        await placeNotices(db, got, e.id, 'Etkinlik ödülü', `“${e.title}” etkinliğine katıldığın için ${item.name} Çantam’ına geldi.`);
+        notify(got, { title: 'Etkinlik ödülü', body: `${item.name} Çantam’ında`, data: { type: 'event', id: String(e.id) } });
+      }
+    }
+  } finally {
+    rewarding = false;
+  }
+}
+
 let timer = null;
 export function startEventSweep() {
   if (timer) return;
@@ -803,6 +856,8 @@ export const eventRoutes = {
     if (stateOf(e) !== 'live') throw new HttpError(409, 'Etkinlik sürmüyor');
     const room = await tx((c) => finish(c, e.id, a.rank >= 2 ? 'owner' : 'admin', me.id));
     if (room) announceRoom(liveKitName(room));
+    // Those who came find the reward in Çantam now, not at the next sweep.
+    rewardEvents().catch((err) => console.error('event rewards', err.message));
     return { event: await detail(e.id, me) };
   },
 
@@ -929,7 +984,13 @@ export const eventRoutes = {
            FROM events`,
       )
     ).rows[0];
-    return { events: r.rows.slice(0, PAGE).map((e) => ({ ...view(e), rules: e.rules, submittedAt: iso(e.submitted_at), rejectReason: e.reject_reason ?? null })), counts, more: r.rowCount > PAGE };
+    return {
+      events: r.rows.slice(0, PAGE).map((e) => ({ ...view(e), rules: e.rules, submittedAt: iso(e.submitted_at), rejectReason: e.reject_reason ?? null })),
+      counts,
+      more: r.rowCount > PAGE,
+      // What the panel may attach as an event's reward.
+      rewardItems: rewardChoices(),
+    };
   },
 
   async 'POST /api/admin/events/review'(req) {
@@ -975,6 +1036,34 @@ export const eventRoutes = {
     });
     notify([...new Set([e.owner_id, ...who])], { title: 'Etkinlik yayından kaldırıldı', body: e.title, data: { type: 'event', id: String(e.id) } });
     announceRoom(liveKitName(e.room_id));
+    return { event: await detail(e.id, me) };
+  },
+
+  // A reward for everyone who comes (null: none): until the event ends, for one still to come or running.
+  async 'POST /api/admin/events/reward'(req) {
+    const me = await adminOnly(req);
+    limit(`event-reward:${me.id}`, 60, 'Çok fazla değişiklik, biraz bekle');
+    const b = await readJson(req);
+    const pick = b.sku === null ? null : pickReward(b.sku, b.days);
+    const e = await rowOf(b.id, me.id);
+    const over = () => new HttpError(409, 'Biten ya da yayında olmayan etkinliğin ödülü değişmez');
+    if (e.ended_at || ['rejected', 'cancelled'].includes(e.status)) throw over();
+    await tx(async (c) => {
+      const r = await c.query('UPDATE events SET reward_sku = $2, reward_days = $3, reward_by = $4, updated_at = now() WHERE id = $1 AND ended_at IS NULL RETURNING id', [
+        e.id,
+        pick?.item.sku ?? null,
+        pick?.days ?? null,
+        me.id,
+      ]);
+      if (!r.rowCount) throw over();
+      const change = { sku: pick?.item.sku ?? null, days: pick?.days ?? null, before: e.reward_sku ? { sku: e.reward_sku, days: e.reward_days } : null };
+      await log(c, e.id, me.id, 'reward', change);
+      await c.query("INSERT INTO audit_events (actor, action, target, detail, ip) VALUES ($1, 'event.reward', NULL, $2, $3)", [
+        me.id,
+        JSON.stringify({ event: e.id, ...change, ...panelDetail(me) }),
+        clientIp(req),
+      ]);
+    });
     return { event: await detail(e.id, me) };
   },
 

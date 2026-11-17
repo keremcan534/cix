@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { SVIP_XP } from '../catalog.mjs';
 import { rnd, startApi } from './harness.mjs';
 
-const h = startApi();
+const h = startApi({ EVENT_SWEEP_MS: '200' });
 const { call } = h;
 const ok = async (p, what = 'istek') => {
   const [st, j] = await p;
@@ -124,5 +124,98 @@ describe('Çantam: nereden geldiği ve seviye ödülleri', () => {
     const item = await itemIn(u, 'rd-sport');
     assert.deepEqual([item.source, item.origin], ['buy', undefined], 'en son gelen: Çarşı');
     assert.ok(Math.abs(Date.parse(item.until) - (t0 + 2 * sport.days * DAY)) < 120_000, 'iki dönem art arda');
+  });
+});
+
+describe('Etkinlik ödülü', () => {
+  const inMinutes = (m) => new Date(Date.now() + m * 60_000).toISOString();
+  const plan = (room, title) => ({ room, category: 'tanisma', title, description: 'Gelen kazanır', rules: 'Saygılı ol', startsAt: inMinutes(90), minutes: 60, capacity: null });
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  async function until(fn, ms = 6000) {
+    const end = Date.now() + ms;
+    while (Date.now() < end) {
+      if (await fn()) return;
+      await wait(100);
+    }
+    throw new Error('zaman aşımı');
+  }
+  let boss;
+  /** An approved event of a new room, and its owner. */
+  async function approved(title) {
+    const owner = await h.signUp(`Sahip ${rnd(2)}`);
+    const room = (await ok(call('POST', '/api/rooms', { title: `Oda ${rnd(2)}` }, owner.session), 'oda')).room.id;
+    const { event } = await ok(call('POST', '/api/events', plan(room, title), owner.session), 'başvuru');
+    await ok(call('POST', '/api/admin/events/review', { id: event.id, approve: true }, boss.session), 'onay');
+    return { owner, id: event.id };
+  }
+  /** Started by its owner now, with `fans` in the room. */
+  async function run({ owner, id }, fans) {
+    await h.sql.query("UPDATE events SET starts_at = now() + interval '5 minutes', ends_at = now() + interval '65 minutes' WHERE id = $1", [id]);
+    await ok(call('POST', '/api/events/start', { id }, owner.session), 'başlat');
+    for (const f of fans) assert.deepEqual(await ok(call('POST', '/api/events/here', { id }, f.session), 'burada'), { counted: true });
+  }
+  const reward = (id, b, who = boss) => call('POST', '/api/admin/events/reward', { id, ...b }, who.session);
+  const doneOf = async (id) => (await h.sql.query('SELECT reward_done_at, reward_given FROM events WHERE id = $1', [id])).rows[0];
+
+  test('yönetici etkinliğe ödül bağlar; gelenler etkinlik bitince Çantam’da bulur, bir kez', async () => {
+    boss = await h.account(`Etkinlik Yöneticisi ${rnd(2)}`, 'admin');
+    const ev = await approved('Ödüllü Gece');
+    const fan = await h.signUp('Gelen');
+    const away = await h.signUp('Gelmeyen');
+    await refused(reward(ev.id, { sku: 'fr-neon' }, fan), 403);
+    await refused(reward(ev.id, { sku: 'noble-1' }), 400, /çerçeve, giriş efekti/);
+    await refused(reward(ev.id, { sku: 'fr-gold', days: 5 }), 400, /süresiz/);
+    const set = (await ok(reward(ev.id, { sku: 'fr-neon', days: 3 }), 'ödül')).event.reward;
+    assert.deepEqual([set.sku, set.kind, set.days, typeof set.name, set.given], ['fr-neon', 'frame', 3, 'string', undefined]);
+    // Everyone sees it on the event; the panel's list offers the items.
+    assert.equal((await ok(call('GET', `/api/events/one?id=${ev.id}`, null, fan.session), 'etkinlik')).event.reward.sku, 'fr-neon');
+    const list = await ok(call('GET', '/api/admin/events?status=upcoming', null, boss.session), 'liste');
+    assert.ok(list.rewardItems.some((x) => x.sku === 'rd-sport' && x.kindName === 'Binek'));
+    assert.equal(list.rewardItems.some((x) => x.sku === 'noble-1'), false);
+
+    await run(ev, [fan]);
+    await ok(call('POST', '/api/events/end', { id: ev.id }, ev.owner.session), 'bitir');
+    await until(async () => (await doneOf(ev.id)).reward_done_at !== null);
+    const got = await itemIn(fan, 'fr-neon');
+    assert.deepEqual([got.source, got.origin], ['event', 'Ödüllü Gece']);
+    assert.ok(Math.abs(Date.parse(got.until) - Date.now() - 3 * DAY) < 120_000, '3 gün');
+    assert.equal((await itemIn(ev.owner, 'fr-neon'))?.source, 'event', 'başlatan da geldi');
+    assert.equal(await itemIn(away, 'fr-neon'), undefined, 'gelmeyen almaz');
+    assert.equal((await ok(call('GET', `/api/events/one?id=${ev.id}`, null, fan.session), 'etkinlik')).event.reward.given, 2);
+    const notices = async () => (await h.sql.query("SELECT body FROM team_notices WHERE target = $1 AND title = 'Etkinlik ödülü'", [fan.user.id])).rows;
+    assert.equal((await notices()).length, 1);
+    assert.match((await notices())[0].body, /“Ödüllü Gece” etkinliğine katıldığın için .+ Çantam’ına geldi/);
+
+    // Given again (a restart midway, a second sweep): nothing more, nobody hears it twice.
+    await h.sql.query('UPDATE events SET reward_done_at = NULL WHERE id = $1', [ev.id]);
+    await until(async () => (await doneOf(ev.id)).reward_done_at !== null);
+    assert.equal((await doneOf(ev.id)).reward_given, 2);
+    const rows = await h.sql.query('SELECT count(*)::int AS n FROM entitlements WHERE user_id = $1 AND ref = $2', [fan.user.id, `event:${ev.id}`]);
+    assert.equal(rows.rows[0].n, 1);
+    assert.equal((await notices()).length, 1);
+    // Over: the reward stays as it was.
+    await refused(reward(ev.id, { sku: null }), 409, /Biten/);
+    const audit = await h.sql.query("SELECT detail FROM audit_events WHERE action = 'event.reward' AND (detail->>'event')::bigint = $1", [ev.id]);
+    assert.deepEqual(audit.rows.map((x) => [x.detail.sku, x.detail.days]), [['fr-neon', 3]]);
+  });
+
+  test('yayından kaldırılan etkinlik ödül vermez; kaldırılan ödül verilmez', async () => {
+    const fan = await h.signUp('Gelen');
+    const gone = await approved('Kaldırılan Gece');
+    await ok(reward(gone.id, { sku: 'bb-candy' }), 'ödül');
+    await run(gone, [fan]);
+    await ok(call('POST', '/api/admin/events/remove', { id: gone.id, reason: 'Kurallara aykırı' }, boss.session), 'kaldır');
+    await until(async () => (await doneOf(gone.id)).reward_done_at !== null);
+    assert.equal((await doneOf(gone.id)).reward_given, 0);
+    assert.equal((await economy(fan)).items.some((x) => x.source === 'event'), false);
+
+    const plain = await approved('Ödülsüz Gece');
+    await ok(reward(plain.id, { sku: 'fr-neon' }), 'ödül');
+    assert.equal((await ok(reward(plain.id, { sku: null }), 'ödülü kaldır')).event.reward, null);
+    await run(plain, [fan]);
+    await ok(call('POST', '/api/events/end', { id: plain.id }, plain.owner.session), 'bitir');
+    await wait(500);
+    assert.equal((await doneOf(plain.id)).reward_done_at, null);
+    assert.equal((await economy(fan)).items.some((x) => x.source === 'event'), false);
   });
 });

@@ -10,14 +10,13 @@
 //   POST /api/admin/level-rewards        { system, level, sku, days? }  → { rule }
 //   POST /api/admin/level-rewards/delete { id }                 → { deleted }
 import { HttpError, auth, clientIp, db, int, limit, readJson, tx } from './core.mjs';
-import { MAX_AHEAD_DAYS, SHOP } from './catalog.mjs';
+import { MAX_AHEAD_DAYS } from './catalog.mjs';
 // economy.mjs reads the rewards in GET /api/economy and this file gives them with its grantReward: used only inside
 // handlers, so the two may import each other.
-import { grantReward, rewardItem } from './economy.mjs';
+import { grantReward, pickReward, rewardChoices } from './economy.mjs';
 import { SYSTEM_NAMES, docsNow } from './levels.mjs';
 import { panelDetail } from './panel.mjs';
 import { levelsOf } from './profiles.mjs';
-import { allShopItems } from './shop-items.mjs';
 
 /** The systems a reward can follow: the ones every person climbs (Rütbe is bought, Abonelik paid). */
 export const REWARD_SYSTEMS = Object.freeze(['vip', 'wealth', 'charm']);
@@ -74,16 +73,6 @@ const audited = (c, a, action, detail, req) =>
   c.query('INSERT INTO audit_events (actor, action, target, detail, ip) VALUES ($1, $2, NULL, $3, $4)', [a.id, action, JSON.stringify({ ...detail, ...panelDetail(a) }), clientIp(req)]);
 /** The top level of each system as Seviye ayarları have it now. */
 const topOf = (system) => docsNow()[system].levels.at(-1).level;
-const KIND_NAME = { frame: 'Çerçeve', entry: 'Giriş efekti', ride: 'Binek', bubble: 'Sohbet balonu', wave: 'Ses dalgası', micfx: 'Mikrofon efekti', sticker: 'Çıkartma paketi' };
-/** What the panel may choose: the shop's frames, entry effects, rides, bubbles and waves as they are now. */
-function choices() {
-  const out = new Map();
-  for (const x of allShopItems()) out.set(x.sku, x);
-  for (const x of SHOP.values()) if (!out.has(x.sku)) out.set(x.sku, x);
-  return [...out.values()]
-    .filter((x) => ['frame', 'entry', 'ride', 'bubble', 'wave'].includes(x.kind) && rewardItem(x.sku))
-    .map((x) => ({ sku: x.sku, kind: x.kind, kindName: KIND_NAME[x.kind], name: rewardItem(x.sku).name, days: rewardItem(x.sku).days ?? null }));
-}
 const ruleView = (r, names) => ({
   id: Number(r.id),
   system: r.system,
@@ -100,7 +89,7 @@ const ruleView = (r, names) => ({
 export const levelRewardRoutes = {
   async 'GET /api/admin/level-rewards'(req) {
     await admin(req);
-    const items = choices();
+    const items = rewardChoices();
     const names = new Map(items.map((x) => [x.sku, x]));
     const r = await db.query(
       `SELECT l.*, (SELECT count(*) FROM level_reward_claims c WHERE c.rule_id = l.id AND c.given) AS given
@@ -122,14 +111,7 @@ export const levelRewardRoutes = {
     const top = topOf(b.system);
     const level = int(b.level, 1, top);
     if (level === null) throw new HttpError(400, `${SYSTEM_NAMES[b.system]} seviyesi 1–${top} olmalı`);
-    const item = rewardItem(b.sku);
-    if (!item || !['frame', 'entry', 'ride', 'bubble', 'wave'].includes(item.kind)) throw new HttpError(400, 'Ödül bir çerçeve, giriş efekti, binek, sohbet balonu ya da ses dalgası olmalı');
-    let days = null;
-    if (b.days !== undefined && b.days !== null && b.days !== 0) {
-      if (item.days === null) throw new HttpError(400, `${item.name} süresiz satılıyor; ödülü de süresizdir, gün verilmez`);
-      days = int(b.days, 1, MAX_AHEAD_DAYS);
-      if (days === null) throw new HttpError(400, `Gün 1–${MAX_AHEAD_DAYS} arasında olmalı (boş: mağazadaki süresi)`);
-    }
+    const { item, days } = pickReward(b.sku, b.days);
     const rule = await tx(async (c) => {
       const n = (await c.query('SELECT count(*)::int AS n FROM level_rewards WHERE deleted_at IS NULL')).rows[0].n;
       if (n >= RULES_MAX) throw new HttpError(400, `En fazla ${RULES_MAX} seviye ödülü olabilir`);
@@ -142,7 +124,7 @@ export const levelRewardRoutes = {
       return r;
     });
     forget();
-    return { rule: ruleView(rule, new Map(choices().map((x) => [x.sku, x]))) };
+    return { rule: ruleView(rule, new Map(rewardChoices().map((x) => [x.sku, x]))) };
   },
 
   async 'POST /api/admin/level-rewards/delete'(req) {

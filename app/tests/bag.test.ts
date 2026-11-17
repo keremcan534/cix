@@ -5,7 +5,7 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { BAG_TABS, parseBag, sourceText, termText } from '@/lib/bag-core';
+import { BAG_TABS, eventRewardText, parseBag, sourceText, termText } from '@/lib/bag-core';
 
 const DAY = 86_400_000;
 const NOW = Date.parse('2026-11-17T12:00:00.000Z');
@@ -50,6 +50,24 @@ describe('Çantam', () => {
     assert.equal(termText(NOW + 2.5 * DAY, NOW), '3 gün kaldı');
     assert.equal(termText(NOW + 3 * 3_600_000, NOW), 'Bugün bitiyor');
     assert.equal(termText(NOW - 1, NOW), 'Bitti');
+  });
+
+  test('etkinliğin katılım ödülü: ne kazanılır, bitince kaç kişi kazandı', () => {
+    const reward = { sku: 'fr-neon', kind: 'frame', name: 'Neon', days: 3 };
+    assert.equal(eventRewardText({ state: 'upcoming', reward }), 'Etkinlik sürerken odaya gelen herkes Neon (3 gün) kazanır; etkinlik bitince Çantam’a gelir.');
+    assert.equal(eventRewardText({ state: 'live', reward: { ...reward, days: null } }), 'Etkinlik sürerken odaya gelen herkes Neon (kalıcı) kazanır; etkinlik bitince Çantam’a gelir.');
+    assert.equal(eventRewardText({ state: 'ended', reward: { ...reward, given: 1200 } }), '1.200 kişi Neon (3 gün) kazandı; Çantam’a geldi.');
+    // Not given yet, given to nobody, taken down, none, malformed (an older server sends none).
+    for (const e of [
+      { state: 'ended', reward },
+      { state: 'ended', reward: { ...reward, given: 0 } },
+      { state: 'cancelled', reward },
+      { state: 'upcoming', reward: null },
+      { state: 'upcoming' },
+      { state: 'upcoming', reward: { name: 5 } },
+      { state: 'upcoming', reward: 'Neon' },
+    ])
+      assert.equal(eventRewardText(e), null, JSON.stringify(e));
   });
 
   test('sekmeler: binek giriş efektleriyle', () => {
