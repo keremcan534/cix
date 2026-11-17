@@ -11,16 +11,15 @@ import { SCENES } from '@/components/fx/scenes';
 import { Backdrop } from '@/components/fx/surface';
 import { Button, CharmBadge, StateIcon, VerifiedBadge, VipBadge } from '@/components/ui';
 import { roomById, USERS, userById, type User } from '@/data/mock';
-import { COUNTRIES, DISCOVER_PROMO, DISCOVER_SHORTCUTS, EXTRA_BIOS, REAL_PERSON, countryOf, preciseKm } from '@/data/social-ui';
+import { COUNTRIES, DISCOVER_PROMO, DISCOVER_SHORTCUTS, REAL_PERSON, countryOf, preciseKm } from '@/data/social-ui';
 import { charmRankBoost } from '@/data/charm';
 import { wealthCharmOf } from '@/data/profile';
 import { useGreet } from '@/components/use-greet';
 import { useApp } from '@/store';
-import { SCRIM, fonts, makeStyles, useTheme } from '@/theme';
+import { SCRIM, fonts, glass, makeStyles, useTheme } from '@/theme';
 import { firstName, greetingFor } from '@/lib/greeting';
 import { RowSkeleton, Skeletons } from '@/components/fx/skeleton';
 import { EmojiIcon, Icon3D } from '@/components/Icon3D';
-import { interestParts } from '@/data/profile-art';
 import { similarity } from '@/lib/similarity';
 import { Photo } from '@/components/photo';
 import { liveMode, oneOnOneOpen, reloadDiscoverPeople, useDiscoverPeople, useDiscoverState } from '@/lib/live';
@@ -49,6 +48,10 @@ export default function DiscoverScreen() {
   const tabStrip = useRef<ComponentRef<typeof ScrollView>>(null);
   const tabAt = useRef(new Map<Tab, { x: number; w: number }>());
   const [stripW, setStripW] = useState(0);
+  // More lists past the strip's right edge (Çevrim içi, Yeni kullanıcılar): a soft fade there says it scrolls.
+  const [stripX, setStripX] = useState(0);
+  const [stripContentW, setStripContentW] = useState(0);
+  const moreRight = stripContentW - (stripX + stripW) > 4;
   const pickTab = (t: Tab) => {
     setTab(t);
     const at = tabAt.current.get(t);
@@ -106,21 +109,21 @@ export default function DiscoverScreen() {
       <FlatList
         data={rows}
         keyExtractor={(r) => (r.kind === 'promo' ? 'promo' : r.user.id)}
-        contentContainerStyle={{ paddingBottom: 24 }}
+        contentContainerStyle={{ paddingBottom: 16 }}
         ListHeaderComponent={
           <View>
             {/* A word for the person, by the time of day ("İyi günler, Ayşe"), on a pink glass bar with a waving hand. */}
             <LinearGradient colors={['#FFF6FA', '#FCE3EF', '#F8CFE4']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.greetBar}>
               <View style={styles.greetHand}>
-                <EmojiIcon emoji="👋" size={24} />
+                <EmojiIcon emoji="👋" size={20} />
               </View>
               <Text style={styles.greet} accessibilityRole="header" numberOfLines={1}>
                 {greetingFor(hour)}
                 {firstName(me.name) ? `, ${firstName(me.name)}` : ''}
               </Text>
               <View style={styles.greetHearts} pointerEvents="none">
-                <Icon3D name="heart" size={26} />
-                <Icon3D name="heart" size={15} style={styles.greetHeartSmall} />
+                <Icon3D name="heart" size={22} />
+                <Icon3D name="heart" size={13} style={styles.greetHeartSmall} />
               </View>
             </LinearGradient>
             {/* Four glossy tiles in one row: Hemen Tanış, Canlı Odalar, Aile, Jeton Kazan. */}
@@ -132,28 +135,41 @@ export default function DiscoverScreen() {
 
             {/* The lists on a pink glass bar: the chosen one on its own pill, then Sıralama and the country. */}
             <View style={styles.tabsBar}>
-              <ScrollView ref={tabStrip} horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={styles.tabs} onLayout={(e) => setStripW(e.nativeEvent.layout.width)}>
-                {TABS.map((t) => (
-                  <Pressable
-                    key={t}
-                    onPress={() => pickTab(t)}
-                    onLayout={(e) => tabAt.current.set(t, { x: e.nativeEvent.layout.x, w: e.nativeEvent.layout.width })}
-                    style={[styles.tabItem, t === tab && styles.tabItemOn]}
-                    accessibilityRole="tab"
-                    accessibilityState={{ selected: t === tab }}
-                  >
-                    <Text style={[styles.tab, t === tab && styles.tabActive]}>{t}</Text>
-                    {t === tab && <View style={styles.underline} />}
-                  </Pressable>
-                ))}
-              </ScrollView>
+              <View style={{ flex: 1 }}>
+                <ScrollView
+                  ref={tabStrip}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={{ flex: 1 }}
+                  contentContainerStyle={styles.tabs}
+                  onLayout={(e) => setStripW(e.nativeEvent.layout.width)}
+                  onContentSizeChange={(w) => setStripContentW(w)}
+                  onScroll={(e) => setStripX(e.nativeEvent.contentOffset.x)}
+                  scrollEventThrottle={32}
+                >
+                  {TABS.map((t) => (
+                    <Pressable
+                      key={t}
+                      onPress={() => pickTab(t)}
+                      onLayout={(e) => tabAt.current.set(t, { x: e.nativeEvent.layout.x, w: e.nativeEvent.layout.width })}
+                      style={[styles.tabItem, t === tab && styles.tabItemOn]}
+                      accessibilityRole="tab"
+                      accessibilityState={{ selected: t === tab }}
+                    >
+                      <Text style={[styles.tab, t === tab && styles.tabActive]}>{t}</Text>
+                      {t === tab && <View style={styles.underline} />}
+                    </Pressable>
+                  ))}
+                </ScrollView>
+                {moreRight && <LinearGradient colors={['rgba(255,240,247,0)', HOME.glass]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.tabFade} pointerEvents="none" />}
+              </View>
               <View style={styles.tabSep} />
               <Pressable style={styles.iconBtn} onPress={() => router.push('/siralama')} hitSlop={6} accessibilityLabel="Sıralama">
-                <Ionicons name="trophy-outline" size={22} color={HOME.plum} />
+                <Ionicons name="trophy-outline" size={20} color={HOME.plum} />
               </Pressable>
               <View style={styles.tabSep} />
               <Pressable style={styles.iconBtn} onPress={() => setFilterOpen(true)} hitSlop={6} accessibilityLabel="Ülke seç">
-                <Ionicons name="globe-outline" size={22} color={HOME.plum} />
+                <Ionicons name="globe-outline" size={20} color={HOME.plum} />
                 {!isDefault(filters) && <View style={styles.filterDot} />}
               </Pressable>
             </View>
@@ -246,8 +262,8 @@ export default function DiscoverScreen() {
   );
 }
 
-/** The design's palette for the pink glass on this screen: deep ink on light glass, in either scheme. */
-const HOME = { ink: '#2B0A1C', plum: '#7A4A63', pink: '#E0287D', deep: '#8E1450', glass: '#FFF0F7', line: 'rgba(226,150,192,0.55)' } as const;
+/** The pink glass on this screen (theme glass): deep ink on light glass, in either scheme. */
+const HOME = { ink: glass.ink, plum: glass.plum, pink: glass.pink, deep: glass.deep, glass: glass.fill, line: glass.line } as const;
 
 /** A tile's picture: white glyphs for calls and rooms, the 3D tent and coin for Aile and Jeton Kazan. */
 function TileArt({ id, emoji, size }: { id: string; emoji: string; size: number }) {
@@ -295,13 +311,13 @@ function QuickTile({ id, title, subtitle, emoji, colors: fill, count, onPress }:
   );
 }
 
-/** "%75 benzer": pink when it's a good match, a quieter plum below half. */
+/** "%75 benzer": a pink ring when it's a good match (its words deep pink: pink this small is too faint), plum below half. */
 function MatchChip({ score }: { score: number }) {
   const styles = useStyles();
-  const c = score >= 50 ? HOME.pink : HOME.plum;
+  const good = score >= 50;
   return (
-    <View style={[styles.matchChip, { borderColor: c }]} accessibilityLabel={`Yüzde ${score} benzer`}>
-      <Text style={[styles.matchText, { color: c }]}>%{score} benzer</Text>
+    <View style={[styles.matchChip, { borderColor: good ? HOME.pink : HOME.plum }]} accessibilityLabel={`Yüzde ${score} benzer`}>
+      <Text style={[styles.matchText, { color: good ? HOME.deep : HOME.plum }]}>%{score} benzer</Text>
     </View>
   );
 }
@@ -331,15 +347,15 @@ function UserRow({
   // Live: the server's distance between our two cities ("Aynı şehir", "350 km"; none when a city is unknown or the
   // profile is private); the demo's sample one.
   const distance = !showDistance ? null : liveMode() ? cityDistanceText(distanceOf(user.id)) : preciseKm(user);
-  const interests = (user.interests ?? []).slice(0, 3).map(interestParts);
   return (
-    // A pink glass card (the owner's design): photo, name and level, chips, then Selam or Sohbet and Takip.
+    // A pink glass card (the owner's design): photo, name and level, age and match, then Selam or Sohbet and Takip.
+    // No interests here (the client: they're on the profile; the cards stay short, so more people fit on the screen).
     <Pressable style={({ pressed }) => [styles.card, pressed && { opacity: 0.92 }]} onPress={() => router.push(`/kullanici/${user.id}`)}>
       <View>
         <Photo uri={user.avatar} kind="face" style={[styles.photo, user.online && styles.photoOnline]} />
         {user.online && <View style={styles.onlineDot} />}
       </View>
-      <View style={{ flex: 1, minWidth: 0, gap: 5 }}>
+      <View style={{ flex: 1, minWidth: 0, gap: 6 }}>
         <View style={styles.nameRow}>
           <Text style={styles.name} numberOfLines={1}>
             {user.name}
@@ -369,22 +385,6 @@ function UserRow({
           )}
           <MatchChip score={sim.score} />
         </View>
-        {interests.length > 0 ? (
-          <View style={styles.chips}>
-            {interests.map((x) => (
-              <View key={x.name} style={styles.chip}>
-                {x.art ? <Art name={x.art} size={14} /> : x.emoji ? <Text style={styles.chipEmoji}>{x.emoji}</Text> : null}
-                <Text style={styles.chipText} numberOfLines={1}>
-                  {x.name}
-                </Text>
-              </View>
-            ))}
-          </View>
-        ) : (
-          <Text style={styles.bio} numberOfLines={1}>
-            {EXTRA_BIOS[user.id] ?? user.bio}
-          </Text>
-        )}
       </View>
       <View style={styles.cardSep} />
       <View style={styles.actions}>
@@ -403,7 +403,7 @@ function UserRow({
         </Pressable>
         <Pressable onPress={onToggleFollow} hitSlop={6} style={[styles.followBtn, isFollowing && styles.followOn]} accessibilityRole="button" accessibilityLabel={isFollowing ? `${user.name}, takiptesin. Takibi bırak` : `${user.name} kişisini takip et`}>
           <Ionicons name={isFollowing ? 'heart' : 'heart-outline'} size={15} color={isFollowing ? HOME.pink : HOME.ink} />
-          <Text style={[styles.followText, isFollowing && { color: HOME.pink }]}>{isFollowing ? 'Takipte' : 'Takip et'}</Text>
+          <Text style={[styles.followText, isFollowing && { color: HOME.deep }]}>{isFollowing ? 'Takipte' : 'Takip et'}</Text>
         </Pressable>
       </View>
     </Pressable>
@@ -491,20 +491,20 @@ const useStyles = makeStyles(({ colors, lift, dark, edge }) => ({
     alignItems: 'center',
     gap: 10,
     marginHorizontal: 16,
-    marginTop: 10,
-    height: 60,
-    borderRadius: 30,
-    paddingLeft: 7,
-    paddingRight: 14,
+    marginTop: 8,
+    height: 50,
+    borderRadius: 25,
+    paddingLeft: 6,
+    paddingRight: 12,
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.9)',
     boxShadow: '0 0 18px rgba(255,120,190,0.35)',
   },
-  greetHand: { width: 46, height: 46, borderRadius: 23, backgroundColor: '#FBD3E5', alignItems: 'center', justifyContent: 'center' },
-  greet: { flex: 1, color: HOME.deep, fontSize: 21, fontFamily: fonts.display, letterSpacing: -0.3 },
+  greetHand: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#FBD3E5', alignItems: 'center', justifyContent: 'center' },
+  greet: { flex: 1, color: HOME.deep, fontSize: 17, fontFamily: fonts.display, letterSpacing: -0.2 },
   greetHearts: { flexDirection: 'row', alignItems: 'flex-start' },
   greetHeartSmall: { marginLeft: -4, marginTop: -8 },
-  tiles: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 12 },
+  tiles: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 10 },
   tile: { borderRadius: 20, padding: 8, overflow: 'hidden', alignItems: 'center', justifyContent: 'flex-end', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.55)' },
   tileGloss: { position: 'absolute', left: 0, right: 0, top: 0, height: '48%' },
   tileArt: { flex: 1, alignItems: 'center', justifyContent: 'center' },
@@ -517,24 +517,25 @@ const useStyles = makeStyles(({ colors, lift, dark, edge }) => ({
     flexDirection: 'row',
     alignItems: 'center',
     marginHorizontal: 16,
-    marginTop: 14,
-    marginBottom: 6,
-    height: 54,
-    borderRadius: 27,
-    paddingHorizontal: 5,
+    marginTop: 10,
+    marginBottom: 8,
+    height: 46,
+    borderRadius: 23,
+    paddingHorizontal: 4,
     backgroundColor: 'rgba(255,240,247,0.97)',
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.9)',
     boxShadow: '0 0 14px rgba(255,120,190,0.28)',
   },
-  tabs: { gap: 4, alignItems: 'center' },
-  tabItem: { alignItems: 'center', paddingHorizontal: 12, paddingTop: 7, paddingBottom: 5, borderRadius: 22 },
-  tabItemOn: { backgroundColor: '#F9D0E4' },
-  tab: { color: HOME.plum, fontSize: 15, fontWeight: '600' },
-  tabActive: { color: HOME.deep, fontSize: 16, fontWeight: '800' },
-  underline: { height: 3, borderRadius: 2, backgroundColor: HOME.pink, marginTop: 3, width: 34 },
-  tabSep: { width: 1, height: 24, backgroundColor: HOME.line, marginHorizontal: 2 },
-  iconBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  tabs: { gap: 2, alignItems: 'center' },
+  tabItem: { alignItems: 'center', paddingHorizontal: 10, paddingTop: 5, paddingBottom: 4, borderRadius: 18 },
+  tabItemOn: { backgroundColor: glass.tint },
+  tab: { color: HOME.plum, fontSize: 13, fontWeight: '600' },
+  tabActive: { color: HOME.deep, fontSize: 14, fontWeight: '800' },
+  underline: { height: 3, borderRadius: 2, backgroundColor: HOME.pink, marginTop: 2, width: 26 },
+  tabFade: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 22 },
+  tabSep: { width: 1, height: 22, backgroundColor: HOME.line, marginHorizontal: 2 },
+  iconBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   filterDot: { position: 'absolute', top: 2, right: 0, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary },
   activeFilters: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, marginTop: 4, backgroundColor: colors.card, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, ...lift },
   activeText: { flex: 1, color: colors.text, fontSize: 12 },
@@ -548,33 +549,31 @@ const useStyles = makeStyles(({ colors, lift, dark, edge }) => ({
     alignItems: 'center',
     gap: 10,
     marginHorizontal: 16,
-    marginBottom: 10,
-    padding: 10,
-    borderRadius: 22,
+    marginBottom: 8,
+    padding: 8,
+    borderRadius: 20,
     backgroundColor: HOME.glass,
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.9)',
     boxShadow: '0 4px 14px rgba(120,20,70,0.2)',
   },
-  photo: { width: 78, height: 78, borderRadius: 18, backgroundColor: '#FBD3E5' },
+  photo: { width: 64, height: 64, borderRadius: 16, backgroundColor: '#FBD3E5' },
   photoOnline: { borderWidth: 2, borderColor: '#F25FA8' },
   onlineDot: { position: 'absolute', right: -2, bottom: -2, width: 16, height: 16, borderRadius: 8, backgroundColor: '#22C55E', borderWidth: 2.5, borderColor: '#fff' },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' },
-  name: { color: HOME.ink, fontFamily: fonts.display, fontSize: 17, maxWidth: 130 },
+  name: { color: HOME.ink, fontFamily: fonts.display, fontSize: 16, maxWidth: 130 },
   chips: { flexDirection: 'row', gap: 5, alignItems: 'center', flexWrap: 'wrap' },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: HOME.line, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
   chipText: { color: HOME.ink, fontSize: 12 },
-  chipEmoji: { fontSize: 12 },
   matchChip: { backgroundColor: '#FFFFFF', borderWidth: 1.5, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 1 },
   matchText: { fontSize: 12, fontWeight: '800' },
-  bio: { color: HOME.plum, fontSize: 13 },
   cardSep: { width: 1, alignSelf: 'stretch', marginVertical: 8, backgroundColor: HOME.line },
-  actions: { gap: 7, alignItems: 'stretch', width: 98 },
-  hiBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: 999, paddingVertical: 8, boxShadow: '0 3px 8px rgba(216,23,94,0.35)' },
+  actions: { gap: 5, alignItems: 'stretch', width: 92 },
+  hiBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: 999, paddingVertical: 7, boxShadow: '0 3px 8px rgba(216,23,94,0.35)' },
   hiText: { color: '#fff', fontWeight: '800', fontSize: 14 },
-  chatBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: 999, paddingVertical: 7, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: HOME.line },
+  chatBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: 999, paddingVertical: 6, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: HOME.line },
   chatText: { color: HOME.ink, fontWeight: '800', fontSize: 14 },
-  followBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, borderRadius: 999, paddingVertical: 6 },
+  followBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, borderRadius: 999, paddingVertical: 5 },
   followOn: { backgroundColor: '#FBD3E5' },
   followText: { color: HOME.ink, fontSize: 13, fontWeight: '700' },
   promoWrap: { marginHorizontal: 16, marginVertical: 10 },

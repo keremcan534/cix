@@ -60,7 +60,7 @@ import { ProfileGiftSheet } from '@/components/profile-gift-sheet';
 import { AffiliationPills, FEMALE_FILL, GenderChip, MALE_FILL, useAffiliations, useStaffBadge, type Affiliation } from '@/components/profile-badges';
 import { Icon3D } from '@/components/Icon3D';
 import { useApp, type FanClub } from '@/store';
-import { SCRIM, makeStyles, useTheme } from '@/theme';
+import { SCRIM, fonts, glass, makeStyles, useTheme } from '@/theme';
 import { Art, type ArtName } from '@/components/Art';
 import { Photo } from '@/components/photo';
 import { useReport } from '@/components/report-sheet';
@@ -116,7 +116,7 @@ export default function UserProfile() {
   const counts = social && social.id === serverId ? social.counts : null;
   const user = isMe ? me : userById(id);
   const insets = useSafeAreaInsets();
-  const { colors, semantic, dark } = useTheme();
+  const { colors, semantic } = useTheme();
   const styles = useStyles();
   // Live mode: a real person's report goes to the moderators (a reason sheet of its own).
   const report = useReport();
@@ -507,8 +507,6 @@ export default function UserProfile() {
   const hasBasics = !live || publicId !== null || !!user.username || showsGender || !!country || (isMe && !!birthday) || !!user.joinedAt || !!extras.relationship || !!extras.education;
 
   const presence = priv.showCurrentRoom ? presenceOf(user.id) : null;
-  // The collapsed bar is solid background: the light scheme swaps the photo's dark chip for a soft ink one.
-  const onBar = collapsed && !dark;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -517,122 +515,132 @@ export default function UserProfile() {
         onScroll={(e) => onScroll(e.nativeEvent.contentOffset.y)}
         scrollEventThrottle={16}
       >
-        {/* Cover + header */}
-        <View>
-          <Photo uri={user.avatar} kind="face" style={styles.cover} />
-          <LinearGradient colors={['rgba(22,14,18,0.55)', 'transparent', 'rgba(22,14,18,0.6)']} style={StyleSheet.absoluteFill} />
-          {/* The voice intro ("Kayıt") control comes back once recording one exists. */}
-        </View>
-
-        <View style={styles.sheet}>
-          <View style={{ flexDirection: 'row' }}>
-            <View style={{ flex: 1, gap: 8 }}>
-              <View style={styles.avatarWrap}>
-                {isMe ? (
-                  <Pressable onPress={() => pickPhoto(false)} accessibilityLabel="Profil fotoğrafını değiştir">
-                    {/* A frame from the store wins over the bond frame. */}
-                    <BondFrame bond={equipped.frame ? null : topBondShown} size={96}>
-                      <FramedAvatar uri={pendingAvatar ?? user.avatar} size={96} vipLevel={vipLevel} frameId={equipped.frame} artScale={2.2} />
-                    </BondFrame>
-                    <View style={styles.cameraBadge}>
-                      <Ionicons name="camera" size={14} color="#fff" />
-                    </View>
-                  </Pressable>
-                ) : (
-                  <>
-                    <BondFrame bond={topBondShown} size={96}>
-                      <Avatar uri={user.avatar} size={96} ring={user.vip && !topBondShown} />
-                    </BondFrame>
-                    {heart && <HeartPin level={heart.level} style={styles.heartPin} />}
-                  </>
-                )}
-              </View>
-              {isMe && pendingAvatar && <Text style={styles.reviewNote}>⏳ Yeni fotoğraf incelemede · şimdilik yalnızca sen görüyorsun</Text>}
-              {isMe && avatarBusy && <Text style={styles.reviewNote}>⏳ Fotoğraf yükleniyor…</Text>}
-              <View style={styles.row}>
-                <Text style={styles.name} numberOfLines={2}>
-                  {user.name}
-                </Text>
-                {country && (
-                  <View style={styles.flag} accessibilityLabel={country.name}>
-                    <Art name={countryArt(country.code)} size={16} />
-                    <Text style={styles.flagText}>{country.code}</Text>
+        {/* The client's design: no banner across the top. The avatar with its frame and the photo large beside it,
+            then the name, handle, badges, status and bio on light glass pills (the same in either scheme). */}
+        <View style={[styles.sheet, { paddingTop: insets.top + BAR_H + 6 }]}>
+          <View style={styles.idRow}>
+            <View style={styles.avatarWrap}>
+              {isMe ? (
+                <Pressable onPress={() => pickPhoto(false)} accessibilityLabel="Profil fotoğrafını değiştir">
+                  {/* A frame from the store wins over the bond frame. */}
+                  <BondFrame bond={equipped.frame ? null : topBondShown} size={96}>
+                    <FramedAvatar uri={pendingAvatar ?? user.avatar} size={96} vipLevel={vipLevel} frameId={equipped.frame} artScale={2.2} />
+                  </BondFrame>
+                  <View style={styles.cameraBadge}>
+                    <Ionicons name="camera" size={14} color="#fff" />
                   </View>
-                )}
-              </View>
-              {!!user.username && (
-                <Pressable style={styles.row} onPress={copyUsername} hitSlop={6} accessibilityLabel="Kullanıcı adını kopyala">
-                  <Text style={styles.handle}>@{user.username}</Text>
-                  <Ionicons name="copy-outline" size={13} color={colors.textDim} />
                 </Pressable>
+              ) : (
+                <>
+                  <BondFrame bond={topBondShown} size={96}>
+                    <Avatar uri={user.avatar} size={96} ring={user.vip && !topBondShown} />
+                  </BondFrame>
+                  {heart && <HeartPin level={heart.level} style={styles.heartPin} />}
+                </>
               )}
-              <View style={[styles.row, { flexWrap: 'wrap' }]}>
-                <GenderChip user={user} owner={isMe} />
-                {/* Live mode: someone else's levels once the server sent them. */}
-                {levels && (
-                  <LevelChips
-                    wealth={levels.wealth ?? 0}
-                    charm={levels.charm ?? 0}
-                    hideWealth={levels.wealth === null || (isMe && myHidden.wealth)}
-                    hideCharm={levels.charm === null || (isMe && myHidden.charm)}
-                  />
-                )}
-                {isMe ? <VipTitle level={vipLevel} /> : user.vip && <VipBadge />}
-                {staff && (
-                  <View style={[styles.staffChip, staff === 'Moderatör' && { backgroundColor: '#1D4ED8' }]} accessibilityLabel={`Resmi ${staff}`}>
-                    <Ionicons name="shield-checkmark" size={12} color="#fff" />
-                    <Text style={styles.genderText}>{staff}</Text>
-                  </View>
-                )}
-                {user.verified && <VerifiedBadge size={18} />}
-                <BondBadge bond={topBondShown} onPress={() => setTab('iliski')} />
-              </View>
-              <AffiliationPills user={user} />
-              <View style={styles.row}>
-                {priv.showOnline ? (
-                  <>
-                    <View style={[styles.dot, { backgroundColor: user.online ? semantic.live : colors.textDim }]} />
-                    <Text style={{ color: user.online ? semantic.actionText : colors.textDim, fontSize: 13 }}>
-                      {user.online ? 'Çevrimiçi' : lastSeen ? `Son görülme ${lastSeen}` : 'Çevrimdışı'}
-                    </Text>
-                  </>
-                ) : (
-                  <Text style={styles.meta}>{isMe ? 'Durumun gizli' : 'Durum gizli'}</Text>
-                )}
-                {!!user.city && (
-                  <>
-                    <View style={styles.vSep} />
-                    <Ionicons name="location-outline" size={14} color={colors.textDim} />
-                    <Text style={styles.meta}>
-                      {user.city}
-                      {/* Live: the server's distance by city ("Aynı şehir", "350 km"); the demo's sample one. */}
-                      {!isMe && settings.cityDiscovery && (live ? (distanceText ? ` · ${distanceText}` : null) : ` · ${user.distanceKm} km`)}
-                    </Text>
-                  </>
-                )}
-              </View>
             </View>
-            {/* Live mode: the guardian (top fan-club supporter) isn't on the server yet. */}
-            {!live && <Guardian guardian={guardian} />}
+            <View style={styles.coverCard}>
+              {/* No photo yet: a light portrait silhouette (the face fallback's dark disc would break the glass). */}
+              {(isMe && pendingAvatar) || user.avatar ? (
+                <Photo uri={(isMe && pendingAvatar) || user.avatar} kind="face" style={StyleSheet.absoluteFill} />
+              ) : (
+                <View style={styles.coverEmpty} accessibilityLabel="Fotoğraf yok">
+                  <Ionicons name="person" size={84} color="#F2B5D0" style={{ marginBottom: -12 }} />
+                </View>
+              )}
+              {/* Live mode: the guardian (top fan-club supporter) isn't on the server yet. */}
+              {!live && (
+                <View style={styles.guardianOver}>
+                  <Guardian guardian={guardian} />
+                </View>
+              )}
+            </View>
           </View>
-
-          <Pressable style={[styles.row, { marginTop: 12 }]} disabled={!isMe} onPress={openEdit}>
-            <Text style={styles.bio}>{user.bio || (isMe ? 'Kendini birkaç kelimeyle anlat…' : '')}</Text>
-            {isMe && (
-              <View style={styles.bioEdit}>
-                <Ionicons name="pencil" size={13} color={colors.text} />
+          {isMe && pendingAvatar && <Text style={styles.reviewNote}>⏳ Yeni fotoğraf incelemede · şimdilik yalnızca sen görüyorsun</Text>}
+          {isMe && avatarBusy && <Text style={styles.reviewNote}>⏳ Fotoğraf yükleniyor…</Text>}
+          <View style={styles.namePill}>
+            <Text style={styles.name} numberOfLines={1}>
+              {user.name}
+            </Text>
+            {country && (
+              <View style={styles.flag} accessibilityLabel={country.name}>
+                <Art name={countryArt(country.code)} size={16} />
+                <Text style={styles.flagText}>{country.code}</Text>
               </View>
             )}
-          </Pressable>
+          </View>
+          {!!user.username && (
+            <Pressable style={styles.handlePill} onPress={copyUsername} hitSlop={6} accessibilityLabel="Kullanıcı adını kopyala">
+              <Text style={styles.handle}>@{user.username}</Text>
+              <Ionicons name="copy-outline" size={13} color={glass.plum} />
+            </Pressable>
+          )}
+          <View style={[styles.row, { flexWrap: 'wrap' }]}>
+            <GenderChip user={user} owner={isMe} />
+            {/* Live mode: someone else's levels once the server sent them. */}
+            {levels && (
+              <LevelChips
+                wealth={levels.wealth ?? 0}
+                charm={levels.charm ?? 0}
+                hideWealth={levels.wealth === null || (isMe && myHidden.wealth)}
+                hideCharm={levels.charm === null || (isMe && myHidden.charm)}
+              />
+            )}
+            {isMe ? <VipTitle level={vipLevel} /> : user.vip && <VipBadge />}
+            {staff && (
+              <View style={[styles.staffChip, staff === 'Moderatör' && { backgroundColor: '#1D4ED8' }]} accessibilityLabel={`Resmi ${staff}`}>
+                <Ionicons name="shield-checkmark" size={12} color="#fff" />
+                <Text style={styles.genderText}>{staff}</Text>
+              </View>
+            )}
+            {user.verified && <VerifiedBadge size={18} />}
+            <BondBadge bond={topBondShown} onPress={() => setTab('iliski')} />
+          </View>
+          <AffiliationPills user={user} glassy />
+          <View style={styles.statusPill}>
+            {priv.showOnline ? (
+              <>
+                <View style={[styles.dot, { backgroundColor: user.online ? semantic.live : glass.plum }]} />
+                <Text style={[styles.statusText, user.online && { color: glass.deep, fontWeight: '700' }]}>
+                  {user.online ? 'Çevrimiçi' : lastSeen ? `Son görülme ${lastSeen}` : 'Çevrimdışı'}
+                </Text>
+              </>
+            ) : (
+              <Text style={styles.statusText}>{isMe ? 'Durumun gizli' : 'Durum gizli'}</Text>
+            )}
+            {!!user.city && (
+              <>
+                <View style={styles.statusSep} />
+                <Ionicons name="location-outline" size={14} color={glass.plum} />
+                <Text style={styles.statusText}>
+                  {user.city}
+                  {/* Live: the server's distance by city ("Aynı şehir", "350 km"); the demo's sample one. */}
+                  {!isMe && settings.cityDiscovery && (live ? (distanceText ? ` · ${distanceText}` : null) : ` · ${user.distanceKm} km`)}
+                </Text>
+              </>
+            )}
+          </View>
+
+          {/* The bio on its own pill; mine with the pencil that opens the form. Someone else's only when written. */}
+          {(isMe || !!user.bio) && (
+            <Pressable style={styles.bioPill} disabled={!isMe} onPress={openEdit} accessibilityLabel={isMe ? 'Hakkımda yazısını düzenle' : undefined}>
+              <Text style={[styles.bio, !user.bio && { color: glass.plum }]}>{user.bio || 'Kendini birkaç kelimeyle anlat…'}</Text>
+              {isMe && (
+                <View style={styles.bioEdit}>
+                  <Ionicons name="pencil" size={13} color={glass.deep} />
+                </View>
+              )}
+            </Pressable>
+          )}
 
           <View style={styles.stats}>
             {/* Someone else's numbers open nothing: who follows them and whom they follow is theirs alone. */}
             <Stat n={followers} label="Takipçi" onPress={isMe ? () => setList('followers') : undefined} />
-            <View style={styles.vSep} />
+            <View style={styles.statSep} />
             <Stat n={followingCount} label="Takip" onPress={isMe ? () => setList('following') : undefined} />
-            <View style={styles.vSep} />
+            <View style={styles.statSep} />
             <Stat n={friends} label="Arkadaş" onPress={isMe ? () => router.push({ pathname: '/(tabs)/mesajlar', params: { tab: 'friends' } }) : undefined} />
-            <View style={styles.vSep} />
+            <View style={styles.statSep} />
             <Stat n={giftCount} label="Hediye" onPress={() => setTab('onur')} />
           </View>
           {heart && heart.level > 0 && <HeartCard heart={heart} me={{ uri: me.avatar, name: me.name }} them={{ uri: user.avatar, name: user.name }} />}
@@ -663,25 +671,114 @@ export default function UserProfile() {
         </View>
 
         {tab === 'profil' && (
-          <View>
+          // The client's design: each part a pink heading over a light card, in this order: who they are (slogan,
+          // verification, basics), then what only I see, photos, interests and where they belong. Someone else's
+          // empty parts stay out instead of saying "none".
+          <View style={styles.sections}>
+            {/* Live mode: their slogan from the server; mine, when I have none, is an invitation to write one (no sample). */}
+            {(extras.slogan || (isMe && (!live || counts?.extras !== undefined))) && (
+              <View style={styles.section}>
+                <SectionTitle title="Arkadaşlık Sloganı" onPress={isMe ? openEdit : undefined} />
+                <InfoBox icon="heart" text={extras.slogan ?? (live ? 'Bir slogan yaz; seninle aynı frekanstakiler seni bulsun.' : 'Bir soruyu yanıtla, seninle aynı frekansta olan biriyle tanış.')} />
+              </View>
+            )}
+
+            <View style={styles.section}>
+              <SectionTitle
+                title="Doğrulama"
+                onPress={
+                  isMe && !user.verified ? () => showAlert('Doğrulama gerekli', 'Selfie ile gerçek kişi doğrulaması yap; profilinde mavi rozet görünür.') : undefined
+                }
+              />
+              <InfoBox
+                icon="shield-checkmark"
+                text={user.verified ? 'Gerçek kişi doğrulandı · mavi rozet aktif' : isMe ? 'Bir kere doğrula, kalıcı bağlantı' : 'Bu kullanıcı henüz doğrulanmadı.'}
+              />
+            </View>
+
+            {hasBasics && (
+              <View style={styles.section}>
+                <SectionTitle title="Temel Bilgiler" />
+                <View style={styles.infoCard}>
+                  {/* Rows keep a hairline above them; the first one's sits under the card's edge. */}
+                  <View style={styles.infoRows}>
+                    {/* The public ID their own Ben tab shows (live: a special ID they wear, else the one made from their server id). */}
+                    {publicId !== null && (
+                      <InfoRow icon="person-outline" label="ID">
+                        <Pressable style={styles.row} onPress={copyId} hitSlop={6} accessibilityLabel="ID kopyala">
+                          <Text selectable style={[styles.infoValue, special?.kind === 'specialId' && { color: '#975A16' }]}>
+                            {special?.kind === 'specialId' ? `${publicId} ✦` : publicId}
+                          </Text>
+                          <Ionicons name="copy-outline" size={16} color={glass.plum} />
+                        </Pressable>
+                      </InfoRow>
+                    )}
+                    {!!user.username && (
+                      <InfoRow icon="at-outline" label="Kullanıcı adı">
+                        <Pressable style={styles.row} onPress={copyUsername} hitSlop={6} accessibilityLabel="Kullanıcı adını kopyala">
+                          <Text selectable style={styles.infoValue}>
+                            @{user.username}
+                          </Text>
+                          <Ionicons name="copy-outline" size={16} color={glass.plum} />
+                        </Pressable>
+                      </InfoRow>
+                    )}
+                    {showsGender && (
+                      <InfoRow icon={user.gender === 'Kadın' ? 'female-outline' : 'male-outline'} label="Cinsiyet" hint={user.showGender === false ? 'Gizli · yalnızca sen görüyorsun, diğerleri sadece yaşını görür' : undefined}>
+                        <Ionicons name={user.gender === 'Kadın' ? 'female' : 'male'} size={18} color={user.gender === 'Kadın' ? FEMALE_FILL : MALE_FILL} accessibilityLabel={user.gender} />
+                      </InfoRow>
+                    )}
+                    {country && (
+                      <InfoRow icon="flag-outline" label="Ülke">
+                        <Text style={styles.infoValue}>
+                          {country.flag} {country.name}
+                        </Text>
+                      </InfoRow>
+                    )}
+                    {isMe && !!birthday && (
+                      <InfoRow icon="gift-outline" label="Doğum Günü" hint="Yalnızca Sen Görebilirsin · diğerleri sadece yaşını görür">
+                        <Text style={styles.infoValue}>{birthday}</Text>
+                      </InfoRow>
+                    )}
+                    {!!user.joinedAt && (
+                      <InfoRow icon="calendar-outline" label="Üyelik">
+                        <Text style={styles.infoValue}>{new Date(user.joinedAt).toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })}</Text>
+                      </InfoRow>
+                    )}
+                    {!!extras.relationship && (
+                      <InfoRow icon="heart-outline" label="İlişki Durumu">
+                        <Text style={styles.infoValue}>{extras.relationship}</Text>
+                      </InfoRow>
+                    )}
+                    {!!extras.education && (
+                      <InfoRow icon="school-outline" label="Eğitim">
+                        <Text style={styles.infoValue}>{extras.education}</Text>
+                      </InfoRow>
+                    )}
+                  </View>
+                </View>
+              </View>
+            )}
+
             {isMe ? (
               <View style={styles.section}>
-                <Pressable onPress={openEdit}>
-                  <LinearGradient colors={[colors.primary, '#38BDF8']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.rewardCard}>
+                {/* No reward is given for a full profile, so the card doesn't promise one (it said "Ödül Kazan"). */}
+                <Pressable onPress={openEdit} accessibilityRole="button" accessibilityLabel={`Profilini tamamla: yüzde ${completion}. Profili düzenle`}>
+                  <LinearGradient colors={['#E0287D', '#9B5DE5', '#38BDF8']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.rewardCard}>
                     <View style={styles.row}>
-                      <Text style={styles.rewardTitle}>Ödül Kazan</Text>
+                      <Text style={styles.rewardTitle}>Profilini tamamla</Text>
                       <View style={{ flex: 1 }} />
                       <View style={styles.editPill}>
-                        <Text style={{ color: colors.primaryText, fontWeight: '800', fontSize: 13 }}>Profili Düzenle</Text>
-                        <Ionicons name="chevron-forward" size={14} color={colors.primaryText} />
+                        <Text style={styles.editPillText}>Profili Düzenle</Text>
+                        <Ionicons name="chevron-forward" size={14} color={glass.deep} />
                       </View>
                     </View>
                     <View style={[styles.row, { marginTop: 10 }]}>
-                      <Text style={styles.rewardSub}>Tamamlanma Oranı</Text>
+                      <Text style={styles.rewardSub}>Tamamlanma oranı</Text>
                       <View style={styles.rewardTrack}>
                         <View style={[styles.rewardFill, { width: `${completion}%` }]} />
                       </View>
-                      <Text style={styles.rewardPct}>{completion}%</Text>
+                      <Text style={styles.rewardPct}>%{completion}</Text>
                     </View>
                   </LinearGradient>
                 </Pressable>
@@ -698,225 +795,105 @@ export default function UserProfile() {
               </View>
             ) : (
               <View style={styles.section}>
+                <SimilarityCard sim={similarity(me, user)} name={user.name} glassy />
                 <FanClubCard name={user.name} club={club} />
               </View>
             )}
-            <Band />
 
             {/* Live mode: the album is on the server (profiles.mjs), with their moment photos after it as in the demo. */}
-            {(!live || counts?.photos !== undefined) && (
-              <>
-                <View style={styles.section}>
-                  <SectionTitle title={`Albüm${isMe ? ` · ${myAlbumCount}/${LIMITS.photos}` : ''}`} onPress={() => setTab('dinamik')} />
-                  {album.length > 0 || isMe ? (
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-                      {isMe && myAlbumCount < LIMITS.photos && (
-                        <Pressable
-                          style={[styles.photo, styles.addPhoto]}
-                          onPress={() => pickPhoto(true)}
-                          disabled={albumBusy}
-                          accessibilityLabel="Albüme fotoğraf ekle"
-                          accessibilityState={{ busy: albumBusy }}
-                        >
-                          <Ionicons name={albumBusy ? 'hourglass-outline' : 'add'} size={30} color={colors.textDim} />
-                          <Text style={styles.meta}>{albumBusy ? 'Yükleniyor…' : 'Fotoğraf ekle'}</Text>
-                        </Pressable>
-                      )}
-                      {album.map((p, i) => {
-                        const liveId = live ? albumIdOf(p) : undefined;
-                        return (
-                          <View key={`${i}-${p}`}>
-                            <Image source={{ uri: p }} style={styles.photo} />
-                            {isMe && (live ? liveId !== undefined : me.photos?.includes(p)) && (
-                              <Pressable
-                                style={styles.removePhoto}
-                                hitSlop={6}
-                                onPress={() => (liveId !== undefined ? removeFromAlbum(liveId) : updateMe({ photos: (me.photos ?? []).filter((x) => x !== p) }))}
-                                accessibilityLabel="Fotoğrafı kaldır"
-                              >
-                                <Ionicons name="close" size={14} color="#fff" />
-                              </Pressable>
-                            )}
-                          </View>
-                        );
-                      })}
-                    </ScrollView>
-                  ) : (
-                    <InfoBox icon="image" text={isMe ? 'Serbest paylaş, ama kendi kurallarına göre' : 'Henüz albüm fotoğrafı yok.'} />
+            {(!live || counts?.photos !== undefined) && (album.length > 0 || isMe) && (
+              <View style={styles.section}>
+                <SectionTitle title={`Albüm${isMe ? ` · ${myAlbumCount}/${LIMITS.photos}` : ''}`} onPress={() => setTab('dinamik')} />
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                  {isMe && myAlbumCount < LIMITS.photos && (
+                    <Pressable
+                      style={[styles.photo, styles.addPhoto]}
+                      onPress={() => pickPhoto(true)}
+                      disabled={albumBusy}
+                      accessibilityLabel="Albüme fotoğraf ekle"
+                      accessibilityState={{ busy: albumBusy }}
+                    >
+                      <Ionicons name={albumBusy ? 'hourglass-outline' : 'add'} size={30} color={glass.deep} />
+                      <Text style={styles.addPhotoText}>{albumBusy ? 'Yükleniyor…' : 'Fotoğraf ekle'}</Text>
+                    </Pressable>
                   )}
-                </View>
-                <Band />
-              </>
-            )}
-
-            {!isMe && (
-              <>
-                <View style={styles.section}>
-                  <SimilarityCard sim={similarity(me, user)} name={user.name} />
-                </View>
-                <Band />
-              </>
+                  {album.map((p, i) => {
+                    const liveId = live ? albumIdOf(p) : undefined;
+                    return (
+                      <View key={`${i}-${p}`}>
+                        <Image source={{ uri: p }} style={styles.photo} />
+                        {isMe && (live ? liveId !== undefined : me.photos?.includes(p)) && (
+                          <Pressable
+                            style={styles.removePhoto}
+                            hitSlop={6}
+                            onPress={() => (liveId !== undefined ? removeFromAlbum(liveId) : updateMe({ photos: (me.photos ?? []).filter((x) => x !== p) }))}
+                            accessibilityLabel="Fotoğrafı kaldır"
+                          >
+                            <Ionicons name="close" size={14} color="#fff" />
+                          </Pressable>
+                        )}
+                      </View>
+                    );
+                  })}
+                </ScrollView>
+              </View>
             )}
 
             {/* Only what is filled in (live mode: the interests; the server keeps no height, job or zodiac). */}
             {hasPersonal && (
-              <>
-                <View style={styles.section}>
-                  <SectionTitle title="Kişisel profil" />
-                  <View style={styles.chips}>
-                    {extras.height > 0 && <Chip icon="resize-outline" label={`${extras.height}cm`} />}
-                    {extras.weight > 0 && <Chip icon="barbell-outline" label={`${extras.weight}kg`} />}
-                    {!!extras.job && <Chip icon="briefcase-outline" label={extras.job} />}
-                    {extras.languages.length > 0 && <Chip icon="language-outline" label={extras.languages.join('、')} />}
-                    {!!extras.zodiac && <Chip icon="star-outline" label={extras.zodiac} />}
-                    {user.interests?.map((i) => (
-                      <Chip key={i} label={i} />
-                    ))}
-                  </View>
+              <View style={styles.section}>
+                <SectionTitle title="Kişisel profil" />
+                <View style={styles.chips}>
+                  {extras.height > 0 && <Chip icon="resize-outline" label={`${extras.height}cm`} />}
+                  {extras.weight > 0 && <Chip icon="barbell-outline" label={`${extras.weight}kg`} />}
+                  {!!extras.job && <Chip icon="briefcase-outline" label={extras.job} />}
+                  {extras.languages.length > 0 && <Chip icon="language-outline" label={extras.languages.join('、')} />}
+                  {!!extras.zodiac && <Chip icon="star-outline" label={extras.zodiac} />}
+                  {user.interests?.map((i) => (
+                    <Chip key={i} label={i} />
+                  ))}
                 </View>
-                <Band />
-              </>
+              </View>
             )}
-
-            {/* Live mode: their slogan from the server; mine, when I have none, is an invitation to write one (no sample). */}
-            {(extras.slogan || (isMe && (!live || counts?.extras !== undefined))) && (
-              <>
-                <View style={styles.section}>
-                  <SectionTitle title="Arkadaşlık Sloganı" onPress={isMe ? openEdit : undefined} />
-                  <InfoBox icon="heart" text={extras.slogan ?? (live ? 'Bir slogan yaz; seninle aynı frekanstakiler seni bulsun.' : 'Bir soruyu yanıtla, seninle aynı frekansta olan biriyle tanış.')} />
-                </View>
-                <Band />
-              </>
-            )}
-
-            <View style={styles.section}>
-              <SectionTitle
-                title="Doğrulama"
-                onPress={
-                  isMe && !user.verified ? () => showAlert('Doğrulama gerekli', 'Selfie ile gerçek kişi doğrulaması yap; profilinde mavi rozet görünür.') : undefined
-                }
-              />
-              <InfoBox
-                icon="shield-checkmark"
-                text={user.verified ? 'Gerçek kişi doğrulandı · mavi rozet aktif' : isMe ? 'Bir kere doğrula, kalıcı bağlantı' : 'Bu kullanıcı henüz doğrulanmadı.'}
-              />
-            </View>
-            <Band />
 
             {extras.tags.length > 0 && (
-              <>
-                <View style={styles.section}>
-                  <SectionTitle title="Kişilik Etiketleri" />
-                  <View style={styles.chips}>
-                    {extras.tags.map((t) => (
-                      <Chip key={t.label} emoji={t.emoji} art={t.art} label={t.label} />
-                    ))}
-                  </View>
-                </View>
-                <Band />
-              </>
-            )}
-
-            {hasBasics && (
               <View style={styles.section}>
-                <SectionTitle title="Temel Bilgiler" />
-                <View style={styles.infoCard}>
-                  {/* The public ID their own Ben tab shows (live: a special ID they wear, else the one made from their server id). */}
-                  {publicId !== null && (
-                    <InfoRow icon="person-outline" label="ID">
-                      <Pressable style={styles.row} onPress={copyId} hitSlop={6} accessibilityLabel="ID kopyala">
-                        <Text selectable style={[styles.infoValue, special?.kind === 'specialId' && { color: colors.gold }]}>
-                          {special?.kind === 'specialId' ? `${publicId} ✦` : publicId}
-                        </Text>
-                        <Ionicons name="copy-outline" size={16} color={colors.textDim} />
-                      </Pressable>
-                    </InfoRow>
-                  )}
-                  {!!user.username && (
-                    <InfoRow icon="at-outline" label="Kullanıcı adı">
-                      <Pressable style={styles.row} onPress={copyUsername} hitSlop={6} accessibilityLabel="Kullanıcı adını kopyala">
-                        <Text selectable style={styles.infoValue}>
-                          @{user.username}
-                        </Text>
-                        <Ionicons name="copy-outline" size={16} color={colors.textDim} />
-                      </Pressable>
-                    </InfoRow>
-                  )}
-                  {showsGender && (
-                    <InfoRow icon={user.gender === 'Kadın' ? 'female-outline' : 'male-outline'} label="Cinsiyet" hint={user.showGender === false ? 'Gizli · yalnızca sen görüyorsun, diğerleri sadece yaşını görür' : undefined}>
-                      <Ionicons name={user.gender === 'Kadın' ? 'female' : 'male'} size={18} color={user.gender === 'Kadın' ? FEMALE_FILL : MALE_FILL} accessibilityLabel={user.gender} />
-                    </InfoRow>
-                  )}
-                  {country && (
-                    <InfoRow icon="flag-outline" label="Ülke">
-                      <Text style={styles.infoValue}>
-                        {country.flag} {country.name}
-                      </Text>
-                    </InfoRow>
-                  )}
-                  {isMe && !!birthday && (
-                    <InfoRow icon="gift-outline" label="Doğum Günü" hint="Yalnızca Sen Görebilirsin · diğerleri sadece yaşını görür">
-                      <Text style={styles.infoValue}>{birthday}</Text>
-                    </InfoRow>
-                  )}
-                  {!!user.joinedAt && (
-                    <InfoRow icon="calendar-outline" label="Üyelik">
-                      <Text style={styles.infoValue}>{new Date(user.joinedAt).toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })}</Text>
-                    </InfoRow>
-                  )}
-                  {!!extras.relationship && (
-                    <InfoRow icon="heart-outline" label="İlişki Durumu">
-                      <Text style={styles.infoValue}>{extras.relationship}</Text>
-                    </InfoRow>
-                  )}
-                  {!!extras.education && (
-                    <InfoRow icon="school-outline" label="Eğitim">
-                      <Text style={styles.infoValue}>{extras.education}</Text>
-                    </InfoRow>
-                  )}
+                <SectionTitle title="Kişilik Etiketleri" />
+                <View style={styles.chips}>
+                  {extras.tags.map((t) => (
+                    <Chip key={t.label} emoji={t.emoji} art={t.art} label={t.label} />
+                  ))}
                 </View>
               </View>
             )}
-            {hasBasics && (showRoom || showAgency || !live) && <Band />}
 
             {/* Live mode: someone else's rooms are listed on the home screen; no sample room here. */}
-            {showRoom && (
+            {showRoom && room && (
               <View style={styles.section}>
-                <SectionTitle title="Oda" />
-                {room ? (
-                  <Pressable style={styles.roomCard} onPress={room.go}>
-                    <Photo uri={room.cover} kind="cover" seed={room.title} style={styles.roomCover} />
-                    <View style={{ flex: 1, gap: 6 }}>
-                      <Text style={styles.roomTitle} numberOfLines={1}>
-                        {room.title}
-                      </Text>
-                      <Text style={styles.meta} numberOfLines={2}>
-                        {room.desc}
-                      </Text>
-                      {room.level !== null && (
-                        <View style={styles.lvChip}>
-                          <Text style={{ fontSize: 12 }}>{ROOM_LEVEL_ICONS[Math.min(room.level, ROOM_LEVEL_ICONS.length) - 1]}</Text>
-                          <Text style={styles.lvText}>Lv.{room.level}</Text>
-                        </View>
-                      )}
-                    </View>
-                    <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
-                  </Pressable>
-                ) : (
-                  <InfoBox icon="mic" text="Henüz bir odası yok." />
-                )}
+                <SectionTitle title="Oda" tag />
+                <Pressable style={styles.roomCard} onPress={room.go} accessibilityRole="button" accessibilityLabel={`Oda: ${room.title}`}>
+                  <Photo uri={room.cover} kind="cover" seed={room.title} style={styles.roomCover} />
+                  <View style={{ flex: 1, gap: 4 }}>
+                    <Text style={styles.roomTitle} numberOfLines={1}>
+                      {room.title}
+                    </Text>
+                    <Text style={styles.cardSub} numberOfLines={2}>
+                      {room.desc}
+                    </Text>
+                    {room.level !== null && (
+                      <View style={styles.lvChip}>
+                        <Text style={{ fontSize: 12 }}>{ROOM_LEVEL_ICONS[Math.min(room.level, ROOM_LEVEL_ICONS.length) - 1]}</Text>
+                        <Text style={styles.lvText}>Lv.{room.level}</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color={glass.plum} />
+                </Pressable>
               </View>
             )}
-            {showRoom && (showAgency || !live) && <Band />}
 
-            {showAgency && <AffiliationSection title="Ajans" item={agency} empty={isMe ? 'Katıl' : 'Ajansı yok'} emptyHref={isMe ? '/ajans' : undefined} />}
-
-            {showAgency && (
-              <>
-                <Band />
-                <AffiliationSection title="Aile" item={kabile} empty={isMe ? 'Katıl' : 'Ailesi yok'} emptyHref={isMe ? '/aile' : undefined} />
-              </>
-            )}
+            {showAgency && <AffiliationSection title="Ajans" icon="business" item={agency} empty="Henüz bir ajansa katılmadın" emptyHref={isMe ? '/ajans' : undefined} />}
+            {showAgency && <AffiliationSection title="Aile" icon="people" item={kabile} empty="Henüz bir aileye katılmadın" emptyHref={isMe ? '/aile' : undefined} />}
           </View>
         )}
 
@@ -965,21 +942,22 @@ export default function UserProfile() {
       </ScrollView>
 
       {/* Fixed top bar; collapses into a solid bar with the tabs once scrolled past the header. */}
-      <View pointerEvents="box-none" style={[styles.topBar, collapsed && { backgroundColor: colors.bg, borderBottomWidth: 1, borderBottomColor: colors.border }]}>
-        <View style={[styles.topRow, { marginTop: insets.top }]}>
-          <Pressable onPress={() => goBack()} style={[styles.iconBtn, collapsed && { backgroundColor: 'transparent' }]} accessibilityLabel="Geri">
-            <Ionicons name="chevron-back" size={24} color={collapsed ? colors.text : '#fff'} />
+      {/* Fixed glass buttons over the page; scrolled past the header, a glass pill with the name and the tabs below it. */}
+      <View pointerEvents="box-none" style={[styles.topBar, collapsed && { backgroundColor: colors.bg }]}>
+        <View style={[styles.topRow, collapsed && styles.topRowOn, { marginTop: insets.top + (collapsed ? 3 : 0) }]}>
+          <Pressable hitSlop={6} onPress={() => goBack()} style={[styles.iconBtn, !collapsed && styles.iconBtnLift]} accessibilityLabel="Geri">
+            <Ionicons name="chevron-back" size={22} color={glass.ink} />
           </Pressable>
           <Text style={styles.topTitle} numberOfLines={1}>
             {collapsed ? user.name : ''}
           </Text>
           {isMe ? (
-            <Pressable onPress={openEdit} style={[styles.iconBtn, onBar && styles.iconBtnBar]} accessibilityLabel="Profili düzenle">
-              <Ionicons name="pencil" size={20} color={onBar ? colors.text : '#fff'} />
+            <Pressable hitSlop={6} onPress={openEdit} style={[styles.iconBtn, !collapsed && styles.iconBtnLift]} accessibilityLabel="Profili düzenle">
+              <Ionicons name="pencil" size={18} color={glass.ink} />
             </Pressable>
           ) : (
-            <Pressable onPress={() => setSheet('more')} style={[styles.iconBtn, onBar && styles.iconBtnBar]} accessibilityLabel="Diğer">
-              <Ionicons name="ellipsis-horizontal" size={22} color={onBar ? colors.text : '#fff'} />
+            <Pressable hitSlop={6} onPress={() => setSheet('more')} style={[styles.iconBtn, !collapsed && styles.iconBtnLift]} accessibilityLabel="Diğer">
+              <Ionicons name="ellipsis-horizontal" size={20} color={glass.ink} />
             </Pressable>
           )}
         </View>
@@ -1112,10 +1090,11 @@ function Guardian({ guardian }: { guardian: { userId: string; points: number } |
   );
 }
 
+/** Profil, Anlar, Vitrin, Bağlar on a glass pill; the chosen one bold and underlined in pink. */
 function TabBar({ tabs, tab, onChange }: { tabs: { id: Tab; label: string }[]; tab: Tab; onChange: (t: Tab) => void }) {
   const styles = useStyles();
   return (
-    <View style={styles.tabBar}>
+    <View style={styles.tabBar} accessibilityRole="tablist">
       {tabs.map((t) => {
         const active = t.id === tab;
         return (
@@ -1131,12 +1110,11 @@ function TabBar({ tabs, tab, onChange }: { tabs: { id: Tab; label: string }[]; t
 
 /** n null: not known yet (live mode, before the server answered), shown as a dash. */
 function Stat({ n, label, onPress }: { n: number | null; label: string; onPress?: () => void }) {
-  const { colors } = useTheme();
   const styles = useStyles();
   return (
     <Pressable style={{ flex: 1, alignItems: 'center' }} onPress={onPress} disabled={!onPress} accessibilityLabel={n === null ? label : `${n.toLocaleString('tr-TR')} ${label}`}>
-      <Text style={{ color: colors.text, fontSize: 17, fontWeight: '800' }}>{n === null ? '—' : n.toLocaleString('tr-TR')}</Text>
-      <Text style={[styles.meta, { fontSize: 12 }]}>{label}</Text>
+      <Text style={styles.statN}>{n === null ? '—' : n.toLocaleString('tr-TR')}</Text>
+      <Text style={styles.statL}>{label}</Text>
     </Pressable>
   );
 }
@@ -1163,87 +1141,86 @@ function BarButton({ icon, label, onPress, highlight, off }: { icon: keyof typeo
 
 // --- Profil tab pieces -----------------------------------------------------------
 
-function Band() {
+/**
+ * Ajans or Aile: a small pink heading over a card (its emblem, name and role). Mine, when I'm in none, invites me to
+ * join; someone else's, when they're in none, stays out.
+ */
+function AffiliationSection({ title, icon, item, empty, emptyHref }: { title: string; icon: keyof typeof Ionicons.glyphMap; item: Affiliation | null; empty: string; emptyHref?: Href }) {
   const styles = useStyles();
-  return <View style={styles.band} />;
-}
-
-function AffiliationSection({ title, item, empty, emptyHref }: { title: string; item: Affiliation | null; empty: string; emptyHref?: Href }) {
-  const { colors } = useTheme();
-  const styles = useStyles();
-  if (!item) return (
-    <View style={styles.section}>
-      <SectionTitle title={title} right={empty} onPress={emptyHref ? () => router.push(emptyHref) : undefined} />
-    </View>
-  );
-  const go = item.href ? () => router.push(item.href!) : undefined;
+  if (!item && !emptyHref) return null;
+  const go = item ? (item.href ? () => router.push(item.href!) : undefined) : () => router.push(emptyHref!);
   return (
     <View style={styles.section}>
-      <SectionTitle title={title} onPress={go} />
-      <Pressable style={styles.familyCard} onPress={go} disabled={!go} accessibilityLabel={`${title}: ${item.name}, ${item.sub}`}>
-        <View style={styles.familyEmoji}>
-          {item.emoji ? <Text style={{ fontSize: 26 }}>{item.emoji}</Text> : <Ionicons name="people" size={24} color={colors.primaryText} />}
+      <SectionTitle title={title} tag />
+      <Pressable style={styles.familyCard} onPress={go} disabled={!go} accessibilityRole={go ? 'button' : undefined} accessibilityLabel={item ? `${title}: ${item.name}, ${item.sub}` : `${empty}. ${title === 'Ajans' ? 'Ajansa' : 'Aileye'} katıl`}>
+        <View style={styles.familyEmoji}>{item?.emoji ? <Text style={{ fontSize: 24 }}>{item.emoji}</Text> : <Ionicons name={icon} size={22} color={glass.deep} />}</View>
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text style={[styles.roomTitle, !item && styles.emptyTitle]} numberOfLines={1}>
+            {item ? item.name : empty}
+          </Text>
+          {item && (
+            <Text style={styles.cardSub} numberOfLines={1}>
+              {item.sub}
+            </Text>
+          )}
         </View>
-        <View style={{ flex: 1, gap: 3 }}>
-          <Text style={styles.roomTitle}>{item.name}</Text>
-          <Text style={styles.meta}>{item.sub}</Text>
-        </View>
-        {go && <Ionicons name="chevron-forward" size={18} color={colors.textDim} />}
+        {!item && <Text style={styles.joinText}>Katıl</Text>}
+        {go && <Ionicons name="chevron-forward" size={18} color={glass.plum} />}
       </Pressable>
     </View>
   );
 }
 
-function SectionTitle({ title, onPress, right }: { title: string; onPress?: () => void; right?: string }) {
-  const { colors } = useTheme();
+/**
+ * A part's heading: a full-width pink bar (a chevron when it opens something), or with `tag` a short pink tag (Oda,
+ * Ajans, Aile, whose cards open themselves).
+ */
+function SectionTitle({ title, onPress, tag }: { title: string; onPress?: () => void; tag?: boolean }) {
   const styles = useStyles();
   return (
-    <Pressable style={styles.sectionHead} onPress={onPress} disabled={!onPress}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      <View style={{ flex: 1 }} />
-      {right && <Text style={[styles.meta, { marginRight: 2 }]}>{right}</Text>}
-      {onPress && <Ionicons name="chevron-forward" size={16} color={colors.textDim} />}
+    <Pressable style={[styles.secHead, tag && styles.secTag]} onPress={onPress} disabled={!onPress} accessibilityRole={onPress ? 'button' : 'header'}>
+      <Text style={styles.secTitle}>{title}</Text>
+      {!tag && <View style={{ flex: 1 }} />}
+      {onPress && <Ionicons name="chevron-forward" size={16} color={glass.deep} />}
     </Pressable>
   );
 }
 
+/** A line on a light card with its pink icon (slogan, verification). */
 function InfoBox({ icon, text }: { icon: keyof typeof Ionicons.glyphMap; text: string }) {
-  const { colors, dark } = useTheme();
   const styles = useStyles();
   return (
     <View style={styles.infoBox}>
-      <LinearGradient colors={['#FF5FA2', colors.primary]} style={styles.infoIcon}>
+      <LinearGradient colors={['#FF5FA2', '#D8175E']} style={styles.infoIcon}>
         <Ionicons name={icon} size={20} color="#fff" />
       </LinearGradient>
-      <Text style={{ color: dark ? '#E9E4FF' : colors.text, flex: 1, fontSize: 14 }}>{text}</Text>
+      <Text style={styles.infoText}>{text}</Text>
     </View>
   );
 }
 
 function Chip({ icon, emoji, art, label }: { icon?: keyof typeof Ionicons.glyphMap; emoji?: string; art?: ArtName; label: string }) {
-  const { colors } = useTheme();
   const styles = useStyles();
   return (
     <View style={styles.chip}>
-      {icon && <Ionicons name={icon} size={15} color={colors.text} />}
+      {icon && <Ionicons name={icon} size={15} color={glass.plum} />}
       {art ? <Art name={art} size={20} /> : emoji && <Text style={{ fontSize: 15 }}>{emoji}</Text>}
-      <Text style={{ color: colors.text, fontSize: 14 }}>{label}</Text>
+      <Text style={styles.chipText}>{label}</Text>
     </View>
   );
 }
 
 function InfoRow({ icon, label, hint, children }: { icon: keyof typeof Ionicons.glyphMap; label: string; hint?: string; children: ReactNode }) {
-  const { colors } = useTheme();
   const styles = useStyles();
   return (
     <View style={styles.infoRow}>
-      <Ionicons name={icon} size={19} color={colors.text} />
+      <Ionicons name={icon} size={19} color={glass.plum} />
       <View style={{ flex: 1, gap: 2 }}>
-        <Text style={{ color: colors.text, fontSize: 15 }}>{label}</Text>
+        <Text style={styles.infoLabel}>{label}</Text>
         {hint && (
           <View style={styles.row}>
-            <Ionicons name="alert-circle-outline" size={12} color={colors.textDim} />
-            <Text style={[styles.meta, { fontSize: 12 }]}>{hint}</Text>
+            <Ionicons name="alert-circle-outline" size={12} color={glass.plum} />
+            <Text style={styles.infoHint}>{hint}</Text>
           </View>
         )}
       </View>
@@ -1253,7 +1230,7 @@ function InfoRow({ icon, label, hint, children }: { icon: keyof typeof Ionicons.
 }
 
 function FanClubCard({ name, club }: { name: string; club: FanClub | undefined }) {
-  const { colors, semantic } = useTheme();
+  const { semantic } = useTheme();
   const styles = useStyles();
   const [showHistory, setShowHistory] = useState(false);
   const points = club?.points ?? 0;
@@ -1261,34 +1238,34 @@ function FanClubCard({ name, club }: { name: string; club: FanClub | undefined }
   return (
     <View style={styles.fanCard}>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        <Ionicons name="heart" size={15} color={colors.pink} style={{ marginRight: 6 }} />
-        <Text style={{ color: colors.text, fontWeight: '800', flex: 1 }}>{name} hayran kulübü</Text>
-        <Text style={{ color: colors.gold, fontWeight: '800' }}>
+        <Ionicons name="heart" size={15} color={glass.pink} style={{ marginRight: 6 }} />
+        <Text style={{ color: glass.ink, fontWeight: '800', flex: 1 }}>{name} hayran kulübü</Text>
+        <Text style={{ color: glass.deep, fontWeight: '800' }}>
           Lv.{fan.index + 1} · {points} puan
         </Text>
       </View>
-      <Text style={styles.meta}>
+      <Text style={styles.glassMeta}>
         {fan.current.name} · Ödül: {fan.current.reward}
       </Text>
       <View style={styles.track}>
         <View style={{ height: 6, backgroundColor: semantic.social, width: fan.next ? `${((points - fan.current.min) / (fan.next.min - fan.current.min)) * 100}%` : '100%' }} />
       </View>
-      <Text style={styles.meta}>{fan.next ? `Sonraki: ${fan.next.name} (${fan.next.min} puan) → ${fan.next.reward}` : 'En üst kulüp seviyesi'}</Text>
-      <Text style={styles.meta}>Puan kazan: takip et (+10), odasına katıl (+5), odada kal (+2/dk), görevler; hediye zorunlu değil.</Text>
+      <Text style={styles.glassMeta}>{fan.next ? `Sonraki: ${fan.next.name} (${fan.next.min} puan) → ${fan.next.reward}` : 'En üst kulüp seviyesi'}</Text>
+      <Text style={styles.glassMeta}>Puan kazan: takip et (+10), odasına katıl (+5), odada kal (+2/dk), görevler; hediye zorunlu değil.</Text>
       <Pressable onPress={() => setShowHistory((v) => !v)}>
-        <Text style={{ color: colors.pink, fontWeight: '700', fontSize: 12 }}>{showHistory ? 'Puan geçmişini gizle' : 'Puan geçmişi'}</Text>
+        <Text style={{ color: glass.deep, fontWeight: '700', fontSize: 12 }}>{showHistory ? 'Puan geçmişini gizle' : 'Puan geçmişi'}</Text>
       </Pressable>
       {showHistory &&
         (club?.history.length ? (
           club.history.map((h, i) => (
-            <Text key={`${h.time}-${i}`} style={styles.meta}>
+            <Text key={`${h.time}-${i}`} style={styles.glassMeta}>
               {h.time} · {h.text} · +{h.pts}
             </Text>
           ))
         ) : (
-          <Text style={styles.meta}>Henüz puan yok.</Text>
+          <Text style={styles.glassMeta}>Henüz puan yok.</Text>
         ))}
-      <Text style={[styles.meta, { fontSize: 12 }]}>Seviyeler: {FAN_LEVELS.map((l) => l.name).join(' → ')}</Text>
+      <Text style={[styles.glassMeta, { fontSize: 12 }]}>Seviyeler: {FAN_LEVELS.map((l) => l.name).join(' → ')}</Text>
     </View>
   );
 }
@@ -1712,36 +1689,35 @@ function ChipRow<T extends string | undefined>({ value, options, onChange }: { v
 /** Owner-only numbers: balances, VIP end date and XP never appear on profiles others open. */
 /** giftsReceived null: not known on this phone (live mode; Gelir lists them), so only the sent count shows. */
 function PrivateStats(p: { coins: number; diamonds: number; vipUntil: string | null; wealthXp: number; charmXp: number; giftsSent: number; giftsReceived: number | null }) {
-  const { colors } = useTheme();
   const styles = useStyles();
   const n = (x: number) => x.toLocaleString('tr-TR');
   return (
     <View style={styles.privateCard}>
       <View style={styles.row}>
-        <Ionicons name="lock-closed" size={14} color={colors.textDim} />
-        <Text style={[styles.meta, { fontSize: 12 }]}>Yalnızca sen görürsün</Text>
+        <Ionicons name="lock-closed" size={14} color={glass.plum} />
+        <Text style={[styles.glassMeta, { fontSize: 12 }]}>Yalnızca sen görürsün</Text>
       </View>
       <View style={styles.privateRow}>
         <Pressable style={styles.privateCell} onPress={() => router.push('/cuzdan')} accessibilityLabel="Jeton bakiyesi">
           <Icon3D name="coin" size={26} />
           <Text style={styles.privateValue}>{n(p.coins)}</Text>
-          <Text style={styles.meta}>Jeton</Text>
+          <Text style={styles.glassMeta}>Jeton</Text>
         </Pressable>
         <Pressable style={styles.privateCell} onPress={() => router.push('/gelir')} accessibilityLabel="Elmas bakiyesi">
           <Icon3D name="diamond" size={26} />
           <Text style={styles.privateValue}>{n(p.diamonds)}</Text>
-          <Text style={styles.meta}>Elmas</Text>
+          <Text style={styles.glassMeta}>Elmas</Text>
         </Pressable>
         <Pressable style={styles.privateCell} onPress={() => router.push('/vip')} accessibilityLabel="VIP durumu">
           <Icon3D name="crown" size={26} />
           <Text style={styles.privateValue} numberOfLines={1}>
             {p.vipUntil ?? 'Yok'}
           </Text>
-          <Text style={styles.meta}>{p.vipUntil ? 'VIP bitişi' : 'VIP'}</Text>
+          <Text style={styles.glassMeta}>{p.vipUntil ? 'VIP bitişi' : 'VIP'}</Text>
         </Pressable>
       </View>
       <Pressable onPress={() => router.push('/seviye')} accessibilityLabel="Seviye ve deneyim puanı">
-        <Text style={styles.meta}>
+        <Text style={styles.glassMeta}>
           Cömertlik puanı {n(p.wealthXp)} · Yankı puanı {n(p.charmXp)} · Hediye: {n(p.giftsSent)} gönderdin{p.giftsReceived === null ? '' : `, ${n(p.giftsReceived)} aldın`} ›
         </Text>
       </Pressable>
@@ -1751,75 +1727,106 @@ function PrivateStats(p: { coins: number; diamonds: number; vipUntil: string | n
 
 
 const useStyles = makeStyles(({ colors, semantic, lift, ink, dark, edge }) => ({
-  cover: { width: '100%', height: 240, backgroundColor: colors.card },
-  sheet: { backgroundColor: colors.bg, borderTopLeftRadius: 26, borderTopRightRadius: 26, marginTop: -26, paddingHorizontal: 16, paddingBottom: 6 },
-  avatarWrap: { marginTop: -48, alignSelf: 'flex-start', borderRadius: 60, borderWidth: 3, borderColor: colors.bg },
+  // The header (the client's design): pills and cards of light glass, the same in either scheme.
+  sheet: { paddingHorizontal: 16, paddingBottom: 4, gap: 8 },
+  idRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  avatarWrap: { alignSelf: 'flex-start' },
+  coverCard: { flex: 1, height: 108, borderRadius: 20, overflow: 'hidden', backgroundColor: glass.well, borderWidth: 1.5, borderColor: glass.rim, boxShadow: glass.shadow },
+  coverEmpty: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'flex-end', backgroundColor: glass.well },
+  guardianOver: { position: 'absolute', right: 0, top: -10 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  name: { color: colors.text, fontSize: 26, fontWeight: '900', flexShrink: 1 },
-  flag: { flexDirection: 'row', alignItems: 'center', gap: 3, marginLeft: 4 },
-  flagText: { color: colors.text, fontSize: 13, fontWeight: '600' },
+  namePill: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', maxWidth: '100%', backgroundColor: glass.fill, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 4, borderWidth: 1.5, borderColor: glass.rim, boxShadow: glass.shadow },
+  name: { color: glass.ink, fontSize: 22, fontFamily: fonts.display, flexShrink: 1 },
+  flag: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  flagText: { color: glass.plum, fontSize: 13, fontWeight: '700' },
+  handlePill: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', backgroundColor: glass.fill, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 4, borderWidth: 1, borderColor: glass.rim },
+  statusPill: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', backgroundColor: glass.fill, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5, borderWidth: 1, borderColor: glass.rim },
+  statusText: { color: glass.plum, fontSize: 13 },
+  statusSep: { width: 1, height: 14, backgroundColor: glass.line, marginHorizontal: 2 },
   genderText: { color: '#fff', fontSize: 12, fontWeight: '800' },
   dot: { width: 8, height: 8, borderRadius: 4 },
   vSep: { width: 1, height: 14, backgroundColor: colors.border, marginHorizontal: 4 },
   meta: { color: colors.textDim, fontSize: 13 },
-  bio: { color: dark ? '#E9E4FF' : colors.text, fontSize: 16, flexShrink: 1 },
-  bioEdit: { width: 24, height: 24, borderRadius: 12, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center' },
-  stats: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.card, borderRadius: 14, paddingVertical: 10, marginTop: 14, ...lift },
+  /** Secondary text on the light glass of the Profil tab (readable in either scheme). */
+  glassMeta: { color: glass.plum, fontSize: 13 },
+  bioPill: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', maxWidth: '100%', backgroundColor: glass.white, borderRadius: 16, paddingLeft: 12, paddingRight: 6, paddingVertical: 6, borderWidth: 1, borderColor: glass.line },
+  bio: { color: glass.ink, fontSize: 14, flexShrink: 1 },
+  bioEdit: { width: 26, height: 26, borderRadius: 13, backgroundColor: glass.tint, alignItems: 'center', justifyContent: 'center' },
+  stats: { flexDirection: 'row', alignItems: 'center', backgroundColor: glass.fill, borderRadius: 18, paddingVertical: 10, marginTop: 4, borderWidth: 1.5, borderColor: glass.rim, boxShadow: glass.shadow },
+  statN: { color: glass.ink, fontSize: 17, fontFamily: fonts.display },
+  statL: { color: glass.plum, fontSize: 12 },
+  statSep: { width: 1, height: 24, backgroundColor: glass.line },
   guardian: { width: 96, alignItems: 'center', paddingTop: 14 },
   guardianRing: { width: 72, height: 72, borderRadius: 36, borderWidth: 2, borderColor: semantic.money, overflow: 'hidden' },
   guardianImg: { width: '100%', height: '100%' },
   guardianLabel: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: -12, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2, borderWidth: 1, borderColor: '#FEF3C7' },
   guardianText: { color: '#5B2A00', fontSize: 11, fontWeight: '900', letterSpacing: 0.5 },
-  tabBar: { flexDirection: 'row', justifyContent: 'center', gap: 26, height: TAB_H, backgroundColor: colors.bg, borderBottomWidth: 1, borderBottomColor: colors.border },
-  tabItem: { alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 4, gap: 5 },
-  tabText: { color: colors.textDim, fontSize: 17, fontWeight: '600' },
-  tabTextActive: { color: colors.text, fontSize: 19, fontWeight: '900' },
-  tabIndicator: { width: 18, height: 4, borderRadius: 2, backgroundColor: colors.primary },
+  tabBar: { flexDirection: 'row', justifyContent: 'space-around', height: TAB_H, marginHorizontal: 12, marginVertical: 6, paddingHorizontal: 6, borderRadius: TAB_H / 2, backgroundColor: glass.fill, borderWidth: 1.5, borderColor: glass.rim, boxShadow: glass.shadow },
+  tabItem: { alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 5, paddingHorizontal: 8, gap: 4 },
+  tabText: { color: glass.plum, fontSize: 15, fontWeight: '600' },
+  tabTextActive: { color: glass.ink, fontSize: 16, fontFamily: fonts.display },
+  tabIndicator: { width: 20, height: 3, borderRadius: 2, backgroundColor: glass.pink },
   topBar: { position: 'absolute', top: 0, left: 0, right: 0 },
   topRow: { height: BAR_H, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, gap: 8 },
-  topTitle: { flex: 1, color: colors.text, fontSize: 18, fontWeight: '700' },
-  iconBtn: { backgroundColor: 'rgba(0,0,0,0.35)', borderRadius: 999, width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
-  iconBtnBar: { backgroundColor: ink(0.06) },
-  band: { height: 8, backgroundColor: dark ? 'rgba(0,0,0,0.28)' : ink(0.045) },
-  section: { padding: 16, gap: 12 },
+  // Scrolled: the row becomes a glass pill (BAR_H tall with its margins, so the page's threshold stays the same).
+  topRowOn: { height: BAR_H - 6, marginBottom: 3, marginHorizontal: 12, paddingHorizontal: 4, borderRadius: (BAR_H - 6) / 2, backgroundColor: glass.fill, borderWidth: 1.5, borderColor: glass.rim, boxShadow: glass.shadow },
+  topTitle: { flex: 1, color: glass.ink, fontSize: 17, fontFamily: fonts.displayBold },
+  iconBtn: { borderRadius: 999, width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
+  iconBtnLift: { backgroundColor: glass.fill, borderWidth: 1.5, borderColor: glass.rim, boxShadow: glass.shadow },
+  // The Profil tab's parts: a pink heading over a light card, close together (the client: no empty space).
+  sections: { paddingBottom: 8 },
+  section: { paddingHorizontal: 16, paddingTop: 14, gap: 8 },
+  secHead: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 34, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 17, backgroundColor: glass.tint, borderWidth: 1, borderColor: glass.rim },
+  secTag: { alignSelf: 'flex-start' },
+  secTitle: { color: glass.deep, fontSize: 15, fontFamily: fonts.displayBold },
   sectionHead: { flexDirection: 'row', alignItems: 'center' },
   sectionTitle: { color: colors.textDim, fontSize: 16, fontWeight: '800' },
-  rewardCard: { borderRadius: 18, padding: 14 },
-  rewardTitle: { color: '#fff', fontWeight: '900', fontSize: 16 },
+  rewardCard: { borderRadius: 20, padding: 14, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.55)', boxShadow: glass.shadow },
+  rewardTitle: { color: '#fff', fontSize: 17, fontFamily: fonts.display, textShadowColor: 'rgba(0,0,0,0.2)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
   rewardSub: { color: '#fff', fontWeight: '700', fontSize: 13 },
   rewardTrack: { flex: 1, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.3)', overflow: 'hidden' },
   rewardFill: { height: 6, backgroundColor: '#fff', borderRadius: 3 },
   rewardPct: { color: '#fff', fontWeight: '900', fontSize: 13, backgroundColor: 'rgba(255,255,255,0.25)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 1, overflow: 'hidden' },
   editPill: { flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: '#fff', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5 },
-  infoBox: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.card, borderRadius: 14, padding: 14, ...lift },
-  infoIcon: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.card, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, ...lift },
-  infoCard: { backgroundColor: colors.card, borderRadius: 18, paddingHorizontal: 16, paddingVertical: 6, ...lift },
-  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
-  infoValue: { color: colors.text, fontSize: 15, fontWeight: '800' },
-  roomCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.card, borderRadius: 16, padding: 10, ...lift },
-  roomCover: { width: 84, height: 84, borderRadius: 12, backgroundColor: colors.cardAlt },
-  roomTitle: { color: colors.text, fontSize: 16, fontWeight: '800' },
+  editPillText: { color: glass.deep, fontWeight: '800', fontSize: 13 },
+  infoBox: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: glass.white, borderRadius: 18, padding: 12, borderWidth: 1, borderColor: glass.line, boxShadow: glass.shadow },
+  infoIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  infoText: { color: glass.ink, flex: 1, fontSize: 14 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: glass.white, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: glass.line },
+  chipText: { color: glass.ink, fontSize: 14 },
+  infoCard: { backgroundColor: glass.white, borderRadius: 18, paddingHorizontal: 14, overflow: 'hidden', borderWidth: 1, borderColor: glass.line, boxShadow: glass.shadow },
+  infoRows: { marginTop: -1 },
+  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, borderTopWidth: 1, borderTopColor: glass.line },
+  infoLabel: { color: glass.ink, fontSize: 15 },
+  infoHint: { color: glass.plum, fontSize: 12, flexShrink: 1 },
+  infoValue: { color: glass.ink, fontSize: 15, fontWeight: '800' },
+  roomCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: glass.white, borderRadius: 18, padding: 10, borderWidth: 1, borderColor: glass.line, boxShadow: glass.shadow },
+  roomCover: { width: 72, height: 72, borderRadius: 14, backgroundColor: glass.well },
+  roomTitle: { color: glass.ink, fontSize: 16, fontFamily: fonts.displayBold },
+  cardSub: { color: glass.plum, fontSize: 13 },
+  emptyTitle: { color: glass.plum, fontFamily: undefined, fontWeight: '600', fontSize: 14 },
+  joinText: { color: glass.deep, fontWeight: '800', fontSize: 13 },
   lvChip: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', backgroundColor: dark ? 'rgba(34,197,94,0.18)' : 'rgba(21,128,61,0.12)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
   lvText: { color: colors.green, fontWeight: '800', fontSize: 12 },
-  familyCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.card, borderRadius: 16, padding: 12, ...lift },
-  familyEmoji: { width: 48, height: 48, borderRadius: 12, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center' },
-  fanCard: { backgroundColor: colors.card, borderRadius: 16, padding: 14, gap: 6, borderWidth: 1, borderColor: dark ? 'rgba(255,101,118,0.4)' : 'rgba(200,48,74,0.26)', ...(dark ? {} : { boxShadow: lift.boxShadow }) },
-  track: { height: 6, borderRadius: 3, backgroundColor: colors.cardAlt, overflow: 'hidden' },
-  photo: { width: 110, height: 110, borderRadius: 12 },
-  addPhoto: { backgroundColor: colors.card, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.border, alignItems: 'center', justifyContent: 'center', gap: 2 },
+  familyCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: glass.white, borderRadius: 18, padding: 10, borderWidth: 1, borderColor: glass.line, boxShadow: glass.shadow },
+  familyEmoji: { width: 48, height: 48, borderRadius: 14, backgroundColor: glass.well, alignItems: 'center', justifyContent: 'center' },
+  fanCard: { backgroundColor: glass.white, borderRadius: 18, padding: 14, gap: 6, borderWidth: 1, borderColor: glass.line, boxShadow: glass.shadow },
+  track: { height: 6, borderRadius: 3, backgroundColor: glass.well, overflow: 'hidden' },
+  photo: { width: 104, height: 104, borderRadius: 16 },
+  addPhoto: { backgroundColor: glass.white, borderWidth: 1.5, borderStyle: 'dashed', borderColor: glass.line, alignItems: 'center', justifyContent: 'center', gap: 2 },
+  addPhotoText: { color: glass.plum, fontSize: 13 },
   removePhoto: { position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(22,14,18,0.75)', alignItems: 'center', justifyContent: 'center' },
   heartPin: { position: 'absolute', right: -4, bottom: -2 },
-  cameraBadge: { position: 'absolute', right: 2, bottom: 2, width: 28, height: 28, borderRadius: 14, backgroundColor: colors.primary, borderWidth: 2, borderColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
+  cameraBadge: { position: 'absolute', right: 2, bottom: 2, width: 28, height: 28, borderRadius: 14, backgroundColor: '#D8175E', borderWidth: 2, borderColor: glass.white, alignItems: 'center', justifyContent: 'center' },
   reviewNote: { color: colors.gold, fontSize: 12, fontWeight: '700' },
-  handle: { color: colors.textDim, fontSize: 14, fontWeight: '600' },
+  handle: { color: glass.plum, fontSize: 14, fontWeight: '600' },
   staffChip: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#B91C1C', borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2 },
   statusNote: { color: colors.gold, fontSize: 13, marginTop: 8 },
-  privateCard: { backgroundColor: colors.card, borderRadius: 16, padding: 12, gap: 10, ...(dark ? { borderWidth: 1, borderColor: colors.border } : lift) },
+  privateCard: { backgroundColor: glass.white, borderRadius: 18, padding: 12, gap: 10, borderWidth: 1, borderColor: glass.line, boxShadow: glass.shadow },
   privateRow: { flexDirection: 'row', gap: 8 },
-  privateCell: { flex: 1, alignItems: 'center', gap: 2, backgroundColor: colors.cardAlt, borderRadius: 12, paddingVertical: 10 },
-  privateValue: { color: colors.text, fontWeight: '900', fontSize: 15 },
+  privateCell: { flex: 1, alignItems: 'center', gap: 2, backgroundColor: glass.well, borderRadius: 14, paddingVertical: 10 },
+  privateValue: { color: glass.ink, fontFamily: fonts.display, fontSize: 15 },
   fieldError: { color: semantic.danger, fontSize: 12, marginTop: 4, fontWeight: '600' },
   editChip: { backgroundColor: colors.cardAlt, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: 'transparent' },
   editChipOn: { borderColor: dark ? semantic.action : semantic.actionText, backgroundColor: dark ? 'rgba(255,95,162,0.18)' : 'rgba(208,46,120,0.11)' },

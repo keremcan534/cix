@@ -8,7 +8,7 @@ import { Text } from '@/components/text';
 import { BounceBadge } from '@/components/fx/bounce-badge';
 import { unreadTotal } from '@/lib/unread';
 import { useApp } from '@/store';
-import { TAB_BAR_HEIGHT, makeStyles, themes, useTheme } from '@/theme';
+import { TAB_BAR_HEIGHT, glass, makeStyles, themes, useTheme } from '@/theme';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -24,8 +24,9 @@ const NAV = {
 // Rooms stay the landing tab even though "Ana Sayfa" (people to meet, /kesfet) is first in the bar.
 export const unstable_settings = { anchor: 'index' };
 
-/** The bar's colours (the owner's design): plum line icons on pink glass, the chosen tab pink on its own pill. */
-const NAV_INK = { on: '#E0287D', off: '#7A4A63' } as const;
+/** The bar's colours (the owner's design): plum line icons on pink glass, the chosen tab on its own pill (a pink
+ *  icon, its name in deep pink: pink text this small would be too faint on the pill). */
+const NAV_INK = { on: glass.pink, label: glass.deep, off: glass.plum } as const;
 
 /** Every tab the same: its icon and name; the chosen one filled, pink, on a soft pink pill (icon and name together). */
 function icon(name: IconName, active: IconName, title: string, badge?: () => number) {
@@ -35,7 +36,7 @@ function icon(name: IconName, active: IconName, title: string, badge?: () => num
     return (
       <View style={[s.pill, focused && s.pillOn]}>
         <Ionicons name={focused ? active : name} size={22} color={c} />
-        <Text style={[s.label, { color: c }, focused && s.labelOn]} numberOfLines={1}>
+        <Text style={[s.label, { color: focused ? NAV_INK.label : c }, focused && s.labelOn]} numberOfLines={1}>
           {title}
         </Text>
         {/* A new message: the count hops once (components/fx/bounce-badge). */}
@@ -45,11 +46,14 @@ function icon(name: IconName, active: IconName, title: string, badge?: () => num
   };
 }
 
-/** A pink glass bar floating a little in from the edges, in either scheme; screens that draw under it show round it. */
+/**
+ * The bar's pink glass, in either scheme. It sits on the bottom edge and runs under the system navigation bar: the
+ * client found the floating bar "didn't sit" (a strip of the page showed round it, the chosen pill reached past its
+ * rounded ends).
+ */
 function TabBarGlass() {
   const s = useStyles();
-  const insets = useSafeAreaInsets();
-  return <View style={[s.float, { bottom: insets.bottom + 4 }]} />;
+  return <View style={s.glass} />;
 }
 
 export default function TabLayout() {
@@ -60,7 +64,8 @@ export default function TabLayout() {
   // The bar's height must include the home-indicator inset: React Navigation pads by it inside the height we
   // give, so a fixed 64 would leave the icons ~24pt on notched phones. Screens pad by TAB_BAR_HEIGHT + inset.
   const insets = useSafeAreaInsets();
-  const bar = { backgroundColor: 'transparent', borderTopWidth: 0, height: TAB_BAR_HEIGHT + insets.bottom, paddingTop: 6, elevation: 0 } as const;
+  // The tabs sit a little in from the glass's rounded ends, so the chosen pill never reaches past them.
+  const bar = { backgroundColor: 'transparent', borderTopWidth: 0, height: TAB_BAR_HEIGHT + insets.bottom, paddingTop: 6, paddingHorizontal: 10, elevation: 0 } as const;
 
   return (
     <ThemeProvider value={NAV[scheme]}>
@@ -109,19 +114,22 @@ export default function TabLayout() {
 
 const useStyles = makeStyles(({ colors }) => ({
   pill: { width: 68, height: 48, borderRadius: 18, alignItems: 'center', justifyContent: 'center', gap: 1 },
-  pillOn: { backgroundColor: '#F9D0E4' },
+  pillOn: { backgroundColor: glass.tint },
   label: { fontSize: 11, fontFamily: 'JakartaSemiBold' },
   labelOn: { fontFamily: 'JakartaBold' },
-  float: {
+  glass: {
     position: 'absolute',
-    left: 8,
-    right: 8,
+    left: 0,
+    right: 0,
     top: 0,
-    borderRadius: 26,
+    bottom: 0,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     backgroundColor: 'rgba(255,240,247,0.97)',
     borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.95)',
-    boxShadow: '0 4px 18px rgba(120,20,70,0.28)',
+    borderBottomWidth: 0,
+    borderColor: glass.rim,
+    boxShadow: '0 -3px 16px rgba(120,20,70,0.22)',
   },
   badge: { position: 'absolute', top: -5, right: 2, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.red, borderWidth: 2, borderColor: '#FFF0F7' },
   badgeText: { color: '#fff', fontSize: 10, fontWeight: '800', fontVariant: ['tabular-nums'] },
