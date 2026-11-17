@@ -17,7 +17,15 @@ Müşterinin iki isteği ele alındı:
 - **Profilin görselleri yeni bir ekran değil:** Uygulamadaki profilin (`kullanici/[id].tsx`) yeniden çizilmiş hâli.
   - Görsellerdeki her bölüm uygulamada zaten var.
   - Değişen: başlığın düzeni, bölümlerin sırası ve görünüşü.
-- **Ekranlar tarayıcıda açıldı:** Expo web, demo hesabı, 412 × 915, açık ve koyu tema. Müşterinin ekranıyla birebir aynı çıktı. Önceki ve sonraki görüntüler PR'da.
+- **Ekranlar tarayıcıda açıldı:** Expo web, demo hesabı, 412 × 915, açık ve koyu tema. Müşterinin ekranıyla birebir aynı çıktı. Önceki ve sonraki görüntüler aşağıda.
+
+## Önce ve sonra
+
+Tarayıcıda, demo hesabıyla, 412 × 915. Ana Sayfa açık temada (müşterinin ekranı gibi), profil koyu temada (görseller gibi). Profildeki "DESTEKÇİ" halkası yalnız internetsiz demoda görünür; gerçek uygulamada yok.
+
+![Ana Sayfa önce ve sonra](gorseller/ana-sayfa-once-sonra.jpg)
+
+![Profil önce ve sonra](gorseller/profil-once-sonra.jpg)
 
 ## 1. Teşhis
 
