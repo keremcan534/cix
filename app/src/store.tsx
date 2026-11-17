@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { Appearance as SystemAppearance, useColorScheme } from 'react-native';
 
 import { agencyByCode, type AgencyRole } from '@/data/agency';
-import { COSMETICS, FREE_PACK_IDS, ROOM_THEMES, ROOM_TYPES, type CosmeticKind, type RoomTheme, type RoomType, type TicketCategory } from '@/data/catalog';
+import { FREE_PACK_IDS, cosmeticById, ROOM_THEMES, ROOM_TYPES, type CosmeticKind, type RoomTheme, type RoomType, type TicketCategory } from '@/data/catalog';
 import {
   CHECKIN_REWARDS,
   TASKS,
@@ -28,7 +28,7 @@ import { setGameVolume } from '@/lib/game-sound';
 import { setHapticsEnabled } from '@/lib/haptics';
 import { setNoiseSuppression, setRawMic } from '@/lib/room-session';
 import { CONVERSATIONS, ME, isServerId, type Conversation, type EventShareCard, type RoomInviteCard, type User } from '@/data/mock';
-import { giftById } from '@/lib/live/catalog-live';
+import { giftById, liveCatalog } from '@/lib/live/catalog-live';
 import { livePack } from '@/lib/live/emoji-live';
 import type { ServerEarnings, ServerUser } from '@/lib/api';
 import { block as serverBlock, follow } from '@/lib/api';
@@ -926,11 +926,29 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     inventory,
     equipped,
     buyCosmetic: (id) => {
-      const item = COSMETICS.find((c) => c.id === id);
+      // As Yönetim › Mağaza has it (its name, price, days, VIP level; the team's own items too), else compiled.
+      const item = cosmeticById(id);
       if (!item) return 'Ürün bulunamadı';
+      if (item.retired) return 'Bu ürün artık satışta değil';
       if (inventory.has(id)) return 'Zaten sahipsin';
       if (item.minVip && vipLevel < item.minVip) return `Bu ürün VIP ${item.minVip} ve üzeri için`;
-      if (!spend(item.price, `Mağaza: ${item.name}`)) return 'Yetersiz jeton';
+      const was = { equipped: equipped[item.kind] };
+      // A frame or entry effect of the server's shop: bought at the price and days shown (POST /api/shop/buy); the
+      // older apps' spend would refuse one the panel changed or added. A refusal takes it back and says why.
+      const mirror =
+        liveCatalog()?.shop && (item.kind === 'frame' || item.kind === 'entry')
+          ? () =>
+              liveShopBuy(id, item.price, item.days ?? 0, (message) => {
+                setInventory((s) => {
+                  const next = new Set(s);
+                  next.delete(id);
+                  return next;
+                });
+                setEquipped((e) => ({ ...e, [item.kind]: was.equipped }));
+                showAlert('Satın alınamadı', message);
+              })
+          : undefined;
+      if (!spend(item.price, `Mağaza: ${item.name}${item.days ? ` (${item.days} gün)` : ''}`, mirror)) return 'Yetersiz jeton';
       setInventory((s) => new Set(s).add(id));
       setEquipped((e) => ({ ...e, [item.kind]: id }));
       return null;

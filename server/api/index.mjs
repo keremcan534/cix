@@ -59,6 +59,7 @@ import { customGiftRoutes, refreshCustomGifts, sendCustomFx, startCustomGifts, s
 import { emojiRoutes, refreshEmoji, startEmoji, stopEmoji } from './emoji.mjs';
 import { refreshLevels, startLevels, stopLevels, topPoints } from './levels.mjs';
 import { levelRoutes, startLevelDecay, stopLevelDecay } from './levels-admin.mjs';
+import { refreshShopItems, sendShopFx, shopRoutes, startShopItems, stopShopItems } from './shop-items.mjs';
 import { FX_PATH, sendFx } from './fx.mjs';
 import { jetonRoutes } from './jeton.mjs';
 import { liveRoutes } from './live.mjs';
@@ -307,6 +308,7 @@ const routes = {
   ...customGiftRoutes,
   ...emojiRoutes,
   ...levelRoutes,
+  ...shopRoutes,
   ...backpackRoutes,
   ...pkRoutes,
   ...crossPkRoutes,
@@ -426,6 +428,7 @@ const server = http.createServer(async (req, res) => {
     const name = url.pathname.slice(FX_PATH.length);
     try {
       if (name.startsWith('g/')) await sendCustomFx(req, res, name.slice(2));
+      else if (name.startsWith('s/')) await sendShopFx(req, res, name.slice(2));
       else if (name.startsWith('art/')) sendArt(req, res, name.slice(4));
       else sendFx(req, res, name);
     } catch (e) {
@@ -502,6 +505,7 @@ function shutdown(signal) {
   stopEmoji();
   stopLevels();
   stopLevelDecay();
+  stopShopItems();
   server.close();
   const started = Date.now();
   const wait = setInterval(async () => {
@@ -519,6 +523,7 @@ await refreshLive();
 await refreshCustomGifts();
 await refreshEmoji();
 await refreshLevels();
+await refreshShopItems();
 server.listen(PORT, '127.0.0.1', () => console.log(`api on 127.0.0.1:${PORT} version ${VERSION}${TEST_TOPUP ? ' (test top-up on)' : ''}`));
 startFinanceSync();
 startRefundSync();
@@ -537,3 +542,4 @@ startCustomGifts();
 startEmoji();
 startLevels();
 startLevelDecay();
+startShopItems();

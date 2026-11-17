@@ -669,8 +669,18 @@ async function stackedResult(output, opaqueText, { opaque = false } = {}) {
 const audited = (c, actor, action, detail, ip = '') =>
   c.query('INSERT INTO audit_events (actor, action, target, detail, ip) VALUES ($1, $2, NULL, $3, $4)', [actor, action, JSON.stringify(detail), ip]);
 
-/** One job: the source downloaded, converted, stored, and put in effect unless the gift moved on meanwhile. */
-async function convertJob(row) {
+/**
+ * Tables whose rows carry a stacked video and the job that makes one from an uploaded source, with custom_gifts'
+ * columns (video_*, job_*, deleted_at, rev): the gifts here, a shop entry effect's video (shop-items.mjs adds
+ * shop_items). `what` names the row in the audit and the logs.
+ */
+const VIDEO_TABLES = [{ table: 'custom_gifts', rev: 'custom_gift_rev', what: 'gift', refresh: () => refreshCustomGifts() }];
+export function addVideoTable(t) {
+  if (!VIDEO_TABLES.some((x) => x.table === t.table)) VIDEO_TABLES.push(Object.freeze({ ...t }));
+}
+
+/** One job: the source downloaded, converted, stored, and put in effect unless the row moved on meanwhile. */
+async function convertJob(row, t = VIDEO_TABLES[0]) {
   const src = keyOf(row.job_source);
   try {
     if (!src) throw new FileError('Kaynak video bulunamadı, yeniden yükle');
@@ -684,43 +694,44 @@ async function convertJob(row) {
     const key = `giftvideo/${src.split('/')[1]}/${row.id}-${Date.now().toString(36)}-${crypto.randomBytes(6).toString('base64url')}.mp4`;
     const url = await writeStored(key, out.buf, 'video/mp4');
     const done = await tx(async (c) => {
-      const cur = (await c.query('SELECT video_url, job_source, job_preview, deleted_at FROM custom_gifts WHERE id = $1 FOR UPDATE', [row.id])).rows[0];
+      const cur = (await c.query(`SELECT video_url, job_source, job_preview, deleted_at FROM ${t.table} WHERE id = $1 FOR UPDATE`, [row.id])).rows[0];
       if (!cur || cur.deleted_at || cur.job_source !== row.job_source) return null;
       await c.query(
-        `UPDATE custom_gifts SET video_url = $2, video_bytes = $3, video_ms = $4, video_v = $5, job_status = NULL, job_source = NULL, job_error = NULL, job_tries = 0,
-                job_preview = NULL, rev = nextval('custom_gift_rev') WHERE id = $1`,
+        `UPDATE ${t.table} SET video_url = $2, video_bytes = $3, video_ms = $4, video_v = $5, job_status = NULL, job_source = NULL, job_error = NULL, job_tries = 0,
+                job_preview = NULL, rev = nextval('${t.rev}') WHERE id = $1`,
         [row.id, url, out.buf.length, out.ms, sha12(out.buf)],
       );
-      await audited(c, null, 'gift.video_ready', { gift: row.id, bytes: out.buf.length, ms: out.ms });
+      await audited(c, null, `${t.what}.video_ready`, { [t.what]: row.id, bytes: out.buf.length, ms: out.ms });
       return { old: cur.video_url, preview: cur.job_preview };
     });
     // Replaced, taken off or deleted while it ran: the new file goes, nothing else changes.
     if (!done) return removeFiles([url]);
     removeFiles([done.old, done.preview, row.job_source].filter(Boolean));
-    await refreshCustomGifts();
-    console.log(`gift video ready: ${row.id}, ${out.buf.length} bytes, ${out.ms} ms`);
+    await t.refresh();
+    console.log(`${t.what} video ready: ${row.id}, ${out.buf.length} bytes, ${out.ms} ms`);
   } catch (e) {
     const file = e instanceof FileError;
-    if (!file) console.error('gift video job', row.id, String(e?.message ?? e).slice(0, 200));
+    if (!file) console.error(`${t.what} video job`, row.id, String(e?.message ?? e).slice(0, 200));
     if (file || row.job_tries >= MAX_TRIES) {
       const error = (file ? e.message : 'Video çevrilemedi, yeniden yükle').slice(0, 300);
       let preview = null;
       if (file && e.preview && src) {
         const key = `giftvideo/${src.split('/')[1]}/${row.id}-onizleme-${Date.now().toString(36)}-${crypto.randomBytes(6).toString('base64url')}.mp4`;
-        preview = await writeStored(key, e.preview, 'video/mp4').catch((err) => (console.error('gift video preview', String(err?.message ?? err).slice(0, 200)), null));
+        preview = await writeStored(key, e.preview, 'video/mp4').catch((err) => (console.error(`${t.what} video preview`, String(err?.message ?? err).slice(0, 200)), null));
       }
       const r = await db.query(
-        `UPDATE custom_gifts g SET job_status = 'failed', job_error = $3, job_source = NULL, job_preview = $4
-           FROM (SELECT id, job_preview AS old FROM custom_gifts WHERE id = $1 FOR UPDATE) x
+        `UPDATE ${t.table} g SET job_status = 'failed', job_error = $3, job_source = NULL, job_preview = $4
+           FROM (SELECT id, job_preview AS old FROM ${t.table} WHERE id = $1 FOR UPDATE) x
           WHERE g.id = x.id AND g.job_source = $2 RETURNING x.old`,
         [row.id, row.job_source, error, preview],
       );
       if (r.rowCount) {
-        await audited(db, null, 'gift.video_failed', { gift: row.id, error, preview: !!preview });
+        await audited(db, null, `${t.what}.video_failed`, { [t.what]: row.id, error, preview: !!preview });
         removeFiles([row.job_source, r.rows[0].old].filter(Boolean));
+        await t.refresh();
       } else if (preview) removeFiles([preview]);
     } else {
-      await db.query("UPDATE custom_gifts SET job_at = now() + $3 * interval '30 seconds' WHERE id = $1 AND job_source = $2", [row.id, row.job_source, row.job_tries]);
+      await db.query(`UPDATE ${t.table} SET job_at = now() + $3 * interval '30 seconds' WHERE id = $1 AND job_source = $2`, [row.id, row.job_source, row.job_tries]);
     }
   }
 }
@@ -882,27 +893,32 @@ export function kickJobs() {
     try {
       do {
         again = false;
-        for (;;) {
-          const r = await db.query(
-            `UPDATE custom_gifts SET job_tries = job_tries + 1
-              WHERE id = (SELECT id FROM custom_gifts WHERE job_status = 'processing' AND deleted_at IS NULL AND job_tries < $1 AND job_at <= now() ORDER BY job_at LIMIT 1)
-              RETURNING id, job_source, job_tries, job_fill, job_opaque`,
-            [MAX_TRIES],
-          );
-          if (!r.rowCount) break;
-          await convertJob(r.rows[0]);
+        // Every table's due jobs, one at a time (one converter on this machine).
+        for (const t of VIDEO_TABLES) {
+          for (;;) {
+            const r = await db.query(
+              `UPDATE ${t.table} SET job_tries = job_tries + 1
+                WHERE id = (SELECT id FROM ${t.table} WHERE job_status = 'processing' AND deleted_at IS NULL AND job_tries < $1 AND job_at <= now() ORDER BY job_at LIMIT 1)
+                RETURNING id, job_source, job_tries, job_fill, job_opaque`,
+              [MAX_TRIES],
+            );
+            if (!r.rowCount) break;
+            await convertJob(r.rows[0], t);
+          }
         }
         // Once (migration 074): the videos made at the old default SVGA size, after the conversions.
         await enlargeOld();
       } while (again);
       // Cut off too often (restarts, the storage): given up on, so the panel says so.
-      const stuck = await db.query(
-        `UPDATE custom_gifts g SET job_status = 'failed', job_error = 'Video çevrilemedi, yeniden yükle', job_source = NULL
-           FROM (SELECT id, job_source FROM custom_gifts WHERE job_status = 'processing' AND job_tries >= $1 FOR UPDATE) x
-          WHERE g.id = x.id RETURNING x.job_source`,
-        [MAX_TRIES],
-      );
-      if (stuck.rowCount) removeFiles(stuck.rows.map((x) => x.job_source).filter(Boolean));
+      for (const t of VIDEO_TABLES) {
+        const stuck = await db.query(
+          `UPDATE ${t.table} g SET job_status = 'failed', job_error = 'Video çevrilemedi, yeniden yükle', job_source = NULL
+             FROM (SELECT id, job_source FROM ${t.table} WHERE job_status = 'processing' AND job_tries >= $1 FOR UPDATE) x
+            WHERE g.id = x.id RETURNING x.job_source`,
+          [MAX_TRIES],
+        );
+        if (stuck.rowCount) removeFiles(stuck.rows.map((x) => x.job_source).filter(Boolean));
+      }
     } catch (e) {
       console.error('gift video jobs', String(e?.message ?? e).slice(0, 200));
     } finally {
@@ -955,7 +971,11 @@ function nameFree(name, self) {
   if (taken) throw new HttpError(409, taken.builtin ? `“${name}” uygulamadaki bir hediyenin adı, başka bir ad seç` : `“${name}” adında bir hediye zaten var`);
 }
 /** video in a body: undefined (unchanged), null (taken off), or a checked stacked video or source. */
-async function videoOf(v) {
+/**
+ * A gift's (or a shop entry effect's, shop-items.mjs) video in a body: undefined (unchanged), null (none), a ready
+ * stacked MP4 ({ kind: 'stacked', url }) or a transparent source to convert ({ kind: 'source', url, fill?, opaque? }).
+ */
+export async function videoOf(v) {
   if (v === undefined) return undefined;
   if (v === null) return null;
   const o = v && typeof v === 'object' && !Array.isArray(v) ? v : {};

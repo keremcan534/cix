@@ -5,6 +5,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Animated, Easing, View, type ImageSourcePropType } from 'react-native';
 
+import { cosmeticById } from '@/data/catalog';
 import { FRAME_ART_SIZES, type FrameArtSize } from '@/data/frame-art';
 import { ART_BREATHE, artFit, seatArt, type SeatRoom } from '@/lib/seat-cell';
 
@@ -20,7 +21,21 @@ const ART: Record<string, Art> = {
   'fr-wing-coral': made('fr-wing-coral', require('../../../assets/frames/fr-wing-coral.png'), '#FF6576'),
   'fr-wing-sky': made('fr-wing-sky', require('../../../assets/frames/fr-wing-sky.png'), '#13D9DF'),
 };
-export const frameArtOf = (id?: string) => (id ? ART[id] : undefined);
+/** The team's own frames (Yönetim › Mağaza, data/catalog `remote.art`), made once per picture: the whole picture is reach. */
+const remote = new Map<string, Art>();
+export const frameArtOf = (id?: string): Art | undefined => {
+  if (!id) return undefined;
+  if (ART[id]) return ART[id];
+  const r = cosmeticById(id)?.remote?.art;
+  if (!r) return undefined;
+  const key = `${r.url}|${r.hole}`;
+  let art = remote.get(key);
+  if (!art) {
+    art = { hole: r.hole, reach: { x: 0.5, top: 0.5, bottom: 0.5 }, src: { uri: r.url }, glow: '#F6BD60' };
+    remote.set(key, art);
+  }
+  return art;
+};
 
 /** Avatar inside an illustrated frame: soft glow pulse behind, the frame breathes slightly. */
 /**

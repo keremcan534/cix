@@ -19,13 +19,16 @@
 // ahead. A higher noble tier runs at the same time as a lower one; a lower one can't be bought over a higher one.
 // Feature 'shop' (features.mjs ROUTES) stops buys and the old-app spend; reads, equip and looks stay open.
 //
-// Rütbe tiers sell at the name, price and days Seviye ayarları give them (levels.mjs nobleItem). A phone that reads
-// the settings sends the price and days it showed (POST /api/shop/buy `price`, `days`): a moved one is a 409
-// price_changed and nothing moves. One that shows the compiled tiers (the old-app spend, a buy without `days`) gets
-// update_required once a tier differs from the compiled one, so nobody pays for other days or another price than shown.
+// Rütbe tiers sell at the name, price and days Seviye ayarları give them (levels.mjs nobleItem); frames and entry
+// effects at what Yönetim › Mağaza gives them (shop-items.mjs: the app's own as changed there, and the admins' own). A
+// phone that reads those sends the price and days it showed (POST /api/shop/buy `price`, `days`; 0 for good): a
+// moved one is a 409 price_changed and nothing moves. One that shows the compiled rows (the old-app spend, a buy
+// without `days`) gets update_required once the item differs from its compiled row, so nobody pays for other days or
+// another price than shown.
 import { HttpError, REF, UUID, auth, claimRef, clientIp, db, env, int, limit, once, readJson, text, tx, userId } from './core.mjs';
 import { FREE_MICFX, MAX_AHEAD_DAYS, PAID_ONLY, SHOP, SHOP_PAUSED, SLOTS, labelOf } from './catalog.mjs';
 import { nobleItem, vipItemNeed, vipLevelOf } from './levels.mjs';
+import { ownShopSkus, shopItem } from './shop-items.mjs';
 import { packByName, packItem, packSkus } from './emoji.mjs';
 import { live } from './live-settings.mjs';
 // live.mjs imports rooms.mjs, which imports this file; the functions are only used inside handlers.
@@ -126,8 +129,11 @@ export async function grantInTx(c, uid, item, { ref, source, price, mode = 'buy'
   return Number(r.rows[0].id);
 }
 
-/** The compiled catalog row of a Rütbe tier (what an app that doesn't read Seviye ayarları shows), else null. */
-const compiledNoble = (item) => (item.kind === 'noble' ? SHOP.get(item.sku) : null);
+/**
+ * The compiled catalog row an app that doesn't read the settings shows for `item`: a Rütbe tier's, one of the app's own
+ * frames' or entry effects'. Null for what only the server sells as it is now (an admin's item, a sticker pack, …).
+ */
+const compiledOf = (item) => (item.kind === 'noble' || shopItem(item.sku)?.builtin ? (SHOP.get(item.sku) ?? null) : null);
 /** Whether a Rütbe tier is sold for another price or other days than the compiled row says. */
 const movedFrom = (item, base) => !!base && (item.price !== base.price || item.days !== base.days);
 
@@ -141,8 +147,10 @@ async function buyInTx(c, uid, item, ref, shown, source, { days, compiled } = {}
   const me = (await c.query('SELECT coins, svip_xp FROM users WHERE id = $1 FOR UPDATE', [uid])).rows[0];
   await claimRef(c, uid, 'coin', ref);
   if (movedFrom(item, compiled)) throw updateRequired();
-  if (!(Number.isSafeInteger(shown) && shown >= item.price)) throw err(409, `Fiyat değişti: şimdi ${fmt(item.price)} jeton`, 'price_changed', { price: item.price, days: item.days });
-  if (days !== undefined && days !== item.days) throw err(409, `Süre değişti: şimdi ${item.days} gün`, 'price_changed', { price: item.price, days: item.days });
+  if (!(Number.isSafeInteger(shown) && shown >= item.price)) throw err(409, `Fiyat değişti: şimdi ${fmt(item.price)} jeton`, 'price_changed', { price: item.price, days: item.days ?? 0 });
+  if (days !== undefined && days !== (item.days ?? 0)) {
+    throw err(409, item.days ? `Süre değişti: şimdi ${item.days} gün` : 'Süre değişti: artık süresiz', 'price_changed', { price: item.price, days: item.days ?? 0 });
+  }
   const st = await statusOf(c, uid);
   // Its own VIP level, and at least the one Seviye ayarları open `vip_store` at.
   const needVip = vipItemNeed('vip_store', item.minVip);
@@ -174,8 +182,10 @@ const boughtWith = async (uid, ref) =>
  */
 export function sellable(sku) {
   const pack = packItem(sku);
-  const item = pack !== undefined ? pack : typeof sku === 'string' ? SHOP.get(sku) : undefined;
-  if (!item || live().shopHidden.has(sku) || SHOP_PAUSED.has(sku)) return null;
+  // A frame or entry effect as Yönetim › Mağaza has it (on the shelf or not there; the app's paused ones count as off).
+  const own = pack === undefined ? shopItem(sku) : undefined;
+  const item = pack !== undefined ? pack : own !== undefined ? own : typeof sku === 'string' ? SHOP.get(sku) : undefined;
+  if (!item || live().shopHidden.has(sku) || (own ? !own.enabled : SHOP_PAUSED.has(sku))) return null;
   if (item.kind === 'specialId' && env.SHOP_SPECIAL_IDS !== '1') return null;
   return nobleItem(item);
 }
@@ -207,7 +217,7 @@ export async function economyOf(uid, q = db) {
   const iso = (t) => (t === null ? null : new Date(t).toISOString());
   return {
     serverNow: iso(st.now),
-    shop: [...[...SHOP.keys()].filter((sku) => !sku.startsWith('pack-')), ...packSkus()]
+    shop: [...[...SHOP.keys()].filter((sku) => !sku.startsWith('pack-')), ...ownShopSkus(), ...packSkus()]
       .map(sellable)
       .filter(Boolean)
       .map(({ sku, kind, name, price, days, minVip }) => ({ sku, kind, name, price, days, minVip })),
@@ -350,7 +360,7 @@ const itemOf = (e, now) => ({
   userId: e.user_id,
   sku: e.sku,
   kind: e.kind,
-  name: nobleItem(SHOP.get(e.sku))?.name ?? packItem(e.sku, { any: true })?.name ?? e.sku,
+  name: shopItem(e.sku)?.name ?? nobleItem(SHOP.get(e.sku))?.name ?? packItem(e.sku, { any: true })?.name ?? e.sku,
   tier: e.tier,
   price: Number(e.price),
   startsAt: e.starts_at,
@@ -377,10 +387,11 @@ export const economyRoutes = {
     const b = await readJson(req);
     const item = sellable(b.sku);
     if (!item) throw new HttpError(400, 'Bu ürün artık satışta değil');
-    // A Rütbe tier: the days the phone showed, or (none sent) it showed the compiled row.
-    const noble = compiledNoble(item);
-    const shownDays = noble && b.days !== undefined ? (Number.isSafeInteger(b.days) ? b.days : -1) : undefined;
-    const how = noble ? (shownDays === undefined ? { compiled: noble } : { days: shownDays }) : {};
+    // The days the phone showed (0: for good), or none sent: it showed the compiled row (a Rütbe tier, one of the
+    // app's own frames or entry effects), which must still be what is sold.
+    const base = compiledOf(item);
+    const shownDays = b.days === undefined ? undefined : Number.isSafeInteger(b.days) && b.days >= 0 ? b.days : -1;
+    const how = shownDays !== undefined ? { days: shownDays } : base ? { compiled: base } : {};
     const r = await once(u.id, 'coin', b.ref, (c) => buyInTx(c, u.id, item, b.ref, b.price, 'buy', how));
     if (r.replay && !(await boughtWith(u.id, b.ref))) throw new HttpError(409, 'Geçersiz istek kimliği');
     // A bought item is worn at once (and a noble rank or VIP can change the frame): the room the buyer is in sees it.
@@ -439,9 +450,11 @@ export const economyRoutes = {
     // server sells it at now (a Rütbe tier as Seviye ayarları have it) after the ref claim.
     const base = itemOfReason(why);
     if (!base || n < base.price || (base.kind === 'specialId' && env.SHOP_SPECIAL_IDS !== '1')) throw updateRequired();
-    if (live().shopHidden.has(base.sku) || SHOP_PAUSED.has(base.sku)) throw new HttpError(409, 'Bu ürün artık satışta değil');
-    const item = nobleItem(base);
-    const r = await once(u.id, 'coin', ref, (c) => buyInTx(c, u.id, item, ref, n, 'bridge', { compiled: compiledNoble(base) }));
+    // What the server sells it as now: a Rütbe tier by Seviye ayarları, a frame or entry effect by Yönetim › Mağaza.
+    const own = shopItem(base.sku);
+    if (live().shopHidden.has(base.sku) || (own ? !own.enabled : SHOP_PAUSED.has(base.sku))) throw new HttpError(409, 'Bu ürün artık satışta değil');
+    const item = own ?? nobleItem(base);
+    const r = await once(u.id, 'coin', ref, (c) => buyInTx(c, u.id, item, ref, n, 'bridge', { compiled: compiledOf(base) }));
     if (r.replay && !(await boughtWith(u.id, ref))) throw new HttpError(409, 'Geçersiz istek kimliği');
     if (!r.replay) void announceLook(u.id);
     return r;
@@ -470,7 +483,8 @@ export const economyRoutes = {
       // What a staff grant may give (POST /api/admin/economy/grant): the shop's items and the sticker packs, with
       // their own length (days null: for good), for editors outside the app (the finance panel).
       grantable: [
-        ...[...SHOP.values()].map(nobleItem).map((s) => ({ sku: s.sku, kind: s.kind, name: s.name, days: s.days })),
+        ...[...SHOP.values()].map((s) => shopItem(s.sku) ?? nobleItem(s)).map((s) => ({ sku: s.sku, kind: s.kind, name: s.name, days: s.days })),
+        ...ownShopSkus().map(shopItem).map((s) => ({ sku: s.sku, kind: s.kind, name: s.name, days: s.days })),
         ...packSkus().map((sku) => packItem(sku, { any: true })).filter(Boolean).map((s) => ({ sku: s.sku, kind: s.kind, name: s.name, days: s.days })),
       ],
     };
@@ -483,7 +497,7 @@ export const economyRoutes = {
     const id = userId(b.userId);
     // A sticker pack as Yönetim › Emojiler has it (the admins' own too, a free one too); anything else from the shop.
     const pack = packItem(b.sku, { any: true });
-    const item = pack !== undefined ? pack : typeof b.sku === 'string' ? nobleItem(SHOP.get(b.sku)) : undefined;
+    const item = pack !== undefined ? pack : typeof b.sku === 'string' ? (shopItem(b.sku) ?? nobleItem(SHOP.get(b.sku))) : undefined;
     if (!item) throw new HttpError(400, 'Bilinmeyen ürün');
     let days = item.days;
     if (b.days !== undefined && b.days !== null) {

@@ -20,6 +20,7 @@ import { HttpError, env } from './core.mjs';
 import { customGiftsRev } from './custom-gifts.mjs';
 import { emojiRev } from './emoji.mjs';
 import { levelsRev } from './levels.mjs';
+import { shopItemsRev } from './shop-items.mjs';
 import { FEATURES, OFF_MESSAGE, configOf, listOf } from './live-registry.mjs';
 import { live } from './live-settings.mjs';
 import { mailProvidersOf } from './mail.mjs';
@@ -118,6 +119,6 @@ export const configRoutes = {
     const s = live();
     // .env's switched-off features first, in .env's order, then the live ones.
     // adminSite: the staff's Yönetim is on the web (Canlı ayarlar › Yönetim sitesi); null keeps it in the app.
-    return { minVersion: s.minVersion, updateUrl: CONFIG.updateUrl, notice: s.notice, adminSite: s.adminSite, featuresOff: [...new Set([...CONFIG.featuresOff, ...s.featuresOff])], v: s.v + customGiftsRev() + emojiRev() + levelsRev(), ...signInOf(env, s.otpPerHour) };
+    return { minVersion: s.minVersion, updateUrl: CONFIG.updateUrl, notice: s.notice, adminSite: s.adminSite, featuresOff: [...new Set([...CONFIG.featuresOff, ...s.featuresOff])], v: s.v + customGiftsRev() + emojiRev() + levelsRev() + shopItemsRev(), ...signInOf(env, s.otpPerHour) };
   },
 };

@@ -6,6 +6,7 @@
 // Pure, so the rules are unit tested (tests/room-entrance.test.ts).
 import type { EntryFx } from '@/components/fx/entry';
 import { cosmeticById } from '@/data/catalog';
+import type { Plate } from '@/lib/shop-live-core';
 import { vipTier } from '@/data/economy';
 import { nobleInfo } from '@/data/status';
 
@@ -64,7 +65,16 @@ export function entranceView(join: PeerJoin, { blocked = false, effectsOn = true
  * A person's entry banner from their own look: the effect, the ride (`rideId` for its picture), the noble badge, and
  * the banner's colors: `tint` undefined with an entry item (its own colors), else the VIP tier's (null: the app's).
  */
-export type EntryPlan = { fx: EntryFx; rideId?: string; ride?: string; badge?: string; tint?: readonly [string, string] | null };
+export type EntryPlan = {
+  fx: EntryFx;
+  rideId?: string;
+  ride?: string;
+  badge?: string;
+  tint?: readonly [string, string] | null;
+  /** The team's own entry effect (Yönetim › Mağaza): its clip (fx entry <id>) and the name plate on it. */
+  clip?: string;
+  plate?: Plate | null;
+};
 /** What `look` (one person's, as the server keeps it) shows when its owner comes in; null when nothing worn shows. */
 export function entryPlanOf(look: { entry?: string | null; ride?: string | null; noble?: number | null; vipLevel?: number } | undefined): EntryPlan | null {
   if (!look) return null;
@@ -72,7 +82,8 @@ export function entryPlanOf(look: { entry?: string | null; ride?: string | null;
   // entry effect at all.
   const worn = (id: string | null | undefined, kind: 'entry' | 'ride') => {
     const c = cosmeticById(id ?? undefined);
-    return c?.kind === kind && !c.retired ? c : undefined;
+    // The team's own item still plays for whoever has it after it left the shelf (its clip stays listed).
+    return c?.kind === kind && (!c.retired || !!c.remote) ? c : undefined;
   };
   const entryItem = worn(look.entry, 'entry');
   const ride = worn(look.ride, 'ride');
@@ -80,6 +91,7 @@ export function entryPlanOf(look: { entry?: string | null; ride?: string | null;
   if (!entryItem && !ride && !noble) return null;
   return {
     fx: (entryItem?.fx as EntryFx | undefined) ?? 'vip',
+    ...(entryItem?.remote?.video ? { clip: entryItem.id, plate: entryItem.remote.plate ?? null } : {}),
     ...(ride ? { rideId: ride.id, ride: ride.emoji } : {}),
     ...(noble ? { badge: noble.emoji } : {}),
     ...(entryItem ? {} : { tint: vipTier(look.vipLevel ?? 0)?.color ?? null }),

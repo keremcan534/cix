@@ -64,7 +64,7 @@ import { AnimPlay } from '@/components/fx/anim-player';
 import { WinBanner } from '@/components/fx/win-banner';
 import { GiftFlights, type Flight, type Point } from '@/components/fx/gift-flight';
 import { GiftShowFx } from '@/components/fx/gift-show';
-import { GiftVideoFx, VideoFx, entryVideoOf, giftVideoOf } from '@/components/fx/video-fx';
+import { GiftVideoFx, PlateName, VideoFx, entryClipOf, entryVideoOf, giftVideoOf } from '@/components/fx/video-fx';
 import { giftShowOf, type GiftShow } from '@/data/gift-shows';
 import type { Animation } from '@/data/animations';
 import { ROOM, addCue, cueCount, cueTo, emptyStage, endCue, resumeCue, type Cue, type Stage } from '@/lib/fx-queue';
@@ -249,7 +249,16 @@ const NO_BONDS: RoomBond[] = [];
 function entryShowOf(look: Look | undefined, name: string, avatar: string): EntryShow | null {
   const plan = entryPlanOf(look);
   if (!plan) return null;
-  return { name, avatar, fx: plan.fx, ride: plan.ride, rideArt: storeArtOf(plan.rideId), colors: plan.tint === undefined ? undefined : (plan.tint ?? gradient), badge: plan.badge };
+  return {
+    name,
+    avatar,
+    fx: plan.fx,
+    ...(plan.clip ? { clip: plan.clip, plate: plan.plate ?? null } : {}),
+    ride: plan.ride,
+    rideArt: storeArtOf(plan.rideId),
+    colors: plan.tint === undefined ? undefined : (plan.tint ?? gradient),
+    badge: plan.badge,
+  };
 }
 // What another phone may put over its seat: a sticker of a known pack, or a standard emoji an older app's panel had
 // (no free text, no unknown art).
@@ -400,7 +409,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     const tier = vipTier(vipLevel);
     // One taken out of the shop (data/catalog `retired`) plays no more, even while it is still on.
     const worn = cosmeticById(equipped.entry);
-    const entryItem = worn && !worn.retired ? worn : undefined;
+    // The team's own (Yönetim › Mağaza) still plays for whoever has it after it left the shelf.
+    const entryItem = worn && (!worn.retired || worn.remote) ? worn : undefined;
     const ride = cosmeticById(equipped.ride);
     const noble = nobleInfo(nobleTier);
     if (!entryItem && !ride && !GATES.entryBanner(svipLevel, nobleTier)) return null;
@@ -408,7 +418,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     const text = `${entryItem?.emoji ?? '✨'} ${ride ? `${ride.emoji} ${ride.name} ile ` : ''}${who} odaya girdi!`;
     const badge = [noble?.emoji, svipLevel ? `VIP ${svipLevel}` : ''].filter(Boolean).join(' ') || undefined;
     const fx = (entryItem?.fx as EntryFx | undefined) ?? 'vip';
-    const show: EntryShow = { name: ME.name, avatar: app.me.avatar, fx, ride: ride?.emoji, rideArt: storeArtOf(ride?.id), colors: entryItem ? undefined : (tier?.color ?? gradient), badge };
+    const clip = entryItem?.remote?.video ? { clip: entryItem.id, plate: entryItem.remote.plate ?? null } : {};
+    const show: EntryShow = { name: ME.name, avatar: app.me.avatar, fx, ...clip, ride: ride?.emoji, rideArt: storeArtOf(ride?.id), colors: entryItem ? undefined : (tier?.color ?? gradient), badge };
     return { text, show };
   }, [vipLevel, svipLevel, nobleTier, equipped.entry, equipped.ride, app.me.avatar]);
 
@@ -1227,7 +1238,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const entryNow = entries.now;
   const [entryLook, setEntryLook] = useState<{ entry: EntryItem<EntryShow> | null; media: ReturnType<typeof entryVideoOf> }>({ entry: null, media: null });
   if (entryLook.entry !== entryNow)
-    setEntryLook({ entry: entryNow, media: entryNow && !settings.reduceMotion && !fxStage.now && !fxStage.next.length ? entryVideoOf(entryNow.show.fx) : null });
+    setEntryLook({ entry: entryNow, media: entryNow && !settings.reduceMotion && !fxStage.now && !fxStage.next.length ? entryClipOf(entryNow.show) : null });
   const entryMedia = entryLook.entry === entryNow ? entryLook.media : null;
   useLayoutEffect(() => {
     entryVideoOn.current = !!entryMedia;
@@ -4447,9 +4458,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       {visible && <WinBanner top={110} still={settings.reduceMotion} />}
       {entries.now &&
         (entryMedia ? (
-          // A video entry (Ejderha): the name banner over the full-screen clip, which ends the turn.
+          // A video entry (Ejderha): the name banner over the full-screen clip, which ends the turn; the team's own
+          // with a name plate (Yönetim › Mağaza) writes the name on the plate instead.
           <VideoFx key={entries.now.id} media={entryMedia} muted={fxMuted} onDone={nextEntry}>
-            <EntryEffect show={entries.now.show} />
+            {entries.now.show.plate ? <PlateName name={entries.now.show.name} plate={entries.now.show.plate} /> : <EntryEffect show={entries.now.show} />}
           </VideoFx>
         ) : (
           <EntryEffect key={entries.now.id} show={entries.now.show} still={settings.reduceMotion} onDone={nextEntry} />

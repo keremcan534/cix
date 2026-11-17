@@ -65,6 +65,9 @@ const KINDS = {
   // Yönetim › Emojiler (emoji.mjs), admins only: a sticker's picture, a transparent PNG or WebP or a Lottie animation
   // (its JSON, pictures inside it).
   stickerart: { types: ['image/png', 'image/webp', 'application/json'], max: 512 * 1024, admin: true },
+  // Yönetim › Mağaza (shop-items.mjs), admins only: a profile frame's picture, a transparent PNG or WebP drawn around
+  // the photo. An entry effect's video comes as a gift video does (giftvideo, giftsource).
+  shopframe: { types: ['image/png', 'image/webp'], max: 4 * 1024 * 1024, admin: true },
 };
 /** The largest file of a kind, in bytes; of one type of it when that type has its own (custom-gifts.mjs shows them). */
 export const kindMax = (kind, type) => KINDS[kind]?.typeMax?.[type] ?? KINDS[kind]?.max ?? 0;
@@ -147,7 +150,7 @@ const signed = (method, key, query = {}) =>
     expires: 60,
     query,
   });
-const FILE_KEY = /^(avatar|moment|dm|album|notice|music|ticket|roombg|roomcover|eventcover|gifticon|giftvideo|giftsource|stickerart)\/[0-9a-f-]{36}\/[A-Za-z0-9._-]{1,80}$/;
+const FILE_KEY = /^(avatar|moment|dm|album|notice|music|ticket|roombg|roomcover|eventcover|gifticon|giftvideo|giftsource|stickerart|shopframe)\/[0-9a-f-]{36}\/[A-Za-z0-9._-]{1,80}$/;
 
 /** The storage key of one of our files from its public address (kind/<uploader>/<name>), else null. With
  *  `owner`, only a file that person uploaded. */
