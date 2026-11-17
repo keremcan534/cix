@@ -10,10 +10,12 @@ import assert from 'node:assert/strict';
 
 import { COSMETICS, cosmeticById, setLiveCosmetics, shopCosmetics } from '@/data/catalog';
 import { fxFileName, parseFxList } from '@/lib/fx-videos-core';
-import { mergeShop, nineSlice, parseBubbleLook, parseLiveShop, parsePlate, parseWaveLook, plateLayout } from '@/lib/shop-live-core';
+import { PLATE_LOOK, mergeShop, nineSlice, parseBubbleLook, parseLiveShop, parsePlate, parseWaveLook, plateLayout, plateText, trUpper } from '@/lib/shop-live-core';
 
 const ART = 'https://130-61-230-94.sslip.io/api/media/f/shopframe/00000000-0000-4000-8000-000000000001/halka.png';
+/** A plate as a server before the plate's look and timing sends it, and as the phone reads it. */
 const PLATE = { x: 0.5, y: 0.7, w: 0.5, size: 0.04, color: '#FFD700', bold: true };
+const PLATE_READ = { ...PLATE, ...PLATE_LOOK };
 /** GET /api/catalog?shop=1 `shop` as shop-items.mjs builds it: the app's own in order, the team's own first. */
 const shopFromServer = () => ({
   items: [
@@ -55,7 +57,7 @@ describe('Mağaza: sunucunun listesi', () => {
     const compiled = COSMETICS.find((c) => c.id === 'fr-neon')!;
     assert.deepEqual([neon.name, neon.price, neon.days, neon.fx, neon.emoji], ['Neon Halka', 200, 14, compiled.fx, compiled.emoji], 'resmi ve animasyonu uygulamanın');
     const ejder = merged.find((c) => c.id === 'se1')!;
-    assert.deepEqual([ejder.kind, ejder.days, ejder.minVip, ejder.remote], ['entry', null, 3, { video: true, plate: PLATE }]);
+    assert.deepEqual([ejder.kind, ejder.days, ejder.minVip, ejder.remote], ['entry', null, 3, { video: true, plate: PLATE_READ }]);
     assert.equal(merged.find((c) => c.id === 'en-dragon')!.retired, undefined, 'satışta');
     assert.equal(merged.find((c) => c.id === 'en-sparkle')!.retired, true, 'satışta değil');
     // The kinds the server didn't list stay as compiled, all of them, each kind in its order.
@@ -85,17 +87,51 @@ describe('Mağaza: sunucunun listesi', () => {
   });
 
   test('isim plakası videonun ekrandaki yerine oturur; uzun ad küçülür, kısa ad plakanın boyunda kalır', () => {
-    assert.deepEqual(parsePlate({ ...PLATE, bold: undefined }), { ...PLATE, bold: true });
+    assert.deepEqual(parsePlate({ ...PLATE, bold: undefined }), { ...PLATE_READ, bold: true });
     assert.equal(parsePlate({ ...PLATE, w: 2 }), null);
     // A 412 × 915 phone: the 540 × 960 clip fits its width (412 × 732), centred with 91.5 above and below.
-    const short = plateLayout(PLATE, 'KaaN', 412, 915);
+    const short = plateLayout(PLATE_READ, 'KaaN', 412, 915);
     assert.equal(Math.round(short.cx), 206);
     assert.equal(Math.round(short.cy), Math.round(91.5 + 0.7 * 732.44));
     assert.equal(Math.round(short.width), 206);
     assert.equal(Math.round(short.fontSize * 100) / 100, Math.round(0.04 * 732.44 * 100) / 100, 'kısa ad plakanın yazı boyunda');
-    const long = plateLayout(PLATE, 'Kraliçe Ayşegül Yıldırım', 412, 915);
+    const long = plateLayout(PLATE_READ, 'Kraliçe Ayşegül Yıldırım', 412, 915);
     assert.ok(long.fontSize < short.fontSize, 'uzun ad küçülür');
     assert.ok(long.fontSize * 24 * 0.62 <= long.width + 0.01, 'plakaya sığar');
+  });
+
+  test('yazının görünüşü ve zamanı okunur; eksik ya da bozuk alan olağan haline döner, ad yine yazılır', () => {
+    const full = { ...PLATE, show: false, upper: true, spacing: 0.1, shadow: { color: '#ff00ff', size: 0.4 }, outline: { color: '#000000', size: 0.08 }, back: { color: '#111827', alpha: 0.5 }, from: 1.2, to: 3, anim: 'zoom' };
+    assert.deepEqual(parsePlate(full), { ...full, shadow: { color: '#FF00FF', size: 0.4 } });
+    // A plate from before (place, size, colour): written, soft shadow, the whole clip, at once.
+    assert.deepEqual(parsePlate(PLATE), PLATE_READ);
+    assert.equal(parsePlate({ ...PLATE, shadow: null })!.shadow, null, 'gölgesiz');
+    // Malformed parts fall back one by one.
+    const odd = { spacing: 3, shadow: { color: 'mor', size: 0.3 }, outline: { color: '#000000', size: 1 }, back: { color: '#000000' }, from: -1, to: 99, anim: 'spin', upper: 'evet', show: 'hayır' };
+    assert.deepEqual(parsePlate({ ...PLATE, ...odd }), PLATE_READ);
+    assert.equal(parsePlate({ ...PLATE, from: 2, to: 1 })!.to, 0, 'gelmeden gitmez: video bitene kadar');
+    // Capitals the Turkish way, whatever the phone's language; capitals and room between letters make a long name smaller.
+    assert.equal(trUpper('kerim ılgaz şişli'), 'KERİM ILGAZ ŞİŞLİ');
+    assert.equal(plateText({ ...PLATE_READ, upper: true }, 'iğdır'), 'İĞDIR');
+    assert.equal(plateText(PLATE_READ, 'iğdır'), 'iğdır');
+    const plain = plateLayout(PLATE_READ, 'Kraliçe Ayşegül', 412, 915).fontSize;
+    assert.ok(plateLayout({ ...PLATE_READ, upper: true, spacing: 0.2 }, 'KRALİÇE AYŞEGÜL', 412, 915).fontSize < plain);
+  });
+
+  test('ekibin giriş efektinin ikonu mağazaya gelir; bozuk adres ve uygulamanın eşyasındaki ikon yok sayılır', () => {
+    const ICON = 'https://130-61-230-94.sslip.io/api/media/f/shopframe/00000000-0000-4000-8000-000000000009/ikon.png';
+    const shop = parseLiveShop({
+      items: [
+        { sku: 'se5', kind: 'entry', name: 'İkonlu', price: 10, days: 30, minVip: 0, video: true, plate: PLATE, icon: { url: ICON } },
+        { sku: 'se6', kind: 'entry', name: 'Kötü ikon', price: 10, days: 30, minVip: 0, video: true, plate: PLATE, icon: { url: 'javascript:alert(1)' } },
+        { sku: 'en-dragon', kind: 'entry', name: 'Ejderha', price: 3000, days: 30, minVip: 7, builtin: true, icon: { url: ICON } },
+      ],
+    })!;
+    assert.deepEqual(shop.items.map((x) => [x.sku, x.icon]), [['se5', { url: ICON }], ['se6', undefined], ['en-dragon', undefined]]);
+    assert.deepEqual(parseLiveShop(JSON.parse(JSON.stringify(shop))), shop, 'telefondaki kopya aynı okunur');
+    const merged = mergeShop(COSMETICS, shop);
+    assert.deepEqual(merged.find((c) => c.id === 'se5')!.remote, { video: true, plate: PLATE_READ, icon: { url: ICON } });
+    assert.equal(merged.find((c) => c.id === 'en-dragon')!.remote, undefined);
   });
 });
 

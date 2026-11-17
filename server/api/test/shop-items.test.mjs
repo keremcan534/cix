@@ -14,6 +14,7 @@ import path from 'node:path';
 
 import { SHOP } from '../catalog.mjs';
 import { convertArgs } from '../custom-gifts.mjs';
+import { PLATE_DEFAULT } from '../shop-items.mjs';
 import { startApi } from './harness.mjs';
 import { bucketEnv, png, standInBucket } from './stand-in-bucket.mjs';
 
@@ -196,9 +197,11 @@ describe('Yönetim › Mağaza', () => {
     const plate = { x: 0.5, y: 0.7, w: 0.55, size: 0.04, color: '#ffd700', bold: true };
     const e = (await ok(post('', { kind: 'entry', name: 'Altın Ejderha', price: 5000, days: 0, minVip: 3, video, plate }), 'giriş ekle')).item;
     assert.match(e.id, /^se[0-9]+$/);
-    assert.deepEqual([e.days, e.minVip, e.plate], [null, 3, { ...plate, color: '#FFD700' }]);
+    // A plate with only its place and size gets the usual look: written, soft shadow, the whole clip.
+    const saved = { ...PLATE_DEFAULT, ...plate, color: '#FFD700' };
+    assert.deepEqual([e.days, e.minVip, e.plate, e.icon], [null, 3, saved, null]);
     const c = await catalog();
-    assert.deepEqual(c.shop.items.find((x) => x.sku === e.id), { sku: e.id, kind: 'entry', name: 'Altın Ejderha', price: 5000, days: null, minVip: 3, video: true, plate: { ...plate, color: '#FFD700' } });
+    assert.deepEqual(c.shop.items.find((x) => x.sku === e.id), { sku: e.id, kind: 'entry', name: 'Altın Ejderha', price: 5000, days: null, minVip: 3, video: true, plate: saved });
     const fx = c.fx.find((x) => x.kind === 'entry' && x.id === e.id);
     assert.match(fx.url, new RegExp(`^/api/fx/s/${e.id}\\.mp4\\?v=[0-9a-f]{12}$`));
     const res = await fetch(`${h.base}${fx.url}`);
@@ -221,6 +224,43 @@ describe('Yönetim › Mağaza', () => {
     assert.deepEqual((await catalog()).shop.items.filter((x) => x.kind === 'entry').map((x) => x.sku), [...entries].reverse());
   });
 
+  test('giriş efektinin yazısı: yazılsın ya da yazılmasın, büyük harf, gölge, kontur, arka plan, zamanı; mağaza ikonu', { skip: NO_FFMPEG }, async () => {
+    await freshAdmin();
+    const video = { kind: 'stacked', url: await upload(admin, 'giftvideo', fs.readFileSync(files.stacked), 'video/mp4') };
+    const base = { x: 0.5, y: 0.6, w: 0.6, size: 0.04, color: '#FFFFFF' };
+    const add = (more) => post('', { kind: 'entry', name: 'Parlak Giriş', price: 800, days: 30, video, ...more });
+    await refused(add({ plate: { ...base, outline: { color: 'siyah', size: 0.05 } } }), 400, /kontur rengi/);
+    await refused(add({ plate: { ...base, shadow: { color: '#FF00FF', size: 2 } } }), 400, /gölge %2–%60/);
+    await refused(add({ plate: { ...base, back: { color: '#000000', alpha: 0 } } }), 400, /arka plan/);
+    await refused(add({ plate: { ...base, from: 3, to: 3.2 } }), 400, /yarım saniye/);
+    await refused(add({ plate: { ...base, from: 21 } }), 400, /0–20 saniye/);
+    await refused(add({ plate: { ...base, anim: 'spin' } }), 400, /belirme/);
+    await refused(add({ plate: { ...base, show: 'hayır' } }), 400, /ad yazılsın/);
+    // The icon: a PNG or WebP of a size the shop can draw; only an entry effect has one.
+    await refused(add({ icon: await upload(admin, 'shopframe', png(40, 40), 'image/png') }), 400, /İkon her yönde 64–1024/);
+    await refused(post('', { kind: 'bubble', name: 'İkonlu Balon', price: 100, days: 7, icon: await upload(admin, 'shopframe', png(128, 128), 'image/png') }), 400, /ikon yalnız giriş efektine/);
+
+    const icon = await upload(admin, 'shopframe', png(192, 192), 'image/png');
+    const look = { ...base, upper: true, spacing: 0.08, shadow: { color: '#ff00ff', size: 0.35 }, outline: { color: '#000000', size: 0.06 }, back: { color: '#111827', alpha: 0.55 }, from: 0.8, to: 2.5, anim: 'zoom' };
+    const e = (await ok(add({ plate: look, icon }), 'ekle')).item;
+    const want = { ...look, bold: true, show: true, shadow: { color: '#FF00FF', size: 0.35 } };
+    assert.deepEqual([e.plate, e.icon], [want, { url: icon, px: 192 }]);
+    assert.deepEqual(await inCatalog(e.id), { sku: e.id, kind: 'entry', name: 'Parlak Giriş', price: 800, days: 30, minVip: 0, video: true, plate: want, icon: { url: icon } });
+
+    // No name over the clip: the plate keeps its place and look for when it is written again.
+    const off = (await ok(post('/update', { id: e.id, plate: { ...want, show: false } }), 'yazısız')).item;
+    assert.deepEqual(off.plate, { ...want, show: false });
+    // A new icon replaces the old one; null takes it away and the shop shows the banner alone.
+    const icon2 = await upload(admin, 'shopframe', png(128, 128), 'image/png');
+    assert.deepEqual((await ok(post('/update', { id: e.id, icon: icon2 }), 'yeni ikon')).item.icon, { url: icon2, px: 128 });
+    assert.equal((await ok(post('/update', { id: e.id, icon: null }), 'ikonsuz')).item.icon, null);
+    assert.equal((await inCatalog(e.id)).icon, undefined);
+    // The app's own entry effects keep the app's pictures.
+    await refused(post('/update', { id: 'en-dragon', icon }), 400, /görseli buradan değişmez/);
+    const audit = (await h.sql.query("SELECT detail FROM audit_events WHERE action = 'shop.update' ORDER BY id DESC LIMIT 1")).rows[0].detail;
+    assert.deepEqual([audit.before.icon_url, audit.after.icon_url], [icon2, null]);
+  });
+
   test('kaynak videodan giriş efekti sunucuda çevrilir (hediyelerle aynı çevirici)', { skip: NO_FFMPEG }, async () => {
     await freshAdmin();
     const source = await upload(admin, 'giftsource', fs.readFileSync(files.source), 'video/webm');
@@ -230,7 +270,7 @@ describe('Yönetim › Mağaza', () => {
     const done = await settled(e.id);
     assert.equal(done.job, null, JSON.stringify(done.job));
     assert.ok(done.video?.bytes > 0);
-    assert.deepEqual(done.plate, { x: 0.5, y: 0.62, w: 0.6, size: 0.035, color: '#FFFFFF', bold: true }, 'plakası olmayana varsayılan');
+    assert.deepEqual(done.plate, { ...PLATE_DEFAULT }, 'plakası olmayana varsayılan');
     const audit = (await h.sql.query("SELECT detail FROM audit_events WHERE action = 'shop.video_ready'")).rows;
     assert.equal(audit.at(-1).detail.shop, e.id);
     // Nobody has it: it can be deleted, and is gone from the shop and the videos.

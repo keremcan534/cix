@@ -25,7 +25,12 @@ Dört sekme var: **Giriş efektleri**, **Çerçeveler**, **Sohbet balonları** v
 - **Yeni giriş efekti:**
   - **Video:** hazır yığılmış MP4, ya da saydam WebM, ProRes 4444 .mov veya SVGA. Bunları uygulamanın sunucusu hediyelerdeki gibi telefon videosuna çevirir. Çevrilene kadar eski video oynar.
   - **İsim plakası:** odaya girenin adının yazılacağı yer. Ayarlar: yatay ve dikey yer, genişlik, yazı boyu, renk, kalın.
-  - **Önizleme:** videonun üstünde örnek bir adla gösterilir.
+    - **Ad yazılsın:** kapatılırsa telefon videonun üstüne ad yazmaz, yalnız video oynar. Plakanın ayarları saklanır; yeniden açılınca aynı yerde çıkar.
+    - **Yer değiştirme:** ad önizlemede sürüklenerek taşınır; sağ alt köşedeki tutamaçla plaka genişler ve yazı büyür. Ok tuşları ince ayar yapar (Shift ile daha büyük adım). Kaydırıcılar da durur.
+    - **Yazının görünüşü:** büyük harf (Türkçe kurala göre: i → İ), harf aralığı, gölge ya da parlama (renk ve yayılma), kontur (renk ve kalınlık), adın arkasında yuvarlak bir bant (renk ve saydamlık).
+    - **Zamanı:** ad videonun kaçıncı saniyesinde görünür ve kaçıncı saniyesinde kaybolur (0: video bitene kadar). Görünme şekli: hemen, solarak, büyüyerek ya da yükselerek. "Hareketi azalt" açık telefonda büyüme ve yükselme yerine solarak gelir.
+  - **İkon (isteğe bağlı):** mağazada efektin bandının üstünde görünen resim. PNG ya da WebP, her yönde 64–1024 px, en çok 512 KB. Kare ve 192 px önerilir. Yoksa yalnız bant görünür.
+  - **Önizleme:** videonun üstünde örnek bir adla gösterilir. Oynat / durdur, baştan oynat, döngü, ses ve zaman çubuğu vardır. Video istenen anda durdurulup ad yerleştirilebilir; "Şu andan görünsün" ve "Şu anda kaybolsun" düğmeleri zamanı o ana koyar.
   - **Uzun ad:** plakaya sığacak kadar küçülür, tek satır kalır.
 - **Yeni sohbet balonu:**
   - **Renkler:** iki renk (soldan sağa geçiş; tek renk için ikisi aynı) ve yazı rengi.
@@ -63,6 +68,7 @@ Dört sekme var: **Giriş efektleri**, **Çerçeveler**, **Sohbet balonları** v
   - Gösterdiği fiyat ve günle satın alır. Fiyat ya da gün arada değiştiyse alım reddedilir, jeton düşmez.
   - Sizin çerçevenizi fotoğrafın çevresine çizer.
   - Sizin giriş efektinizin videosunu indirir ve odaya girenin adını plakaya yazar. Video henüz telefonda değilse ya da "hareketi azalt" açıksa alışılmış giriş bandı çıkar.
+  - Yazının görünüşünü (büyük harf, harf aralığı, gölge, kontur, bant) ve zamanını panelden okur. "Ad yazılsın" kapalıysa yalnız video oynar. Mağazada efektin ikonunu gösterir.
   - Sizin sohbet balonunuzu odadaki sohbette çizer: renkleriyle ya da resmiyle, köşeler bozulmadan.
   - Sizin ses dalganızı konuşanın koltuğunda çizer; dalga sese göre büyür.
 - **Eski APK'lar:**
@@ -70,10 +76,12 @@ Dört sekme var: **Giriş efektleri**, **Çerçeveler**, **Sohbet balonları** v
   - Panelde fiyatı ya da süresi değişmiş bir eşyayı alamaz, "uygulamayı güncelle" görür. Satıştan kaldırılmış eşya için "artık satışta değil" görür.
   - Sizin eklediğiniz eşyaları göremez. Onları takan birini görünce çerçeve, giriş efekti, balon ya da dalga çizmez; düz halini gösterir.
   - Çerçeve ve giriş efektiyle çıkan APK (preview-172) balon ve dalga satırlarını atlar; kendi balonlarını ve dalgalarını gösterir.
+  - Yazı ayarlarından önceki APK'lar adı plakanın yerine, boyunda, renginde ve kalınlığında yazar. "Ad yazılsın" kapalı olsa da adı yazar. Büyük harf, harf aralığı, gölge, kontur, bant ve zamanı bilmez. İkonu göstermez.
 
 ## Teknik
 
-- **Tablo:** `076_shop_items`, `077_shop_bubbles_waves` (balon ve dalga; görünüş `look` sütununda).
+- **Tablo:** `076_shop_items`, `077_shop_bubbles_waves` (balon ve dalga; görünüş `look` sütununda), `078_shop_entry_icons` (giriş efektinin ikonu, `icon_url`).
+- **İsim plakası (`plate`):** `x`, `y`, `w`, `size`, `color`, `bold`; yeni alanlar `show`, `upper`, `spacing`, `shadow` (`{ color, size }` ya da `null`), `outline` (`{ color, size }` ya da `null`), `back` (`{ color, alpha }` ya da `null`), `from`, `to` (saniye), `anim` (`none` / `fade` / `zoom` / `rise`). Gönderilmeyen alan varsayılanını alır (`PLATE_DEFAULT`); eski kayıtlarda olmayan alanları telefon ve panel varsayılanla okur.
 - **Sunucu:**
   - `shop-items.mjs`: panel uçları ve telefonlara giden liste (`GET /api/catalog?shop=1` `shop`).
   - Giriş efekti videoları `/api/fx/s/<id>.mp4` adresinden ve katalogun `fx` listesinden gelir.

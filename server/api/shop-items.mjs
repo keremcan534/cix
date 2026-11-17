@@ -9,9 +9,12 @@
 //   - a frame: its picture, a transparent PNG or WebP (media.mjs shopframe), square, its empty centre's radius as a
 //     share of its width (`hole`) so the photo sits inside it;
 //   - an entry effect: its video, a ready stacked MP4 or a transparent source (WebM, ProRes .mov, SVGA) the server
-//     turns into one, as a gift's (custom-gifts.mjs videoOf and its job), and its name plate (`plate`): where the
+//     turns into one, as a gift's (custom-gifts.mjs videoOf and its job), its name plate (`plate`): where the
 //     entering person's name is written over it, as shares of the 540 × 960 frame (x, y: the centre; w: the widest
-//     the name may be, a long one is drawn smaller; size: the letters' height; colour; bold);
+//     the name may be, a long one is drawn smaller; size: the letters' height; colour; bold), how it looks and when
+//     it shows (plateOf: written or not, capitals, letter spacing, shadow or glow, outline, a band behind it, the
+//     seconds of the clip it shows between and how it comes in), and an icon (`icon_*`, 078): the picture the shop
+//     shows for it;
 //   - a chat bubble: its look (`look`): two colours (left to right) and the text's colour, and a picture if it has one
 //     (art_*, a PNG or WebP drawn as a nine-slice: `look.slice` has its size and how far in from each edge its corners
 //     go, kept as they are while the middle stretches round the message);
@@ -20,9 +23,9 @@
 // Every picture is uploaded as a shop picture (media.mjs shopframe) and checked here for its use.
 //
 //   GET  /api/admin/shop                                   → { items, limits, storage, convert, svga }
-//   POST /api/admin/shop        { kind, name, price, days, minVip?, enabled?, art?, hole?, video?, plate?, look? } → { item }
-//   POST /api/admin/shop/update { id, name?, price?, days?, minVip?, enabled?, art?, hole?, video?, plate?, look? } → { item }
-//        (a bubble's or wave's art: null takes its picture away)
+//   POST /api/admin/shop        { kind, name, price, days, minVip?, enabled?, art?, hole?, video?, plate?, look?, icon? } → { item }
+//   POST /api/admin/shop/update { id, name?, price?, days?, minVip?, enabled?, art?, hole?, video?, plate?, look?, icon? } → { item }
+//        (a bubble's or wave's art: null takes its picture away; an entry effect's icon: null takes it away)
 //        (an app's own item: name, price, days, minVip and enabled only)
 //   POST /api/admin/shop/reset  { id, fields? }   an app's item back to the app's values → { item }
 //        (fields: any of name, price, days, minVip, enabled, sort; none: all but its place)
@@ -32,9 +35,10 @@
 //
 // What the phones get: GET /api/catalog?shop=1 → `shop: { items }` (shopCatalog): every frame, entry effect, chat bubble
 // and voice wave as it is now, in order; one taken off the shelf has `off: true` (whoever has it still wears it and
-// others still see it); an admin's frame its `art` ({ url, hole }), an admin's entry effect `video: true` and its
-// `plate`, its clip listed in the catalog's `fx` as entry <id> (served at /api/fx/s/<id>.mp4), an admin's bubble or
-// wave its `look`. The app that first read this list (frames and entry effects) skips the other kinds. The catalog's and /api/config's `v` add
+// others still see it); an admin's frame its `art` ({ url, hole }), an admin's entry effect `video: true`, its
+// `plate` and its `icon` ({ url }) if it has one, its clip listed in the catalog's `fx` as entry <id> (served at
+// /api/fx/s/<id>.mp4), an admin's bubble or wave its `look`. An older app reads the plate's place, size, colour and
+// boldness only (it writes the name even when `show` is false) and shows no icon. The app that first read this list (frames and entry effects) skips the other kinds. The catalog's and /api/config's `v` add
 // shopItemsRev(). The shop sells at the price, days and VIP level set here (economy.mjs sellable). An older app never
 // asks: it shows its compiled shop and buys by the app's names and prices, refused (update_required, nothing taken)
 // when an item's price or days moved; it draws nothing for an admin's item someone wears.
@@ -72,8 +76,31 @@ export const LOOK_DEFAULT = Object.freeze({
   bubble: Object.freeze({ colors: Object.freeze(['#7C3AED', '#EC4899']), text: '#FFFFFF' }),
   wave: Object.freeze({ style: 'ring', colors: Object.freeze(['#3D9BFF']) }),
 });
-/** The plate a new entry effect gets until the panel moves it: centred, a little below the middle, white. */
-export const PLATE_DEFAULT = Object.freeze({ x: 0.5, y: 0.62, w: 0.6, size: 0.035, color: '#FFFFFF', bold: true });
+/** How the name may come in and go (`plate.anim`): at once, fading, growing, rising. */
+export const PLATE_ANIMS = Object.freeze(['none', 'fade', 'zoom', 'rise']);
+/** The soft dark shadow round the letters a plate has unless the panel changes it (the app drew it before it could). */
+const PLATE_SHADOW = Object.freeze({ color: '#000000', size: 0.1 });
+/**
+ * The plate a new entry effect gets until the panel moves it: centred, a little below the middle, white, bold, with
+ * its soft shadow, for the whole clip.
+ */
+export const PLATE_DEFAULT = Object.freeze({
+  x: 0.5,
+  y: 0.62,
+  w: 0.6,
+  size: 0.035,
+  color: '#FFFFFF',
+  bold: true,
+  show: true,
+  upper: false,
+  spacing: 0,
+  shadow: PLATE_SHADOW,
+  outline: null,
+  back: null,
+  from: 0,
+  to: 0,
+  anim: 'none',
+});
 /** The rules the panel shows and every save checks. */
 export const SHOP_LIMITS = Object.freeze({
   nameMin: 2,
@@ -87,7 +114,26 @@ export const SHOP_LIMITS = Object.freeze({
   holeMin: 0.1,
   holeMax: 0.45,
   holeDefault: 0.25,
-  plate: Object.freeze({ wMin: 0.1, wMax: 1, sizeMin: 0.015, sizeMax: 0.08 }),
+  // The name plate: its width and letters as shares of the frame; letter spacing, shadow and outline as shares of the
+  // letters' size; a band's opacity; the seconds of the clip it shows between.
+  plate: Object.freeze({
+    wMin: 0.1,
+    wMax: 1,
+    sizeMin: 0.015,
+    sizeMax: 0.08,
+    spacingMax: 0.4,
+    shadowMin: 0.02,
+    shadowMax: 0.6,
+    outlineMin: 0.02,
+    outlineMax: 0.15,
+    backMin: 0.1,
+    secondsMax: 20,
+    anims: PLATE_ANIMS,
+  }),
+  // An entry effect's icon in the shop: a PNG or WebP, drawn small.
+  iconBytes: 512 * 1024,
+  iconPxMin: 64,
+  iconPxMax: 1024,
   // A bubble's picture: drawn at a third of its size (made at 3×, as a phone's screen), its corners as they are.
   bubbleBytes: 1024 * 1024,
   bubblePxMin: 64,
@@ -126,6 +172,7 @@ const rowOf = (r) =>
     video: r.video_url ? Object.freeze({ url: r.video_url, bytes: num(r.video_bytes), ms: num(r.video_ms), v: r.video_v }) : null,
     plate: r.plate ?? null,
     look: r.look ?? null,
+    icon: r.icon_url ? Object.freeze({ url: r.icon_url, px: num(r.icon_px) }) : null,
     job: r.job_status ? Object.freeze({ status: r.job_status, error: r.job_error ?? null, preview: r.job_preview ?? null }) : null,
     deleted: !!r.deleted_at,
     updatedAt: r.updated_at,
@@ -185,6 +232,7 @@ const appItemOf = (base, o) =>
     video: null,
     plate: null,
     look: null,
+    icon: null,
     job: null,
     row: o ?? null,
   });
@@ -204,6 +252,7 @@ const ownItemOf = (r) =>
     video: r.video,
     plate: r.plate,
     look: r.look,
+    icon: r.icon,
     job: r.job,
     row: r,
   });
@@ -232,8 +281,8 @@ function lookOut(x) {
 }
 /**
  * GET /api/catalog `shop` (?shop=1): every item in its order as it is now; `off` for one taken off the shelf; an
- * admin's frame its picture, an admin's entry effect that it has a video (in `fx`) and its plate, an admin's bubble or
- * wave its look.
+ * admin's frame its picture, an admin's entry effect that it has a video (in `fx`), its plate and its icon, an admin's
+ * bubble or wave its look.
  */
 export function shopCatalog() {
   return {
@@ -247,7 +296,7 @@ export function shopCatalog() {
       ...(x.builtin ? { builtin: true } : {}),
       ...(x.enabled ? {} : { off: true }),
       ...(x.kind === 'frame' && x.art ? { art: { url: x.art.url, hole: x.art.hole } } : {}),
-      ...(x.kind === 'entry' && x.video ? { video: true, plate: x.plate } : {}),
+      ...(x.kind === 'entry' && x.video ? { video: true, plate: x.plate, ...(x.icon ? { icon: { url: x.icon.url } } : {}) } : {}),
       ...(!x.builtin && x.look && (x.kind === 'bubble' || x.kind === 'wave') ? { look: lookOut(x) } : {}),
     })),
   };
@@ -305,22 +354,68 @@ const holeOf = (v) => {
   if (!Number.isFinite(n) || n < SHOP_LIMITS.holeMin || n > SHOP_LIMITS.holeMax) throw bad(`Fotoğraf alanı resmin %${SHOP_LIMITS.holeMin * 100}–%${SHOP_LIMITS.holeMax * 100}'i olmalı`);
   return Math.round(n * 1000) / 1000;
 };
-/** The name plate: shares of the 540 × 960 frame, a colour and bold or not; null: none (the app's usual banner). */
+/**
+ * The name plate: shares of the 540 × 960 frame, a colour and bold or not; null: none (the app's usual banner). Its
+ * look and timing, each with a default when left out: `show` (false: no name over the clip), `upper` (capitals),
+ * `spacing` (between the letters), `shadow` (a soft shadow or a glow round the letters: its colour and reach; null:
+ * none), `outline` (a line round them: its colour and width), the reaches and widths as shares of the letters' size,
+ * `back` (a rounded band behind the name: its colour and opacity), `from` / `to` (the seconds of the clip the name
+ * shows between; `to` 0: until the clip ends) and `anim` (how it comes in and goes, PLATE_ANIMS).
+ */
 export function plateOf(v) {
   if (v === undefined) return undefined;
   if (v === null) return null;
   const o = v && typeof v === 'object' && !Array.isArray(v) ? v : null;
   if (!o) throw bad('İsim plakası geçersiz');
   const P = SHOP_LIMITS.plate;
-  const share = (k, min, max, what) => {
-    const n = Number(o[k]);
+  const shareOf = (val, min, max, what) => {
+    const n = Number(val);
     if (!Number.isFinite(n) || n < min || n > max) throw bad(`İsim plakası: ${what} %${Math.round(min * 1000) / 10}–%${Math.round(max * 1000) / 10} olmalı`);
     return Math.round(n * 1000) / 1000;
   };
-  const color = typeof o.color === 'string' && /^#[0-9A-Fa-f]{6}$/.test(o.color) ? o.color.toUpperCase() : null;
-  if (!color) throw bad('İsim plakası: renk #RRGGBB biçiminde olmalı');
+  const share = (k, min, max, what) => shareOf(o[k], min, max, what);
+  const colorIn = (c, what) => {
+    if (typeof c === 'string' && /^#[0-9A-Fa-f]{6}$/.test(c)) return c.toUpperCase();
+    throw bad(`İsim plakası: ${what} #RRGGBB biçiminde olmalı`);
+  };
+  const flag = (k, d, what) => {
+    if (o[k] === undefined) return d;
+    if (typeof o[k] !== 'boolean') throw bad(`İsim plakası: ${what} seçimi geçersiz`);
+    return o[k];
+  };
+  /** A colour and how much of it (`size` or a band's `alpha`); null: none; left out: `d`. */
+  const paint = (k, amount, min, max, d, what) => {
+    if (o[k] === undefined) return d && { ...d };
+    if (o[k] === null) return null;
+    const p = o[k] && typeof o[k] === 'object' && !Array.isArray(o[k]) ? o[k] : null;
+    if (!p) throw bad(`İsim plakası: ${what} geçersiz`);
+    return { color: colorIn(p.color, `${what} rengi`), [amount]: shareOf(p[amount], min, max, what) };
+  };
+  const seconds = (k, what) => {
+    if (o[k] === undefined) return 0;
+    if (typeof o[k] !== 'number' || !Number.isFinite(o[k]) || o[k] < 0 || o[k] > P.secondsMax) throw bad(`İsim plakası: ${what} 0–${P.secondsMax} saniye olmalı`);
+    return Math.round(o[k] * 10) / 10;
+  };
+  const color = colorIn(o.color, 'renk');
   if (o.bold !== undefined && typeof o.bold !== 'boolean') throw bad('İsim plakası: kalın yazı seçimi geçersiz');
-  return { x: share('x', 0, 1, 'yatay yer'), y: share('y', 0, 1, 'dikey yer'), w: share('w', P.wMin, P.wMax, 'genişlik'), size: share('size', P.sizeMin, P.sizeMax, 'yazı boyu'), color, bold: o.bold !== false };
+  const plate = { x: share('x', 0, 1, 'yatay yer'), y: share('y', 0, 1, 'dikey yer'), w: share('w', P.wMin, P.wMax, 'genişlik'), size: share('size', P.sizeMin, P.sizeMax, 'yazı boyu'), color, bold: o.bold !== false };
+  const from = seconds('from', 'görünme anı');
+  const to = seconds('to', 'kaybolma anı');
+  if (to && to < from + 0.5) throw bad('İsim plakası: kaybolma anı görünme anından en az yarım saniye sonra olmalı (0: video bitene kadar)');
+  const anim = o.anim === undefined ? 'none' : PLATE_ANIMS.includes(o.anim) ? o.anim : null;
+  if (!anim) throw bad('İsim plakası: belirme şekli geçersiz');
+  return {
+    ...plate,
+    show: flag('show', true, 'ad yazılsın'),
+    upper: flag('upper', false, 'büyük harf'),
+    spacing: o.spacing === undefined ? 0 : share('spacing', 0, P.spacingMax, 'harf aralığı'),
+    shadow: paint('shadow', 'size', P.shadowMin, P.shadowMax, PLATE_SHADOW, 'gölge'),
+    outline: paint('outline', 'size', P.outlineMin, P.outlineMax, null, 'kontur'),
+    back: paint('back', 'alpha', P.backMin, 1, null, 'arka plan'),
+    from,
+    to,
+    anim,
+  };
 }
 /** A shop picture (uploaded as media.mjs shopframe), read and measured: a PNG or WebP of at most `max` bytes. */
 async function pictureOf(url, what, max) {
@@ -345,6 +440,13 @@ async function bubbleArt(url) {
   const { bubblePxMin: lo, bubblePxMax: hi } = SHOP_LIMITS;
   if (info.width < lo || info.height < lo || info.width > hi || info.height > hi) throw bad(`Balon resmi her yönde ${lo}–${hi} piksel olmalı (bu ${info.width} × ${info.height})`);
   return { url, px: info.width, w: info.width, h: info.height };
+}
+/** An entry effect's icon in the shop: a PNG or WebP, 64–1024 px each way, up to 512 KB. */
+async function iconArt(url) {
+  const info = await pictureOf(url, 'İkon resmini', SHOP_LIMITS.iconBytes);
+  const { iconPxMin: lo, iconPxMax: hi } = SHOP_LIMITS;
+  if (info.width < lo || info.height < lo || info.width > hi || info.height > hi) throw bad(`İkon her yönde ${lo}–${hi} piksel olmalı (bu ${info.width} × ${info.height})`);
+  return { url, px: info.width };
 }
 /** A wave's spark picture: a transparent PNG or WebP, 64–512 px, up to 512 KB. */
 async function sparkArt(url) {
@@ -486,6 +588,7 @@ function itemView(x, owned) {
     video: x.video ? { url: fxUrl(x.sku, x.video.v), bytes: x.video.bytes, ms: x.video.ms } : null,
     plate: x.plate,
     look: x.look,
+    icon: x.icon ? { url: x.icon.url, px: x.icon.px } : null,
     job: x.job,
     ...(base ? { original: { name: base.name, price: base.price, days: base.days, minVip: base.minVip, enabled: !SHOP_PAUSED.has(base.sku) }, changed: changedOf(x.row) } : {}),
     updatedAt: x.row?.updatedAt ?? null,
@@ -532,7 +635,9 @@ export const shopRoutes = {
     let video = null;
     let plate = null;
     let look = null;
+    let icon = null;
     if (kind !== 'bubble' && kind !== 'wave' && b.look !== undefined) throw bad(`${KIND_NAME[kind]} için renk ve stil buradan değil, resmiyle ya da videosuyla gelir`);
+    if (kind !== 'entry' && b.icon !== undefined && b.icon !== null) throw bad(`${KIND_NAME[kind]} mağazada kendi görünüşüyle durur; ikon yalnız giriş efektine eklenir`);
     if (kind === 'frame') {
       if (b.video !== undefined || b.plate !== undefined) throw bad('Çerçevenin videosu ya da isim plakası olmaz');
       art = await frameArt(b.art);
@@ -542,6 +647,7 @@ export const shopRoutes = {
       video = await videoOf(b.video ?? null);
       if (!video) throw bad('Giriş efektinin videosunu önce yükle');
       plate = plateOf(b.plate === undefined ? PLATE_DEFAULT : b.plate);
+      if (b.icon !== undefined && b.icon !== null) icon = await iconArt(b.icon);
     } else {
       if (b.video !== undefined || b.plate !== undefined || b.hole !== undefined) throw bad(`${KIND_NAME[kind]} için video, isim plakası ya da fotoğraf alanı olmaz`);
       ({ look, art } = await lookAndArt(kind, b.look, b.art ?? null, null));
@@ -553,11 +659,11 @@ export const shopRoutes = {
         const id = `${PREFIX[kind]}${(await c.query("SELECT nextval('shop_item_no') AS n")).rows[0].n}`;
         const r = await c.query(
           `INSERT INTO shop_items (id, kind, name, price, days, min_vip, enabled, sort, art_url, art_px, hole, video_url, video_bytes, video_ms, video_v, plate,
-                                   job_status, job_source, job_fill, job_opaque, look, created_by, updated_by)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $22) RETURNING *`,
+                                   job_status, job_source, job_fill, job_opaque, look, icon_url, icon_px, created_by, updated_by)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $24) RETURNING *`,
           [id, kind, name, price, days, minVip, enabled, firstSort(kind), art?.url ?? null, art?.px ?? null, hole, stacked?.url ?? null, stacked?.bytes ?? null, stacked?.ms ?? null,
             stacked?.v ?? null, plate ? JSON.stringify(plate) : null, source ? 'processing' : null, source?.url ?? null, source?.fill ?? null, source?.opaque === true,
-            look ? JSON.stringify(look) : null, a.id],
+            look ? JSON.stringify(look) : null, icon?.url ?? null, icon?.px ?? null, a.id],
         );
         await audited(c, a, 'shop.create', { item: id, before: null, after: auditOf(r.rows[0]) }, req);
         return id;
@@ -586,7 +692,9 @@ export const shopRoutes = {
     if (b.enabled !== undefined) cols.enabled = boolOf(b.enabled, 'Açık / kapalı');
     const drop = [];
     if (cur.builtin) {
-      if (['art', 'hole', 'video', 'plate', 'look'].some((k) => b[k] !== undefined)) throw bad('Uygulamanın kendi eşyasının görseli buradan değişmez; yeni görselle kendi eşyanı ekle');
+      if (['art', 'hole', 'video', 'plate', 'look', 'icon'].some((k) => b[k] !== undefined)) throw bad('Uygulamanın kendi eşyasının görseli buradan değişmez; yeni görselle kendi eşyanı ekle');
+    } else if (cur.kind !== 'entry' && b.icon !== undefined && b.icon !== null) {
+      throw bad(`${KIND_NAME[cur.kind]} mağazada kendi görünüşüyle durur; ikon yalnız giriş efektine eklenir`);
     } else if (cur.kind !== 'bubble' && cur.kind !== 'wave' && b.look !== undefined) {
       throw bad(`${KIND_NAME[cur.kind]} için renk ve stil buradan değil, resmiyle ya da videosuyla gelir`);
     } else if (cur.kind === 'bubble' || cur.kind === 'wave') {
@@ -610,6 +718,12 @@ export const shopRoutes = {
     } else {
       if (b.art !== undefined || b.hole !== undefined) throw bad('Giriş efektinin çerçeve resmi olmaz');
       if (b.plate !== undefined) cols.plate = plateOf(b.plate);
+      // A new icon replaces the old file; null takes it away (the shop shows the banner alone).
+      if (b.icon !== undefined && b.icon !== (cur.icon?.url ?? null)) {
+        const icon = b.icon === null ? null : await iconArt(b.icon);
+        Object.assign(cols, { icon_url: icon?.url ?? null, icon_px: icon?.px ?? null });
+        if (cur.icon) drop.push(cur.icon.url);
+      }
       if (b.video === null) throw bad('Giriş efektinin videosu kaldırılamaz; yenisini yükle');
       const video = await videoOf(b.video);
       if (video?.kind === 'stacked') {
@@ -681,7 +795,7 @@ export const shopRoutes = {
       if (n) throw new HttpError(409, `Bu eşya ${fmt(n)} kişide var; silinemez. Satıştan kaldırmak için kapat (sahipleri kullanmaya devam eder).`);
       await c.query("UPDATE shop_items SET deleted_at = now(), job_status = NULL, job_source = NULL, rev = nextval('shop_item_rev'), updated_by = $2, updated_at = now() WHERE id = $1", [id, a.id]);
       await audited(c, a, 'shop.delete', { item: id, before: auditOf(cur), after: null }, req);
-      return [cur.art_url, cur.video_url, cur.job_source, cur.job_preview];
+      return [cur.art_url, cur.video_url, cur.job_source, cur.job_preview, cur.icon_url];
     });
     removeFiles(files.filter(Boolean));
     await refreshShopItems();

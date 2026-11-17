@@ -6,14 +6,45 @@
 // level, whether they are on the shelf and their order. The admins' own come only from here: a frame's picture (`art`:
 // its address and the empty centre's radius as a share of its width); an entry effect's video (in the catalog's `fx`
 // as entry <its id>) with its name plate (`plate`): where, how wide and how big the entering person's name is written
-// over the clip, as shares of its 540 × 960 frame; a chat bubble's look (two colours, the text's colour, and a picture
+// over the clip, as shares of its 540 × 960 frame, how it looks and when it shows, and its icon in the shop (`icon`);
+// a chat bubble's look (two colours, the text's colour, and a picture
 // stretched with its corners kept: nineSlice); a voice wave's look (a style components/room/voice-wave draws, its
 // colours, and for the sparkle style a picture for its sparks). Anything malformed is left out (a bubble's picture
 // alone: its colours stay); no list at all (an older server, demo) is the compiled shop.
 import type { Cosmetic, CosmeticKind } from '@/data/catalog';
 
-/** Where the entering person's name goes on an entry effect's clip (shares of its 540 × 960 frame). */
-export type Plate = { x: number; y: number; w: number; size: number; color: string; bold: boolean };
+/** How the name comes in and goes (server/api/shop-items.mjs PLATE_ANIMS): at once, fading, growing, rising. */
+export const PLATE_ANIMS = ['none', 'fade', 'zoom', 'rise'] as const;
+export type PlateAnim = (typeof PLATE_ANIMS)[number];
+/** A colour round the letters and how far it reaches (a share of the letters' size). */
+export type PlatePaint = { color: string; size: number };
+/**
+ * Where the entering person's name goes on an entry effect's clip (shares of its 540 × 960 frame) and how it looks:
+ * written or not (`show`), capitals, the room between letters (a share of their size), a shadow or glow and an
+ * outline round them, a rounded band behind the name, the seconds of the clip it shows between (`to` 0: until the
+ * clip ends) and how it comes in and goes.
+ */
+export type Plate = {
+  x: number;
+  y: number;
+  w: number;
+  size: number;
+  color: string;
+  bold: boolean;
+  show: boolean;
+  upper: boolean;
+  spacing: number;
+  shadow: PlatePaint | null;
+  outline: PlatePaint | null;
+  back: { color: string; alpha: number } | null;
+  from: number;
+  to: number;
+  anim: PlateAnim;
+};
+/** The soft dark shadow a plate has unless the panel set another or none (also a plate from an older server). */
+export const PLATE_SHADOW: PlatePaint = { color: '#000000', size: 0.1 };
+/** What a plate the server sent without its look and timing (an older server, an older plate) is read with. */
+export const PLATE_LOOK = { show: true, upper: false, spacing: 0, shadow: PLATE_SHADOW, outline: null, back: null, from: 0, to: 0, anim: 'none' } as const satisfies Partial<Plate>;
 /** A chat bubble's picture: its size and how far in (its px) from each edge the corners go, kept as they are. */
 export type BubbleArt = { url: string; w: number; h: number; t: number; r: number; b: number; l: number };
 /** An admin's chat bubble: two colours (left to right), the text's colour, and a picture if it has one. */
@@ -39,6 +70,8 @@ export type ShopItem = {
   art?: { url: string; hole: number };
   video?: boolean;
   plate?: Plate | null;
+  /** An admin's entry effect's picture in the shop. */
+  icon?: { url: string };
   /**
    * An admin's bubble's or wave's look, in the server's own shape: the phone keeps the list it read (lib/live/
    * catalog-live) and reads its copy again with parseLiveShop, so every field keeps its name and form.
@@ -53,20 +86,54 @@ const SKU = /^[a-z][a-z0-9-]{1,31}$/;
 const ART_URL = /^https?:\/\/[^\s"'<>\\]{1,600}$/;
 const share = (v: unknown, min: number, max: number) => (typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max ? v : null);
 
-/** A name plate the server sent; null when it is missing or malformed (the usual banner is shown instead). */
+const HEX = /^#[0-9A-Fa-f]{6}$/;
+const hex = (v: unknown) => (typeof v === 'string' && HEX.test(v) ? v.toUpperCase() : null);
+
+/** A colour and an amount of it (`size` or `alpha`) the server sent; null when either is malformed. */
+function paintOf<K extends 'size' | 'alpha'>(raw: unknown, amount: K, min: number, max: number) {
+  const r = obj(raw);
+  const color = hex(r.color);
+  const n = share(r[amount], min, max);
+  return color && n !== null ? ({ color, [amount]: n } as { color: string } & Record<K, number>) : null;
+}
+
+/**
+ * A name plate the server sent; null when its place, size or colour is missing or malformed (the usual banner is shown
+ * instead). Its look and timing are read field by field: one missing or malformed is the usual (PLATE_LOOK).
+ */
 export function parsePlate(raw: unknown): Plate | null {
   const r = obj(raw);
   const x = share(r.x, 0, 1);
   const y = share(r.y, 0, 1);
   const w = share(r.w, 0.1, 1);
   const size = share(r.size, 0.015, 0.08);
-  const color = typeof r.color === 'string' && /^#[0-9A-Fa-f]{6}$/.test(r.color) ? r.color : null;
+  const color = typeof r.color === 'string' && HEX.test(r.color) ? r.color : null;
   if (x === null || y === null || w === null || size === null || !color) return null;
-  return { x, y, w, size, color, bold: r.bold !== false };
+  const from = share(r.from, 0, 20) ?? 0;
+  const to = share(r.to, 0, 20) ?? 0;
+  return {
+    x,
+    y,
+    w,
+    size,
+    color,
+    bold: r.bold !== false,
+    show: r.show !== false,
+    upper: r.upper === true,
+    spacing: share(r.spacing, 0, 0.4) ?? 0,
+    shadow: r.shadow === null ? null : (paintOf(r.shadow, 'size', 0.02, 0.6) ?? PLATE_SHADOW),
+    outline: paintOf(r.outline, 'size', 0.02, 0.15),
+    back: paintOf(r.back, 'alpha', 0.1, 1),
+    from,
+    to: to > from ? to : 0,
+    anim: (PLATE_ANIMS as readonly unknown[]).includes(r.anim) ? (r.anim as PlateAnim) : 'none',
+  };
 }
 
-const HEX = /^#[0-9A-Fa-f]{6}$/;
-const hex = (v: unknown) => (typeof v === 'string' && HEX.test(v) ? v.toUpperCase() : null);
+/** The name in capitals the Turkish way (i → İ, ı → I), whatever the phone's language. */
+export const trUpper = (s: string) => s.replace(/i/g, 'İ').replace(/ı/g, 'I').toUpperCase();
+/** The name as the plate writes it. */
+export const plateText = (plate: Plate, name: string) => (plate.upper ? trUpper(name) : name);
 const whole = (v: unknown, min: number, max: number) => (typeof v === 'number' && Number.isSafeInteger(v) && v >= min && v <= max ? v : null);
 
 /** A bubble's look the server sent; null when its colours are malformed. A malformed picture alone is dropped. */
@@ -122,6 +189,8 @@ export function parseLiveShop(raw: unknown): LiveShop | null {
     const builtin = r.builtin === true;
     const bubble = !builtin && kind === 'bubble' ? parseBubbleLook(r.look) : null;
     const wave = !builtin && kind === 'wave' ? parseWaveLook(r.look) : null;
+    const i = obj(r.icon);
+    const icon = !builtin && kind === 'entry' && typeof i.url === 'string' && ART_URL.test(i.url) ? { url: i.url } : undefined;
     // An admin's frame needs its picture, an admin's entry effect its video, an admin's bubble or wave its look:
     // without, there is nothing to draw.
     if (!builtin && kind === 'frame' && !art) continue;
@@ -139,7 +208,7 @@ export function parseLiveShop(raw: unknown): LiveShop | null {
       builtin,
       off: r.off === true,
       ...(art ? { art } : {}),
-      ...(kind === 'entry' && r.video === true ? { video: true, plate: parsePlate(r.plate) } : {}),
+      ...(kind === 'entry' && r.video === true ? { video: true, plate: parsePlate(r.plate), ...(icon ? { icon } : {}) } : {}),
       ...(bubble ? { look: bubble } : {}),
       ...(wave ? { look: wave } : {}),
     });
@@ -178,6 +247,7 @@ export function mergeShop(compiled: readonly Cosmetic[], shop: LiveShop | null):
           remote: {
             ...(x.art ? { art: x.art } : {}),
             ...(x.video ? { video: true as const, plate: x.plate ?? null } : {}),
+            ...(x.icon ? { icon: x.icon } : {}),
             ...(x.look && kind === 'bubble' ? { bubble: x.look as BubbleLook } : {}),
             ...(x.look && kind === 'wave' ? { wave: x.look as WaveLook } : {}),
           },
@@ -229,7 +299,8 @@ export function nineSlice(a: BubbleArt, k: number) {
 /**
  * Where the name goes on screen over a clip drawn aspect-fit in a `W` × `H` view (components/fx/video-fx, the native
  * player): the plate's centre, its widest width and the letters' size, made smaller for a long name so it stays on one
- * line inside the plate (about 0.6 of the size per letter: an estimate the phone's own fit refines).
+ * line inside the plate (about 0.6 of the size per letter, more in capitals and with room between them: an estimate
+ * the phone's own fit refines).
  */
 export function plateLayout(plate: Plate, name: string, W: number, H: number) {
   const scale = Math.min(W / 540, H / 960);
@@ -240,6 +311,7 @@ export function plateLayout(plate: Plate, name: string, W: number, H: number) {
   const width = plate.w * vw;
   const size = plate.size * vh;
   const letters = Math.max(1, [...name].length);
-  const fontSize = Math.max(8, Math.min(size, width / (letters * (plate.bold ? 0.62 : 0.56))));
+  const per = (plate.bold ? 0.62 : 0.56) + (plate.upper ? 0.1 : 0) + plate.spacing;
+  const fontSize = Math.max(8, Math.min(size, width / (letters * per)));
   return { cx: left + plate.x * vw, cy: top + plate.y * vh, width, fontSize };
 }

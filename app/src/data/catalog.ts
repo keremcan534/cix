@@ -1,5 +1,5 @@
 // Catalogs for the prototype: cosmetics, emoji and sticker packs, room levels, music, support.
-import type { BubbleLook, WaveLook } from '@/lib/shop-live-core';
+import type { BubbleLook, Plate, WaveLook } from '@/lib/shop-live-core';
 
 // --- Cosmetics store ---------------------------------------------------------
 export type CosmeticKind = 'frame' | 'entry' | 'ride' | 'bubble' | 'specialId' | 'wave';
@@ -31,7 +31,9 @@ export type Cosmetic = {
   remote?: {
     art?: { url: string; hole: number };
     video?: true;
-    plate?: { x: number; y: number; w: number; size: number; color: string; bold: boolean } | null;
+    plate?: Plate | null;
+    /** An entry effect's picture in the shop, above its banner. */
+    icon?: { url: string };
     bubble?: BubbleLook;
     wave?: WaveLook;
   };

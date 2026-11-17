@@ -238,7 +238,8 @@ function Preview({ item, avatar, voice, still }: { item: Cosmetic; avatar: strin
       </View>
     );
   }
-  const pic = storeArtOf(item.id);
+  // The app's own picture, or the icon the team gave its own entry effect (Yönetim › Mağaza).
+  const pic = storeArtOf(item.id) ?? (item.kind === 'entry' && item.remote?.icon ? { uri: item.remote.icon.url } : undefined);
   if (item.kind === 'entry') {
     const look = ENTRY_LOOKS[(item.fx as EntryFx | undefined) ?? 'vip'];
     const banner = (
