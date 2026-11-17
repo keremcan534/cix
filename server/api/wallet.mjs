@@ -39,7 +39,8 @@ export const CHANNELS = {
   cevir: { label: 'Elmastan çevrildi', lock: 'jeton' },
   // Daily check-in, tasks, İlk adımlar: spent only in the shop (spendCoins `use`), so never gifted.
   odul: { label: 'Ödül jetonu', lock: 'store' },
-  // Şanslı hediye rewards (lucky.mjs): spent like any coin; what they pay for never counts for Cömertlik.
+  // Şanslı hediye rewards (lucky.mjs) and Oda roketi coin prizes (room-rocket.mjs): spent like any coin; what they pay
+  // for never counts for Cömertlik.
   ugurlu: { label: 'Şanslı ödülü', lock: 'store' },
   // Coins from someone's Şanslı çanta (lucky-bags.mjs); the store lock, whatever paid for them.
   canta: { label: 'Şanslı çanta', lock: 'store' },

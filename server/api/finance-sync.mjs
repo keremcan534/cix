@@ -25,6 +25,7 @@
 //   diamonds → coins (Çevir/bozdurma) → bonus_grant (campaign elmas_cevirme / elmas_bozdurma)
 //   test top-up / test purchase    → promotion (campaign test_yukleme / test_satin_alma); store sandbox the same
 //   reward coins ('odul')          → bonus_grant (hos_geldin, davet_odulu, gorev_odulu, aile_sandigi); taken back → coin_spend
+//   prize coins ('ugurlu')         → bonus_grant (ugurlu_odul: Şanslı hediye; oda_roketi: Oda roketi)
 //   paid message (one-on-one.mjs)  → gift (gift_ref mesaj_ucreti) from the payer's row, which names the earner
 //   paid call or match minute      → call (minutes 1, voice/video); a minute nobody earns → coin_spend
 //   Aile kurma, oda animasyonu, koltuk rengi, oda özel görseli → coin_spend (the shop's own buys carry their sku)
@@ -79,7 +80,8 @@ export function eventsOf(r) {
     if (r.channel === 'test') return [{ ...base, type: 'promotion', user_ref: r.user_id, coins: amount, campaign_ref: 'test_yukleme' }];
     if (r.channel === 'cevir') return [{ ...base, type: 'bonus_grant', user_ref: r.user_id, coins: amount, campaign_ref: 'elmas_cevirme' }];
     if (r.channel === 'bozdurma') return [{ ...base, type: 'bonus_grant', user_ref: r.user_id, coins: amount, campaign_ref: 'elmas_bozdurma' }];
-    if (r.channel === 'ugurlu') return [{ ...base, type: 'bonus_grant', user_ref: r.user_id, coins: amount, campaign_ref: 'ugurlu_odul' }];
+    // Şanslı hediye's and Oda roketi's prizes share the channel; the rocket's reason says which (room-rocket.mjs).
+    if (r.channel === 'ugurlu') return [{ ...base, type: 'bonus_grant', user_ref: r.user_id, coins: amount, campaign_ref: r.reason?.startsWith('Oda roketi') ? 'oda_roketi' : 'ugurlu_odul' }];
     if (r.channel === 'toptan' && d.priceTl !== undefined)
       return [{ ...base, type: 'purchase', user_ref: r.user_id, channel: 'jeton_noktasi', amount: money(d.priceTl), currency: 'TRY', coins: amount, product_ref: 'toptan' }];
     if (r.channel === 'odul') return [{ ...base, type: 'bonus_grant', user_ref: r.user_id, coins: amount, campaign_ref: rewardOf(r.reason) }];

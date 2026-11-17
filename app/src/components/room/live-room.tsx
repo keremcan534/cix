@@ -45,6 +45,7 @@ import {
 import { EventRoomBanner, EventThemeLayer, RoomEventsSheet, type RoomEvents } from '@/components/events/room-events';
 import { RoomMenuSheet, type MenuSection } from '@/components/room/menu';
 import { ContribBoard } from '@/components/room/contrib-board';
+import { RocketPill, RocketSheet, RocketShow } from '@/components/room/room-rocket';
 import { RoomFollowHeart } from '@/components/room/members';
 import { BossSeat, BossSeatSheet, RoomInfoSheet, RoomSettingsScreen, type BossPick, type GiftLogRow, type SettingsSection } from '@/components/room/owner';
 import { GiftSheet } from '@/components/room/gift-sheet';
@@ -103,6 +104,7 @@ import { giftById, refreshLiveCatalog } from '@/lib/live/catalog-live';
 import { liveSticker } from '@/lib/live/emoji-live';
 import { useLiveRoomSync } from '@/lib/live/room';
 import { useRoomTop } from '@/lib/live/room-contrib';
+import { useRoomRocket } from '@/lib/live/room-rocket';
 import { onServerLook, onServerRoom, sendSignal, useBossNews, useLivePeers, type LuckySignal, type RoomSignal } from '@/lib/live/room-bus';
 import { answerLiveCrossPk, refreshRoomPkSoon, useIncomingCrossPk, useRoomPkJoin, useRoomPkSync } from '@/lib/live/pk';
 import { useOwnerStats } from '@/lib/live/owner-stats';
@@ -683,7 +685,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const [inviteSeat, setInviteSeat] = useState<number | null>(null);
   const [sheet, setSheet] = useState<{ title: string; options: SheetOption[] } | null>(null);
   const [msgFilter, setMsgFilter] = useState({ joins: true, gifts: true, bot: true });
-  const [panel, setPanel] = useState<null | 'menu' | 'msgSettings' | 'info' | 'settings' | 'music' | 'envelope' | 'bag' | 'dice' | 'contrib' | 'requests' | 'poll' | 'goal' | 'events' | 'qa' | 'effects' | 'mod' | 'invite' | 'results' | 'session' | 'seatColor'>(null);
+  const [panel, setPanel] = useState<null | 'menu' | 'msgSettings' | 'info' | 'settings' | 'music' | 'envelope' | 'bag' | 'dice' | 'contrib' | 'requests' | 'poll' | 'goal' | 'events' | 'qa' | 'effects' | 'mod' | 'invite' | 'results' | 'session' | 'seatColor' | 'rocket'>(null);
   const [poll, setPoll] = useState<Poll | null>(null);
   const [goal, setGoal] = useState<Goal | null>(null);
   const [events, setEvents] = useState<RoomEvent[]>(() =>
@@ -3300,6 +3302,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // Next to the trophy: a server room's top three of today's Cömertlik as the server counts it (the board's own list),
   // the same on every phone whenever it came in; the demo's from this visit's gifts.
   const serverTop = useRoomTop(id, real && unlocked, giftLog[0]?.id);
+  // Oda roketi (lib/live/room-rocket): a server room's rocket today; read again after gifts and when it launches.
+  const roomRocket = useRoomRocket(real && unlocked ? id : null, { open: panel === 'rocket', bump: giftLog[0]?.id });
   const top3 = real ? serverTop : ranking.slice(0, 3).map(([uid]) => uid);
 
   // Mic invites I sent: announce each answer once (accepted, declined, no answer, no free mic left).
@@ -3654,6 +3658,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
               <View style={styles.subLine}>
                 {/* Normal PK: its timer pill leads the line; on a narrow phone the line's end gives way, not the pill. */}
                 {soloPk && <SoloPkPill pk={soloPk} canManage={canManage && !offline} />}
+                {roomRocket.rocket?.on && <RocketPill rocket={roomRocket.rocket} onPress={() => setPanel('rocket')} />}
                 <Pressable onPress={() => setPeopleOpen(true)} style={[styles.subRow, styles.subShrink]} accessibilityLabel={`${listeners} kişi, ${capacity} mikrofon. Odadaki kullanıcıları aç`}>
                   <Ionicons name="people" size={11} color={colors.textDim} />
                   <Text style={styles.sub}>{listeners}</Text>
@@ -4163,6 +4168,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       />
       )}
       <EnvelopeSendModal visible={panel === 'envelope'} onClose={closePanel} onSend={sendEnvelope} coins={coins} />
+      {panel === 'rocket' && roomRocket.rocket && (
+        <RocketSheet rocket={roomRocket.rocket} onClose={closePanel} onGift={() => (setPanel(null), setGiftTo(null), setGiftOpen(true))} />
+      )}
+      {roomRocket.show && !settings.effectsOff && <RocketShow news={roomRocket.show} still={settings.reduceMotion} onDone={roomRocket.next} />}
       {real && panel === 'bag' && (
         <LuckyBagSheet
           visible

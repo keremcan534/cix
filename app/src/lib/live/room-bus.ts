@@ -101,6 +101,12 @@ const roomListeners = new Set<(roomId: string) => void>();
 /** A bag packet: which bag, and whether it is the draw's (the bag was just drawn) rather than a new bag. */
 export type BagNews = { id: number | null; drawn: boolean };
 const bagListeners = new Set<(roomId: string, news: BagNews) => void>();
+/**
+ * The room's rocket (server/api/room-rocket.mjs): a level launched, then who won what (a few words per prize, as the
+ * server wrote them).
+ */
+export type RocketNews = { event: 'launch' | 'paid'; level: number; launch: number; winners: { user: string; name: string; prize: string; paid: boolean }[] };
+const rocketListeners = new Set<(roomId: string, news: RocketNews) => void>();
 /** A mic invite packet: who it is for and from (server user ids; null when several ended at once). */
 export type InviteNews = { to: string | null; from: string | null };
 const inviteListeners = new Set<(roomId: string, news: InviteNews) => void>();
@@ -264,6 +270,9 @@ export function reportSignal(roomId: string, from: string | null, raw: unknown) 
       const news: BagNews = { id: typeof p.id === 'number' && Number.isSafeInteger(p.id) ? p.id : null, drawn: p.drawn === true };
       return bagListeners.forEach((l) => l(roomId, news));
     }
+    // The room's rocket launched a level, or its prizes were paid (server/api/room-rocket.mjs): play it, read it again.
+    const rocket = parseServerRocket(raw);
+    if (rocket) return rocketListeners.forEach((l) => l(roomId, rocket));
     const fx = parseServerFx(raw);
     if (fx) {
       if (seenFx.includes(fx.msg.eventId)) return;
@@ -347,6 +356,24 @@ export const isServerPk = (raw: unknown) => !!raw && typeof raw === 'object' && 
 export const isServerRoom = (raw: unknown) => !!raw && typeof raw === 'object' && (raw as Record<string, unknown>).type === 'room';
 /** The server's bag packet: someone dropped a Şanslı çanta in the room (server/api/lucky-bags.mjs); read the bags. */
 export const isServerBag = (raw: unknown) => !!raw && typeof raw === 'object' && (raw as Record<string, unknown>).type === 'bag';
+
+/** The server's rocket packet (server/api/room-rocket.mjs launchRockets / announcePaid); null for anything else. */
+export function parseServerRocket(raw: unknown): RocketNews | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const p = raw as Record<string, unknown>;
+  if (p.type !== 'rocket' || (p.event !== 'launch' && p.event !== 'paid')) return null;
+  const level = typeof p.level === 'number' && Number.isSafeInteger(p.level) && p.level >= 1 && p.level <= 5 ? p.level : null;
+  const launch = typeof p.launch === 'number' && Number.isSafeInteger(p.launch) && p.launch > 0 ? p.launch : null;
+  if (level === null || launch === null) return null;
+  const text = (v: unknown, max: number) => (typeof v === 'string' && v.length > 0 && v.length <= max ? v : null);
+  const winners = (Array.isArray(p.winners) ? p.winners.slice(0, 20) : []).flatMap((w) => {
+    const o = (w && typeof w === 'object' ? w : {}) as Record<string, unknown>;
+    const user = text(o.user, 64);
+    const prize = text(o.prize, 80);
+    return user && prize ? [{ user, name: text(o.name, 40) ?? 'Üye', prize, paid: o.paid !== false }] : [];
+  });
+  return { event: p.event, level, launch, winners };
+}
 
 /** The server's mic invite packet (server/api/room-social.mjs): an invite in the room was sent or answered. */
 export const isServerInvite = (raw: unknown) => !!raw && typeof raw === 'object' && (raw as Record<string, unknown>).type === 'invite';
@@ -451,6 +478,12 @@ export function onServerBag(roomId: string, fn: (news: BagNews) => void) {
   const l = (r: string, news: BagNews) => r === roomId && fn(news);
   bagListeners.add(l);
   return () => void bagListeners.delete(l);
+}
+/** The server says this room's rocket launched a level, or paid its prizes; returns the unsubscribe. */
+export function onServerRocket(roomId: string, fn: (news: RocketNews) => void) {
+  const l = (r: string, news: RocketNews) => r === roomId && fn(news);
+  rocketListeners.add(l);
+  return () => void rocketListeners.delete(l);
 }
 /** The server says a mic invite in this room was sent or answered; returns the unsubscribe. */
 export function onServerInvite(roomId: string, fn: (news: InviteNews) => void) {

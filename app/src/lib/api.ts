@@ -1273,6 +1273,8 @@ export const roomOwnerStats = (room: string) => call<ServerOwnerStats>('GET', `/
 export type RoomContribBody = { rows: RankingRow[]; me: { rank: number | null; score: number }; since: string };
 export const roomContrib = (room: string, side: 'sent' | 'received', period: 'hour' | 'day' | 'week') =>
   call<RoomContribBody>('GET', `/api/rooms/contrib?room=${encodeURIComponent(room)}&side=${side}&period=${period}`);
+/** Oda roketi (server/api/room-rocket.mjs): the room's rocket today, read with lib/room-rocket-core parseRocket. */
+export const roomRocket = (room: string) => call<unknown>('GET', `/api/rooms/rocket?room=${encodeURIComponent(room)}`);
 // Yeni üye ödülleri (server/api/referrals.mjs): the welcome coins I got at sign-up (0: none), the packs whose
 // first-purchase gift is still mine, and Arkadaşını Getir: my code, the code I entered, what my invites brought.
 export type ServerRewards = {

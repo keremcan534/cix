@@ -948,3 +948,15 @@ Oyun Salonu'nun kazanç kutlaması yenilendi (`app/src/components/games/fx/win-f
 | 3 | Efsane Kazanç levhası | "EFSANE KAZANÇ" yazılı levha: turkuaz (#13D9DF) ve altın harfler, kristal gibi parlayan yüzey, çevresinde küçük şimşekler ve parıltılar; üçünün en gösterişlisi | `kazanc-levha-efsane.png` | P1 |
 
 Teslimden sonra: dosyalar `app/assets/art/` içine konur ve `app/src/components/games/fx/salon-art.tsx` listesine eklenir → `fx/win-fx.tsx` içindeki şerit (`ribbon`) her kademede kendi levhasıyla değişir (başlık yükselince yeni levha yaylanarak gelir); `fx/jackpot-show.tsx` (Kızıl Yedi) aynı levhaları kullanır. JACKPOT levhası, ışık huzmeleri, jeton ve parıltı zaten var (§24 #12–16); tutar kodla yazılmaya devam eder.
+
+## 26. Oda roketi (5)
+
+Odadaki roketin her seviyesi için bir roket ([`ODA_ROKETI.md`](ODA_ROKETI.md)). Şimdilik beşi de Roket hediyesinin resmini kullanıyor; her seviyenin rengi farklı (pembe, turuncu, mavi, mor, altın). Saydam PNG, 512 × 512, roket ortada ve dik; altında boşluk (pencerede altına parıltı çizilir). Uygulamada `components/room/room-rocket.tsx` `ROCKET_ART` yerine seviyeye göre bağlanacak.
+
+| # | Dosya | Ad | Görsel | Kullanım | Not |
+| --- | --- | --- | --- | --- | --- |
+| 1 | `oda-roketi-1.png` | Lv.1 roketi | Küçük, pembe-beyaz, tek pencereli sevimli roket | odanın roket düğmesi ve penceresi, kalkış gösterisi | ⏳ istenecek |
+| 2 | `oda-roketi-2.png` | Lv.2 roketi | Turuncu-beyaz roket, iki yan kanat | aynı | ⏳ istenecek |
+| 3 | `oda-roketi-3.png` | Lv.3 roketi | Mavi roket, altın pencere, yan iticiler | aynı | ⏳ istenecek |
+| 4 | `oda-roketi-4.png` | Lv.4 roketi | Mor-altın, süslü, iri roket | aynı | ⏳ istenecek |
+| 5 | `oda-roketi-5.png` | Lv.5 roketi | Gümüş-altın büyük mekik, dört itici | aynı | ⏳ istenecek |
