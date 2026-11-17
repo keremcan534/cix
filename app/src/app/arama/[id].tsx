@@ -42,13 +42,11 @@ function CallScreen() {
 
   const [phase, setPhase] = useState<Phase>('ringing');
   const [seconds, setSeconds] = useState(0);
-  const [spent, setSpent] = useState(0);
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(true);
   const [front, setFront] = useState(true);
   const [floating, setFloating] = useState<Gift | null>(null);
   const pulse = useState(() => new Animated.Value(0))[0];
-  const spentRef = useRef(0);
   // Release only what this screen claimed (a busy attempt must not end someone else's call).
   const claimedRef = useRef(false);
   const release = () => {
@@ -84,8 +82,6 @@ function CallScreen() {
         showAlert('Yetersiz jeton', `Bu arama dakikada ${price} jeton. Jeton yükleyip tekrar dene.`, [{ text: 'Tamam', onPress: () => goBack() }]);
         return;
       }
-      spentRef.current = price;
-      setSpent(price);
       setPhase('connected');
       bump('calls');
     }, 2500);
@@ -113,19 +109,17 @@ function CallScreen() {
   // Charge at the start of each new minute.
   useEffect(() => {
     if (phase !== 'connected' || seconds === 0 || seconds % 60 !== 0) return;
-    if (spendCoins(price)) {
-      spentRef.current += price;
-      setSpent(spentRef.current);
-    } else {
-      setPhase('ended');
-      showAlert('Jetonun bitti', 'Arama sonlandırıldı.', [{ text: 'Tamam', onPress: () => goBack() }]);
-    }
+    if (spendCoins(price)) return;
+    // Out of coins: the call ends (the demo's minute charge, on its timer).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPhase('ended');
+    showAlert('Jetonun bitti', 'Arama sonlandırıldı.', [{ text: 'Tamam', onPress: () => goBack() }]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seconds]);
 
   const hangUp = () => {
     setPhase('ended');
-    showAlert('Arama bitti', `Süre: ${mmss(seconds)} · Harcanan: ${spentRef.current} jeton`, [{ text: 'Tamam', onPress: () => goBack() }]);
+    showAlert('Arama bitti', `Süre: ${mmss(seconds)}`, [{ text: 'Tamam', onPress: () => goBack() }]);
   };
 
   const sendGift = () => {
@@ -167,7 +161,7 @@ function CallScreen() {
             />
             <Photo uri={user.avatar} kind="face" style={styles.bigAvatar} />
             <Text style={styles.priceNote}>
-              🪙 {price} jeton / dakika · {user.name} her dakika için elmas kazanır
+              Ücretli arama
             </Text>
           </View>
         )}
@@ -181,14 +175,6 @@ function CallScreen() {
                 <Ionicons name="videocam-off" size={26} color="#fff" />
               </View>
             )}
-          </View>
-        )}
-
-        {phase === 'connected' && (
-          <View style={styles.meter}>
-            <Text style={styles.meterText}>
-              🪙 {price}/dk · Harcanan {spent}
-            </Text>
           </View>
         )}
 

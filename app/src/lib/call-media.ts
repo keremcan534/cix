@@ -10,7 +10,7 @@ import { useSyncExternalStore } from 'react';
 
 import { beginCall, endCall } from '@/lib/media';
 import { holdForCall } from '@/lib/room-session';
-import { BEAUTY_EFFECT, registerBeauty } from '../../modules/similar-beauty';
+import { videoEffects } from '../../modules/similar-beauty';
 import { ensureWebRtc, holdAudio, micStarted, playRemote, releaseAudio } from '@/lib/webrtc-globals';
 
 /** What a video view shows (the shape of @livekit/components-react's TrackReference). */
@@ -72,6 +72,7 @@ export async function joinCallMedia(callId: number, token: string, video: boolea
   // A voice room I'm in stays: I go to its Balkon and its voices go quiet until the call ends (room-session).
   holdForCall(true);
   ensureWebRtc();
+  effectsOnNewCameras();
   endCall();
   beginCall({ kind: 'direct', mode: video ? 'video' : 'voice', peerId: peer });
   const r = new Room({ adaptiveStream: true, dynacast: true });
@@ -113,18 +114,53 @@ export async function joinCallMedia(callId: number, token: string, video: boolea
 }
 
 /**
- * My camera gets the beauty filter (modules/similar-beauty): it runs at the strength the call screen sets, which is
- * 0 (the frames pass untouched) unless it is mine to use. Again after every new camera track (on, flipped).
+ * My camera's effects (modules/similar-beauty): the beauty filter, then the mask, each at what the call screen sets,
+ * which is off (the frames pass untouched) unless it is mine to use. Without the mask (an APK from before it) only
+ * the filter, as before. They go on a camera track of the call the moment getUserMedia hands it over (camera on,
+ * turned back on, flipped), before LiveKit sends a frame of it: put on after the track is out, its first frames could
+ * leave without the mask. beautify puts them on a camera track that came another way, after every new one.
  */
-function beautify(r: Room) {
-  if (room !== r || !registerBeauty()) return;
-  const track = r.localParticipant.getTrackPublication(Track.Source.Camera)?.track;
-  const media = track?.mediaStreamTrack as unknown as { _setVideoEffects?: (names: string[]) => void } | undefined;
+type CameraTrack = { kind?: string; _setVideoEffects?: (names: string[]) => void };
+const withEffects = new WeakSet<object>();
+function setEffects(media: CameraTrack | undefined) {
+  if (!media || media.kind !== 'video' || withEffects.has(media)) return;
+  const names = videoEffects();
+  if (!names) return;
   try {
-    media?._setVideoEffects?.([BEAUTY_EFFECT]);
+    media._setVideoEffects?.(names);
+    withEffects.add(media);
   } catch {
     // An older WebRTC build without video effects: the camera goes as it is.
   }
+}
+
+type GetUserMedia = (constraints: unknown) => Promise<{ getVideoTracks?: () => CameraTrack[] }>;
+let camerasWatched = false;
+/** Once, after the WebRTC globals are in: the cameras getUserMedia opens during a call get the effects at once. */
+function effectsOnNewCameras() {
+  if (camerasWatched || !videoEffects()) return;
+  const devices = (globalThis.navigator as unknown as { mediaDevices?: { getUserMedia?: GetUserMedia } } | undefined)?.mediaDevices;
+  const getUserMedia = devices?.getUserMedia;
+  if (!devices || !getUserMedia) return;
+  camerasWatched = true;
+  devices.getUserMedia = async (constraints) => {
+    const stream = await getUserMedia.call(devices, constraints);
+    // A call's camera only: a voice room's camera goes its own way.
+    if (room && state.camOn) {
+      try {
+        stream.getVideoTracks?.().forEach((t) => setEffects(t));
+      } catch {
+        // beautify puts them on after.
+      }
+    }
+    return stream;
+  };
+}
+
+function beautify(r: Room) {
+  if (room !== r) return;
+  const track = r.localParticipant.getTrackPublication(Track.Source.Camera)?.track;
+  setEffects(track?.mediaStreamTrack as unknown as CameraTrack | undefined);
 }
 
 /** Leaves the call's room (hung up, ended, or the screen closed). */

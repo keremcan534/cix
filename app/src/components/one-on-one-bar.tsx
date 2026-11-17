@@ -65,6 +65,7 @@ export function nextUnlock(p: Pair): string | null {
 /**
  * Under the chat's header: the heart between the two of us in its look (from the pulse look on, our two photos with
  * heartbeats travelling between them), its level, and what it opens next (a paid pair) or what its next look brings.
+ * A tap says how it grows and that it cools when the two go quiet (server one-on-one.mjs heartPoints).
  */
 export function HeartBar({ heart, pair, them }: { heart: HeartView; pair: Pair | null; them: User }) {
   const styles = useStyles();
@@ -74,11 +75,19 @@ export function HeartBar({ heart, pair, them }: { heart: HeartView; pair: Pair |
   const tier = heartTier(level);
   const paid = paidPair(pair);
   const hint = (paid && nextUnlock(pair)) || nextLookText(level) || 'Kalbiniz en parlak hâlinde';
-  // Paid messages grow it too where messages are paid (and in the demo, where they cost coins).
-  const grows = paid || !liveMode() ? 'Hediye ve sohbet kalbi büyütür' : 'Hediyeler kalbi büyütür';
+  const grows = 'Sohbet ve hediye kalbi büyütür';
   const linked = tier.line === 'one' || tier.line === 'both';
+  const explain = () =>
+    showAlert(heartTitle(level), `${hint}.
+
+Sohbet ettikçe ve hediyeleştikçe kalbiniz büyür. Bir süre konuşmazsanız yavaş yavaş soğur ve seviyesi düşebilir.`);
   return (
-    <View style={[styles.heart, tier.rim && { borderColor: `${tier.rim}99` }]} accessible accessibilityLabel={`${heartTitle(level)}. ${hint}`}>
+    <Pressable
+      onPress={explain}
+      style={[styles.heart, tier.rim && { borderColor: `${tier.rim}99` }]}
+      accessibilityRole="button"
+      accessibilityLabel={`${heartTitle(level)}. ${hint}. Ayrıntı için dokun`}
+    >
       {linked ? (
         <View style={styles.link}>
           <HeartLink level={level} me={{ uri: me.avatar, name: me.name }} them={{ uri: them.avatar, name: them.name }} size="sm" />
@@ -100,7 +109,7 @@ export function HeartBar({ heart, pair, them }: { heart: HeartView; pair: Pair |
           {hint} · {grows}
         </Text>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -113,14 +122,17 @@ function backAt(iso: string) {
   return `${day} ${d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`;
 }
 
-/** Calls them: a locked call says why, a paid one shows its price first (and, past my free calls, when they're back). */
+/**
+ * Calls them: a locked call says why, a paid one says so once before it starts, calmly, with its price (and, past my
+ * free calls, when they're back); during the call nothing shows what it costs (components/call-stage).
+ */
 export function callPair(userId: string, pair: Pair, mode: CallMode) {
   const gate = pair.calls[mode];
   if (!gate.open) return showAlert(`${MODE_NAME[mode]} arama kapalı`, gate.why ?? 'Bu kişiyi şu an arayamazsın.');
   const go = () => router.push({ pathname: '/arama/[id]', params: { id: userId, mode: mode === 'voice' ? 'sesli' : 'goruntulu' } });
   if (!iPayFor(pair, gate)) return go();
   const used = gate.free ? `Bugünkü ${gate.free.total} ücretsiz araman bitti${gate.free.nextAt ? `; ilki ${backAt(gate.free.nextAt)} yenilenir` : ''}. ` : '';
-  showAlert(`${MODE_NAME[mode]} arama`, `${used}Dakikası ${fmt(gate.price)} jeton. Her dakikanın başında ödenir; jetonun bitince görüşme biter.`, [
+  showAlert(`${MODE_NAME[mode]} arama`, `${used}Bu arama ücretlidir; dakika başına ${fmt(gate.price)} jeton ücret kesilir.`, [
     { text: 'Vazgeç', style: 'cancel' },
     { text: 'Ara', onPress: go },
   ]);

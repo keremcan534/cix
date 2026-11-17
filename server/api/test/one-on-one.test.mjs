@@ -90,7 +90,7 @@ describe('Birebir mesaj', () => {
     const free = await ok(dm(man.session, star.user.id, 'Takipteyiz'), 'karşılıklı takip');
     assert.equal(free.price, undefined);
     assert.equal((await me(man.session)).coins, 760);
-    assert.equal((await pair(man.session, star.user.id)).heart.points, 240, 'ücretli mesaj kalbe sayılır');
+    assert.equal((await pair(man.session, star.user.id)).heart.points, 240 + 3 * 2, 'ücretli mesaj kalbe sayılır, her mesaj da 2 puan');
   });
 
   test('yayıncı olmayan iki kişi ücretsiz yazışır', async () => {
@@ -190,6 +190,39 @@ describe('Birebir arama', () => {
     const income = await ok(call('GET', '/api/wallet/income?period=all', null, star.session), 'gelir');
     assert.equal(income.sources.find((x) => x.key === 'voice_call').diamonds, 4000);
     assert.equal((await pair(man.session, star.user.id)).heart.points, 5500, 'dakikalar kalbe sayılır');
+  });
+
+  test('5.000 jetonluk hediye görüntülü aramayı da açar (kalp seviyesi 3)', async () => {
+    const man = await person('Cömert', 'Erkek');
+    const star = await streamer('Işıl');
+    assert.equal((await pair(man.session, star.user.id)).calls.video.open, false);
+    await giftPoints(man.user.id, star.user.id, 5000);
+    const p = await pair(man.session, star.user.id);
+    assert.deepEqual([p.heart.level, p.heart.videoAt, p.calls.voice.open, p.calls.video.open], [3, 3, true, true]);
+  });
+
+  test('arama sırasında hediye gönderilir; iki taraf da aramanın ekranında görür', async () => {
+    const man = await person('Hediyeci', 'Erkek');
+    const star = await streamer('Melis');
+    // Before the call: not the call's gift.
+    await giftPoints(man.user.id, star.user.id, 1500);
+    await topUp(man.session, 10_000);
+    const { call: k } = await ok(ring(man.session, star.user.id), 'ara');
+    assert.equal(k.gifts, undefined, 'çalarken hediye özeti yok');
+    await ok(call('POST', '/api/calls/answer', { id: k.id }, star.session), 'aç');
+    let mine = (await beat(man.session, k.id)).call;
+    assert.deepEqual(mine.gifts, { received: 0, sent: 0, last: null });
+
+    const ref = rnd(6);
+    await ok(call('POST', '/api/gifts/send', { to: star.user.id, giftId: 'g4', count: 1, place: 'chat', ref }, man.session), 'aramada hediye');
+    const g = (await q('SELECT id, total FROM gift_events WHERE ref = $1', [ref])).rows[0];
+    const total = Number(g.total);
+    const theirs = (await beat(star.session, k.id)).call;
+    assert.deepEqual(theirs.gifts, { received: total, sent: 0, last: { id: Number(g.id), fromMe: false, giftId: 'g4', count: 1, total } });
+    mine = (await beat(man.session, k.id)).call;
+    assert.deepEqual([mine.gifts.received, mine.gifts.sent, mine.gifts.last.fromMe], [0, total, true]);
+    assert.equal((await ok(call('GET', '/api/calls/current', null, star.session), 'açık arama')).call.gifts.received, total);
+    assert.equal(mine.status, 'live', 'hediye aramayı kesmez');
   });
 
   test('karşılıklı takipte arayanın 24 saatte 3 ücretsiz hakkı, her biri 58 saniye; sonra arayan dakika öder', async () => {

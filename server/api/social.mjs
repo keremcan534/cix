@@ -148,6 +148,8 @@ export async function eraseAccount(c, id, phone) {
     await c.query('DELETE FROM profile_photos WHERE user_id = $1', [id]);
     await c.query('UPDATE users SET gender_hidden = false WHERE id = $1', [id]);
     await c.query('DELETE FROM messages WHERE sender = $1 OR recipient = $1', [id]);
+    // With them, how much they chatted with each other person (the heart's chat_days).
+    await c.query('DELETE FROM chat_days WHERE lo = $1 OR hi = $1', [id]);
     // 1v1: out of the match queue, an open call ends (the paid rows stay as accounting records).
     await c.query('DELETE FROM match_queue WHERE user_id = $1', [id]);
     await c.query("UPDATE calls SET status = CASE WHEN status = 'live' THEN 'ended' ELSE 'cancelled' END, end_reason = 'deleted', ended_at = now() WHERE (caller = $1 OR callee = $1) AND status IN ('ringing', 'live')", [id]);

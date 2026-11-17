@@ -14,6 +14,7 @@ import { Photo } from '@/components/photo';
 import { Text } from '@/components/text';
 import { Button } from '@/components/ui';
 import { userById } from '@/data/mock';
+import { callGifts } from '@/lib/call-gifts';
 import { joinCallMedia, leaveCallMedia } from '@/lib/call-media';
 import { toServer } from '@/lib/live';
 import { answerCall, callToken, currentCall, dismissCall, endText, hangUp, isOpen, MODE_NAME, refreshCall, refusal, startCall, useCall, type CallMode, type CallView } from '@/lib/live/one-on-one';
@@ -116,6 +117,9 @@ export function LiveCall() {
 
   if (call && !isOpen(call)) {
     const seconds = call.startedAt && call.endedAt ? Math.max(0, Math.round((Date.parse(call.endedAt) - Date.parse(call.startedAt)) / 1000)) : 0;
+    // The earner sees what the call brought (minutes and gifts); the payer only how long it was (the coins are in
+    // the wallet's history).
+    const earned = call.iEarn && call.coins > 0 ? call.coins + callGifts(call).received : 0;
     return (
       <Shell avatar={call.other.avatarUrl ?? peer.avatar} seed={peer.id}>
         <View style={styles.center}>
@@ -125,7 +129,7 @@ export function LiveCall() {
           {call.startedAt && (
             <Text style={styles.summary}>
               Süre {mmss(seconds)}
-              {call.iPay && call.coins > 0 ? ` · Harcanan ${call.coins.toLocaleString('tr-TR')} jeton` : ''}
+              {earned > 0 ? ` · Kazandığın ${earned.toLocaleString('tr-TR')} 💎` : ''}
             </Text>
           )}
           <Button title="Kapat" variant="tonal" onPress={close} style={{ marginTop: 8 }} />

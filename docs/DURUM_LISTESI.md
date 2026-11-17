@@ -93,6 +93,22 @@ Son güncelleme: preview-96 sonrası (Küçült, çanta yağmuru, @bahset düzel
   - Depo (R2) 9 Kasım'da kuruldu.
 - **Alt menü:** "Benzerler" artık "Ana Sayfa". Odalar'ın simgesi mikrofon oldu.
 
+## Kalp, arama ve Bağlar (yeni APK)
+
+- **Sohbetteki kalp:** iki kişinin yakınlığı, Bağlar'dan ayrı.
+  - Hediyeler, ücretli mesaj ve dakikalar doldurur (jeton başına 1 puan). Sohbet de yavaş doldurur: mesaj başına 2 puan, günde en çok 60.
+  - Konuşmayınca yavaş düşer: puan 7 gün tam sayılır, sonra her 14 günde yarıya iner.
+  - 5.000 jetonluk bir hediye görüntülü aramayı hemen açar (kalp seviyesi 3). Sesli arama seviye 2'de.
+  - Sayıların hepsi Canlı ayarlar › Birebir ve eşleşme'den değişir.
+- **Arama öncesi:** ücretli aramada bir kez sakin bir not: "Bu arama ücretlidir; dakika başına … jeton ücret kesilir."
+- **Arama sırasında:** ödeyen taraf dakika ücretini ve harcadığını görmez; arama bitince yalnız süreyi görür (harcama cüzdan geçmişinde ve Aramalar listesinde). Kazanan taraf her dakika kazandığı elması ve büyüyen toplamı görür, 5 dakikada bir daha büyük bir teşvik notu çıkar; bitişte kazandığı elması görür.
+- **Aramada hediye:** arama ekranındaki hediye düğmesiyle gönderilir; alan "🎁 … gönderdi" notunu görür. Telefonda denenmeli.
+- **Bağlar:** "Aile ve Dost" boşken Kardeş, Bacı, Ağabey, Abla, Yenge, Enişte ve Kanka resimleri ve fiyatlarıyla görünür. Başkasının profilinde birine dokununca fiyat bir kez sorulur, sonra istek gider.
+- **Maske (görüntülü arama ve eşleşme, kadınlar, Android):** kendi küçük görüntüsünün altındaki **Maske** düğmesi sırayla Kapalı → Göz maskesi → Mozaik yüz → Emoji yüz yapar. Güzellik düğmesi de oraya taşındı. Seçim telefonda kalır, bir sonraki aramada da açık başlar.
+  - Yüzü telefon bulur (saniyede 5 kez). Yüz bulunamazsa (yüz çevrik, karanlık, ekrandan çıkmış) görüntünün tamamı iri karelere bölünür; bir hata olursa siyah gider. Yüz hiçbir zaman maskesiz gitmez.
+  - Durum: Telefonda denenmeli. Kodu bu bilgisayarda derlenemedi; ilk derleme GitHub'daki APK yapımında. Denerken iki telefonla görüntülü ara, karşı telefonda maskenin yüzde durduğuna, kafa hızlı dönünce ve kamera çevrilince yüzün bir an bile görünmediğine bak. Eski Android yüz bulucusu yandan ve uzaktan yüzü zor bulur, o zaman görüntü kareli gider.
+  - iPhone'da ve eski APK'larda maske düğmesi görünmez.
+
 ## Depo (R2): kuruldu, az yer kaplıyor
 
 - **Kurulum:** Anahtarlar 9 Kasım'da girildi, sunucuya yazıldı. Fotoğraf ve şarkı yükleme açık.
