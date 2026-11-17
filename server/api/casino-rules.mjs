@@ -26,8 +26,11 @@ export const STAKES = {
   mid: [MIN_STAKE, 500, 1_000, 5_000],
   base: [MIN_STAKE, 500, 1_000],
 };
-/** The default daily ceiling per game: this many rounds at the game's top stake (live setting casino_daily_rounds). */
-export const DAILY_ROUNDS = 40;
+/**
+ * The default daily ceiling per game: this many rounds at the game's top stake (live setting casino_daily_rounds).
+ * 0 is none: the owners removed the daily limit (Nov 2026); Canlı ayarlar can set one again.
+ */
+export const DAILY_ROUNDS = 0;
 /**
  * The games the server plays, in the app's order. `id` is the app's (and the history's) key: 'olympus' is Yıldız
  * Avı and 'slot' Gece Yarısı Çarkı. The demo's switched-off games (Şans Çarkı, Zar, Ejder ile Kaplan, Altın

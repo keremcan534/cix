@@ -123,6 +123,7 @@ describe('Canlı ayarlar paneli Oyun Salonu’nu sunucu gibi okur', () => {
     assert.equal(valueText('casino_off', []), 'Hepsi açık');
     assert.equal(valueText('casino_max_bet', 25_000), '25.000 jeton');
     assert.equal(valueText('casino_daily_rounds', 40), 'En yüksek bahisle 40 tur');
+    assert.equal(valueText('casino_daily_rounds', 0), 'Sınırsız', '0 = sınır yok (varsayılan)');
     assert.deepEqual(registry.REGISTRY.casino_off.bounds.options, serverIds);
   });
 });

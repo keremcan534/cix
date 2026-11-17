@@ -150,7 +150,7 @@ export default function GameAdmin() {
                 <Row label="Profildeki Oyun Salonu'ndan" value={g.fromProfile} onChange={(v) => updateCasino(g.id, { fromProfile: v })} />
                 <Row label="Oda içinden" value={g.fromRoom} onChange={(v) => updateCasino(g.id, { fromRoom: v })} />
                 <Text style={s.label}>Günlük limit (kullanıcı başına)</Text>
-                <Chips value={g.dailyLimit} options={[40_000, 200_000, 400_000, 1_000_000].map((n) => [n, `${n.toLocaleString('tr-TR')} jeton`] as [number, string])} onChange={(v) => updateCasino(g.id, { dailyLimit: v })} />
+                <Chips value={g.dailyLimit} options={[[0, 'Sınırsız'], ...[40_000, 200_000, 400_000, 1_000_000].map((n) => [n, `${n.toLocaleString('tr-TR')} jeton`] as [number, string])]} onChange={(v) => updateCasino(g.id, { dailyLimit: v })} />
                 <Text style={s.label}>Sağlayıcı bağlantısı</Text>
                 <Chips<CasinoGame['providerStatus']>
                   value={g.providerStatus}

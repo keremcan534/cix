@@ -186,7 +186,6 @@ import { colors, fonts, gradient, semantic } from '@/theme';
 import { MuteBanner, useStopped } from '@/components/sanction-screen';
 import { refreshSanctions, showSanction } from '@/lib/sanctions';
 
-const DAILY_DICE = 20;
 const BOT_TIPS = [
   'Oda kuralları: saygılı ol, spam ve hakaret yok. Şikâyet için ⋯ menüsünü kullan.',
   'Koltuğa geçmek için boş bir koltuğa dokun; bu odada istekle oturuluyor.',
@@ -823,7 +822,6 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const [giftLog, setGiftLog] = useState<GiftLogRow[]>([]);
   const [requests, setRequests] = useState<string[]>([]);
   const [envelope, setEnvelope] = useState<{ from: string; amount: number; count: number; seconds: number } | null>(null);
-  const [dicePlays, setDicePlays] = useState(DAILY_DICE);
   // Room music on this phone: on/off and how loud (a server room plays its music here, components/room/room-music).
   const [musicEnabled, setMusicEnabled] = useState(true);
   const [musicVolume, setMusicVolume] = useState(0.65);
@@ -3013,17 +3011,12 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   };
 
   const playDice = (bet: number) => {
-    if (dicePlays <= 0) {
-      showAlert('Günlük limit', 'Bugünkü oyun hakkın bitti.');
-      return null;
-    }
     // Same house rule and payout pool as the casino (lib/games, lib/casino-odds).
     const r = playDuel(bet);
     if (!r.ok) {
       showAlert('Zar Düellosu', r.reason);
       return null;
     }
-    setDicePlays((n) => n - 1);
     const { me, them, payout } = r;
     const opponent = pick(seatedOthers.length ? seatedOthers : USERS.map((u) => u.id));
     addMsg({ system: true, text: `🎲 ${ME.name} (${me}) vs ${userById(opponent).name} (${them}) → ${payout > 0 ? `${ME.name} kazandı! +${payout} (oyun bakiyesine)` : 'kasa kazandı'}` });
@@ -4202,7 +4195,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           onJoin={joinLuckyBag}
         />
       )}
-      <DiceModal visible={panel === 'dice'} onClose={closePanel} onPlay={playDice} playsLeft={dicePlays} />
+      <DiceModal visible={panel === 'dice'} onClose={closePanel} onPlay={playDice} />
       <ContribBoard
         visible={panel === 'contrib'}
         onClose={closePanel}

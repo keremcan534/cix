@@ -68,7 +68,7 @@ describe('defaults are today', () => {
       casino_off: [],
       casino_open: [],
       casino_max_bet: 25_000,
-      casino_daily_rounds: 40,
+      casino_daily_rounds: 0,
       room_decor_off: [],
       room_bg_custom_price: 5_000,
       room_bg_custom_days: 30,

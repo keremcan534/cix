@@ -18,7 +18,7 @@ Bu bir **tıklanabilir prototip**: backend yok, veriler sahte. "Sunucu tarafınd
 | M06 Mesajlaşma, teslim/okundu, ücretli mesaj kuralı, emoji | ✅ | `sohbet/[id]` |
 | M07/M09 Sesli/görüntülü arama, dakika ücreti önceden gösterilir | 🟡 | `arama/[id]` (gerçek ses/görüntü yok) |
 | M08 Sesli odalar (6.2–6.3) | ✅ | `oda/[id]` — aşağıya bak |
-| M10 Mini oyun | ✅ | Odada 🎲 Zar Düellosu (18+, günlük limit) |
+| M10 Mini oyun | ✅ | Odada 🎲 Zar Düellosu (18+; günlük limit sahiplerin isteğiyle kaldırıldı, Kasım 2026) |
 | M11 Hediyeler, fiyat onayı, adet | ✅ | Oda hediye paneli |
 | M12 Coin cüzdanı, hareket geçmişi, bekleyen satın alma | ✅ | `cuzdan` |
 | M13 Elmas, yayıncı kazancı, para çekme | ✅ | `yayinci/*` |

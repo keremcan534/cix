@@ -73,7 +73,7 @@ Eski uygulama sürümleri yeni masaları çizemez: oda oyunlarında sunucu ve uy
 - **Fizik:** yerçekimi, yuvarlak bilye ve çiviler, duvarlar ve kupa ağızları. Hesap yalnızca dört işlem ve karekökle yapılır; aynı atış her telefonda aynı yolu çizer.
 - **Sonuç sunucuda:** tur, diğer oyunlar gibi `POST /api/casino/play` ile oynanır (`game: 'bilye'`, `pick`: atış gücü). Sunucu bilyenin düşeceği hedefi çeker; ekran o hedefe giden, simülasyonda gerçekten oraya düşmüş bir uçuşu oynatır. Telefon sonucu belirlemez.
 - **Olasılık:** her atış gücü için 400.000 atış simüle edildi ve bilyenin gerçekten nereye düştüğü sayıldı. Ödeyen hedeflerin payları, beklenen geri ödeme %40'ı geçmeyecek biçimde ölçeklendi (Hafif %39,98, Orta %39,99, Güçlü %40,00); kalan pay ödemesiz ceplere gider. Altın kupa her atış gücünde %1'in altındadır. Tahta ya da fizik değişirse `node --experimental-strip-types --no-warnings --import ./tests/register.mjs scripts/bilye-table.ts` yeniden çalıştırılır; testler eski tablo kalırsa kırılır.
-- **Ekonomi:** ayrı bir sistem kurulmadı. Bahis önce oyun bakiyesinden düşer; kazanç oyun bakiyesine yazılır (hediye edilemez, paraya çevrilemez). Bahsin %60'ı kasaya, %40'ı ödül havuzuna; kazanç yalnızca havuzdan ödenir, havuz en yüksek ödülü karşılayamıyorsa tur reddedilir. Günlük sınır, en yüksek bahis ve oyunu kapatma Canlı ayarlar › Oyun Salonu'ndan.
+- **Ekonomi:** ayrı bir sistem kurulmadı. Bahis önce oyun bakiyesinden düşer; kazanç oyun bakiyesine yazılır (hediye edilemez, paraya çevrilemez). Bahsin %60'ı kasaya, %40'ı ödül havuzuna; kazanç yalnızca havuzdan ödenir, havuz en yüksek ödülü karşılayamıyorsa tur reddedilir. **Günlük sınır yok** (sahipler kaldırdı, Kasım 2026): Canlı ayarlar › Oyun Salonu › Günlük sınır varsayılanı 0 = sınırsız; bir sayı yazılırsa kişi başı her oyunda günde en yüksek bahisle o kadar tur oynanır. En yüksek bahis ve oyunu kapatma da oradan. Kişinin kendi koyduğu harcama limiti oyunlarda da geçerli.
 - **Rapor:** Yönetim › Oyun Salonu (yalnız yönetici). Turlar 180 gün saklanır; kasa defteri başlangıçtan bu yanadır.
 - **Henüz yok (sonraki aşamalar, karar gerektirir):** oyuncu oranının panelden değiştirilmesi (60/40 kuralını değiştirir), Pachinko'ya özel Jackpot ve Fever modu, ikinci tahta, oda içi skor tablosu, düello ve turnuvalar.
 
@@ -89,7 +89,7 @@ Eski uygulama sürümleri yeni masaları çizemez: oda oyunlarında sunucu ve uy
 İsteğin işlenme sırası:
 1. **Tekrar kontrolü:** Aynı istek kimliğiyle tekrar gelen istek aynı sonucu döndürür; ikinci kez jeton düşülmez.
 2. **Erişim:** Oyun aktif mi, sağlayıcı ayakta mı, bu giriş noktası (profil/oda) izinli mi, Cömertlik Seviyesi yeterli mi? Seviye her turda yeniden okunur, ekrandaki bilgiye güvenilmez.
-3. **Limit:** Bahis tutarı ve günlük limit kontrolü.
+3. **Limit:** Bahis tutarı kontrolü; Canlı ayarlar'da günlük sınır konmuşsa o da (varsayılan: sınır yok).
 4. **Tahsilat:** Bahis tek bir hareketle düşülür.
 5. **Sağlayıcı:** Sağlayıcı hata verirse bahis aynı işlem numarasıyla iade edilir.
 6. **Ödeme:** Kazanç varsa yatırılır.

@@ -16,8 +16,9 @@
 // anything is taken. A slot's JACKPOT share moves from the pool into its fund; a line of wilds wins bet / top stake
 // of the fund.
 // Open from Cömertlik Lv.2 (Seviye ayarları can move it: wheel.mjs casinoNeed), checked on every round; to admin accounts only until the live
-// setting casino_open opens the coin games to everyone (wheel.mjs paidGamesOpen). Per person: a daily ceiling per game
-// (live setting casino_daily_rounds × the game's top stake) and a rate limit. Live settings also switch single games
+// setting casino_open opens the coin games to everyone (wheel.mjs paidGamesOpen). Per person: a rate limit, and a daily
+// ceiling per game only when the live setting casino_daily_rounds sets one (× the game's top stake; 0, the default since
+// the owners removed the limit in Nov 2026, is none). Live settings also switch single games
 // off (casino_off) and cap the stake (casino_max_bet); Acil durum's Oyunlar stops them all (features.mjs).
 // Kept: the rounds, 180 days (the history and the daily limit), deleted with the account (social.mjs eraseAccount).
 import crypto from 'node:crypto';
@@ -56,7 +57,7 @@ const DAY_START = `(date_trunc('day', now() AT TIME ZONE 'Europe/Istanbul') AT T
 const fmt = (n) => n.toLocaleString('tr-TR');
 const POOL_LOW = 'Ödül havuzu şu an bu bahsin en yüksek ödülünü karşılayamıyor. Daha küçük bir bahisle dene; jetonun düşülmedi.';
 
-/** A game's daily ceiling per person, in coins played. */
+/** A game's daily ceiling per person, in coins played; 0 is none. */
 export const dailyOf = (g, s = live()) => s.casinoDailyRounds * topStake(g);
 const isOn = (g, s) => !s.casinoOff.has(g.id) && !s.featuresOff.has('games');
 
@@ -240,10 +241,12 @@ export const casinoRoutes = {
       row = await tx(async (c) => {
         const u = (await c.query('SELECT coins, game_coins FROM users WHERE id = $1 FOR UPDATE', [me.id])).rows[0];
         if ((await c.query('SELECT 1 FROM casino_rounds WHERE user_id = $1 AND ref = $2', [me.id, ref])).rowCount) throw Object.assign(new Error('replay'), { code: '23505' });
-        const played = Number(
-          (await c.query(`SELECT coalesce(sum(bet), 0) AS n FROM casino_rounds WHERE user_id = $1 AND game = $2 AND created_at >= ${DAY_START}`, [me.id, g.id])).rows[0].n,
-        );
-        if (played + bet > daily) throw new HttpError(409, `${g.name} için günlük sınır ${fmt(daily)} jeton. Bugün kalan: ${fmt(Math.max(0, daily - played))}`);
+        if (daily) {
+          const played = Number(
+            (await c.query(`SELECT coalesce(sum(bet), 0) AS n FROM casino_rounds WHERE user_id = $1 AND game = $2 AND created_at >= ${DAY_START}`, [me.id, g.id])).rows[0].n,
+          );
+          if (played + bet > daily) throw new HttpError(409, `${g.name} için günlük sınır ${fmt(daily)} jeton. Bugün kalan: ${fmt(Math.max(0, daily - played))}`);
+        }
         const { fromGame, fromCoins } = splitStake(bet, Number(u.game_coins));
         if (Number(u.coins) < fromCoins) throw new HttpError(409, 'Yetersiz jeton');
         // Before anything is taken: the pool must cover this round's top prize.

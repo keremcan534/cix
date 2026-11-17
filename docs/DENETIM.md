@@ -20,7 +20,10 @@ modunda olması, hata takibi olmaması ve kırık kodun birleşmeden önce yakal
   Türkiye'de de lisans gerekir. Kodda varsayılan olarak **açık** (Cömertlik Lv.2 ve 18 yaş şartıyla). Panelin "Şanslı
   hediye ayarı" sayfasından paket paket kapatılabiliyor.
 - **Oyun Salonu** kazancı ayrı oyun jetonuna gidiyor (`casino.mjs`, `game_coins`), bu daha güvenli. Ama bahis satın
-  alınan jetonla da yapılabiliyor. Varsayılan olarak yalnız yöneticilere açık.
+  alınan jetonla da yapılabiliyor. Varsayılan olarak yalnız yöneticilere açık. Oyun başına günlük sınır (Oyun Salonu,
+  Rüzgâr Gülü, Zar Düellosu) Kasım 2026'da sahiplerin isteğiyle kaldırıldı: bir kişinin bir günde oynayabileceği
+  jetonun üst sınırı yok; yalnız kişinin kendi koyduğu harcama limiti duruyor. Canlı ayarlar › Oyun Salonu › Günlük
+  sınır (ve `WHEEL_DAILY`) ile yeniden konabilir.
 - **Öneri:** İlk sürümde Şanslı hediye kapalı olsun, ya da kazancı nakde dönmeyen ayrı bir bakiyeye gitsin (Oyun
   Salonu gibi). Kararı bir avukat görüşüyle siz verin; kapatma ya da ayrı bakiye işini Claude yapar.
 

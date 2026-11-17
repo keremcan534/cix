@@ -43,8 +43,8 @@ export const WHEEL_JACKPOT_SHARE_MILLI = 15;
 export const WHEEL_JACKPOT_SEED_SPINS = 20;
 /** A request whose best slice is at least this (thousandths) or a JACKPOT goes on the winners' list. */
 export const WHEEL_BIG_MILLI = 10_000;
-/** The server's default daily limit per person, in coins played (WHEEL_DAILY). */
-export const WHEEL_DAILY = 1_000_000;
+/** The server's default daily limit per person, in coins played (WHEEL_DAILY); 0 is none, as the server has it unset. */
+export const WHEEL_DAILY: number = 0;
 /** Cömertlik level the wheel opens at. */
 export const WHEEL_NEED_LEVEL = 2;
 
