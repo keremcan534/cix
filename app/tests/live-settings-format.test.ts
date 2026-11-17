@@ -23,6 +23,7 @@ import {
   impactText,
   istanbulAt,
   MONEY_STOP,
+  ONE_ON_ONE_KEYS,
   parseRate,
   parseWhole,
   rateError,
@@ -81,6 +82,7 @@ describe('the second confirmation', () => {
     for (const k of ['dm_price', 'call_voice_price', 'call_video_price', 'call_plain_voice_price', 'call_plain_video_price', 'match_voice_price', 'match_video_price'] as LiveKey[])
       for (const a of [0, 100, 119, 120, 240, 480, 481, 2000, null]) cases.push([k, 240, a]);
     for (const k of ['call_free', 'call_free_seconds', 'match_free', 'match_free_seconds', 'heart_voice_level', 'heart_video_level'] as LiveKey[]) cases.push([k, 3, 20], [k, 3, 0], [k, 3, null]);
+    for (const k of ['heart_msg_points', 'heart_msg_daily', 'heart_grace_days', 'heart_half_days'] as LiveKey[]) cases.push([k, 7, 30], [k, 7, 1], [k, 7, null]);
     for (const k of ['welcome_coins', 'invite_coins', 'invite_daily_cap'] as LiveKey[]) for (const a of [10, 100, 200, 201, 400, 401, 1000, null]) cases.push([k, 200, a]);
     cases.push(['rewards_off', [], ['welcome', 'invite', 'first_purchase']], ['rewards_off', ['invite'], null]);
     for (const a of [1, 2, 3, 5, 60, null]) cases.push(['room_staff_away_minutes', 5, a]);
@@ -284,6 +286,13 @@ describe('values as the admin reads them', () => {
     assert.equal(valueText('room_staff_away_minutes', 5), '5 dakika sonra kapanır');
     assert.equal(valueText('boss_seat_coins', 25_000), 'Tek seferde 25.000 jeton');
     assert.equal(valueText('boss_seat_minutes', 10), '10 dakika');
+    assert.equal(valueText('heart_video_level', 3), 'Kalp Lv.3');
+    assert.equal(valueText('heart_msg_points', 2), 'Mesaj başına 2 puan');
+    assert.equal(valueText('heart_msg_daily', 0), 'Mesaj saymaz');
+    assert.equal(valueText('heart_grace_days', 7), '7 gün tam sayılır');
+    assert.equal(valueText('heart_half_days', 14), '14 günde yarıya iner');
+    // Birebir ve eşleşme: the admin card shows every 1v1 key.
+    assert.deepEqual(ONE_ON_ONE_KEYS.map((k) => k.key).sort(), Object.keys(registry.REGISTRY).filter((k) => registry.REGISTRY[k as keyof typeof registry.REGISTRY].group === 'Birebir ve eşleşme').sort());
     assert.equal(valueText('event_reminders_off', []), 'Hepsi açık');
     assert.equal(valueText('event_reminders_off', ['hour', 'start']), 'Kapalı: 1 saat önce, Başlarken');
     assert.deepEqual(ROOM_NUMBER_KEYS.map((k) => k.key), Object.keys(registry.REGISTRY).filter((k) => registry.REGISTRY[k as keyof typeof registry.REGISTRY].group === 'Odalar'));

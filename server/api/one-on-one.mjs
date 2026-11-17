@@ -41,7 +41,7 @@ import { assertMay } from './sanctions.mjs';
 import { giftDiamonds, paidCoins, spendCoins } from './wallet.mjs';
 import { assertUnderLimit, limitRefusal } from './spend-limit.mjs';
 
-/** Heart points (coins the two spent on each other: gifts, paid messages, paid minutes) needed for each level. */
+/** Heart points (heartPoints: what the two spent on each other and their messages, cooling when quiet) for each level. */
 export const HEART_LEVELS = [0, 300, 1500, 5000, 15_000, 40_000, 100_000, 250_000, 500_000, 1_000_000, 2_000_000];
 export const heartLevel = (points) => HEART_LEVELS.findLastIndex((p) => points >= p);
 /** A photo in a chat between a streamer and someone who isn't opens at this heart level (messages.mjs). */
@@ -58,14 +58,41 @@ const TOKEN_TTL = 600;
 const streamerSql = (x) => `EXISTS (SELECT 1 FROM agency_streamers s WHERE s.streamer_id = ${x} AND s.ended_at IS NULL AND s.contract = 'approved')`;
 const insufficient = () => Object.assign(new HttpError(409, 'Yetersiz jeton'), { extra: { code: 'insufficient' } });
 
-/** Heart points between two people, both ways. */
+/**
+ * How much a heart point earned at `at` still counts (SQL, numeric): in full for the grace's days, then halving
+ * every half's days, so a pair that keeps in touch keeps its heart and one that goes quiet slowly loses it. `grace`
+ * and `half` are the query's parameters (Canlı ayarlar heart_grace_days, heart_half_days).
+ */
+export const heartWarmth = (at, grace, half) =>
+  `CASE WHEN ${at} > now() - make_interval(days => ${grace}::int) THEN 1
+        ELSE power(0.5, extract(epoch FROM now() - make_interval(days => ${grace}::int) - ${at}) / (${half}::numeric * 86400)) END`;
+/** A year back is enough: older points weigh next to nothing. */
+export const HEART_WINDOW = "interval '365 days'";
+/** A day of chat (chat_days, Turkey's days) counts from its noon. */
+export const CHAT_DAY_AT = "(day + time '12:00') AT TIME ZONE 'Europe/Istanbul'";
+
+/**
+ * Heart points between two people, both ways: the coins they spent on each other (gifts, paid messages, paid
+ * minutes) and their messages (chat_days: heart_msg_points each, at most heart_msg_daily a day: trust grows slowly), each as
+ * much as it still counts (heartWarmth). A 5,000-coin gift is level 3 at once; chatting every day keeps a heart warm.
+ */
 export async function heartPoints(c, a, b) {
+  const s = live();
   const r = await c.query(
-    `SELECT (SELECT coalesce(sum(total), 0) FROM gift_events WHERE (sender = $1 AND recipient = $2) OR (sender = $2 AND recipient = $1))
-          + (SELECT coalesce(sum(coins), 0) FROM paid_events WHERE (payer = $1 AND earner = $2) OR (payer = $2 AND earner = $1)) AS points`,
-    [a, b],
+    `WITH ev AS (
+       SELECT created_at AS at, total::numeric AS pts FROM gift_events
+        WHERE ((sender = $1 AND recipient = $2) OR (sender = $2 AND recipient = $1)) AND created_at > now() - ${HEART_WINDOW}
+       UNION ALL
+       SELECT created_at, coins::numeric FROM paid_events
+        WHERE ((payer = $1 AND earner = $2) OR (payer = $2 AND earner = $1)) AND created_at > now() - ${HEART_WINDOW}
+       UNION ALL
+       SELECT ${CHAT_DAY_AT}, least(n * $3::numeric, $4::numeric) FROM chat_days
+        WHERE lo = LEAST($1::uuid, $2::uuid) AND hi = GREATEST($1::uuid, $2::uuid) AND day > (now() - ${HEART_WINDOW})::date
+     )
+     SELECT coalesce(sum(pts * ${heartWarmth('at', '$5', '$6')}), 0) AS points FROM ev`,
+    [a, b, s.heartMsg, s.heartMsgDaily, s.heartGrace, s.heartHalf],
   );
-  return Number(r.rows[0].points);
+  return Math.floor(Number(r.rows[0].points));
 }
 
 /**
@@ -155,9 +182,28 @@ const openCallOf = async (c, uid) => (await c.query(`${CALL_SELECT} WHERE (k.cal
 const lockUsers = (c, ids) => c.query('SELECT id FROM users WHERE id = ANY($1::uuid[]) ORDER BY id FOR UPDATE', [[...new Set(ids)]]);
 export const callRoom = (id) => `call-${id}`;
 
+/**
+ * The gifts the two sent each other since the call went live (to its end), for the call's screen: the coins each of
+ * them received, and the last gift. Read on the beat and with the open call (not on the locked paths).
+ */
+async function withGifts(c, k) {
+  if (!k?.started_at) return k;
+  const r = await c.query(
+    `SELECT coalesce(sum(total) FILTER (WHERE recipient = $1), 0)::bigint AS to_caller,
+            coalesce(sum(total) FILTER (WHERE recipient = $2), 0)::bigint AS to_callee,
+            (array_agg(json_build_object('id', id, 'sender', sender, 'giftId', gift_id, 'count', count, 'total', total) ORDER BY id DESC))[1] AS last
+       FROM gift_events
+      WHERE created_at >= $3 AND ($4::timestamptz IS NULL OR created_at <= $4)
+        AND ((sender = $1 AND recipient = $2) OR (sender = $2 AND recipient = $1))`,
+    [k.caller, k.callee, k.started_at, k.ended_at],
+  );
+  return { ...k, gifts: r.rows[0] };
+}
+
 /** A call as one of its two people sees it. */
 function view(k, me) {
   const mine = k.caller === me;
+  const g = k.gifts;
   return {
     id: Number(k.id),
     kind: k.kind,
@@ -177,6 +223,16 @@ function view(k, me) {
     minutes: k.minutes,
     coins: Number(k.coins),
     serverNow: k.now,
+    // Gifts during the call (withGifts): what I received and sent, and the last one (an older app ignores it).
+    ...(g
+      ? {
+          gifts: {
+            received: Number(mine ? g.to_caller : g.to_callee),
+            sent: Number(mine ? g.to_callee : g.to_caller),
+            last: g.last ? { id: Number(g.last.id), fromMe: g.last.sender === me, giftId: g.last.giftId, count: Number(g.last.count), total: Number(g.last.total) } : null,
+          },
+        }
+      : {}),
   };
 }
 
@@ -460,14 +516,14 @@ export const oneOnOneRoutes = {
   async 'GET /api/calls/current'(req) {
     const me = await auth(req);
     const k = await openCallOf(db, me.id);
-    return { call: k ? view(k, me.id) : null };
+    return { call: k ? view(await withGifts(db, k), me.id) : null };
   },
 
   async 'POST /api/calls/beat'(req) {
     const me = await auth(req);
     const k = await ownCall(db, idOf(await readJson(req)), me.id);
     if (k.status === 'ringing' || k.status === 'live') await db.query(`UPDATE calls SET ${k.caller === me.id ? 'caller_seen' : 'callee_seen'} = now() WHERE id = $1`, [k.id]);
-    return { call: view(await settle(k.id), me.id) };
+    return { call: view(await withGifts(db, await settle(k.id)), me.id) };
   },
 
   async 'POST /api/calls/answer'(req) {

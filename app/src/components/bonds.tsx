@@ -1,5 +1,6 @@
 // Bağlar on a profile: the bonds (Çift, Kardeş, Kanka…), requests to answer, sending a new one with its bond
-// gift, ending one, hiding them, and the Lv2 badge / Lv6 frame that a bond gives the profile header.
+// gift (from "Bağ kur" or, while Aile ve Dost is empty, its shelf of kinds), ending one, hiding them, and the Lv2
+// badge / Lv6 frame that a bond gives the profile header.
 // Live mode reads and changes everything on the server (lib/live/bonds); the offline demo keeps it on the phone.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -226,6 +227,16 @@ export function BondsTab({ user, isMe, state, isBlocked, onMeetInvite }: { user:
     setDemo({ hidden: !demo.hidden });
   };
 
+  // A kind picked from the shelf: its price said once before the bond gift goes (the sheet's "Bağ kur" sends at once).
+  const canAsk = !isMe && !ours && !myRequest && !theirRequest;
+  const ask = (kind: BondKind) => {
+    const k = BOND_KINDS[kind];
+    showAlert(`${k.label} bağı kur`, `${user.name} ile ${k.label} bağı için ${k.gift} gider: ${k.price.toLocaleString('tr-TR')} jeton. Kabul etmezse jetonların geri gelir.`, [
+      { text: 'Vazgeç', style: 'cancel' },
+      { text: 'İstek gönder', onPress: () => void request(kind) },
+    ]);
+  };
+
   const rules = () => showAlert('Bağlar nasıl işler?', [...BOND_RULES, '', 'Ödüller: ' + BOND_REWARDS.map((r) => `Lv.${r.level} ${r.label}`).join(' · ')].join('\n'));
 
   return (
@@ -251,6 +262,13 @@ export function BondsTab({ user, isMe, state, isBlocked, onMeetInvite }: { user:
           )}
         </View>
         {isMe && hidden && <Text style={[styles.meta, { marginTop: 8, textAlign: 'center', fontSize: 12 }]}>Bağların başkalarından gizli. Göz simgesiyle açabilirsin.</Text>}
+        {seg === 'diger' && shown && list.length > 0 && (
+          <Text style={[styles.meta, { marginTop: 8, textAlign: 'center', fontSize: 12 }]}>
+            {BOND_ORDER.filter((kind) => kind !== 'cift')
+              .map((kind) => BOND_KINDS[kind].label)
+              .join(' · ')}
+          </Text>
+        )}
 
         <View style={{ gap: 12, marginTop: 14 }}>
           {!shown ? (
@@ -263,6 +281,7 @@ export function BondsTab({ user, isMe, state, isBlocked, onMeetInvite }: { user:
           ) : (
             <View style={styles.emptyBox}>
               <Text style={styles.meta}>{seg === 'cift' ? 'Henüz Çift bağı yok.' : 'Henüz aile ya da dost bağı yok.'}</Text>
+              {seg === 'diger' && <KindShelf onPick={canAsk && !busy ? ask : undefined} />}
             </View>
           )}
         </View>
@@ -393,6 +412,37 @@ function RequestRow({ bond, now, mine, children }: { bond: Bond; now: number; mi
   );
 }
 
+/**
+ * Aile ve Dost's kinds (Kardeş, Bacı, Ağabey, Abla, Yenge, Enişte, Kanka) with their bond gifts, so an empty list still
+ * shows what can be formed; on someone else's profile a kind can be picked from here (`onPick`).
+ */
+function KindShelf({ onPick }: { onPick?: (kind: BondKind) => void }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
+  return (
+    <View style={styles.shelf}>
+      {BOND_ORDER.filter((kind) => kind !== 'cift').map((kind) => {
+        const k = BOND_KINDS[kind];
+        const art = BOND_ART[kind];
+        return (
+          <Pressable
+            key={kind}
+            disabled={!onPick}
+            onPress={() => onPick?.(kind)}
+            style={({ pressed }) => [styles.shelfItem, pressed && { opacity: 0.7 }]}
+            accessibilityRole={onPick ? 'button' : undefined}
+            accessibilityLabel={`${k.label}: ${k.gift}, ${k.price.toLocaleString('tr-TR')} jeton`}
+          >
+            {art ? <Image source={art} style={styles.kindArt} resizeMode="contain" accessibilityIgnoresInvertColors /> : <Ionicons name={k.icon} size={26} color={colors.primaryText} />}
+            <Text style={styles.kindLabel}>{k.label}</Text>
+            <Text style={styles.shelfPrice}>{k.price.toLocaleString('tr-TR')} jeton</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 function SmallButton({ title, onPress, primary, disabled }: { title: string; onPress: () => void; primary?: boolean; disabled?: boolean }) {
   const styles = useStyles();
   return (
@@ -422,6 +472,9 @@ const useStyles = makeStyles(({ colors, semantic, lift, ink, dark }) => ({
   kindDot: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   kindArt: { width: 44, height: 44 },
   kindLabel: { color: colors.text, fontSize: 13, fontWeight: '800' },
+  shelf: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginTop: 8 },
+  shelfItem: { width: 76, alignItems: 'center', gap: 2, paddingVertical: 8, borderRadius: 14, backgroundColor: dark ? 'rgba(255,255,255,0.06)' : ink(0.04) },
+  shelfPrice: { color: colors.textDim, fontSize: 11 },
   track: { height: 6, borderRadius: 3, backgroundColor: dark ? 'rgba(255,255,255,0.1)' : ink(0.08), marginTop: 12, overflow: 'hidden' },
   fill: { height: 6, borderRadius: 3, backgroundColor: colors.primary },
   request: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: colors.card, borderRadius: 16, padding: 12, ...(dark ? { borderWidth: 1, borderColor: colors.border } : lift) },

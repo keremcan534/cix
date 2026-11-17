@@ -105,6 +105,37 @@ describe('Yakınlık ve yayıncı arama kazancı', () => {
     assert.deepEqual(hearts.map((x) => x.id), [close.user.id]);
   });
 
+  test('sohbet kalbi yavaş doldurur (mesaj 2 puan, günde en çok 60); sessiz kalan kalp soğur', async () => {
+    const me = await signUp('Sohbet Selin');
+    const chatty = await signUp('Konuşkan Kerem');
+    const quiet = await signUp('Sessiz Ekin');
+    const msgs = (from, to, n, days = 0) =>
+      q("INSERT INTO messages (sender, recipient, body, ref, created_at) SELECT $1, $2, 'Selam', md5(random()::text), now() - make_interval(days => $3) FROM generate_series(1, $4)", [from.user.id, to.user.id, days, n]);
+    // Today 10 each way: 20 messages, 40 points. Yesterday 50: 100, but at most 60 a day.
+    await msgs(me, chatty, 10);
+    await msgs(chatty, me, 10);
+    await msgs(me, chatty, 50, 1);
+    // A minute short of `days` ago, so a halving the test expects is just not reached when it reads.
+    const gift = (from, to, total, days) =>
+      q("INSERT INTO gift_events (sender, recipient, gift_id, count, unit_price, total, place, ref, created_at) VALUES ($1, $2, 'gul', 1, $3, $3, 'chat', $4, now() - make_interval(days => $5) + interval '1 minute')", [from.user.id, to.user.id, total, rnd(6), days]);
+    // Three weeks ago: a week in full, then half in two weeks: 1000 → 500.
+    await gift(chatty, me, 1000, 21);
+    // Nine weeks quiet: a week in full, then four halvings: 2000 → 125.
+    await gift(me, quiet, 2000, 63);
+    const { hearts } = await ok(call('GET', '/api/me/hearts', null, me.session), 'kalpler');
+    assert.deepEqual(hearts, [
+      { id: chatty.user.id, points: 40 + 60 + 500, level: 1 },
+      { id: quiet.user.id, points: 125, level: 0 },
+    ]);
+    const pairPoints = async (other) => (await ok(call('GET', `/api/one-on-one?with=${other.user.id}`, null, me.session), 'birebir')).pair.heart.points;
+    assert.equal(await pairPoints(chatty), 600, 'sohbetin kalbi aynı puanı görür');
+    assert.equal(await pairPoints(quiet), 125);
+    assert.deepEqual((await q('SELECT n FROM chat_days WHERE lo = LEAST($1::uuid, $2::uuid) AND hi = GREATEST($1::uuid, $2::uuid) ORDER BY day', [me.user.id, chatty.user.id])).rows, [{ n: 50 }, { n: 20 }]);
+
+    await ok(call('DELETE', '/api/me', null, chatty.session), 'hesap silinir');
+    assert.equal((await q('SELECT count(*)::int AS n FROM chat_days WHERE lo = $1 OR hi = $1', [chatty.user.id])).rows[0].n, 0, 'silinen hesabın sohbet günleri gider');
+  });
+
   test('bu haftaki ücretli aramalar: kaç arama, dakika, elmas (mesaj ücreti sayılmaz)', async () => {
     const star = await signUp('Yayıncı Yeliz');
     const fan = await signUp('Dinleyen Doruk');

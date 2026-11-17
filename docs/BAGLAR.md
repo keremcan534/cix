@@ -2,6 +2,8 @@
 
 İki kişinin karşılıklı kabul ettiği bağ: Çift, Kardeş, Bacı, Ağabey, Abla, Yenge, Enişte, Kanka. Profilin **Bağlar** sekmesinde görünür.
 
+Sekmede iki bölüm var: **Çift** ve **Aile ve Dost** (diğer yedi tür). Aile ve Dost boşken yedi tür resmi ve fiyatıyla görünür; başkasının profilinde birine dokununca fiyat bir kez sorulur ve istek gider. Doluyken bağların üstünde türlerin adları yazar. Sohbetteki **kalp** başka bir şeydir: iki kişinin yakınlığı, hediye ve sohbetle dolar, sessiz kalınca düşer (`one-on-one.mjs`, [`SUNUCU.md`](SUNUCU.md)).
+
 ## Kurallar
 
 | Tür | Bağ hediyesi | Fiyat | Bir kişide en fazla |

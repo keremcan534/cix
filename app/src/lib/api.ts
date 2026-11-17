@@ -1439,7 +1439,11 @@ export type OneOnOneKey =
   | 'match_free'
   | 'match_free_seconds'
   | 'heart_voice_level'
-  | 'heart_video_level';
+  | 'heart_video_level'
+  | 'heart_msg_points'
+  | 'heart_msg_daily'
+  | 'heart_grace_days'
+  | 'heart_half_days';
 /** A setting's value: a list of ids, text, a number, a campaign, or null for the built-in default. */
 export type LiveValue = string | number | string[] | CatalogCampaign | null;
 export type LiveSetting = {

@@ -10,6 +10,7 @@ import { useSyncExternalStore } from 'react';
 import { AppState } from 'react-native';
 
 import * as api from '@/lib/api';
+import type { CallGifts } from '@/lib/call-gifts';
 import { liveCalls, once, refreshWallet, rememberUser, toLocal } from '@/lib/live';
 import { lineOpen, onLine } from '@/lib/live/live-line';
 
@@ -34,6 +35,8 @@ export type CallView = {
   minutes: number;
   coins: number;
   serverNow: string;
+  /** Gifts during the call (the beat's answer; missing from an older server and before the call went live). */
+  gifts?: CallGifts;
 };
 /** My free calls with someone nobody earns from (server one-on-one.mjs callRightsOf): 24 hours, `seconds` each. */
 export type CallRights = { total: number; left: number; seconds: number; nextAt: string | null };

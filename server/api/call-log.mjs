@@ -14,7 +14,8 @@
 // number per person (call_history_cleared), deleted with the account. Weeks and days are Turkey's.
 import { grantBackpack } from './backpack.mjs';
 import { HttpError, auth, claimRef, db, limit, once } from './core.mjs';
-import { heartLevel } from './one-on-one.mjs';
+import { live } from './live-settings.mjs';
+import { CHAT_DAY_AT, HEART_WINDOW, heartLevel, heartWarmth } from './one-on-one.mjs';
 import { grantTaskRewards, taskItems } from './task-rewards.mjs';
 import { creditCoins } from './wallet.mjs';
 
@@ -132,20 +133,28 @@ export const callLogRoutes = {
   },
 
   /**
-   * Yakınlık: heart points (one-on-one.mjs heartPoints: gifts both ways, paid messages and minutes) with each person
-   * I share any, most first, at most 200. Blocks either way and deleted accounts left out.
+   * Yakınlık: heart points (one-on-one.mjs heartPoints: gifts both ways, paid messages and minutes, messages, each as
+   * much as it still counts) with each person I share any, most first, at most 200. Blocks either way and deleted
+   * accounts left out.
    */
   async 'GET /api/me/hearts'(req) {
     const me = await auth(req);
+    const s = live();
     const r = await db.query(
-      `SELECT t.peer AS id, sum(t.points) AS points FROM (
-          SELECT CASE WHEN sender = $1 THEN recipient ELSE sender END AS peer, total AS points FROM gift_events WHERE (sender = $1 OR recipient = $1) AND sender <> recipient
+      `WITH ev AS (
+          SELECT CASE WHEN sender = $1 THEN recipient ELSE sender END AS peer, created_at AS at, total::numeric AS pts FROM gift_events
+           WHERE (sender = $1 OR recipient = $1) AND sender <> recipient AND created_at > now() - ${HEART_WINDOW}
           UNION ALL
-          SELECT CASE WHEN payer = $1 THEN earner ELSE payer END, coins FROM paid_events WHERE (payer = $1 OR earner = $1) AND earner IS NOT NULL AND payer <> earner
-        ) t JOIN users u ON u.id = t.peer
-        WHERE u.deleted_at IS NULL AND ${NOT_BLOCKED('$1', 't.peer')}
-        GROUP BY t.peer HAVING sum(t.points) > 0 ORDER BY sum(t.points) DESC LIMIT 200`,
-      [me.id],
+          SELECT CASE WHEN payer = $1 THEN earner ELSE payer END, created_at, coins::numeric FROM paid_events
+           WHERE (payer = $1 OR earner = $1) AND earner IS NOT NULL AND payer <> earner AND created_at > now() - ${HEART_WINDOW}
+          UNION ALL
+          SELECT CASE WHEN lo = $1 THEN hi ELSE lo END, ${CHAT_DAY_AT}, least(n * $2::numeric, $3::numeric) FROM chat_days
+           WHERE (lo = $1 OR hi = $1) AND day > (now() - ${HEART_WINDOW})::date
+        ), t AS (SELECT peer, floor(sum(pts * ${heartWarmth('at', '$4', '$5')})) AS points FROM ev GROUP BY peer)
+        SELECT t.peer AS id, t.points FROM t JOIN users u ON u.id = t.peer
+         WHERE t.points > 0 AND u.deleted_at IS NULL AND ${NOT_BLOCKED('$1', 't.peer')}
+         ORDER BY t.points DESC LIMIT 200`,
+      [me.id, s.heartMsg, s.heartMsgDaily, s.heartGrace, s.heartHalf],
     );
     return { hearts: r.rows.map((x) => ({ id: x.id, points: Number(x.points), level: heartLevel(Number(x.points)) })) };
   },

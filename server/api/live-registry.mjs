@@ -142,7 +142,12 @@ const ONE_ON_ONE = {
   match_free: { field: 'matchFree', label: 'Ücretsiz eşleşme (24 saatte)', default: 3, bounds: { min: 0, max: 20, step: 1 }, unit: '', help: 'Yayıncı olmayan herkesin 24 saatte kullanabileceği ücretsiz eşleşme.', text: (a, b) => `24 saatte ${a} → ${b} ücretsiz eşleşme.` },
   match_free_seconds: { field: 'matchSeconds', label: 'Ücretsiz eşleşme süresi (saniye)', default: 58, bounds: { min: 15, max: 600, step: 1 }, unit: ' saniye', help: 'Ücretsiz bir eşleşme en çok bu kadar sürer.', text: (a, b) => `Ücretsiz eşleşme en çok ${a} → ${b} saniye sürer.` },
   heart_voice_level: { field: 'heartVoice', label: 'Sesli arama kalp seviyesi', default: 2, bounds: { min: 0, max: 10, step: 1 }, unit: '', help: 'Yayıncıyla sesli arama bu kalp seviyesinde açılır. 0: hemen.', text: (a, b) => `Sesli arama kalp seviyesi ${a} → ${b}.` },
-  heart_video_level: { field: 'heartVideo', label: 'Görüntülü arama kalp seviyesi', default: 4, bounds: { min: 0, max: 10, step: 1 }, unit: '', help: 'Yayıncıyla görüntülü arama bu kalp seviyesinde açılır. 0: hemen.', text: (a, b) => `Görüntülü arama kalp seviyesi ${a} → ${b}.` },
+  heart_video_level: { field: 'heartVideo', label: 'Görüntülü arama kalp seviyesi', default: 3, bounds: { min: 0, max: 10, step: 1 }, unit: '', help: 'Yayıncıyla görüntülü arama bu kalp seviyesinde açılır. Seviye 3: 5.000 puan, 5.000 jetonluk bir hediye açar. 0: hemen.', text: (a, b) => `Görüntülü arama kalp seviyesi ${a} → ${b}.` },
+  // The heart's warmth (one-on-one.mjs heartPoints): chatting fills it a little, and it cools when the two go quiet.
+  heart_msg_points: { field: 'heartMsg', label: 'Mesajın kalp puanı', default: 2, bounds: { min: 0, max: 100, step: 1 }, unit: ' puan', help: 'İki kişi arasındaki her mesaj kalbe bu kadar puan ekler (hediye ve ücretli dakika harcanan jeton kadar ekler). 0: mesaj kalbi doldurmaz.', text: (a, b) => `Mesaj başı kalp puanı ${a} → ${b}.` },
+  heart_msg_daily: { field: 'heartMsgDaily', label: 'Mesajla günlük kalp puanı', default: 60, bounds: { min: 0, max: 5000, step: 10 }, unit: ' puan', help: 'İki kişinin bir günde mesajla kazanabileceği en çok kalp puanı: güven yavaş yavaş artar.', text: (a, b) => `Mesajla günlük kalp puanı ${a} → ${b}.` },
+  heart_grace_days: { field: 'heartGrace', label: 'Kalbin tam kaldığı süre', default: 7, bounds: { min: 0, max: 365, step: 1 }, unit: ' gün', help: 'Bir hediyenin, dakikanın ya da mesajın puanı bu kadar gün tam sayılır, sonra azalmaya başlar. Konuşmaya devam edenin kalbi düşmez.', text: (a, b) => `Kalp puanı ${a} → ${b} gün tam sayılır.` },
+  heart_half_days: { field: 'heartHalf', label: 'Kalbin yarıya inme süresi', default: 14, bounds: { min: 1, max: 365, step: 1 }, unit: ' gün', help: 'Tam sayılma süresi geçen puan bu kadar günde yarıya iner: sessiz kalan ikilinin kalbi yavaş yavaş düşer, aramalar yeniden kapanabilir.', text: (a, b) => `Kalp puanı ${a} → ${b} günde yarıya iner.` },
 };
 /** The 1v1 keys as registry entries; a price that more than doubles or halves needs the second confirmation. */
 const oneOnOneEntries = () =>
@@ -860,7 +865,7 @@ const readOnlySet = (xs) => {
  *   { v, featuresOff: Set, notice, minVersion, adminSite, giftsHidden: Set, shopHidden: Set, packsHidden: Set, campaign, usdTry, withdrawMax,
  *     withdrawWeekly, otpPerHour, dmPrice, callVoice, callVideo, callFree, callSeconds, callPlainVoice, callPlainVideo,
  *     matchVoice, matchVideo, matchFree, matchSeconds, heartVoice,
- *     heartVideo, backpackCallTask, rewardsOff: Set, welcomeCoins, inviteCoins, inviteDailyCap, casinoOff: Set, casinoOpen: Set, casinoMaxBet,
+ *     heartVideo, heartMsg, heartMsgDaily, heartGrace, heartHalf, backpackCallTask, rewardsOff: Set, welcomeCoins, inviteCoins, inviteDailyCap, casinoOff: Set, casinoOpen: Set, casinoMaxBet,
  *     casinoDailyRounds, roomDecorOff: Set, roomBgCustomPrice, roomBgCustomDays, roomStaffAwayMinutes, bossSeatCoins,
  *     bossSeatMinutes, eventMinRoomLevel, eventMinLead, eventMaxMinutes, eventMaxCapacity, eventGrace, eventStrikeLimit,
  *     eventBlockDays, eventRemindersOff: Set, luckyAnnounceMinCoins, invalid }

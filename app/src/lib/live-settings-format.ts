@@ -155,6 +155,10 @@ export const ONE_ON_ONE_KEYS: { key: OneOnOneKey; unit: string }[] = [
   { key: 'call_video_price', unit: ' jeton' },
   { key: 'heart_voice_level', unit: '' },
   { key: 'heart_video_level', unit: '' },
+  { key: 'heart_msg_points', unit: ' puan' },
+  { key: 'heart_msg_daily', unit: ' puan' },
+  { key: 'heart_grace_days', unit: ' gün' },
+  { key: 'heart_half_days', unit: ' gün' },
   { key: 'call_free', unit: '' },
   { key: 'call_free_seconds', unit: ' saniye' },
   { key: 'call_plain_voice_price', unit: ' jeton' },
@@ -249,6 +253,14 @@ export function valueText(key: LiveKey, v: LiveValue, { stored = false, names = 
     case 'heart_voice_level':
     case 'heart_video_level':
       return typeof v === 'number' ? (v === 0 ? 'Hemen' : `Kalp Lv.${v}`) : String(v);
+    case 'heart_msg_points':
+      return typeof v === 'number' ? (v === 0 ? 'Mesaj saymaz' : `Mesaj başına ${fmtNum(v)} puan`) : String(v);
+    case 'heart_msg_daily':
+      return typeof v === 'number' ? (v === 0 ? 'Mesaj saymaz' : `Günde en çok ${fmtNum(v)} puan`) : String(v);
+    case 'heart_grace_days':
+      return typeof v === 'number' ? (v === 0 ? 'Hemen soğumaya başlar' : `${fmtNum(v)} gün tam sayılır`) : String(v);
+    case 'heart_half_days':
+      return typeof v === 'number' ? `${fmtNum(v)} günde yarıya iner` : String(v);
     case 'call_free':
     case 'match_free':
       return typeof v === 'number' ? `24 saatte ${v}` : String(v);

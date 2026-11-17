@@ -67,4 +67,5 @@ export const NOT_EXPORTED = {
   phone_claims: 'a phone check’s one-time code, kept minutes',
   room_tables: 'a free game table in a room, kept only while it is played',
   room_seat_colors: 'a room’s seat colors; the coins paid for each are in ledger',
+  chat_days: 'how many messages two people wrote a day, counted for the heart; the messages themselves are in messages',
 };
