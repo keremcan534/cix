@@ -328,7 +328,9 @@ describe('Yönetim › Mağaza', () => {
     // The app's own entry effects keep the app's pictures.
     await refused(post('/update', { id: 'en-dragon', icon }), 400, /görseli buradan değişmez/);
     const audit = (await h.sql.query("SELECT detail FROM audit_events WHERE action = 'shop.update' ORDER BY id DESC LIMIT 1")).rows[0].detail;
-    assert.deepEqual([audit.before.icon_url, audit.after.icon_url], [icon2, null]);
+    // The audit keeps the stored address (the storage's own); the panel and the phones get the API's: the same file.
+    const file = (u) => u.slice(u.indexOf('shopframe/'));
+    assert.deepEqual([file(audit.before.icon_url), audit.after.icon_url], [file(icon2), null]);
   });
 
   test('kaynak videodan giriş efekti sunucuda çevrilir (hediyelerle aynı çevirici)', { skip: NO_FFMPEG }, async () => {
