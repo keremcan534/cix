@@ -32,6 +32,7 @@ import { live } from './live-settings.mjs';
 import { scorePkGift } from './pk.mjs';
 import { roomLevel } from './rooms.mjs';
 import { announceBoss, bossGift } from './boss-seat.mjs';
+import { fuelRocket, launchRockets } from './room-rocket.mjs';
 import { audit } from './sanctions.mjs';
 import { creditCoins, giftCoins, spendCoins } from './wallet.mjs';
 import { casinoNeed, wealthPoints } from './wheel.mjs';
@@ -161,6 +162,7 @@ export const luckyRoutes = {
     let levelUp = false;
     let events = [];
     let boss = [];
+    let rocket = null;
     let announceFrom = DEFAULT_CONFIG.announceFrom;
     let gift;
     try {
@@ -208,6 +210,8 @@ export const luckyRoutes = {
         }
         // Patron koltuğu (boss-seat.mjs): the whole send counts, every recipient together.
         boss = await bossGift(c, { roomId, sender: me.id, coins: cost });
+        // Oda roketi (room-rocket.mjs): so does the rocket, the whole send's coins.
+        rocket = await fuelRocket(c, { roomId, sender: me.id, coins: cost });
         const rest = cost - share * to.length;
         const many = to.length > 1 ? ` → ${to.length} kişi` : '';
         if (rest > 0) await spendCoins(c, me.id, rest, `Uygulama içi: Şanslı hediye ${label}${many}`, `${lref}-p`);
@@ -249,6 +253,8 @@ export const luckyRoutes = {
       if (levelUp) announceRoom(lkRoom);
       // Patron koltuğu: a Şanslı send counts like any gift in the room.
       await announceBoss(lkRoom.slice(4), boss);
+      // Oda roketi: a level this send filled launches and is paid (not awaited).
+      if (rocket) void launchRockets(lkRoom.slice(4), rocket);
     }
     // Every room hears of a win, from the live setting's floor up (Canlı ayarlar › Kazanç duyurusu).
     if (Number(row.payout) > 0 && Number(row.payout) >= live().luckyAnnounceMinCoins) await announceWin(me, row, gift, lkRoom, b.named === true);

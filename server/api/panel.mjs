@@ -82,6 +82,9 @@ export const PANEL_ROUTES = new Set([
   'GET /api/admin/wallet/audit',
   // Şanslı hediyeler (lucky.mjs).
   'GET /api/admin/lucky',
+  // Oda roketi (room-rocket.mjs): the levels' goals and prizes.
+  'GET /api/admin/rocket',
+  'POST /api/admin/rocket/config',
   'POST /api/admin/lucky/config',
   // Canlı ayarlar (live-settings.mjs).
   'GET /api/admin/live-settings',

@@ -84,6 +84,13 @@ Son güncelleme: preview-96 sonrası (Küçült, çanta yağmuru, @bahset düzel
 - **Eski APK'lar:** seviyeyi kendi içindeki eşiklerle gösterir; sunucunun denetimleri herkes için ayara uyar. Panelde değişmiş Rütbe kademesini eski APK alamaz, "uygulamayı güncelle" görür.
 - Ayrıntı: [`SEVIYE_AYARLARI.md`](SEVIYE_AYARLARI.md).
 
+## Oda roketi (yeni APK)
+
+- **Kapalı gelir:** finans panelinde Hediye ve mağaza › Oda roketi'nden açılır (şansla dağıtılan, nakde dönebilen ödül; hukuki değerlendirme gerekir).
+- **Açılınca (yeni APK):** odanın adının altında roket düğmesi; odadaki hediyeler roketi doldurur (günde 5 seviye, 00:00'da sıfırlanır), seviye dolunca roket kalkar, ödüller o seviyeye katkı verenler arasında çekilir (normal jeton ya da birkaç günlük mağaza eşyası).
+- **Telefonda denenmeli:** kalkış gösterisi ve roket penceresi gerçek telefonda henüz denenmedi.
+- **Eski APK'lar:** roketi göstermez; hediyeleri roketi doldurur, kazandıkları hesaplarına geçer. Ayrıntı: [`ODA_ROKETI.md`](ODA_ROKETI.md).
+
 ## Paket 5'te gelenler
 
 - **Ajans kazançları:** Gerçek dosya olarak (Excel'de açılır) paylaşılıyor.

@@ -100,6 +100,7 @@ import { roomFollowRoutes } from './room-follow.mjs';
 import { roomMemberRoutes } from './room-members.mjs';
 import { roomOwnerRoutes } from './room-owner.mjs';
 import { roomContribRoutes } from './room-contrib.mjs';
+import { roomRocketRoutes, startRocketSweep, stopRocketSweep } from './room-rocket.mjs';
 import { roomDecorRoutes, startDecorSweep, stopDecorSweep } from './room-decor.mjs';
 import { bossSeatRoutes, startBossSweep, stopBossSweep } from './boss-seat.mjs';
 import { startStaffSweep, stopStaffSweep } from './room-autoclose.mjs';
@@ -348,6 +349,7 @@ const routes = {
   ...roomMemberRoutes,
   ...roomOwnerRoutes,
   ...roomContribRoutes,
+  ...roomRocketRoutes,
   ...roomDecorRoutes,
   ...bossSeatRoutes,
   ...roomRoutes,
@@ -497,6 +499,7 @@ function shutdown(signal) {
   stopOtpSweep();
   stopCallSweep();
   stopBagSweep();
+  stopRocketSweep();
   stopDecorSweep();
   stopEventSweep();
   stopBossSweep();
@@ -534,6 +537,7 @@ startLiveSync();
 startOtpSweep();
 startCallSweep();
 startBagSweep();
+startRocketSweep();
 startDecorSweep();
 startEventSweep();
 startBossSweep();

@@ -21,6 +21,10 @@ modunda olması, hata takibi olmaması ve kırık kodun birleşmeden önce yakal
   hediye ayarı" sayfasından paket paket kapatılabiliyor.
 - **Oyun Salonu** kazancı ayrı oyun jetonuna gidiyor (`casino.mjs`, `game_coins`), bu daha güvenli. Ama bahis satın
   alınan jetonla da yapılabiliyor. Varsayılan olarak yalnız yöneticilere açık.
+- **Oda roketi** (17 Kasım, `room-rocket.mjs`, [`ODA_ROKETI.md`](ODA_ROKETI.md)): odadaki hediyelerle dolan roketin ödülleri o seviyeye
+  katkı verenler arasında şansla dağılır. Jeton ödülü sahibin kararıyla **normal jeton** (Şanslı hediye kazancıyla aynı): hediyeyle
+  elmasa, elmas da nakde dönebilir. Yani Şanslı hediye ile aynı risk. **Kapalı gelir**, panelden açılır; açmadan önce aynı avukat
+  görüşüne katın. Riski azaltmak için ödül yalnız süreli mağaza eşyası yapılabilir.
 - **Öneri:** İlk sürümde Şanslı hediye kapalı olsun, ya da kazancı nakde dönmeyen ayrı bir bakiyeye gitsin (Oyun
   Salonu gibi). Kararı bir avukat görüşüyle siz verin; kapatma ya da ayrı bakiye işini Claude yapar.
 

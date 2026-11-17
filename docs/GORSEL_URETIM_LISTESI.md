@@ -935,3 +935,15 @@ Bir oyunun baştan sona gerçek görsellerle giydirilmesi için deneme: Kızıl 
 | 16 | `parilti.png` | Parıltı | Dört köşeli altın parıltı | gösteride yanıp sönen parıltılar | ✅ teslim edildi, bağlandı · 128 × 128 |
 
 Gösteri eşikleri (bahsin katı olarak): tablo 100× yazsa da bu çizgi bahsidir; tur bahsi 5 çizgiye bölündüğü için üç 7 turun **20,6 katını** öder ve makinenin bir turda ödeyebileceği en yüksek tutar 25,3 kattır (50 kat hiç gelmez). Bu yüzden **JACKPOT ≥ 20 kat** (pratikte yalnız bir çizgide üç 7), **Büyük Kazanç ≥ 10 kat** (ör. iki elmas çizgisi); altı küçük kutlama (birkaç jeton ve tutar). Oranlar, ödemeler ve bahisler değişmedi.
+
+## 20. Oda roketi (5)
+
+Odadaki roketin her seviyesi için bir roket ([`ODA_ROKETI.md`](ODA_ROKETI.md)). Şimdilik beşi de Roket hediyesinin resmini kullanıyor; her seviyenin rengi farklı (pembe, turuncu, mavi, mor, altın). Saydam PNG, 512 × 512, roket ortada ve dik; altında boşluk (pencerede altına parıltı çizilir). Uygulamada `components/room/room-rocket.tsx` `ROCKET_ART` yerine seviyeye göre bağlanacak.
+
+| # | Dosya | Ad | Görsel | Kullanım | Not |
+| --- | --- | --- | --- | --- | --- |
+| 1 | `oda-roketi-1.png` | Lv.1 roketi | Küçük, pembe-beyaz, tek pencereli sevimli roket | odanın roket düğmesi ve penceresi, kalkış gösterisi | ⏳ istenecek |
+| 2 | `oda-roketi-2.png` | Lv.2 roketi | Turuncu-beyaz roket, iki yan kanat | aynı | ⏳ istenecek |
+| 3 | `oda-roketi-3.png` | Lv.3 roketi | Mavi roket, altın pencere, yan iticiler | aynı | ⏳ istenecek |
+| 4 | `oda-roketi-4.png` | Lv.4 roketi | Mor-altın, süslü, iri roket | aynı | ⏳ istenecek |
+| 5 | `oda-roketi-5.png` | Lv.5 roketi | Gümüş-altın büyük mekik, dört itici | aynı | ⏳ istenecek |

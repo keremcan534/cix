@@ -79,7 +79,7 @@ panel's `UPLOADS`.
 **User content.** Validate on the server (type, size, magic bytes, dimensions), never trust the client. User text goes
 through the contact filter; Turkish error sentences that say what to do.
 
-**Store and legal.** 18+ app. Chance features with purchased coins (Şanslı hediye, Oyun Salonu, Rüzgâr Gülü) and
+**Store and legal.** 18+ app. Chance features with purchased coins (Şanslı hediye, Oyun Salonu, Rüzgâr Gülü, Oda roketi) and
 cash-outs (para çekme, Jeton Noktası, agency payouts) are a legal question the owners haven't closed
 (`docs/YAYIN_HAZIRLIGI.md` §1, `docs/DENETIM.md`): never widen them without saying so.
 
