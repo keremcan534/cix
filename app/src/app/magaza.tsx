@@ -7,14 +7,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
 import { EntryEffect, ENTRY_LOOKS, type EntryFx, type EntryShow } from '@/components/fx/entry';
-import { VideoFx, entryVideoOf } from '@/components/fx/video-fx';
+import { PlateName, VideoFx, entryClipOf } from '@/components/fx/video-fx';
 import { GlossButton, Halo, hueAt } from '@/components/fx/float';
 import { ArtFrame, frameArtOf } from '@/components/fx/frame-art';
 import { AnimatedFrame, type FrameFx } from '@/components/fx/frames';
 import { SCENES } from '@/components/fx/scenes';
 import { Backdrop, EdgeLight, PressableScale, glassChipOf } from '@/components/fx/surface';
 import { CoinPill, Header } from '@/components/ui';
-import { COSMETICS, COSMETIC_KINDS, type Cosmetic, type CosmeticKind } from '@/data/catalog';
+import { COSMETIC_KINDS, shopCosmetics, type Cosmetic, type CosmeticKind } from '@/data/catalog';
 import { showAlert } from '@/lib/alert';
 import { useLiveCatalog } from '@/lib/live/catalog-live';
 import { livePacks } from '@/lib/live/emoji-live';
@@ -37,19 +37,24 @@ export default function StoreScreen() {
   const t = useTheme();
   const styles = useStyles();
   const playPreview = (c: Cosmetic) => {
-    setPreviewMedia(c.kind === 'entry' && !settings.reduceMotion ? entryVideoOf(c.fx as EntryFx | undefined) : null);
+    const fx = c.kind === 'entry' ? ((c.fx as EntryFx | undefined) ?? 'vip') : 'vip';
+    // The team's own entry effect (Yönetim › Mağaza): its clip and the plate my name is written on.
+    const clip = c.kind === 'entry' && c.remote?.video ? { clip: c.id, plate: c.remote.plate ?? null } : {};
+    setPreviewMedia(c.kind === 'entry' && !settings.reduceMotion ? entryClipOf({ fx, ...clip }) : null);
     setPreview({
       name: me.name,
       avatar: me.avatar,
-      fx: c.kind === 'entry' ? ((c.fx as EntryFx | undefined) ?? 'vip') : 'vip',
+      fx,
+      ...clip,
       ride: c.kind === 'ride' ? c.emoji : undefined,
       rideArt: c.kind === 'ride' ? storeArtOf(c.id) : undefined,
     });
   };
-  // An item no longer sold (data/catalog `retired`) isn't shown at all, not even to someone who has it.
-  const items = COSMETICS.filter((c) => c.kind === tab && !c.retired);
+  // The shop as Yönetim › Mağaza has it (names, prices, days, order, the team's own), else the app's own. An item no
+  // longer sold (data/catalog `retired`) isn't shown at all, not even to someone who has it.
+  const items = shopCosmetics().filter((c) => c.kind === tab && !c.retired);
   // Read once per preview: a clip not on the phone yet starts downloading and the drawn banner plays this time.
-  const [previewMedia, setPreviewMedia] = useState<ReturnType<typeof entryVideoOf>>(null);
+  const [previewMedia, setPreviewMedia] = useState<ReturnType<typeof entryClipOf>>(null);
 
   const buy = (c: Cosmetic) => {
     showAlert(`${c.emoji} ${c.name}`, `Fiyat: ${c.price.toLocaleString('tr-TR')} jeton · Süre: ${c.days ? `${c.days} gün` : 'kalıcı'}`, [
@@ -163,8 +168,8 @@ export default function StoreScreen() {
       {preview &&
         (previewMedia ? (
           // A video entry plays its clip as in a room, with the name banner over it; the clip ends the preview.
-          <VideoFx key={`${preview.fx}-video`} media={previewMedia} muted={false} onDone={() => setPreview(null)}>
-            <EntryEffect show={preview} still top={140} />
+          <VideoFx key={`${preview.clip ?? preview.fx}-video`} media={previewMedia} muted={false} onDone={() => setPreview(null)}>
+            {preview.plate ? <PlateName name={preview.name} plate={preview.plate} /> : <EntryEffect show={preview} still top={140} />}
           </VideoFx>
         ) : (
           <EntryEffect key={`${preview.fx}-${preview.ride}`} show={preview} still={settings.reduceMotion} top={140} onDone={() => setPreview(null)} />

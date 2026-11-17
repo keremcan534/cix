@@ -6,12 +6,13 @@
 // Phones with the module only: the web build and an older APK keep the code-drawn effects (giftVideoOf /
 // entryVideoOf say null there), and so does a phone that hasn't downloaded that clip yet.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 
 import { Text } from '@/components/text';
 import type { EntryFx } from '@/components/fx/entry';
 import { fxMedia, setFxVideos, type FxMedia } from '@/lib/fx-videos';
 import { fxSafetyMs } from '@/lib/fx-videos-core';
+import { plateLayout, type Plate } from '@/lib/shop-live-core';
 import { useLiveCatalog } from '@/lib/live/catalog-live';
 import { useSettings } from '@/store';
 
@@ -23,6 +24,35 @@ export type { FxMedia };
 export const giftVideoOf = (giftId?: string): FxMedia | null => (alphaVideoAvailable && giftId ? fxMedia('gift', giftId) : null);
 /** The video an entry effect plays under the name banner (by COSMETICS `fx`), when it's on the phone. */
 export const entryVideoOf = (fx?: EntryFx): FxMedia | null => (alphaVideoAvailable && fx ? fxMedia('entry', fx) : null);
+/** An entry show's clip: the team's own (Yönetim › Mağaza, fx entry <id>) or the app's entry effect's. */
+export const entryClipOf = (show: { fx?: EntryFx; clip?: string }): FxMedia | null =>
+  alphaVideoAvailable ? (show.clip ? fxMedia('entry', show.clip) : show.fx ? fxMedia('entry', show.fx) : null) : null;
+
+/**
+ * The entering person's name on an entry effect's plate (Yönetim › Mağaza): over the clip, which the player draws
+ * aspect-fit in the same box, at the plate's place, one line, smaller for a long name so it stays inside the plate.
+ */
+export function PlateName({ name, plate }: { name: string; plate: Plate }) {
+  const [box, setBox] = useState<{ w: number; h: number } | null>(null);
+  const measured = (e: LayoutChangeEvent) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height });
+  const l = box ? plateLayout(plate, name, box.w, box.h) : null;
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none" onLayout={measured}>
+      {l && (
+        <View style={{ position: 'absolute', left: l.cx - l.width / 2, top: l.cy - l.fontSize, width: l.width, height: l.fontSize * 2, alignItems: 'center', justifyContent: 'center' }}>
+          <Text
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.4}
+            accessibilityLabel={`${name} odaya girdi`}
+            style={{ color: plate.color, fontSize: l.fontSize, fontWeight: plate.bold ? '800' : '500', textShadowColor: 'rgba(0,0,0,0.8)', textShadowRadius: 3, textShadowOffset: { width: 0, height: 1 } }}>
+            {name}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+}
 
 /** Keeps the phone's clips in step with the server's list; fetches ahead unless Düşük veri modu is on. Draws nothing. */
 export function FxVideoSync() {

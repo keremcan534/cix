@@ -65,6 +65,15 @@ Son güncelleme: preview-96 sonrası (Küçült, çanta yağmuru, @bahset düzel
 - **Bildirimler:** Mesaj, hediye ve takip bildirimleri gelecek.
 - **Kurulum:** Kod hazır. Firebase dosyaları girilince açılır (aşağıda).
 
+## Mağaza yönetimi (yeni APK)
+
+- **Çalışıyor (yeni APK):** çerçeveler ve giriş efektleri finans panelinden yönetiliyor (Hediye ve mağaza › Mağaza).
+  - Uygulamanın kendi eşyalarının adı, fiyatı, süresi, VIP seviyesi, satışta olup olmadığı ve sırası değişir.
+  - Yeni çerçeve: saydam PNG yüklenir, fotoğrafın çevresine çizilir.
+  - Yeni giriş efekti: video ya da SVGA yüklenir, odaya girenin adı isim plakasına yazılır.
+- **Eski APK'lar:** kendi mağazasını gösterir; değişen eşyayı alamaz ("uygulamayı güncelle"), yeni eşyaları görmez.
+- **Sırada:** sohbet balonu ve ses dalgası. Ayrıntı: [`MAGAZA_YONETIMI.md`](MAGAZA_YONETIMI.md).
+
 ## Seviye ve VIP ayarları (yeni APK)
 
 - **Çalışıyor (yeni APK):** VIP, Rütbe, Cömertlik, Yankı ve Abonelik finans panelinden (Seviye ve VIP › Seviyeler ve VIP) ayarlanıyor; telefon ayarı katalogla alıyor.

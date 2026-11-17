@@ -22,6 +22,16 @@ export type Cosmetic = {
    * own entry); the server refuses a purchase (server/api/catalog.mjs SHOP_PAUSED, the same list).
    */
   retired?: true;
+  /**
+   * An item the team added in Yönetim › Mağaza (lib/shop-live-core): its frame picture (`art`, the empty centre's
+   * radius as a share of its width), or its entry clip (`video`: in the catalog's fx as entry <id>) and the name plate
+   * the entering person's name is written on.
+   */
+  remote?: {
+    art?: { url: string; hole: number };
+    video?: true;
+    plate?: { x: number; y: number; w: number; size: number; color: string; bold: boolean } | null;
+  };
 };
 
 export const COSMETIC_KINDS: { kind: CosmeticKind; label: string; emoji: string }[] = [
@@ -78,7 +88,17 @@ export const COSMETICS: Cosmetic[] = [
   { id: 'wv-rainbow', kind: 'wave', name: 'Gökkuşağı', emoji: '🌈', price: 3_500, days: null, color: ['#FFD60A', '#34C759'] },
   { id: 'wv-gold', kind: 'wave', name: 'Altın Halka', emoji: '💫', price: 5_000, days: null, color: ['#F6BD60', '#B7832E'] },
 ];
-export const cosmeticById = (id?: string | null) => COSMETICS.find((c) => c.id === id);
+/**
+ * The shop as the server has it now (Yönetim › Mağaza, lib/live/catalog-live sets it from the catalog's `shop`): its
+ * frames and entry effects with their names, prices and days, and the ones the team added. Null: the compiled shop.
+ */
+let live: { list: Cosmetic[]; byId: Map<string, Cosmetic> } | null = null;
+export function setLiveCosmetics(list: Cosmetic[] | null) {
+  live = list ? { list, byId: new Map(list.map((c) => [c.id, c])) } : null;
+}
+/** Every shop item as it is now (the server's when it said, else compiled), in the shop's order. */
+export const shopCosmetics = (): readonly Cosmetic[] => live?.list ?? COSMETICS;
+export const cosmeticById = (id?: string | null) => (id ? (live?.byId.get(id) ?? COSMETICS.find((c) => c.id === id)) : undefined);
 
 // --- Emoji & sticker market --------------------------------------------------
 // Standard Unicode emoji are free for everyone; only custom-drawn stickers (assets/reactions,

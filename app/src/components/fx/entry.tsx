@@ -11,6 +11,7 @@ import { Animated, Easing, StyleSheet, View, useWindowDimensions } from 'react-n
 
 import { Text } from '@/components/text';
 import { Photo } from '@/components/photo';
+import type { Plate } from '@/lib/shop-live-core';
 
 // The video entries (Çarşı › Giriş efekti) play their clip full screen (components/fx/video-fx, server/api/fx.mjs
 // FX_VIDEOS.entry); this banner and its look are what shows over it, and alone where the clip can't play.
@@ -20,6 +21,9 @@ export type EntryShow = {
   name: string;
   avatar: string;
   fx: EntryFx;
+  /** The team's own entry effect (Yönetim › Mağaza): its clip (fx entry <id>) and the plate the name is written on. */
+  clip?: string;
+  plate?: Plate | null;
   ride?: string;
   rideArt?: number;
   colors?: readonly [string, string];

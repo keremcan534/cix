@@ -60,6 +60,14 @@ export const PANEL_ROUTES = new Set([
   'POST /api/admin/levels/save',
   'POST /api/admin/levels/reset',
   'GET /api/admin/levels/drops',
+  // Mağaza (shop-items.mjs): frames and entry effects, the app's own and the admins' (uploads shopframe, giftvideo,
+  // giftsource).
+  'GET /api/admin/shop',
+  'POST /api/admin/shop',
+  'POST /api/admin/shop/update',
+  'POST /api/admin/shop/reset',
+  'POST /api/admin/shop/delete',
+  'POST /api/admin/shop/order',
   // Para çekme (withdraw.mjs).
   'GET /api/admin/withdrawals',
   'POST /api/admin/withdrawals/decide',

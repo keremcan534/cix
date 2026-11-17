@@ -31,6 +31,7 @@ export const NOT_EXPORTED = {
   staff_assignments: 'staff roles in agencies, set by staff',
   live_settings: 'platform settings, set by staff',
   level_settings: 'platform settings, set by staff (Seviye ayarları: which staff member saved them)',
+  shop_items: 'the shop catalog, kept by staff (which admin added or changed a frame or entry effect)',
   custom_gifts: 'the gift catalog, kept by staff (which admin added or changed a gift)',
   emoji_packs: 'the emoji panel’s packs, kept by staff (which admin added or changed a pack)',
   emoji_stickers: 'the emoji panel’s stickers, kept by staff (which admin added or changed a sticker)',

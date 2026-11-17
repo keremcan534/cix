@@ -38,6 +38,8 @@ import { RULES, type Rules } from '@/data/rules';
 import { selfExchangeRate } from '@/lib/coins-bank';
 import { parseLiveEmoji, type LiveEmoji } from '@/lib/emoji-live-core';
 import { parseLiveLevels, type LiveLevels } from '@/lib/levels-live-core';
+import { mergeShop, parseLiveShop, type LiveShop } from '@/lib/shop-live-core';
+import { COSMETICS, setLiveCosmetics } from '@/data/catalog';
 import { parseFxList, type FxVideo } from '@/lib/fx-videos-core';
 import { parseCatalog, type CatalogPack } from '@/lib/live/billing-core';
 
@@ -80,6 +82,8 @@ export type LiveCatalog = {
   emoji: LiveEmoji | null;
   /** Seviye ve VIP ayarları (levels=1); null from an older server: the app's own tables. */
   levels: LiveLevels | null;
+  /** The shop's frames and entry effects (shop=1, Yönetim › Mağaza); null from an older server: the compiled shop. */
+  shop: LiveShop | null;
 };
 
 // --- Reading the server's answer, without trusting it ----------------------------------------------------
@@ -186,6 +190,7 @@ export function parseLiveCatalog(raw: unknown): LiveCatalog {
     app,
     emoji: parseLiveEmoji(r.emoji),
     levels: parseLiveLevels(r.levels),
+    shop: parseLiveShop(r.shop),
   };
 }
 
@@ -217,12 +222,13 @@ export function parseSavedLiveCatalog(raw: string | null): { catalog: LiveCatalo
       app,
       emoji: parseLiveEmoji(r.emoji),
       levels: parseLiveLevels(r.levels),
+      shop: parseLiveShop(r.shop),
     },
     // A copy an older app saved counts as old: the next poll reads the catalog again. One from before the videos were
     // listed (no fx), or from before the shelves were (no shelf): that app hid the gifts put back on the shelves
     // (data/gifts-paused), and an updated phone would go on hiding them until the copy was ten minutes old.
     // One from before the level settings (no levels) too: the levels would stay the compiled ones until it was old.
-    fetchedAt: 'fx' in r && 'shelf' in r && 'levels' in r && typeof r.fetchedAt === 'number' && Number.isFinite(r.fetchedAt) ? r.fetchedAt : 0,
+    fetchedAt: 'fx' in r && 'shelf' in r && 'levels' in r && 'shop' in r && typeof r.fetchedAt === 'number' && Number.isFinite(r.fetchedAt) ? r.fetchedAt : 0,
   };
 }
 
@@ -344,6 +350,8 @@ const same = (a: LiveCatalog | null, b: LiveCatalog) => !!a && JSON.stringify(a)
 const publish = (next: LiveCatalog) => {
   if (same(current, next)) return;
   current = next;
+  // The shop's frames and entry effects for every screen that looks one up (data/catalog cosmeticById).
+  setLiveCosmetics(next.shop ? mergeShop(COSMETICS, next.shop) : null);
   listeners.forEach((l) => l());
 };
 // Storage failures never matter here: the next answer replaces the copy.
@@ -385,7 +393,8 @@ export function fetchLiveCatalog(): Promise<unknown> {
     try {
       // gifts=2: the whole story about the app's own gifts too; emoji=1: the emoji panel's packs; levels=1: Seviye ve
       // VIP ayarları (server/api/gifts.mjs).
-      const res = await fetch(`${BASE}/api/catalog?gifts=2&emoji=1&levels=1`, { signal: ctrl.signal });
+      // shop=1: the shop's frames and entry effects (Yönetim › Mağaza).
+      const res = await fetch(`${BASE}/api/catalog?gifts=2&emoji=1&levels=1&shop=1`, { signal: ctrl.signal });
       if (!res.ok) throw new Error(`Sunucu hatası (${res.status})`);
       const body: unknown = await res.json();
       fetchedAt = Date.now();
@@ -414,7 +423,7 @@ export const liveCatalogStale = (now = Date.now()) => !current || now - fetchedA
 /** The server named its current Çevir rate (409 rate_changed): the screens show it before the catalog is read again. */
 export function noteLiveRate(usdTry: unknown) {
   if (!validRate(usdTry)) return;
-  publish({ ...(current ?? { v: 0, giftIds: null, packs: [], campaign: null, fx: null, remote: [], shelf: null, app: {}, emoji: null, levels: null }), usdTry });
+  publish({ ...(current ?? { v: 0, giftIds: null, packs: [], campaign: null, fx: null, remote: [], shelf: null, app: {}, emoji: null, levels: null, shop: null }), usdTry });
 }
 
 const subscribe = (l: () => void) => {
