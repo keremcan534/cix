@@ -10,7 +10,7 @@ Sahibin kararı (17 Kasım): VIP, Rütbe, Cömertlik, Yankı ve Abonelik'in büt
 
 Müşterinin sorusu: *"Bu seviyelere denk gelen çerçeve, giriş efekti ve diğer tüm özellikleri tasarlayıp değiştirebileceğimiz, seviyeler arasındaki atış miktarını belirleyebileceğimiz, hangi seviyede hangi ödülün açılacağını seçebileceğimiz ekran nerede?"* Sahibin eki: *"Yükleme yapmayanlar, yayıncıların çalışmalarının yavaşlaması durması gibi durumlarda bu seviyeler geriye doğru düşecek."*
 
-Seviyeye bağlı eşya (bir seviyeye gelenin Çantam'ına düşen çerçeve, giriş efekti, binek, balon, dalga) ayrı sayfada: **Seviye ve VIP › Seviye ödülleri** ([`CANTA.md`](CANTA.md)).
+Seviyeye bağlı eşya (bir seviyeye gelenin Çantam'ına düşen çerçeve, giriş efekti, binek, balon, dalga) ayrı sayfada: **Seviye ve VIP › Seviye ve görev ödülleri** ([`CANTA.md`](CANTA.md)).
 
 ## Bugün
 

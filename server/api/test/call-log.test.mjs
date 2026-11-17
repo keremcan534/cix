@@ -128,7 +128,7 @@ describe('Görev: 1 görüntülü arama yap', () => {
     const friend = await signUp('Arkadaş Alp');
     const task = async () => (await ok(call('GET', '/api/me/call-task', null, me.session), 'görev')).task;
     const coins = async () => (await ok(call('GET', '/api/me', null, me.session), 'ben')).user.coins;
-    assert.deepEqual(await task(), { goal: 1, done: 0, reward: 25, minSeconds: 60, claimed: false });
+    assert.deepEqual(await task(), { goal: 1, done: 0, reward: 25, minSeconds: 60, claimed: false, items: [] });
 
     await pastCall(me, friend, { mode: 'video', secs: 30, ago: '5 minutes' });
     await pastCall(friend, me, { mode: 'voice', secs: 300, ago: '10 minutes' });

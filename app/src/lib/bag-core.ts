@@ -58,6 +58,16 @@ export function eventRewardText(e: { state: string; reward?: unknown }): string 
   return `Etkinlik sürerken odaya gelen herkes ${name} (${term}) kazanır; etkinlik bitince Çantam’a gelir.`;
 }
 
+/** A task's items for Çantam (server/api/task-rewards.mjs, the call task's `items`): their names, read without trusting it. */
+export function taskItemNames(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .slice(0, 10)
+    .map((x) => obj(x).name)
+    .filter((n): n is string => typeof n === 'string' && !!n.trim())
+    .map((n) => n.trim().slice(0, 60));
+}
+
 /** Çantam's tabs of items (gifts have their own): rides are with the entry effects, as in Çarşı. */
 export const BAG_TABS = [
   { key: 'frame', label: 'Çerçeveler', kinds: ['frame'] },

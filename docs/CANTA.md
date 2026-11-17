@@ -10,8 +10,8 @@ Sahibin kararları:
 - **Çantam'ın yeri:** Profil › Çantam, ayrı bir ekran.
 - **Çantam'a ne gelir:** Çarşı'dan alınanlar, yetkili hediyesi, etkinlik ödülü, görev ödülü, seviye ve VIP ödülü.
 
-Yapılış sırası: 1) Çantam, Çarşı ve ortak ödül yolu, 2) seviye ve VIP ödülleri, 3) etkinlik ödülleri (üçü yapıldı),
-4) görev ödülleri.
+Yapılış sırası: 1) Çantam, Çarşı ve ortak ödül yolu, 2) seviye ve VIP ödülleri, 3) etkinlik ödülleri, 4) görev
+ödülleri (hepsi yapıldı).
 
 ## Uygulamada
 
@@ -46,7 +46,7 @@ Bütün kaynaklar aynı yoldan verir (`economy.mjs` `grantReward`):
 
 ## Seviye ve VIP ödülleri
 
-Panelde **Seviye ve VIP › Seviye ödülleri** (yetki: `app.levels`, Seviyeler ve VIP ile aynı).
+Panelde **Seviye ve VIP › Seviye ve görev ödülleri** (yetki: `app.levels`, Seviyeler ve VIP ile aynı).
 
 - Bir ödül: seviye sistemi (VIP, Cömertlik ya da Yankı), seviye, eşya ve isteğe bağlı gün (boş: eşyanın Çarşı'daki
   süresi; Çarşı'da süresiz olan eşyaya gün verilmez). Bir seviyeye birden çok eşya konabilir.
@@ -68,9 +68,22 @@ Panelde **Duyuru ve etkinlik › Etkinlikler** › etkinliğin satırında **Öd
 odaya giren herkes, etkinlik bitince eşyayı Çantam'ında bulur ("Etkinlik ödülü · etkinliğin adı"), bir kez. Oda sahibi
 ödül bağlayamaz. Ayrıntı: [`ETKINLIK_MERKEZI.md`](ETKINLIK_MERKEZI.md) › Katılım ödülü.
 
+## Görev ödülleri
+
+Panelde **Seviye ve VIP › Seviye ve görev ödülleri** › **Görev** sekmesi (yetki: `app.levels`).
+
+- Sunucuda sayılan tek görev bugün günlük **"1 görüntülü arama yap"** (diğer görevler telefonda sayılıyor; onlar
+  sunucuya taşınınca bu listeye eklenir).
+- Görevi tamamlayıp ödülünü alan, jeton ödülü ve çanta hediyesiyle birlikte eşyayı da Çantam'ında bulur ("Görev
+  ödülü · Günlük görüntülü arama"). Görevler ekranında görevin satırında eşyanın adı görünür.
+- Günlük görev her gün verir: süreli eşyanın günü her seferinde eklenir. **1 gün önerilir**: görevi her gün yapan
+  eşyayı hep kullanır, bırakınca biter. Süresiz eşya bir kez verilir.
+- Aynı gün ikinci kez alınmaz. Kaldırılan ödül bundan sonra verilmez; verilmiş olanlar kalır.
+
 ## Eski APK'lar
 
 - Eski uygulamada Çantam ekranı yok; Mağaza'sında Binek sekmesi durur, "Mağaza" adıyla.
+- Görev ödülü eski APK'da da verilir (görevin ödülünü aldığında); eski APK eşyayı göstermez.
 - Eski uygulama çantayı sunucudan okumaz, bu yüzden seviye ödüllerini güncelleyince alır. Etkinlik ödülü eski APK'da
   da verilir (etkinlik bitince sunucu verir); eski APK onu göstermez, güncelleyince Çantam'da görünür. Yetkilinin verdiği eşyayı
   da (önceden olduğu gibi) "sahip" göstermez; yeni APK gösterir.
@@ -82,4 +95,6 @@ odaya giren herkes, etkinlik bitince eşyayı Çantam'ında bulur ("Etkinlik öd
   (`my-data.mjs`, kaynağı ve `origin`'iyle).
 - Etkinlik ödülü `events` satırında (`reward_sku`, `reward_days`, kim bağladı, kaç kişiye verildi); verilen eşya
   `entitlements`'ta `event:<etkinlik>` kimliğiyle.
-- Göç: `085_bag_rewards.sql`, `086_event_rewards.sql`.
+- `task_rewards` (görev ödülleri; silinen satır kalır). Verilen eşya `entitlements`'ta `task:<günün kimliği>:<ödül>`
+  kimliğiyle.
+- Göç: `085_bag_rewards.sql`, `086_event_rewards.sql`, `087_task_rewards.sql`.

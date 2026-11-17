@@ -1,5 +1,5 @@
 // Seviye ödülleri (docs/CANTA.md): an item the team ties to a level of VIP, Cömertlik or Yankı in the finance panel
-// (Seviye ve VIP › Seviye ödülleri); whoever has that level finds it in Çantam (economy.mjs grantReward, source
+// (Seviye ve VIP › Seviye ve görev ödülleri); whoever has that level finds it in Çantam (economy.mjs grantReward, source
 // 'level', origin "VIP 5"). Given when the person's economy is read (GET /api/economy: the app reads it at sign-in and
 // each time Çantam opens; older apps never read it, so theirs come with the update), every rule at or under their
 // level now, once per rule and person (level_reward_claims, given or not: an item already had for good adds nothing

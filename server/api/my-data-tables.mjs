@@ -33,6 +33,7 @@ export const NOT_EXPORTED = {
   level_settings: 'platform settings, set by staff (Seviye ayarları: which staff member saved them)',
   level_rewards: 'platform settings, set by staff (Seviye ödülleri: which staff member made or removed a reward)',
   level_reward_claims: 'which level rewards someone was given: the items themselves are in the copy (shopItems, source level)',
+  task_rewards: 'platform settings, set by staff (Görev ödülleri: which staff member made or removed a reward)',
   shop_items: 'the shop catalog, kept by staff (which admin added or changed a frame or entry effect)',
   custom_gifts: 'the gift catalog, kept by staff (which admin added or changed a gift)',
   emoji_packs: 'the emoji panel’s packs, kept by staff (which admin added or changed a pack)',

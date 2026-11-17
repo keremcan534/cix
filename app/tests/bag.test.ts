@@ -5,7 +5,7 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { BAG_TABS, eventRewardText, parseBag, sourceText, termText } from '@/lib/bag-core';
+import { BAG_TABS, eventRewardText, parseBag, sourceText, taskItemNames, termText } from '@/lib/bag-core';
 
 const DAY = 86_400_000;
 const NOW = Date.parse('2026-11-17T12:00:00.000Z');
@@ -68,6 +68,11 @@ describe('Çantam', () => {
       { state: 'upcoming', reward: 'Neon' },
     ])
       assert.equal(eventRewardText(e), null, JSON.stringify(e));
+  });
+
+  test('görevin Çantam eşyaları: adları, bozuk olan atlanır', () => {
+    assert.deepEqual(taskItemNames([{ sku: 'bb-candy', name: ' Şeker ' }, { name: 5 }, null, 'x', { name: '' }]), ['Şeker']);
+    for (const raw of [undefined, null, {}, 'Şeker']) assert.deepEqual(taskItemNames(raw), []);
   });
 
   test('sekmeler: binek giriş efektleriyle', () => {

@@ -3,6 +3,8 @@
 // is read again when its screen comes to the front. The server counts and pays; this only shows its answers.
 import * as api from '@/lib/api';
 import { applyServerUser, rememberUser, toLocal } from '@/lib/live';
+import { taskItemNames } from '@/lib/bag-core';
+import { refreshBag } from '@/lib/live/bag';
 import { focusStore } from '@/lib/live/focus-store';
 
 // --- Aramalar ------------------------------------------------------------------------------------------------
@@ -54,11 +56,14 @@ export const useLiveCallTask = (on = true) => task.useData(on);
 
 /**
  * Takes the call task's reward on the server; the answer's balance reaches the wallet. `paid`: false for a repeat.
- * `gift`: what it put in Çantam (server/api/backpack.mjs), or null.
+ * `gift`: what it put in Çantam (server/api/backpack.mjs), or null; `items`: the names of the Görev ödülleri items it
+ * put there (task-rewards.mjs), which Çantam then reads.
  */
 export async function claimLiveCallTask() {
   const r = await api.claimCallTask();
   applyServerUser(r, 'Görev ödülü');
   task.put(r.task);
-  return { paid: !r.replay, task: r.task, gift: r.backpack ?? null };
+  const items = taskItemNames(r.items);
+  if (items.length) void refreshBag();
+  return { paid: !r.replay, task: r.task, gift: r.backpack ?? null, items };
 }

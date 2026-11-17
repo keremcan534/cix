@@ -1075,9 +1075,11 @@ export const myHearts = () => call<{ hearts: { id: string; points: number; level
 export type ServerCallStats = { calls: number; minutes: number; diamonds: number };
 export const myCallStats = () => call<{ week: ServerCallStats }>('GET', '/api/me/call-stats').then((r) => r.week);
 /** Görevler › "1 görüntülü arama yap" today, as the server counts it. */
-export type ServerCallTask = { goal: number; done: number; reward: number; minSeconds: number; claimed: boolean };
+/** `items`: what the task also puts in Çantam (Görev ödülleri, server/api/task-rewards.mjs; older servers leave it out). */
+export type ServerCallTask = { goal: number; done: number; reward: number; minSeconds: number; claimed: boolean; items?: unknown };
 export const myCallTask = () => call<{ task: ServerCallTask }>('GET', '/api/me/call-task').then((r) => r.task);
-export const claimCallTask = () => call<{ user: ServerUser; replay: boolean; task: ServerCallTask; backpack?: { giftId: string; count: number } | null }>('POST', '/api/me/call-task/claim', {});
+export const claimCallTask = () =>
+  call<{ user: ServerUser; replay: boolean; task: ServerCallTask; backpack?: { giftId: string; count: number } | null; items?: unknown }>('POST', '/api/me/call-task/claim', {});
 // Room social (server/api/room-social.mjs): mic invites, the room poll, upcoming events, my rooms, follower invites.
 export type MicInviteStatus = 'pending' | 'accepted' | 'declined' | 'expired' | 'failed' | 'cancelled';
 /** `expiresIn`: ms left to answer by the server's clock (0 once answered); `seat` null: any free mic. */

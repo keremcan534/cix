@@ -219,3 +219,52 @@ describe('Etkinlik ödülü', () => {
     assert.equal((await economy(fan)).items.some((x) => x.source === 'event'), false);
   });
 });
+
+describe('Görev ödülü', () => {
+  test('günlük arama görevini alan, panelin eşyasını Çantam’da bulur; aynı gün ikinci kez almaz', async () => {
+    const boss = await h.account(`Görev Yöneticisi ${rnd(2)}`, 'admin');
+    const u = await h.signUp('Görevli');
+    const friend = await h.signUp('Arkadaş');
+    const add = (b, who = boss) => call('POST', '/api/admin/task-rewards', b, who.session);
+    await refused(add({ task: 'call', sku: 'bb-candy' }, u), 403);
+    await refused(call('GET', '/api/admin/task-rewards', null, u.session), 403);
+    await refused(add({ task: 'davet', sku: 'bb-candy' }), 400, /Görev bulunamadı/);
+    await refused(add({ task: 'call', sku: 'noble-1' }), 400, /çerçeve, giriş efekti/);
+    await refused(add({ task: 'call', sku: 'fr-gold', days: 2 }), 400, /süresiz/);
+    const { rule } = await ok(add({ task: 'call', sku: 'bb-candy', days: 1 }), 'ekle');
+    await refused(add({ task: 'call', sku: 'bb-candy' }), 409, /zaten var/);
+    // The task says what it gives.
+    const task = async () => (await ok(call('GET', '/api/me/call-task', null, u.session), 'görev')).task;
+    assert.deepEqual((await task()).items.map((x) => [x.sku, x.kind, x.days]), [['bb-candy', 'bubble', 1]]);
+
+    // A video call of two minutes today: the task is done and its reward taken.
+    await h.sql.query(
+      `INSERT INTO calls (kind, mode, caller, callee, price, status, ref, created_at, started_at, ended_at, minutes, coins)
+       VALUES ('call', 'video', $1, $2, 0, 'ended', $3, now() - interval '3 minutes', now() - interval '3 minutes', now() - interval '1 minute', 0, 0)`,
+      [u.user.id, friend.user.id, rnd(6)],
+    );
+    const r = await ok(call('POST', '/api/me/call-task/claim', {}, u.session), 'ödül');
+    assert.deepEqual(r.items.map((x) => x.sku), ['bb-candy']);
+    const got = await itemIn(u, 'bb-candy');
+    assert.deepEqual([got.source, got.origin], ['task', 'Günlük görüntülü arama']);
+    const until = Date.parse(got.until);
+    assert.ok(Math.abs(until - Date.now() - DAY) < 120_000, '1 gün');
+    // Again the same day: nothing more.
+    const again = await ok(call('POST', '/api/me/call-task/claim', {}, u.session), 'tekrar');
+    assert.deepEqual([again.replay, again.items], [true, []]);
+    assert.equal(Date.parse((await itemIn(u, 'bb-candy')).until), until);
+    const refs = await h.sql.query("SELECT ref FROM entitlements WHERE user_id = $1 AND source = 'task'", [u.user.id]);
+    assert.deepEqual(refs.rows.map((x) => x.ref.replace(/\d{4}-\d{2}-\d{2}/, 'GÜN')), [`task:task-call-GÜN:${rule.id}`]);
+    const list = await ok(call('GET', '/api/admin/task-rewards', null, boss.session), 'liste');
+    assert.deepEqual(list.rules.map((x) => [x.sku, x.days, x.given, x.taskName]), [['bb-candy', 1, 1, 'Günlük görüntülü arama']]);
+    assert.ok(list.items.some((x) => x.sku === 'fr-neon'));
+
+    // Taken away: the task gives it no more; what it gave stays.
+    await ok(call('POST', '/api/admin/task-rewards/delete', { id: rule.id }, boss.session), 'kaldır');
+    await refused(call('POST', '/api/admin/task-rewards/delete', { id: rule.id }, boss.session), 404);
+    assert.deepEqual((await task()).items, []);
+    assert.equal((await itemIn(u, 'bb-candy')).source, 'task');
+    const audit = (await h.sql.query("SELECT action FROM audit_events WHERE action LIKE 'task_reward.%' ORDER BY id")).rows.map((x) => x.action);
+    assert.deepEqual(audit, ['task_reward.create', 'task_reward.delete']);
+  });
+});
