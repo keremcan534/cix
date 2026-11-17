@@ -17,21 +17,21 @@ export const SVIP_LEVELS = [
 export const svipLevelOf = (xp: number) => SVIP_LEVELS.filter((l) => xp >= l.xp).length;
 export type RightGroup = 'Görünüm' | 'Odada' | 'Sosyal' | 'Destek';
 /** Ordered so that VIP n has the first `rights` entries (entry notice from VIP 1, gifts from VIP 2). */
-export const SVIP_RIGHTS: { name: string; emoji: string; group: RightGroup; art?: ArtName }[] = [
-  { name: 'Özel giriş duyurusu', emoji: '✨', group: 'Odada', art: 'ayricalik-giris-ekrani-kayan-yazi' },
+export const SVIP_RIGHTS: { name: string; emoji: string; group: RightGroup; art?: ArtName; soon?: boolean }[] = [
+  { name: 'Özel giriş duyurusu', emoji: '✨', group: 'Odada', art: 'ayricalik-giris-ekrani-kayan-yazi', soon: true },
   { name: 'VIP rozeti', emoji: '🎖️', group: 'Görünüm', art: 'ayricalik-svip-rozeti' },
   { name: 'Üyelere özel hediyeler', emoji: '🎁', group: 'Odada', art: 'ayricalik-svip-e-ozel-hediye' },
-  { name: 'Renkli sohbet balonu', emoji: '🎨', group: 'Görünüm', art: 'ayricalik-genel-sohbet-balonu' },
+  { name: 'Renkli sohbet balonu', emoji: '🎨', group: 'Görünüm', art: 'ayricalik-genel-sohbet-balonu', soon: true },
   { name: 'Profil çerçevesi', emoji: '🖼️', group: 'Görünüm', art: 'ayricalik-profil-cercevesi' },
-  { name: 'Puanla alışveriş', emoji: '🏪', group: 'Destek', art: 'ayricalik-puan-takas-magazasi' },
-  { name: 'Profil kartı çerçevesi', emoji: '🪪', group: 'Görünüm', art: 'ayricalik-bilgi-karti-cercevesi' },
-  { name: 'Hediye serisi efekti', emoji: '🔥', group: 'Odada', art: 'ayricalik-hediye-combo-skin' },
-  { name: 'Kendi unvanını yaz', emoji: '✏️', group: 'Görünüm', art: 'ayricalik-diy-unvani' },
+  { name: 'Puanla alışveriş', emoji: '🏪', group: 'Destek', art: 'ayricalik-puan-takas-magazasi', soon: true },
+  { name: 'Profil kartı çerçevesi', emoji: '🪪', group: 'Görünüm', art: 'ayricalik-bilgi-karti-cercevesi', soon: true },
+  { name: 'Hediye serisi efekti', emoji: '🔥', group: 'Odada', art: 'ayricalik-hediye-combo-skin', soon: true },
+  { name: 'Kendi unvanını yaz', emoji: '✏️', group: 'Görünüm', art: 'ayricalik-diy-unvani', soon: true },
   { name: 'Sessiz ziyaret', emoji: '🥷', group: 'Sosyal', art: 'ayricalik-gizli-ziyaret' },
-  { name: 'Dolu odaya girebilme', emoji: '🚪', group: 'Odada', art: 'ayricalik-tam-dolu-odalar' },
-  { name: 'Mesaj çevirisi', emoji: '🔤', group: 'Sosyal', art: 'ayricalik-metin-cevirisi' },
-  { name: 'Yüklemede indirim', emoji: '💸', group: 'Destek', art: 'ayricalik-yukleme-indirimi' },
-  { name: 'Öncelikli destek', emoji: '🎧', group: 'Destek', art: 'ayricalik-ozel-musteri-temsilcisi' },
+  { name: 'Dolu odaya girebilme', emoji: '🚪', group: 'Odada', art: 'ayricalik-tam-dolu-odalar', soon: true },
+  { name: 'Mesaj çevirisi', emoji: '🔤', group: 'Sosyal', art: 'ayricalik-metin-cevirisi', soon: true },
+  { name: 'Yüklemede indirim', emoji: '💸', group: 'Destek', art: 'ayricalik-yukleme-indirimi', soon: true },
+  { name: 'Öncelikli destek', emoji: '🎧', group: 'Destek', art: 'ayricalik-ozel-musteri-temsilcisi', soon: true },
 ];
 
 // --- Rütbe (noble): bought with coins for 30 days -------------------------------------
@@ -44,21 +44,49 @@ export const NOBLE_TIERS = [
 ];
 export const NOBLE_DAYS = 30;
 /** Ordered so that tier n has the first `rights` entries; GATES below read rights by name. */
-export const NOBLE_RIGHTS: { name: string; emoji: string; art?: ArtName }[] = [
+export const NOBLE_RIGHTS: { name: string; emoji: string; art?: ArtName; soon?: boolean }[] = [
   { name: 'Rütbe Nişanı', emoji: '🏅', art: 'ayricalik-asil-madalyasi' },
-  { name: 'Rütbe etiketi', emoji: '🔖', art: 'ayricalik-asil-etiketi' },
+  { name: 'Rütbe etiketi', emoji: '🔖', art: 'ayricalik-asil-etiketi', soon: true },
   { name: 'Oda kilitleme', emoji: '🔒', art: 'ayricalik-oda-kilitleme' },
   { name: 'Giriş karşılaması', emoji: '🌟', art: 'ayricalik-giris-ekrani' },
   { name: 'Profil çerçevesi', emoji: '🖼️', art: 'ayricalik-profil-cercevesi' },
-  { name: 'Sohbet balonu', emoji: '💬', art: 'ayricalik-sohbet-balonu' },
-  { name: 'Odada ayrılmış koltuk', emoji: '🛋️', art: 'ayricalik-asil-koltugu' },
-  { name: 'Binekler', emoji: '🚘', art: 'ayricalik-araclar' },
-  { name: 'Gizli oda girişi', emoji: '👻', art: 'ayricalik-gizli-oda-girisi' },
-  { name: 'Arkadaşına jeton gönder', emoji: '💗', art: 'ayricalik-jeton-hediye-et' },
-  { name: 'Sıralamada gizli kalma', emoji: '🕵️', art: 'ayricalik-gizemli-kisi-kimligi' },
-  { name: 'Aile içinde görünmezlik', emoji: '🎭', art: 'ayricalik-klan-gizliligi' },
+  { name: 'Sohbet balonu', emoji: '💬', art: 'ayricalik-sohbet-balonu', soon: true },
+  { name: 'Odada ayrılmış koltuk', emoji: '🛋️', art: 'ayricalik-asil-koltugu', soon: true },
+  { name: 'Binekler', emoji: '🚘', art: 'ayricalik-araclar', soon: true },
+  { name: 'Gizli oda girişi', emoji: '👻', art: 'ayricalik-gizli-oda-girisi', soon: true },
+  { name: 'Arkadaşına jeton gönder', emoji: '💗', art: 'ayricalik-jeton-hediye-et', soon: true },
+  { name: 'Sıralamada gizli kalma', emoji: '🕵️', art: 'ayricalik-gizemli-kisi-kimligi', soon: true },
+  { name: 'Aile içinde görünmezlik', emoji: '🎭', art: 'ayricalik-klan-gizliligi', soon: true },
 ];
 export const nobleInfo = (tier: number) => NOBLE_TIERS.find((t) => t.tier === tier);
+
+// --- What the screens list (güncelleme 6, owner's call): only the rights the real app gives today --------------
+// A right marked `soon` isn't built yet (or only shows on its owner's phone): the VIP and Rütbe pages leave it out
+// until it is, instead of selling it. The lists above keep their order, which the gates (hasNobleRight) read.
+/** A right as a page shows it: the level (VIP) or tier (Rütbe) it opens at. */
+export type ShownRight = { name: string; emoji: string; art?: ArtName; level: number };
+/** Rights the server already gives from VIP 1 that the list above never named. */
+const SVIP_MORE: ShownRight[] = [
+  { name: 'Seviyeleri gizle', emoji: '🙈', art: 'ayricalik-gizemli-kisi-kimligi', level: 1 },
+  { name: 'Oda şifresi', emoji: '🔑', art: 'ayricalik-oda-kilitleme', level: 1 },
+  { name: 'VIP mağaza eşyaları', emoji: '🛍️', art: 'ayricalik-puan-takas-magazasi', level: 1 },
+];
+/** Where the real app gives a right earlier than its place in the list says (the VIP ring: from VIP 1). */
+const SVIP_FROM: Record<string, number> = { 'Profil çerçevesi': 1 };
+/** VIP 1–10 rights to show, by the level they open at. */
+export const SVIP_SHOWN: ShownRight[] = [
+  ...SVIP_RIGHTS.map((r, i) => ({ name: r.name, emoji: r.emoji, art: r.art, level: SVIP_FROM[r.name] ?? SVIP_LEVELS.find((l) => l.rights > i)?.level ?? 99, soon: r.soon })).filter((r) => !r.soon),
+  ...SVIP_MORE,
+]
+  .map(({ name, emoji, art, level }) => ({ name, emoji, art, level }))
+  .sort((a, b) => a.level - b.level);
+/** Where a Rütbe gives a right earlier than its place in the list says (its VIP ring: from Çavuş). */
+const NOBLE_FROM: Record<string, number> = { 'Profil çerçevesi': 1 };
+/** Rütbe rights to show, by the tier they open at. */
+export const NOBLE_SHOWN: ShownRight[] = NOBLE_RIGHTS.map((r, i) => ({ name: r.name, emoji: r.emoji, art: r.art, level: NOBLE_FROM[r.name] ?? NOBLE_TIERS.find((t) => t.rights > i)?.tier ?? 99, soon: r.soon }))
+  .filter((r) => !r.soon)
+  .map(({ name, emoji, art, level }) => ({ name, emoji, art, level }))
+  .sort((a, b) => a.level - b.level);
 export const hasNobleRight = (tier: number, name: string) => {
   const t = nobleInfo(tier);
   return !!t && NOBLE_RIGHTS.findIndex((r) => r.name === name) < t.rights;
@@ -73,37 +101,27 @@ export const VIP_PLANS = [
   { days: 30, tl: 285, was: 1_199, label: '1 Ay' },
   { days: 90, tl: 599, was: 3_599, label: '3 Ay' },
 ].map((p) => ({ ...p, save: Math.floor((1 - p.tl / p.was) * 100) }));
-/** Comparison table; `true` / `false` render as a check / cross. */
+/**
+ * Comparison table; `true` / `false` render as a check / cross. Only what the server gives a subscriber today
+ * (güncelleme 6): the call and match discounts, gold name, VIP medal, extra login reward and welcome box aren't built
+ * yet, so the page doesn't sell them.
+ */
 export const VIP_COMPARE: [string, string | boolean, string | boolean][] = [
-  ['Sesli sohbet', '2.000 Jeton / dakika', '%20 indirim'],
-  ['Görüntülü sohbet', '3.000 Jeton / dakika', '%20 indirim'],
-  ['Sesli eşleşme', '1.750 Jeton / dakika', 'Günde 1 ücretsiz'],
-  ['Görüntülü eşleşme', '2.500 Jeton / dakika', 'Günde 1 ücretsiz'],
   ['Profiline bakanları gör', false, true],
-  ['Altın renkli isim', false, true],
-  ['VIP madalyası', false, true],
-  ['Ek giriş ödülü', false, true],
-  ['Hoş Geldin Kutusu', false, true],
   ['Seviyeleri gizle', false, true],
 ];
-/** "VIP Ayrıcalıkları" carousel (Ionicons names). */
+/** "VIP Ayrıcalıkları" carousel (Ionicons names): the same two, as above. */
 export const VIP_PERKS: { name: string; desc: string; icon: string }[] = [
-  { name: 'Arama indirimi', desc: 'Aramalarda %20 indirim', icon: 'call' },
   { name: 'Ziyaretçiler', desc: 'Profiline bakanları gör', icon: 'eye' },
-  { name: 'Altın renkli isim', desc: 'Adın her yerde altın renginde görünür', icon: 'sparkles' },
-  { name: 'Ek ödül', desc: 'Günlük girişte fazladan ödül', icon: 'ribbon' },
-  { name: 'Eşleşme', desc: 'Her gün 1 ücretsiz sesli ve görüntülü eşleşme', icon: 'shuffle' },
-  { name: 'VIP madalyası', desc: 'Profilinde parlayan madalya', icon: 'medal' },
-  { name: 'Hoş Geldin Kutusu', desc: 'Her planla gelen hediyeler', icon: 'gift' },
   { name: 'Seviyeleri gizle', desc: 'Cömertlik ve Yankı seviyeni gizle', icon: 'eye-off' },
 ];
-/** "Hoş Geldin Kutusu": granted with every plan. */
+/** "Hoş Geldin Kutusu": meant to come with every plan; the server doesn't grant it yet, so the page doesn't show it. */
 export const VIP_GIFT_PACK: { name: string; emoji: string; art: ArtName; days: number; qty: number }[] = [
   { name: 'VIP Sohbet Balonu', emoji: '💬', art: 'ayricalik-sohbet-balonu', days: 7, qty: 1 },
   { name: 'VIP Giriş Efekti', emoji: '✨', art: 'ayricalik-giris-ekrani', days: 7, qty: 1 },
 ];
 
-// --- Gates used across the app (admin-configurable in the real product) -------------------
+// --- Gates used across the app (written here and on the server; not settable from a panel yet) -----------------
 export const GATES = {
   /** Game center: VIP 2 (SVIP) or Yüzbaşı+ */
   games: (svip: number, noble: number) => svip >= 2 || noble >= 2,

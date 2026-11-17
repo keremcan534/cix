@@ -13,9 +13,9 @@ import { SCENES } from '@/components/fx/scenes';
 import { Backdrop } from '@/components/fx/surface';
 import { Art, type ArtName } from '@/components/Art';
 import { Avatar, CharmBadge, WealthBadge } from '@/components/ui';
-import { CHARM_PERKS, CHARM_TIERS, CHARM_XP, charmBonusPct, charmTier } from '@/data/charm';
+import { CHARM_PERKS, CHARM_TIERS, CHARM_XP, charmTier } from '@/data/charm';
 import { SVIP_LEVELS, nobleInfo } from '@/data/status';
-import { WEALTH_PERKS, WEALTH_TIERS, WEALTH_XP, levelGiftOf, wealthTier, type LevelPerk, type LevelTier } from '@/data/wealth';
+import { WEALTH_PERKS, WEALTH_TIERS, WEALTH_XP, levelGiftOf, shownPerks, wealthTier, type LevelPerk, type LevelTier } from '@/data/wealth';
 import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 import { goBack } from '@/lib/nav';
@@ -46,7 +46,8 @@ const SYSTEMS: Record<Kind, System> = {
     point: 'Cömertlik puanı',
     table: WEALTH_XP,
     tiers: WEALTH_TIERS,
-    perks: WEALTH_PERKS,
+    // Only what the real app gives today (güncelleme 6); the rest come back as they're built.
+    perks: shownPerks(WEALTH_PERKS),
     tierOf: wealthTier,
     Badge: WealthBadge,
     perkDetail: (p, level) => (p.key === 'gift' ? `${levelGiftOf(level)} · ${p.detail}` : p.detail),
@@ -57,10 +58,10 @@ const SYSTEMS: Record<Kind, System> = {
     point: 'Yankı puanı',
     table: CHARM_XP,
     tiers: CHARM_TIERS,
-    perks: CHARM_PERKS,
+    perks: shownPerks(CHARM_PERKS),
     tierOf: charmTier,
     Badge: CharmBadge,
-    perkDetail: (p, level) => (p.key === 'bonus' ? `+%${Math.max(1, charmBonusPct(level))} · ${p.detail}` : p.key === 'rank' ? `Sıralama ağırlığı ${level} · ${p.detail}` : p.detail),
+    perkDetail: (p) => p.detail,
   },
 };
 
@@ -135,7 +136,6 @@ function LevelPane({ kind, xp, myLevel }: { kind: Kind; xp: number; myLevel: num
           </View>
           <Text style={s.meLine}>
             {sys.point} <Text style={{ fontWeight: '900', color: '#fff' }}>{fmt(xp)}</Text> · {mine.name}
-            {kind === 'charm' && charmBonusPct(myLevel) > 0 ? ` · kazanç bonusu %${charmBonusPct(myLevel)}` : ''}
           </Text>
           <View style={s.track}>
             <View style={[s.fill, { width: `${Math.round(pct * 100)}%`, backgroundColor: mine.colors[0] }]} />
@@ -165,7 +165,10 @@ function LevelPane({ kind, xp, myLevel }: { kind: Kind; xp: number; myLevel: num
           <Text style={s.statusText}>{open ? `Lv.${level} ayrıcalıkları açık.` : `Lv.${level} için ${fmt(sys.table[level] - xp)} ${sys.point.toLowerCase()} gerekiyor (toplam ${fmt(sys.table[level])}).`}</Text>
         </View>
         <PerkGrid title={`Lv.${level} ayrıcalıkları`} perks={sys.perks.filter((p) => p.kind === 'privilege' && p.from <= level)} level={level} open={open} Badge={Badge} detail={sys.perkDetail} />
-        <PerkGrid title={`Lv.${level} görünüm`} perks={sys.perks.filter((p) => p.kind === 'costume' && p.from <= level)} level={level} open={open} Badge={Badge} detail={sys.perkDetail} empty={`Görünüm ödülleri Lv.${fromN(firstCostume)} itibaren açılır.`} />
+        {/* No look rewards are built yet (güncelleme 6): the section comes back with the first one. */}
+        {firstCostume < 99 && (
+          <PerkGrid title={`Lv.${level} görünüm`} perks={sys.perks.filter((p) => p.kind === 'costume' && p.from <= level)} level={level} open={open} Badge={Badge} detail={sys.perkDetail} empty={`Görünüm ödülleri Lv.${fromN(firstCostume)} itibaren açılır.`} />
+        )}
 
         {kind === 'wealth' && (
           <Pressable onPress={() => router.push('/vip')} style={s.card} accessibilityLabel="Ayrıcalıklarım">
@@ -253,13 +256,13 @@ function PerkGrid({ title, perks, level, open, empty, Badge, detail }: { title: 
 const GUIDE: Record<Kind, { title: string; art?: ArtName; icon?: keyof typeof Ionicons.glyphMap; body: string[] }[]> = {
   wealth: [
     { title: 'Cömertlik seviyesi nedir?', art: 'seviye-servet-seviyesi', body: ['Similar Club’da yaptığın geçerli jeton harcamalarının toplamını gösteren kalıcı seviyedir. Harcadıkça cömertlik puanın birikir; eşik geçildiğinde seviyen yükselir ve düşmez.'] },
-    { title: 'Ne işe yarar?', icon: 'gift-outline', body: ['Seviyen adının yanında rozet olarak görünür. Yükseldikçe listelerde öne çıkarsın; seviye hediyesi, giriş efekti, madalya ve çerçeve açılır. Lv.10’dan sonra seviye atlaman bulunduğun odada, Lv.33’ten sonra tüm platformda duyurulur.'] },
+    { title: 'Ne işe yarar?', icon: 'gift-outline', body: ['Seviyen profilinde adının yanında rozet olarak görünür. Yeni ayrıcalıklar eklendikçe bu ekranda listelenir.'] },
     { title: 'Puan nasıl kazanılır?', icon: 'trending-up', body: ['Harcanan her 1 jeton 1 cömertlik puanıdır. Sayılanlar: odada ve sohbette hediye, Şanslı hediye (yalnızca harcadığın jeton; kazandığın ödül sayılmaz), ücretli mesaj ve aramalar, mağaza alışverişi, aile kurma ve aile hediyeleri, oda etkinlikleri ve animasyonlar.'] },
     { title: 'Sayılmayanlar', icon: 'alert-circle-outline', body: ['• Jetonla oynanan oyunlar.', '• Jeton dağıtma: oda zarfı, jeton transferi.', '• İade edilen işlemler ve kural dışı bulunan hareketler; şüpheli işlemlerde puan verilmez.'] },
   ],
   charm: [
-    { title: 'Yankı seviyesi nedir?', art: 'seviye-cazibe-seviyesi', body: ['Diğer kullanıcıların seninle ne kadar etkileşim kurduğunu gösteren kalıcı seviyedir. Her kullanıcının bir Yankı seviyesi vardır ve profilinde, odada ve keşfette rozet olarak görünür.'] },
-    { title: 'Kazancını ve popülerliğini etkiler', icon: 'diamond-outline', body: [`• Kazanç: Lv.6’dan itibaren aldığın hediyelerin elmasına bonus eklenir (Lv.6 %1, Lv.16 %2, Lv.26 %3, Lv.36 %4, Lv.46 %5). Bonus, gelir geçmişinde ayrı satır olarak görünür.`, '• Popülerlik: Keşfet ve önerilerde çevrimiçi kişiler arasında Yankı seviyesi yüksek olan daha üstte gösterilir.'] },
+    { title: 'Yankı seviyesi nedir?', art: 'seviye-cazibe-seviyesi', body: ['Diğer kullanıcıların seninle ne kadar etkileşim kurduğunu gösteren kalıcı seviyedir. Her kullanıcının bir Yankı seviyesi vardır ve profilinde ve Ana Sayfa kartında rozet olarak görünür.'] },
+    { title: 'Ne işe yarar?', icon: 'diamond-outline', body: ['• Popülerlik: Ana Sayfa’da çevrim içi kişiler arasında Yankı seviyesi yüksek olan daha üstte gösterilir.', '• Lv.5’te Anlar’da paylaşım açılır.'] },
     { title: 'Puan nasıl kazanılır?', icon: 'trending-up', body: ['Sana gönderilen hediyelerden gelen her 1 elmas 1 Yankı puanıdır; seninle yapılan ücretli aramalar da sayılır. Beğeni ve özel sohbet puanları sunucuya geçince günlük sınırla eklenecek.'] },
     { title: 'Dikkat', icon: 'alert-circle-outline', body: ['Sahte etkileşimle puan artırmak, başkasının kimliğini kullanmak veya kural ihlali puan silinmesine ve hesabın kapatılmasına yol açar.'] },
   ],

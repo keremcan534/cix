@@ -41,6 +41,23 @@ Sahibin gönderdiği tasarıma göre, açık ve koyu temada aynı pembe cam gör
 - Her kişi pembe cam bir kartta: fotoğraf, isim ve Yankı rozeti, yaş, benzerlik ve ilgi alanları; yanında Selam ya da Sohbet ve Takip et / Takipte.
 - Alt menü ekranın kenarından biraz içeride yüzen pembe cam bir çubuk; seçili sekmenin simgesi ve adı pembe hapta.
 
+## Çalışmayan haklar gizlendi (17 Kasım)
+
+Sahibin kararı: VIP, Rütbe, Abonelik, Cömertlik ve Yankı sayfalarında yalnız uygulamanın gerçekten verdiği haklar görünür; yapılmamış olanlar yapılınca geri gelir. Çalışmayan bir özelliği satmak kullanıcıyı yanıltır, Google Play de bunu yanıltıcı sayabilir.
+
+| Sayfa | Görünenler (çalışıyor) | Gizlenenler (henüz yok) |
+|---|---|---|
+| VIP 1–10 | VIP rozeti, Profil çerçevesi, Seviyeleri gizle, Oda şifresi, VIP mağaza eşyaları (VIP 1), Üyelere özel hediyeler (VIP 2), Sessiz ziyaret (VIP 7) | Özel giriş duyurusu (yalnız kişinin kendi telefonunda görünüyordu), renkli sohbet balonu, puanla alışveriş, profil kartı çerçevesi, hediye serisi efekti, kendi unvanını yaz, dolu odaya girme, mesaj çevirisi, yüklemede indirim, öncelikli destek |
+| Rütbe | Rütbe Nişanı, Oda kilitleme, Giriş karşılaması, Profil çerçevesi | Rütbe etiketi, sohbet balonu, ayrılmış koltuk, binek, gizli oda girişi, arkadaşa jeton, sıralamada gizlenme, aile içinde görünmezlik |
+| Abonelik | Profiline bakanları gör, Seviyeleri gizle | Arama indirimi, günlük ücretsiz eşleşme, altın isim, VIP madalyası, ek giriş ödülü, Hoş Geldin Kutusu |
+| Cömertlik | Seviye rozeti | Öne çıkma, seviye hediyesi, giriş efekti, madalya, odada seviye duyurusu, profil çerçevesi, platform duyurusu |
+| Yankı | Yankı rozeti, Ana Sayfa'da öne çıkma, Anlar'da paylaşım (Lv.5) | Kazanç bonusu %1–5, sohbet balonu, madalya, giriş efekti, mikrofon halkası, profil çerçevesi, özel araç |
+
+- "Gizli oda girişi" sunucu odalarında kimseyi gizlemiyordu ama odada "kimse görmez" yazıyordu; artık sunucu odalarında açılmıyor.
+- Yankı seviye atlama bildirimi artık kazanç bonusundan söz etmiyor.
+- **Sahibin dikkatine:** Abonelikte artık iki ayrıcalık görünüyor (fiyat 145–599 TL). Fiyatı ya da haklarını gözden geçirmek gerekebilir.
+- Sonraki adım (karar bekliyor): sunucuda "Seviye ve VIP ayarları" ve finans panelinde ekran; haklar sırayla sunucuda yapılınca sayfalara geri döner.
+
 ## Mikrofon denoise
 
 Kod satır satır izlendi (LiveKit kancası, 48 kHz / 10 ms kareler, ölçek, APK derlemesi): temizlik **gönderilen sesin** yolunda ve çalışıyor. "Çalışmıyor" görünmesinin sebepleri:
