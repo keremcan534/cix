@@ -110,6 +110,47 @@ describe('Finans paneline aktarım', () => {
     const b = await signUp('B');
     assert.equal((await call('GET', '/api/admin/finance-sync', null, b.session))[0], 403);
   });
+
+  test('biten günlerin konuşma, dinleme ve arama dakikaları panele kullanım olarak gider; panel reddederse gün bekler', async () => {
+    const day = async (n) => (await h.sql.query("SELECT to_char((now() AT TIME ZONE 'Europe/Istanbul')::date - $1::int, 'YYYY-MM-DD') AS d", [n])).rows[0].d;
+    const [d3, d2, d1, d0] = [await day(3), await day(2), await day(1), await day(0)];
+    const sent = () => h.sql.query("SELECT to_char(usage_day, 'YYYY-MM-DD') AS day, usage_error, last_error FROM finance_sync WHERE id = 1").then((r) => r.rows[0]);
+    // Two days ago: 10 minutes in voice rooms, 2 of them speaking, and a minute and a half of video call. Yesterday
+    // nothing; today isn't over.
+    await h.sql.query("INSERT INTO media_minutes (day, kind, seconds) VALUES ($1, 'room', 600), ($1, 'speaker', 120), ($1, 'call_video', 90), ($2, 'room', 60)", [d2, d0]);
+
+    // The panel refuses (no such provider there yet): the day waits, the money feed stays healthy.
+    panel.refuse = 'usage';
+    await h.sql.query('UPDATE finance_sync SET usage_day = $1, usage_error = NULL WHERE id = 1', [d3]);
+    const waiting = await until(async () => ((await sent()).usage_error ? sent() : null));
+    assert.match(waiting.usage_error, new RegExp(`^${d2}: Tanımsız`));
+    assert.deepEqual([waiting.day, waiting.last_error], [d3, null]);
+    assert.ok(!panel.events.some((e) => e.type === 'usage'));
+
+    panel.refuse = null;
+    const usage = await until(() => {
+      const u = panel.events.filter((e) => e.type === 'usage');
+      return u.length >= 8 ? u : null;
+    });
+    const of = (d) => Object.fromEntries(usage.filter((e) => e.idempotency_key.endsWith(d)).map((e) => [e.service, e.quantity]));
+    assert.deepEqual(of(d2), { oda_konusan_dk: '2.00', oda_dinleyen_dk: '8.00', sesli_gorusme_dk: '0.00', goruntulu_gorusme_dk: '1.50' });
+    assert.deepEqual(of(d1), { oda_konusan_dk: '0.00', oda_dinleyen_dk: '0.00', sesli_gorusme_dk: '0.00', goruntulu_gorusme_dk: '0.00' }, 'ölçüldü, yok');
+    assert.deepEqual(of(d0), {}, 'bugün bitmedi');
+    const one = usage.find((e) => e.idempotency_key === `usage-oda_dinleyen_dk-${d2}`);
+    assert.deepEqual([one.provider_code, one.period, one.occurred_at], ['oracle', d2.slice(0, 7), `${d2}T20:59:59Z`]);
+    await until(async () => {
+      const s = await sent();
+      return s.day === d1 && s.usage_error === null;
+    });
+
+    // The admin sees where it stands; sent days go once.
+    const a = await signUp('Bakan');
+    await h.sql.query("UPDATE users SET role = 'admin' WHERE id = $1", [a.user.id]);
+    const [, status] = await call('GET', '/api/admin/finance-sync', null, a.session);
+    assert.deepEqual([status.usageDay, status.usageError], [d1, null]);
+    await new Promise((r) => setTimeout(r, 500));
+    assert.equal(panel.events.filter((e) => e.type === 'usage').length, 8);
+  });
 });
 
 describe('Defter satırı → panel olayı', () => {

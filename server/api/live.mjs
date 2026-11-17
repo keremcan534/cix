@@ -1,7 +1,8 @@
 // LiveKit (voice): the join token, and who is in which room from LiveKit's webhooks.
 //
 //   GET  /token?room=&password=   → { token, ttl }          (rooms.mjs voiceAccess decides who may join)
-//   POST /api/livekit/webhook     LiveKit → us, signed       (participant joined / left, room started / finished)
+//   POST /api/livekit/webhook     LiveKit → us, signed       (participant joined / left, room started / finished,
+//                                                              track published / unpublished: a voice room's mic)
 //   GET  /api/rooms/live          → { rooms: [{ room, listeners }] }   (every voice room with people in it)
 //
 // livekit.yaml sends the webhooks: webhook.api_key = our key, urls = [http://127.0.0.1:7890/api/livekit/webhook]
@@ -21,6 +22,7 @@ import crypto from 'node:crypto';
 import { HttpError, UUID, auth, db, env, filesOut, readRaw } from './core.mjs';
 import { roomEntered } from './referrals.mjs';
 import { eventJoined, eventRoomFinished } from './events.mjs';
+import { connectionEnded, roomEnded, sessionsEnded, trackPublished, trackUnpublished } from './media-minutes.mjs';
 import { leftVoiceRoom, mayStay, voiceAccess, voiceRoomStarted } from './rooms.mjs';
 import { voiceGrant } from './sanctions.mjs';
 
@@ -71,8 +73,12 @@ const clip = (v) => (typeof v === 'string' ? v.slice(0, 64) : '');
 let webhooksSeen = false;
 export const presenceTracked = () => webhooksSeen;
 
-/** Time in a room feeds the agency's activity measure (agency-perf.mjs). Identities are user ids. */
+/**
+ * Time in a room feeds the agency's activity measure (agency-perf.mjs). Identities are user ids. The day's voice
+ * and video minutes for the finance panel count everyone (media-minutes.mjs).
+ */
 async function logPresence(gone) {
+  await sessionsEnded(gone.rows);
   for (const x of gone.rows) {
     if (!UUID.test(x.identity)) continue;
     await db.query(
@@ -115,6 +121,8 @@ async function onEvent(e) {
       if (who) {
         const gone = await db.query("DELETE FROM room_presence WHERE room = $1 AND identity = $2 AND (sid = $3 OR $3 = '') RETURNING room, identity, joined_at", [room, who, sid]);
         await logPresence(gone);
+        // Its mics are off too (a voice room's speaking time, media-minutes.mjs).
+        await connectionEnded(room, who, sid);
         // Gone from the room: no longer waiting for a mic (not after a reconnect, which keeps another sid).
         if (gone.rowCount) await leftVoiceRoom(room, who);
       }
@@ -123,13 +131,22 @@ async function onEvent(e) {
       // Someone with a still-valid token can start a room again after it was closed.
       if ((await mayStay(room, '')) === 'closed') await deleteVoiceRoom(room);
       await logPresence(await db.query('DELETE FROM room_presence WHERE room = $1 RETURNING room, identity, joined_at', [room]));
+      await roomEnded(room);
       // The new LiveKit room gets the room's locked mics, layout and mic queue (rooms.mjs pushRoomMeta).
       await voiceRoomStarted(room);
       break;
     case 'room_finished':
       await logPresence(await db.query('DELETE FROM room_presence WHERE room = $1 RETURNING room, identity, joined_at', [room]));
+      await roomEnded(room);
       // The room emptied and closed: its running event ends (events.mjs).
       await eventRoomFinished(room);
+      break;
+    // A mic on and off in a voice room: its speaking time (media-minutes.mjs, the finance panel's minutes).
+    case 'track_published':
+      await trackPublished(room, who, sid, e.track);
+      break;
+    case 'track_unpublished':
+      await trackUnpublished(e.track);
       break;
     default:
   }
