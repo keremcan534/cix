@@ -9,7 +9,7 @@ import { liveCallRows } from '@/lib/call-rows';
 import { friendRows } from '@/lib/friend-rows';
 import { privacySync } from '@/lib/privacy-sync';
 
-const SERVER: ServerPrivacy = { profilePublic: true, showOnline: true, showLastSeen: true, showCurrentRoom: true, dmFrom: 'everyone', callsFrom: 'everyone', invitesFrom: 'everyone' };
+const SERVER: ServerPrivacy = { profilePublic: true, showOnline: true, showLastSeen: true, showCurrentRoom: true, dmFrom: 'everyone', callsFrom: 'everyone', invitesFrom: 'everyone', voiceCalls: true, videoCalls: true, messagePush: true, pushCloseOnly: true };
 
 describe('Gizlilik: hemen görünür, reddedilirse geri döner', () => {
   test('reddedilen değişiklik sunucunun son onayladığına döner', () => {

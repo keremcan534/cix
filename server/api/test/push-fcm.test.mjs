@@ -32,7 +32,7 @@ google.unref();
 const base = `http://127.0.0.1:${google.address().port}`;
 const account = { type: 'service_account', project_id: 'similar-test', client_email: 'push@similar-test.iam.gserviceaccount.com', private_key: privateKey.export({ type: 'pkcs8', format: 'pem' }), token_uri: `${base}/token` };
 
-const h = startApi({ PUSH_ENABLED: '1', FCM_URL: base, FCM_SERVICE_ACCOUNT_B64: Buffer.from(JSON.stringify(account)).toString('base64') });
+const h = startApi({ PUSH_ENABLED: '1', FCM_URL: base, FCM_SERVICE_ACCOUNT_B64: Buffer.from(JSON.stringify(account)).toString('base64') }, { moneyCheck: { skip: ['gifts'], why: 'kalp puanı için hediye geçmişini doğrudan yazar' } });
 const { call, signUp } = h;
 const until = async (fn, ms = 3000) => {
   const end = Date.now() + ms;
@@ -73,6 +73,45 @@ describe('Firebase bildirimleri', () => {
     assert.equal((await h.sql.query('SELECT kind FROM push_tokens WHERE token = $1', [live])).rows[0].kind, 'fcm');
     await call('POST', '/api/push/unregister', { token: live }, a.session);
     assert.equal((await h.sql.query('SELECT 1 FROM push_tokens WHERE token = $1', [live])).rowCount, 0, 'çıkışta silinir');
+  });
+
+  test('mesaj bildirimi tercihlere uyar: samimi kişi, herkes, kapalı; mesaj her durumda gelir', async () => {
+    const a = await signUp('Tercih Alan');
+    const b = await signUp('Tanımadık');
+    const c = await signUp('Kalp Yakını');
+    const token = fcmToken();
+    await call('POST', '/api/push/register', { token, platform: 'android', kind: 'fcm' }, a.session);
+    const dm = async (from, text) => assert.equal((await call('POST', '/api/messages', { to: a.user.id, text, ref: rnd(6) }, from.session))[0], 200, text);
+    const bodies = () => sent.filter((m) => m.message.token === token && m.message.data.type === 'message').map((m) => m.message.notification.body);
+    const arrives = (text) => until(() => bodies().includes(text));
+    const prefs = (patch) => call('PATCH', '/api/me/privacy', patch, a.session);
+
+    // At first only people close to me notify: a stranger's message comes without one.
+    await dm(b, 'yabancı bir');
+    await call('POST', '/api/follow', { to: a.user.id }, b.session);
+    await dm(b, 'yabancı iki');
+    await call('POST', '/api/follow', { to: b.user.id }, a.session);
+    await dm(b, 'karşılıklı takip');
+    assert.ok(await arrives('karşılıklı takip'), 'karşılıklı takip bildirir');
+    // A heart level between us is close too.
+    await h.sql.query("INSERT INTO gift_events (sender, recipient, gift_id, count, unit_price, total, place, ref) VALUES ($1, $2, 'gul', 1, 100000, 100000, 'chat', $3)", [c.user.id, a.user.id, rnd(6)]);
+    await dm(c, 'kalp seviyesi');
+    assert.ok(await arrives('kalp seviyesi'), 'kalp seviyesi bildirir');
+    assert.deepEqual(bodies().filter((x) => x.startsWith('yabancı')), [], 'yabancı bildirmez');
+
+    await prefs({ pushCloseOnly: false });
+    const d = await signUp('Herkesten');
+    await dm(d, 'artık herkes');
+    assert.ok(await arrives('artık herkes'), 'herkesten bildirim');
+
+    await prefs({ messagePush: false });
+    await dm(b, 'sessiz mesaj');
+    await prefs({ messagePush: true });
+    await dm(b, 'yine açık');
+    assert.ok(await arrives('yine açık'));
+    assert.equal(bodies().includes('sessiz mesaj'), false, 'kapalıyken bildirim yok');
+    const kept = await h.sql.query("SELECT 1 FROM messages WHERE recipient = $1 AND body = 'sessiz mesaj'", [a.user.id]);
+    assert.equal(kept.rowCount, 1, 'mesaj yine gelir');
   });
 
   test('arama "Aramalar" kanalında çalar, cevapsız arama normal kanalda', async () => {

@@ -46,8 +46,11 @@ export function peerChanges(
   return { leaves, joins };
 }
 
-/** Someone back this soon after leaving is a dropped connection coming back: the line again, not their entry effect. */
-export const RETURN_MS = 60_000;
+/**
+ * Someone back this soon after leaving is a dropped connection coming back: the line again, not their entry effect.
+ * Short on purpose: someone who walks out and back in a little later is an entrance, and everyone should see it.
+ */
+export const RETURN_MS = 15_000;
 
 /**
  * What my phone shows for someone joining the room's people: the chat line ("X odaya girdi") and their own entry
@@ -75,25 +78,32 @@ export type EntryPlan = {
   clip?: string;
   plate?: Plate | null;
 };
-/** What `look` (one person's, as the server keeps it) shows when its owner comes in; null when nothing worn shows. */
+/**
+ * What `look` (one person's, as the server keeps it) shows when its owner comes in; null when nothing worn shows.
+ * Everyone in the room sees what the person sees on their own phone (the customer's note, 18 Nov): a VIP level alone
+ * brings the banner, and so does an entry effect this phone can't play: one taken out of the shop (data/catalog
+ * `retired`), or one the team added after this phone last read the shop.
+ */
 export function entryPlanOf(look: { entry?: string | null; ride?: string | null; noble?: number | null; vipLevel?: number } | undefined): EntryPlan | null {
   if (!look) return null;
-  // Only an item of its own slot, and not one taken out of the shop (data/catalog `retired`): either would be no
-  // entry effect at all.
+  const known = cosmeticById(look.entry ?? undefined);
+  const wearing = known?.kind === 'entry' || (!!look.entry && !known);
+  // Only an item of its own slot. The team's own item still plays for whoever has it after it left the shelf.
   const worn = (id: string | null | undefined, kind: 'entry' | 'ride') => {
     const c = cosmeticById(id ?? undefined);
-    // The team's own item still plays for whoever has it after it left the shelf (its clip stays listed).
     return c?.kind === kind && (!c.retired || !!c.remote) ? c : undefined;
   };
   const entryItem = worn(look.entry, 'entry');
   const ride = worn(look.ride, 'ride');
   const noble = look.noble ? nobleInfo(look.noble) : undefined;
-  if (!entryItem && !ride && !noble) return null;
+  const vip = look.vipLevel ?? 0;
+  if (!wearing && !ride && !noble && vip < 1) return null;
+  const badge = [noble?.emoji, vip > 0 ? `VIP ${vip}` : ''].filter(Boolean).join(' ');
   return {
     fx: (entryItem?.fx as EntryFx | undefined) ?? 'vip',
     ...(entryItem?.remote?.video ? { clip: entryItem.id, plate: entryItem.remote.plate ?? null } : {}),
     ...(ride ? { rideId: ride.id, ride: ride.emoji } : {}),
-    ...(noble ? { badge: noble.emoji } : {}),
-    ...(entryItem ? {} : { tint: vipTier(look.vipLevel ?? 0)?.color ?? null }),
+    ...(badge ? { badge } : {}),
+    ...(entryItem ? {} : { tint: vipTier(vip)?.color ?? null }),
   };
 }

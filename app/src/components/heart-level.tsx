@@ -55,6 +55,12 @@ const fmt = (n: number) => n.toLocaleString('tr-TR');
 /** One of the two people on the line. */
 export type HeartFace = { uri?: string; name?: string };
 
+/**
+ * The chat heart's own colors: turquoise, with a speech bubble. The relationship (Çift, İlişki Duvarı) keeps the pink
+ * heart, so the two are never taken for one another (the customer's note, 18 Nov).
+ */
+export const CHAT_HEART = { fill: ['#2BD4D9', '#0E7C93'] as const, tint: '#14A9B8', soft: 'rgba(20,169,184,0.12)', line: 'rgba(20,169,184,0.4)' };
+
 // --- The loop ------------------------------------------------------------------------------------------------
 
 const onAppState = (l: () => void) => {
@@ -180,6 +186,18 @@ export function HeartGlyph({ level, size = 22, t: outer, still }: { level: numbe
   );
 }
 
+/** The chat heart's mark: the heart in its look inside a turquoise speech bubble. */
+export function ChatHeartMark({ level, size = 36 }: { level: number; size?: number }) {
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      <Ionicons name="chatbubble" size={size} color={CHAT_HEART.tint} style={{ position: 'absolute', left: 0, top: 0 }} />
+      <View style={{ marginTop: -Math.round(size * 0.1) }}>
+        <HeartGlyph level={level} size={Math.round(size * 0.5)} />
+      </View>
+    </View>
+  );
+}
+
 // --- The badge -----------------------------------------------------------------------------------------------
 
 const BADGE = {
@@ -188,7 +206,7 @@ const BADGE = {
   md: { h: 26, icon: 14, font: 13, pad: 9, gap: 4 },
 } as const;
 
-/** "♥ Lv.7" in its level's look. `still` for lists (one row after another needs no motion). */
+/** The chat heart's "Lv.7": a turquoise pill with a speech bubble. `still` for lists (one row after another needs no motion). */
 export function HeartBadge({ level, size = 'sm', t: outer, still, style }: { level: number; size?: keyof typeof BADGE; t?: Animated.Value | null; still?: boolean; style?: StyleProp<ViewStyle> }) {
   const s = useStyles();
   const tier = heartTier(level);
@@ -197,7 +215,7 @@ export function HeartBadge({ level, size = 'sm', t: outer, still, style }: { lev
   const b = BADGE[size];
   const scale = on(t, softened(scaleCurve(tier.motion), 0.5));
   return (
-    <View style={[{ alignSelf: 'flex-start' }, style]} accessible accessibilityLabel={`Kalp seviyesi ${level}`}>
+    <View style={[{ alignSelf: 'flex-start' }, style]} accessible accessibilityLabel={`Sohbet kalbi seviyesi ${level}`}>
       {/* The light and the rising hearts sit around the heart at the badge's start. */}
       <View style={{ position: 'absolute', left: b.pad - (b.h - b.icon) / 2, top: 0, width: b.h, height: b.h }}>
         <Glow tier={tier} size={b.h} t={t} strength={0.85} />
@@ -205,12 +223,12 @@ export function HeartBadge({ level, size = 'sm', t: outer, still, style }: { lev
       </View>
       <Animated.View style={{ transform: [{ scale }] }}>
         <LinearGradient
-          colors={tier.fill}
+          colors={CHAT_HEART.fill}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={[s.badge, { height: b.h, borderRadius: b.h / 2, paddingHorizontal: b.pad, gap: b.gap }, tier.rim && { borderWidth: 1.5, borderColor: tier.rim, paddingHorizontal: b.pad - 1.5 }]}
         >
-          <Ionicons name={tier.id === 'none' ? 'heart-outline' : 'heart'} size={b.icon} color="#fff" />
+          <Ionicons name={tier.id === 'none' ? 'chatbubble-outline' : 'chatbubble-ellipses'} size={b.icon} color="#fff" />
           <Text style={[s.badgeText, { fontSize: b.font, lineHeight: b.h - 2 }]}>Lv.{level}</Text>
         </LinearGradient>
         {tier.rim && <Ionicons name="sparkles" size={b.icon} color={tier.rim} style={{ position: 'absolute', right: -b.icon / 2, top: -b.icon / 2 }} />}
@@ -292,18 +310,17 @@ export function HeartPin({ level, style }: { level: number; style?: StyleProp<Vi
 /** Their profile: the heart between us, with the two photos, its level and look, and what the next look brings. */
 export function HeartCard({ heart, me, them }: { heart: HeartView; me: HeartFace; them: HeartFace }) {
   const s = useStyles();
-  const tier = heartTier(heart.level);
   const next = nextLookText(heart.level);
   return (
-    <View style={[s.card, { borderColor: `${tier.rim ?? tier.tint}55` }]} accessible accessibilityLabel={`Aranızdaki kalp: ${heartTitle(heart.level)}. ${next ?? 'En yüksek görünüm.'}`}>
-      <Text style={s.cardHead}>Aranızdaki kalp</Text>
+    <View style={[s.card, { borderColor: CHAT_HEART.line }]} accessible accessibilityLabel={`${heartTitle(heart.level)}. ${next ?? 'En yüksek görünüm.'}`}>
+      <Text style={s.cardHead}>Sohbet kalbiniz</Text>
       <HeartLink level={heart.level} me={me} them={them} />
       <View style={s.cardRow}>
         <Text style={s.cardTitle}>{heartTitle(heart.level)}</Text>
         <Text style={s.cardPoints}>{heart.next === null ? `${fmt(heart.points)} · en yüksek seviye` : `${fmt(heart.points)} / ${fmt(heart.next)}`}</Text>
       </View>
       <View style={s.track}>
-        <View style={[s.fill, { width: `${Math.round(heartShare(heart) * 100)}%`, backgroundColor: tier.tint }]} />
+        <View style={[s.fill, { width: `${Math.round(heartShare(heart) * 100)}%`, backgroundColor: CHAT_HEART.tint }]} />
       </View>
       <Text style={s.hint} numberOfLines={2}>
         {next ?? 'Kalbiniz en parlak hâlinde'}
@@ -319,7 +336,7 @@ const useStyles = makeStyles(({ colors, dark, lift }) => ({
   card: { backgroundColor: colors.card, borderRadius: 16, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, gap: 8, marginTop: 12, ...lift },
   cardHead: { color: colors.textDim, fontSize: 12, fontWeight: '700' },
   cardRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 },
-  cardTitle: { color: colors.pink, fontSize: 15, fontWeight: '800', flexShrink: 1 },
+  cardTitle: { color: CHAT_HEART.tint, fontSize: 15, fontWeight: '800', flexShrink: 1 },
   cardPoints: { color: colors.textDim, fontSize: 12, fontWeight: '600' },
   track: { height: 5, borderRadius: 3, backgroundColor: dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.07)', overflow: 'hidden' },
   fill: { height: 5, borderRadius: 3 },

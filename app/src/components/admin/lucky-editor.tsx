@@ -1,8 +1,9 @@
 // One Şanslı package's editor (Yönetim › Şanslı hediyeler, and the offline demo's admin screen). Odds are typed as
 // percentages; the total shows live, and a package whose odds don't add up to exactly 100 % can't be opened.
 import { useState } from 'react';
-import { Pressable, Switch, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
+import { Switch } from '@/components/luxe-switch';
 import { Text, TextInput } from '@/components/text';
 import { Card } from '@/components/ui';
 import { DOC_TEST_TIERS, LUCKY_MULTS, ODDS_TOTAL, STANDARD_TIERS, oddsLabel, oddsSum, validate, type LuckyGift } from '@/lib/lucky';

@@ -1,6 +1,6 @@
 // Gifts at the server's price, and the rankings they feed.
 //
-//   GET  /api/catalog[?gifts=2][&emoji=1][&levels=1][&shop=1]     → { gifts, counts, packs, vipPlans, svipXp, purchases, campaign, exchange, fx, v, emoji?, levels?, shop? }
+//   GET  /api/catalog[?gifts=2][&family=1][&emoji=1][&levels=1][&shop=1]     → { gifts, counts, packs, vipPlans, svipXp, purchases, campaign, exchange, fx, v, emoji?, levels?, shop? }
 //   POST /api/gifts/send  { to, giftId, count, price?, room?, place?, ref } → { user, replay, total }  (place: chat|moment|profile|family)
 //   GET  /api/rankings?board=wealth|charm|agency&period=day|week|month → { rows }  (agency: rows carry agency, not user)
 //
@@ -41,7 +41,7 @@ import { announceRoom, roomService } from './live.mjs';
 import { roomLevel } from './rooms.mjs';
 import { announceBoss, bossGift } from './boss-seat.mjs';
 import { GUARD_CARD, guardStarted, startGuard } from './guards.mjs';
-import { fuelRocket, launchRockets } from './room-rocket.mjs';
+import { fuelRocket, launchRockets, rocketFx, rocketVideosRev } from './room-rocket.mjs';
 
 export const ROOM = /^[A-Za-z0-9_-]{1,64}$/;
 const BOARDS = { wealth: 'sender', charm: 'recipient' };
@@ -116,11 +116,13 @@ export const giftRoutes = {
     const now = Date.now();
     const c = s.campaign;
     const app2 = url?.searchParams.get('gifts') === '2';
+    // The Aile ve Dost shelf (custom-gifts.mjs catalogGifts): only for a phone that has it.
+    const family = url?.searchParams.get('family') === '1';
     return {
       // Every gift on the shelves in the shelves' order (custom-gifts.mjs): the admins' with their icon (an older app
       // skips them), the app's own as changed in the panel. Off the shelves (the app's paused ones unless put back,
       // catalog.mjs GIFTS_PAUSED) or hidden in Canlı ayarlar: left out, so older apps drop them too.
-      gifts: catalogGifts({ app2, hidden: s.giftsHidden }),
+      gifts: catalogGifts({ app2, hidden: s.giftsHidden, family }),
       ...(app2 ? { giftsFormat: 2 } : {}),
       counts: GIFT_COUNTS,
       packs: PACKS.filter((p) => !s.packsHidden.has(p.id)).map(({ id, productId, coins, firstBonus }) => ({ id, productId, coins, firstBonus })),
@@ -136,7 +138,7 @@ export const giftRoutes = {
       campaign: c && Date.parse(c.startsAt) <= now && now < Date.parse(c.endsAt) ? { percent: c.percent, startsAt: c.startsAt, endsAt: c.endsAt, label: c.label } : null,
       exchange: { usdTry: s.usdTry, minDiamonds: EXCHANGE.minDiamonds },
       // The gift and entry videos the phones download and keep (fx.mjs, and the admins' gifts'); an older app ignores it.
-      fx: [...fxCatalog(s.giftsHidden, replacedClips()), ...giftFx(s.giftsHidden), ...shopFx()],
+      fx: [...fxCatalog(s.giftsHidden, replacedClips()), ...giftFx(s.giftsHidden, family), ...shopFx(), ...rocketFx()],
       // The emoji panel's packs and stickers as they are now (emoji.mjs): only for an app that asks (emoji=1).
       ...(url?.searchParams.get('emoji') === '1' ? { emoji: emojiCatalog() } : {}),
       // Seviye ve VIP ayarları (levels.mjs): only for an app that asks (levels=1).
@@ -145,7 +147,7 @@ export const giftRoutes = {
       ...(url?.searchParams.get('shop') === '1' ? { shop: shopCatalog() } : {}),
       // Grows with every live settings save, every change in Yönetim › Hediyeler and Emojiler, and every Seviye
       // ayarları save (as /api/config's).
-      v: s.v + customGiftsRev() + emojiRev() + levelsRev() + shopItemsRev(),
+      v: s.v + customGiftsRev() + emojiRev() + levelsRev() + shopItemsRev() + rocketVideosRev(),
     };
   },
 

@@ -50,8 +50,9 @@ yetmezse alınabildiği kadar alınır; kalan borç olarak kalır ve sonraki pay
 - **Kim atar:** yalnız ajans sahibi atar, payı değiştirir, çıkarır (merkez `agencies.manage` ile çıkarabilir).
 - **Kim asistan olur:** ajansın şu anki yayıncılarından ya da ekibinden biri; sahibin kendisi olamaz; kişi aynı anda
   tek ajansta asistan olabilir.
-- **Sınır:** aynı anda en fazla `assistant_policy.max` asistan (varsayılan 1). Merkez, Ajans Merkezi › Kurallar'dan
-  değiştirir.
+- **Sınır:** aynı anda en fazla `assistant_policy.max` asistan (varsayılan 1, en çok 10). Merkez, finans panelinde
+  Ajans Merkezi › Kurallar'dan elle değiştirir; önce 1, sonra 3, sonra 5 gibi kademeli açılabilir. Sınır düşürülürse
+  görevdeki asistanlar kalır, yalnız yenisi eklenemez.
 - **Getirdiği yayıncı:** `agency_streamers.invited_by`. Asistanın uygulamadan gönderdiği ve kabul edilen davet
   (`agency_requests.created_by`) ya da asistanın kendi davet koduyla katılım. Asistan kodu ajans kodu gibi
   "Davet koduyla katıl"a yazılır; yayıncı ajansın kendisine katılır. Eski davetler, migration'da kabul edilen davetten

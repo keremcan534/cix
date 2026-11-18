@@ -62,6 +62,7 @@ export const COSMETICS: Cosmetic[] = [
   { id: 'fr-laurel', kind: 'frame', name: 'Altın Defne', emoji: '🌿', price: 2_000, days: 30, color: ['#F6BD60', '#B7832E'] },
   { id: 'fr-crown-silver', kind: 'frame', name: 'Gümüş Taç', emoji: '👑', price: 4_000, days: 30, color: ['#E2E8F0', '#13D9DF'], minVip: 2 },
   { id: 'fr-crown-gold', kind: 'frame', name: 'Kraliyet Kanatları', emoji: '🪽', price: 9_000, days: null, color: ['#F6BD60', '#13D9DF'], minVip: 4 },
+  { id: 'fr-wing-rose', kind: 'frame', name: 'Aşk Kanatları', emoji: '💖', price: 3_000, days: 30, color: ['#FF5FA2', '#F6BD60'] },
   { id: 'fr-wing-coral', kind: 'frame', name: 'Melek Kalp · Pembe', emoji: '💞', price: 3_000, days: 30, color: ['#FF6576', '#F6BD60'] },
   { id: 'fr-wing-sky', kind: 'frame', name: 'Melek Kalp · Turkuaz', emoji: '💙', price: 3_000, days: 30, color: ['#13D9DF', '#F6BD60'] },
   { id: 'en-sparkle', kind: 'entry', name: 'Işıltı', emoji: '✨', price: 200, days: 7, color: ['#0B3B4A', '#087A80'], fx: 'sparkle', retired: true },

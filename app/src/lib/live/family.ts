@@ -24,7 +24,8 @@ export type LiveFamily = {
   theme: string;
 };
 export type FamilyMember = FamilyPerson & { role: FamilyRole; joinedAt: string; weekly: number };
-export type FamilyDetail = { family: LiveFamily | null; members: FamilyMember[]; myRole: FamilyRole | null; requested: boolean; requests: (FamilyPerson & { at: string })[] };
+/** `leaveDays`: how long I'd wait to join another family if I left this one (a streamer); an older server sends none. */
+export type FamilyDetail = { family: LiveFamily | null; members: FamilyMember[]; myRole: FamilyRole | null; requested: boolean; requests: (FamilyPerson & { at: string })[]; rejoinAt?: string | null; leaveDays?: number | null };
 export type FamilyMessage = { id: string; author: FamilyPerson; text: string; createdAt: string };
 
 export const ROLE_NAME: Record<FamilyRole, string> = { owner: 'Lider', helper: 'Yardımcı', member: 'Üye' };
@@ -49,7 +50,7 @@ export async function family(id?: string): Promise<FamilyDetail> {
 export const create = (name: string, ref: string) => api.apiRequest<{ family: LiveFamily | null; user: api.ServerUser }>('POST', '/api/families', { name, ref });
 export const join = (id: string, on = true) => api.apiRequest<{ joined?: boolean; requested?: boolean }>('POST', '/api/family/join', { id, join: on });
 export const answer = (userId: string, accept: boolean) => api.apiRequest<{ members: FamilyMember[] }>('POST', '/api/family/request', { userId, accept });
-export const leave = () => api.apiRequest<{ left: true }>('POST', '/api/family/leave', {});
+export const leave = () => api.apiRequest<{ left: true; rejoinAt?: string | null }>('POST', '/api/family/leave', {});
 export const kick = (userId: string) => api.apiRequest<{ members: FamilyMember[] }>('POST', '/api/family/kick', { userId });
 export const setRole = (userId: string, role: FamilyRole) => api.apiRequest<{ members: FamilyMember[] }>('POST', '/api/family/role', { userId, role });
 export const settings = (s: { announcement?: string; joinMode?: 'open' | 'approve'; tag?: string; theme?: string }) => api.apiRequest<{ family: LiveFamily }>('POST', '/api/family/settings', s);

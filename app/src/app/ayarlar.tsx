@@ -1,15 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Linking, Pressable, ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
 import { Icon3D } from '@/components/Icon3D';
 import { ChoiceChips, ListBlock, ListGroup, ListRow, ListSwitch } from '@/components/list';
-import { AdminPanel } from '@/components/admin/admin-panel';
-import { AlphaVideoTestPanel } from '@/components/admin/alpha-video-test';
-import { EffectPreviewPanel } from '@/components/admin/effect-preview';
 import { LicensesSheet } from '@/components/licenses-sheet';
 import { Avatar, Header } from '@/components/ui';
 import { userById } from '@/data/mock';
@@ -23,11 +20,9 @@ import { openLegal } from '@/lib/legal';
 import { liveMode, message, myServerId } from '@/lib/live';
 import { testLine, useLineState } from '@/lib/live/live-line';
 import { confirmDeleteLiveAccount, liveSignOut } from '@/lib/live/account';
-import { useStaffRole } from '@/lib/live/admin';
 import { useLivePrivacy, usePrivacySetter, type PrivacyKey } from '@/lib/live/privacy';
 import { useEventReminderSetting } from '@/lib/live/event-reminders';
 import { type CodeKind } from '@/lib/live/account';
-import { siteHost } from '@/lib/remote-config';
 import { useRemoteConfig } from '@/lib/remote-control';
 import { installUpdate, useInstallState } from '@/lib/app-install';
 import { useAppUpdate, versionLabel } from '@/lib/app-update';
@@ -169,18 +164,12 @@ export default function SettingsScreen() {
     );
   // Live mode: the account's e-mail and checked number (the ways the server has on, lib/remote-config).
   const { email, phoneVerified } = useApp();
-  const { signIn, verify, adminSite } = useRemoteConfig();
+  const { signIn, verify } = useRemoteConfig();
   const update = useAppUpdate();
   const install = useInstallState();
   const [verifyKind, setVerifyKind] = useState<CodeKind | null>(null);
   const canAddEmail = liveMode() && !!signIn?.email;
   const canCheckPhone = liveMode() && (verify.sms || verify.whatsapp);
-  const staff = useStaffRole();
-  const [adminOpen, setAdminOpen] = useState(false);
-  // Şeffaf video testi (POC): a live build's admins, and the offline demo (like its other demo admin tools).
-  const alphaTest = staff === 'admin' || (IS_DEMO && !liveMode());
-  const [alphaOpen, setAlphaOpen] = useState(false);
-  const [fxOpen, setFxOpen] = useState(false);
   const { colors, semantic } = useTheme();
   const styles = useStyles();
   const snoozed = settings.snoozeUntil > nowMs();
@@ -235,28 +224,6 @@ export default function SettingsScreen() {
             />
           )}
           <ListRow icon="receipt-outline" tone="money" title="İşlem geçmişi" subtitle="Satın almalar ve iadeler" onPress={() => router.push('/cuzdan')} />
-          {IS_DEMO && <ListRow icon="server-outline" tone="neutral" title="Sunucu hesabı" subtitle="Veritabanı bağlantısı ve test" onPress={() => router.push('/sunucu-hesabi')} />}
-          {staff && (
-            <ListRow
-              icon="speedometer-outline"
-              title="Yönetim"
-              subtitle={
-                // On the web (Canlı ayarlar › Yönetim sitesi): the row opens the site, the in-app screen stays shut.
-                adminSite
-                  ? `Yönetim artık sitede: ${siteHost(adminSite)}`
-                  : staff === 'admin'
-                    ? 'Şikâyetler, yaptırımlar, destek, para çekme, ajans ödemeleri ve iadeler'
-                    : 'Yaptırımlar, itirazlar ve destek talepleri'
-              }
-              onPress={() => (adminSite ? void Linking.openURL(adminSite).catch(() => showAlert('Site açılamadı', adminSite)) : setAdminOpen(true))}
-            />
-          )}
-          {alphaTest && (
-            <ListRow icon="sparkles-outline" tone="neutral" title="Hediye ve giriş efektleri" subtitle="Yönetim · videolu hediyeleri ve girişleri göndermeden dene" onPress={() => setFxOpen(true)} />
-          )}
-          {alphaTest && (
-            <ListRow icon="film-outline" tone="neutral" title="Şeffaf video testi (POC)" subtitle="Yönetim · oda üstünde şeffaf video denemesi" onPress={() => setAlphaOpen(true)} />
-          )}
         </ListGroup>
 
         {live ? (
@@ -571,9 +538,6 @@ export default function SettingsScreen() {
       </ScrollView>
       <LicensesSheet visible={licenses} onClose={() => setLicenses(false)} />
       {liveMode() && <VerifySheet kind={verifyKind} onClose={() => setVerifyKind(null)} />}
-      {staff && !adminSite && <AdminPanel visible={adminOpen} onClose={() => setAdminOpen(false)} moderator={staff === 'moderator'} />}
-      {alphaTest && <AlphaVideoTestPanel visible={alphaOpen} onClose={() => setAlphaOpen(false)} />}
-      {alphaTest && <EffectPreviewPanel visible={fxOpen} onClose={() => setFxOpen(false)} />}
     </SafeAreaView>
   );
 }

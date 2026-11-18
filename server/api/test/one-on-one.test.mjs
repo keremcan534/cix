@@ -412,6 +412,27 @@ describe('Eşleşme', () => {
     assert.equal((await ok(join(m.session), 'yine')).state, 'waiting');
   });
 
+  test('kimsenin ödemediği eşleşme de süresi dolunca kendiliğinden biter', async () => {
+    await q('DELETE FROM match_queue'); // Whoever the test before left waiting.
+    const star = await streamer('Sibel');
+    const lead = await person('Yusuf', 'Erkek');
+    await q("INSERT INTO agencies (code, name, level, status, owner_id) VALUES ($1, $2, 1, 'approved', $3)", [`K${rnd(3).toUpperCase()}`, `Kıyı ${rnd(3)}`, lead.user.id]);
+    assert.equal((await ok(join(star.session), 'yayıncı bekler')).state, 'waiting');
+    const got = await ok(join(lead.session), 'iki yayıncı eşleşir');
+    assert.equal(got.state, 'matched');
+    assert.equal(got.call.iPay, false);
+    assert.equal(got.call.free, true);
+    assert.equal(got.call.maxSeconds, 58, 'süresiz eşleşme olmaz');
+    assert.equal(got.rights.freeLeft, 3, 'kimsenin hakkı gitmez');
+    await backdate(got.call.id, 57);
+    assert.equal((await beat(lead.session, got.call.id)).call.status, 'live', 'süre dolmadan kesilmez');
+    // No phone asks: the server's own sweep ends it.
+    await backdate(got.call.id, 2);
+    await until(async () => (await q('SELECT status FROM calls WHERE id = $1', [got.call.id])).rows[0].status === 'ended');
+    const [row] = (await q('SELECT end_reason FROM calls WHERE id = $1', [got.call.id])).rows;
+    assert.equal(row.end_reason, 'time');
+  });
+
   test('yayıncıyla eşleşmede yayıncı olmayan öder, yayıncı kazanır', async () => {
     const m = await person('Serkan', 'Erkek');
     const star = await streamer('Melis');

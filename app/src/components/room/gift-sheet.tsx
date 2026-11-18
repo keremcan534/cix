@@ -18,12 +18,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
 import { Avatar, Button } from '@/components/ui';
-import { GIFTS, userById, type Gift, type GiftCat } from '@/data/mock';
+import { GIFTS, isBondGift, userById, type Gift, type GiftCat } from '@/data/mock';
 import { LUCKY_RECIPIENT_SHARE, pct } from '@/data/rules';
 import { bagCounts, bagLabel, bagNeed as needOf, bagShort as shortOf } from '@/lib/backpack';
 import { gamblingLevelOk } from '@/lib/games';
 import { pressHaptic, tapHaptic } from '@/lib/haptics';
-import { bagGifts, giftShelf, useLiveCatalog } from '@/lib/live/catalog-live';
+import { bagGifts, roomGiftShelf, useLiveCatalog } from '@/lib/live/catalog-live';
 import { liveMode } from '@/lib/live';
 import { refreshBackpack, useBackpack } from '@/lib/live/backpack';
 import { refreshLucky } from '@/lib/live/lucky';
@@ -42,19 +42,21 @@ const SHELVES: { key: Shelf; label: string; icon?: keyof typeof Ionicons.glyphMa
   { key: 'hot', label: 'Popüler' },
   { key: 'lucky', label: 'Şanslı', icon: 'leaf' },
   { key: 'couple', label: 'İkili' },
+  { key: 'family', label: 'Aile ve Dost' },
   { key: 'gameplay', label: 'Kutlama' },
   { key: 'privilege', label: 'Özel' },
   { key: 'fav', label: 'Favoriler', icon: 'star' },
   { key: 'bag', label: 'Çantam', icon: 'bag-handle' },
 ];
 /** The shelves that are a gift category: one with no gift left on it (all off the shelf for now) isn't shown. */
-const CATEGORY_SHELVES = new Set<Shelf>(['hot', 'couple', 'gameplay', 'privilege']);
+const CATEGORY_SHELVES = new Set<Shelf>(['hot', 'couple', 'family', 'gameplay', 'privilege']);
 /** One neutral line that explains the shelf; no countdowns, no "spend more" nudges. */
 const SHELF_NOTE: Record<Shelf, string> = {
   hot: 'En çok gönderilen hediyeler.',
   lucky: `Ödül garanti değildir: gönderdiğin hediyenin katları kadar jeton kazanma ihtimalin var, olasılıklar aşağıda. Kazandığın jeton bakiyene eklenir. Alıcıya ve PK puanına hediye değerinin ${pct(LUCKY_RECIPIENT_SHARE)}’si yazılır.`,
   gameplay: 'Alıcının koltuğuna animasyonla atılır. Fiyat sabit, sürpriz ödül yok.',
   couple: 'İkili hediyeler yakınlık puanını ekstra %2 artırır.',
+  family: 'Koruma Kartı seni koruyucu yapar. Bağ hediyesi bağ isteği olarak gider; kabul edilmezse jetonun geri döner.',
   privilege: 'VIP üyelerine özel hediyeler.',
   fav: 'Bir hediyeye uzun basarak favorilere ekle veya çıkar.',
   bag: 'Görev ve giriş ödüllerin. Gönderirken jeton harcanmaz.',
@@ -97,6 +99,7 @@ export function GiftSheet({
   coins,
   onSend,
   onSendLucky,
+  onSendBond,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -113,6 +116,8 @@ export function GiftSheet({
   onSend: (g: Gift, to: string[], count: number, fromBag?: boolean) => boolean;
   /** `count` Lucky gifts to each person picked (one draw per gift). */
   onSendLucky: (giftId: string, toIds: string[], count: number) => void;
+  /** A bond gift of the Aile ve Dost shelf: one, to one person, as a bond request. */
+  onSendBond: (g: Gift, to: string) => void;
 }) {
   const { svipLevel, spentTotal, me, spendBlock, wealthLevel } = useApp();
   // Android modals draw edge to edge: the Gönder row must sit above the navigation bar.
@@ -128,7 +133,7 @@ export function GiftSheet({
   const lucky = useLucky();
   const catalog = useLiveCatalog();
   // The admins' gifts (Yönetim › Hediyeler) lead their shelves; then the compiled ones the server still lists.
-  const shown = giftShelf(catalog);
+  const shown = roomGiftShelf(catalog);
   const inBag = bagGifts(GIFTS, catalog);
   // Şanslı is a game of chance: no shelf below the gambling level. Live: the server draws and pays (lib/live/lucky).
   const luckyShelf = gamblingLevelOk(wealthLevel);
@@ -176,7 +181,10 @@ export function GiftSheet({
   const onShelf = shelf === 'lucky' ? !!lg : list.some((it) => it.id === sel.id && sel.bag === (shelf === 'bag'));
   const fromBag = sel.bag;
   const locked = !fromBag && isLocked(gift, svipLevel);
-  const total = isLucky ? lg.price * count * targets.length : (fromBag ? 0 : gift.price) * count * targets.length;
+  // A bond gift goes one at a time, to one person: it asks them for a bond.
+  const bondGift = !isLucky && !fromBag && isBondGift(gift.id);
+  const sendCount = bondGift ? 1 : count;
+  const total = isLucky ? lg.price * count * targets.length : (fromBag ? 0 : gift.price) * sendCount * targets.length;
   const short = fromBag ? 0 : total - coins;
   const bagNeed = needOf(count, targets.length);
   const bagShort = fromBag && shortOf(bag, gift.id, count, targets.length);
@@ -233,6 +241,13 @@ export function GiftSheet({
     if (!onShelf) return;
     if (isLucky) return sendLucky();
     if (!targets.length || locked || bagShort) return;
+    if (bondGift) {
+      if (targets.length !== 1) return;
+      if (short > 0) return goWallet();
+      if (overLimit) return;
+      pressHaptic();
+      return onSendBond(gift, targets[0]);
+    }
     if (fromBag) {
       // Stock goes down only after the gift really went out (offline sends nothing). Live: the server's answer.
       if (!onSend({ ...gift, price: 0 }, targets, count, true) || live) return;
@@ -262,6 +277,8 @@ export function GiftSheet({
           : overLimit
             ? { tone: 'lock' as const, text: overLimit, cta: 'Günlük limiti aşıyor', disabled: true }
           : { tone: 'info' as const, text: `${count * targets.length > 1 ? `Her hediye için ayrı çekiliş yapılır. ` : ''}En yüksek ödül ×${fmt(top)} = ${fmt(lg.price * top)} jeton (olasılık ${oddsLabel(topOdds)}). Ödül garanti değildir.`, cta: `Gönder · ${fmt(total)}`, variant: 'money' as const }
+    : bondGift && targets.length !== 1
+      ? { tone: 'info' as const, text: 'Bağ hediyesi tek kişiye gönderilir: alıcılardan birini seç.', cta: 'Tek kişi seç', disabled: true }
     : locked
       ? { tone: 'lock' as const, text: `VIP ${gift.minSvip} ve üzerine özel (sen VIP ${svipLevel}).`, cta: 'VIP ayrıcalıklarını gör', variant: 'tonal' as const, onPress: goVip }
       : bagShort
@@ -438,7 +455,7 @@ export function GiftSheet({
                 {isLucky ? `${lg.name} · Şanslı` : gift.name}
               </Text>
               <Text style={g.dim} numberOfLines={1}>
-                {isLucky ? `${fmt(lg.price)} jeton × ${count} adet × ${targets.length} kişi` : `${fromBag ? 'Ücretsiz' : `${fmt(gift.price)} jeton`} × ${count} adet × ${targets.length} kişi`}
+                {isLucky ? `${fmt(lg.price)} jeton × ${count} adet × ${targets.length} kişi` : `${fromBag ? 'Ücretsiz' : `${fmt(gift.price)} jeton`} × ${sendCount} adet × ${targets.length} kişi`}
                 {!isLucky && gift.intimacy && !fromBag ? ` · 💗 +${fmt(gift.intimacy * count)} yakınlık` : ''}
               </Text>
             </View>

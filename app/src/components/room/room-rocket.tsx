@@ -1,14 +1,15 @@
 // Oda roketi in a server room (lib/live/room-rocket, server/api/room-rocket.mjs, docs/ODA_ROKETI.md): the pill under
 // the room's name (the level filling now and how full it is), its sheet (Lv.1–5, the rocket, how full, the prizes,
 // the level's top three and what I put in, the last launch's winners, a button to the gift panel) and the show when a
-// level launches and its prizes are paid. The rocket picture is the Roket gift's until its five pictures are drawn
-// (docs/GORSEL_URETIM_LISTESI.md); each level has its own colour.
+// level launches and its prizes are paid. A level the team gave a video (Oda roketi in the panel: an SVGA, one a level)
+// launches with it, once it is on the phone; otherwise the Roket gift's picture rises, in the level's own colour.
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Animated, Easing, Image, Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 
 import { Halo } from '@/components/fx/float';
 import { frameArtOf } from '@/components/fx/frame-art';
+import { VideoFx, entryClipOf } from '@/components/fx/video-fx';
 import { Icon3D } from '@/components/Icon3D';
 import { roomStyles, useSheetBottom } from '@/components/room/parts';
 import { storeArtOf } from '@/components/StoreArt';
@@ -181,11 +182,14 @@ export function RocketSheet({ rocket, onClose, onGift }: { rocket: RoomRocket; o
  * A level launching (the rocket rises across the screen) or its prizes paid (who won; mine first). `still`:
  * "hareketi azalt" (no rise, the line alone). Ends itself (onDone) after a few seconds.
  */
-export function RocketShow({ news, still, onDone }: { news: RocketNews; still?: boolean; onDone: () => void }) {
+export function RocketShow({ news, still, muted, onDone }: { news: RocketNews; still?: boolean; muted?: boolean; onDone: () => void }) {
   const { height } = useWindowDimensions();
   const [rise] = useState(() => new Animated.Value(0));
   const launch = news.event === 'launch';
+  const media = useMemo(() => (news.event === 'launch' && !still ? entryClipOf({ clip: `rocket-${news.level}` }) : null), [news, still]);
   useEffect(() => {
+    // The video ends the show itself (VideoFx).
+    if (media) return;
     const ms = launch ? 2600 : 3600;
     const t = setTimeout(onDone, ms);
     if (launch && !still) Animated.timing(rise, { toValue: 1, duration: 2200, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start();
@@ -203,6 +207,14 @@ export function RocketShow({ news, still, onDone }: { news: RocketNews; still?: 
       : others
         ? `Lv.${news.level} roketi: ${others} kişi ödül kazandı`
         : `Lv.${news.level} roketi kalktı`;
+  if (media)
+    return (
+      <VideoFx media={media} muted={muted} onDone={onDone}>
+        <View style={[s.banner, { borderColor: hue }]} accessibilityLiveRegion="polite" accessibilityLabel={line}>
+          <Text style={s.bannerText}>{line}</Text>
+        </View>
+      </VideoFx>
+    );
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill} accessibilityLiveRegion="polite" accessibilityLabel={line}>
       {launch && !still && (

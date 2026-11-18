@@ -10,7 +10,8 @@
 // followList: mine only; only the numbers are on a profile).
 //
 // The keys: profilePublic, showOnline, showLastSeen, showCurrentRoom (true or false), dmFrom (everyone | following |
-// mutual), callsFrom and invitesFrom (everyone | following | nobody). "following" means people the owner follows.
+// mutual), callsFrom and invitesFrom (everyone | following | nobody), and Mesajlar's preferences voiceCalls, videoCalls,
+// messagePush and pushCloseOnly (true or false, all on at first). "following" means people the owner follows.
 // Where each one bites:
 //   - profilePublic off: someone I don't follow sees my name, photo and username, not my age, city, bio or interests
 //     (GET /api/user, Keşfet: shownToViewer).
@@ -20,6 +21,9 @@
 //   - dmFrom: POST /api/messages (messages.mjs, dmRefusal). Someone I wrote to may always answer me.
 //   - callsFrom: POST /api/calls through pairOf (one-on-one.mjs, callRefusal). Someone I called in the last 24 hours
 //     may call me back. Eşleşme is not affected: both people join its queue themselves.
+//   - voiceCalls, videoCalls off: nobody can call me that way, whoever they are (callRefusals). Eşleşme is not affected.
+//   - messagePush off: messages still arrive, my phone shows no notification for them (one-on-one.mjs wantsMessagePush).
+//   - pushCloseOnly on: only people close to me notify: we follow each other, or there is a heart level between us.
 //   - invitesFrom: inviteRefusal / mayInvite, for room and mic invites.
 // A block either way refuses all three. The other person is never told which setting refused them beyond the
 // reason the demo shows ("… yalnızca takip ettiği kişilerden mesaj alıyor").
@@ -33,6 +37,10 @@ export const PRIVACY_DEFAULTS = Object.freeze({
   dmFrom: 'everyone',
   callsFrom: 'everyone',
   invitesFrom: 'everyone',
+  voiceCalls: true,
+  videoCalls: true,
+  messagePush: true,
+  pushCloseOnly: true,
 });
 const COLUMN = {
   profilePublic: 'profile_public',
@@ -42,6 +50,10 @@ const COLUMN = {
   dmFrom: 'dm_from',
   callsFrom: 'calls_from',
   invitesFrom: 'invites_from',
+  voiceCalls: 'voice_calls',
+  videoCalls: 'video_calls',
+  messagePush: 'message_push',
+  pushCloseOnly: 'push_close_only',
 };
 const CHOICES = { dmFrom: ['everyone', 'following', 'mutual'], callsFrom: ['everyone', 'following', 'nobody'], invitesFrom: ['everyone', 'following', 'nobody'] };
 /** A session seen this recently is online (as Keşfet has always counted it). */
@@ -95,11 +107,8 @@ export async function dmRefusal(q, from, to) {
   return rule === 'following' ? `${x.name} yalnızca takip ettiği kişilerden mesaj alıyor.` : `${x.name} yalnızca karşılıklı takipleştiği kişilerden mesaj alıyor.`;
 }
 
-/** Why `from` may not call `to` now (their "Beni kimler arayabilir?"), or null when they may. */
-export async function callRefusal(q, from, to) {
-  const x = await reach(q, from, to);
-  if (!x) return 'Kullanıcı bulunamadı';
-  if (x.blocked) return 'Bu kişiyi arayamazsın';
+/** Why `from` may not call `to` now, whichever the call (their "Beni kimler arayabilir?"), or null when they may. */
+async function whoRefusal(q, x, from, to) {
   const rule = x.privacy.callsFrom;
   if (rule === 'everyone') return null;
   if (rule === 'nobody') return `${x.name} şu an arama kabul etmiyor.`;
@@ -108,6 +117,18 @@ export async function callRefusal(q, from, to) {
   const back = await q.query("SELECT 1 FROM calls WHERE caller = $1 AND callee = $2 AND kind = 'call' AND created_at > now() - interval '24 hours' LIMIT 1", [to, from]);
   if (back.rowCount) return null;
   return `${x.name} yalnızca takip ettiği kişilerden arama alıyor.`;
+}
+
+/** Why `from` may not call `to` now: { voice, video }, each a reason or null when that call is open. */
+export async function callRefusals(q, from, to) {
+  const x = await reach(q, from, to);
+  if (!x) return { voice: 'Kullanıcı bulunamadı', video: 'Kullanıcı bulunamadı' };
+  if (x.blocked) return { voice: 'Bu kişiyi arayamazsın', video: 'Bu kişiyi arayamazsın' };
+  const who = await whoRefusal(q, x, from, to);
+  return {
+    voice: who ?? (x.privacy.voiceCalls ? null : `${x.name} şu an sesli arama kabul etmiyor.`),
+    video: who ?? (x.privacy.videoCalls ? null : `${x.name} şu an görüntülü arama kabul etmiyor.`),
+  };
 }
 
 /**

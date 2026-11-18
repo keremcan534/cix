@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState, type ReactNode } from 'react';
-import { FlatList, Image, Pressable, StyleSheet, View } from 'react-native';
+import { FlatList, Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
@@ -10,6 +10,7 @@ import { SCENES } from '@/components/fx/scenes';
 import { ActionSheet, type SheetOption } from '@/components/ActionSheet';
 import { Avatar, VerifiedBadge, VipBadge } from '@/components/ui';
 import { HeartBadge } from '@/components/heart-level';
+import { MessagePrefsButton } from '@/components/message-prefs';
 import { CALL_HISTORY, formatDuration, formatIntimacy, intimacyOf, isTodayTime, messageTime } from '@/data/messages-ui';
 import { FOLLOWS_ME, ROOMS, userById, type Conversation, type User } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
@@ -180,10 +181,13 @@ export default function MessagesScreen() {
         <HubTile title="Çevrim içi hizmet" sub="Destek ekibine yaz" art={HUB_ART.support} tint={['#0B7A86', '#14532D']} onPress={() => router.push('/destek')} />
         <HubTile title="Ajansım" sub="Ajans ve kazanç" art={HUB_ART.agency} tint={['#9A4A12', '#6B1F3A']} onPress={() => router.push('/ajans')} />
       </View>
-      <View style={styles.chips}>
-        {FILTERS.map((f) => (
-          <Chip key={f.key} label={f.label} active={filter === f.key} onPress={() => setFilter(f.key)} />
-        ))}
+      <View style={styles.chipRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={styles.chips}>
+          {FILTERS.map((f) => (
+            <Chip key={f.key} label={f.label} active={filter === f.key} onPress={() => setFilter(f.key)} />
+          ))}
+        </ScrollView>
+        <MessagePrefsButton />
       </View>
       {filter === 'all' && (
         <View style={styles.systemCard}>
@@ -562,13 +566,8 @@ const useStyles = makeStyles(({ colors, lift, dark }) => ({
   hubTitle: { color: '#fff', fontSize: 14, lineHeight: 18, fontWeight: '800' },
   hubSub: { color: 'rgba(255,255,255,0.78)', fontSize: 11, lineHeight: 14 },
   hubBadge: { position: 'absolute', top: 8, right: 8 },
-  chips: {
-    flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 6,
-  },
+  chipRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingRight: 12, paddingTop: 10, paddingBottom: 6 },
+  chips: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 16, paddingRight: 4 },
   chip: {
     paddingHorizontal: 14,
     paddingVertical: 6,

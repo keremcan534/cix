@@ -62,7 +62,8 @@ export type RoomLayout = {
 
 export const ROOM_MODES: RoomMode[] = [
   { id: 'audio', name: 'Ses', icon: 'mic', desc: 'Yalnızca sesli mikrofonlar', content: 'none', isEnabled: true, sortOrder: 1 },
-  { id: 'video', name: 'Video', icon: 'videocam', desc: 'Görüntülü yuvalar ve ortak YouTube ekranı', content: 'optional', isEnabled: true, sortOrder: 2 },
+  // No shared YouTube screen here (the customer's note, 18 Nov): that is Sinema Salonu's.
+  { id: 'video', name: 'Video', icon: 'videocam', desc: 'Görüntülü yuvalar ve mikrofonlar', content: 'none', isEnabled: true, sortOrder: 2 },
   { id: 'cinema', name: 'Sinema Salonu', icon: 'film', desc: 'Büyük ortak ekran (YouTube), altta mikrofonlar', content: 'always', isEnabled: true, sortOrder: 3 },
   { id: 'couple', name: 'Çift Odası', icon: 'heart', desc: 'İki ana katılımcı öne çıkar', content: 'none', isEnabled: true, sortOrder: 4 },
 ];

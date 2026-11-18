@@ -510,6 +510,48 @@ describe('Yönetim › Hediyeler', () => {
     assert.equal((await q('SELECT job_preview FROM custom_gifts WHERE id = $1', [g.id])).rows[0].job_preview, null);
   });
 
+  test('çerçeve için SVGA: durağan PNG ve hareketli WebP olur, çerçeve onlarla kaydedilir, SVGA silinir', { skip: NO_SVGA }, async () => {
+    await freshAdmin();
+    const src = await upload(admin, 'giftsource', svga(30), 'application/x-svga');
+    const out = await ok(call('POST', '/api/admin/shop/frame-svga', { source: src }, admin.session), 'svga çerçeve');
+    const still = imageInfo(stored.get(keyOfUrl(out.art)).body);
+    const motion = imageInfo(stored.get(keyOfUrl(out.motion)).body);
+    assert.deepEqual([still.type, still.alpha, still.animated], ['png', true, false]);
+    assert.deepEqual([motion.type, motion.alpha, motion.animated], ['webp', true, true]);
+    assert.equal(motion.width, motion.height);
+    assert.ok(out.bytes <= 3 * 1024 * 1024);
+    // The file goes in the background, after the answer.
+    for (let i = 0; i < 50 && stored.has(keyOfUrl(src)); i++) await sleep(100);
+    assert.ok(!stored.has(keyOfUrl(src)), 'SVGA çevrildikten sonra silindi');
+    const saved = await ok(call('POST', '/api/admin/shop', { kind: 'frame', name: `SVGA ${Date.now() % 100000}`, price: 100, days: 7, art: out.art, motion: out.motion, hole: 0.25 }, admin.session), 'çerçeve');
+    assert.equal(saved.item.art.motion.url, out.motion);
+    // Not an SVGA, and someone who isn't an admin: refused.
+    await refused(call('POST', '/api/admin/shop/frame-svga', { source: out.art }, admin.session), 400, /SVGA dosyasını önce yükle/);
+    const user = await h.signUp('Üye');
+    await refused(call('POST', '/api/admin/shop/frame-svga', { source: src }, user.session), 403);
+  });
+
+  test('oda roketi: seviyenin SVGA videosu çevrilir, telefonlara listelenir, kaldırılınca gider', { skip: NO_SVGA }, async () => {
+    await freshAdmin();
+    const src = await upload(admin, 'giftsource', svga(30), 'application/x-svga');
+    await ok(call('POST', '/api/admin/rocket/video', { level: 3, video: { kind: 'source', url: src } }, admin.session), 'roket videosu');
+    let row;
+    for (let i = 0; i < 300 && !row?.video; i++) {
+      await sleep(100);
+      row = (await ok(call('GET', '/api/admin/rocket', null, admin.session))).videos[2];
+      assert.notEqual(row.job?.status, 'failed', row.job?.error);
+    }
+    assert.ok(row.video, 'video hazır');
+    assert.ok(!stored.has(keyOfUrl(src)), 'SVGA çevrildikten sonra silindi');
+    const fx = (await ok(call('GET', '/api/catalog?gifts=2&family=1'))).fx.find((x) => x.id === 'rocket-3');
+    assert.equal(fx.kind, 'entry');
+    assert.match(fx.url, /^\/api\/fx\/r\/rocket-3\.mp4\?v=[0-9a-f]{12}$/);
+    assert.equal((await fetch(`${h.base}${fx.url}`)).status, 200);
+    await ok(call('POST', '/api/admin/rocket/video', { level: 3, video: null }, admin.session), 'kaldır');
+    assert.equal((await ok(call('GET', '/api/catalog?gifts=2&family=1'))).fx.some((x) => x.id === 'rocket-3'), false);
+    assert.equal((await fetch(`${h.base}${fx.url}`)).status, 404);
+  });
+
   test('SVGA sunucuda videoya çevrilir; boyutu seçilir; SVGA 1.x ve 15 saniyeden uzunu reddedilir', { skip: NO_SVGA }, async () => {
     await freshAdmin();
     const g = await newGift();

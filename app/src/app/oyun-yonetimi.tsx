@@ -1,9 +1,10 @@
 // Admin: the two independent game catalogs (spec §6). Changes apply to both entry points at once,
 // because profile and rooms read the same platform state (lib/games).
 import { useState } from 'react';
-import { Image, Pressable, ScrollView, Switch, View } from 'react-native';
+import { Image, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Switch } from '@/components/luxe-switch';
 import { Text } from '@/components/text';
 import { gameArtOf } from '@/components/GameArt';
 import { useWinFx } from '@/components/games/fx/win-fx';

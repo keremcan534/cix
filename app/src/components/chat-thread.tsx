@@ -277,7 +277,7 @@ export function ChatThread({
   return (
     <>
       {header(typing, pair)}
-      {heart && (paidPair(pair) || heart.level > 0) && <HeartBar heart={heart} pair={pair} them={user} />}
+      {heart && (paidPair(pair) || heart.level > 0) && <HeartBar heart={heart} pair={pair} />}
       <Body style={{ flex: 1 }}>
         <FlatList
           data={[...(last && messages.length > last ? messages.slice(-last) : messages)].reverse()}

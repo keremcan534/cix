@@ -76,6 +76,7 @@ export const PANEL_ROUTES = new Set([
   'POST /api/admin/shop/reset',
   'POST /api/admin/shop/delete',
   'POST /api/admin/shop/order',
+  'POST /api/admin/shop/frame-svga',
   // Para çekme (withdraw.mjs).
   'GET /api/admin/withdrawals',
   'POST /api/admin/withdrawals/decide',
@@ -93,6 +94,7 @@ export const PANEL_ROUTES = new Set([
   // Oda roketi (room-rocket.mjs): the levels' goals and prizes.
   'GET /api/admin/rocket',
   'POST /api/admin/rocket/config',
+  'POST /api/admin/rocket/video',
   'POST /api/admin/lucky/config',
   // Canlı ayarlar (live-settings.mjs).
   'GET /api/admin/live-settings',

@@ -1,5 +1,6 @@
-// The person card in a room: tapping someone on a mic, on the balcony list or in the chat opens it from the bottom.
-// The designer's card (components/person-showcase): their photo in their own shop frame, name with their Yankı level
+// The person card in a room: tapping someone on a mic, on the balcony list or in the chat opens it from the bottom,
+// a card of its own, drawn with the designer's picture set (components/person-card-art, person-showcase): their photo
+// in their own shop frame, name with their Yankı level
 // and the heart between us, gender and age, their mic and room role, agency and Aile, interests, the three walls
 // (İlişki Duvarı, Hediye Duvarı, Koruma: each opens that part of their profile), followers, and what I can do: send a
 // gift, mention them in the chat (@bahset), follow, message, open the full profile. Room staff get "Yönet" for their
@@ -7,7 +8,6 @@
 // (lib/live/profile, lib/live/one-on-one), as on the profile screen; their frame is the one the room read
 // (lib/live/looks).
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -16,10 +16,11 @@ import { Text } from '@/components/text';
 import { HeartBadge } from '@/components/heart-level';
 import { heartOf, usePair } from '@/components/one-on-one-bar';
 import { GenderChip } from '@/components/profile-badges';
+import { CardArt, CardPanel } from '@/components/person-card-art';
 import { ActionTiles, ClubPills, InterestRow, LevelPill, ManageRow, SHOW, WallLinks, type WallKey } from '@/components/person-showcase';
 import { useSheetBottom } from '@/components/room/parts';
 import { FramedAvatar, VipBadge } from '@/components/ui';
-import { userById } from '@/data/mock';
+import { userById, type User } from '@/data/mock';
 import { wealthCharmOf } from '@/data/profile';
 import { showAlert } from '@/lib/alert';
 import { liveMode, message, toServer } from '@/lib/live';
@@ -27,11 +28,25 @@ import { lookOf } from '@/lib/live/looks';
 import { followOnServer, loadPublicProfile } from '@/lib/live/profile';
 import { useSheetMax } from '@/lib/sheet-space';
 import { useApp } from '@/store';
-import { SCRIM, edge } from '@/theme';
+import { SCRIM } from '@/theme';
 
 const fmt = (n: number) => n.toLocaleString('tr-TR');
 /** The profile tab each wall opens (the Koruma banner sits on the profile's first tab). */
 const WALL_TAB: Record<WallKey, string> = { iliski: 'iliski', hediye: 'onur', koruma: 'profil' };
+
+/** A woman's age on the set's pink pill; every other case is the app's usual chip. */
+function AgePill({ user }: { user: User }) {
+  if (user.gender !== 'Kadın' || user.showGender === false || !(user.age > 0)) return <GenderChip user={user} size="md" />;
+  return (
+    <View style={s.age} accessibilityLabel={`${user.gender}, ${user.age} yaş`}>
+      <View style={StyleSheet.absoluteFill}>
+        <CardArt name="yas-rozet" h={AGE_H} />
+      </View>
+      <Ionicons name="female" size={13} color="#fff" />
+      <Text style={s.ageText}>{user.age}</Text>
+    </View>
+  );
+}
 
 export type PersonCardProps = {
   uid: string;
@@ -110,80 +125,86 @@ export function PersonCard({ uid, note, onClose, onGift, onMention, onReport, on
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={s.backdrop} onPress={onClose} accessibilityLabel="Kapat" />
-      <LinearGradient colors={['#3A1638', SHOW.panel, SHOW.bg]} style={[s.sheet, { maxHeight, paddingBottom }]}>
-        <View style={s.handle} />
-        <View style={s.head}>
-          <View style={s.avatar}>
-            <FramedAvatar uri={u.avatar} size={78} vipLevel={vip} frameId={frameId ?? undefined} artScale={1.6} />
-          </View>
-          <View style={{ flex: 1, minWidth: 0, gap: 6 }}>
-            <View style={s.row}>
-              <Text style={s.name} numberOfLines={1}>
-                {u.name}
-              </Text>
-              {charm !== null && <LevelPill level={charm} />}
+      <View style={[s.float, { paddingBottom }]}>
+        <CardPanel style={[s.sheet, { maxHeight }]}>
+          <View style={s.head}>
+            <View style={s.avatar}>
+              <FramedAvatar uri={u.avatar} size={78} vipLevel={vip} frameId={frameId ?? undefined} artScale={1.6} />
             </View>
-            <View style={[s.row, { flexWrap: 'wrap' }]}>
-              <GenderChip user={u} size="md" />
-              {u.vip && <VipBadge />}
-              {heart && heart.level > 0 && <HeartBadge level={heart.level} />}
-            </View>
-            {!!note && (
-              <View style={s.row}>
-                <Ionicons name="leaf" size={13} color={SHOW.gold} style={{ transform: [{ scaleX: -1 }] }} />
-                <Text style={s.note} numberOfLines={1}>
-                  {note}
+            <View style={s.who}>
+              <View style={[s.row, { paddingRight: 26 }]}>
+                <Text style={s.name} numberOfLines={1}>
+                  {u.name}
                 </Text>
-                <Ionicons name="leaf" size={13} color={SHOW.gold} />
+                {charm !== null && <LevelPill level={charm} />}
               </View>
-            )}
+              <View style={[s.row, { flexWrap: 'wrap' }]}>
+                <AgePill user={u} />
+                {u.vip && <VipBadge />}
+                {heart && heart.level > 0 && <HeartBadge level={heart.level} />}
+              </View>
+              {!!note && (
+                <View style={s.row}>
+                  <CardArt name="defne-sol" h={20} />
+                  <Text style={s.note} numberOfLines={2}>
+                    {note}
+                  </Text>
+                  <CardArt name="defne-sag" h={20} />
+                </View>
+              )}
+            </View>
           </View>
-          <Pressable onPress={onClose} hitSlop={10} style={s.close} accessibilityRole="button" accessibilityLabel="Kapat">
-            <Ionicons name="close" size={26} color={SHOW.dim} />
+
+          <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ gap: 10 }} showsVerticalScrollIndicator={false}>
+            <ClubPills user={u} onOpen={onClose} />
+            <InterestRow interests={u.interests} />
+            <WallLinks onOpen={openWall} />
+            {mine && (
+              <Text style={s.dim}>
+                <Text style={s.strong}>{fmt(mine.followers)}</Text> takipçi
+              </Text>
+            )}
+          </ScrollView>
+
+          <ActionTiles
+            tiles={[
+              { art: 'hediye', label: 'Hediye', onPress: act(() => onGift(uid)) },
+              { art: 'bahset', label: 'Bahset', onPress: act(() => onMention(uid)) },
+              { art: 'takip', label: isFollowing ? 'Takiptesin' : 'Takip et', on: isFollowing, disabled: busy, onPress: () => void follow() },
+              { art: 'sohbet', label: 'Mesaj', onPress: act(() => router.push(`/sohbet/${uid}`)) },
+            ]}
+          />
+          <ManageRow
+            items={[
+              { art: 'kisi', label: 'Profili gör', onPress: act(() => router.push(`/kullanici/${uid}`)) },
+              ...(onManage ? [{ art: 'yonet' as const, label: 'Yönet', onPress: act(onManage) }] : []),
+              { art: 'sikayet', label: 'Şikâyet et', onPress: act(() => onReport(uid)) },
+            ]}
+          />
+          <Pressable onPress={onClose} hitSlop={6} style={s.close} accessibilityRole="button" accessibilityLabel="Kapat">
+            <CardArt name="kapat" h={14} />
           </Pressable>
-        </View>
-
-        <ScrollView contentContainerStyle={{ gap: 12 }}>
-          <ClubPills user={u} onOpen={onClose} />
-          <InterestRow interests={u.interests} />
-          <WallLinks onOpen={openWall} />
-          {mine && (
-            <Text style={s.dim}>
-              <Text style={s.strong}>{fmt(mine.followers)}</Text> takipçi
-            </Text>
-          )}
-        </ScrollView>
-
-        <ActionTiles
-          tiles={[
-            { icon: 'gift', label: 'Hediye', tint: SHOW.gold, onPress: act(() => onGift(uid)) },
-            { icon: 'at', label: 'Bahset', onPress: act(() => onMention(uid)) },
-            { icon: isFollowing ? 'person-remove-outline' : 'person-add-outline', label: isFollowing ? 'Takiptesin' : 'Takip et', on: isFollowing, disabled: busy, onPress: () => void follow() },
-            { icon: 'chatbubble-ellipses', label: 'Mesaj', onPress: act(() => router.push(`/sohbet/${uid}`)) },
-          ]}
-        />
-        <ManageRow
-          items={[
-            { icon: 'person-circle-outline', label: 'Profili gör', onPress: act(() => router.push(`/kullanici/${uid}`)) },
-            ...(onManage ? [{ icon: 'shield-half-outline' as const, label: 'Yönet', onPress: act(onManage) }] : []),
-            { icon: 'flag-outline', label: 'Şikâyet et', onPress: act(() => onReport(uid)) },
-          ]}
-        />
-      </LinearGradient>
+        </CardPanel>
+      </View>
     </Modal>
   );
 }
 
+const AGE_H = 22;
+
 const s = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: SCRIM },
-  sheet: { borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingHorizontal: 16, paddingTop: 8, gap: 14, borderWidth: 1, borderBottomWidth: 0, borderColor: 'rgba(255,212,117,0.45)', ...edge.sheet },
-  handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.25)' },
-  head: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  avatar: { width: 96, height: 96, alignItems: 'center', justifyContent: 'center' },
+  float: { position: 'absolute', left: 8, right: 8, bottom: 0 },
+  sheet: { flexShrink: 1, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6, gap: 10 },
+  head: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  avatar: { width: 104, height: 104, alignItems: 'center', justifyContent: 'center' },
+  who: { flex: 1, minWidth: 0, gap: 7, paddingTop: 8 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  name: { color: SHOW.text, fontSize: 22, fontWeight: '900', flexShrink: 1 },
-  note: { color: SHOW.dim, fontSize: 14, flexShrink: 1 },
-  close: { alignSelf: 'flex-start', width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginRight: -8 },
-  dim: { color: SHOW.dim, fontSize: 15 },
+  name: { color: SHOW.text, fontSize: 21, fontWeight: '900', flexShrink: 1 },
+  age: { width: AGE_H * 3, height: AGE_H, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3 },
+  ageText: { color: '#fff', fontSize: 13, lineHeight: 16, fontWeight: '800' },
+  note: { color: SHOW.dim, fontSize: 13, flexShrink: 1 },
+  close: { position: 'absolute', right: 4, top: 4, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  dim: { color: SHOW.dim, fontSize: 14 },
   strong: { color: SHOW.text, fontWeight: '800' },
 });

@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 
 import { GIFTS } from '@/data/mock';
 import { fxFileName, parseFxList } from '@/lib/fx-videos-core';
-import { giftById, giftShelf, parseLiveCatalog, parseRemoteGifts, parseSavedLiveCatalog, visibleGifts, type LiveCatalog } from '@/lib/live/catalog-live';
+import { giftById, giftShelf, roomGiftShelf, parseLiveCatalog, parseRemoteGifts, parseSavedLiveCatalog, visibleGifts, type LiveCatalog } from '@/lib/live/catalog-live';
 import { contentTypeOf, fileProblem, moved, videoKindOf, videoLine, type AdminGift, type GiftLimits } from '@/lib/gifts-admin-core';
 import * as server from '../../server/api/catalog.mjs';
 
@@ -69,10 +69,14 @@ describe('Yöneticinin hediyeleri: katalog', () => {
 
   test('raf: yöneticinin hediyeleri başta, sonra uygulamadakiler; aynı katalogda aynı dizi', () => {
     const c = parseLiveCatalog(body([custom('a2'), custom('a1', { cat: 'couple' })]));
-    const shelf = giftShelf(c);
+    const shelf = roomGiftShelf(c);
     assert.deepEqual(shelf.slice(0, 2).map((g) => g.id), ['a2', 'a1']);
     assert.deepEqual(shelf.slice(2), visibleGifts(GIFTS, c));
-    assert.equal(giftShelf(c), shelf);
+    assert.equal(roomGiftShelf(c), shelf);
+    // A bond gift goes only from the room's gift panel, as a bond request.
+    assert.ok(shelf.some((g) => g.id === 'bag-kardes'));
+    assert.ok(!giftShelf(c).some((g) => g.id.startsWith('bag-')));
+    assert.ok(giftShelf(c).some((g) => g.id === 'koruma'));
     assert.deepEqual(giftShelf(c).filter((g) => (g.cat ?? 'hot') === 'couple')[0].id, 'a1', 'İkili rafının başında');
     // An older app's shelf: the compiled list cut to the server's ids. The new ones aren't in it, nothing breaks.
     assert.ok(!visibleGifts(GIFTS, c).some((g) => g.id.startsWith('a')));

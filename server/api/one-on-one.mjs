@@ -12,7 +12,7 @@
 //   POST /api/match/state                 → { state, call, rights }   (state: idle | waiting | matched)
 //   POST /api/match/leave                 → { state, call, rights }
 //
-// Who pays: between a streamer (an approved agency streamer) and anyone else, the other one pays and the streamer
+// Who pays: between a streamer (streamer-rule.mjs) and anyone else, the other one pays and the streamer
 // earns the same number of diamonds. Messages are free when the two follow each other, calls open at a heart
 // level (heart_voice_level, heart_video_level). Between two streamers, or two people who aren't: messages are free
 // and calls need a mutual follow; nobody earns from such a call, and its caller has call_free free calls in 24
@@ -21,7 +21,7 @@
 // people who aren't streamers the man pays and nobody earns. Non-streamers get match_free free matches in 24
 // hours, each at most match_free_seconds long.
 // Prices are live settings (live-registry.mjs, "Birebir ve eşleşme"); a call keeps the price it started with.
-// Whoever is called decides who may call them (Ayarlar › "Beni kimler arayabilir?", privacy.mjs callRefusal);
+// Whoever is called decides who may call them (Ayarlar › "Beni kimler arayabilir?", privacy.mjs callRefusals);
 // Eşleşme isn't a call to anyone, so it doesn't ask.
 //
 // A minute is paid when it starts: the first when the call goes live, the next at 60 s, and so on. A payer who
@@ -35,11 +35,12 @@ import { HttpError, REF, auth, blockedBetween, db, env, limit, readJson, tx, use
 import { line } from './live-line.mjs';
 import { live } from './live-settings.mjs';
 import { deleteVoiceRoom, liveKitJwt } from './live.mjs';
-import { callRefusal } from './privacy.mjs';
+import { callRefusals, privacyOf } from './privacy.mjs';
 import { notify } from './push.mjs';
 import { assertMay } from './sanctions.mjs';
 import { giftDiamonds, paidCoins, spendCoins } from './wallet.mjs';
 import { assertUnderLimit, limitRefusal } from './spend-limit.mjs';
+import { streamerSql } from './streamer-rule.mjs';
 
 /** Heart points (heartPoints: what the two spent on each other and their messages, cooling when quiet) for each level. */
 export const HEART_LEVELS = [0, 300, 1500, 5000, 15_000, 40_000, 100_000, 250_000, 500_000, 1_000_000, 2_000_000];
@@ -55,7 +56,6 @@ const LOST_S = 30;
 const QUEUE_S = 12;
 const TOKEN_TTL = 600;
 
-const streamerSql = (x) => `EXISTS (SELECT 1 FROM agency_streamers s WHERE s.streamer_id = ${x} AND s.ended_at IS NULL AND s.contract = 'approved')`;
 const insufficient = () => Object.assign(new HttpError(409, 'Yetersiz jeton'), { extra: { code: 'insufficient' } });
 
 /**
@@ -115,6 +115,15 @@ export async function callRightsOf(c, me) {
   };
 }
 
+/** Whether `to` wants a notification on their phone for a message from `from` (Mesajlar's preferences, privacy.mjs). */
+export async function wantsMessagePush(c, to, from) {
+  const p = await privacyOf(c, to);
+  if (!p.messagePush) return false;
+  if (!p.pushCloseOnly) return true;
+  const both = await c.query('SELECT count(*)::int AS n FROM follows WHERE (follower = $1 AND followee = $2) OR (follower = $2 AND followee = $1)', [to, from]);
+  return both.rows[0].n === 2 || heartLevel(await heartPoints(c, to, from)) >= 1;
+}
+
 /** The two people as 1v1 sees them: who pays, the message price, the heart level, which calls are open. */
 export async function pairOf(c, me, other) {
   const s = live();
@@ -141,9 +150,9 @@ export async function pairOf(c, me, other) {
     }
     return { open: level >= need, price: mode === 'voice' ? s.callVoice : s.callVideo, iPay: payer === me, free: null, why: level >= need ? null : `${MODE_TEXT[mode]} arama kalp seviyesi ${need} olunca açılır` };
   };
-  // "Beni kimler arayabilir?" (privacy.mjs): their choice closes both calls, with their reason.
-  const refused = await callRefusal(c, me, other);
-  const closed = (gate) => (refused ? { ...gate, open: false, why: refused } : gate);
+  // "Beni kimler arayabilir?" and Mesajlar's preferences (privacy.mjs): their choice closes a call, with their reason.
+  const refused = await callRefusals(c, me, other);
+  const closed = (mode, gate) => (refused[mode] ? { ...gate, open: false, why: refused[mode] } : gate);
   return {
     streamer: x.other_s,
     meStreamer: x.me_s,
@@ -153,7 +162,7 @@ export async function pairOf(c, me, other) {
     iPay: payer === me,
     dmPrice: payer === me && !mutual ? s.dmPrice : 0,
     heart: { points, level, next: HEART_LEVELS[level + 1] ?? null, floor: HEART_LEVELS[level], voiceAt: s.heartVoice, videoAt: s.heartVideo, photoAt: PHOTO_HEART_LEVEL },
-    calls: { voice: closed(call('voice')), video: closed(call('video')) },
+    calls: { voice: closed('voice', call('voice')), video: closed('video', call('video')) },
     // A photo in the chat: with a streamer from the heart level, otherwise between people who follow each other.
     photo: paid
       ? { open: level >= PHOTO_HEART_LEVEL, why: level >= PHOTO_HEART_LEVEL ? null : `Mesajda fotoğraf kalp seviyesi ${PHOTO_HEART_LEVEL} olunca açılır` }
@@ -376,7 +385,8 @@ async function pairUp(me, mode) {
     );
     for (const other of cands.rows) {
       const { payer, earner } = matchRoles(self, other);
-      let free = false;
+      // Nobody pays (two streamers): free as well, so it ends at its time like every other free match.
+      let free = true;
       let price = 0;
       if (payer) {
         const used = (await c.query("SELECT count(*)::int AS n FROM calls WHERE kind = 'match' AND free AND payer = $1 AND created_at > now() - interval '24 hours'", [payer])).rows[0].n;

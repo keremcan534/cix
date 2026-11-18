@@ -38,7 +38,8 @@ describe('Sunucu kataloğu uygulamayla aynı', () => {
     const { FX_VIDEOS } = await import('../../server/api/fx.mjs');
     assert.deepEqual([...GIFTS_PAUSED].sort(), [...(server.GIFTS_PAUSED as Set<string>)].sort());
     const animated = (id: string) => id in FX_VIDEOS.gift || !!giftShowOf(id);
-    assert.deepEqual([...GIFTS_PAUSED].sort(), GIFTS.filter((g) => !animated(g.id)).map((g) => g.id).sort());
+    // The bond gifts stay on their shelf without an animation: the team uploads theirs in the panel.
+    assert.deepEqual([...GIFTS_PAUSED].sort(), GIFTS.filter((g) => !animated(g.id) && !g.id.startsWith('bag-')).map((g) => g.id).sort());
   });
 
   test('Popüler rafı videolu hediyelerle açılır: Roket, sonra yeni sekizi (panel Balkon çizgisinin altında iki satır gösterir)', async () => {

@@ -4,8 +4,9 @@
 // ListBlock so it shares the group's padding.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Children, Fragment, isValidElement, type ReactNode } from 'react';
-import { Pressable, StyleSheet, Switch, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
+import { Switch } from '@/components/luxe-switch';
 import { Text } from '@/components/text';
 import { tapHaptic } from '@/lib/haptics';
 import { makeStyles, radius, space, useTheme, type Theme } from '@/theme';
@@ -125,9 +126,6 @@ export function ListSwitch({
   disabled,
   ...row
 }: Omit<Parameters<typeof ListRow>[0], 'right' | 'onPress' | 'chevron' | 'value'> & { value: boolean; onChange: (v: boolean) => void }) {
-  const { colors, dark } = useTheme();
-  // The off track is a step darker than the card in the light scheme, where cardAlt would vanish on white.
-  const off = dark ? colors.cardAlt : colors.border;
   return (
     <ListRow
       {...row}
@@ -137,9 +135,6 @@ export function ListSwitch({
           value={value}
           disabled={disabled}
           onValueChange={onChange}
-          trackColor={{ false: off, true: colors.primary }}
-          thumbColor="#fff"
-          ios_backgroundColor={off}
           accessibilityLabel={row.title}
         />
       }

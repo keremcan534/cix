@@ -5,9 +5,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useMemo, useState } from 'react';
-import { Image, Modal, Pressable, ScrollView, Switch, View } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Switch } from '@/components/luxe-switch';
 import { themeCoverArt } from '@/components/events/event-art';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { Text, TextInput } from '@/components/text';
@@ -246,7 +247,7 @@ export function EventFormView({ meta, room: roomId, edit, onClose, onSaved }: Pr
                 <Text style={styles.label}>Yer ayırtma</Text>
                 <Text style={styles.hint}>{reservation ? 'Katılmak isteyenler önceden yer ayırtır.' : 'Herkes yer ayırtmadan katılabilir.'}</Text>
               </View>
-              <Switch value={reservation} onValueChange={setReservation} trackColor={{ true: semantic.action, false: colors.border }} />
+              <Switch value={reservation} onValueChange={setReservation} />
             </View>
             <Field label="Kimler görsün">
               <View style={styles.wrap}>

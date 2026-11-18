@@ -171,7 +171,7 @@ export function PkSetupSheet({ visible, roomId, starterId, micUsers, offline, on
               <CloseBtn onPress={onClose} label="PK panelini kapat" />
             </View>
             <View style={st.sheetHead}>
-              <Crest width={124} />
+              <Crest width={96} />
               <View style={{ marginTop: -12 }}>
                 <Ribbon title="PK Başlat" size={20} />
               </View>
@@ -196,7 +196,7 @@ export function PkSetupSheet({ visible, roomId, starterId, micUsers, offline, on
                 </Pressable>
               ))}
             </View>
-            <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ gap: 12, paddingBottom: 12 }} keyboardShouldPersistTaps="handled">
+            <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ gap: 7, paddingBottom: 8 }} keyboardShouldPersistTaps="handled">
               {offline && <Notice icon="cloud-offline-outline" text="Bağlantı yok." warn />}
               {tab === 'room' && (
                 <View style={st.modes}>
@@ -374,7 +374,7 @@ function ModeCard({ tone, on, off, art, title, sub, onPress }: { tone: 'pink' | 
       <LinearGradient colors={fill} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={[st.modeFill, on ? { borderColor: '#FFD86B', borderWidth: 2, boxShadow: `0 0 18px ${glow}` } : null]}>
         {on && <Ionicons name="checkmark-circle" size={20} color="#FFD86B" style={st.modeTick} />}
         <View style={st.modeArt}>
-          <Art name={art} size={50} />
+          <Art name={art} size={44} />
           <LinearGradient colors={PK.gold} style={st.modeStand} />
         </View>
         <Text style={st.modeTitle}>{title}</Text>
@@ -548,8 +548,8 @@ export function TeamArena({
 }) {
   const now = useNow(pk.status !== 'done' && pk.status !== 'cancelled');
   const [open, setOpen] = useState(false);
-  // Inner width of one half: screen − arena margins (24) − arena padding+border (18) − gap (8), halved, − half padding+border (10).
-  const inner = Math.max(110, (width - 50) / 2 - 10);
+  // Inner width of one half: screen − arena margins (16) − arena padding+rim (13) − gap (8), halved, − half padding+border (6).
+  const inner = Math.max(110, (width - 37) / 2 - 6);
   const cols = Math.max(1, Math.min(3, Math.floor(inner / 58)));
   const slotW = Math.floor(inner / cols);
   const size = Math.max(34, Math.min(52, slotW - 22));
@@ -687,7 +687,7 @@ export function PkDetail({ pk, open, onClose, viewerRoomId, canManage }: { pk: P
               </View>
               <ScrollView contentContainerStyle={st.detailBody} showsVerticalScrollIndicator={false}>
                 <View style={{ alignItems: 'center', gap: 6 }}>
-                  <Crest width={170} />
+                  <Crest width={128} />
                   <View style={{ marginTop: -14 }}>
                     <Ribbon title="PK" sub={`${modeLabel(pk)} · ${STATUS_LABEL[pk.status]}`} size={26} />
                   </View>
@@ -840,52 +840,52 @@ export function CrossPkInvitePrompt({ invite, busy, onAnswer }: { invite: Incomi
 
 const st = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: SCRIM },
-  sheet: { padding: 16, paddingTop: 10, gap: 12, flexShrink: 1 },
+  sheet: { paddingHorizontal: 12, paddingTop: 8, gap: 8, flexShrink: 1 },
   closeAt: { position: 'absolute', right: 10, top: 10, zIndex: 3 },
-  sheetHead: { alignItems: 'center', gap: 6 },
+  sheetHead: { alignItems: 'center', gap: 3 },
   tagline: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'stretch' },
   taglineLine: { flex: 1, height: 1 },
   taglineText: { color: '#F3E3FF', fontSize: 12, fontWeight: '600', flexShrink: 1 },
-  seg: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 999, padding: 4, borderWidth: 1, borderColor: 'rgba(231,169,58,0.45)' },
-  segBtn: { flex: 1, borderRadius: 999, paddingVertical: 9, alignItems: 'center' },
+  seg: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 999, padding: 3, borderWidth: 1, borderColor: 'rgba(231,169,58,0.45)' },
+  segBtn: { flex: 1, borderRadius: 999, paddingVertical: 6, alignItems: 'center' },
   segOn: { backgroundColor: '#F7C85A' },
   segText: { color: '#fff', fontWeight: '800' },
   label: { color: '#fff', fontWeight: '800', fontSize: 14 },
   dim: { color: PK.dim, fontSize: 12, lineHeight: 17 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { borderRadius: 999, borderWidth: 1.5, borderColor: 'rgba(231,169,58,0.55)', paddingHorizontal: 14, paddingVertical: 8, backgroundColor: 'rgba(255,255,255,0.05)' },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  chip: { borderRadius: 999, borderWidth: 1.5, borderColor: 'rgba(231,169,58,0.55)', paddingHorizontal: 12, paddingVertical: 5, backgroundColor: 'rgba(255,255,255,0.05)' },
   chipOn: { borderColor: '#FFE7A0', backgroundColor: '#F7C85A' },
   chipText: { color: '#fff', fontWeight: '800', fontSize: 13 },
-  modes: { flexDirection: 'row', gap: 12 },
+  modes: { flexDirection: 'row', gap: 8 },
   vsAt: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
   modeCard: { flex: 1, minWidth: 0 },
-  modeFill: { borderRadius: 18, paddingVertical: 12, paddingHorizontal: 10, gap: 4, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)', minHeight: 170 },
-  modeTick: { position: 'absolute', top: 8, right: 8 },
-  modeArt: { alignItems: 'center', marginBottom: 2 },
+  modeFill: { borderRadius: 16, paddingVertical: 6, paddingHorizontal: 6, gap: 1, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)' },
+  modeTick: { position: 'absolute', top: 5, right: 5 },
+  modeArt: { alignItems: 'center' },
   modeStand: { width: 64, height: 10, borderRadius: 32, marginTop: -6, opacity: 0.9 },
   modeTitle: { color: PK.goldText, fontWeight: '800', fontSize: 17, textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 4 },
   modeSub: { color: '#fff', fontSize: 12, textAlign: 'center', lineHeight: 16 },
-  notice: { flexDirection: 'row', gap: 8, alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 12, padding: 10 },
+  notice: { flexDirection: 'row', gap: 6, alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 6 },
   noticeWarn: { backgroundColor: 'rgba(246,189,96,0.16)' },
-  people: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  people: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   person: { alignItems: 'center', gap: 3, width: 58 },
   personName: { color: '#fff', fontSize: 12, maxWidth: 58 },
-  preview: { flexDirection: 'row', gap: 8 },
-  previewCol: { flex: 1, minWidth: 0, borderWidth: 1.5, borderRadius: 14, padding: 10, gap: 8, flexDirection: 'row', flexWrap: 'wrap' },
+  preview: { flexDirection: 'row', gap: 6 },
+  previewCol: { flex: 1, minWidth: 0, borderWidth: 1.5, borderRadius: 12, padding: 6, gap: 4, flexDirection: 'row', flexWrap: 'wrap' },
   previewHead: { width: '100%', flexDirection: 'row', alignItems: 'center', gap: 6 },
   previewName: { flexShrink: 1, fontWeight: '800', fontSize: 13 },
-  member: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  member: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   av: { width: 36, height: 36, borderRadius: 18 },
   memberName: { color: '#fff', fontWeight: '700', flex: 1 },
   teamBtn: { borderRadius: 999, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.3)', paddingHorizontal: 10, paddingVertical: 7 },
   teamBtnText: { color: '#fff', fontWeight: '800', fontSize: 12 },
   disabled: { opacity: 0.45 },
-  secondary: { backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 999, paddingVertical: 11, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(231,169,58,0.55)' },
+  secondary: { backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 999, paddingVertical: 7, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(231,169,58,0.55)' },
   secondaryText: { color: PK.goldText, fontWeight: '800' },
-  input: { backgroundColor: 'rgba(255,255,255,0.08)', color: '#fff', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: 'rgba(231,169,58,0.45)' },
+  input: { backgroundColor: 'rgba(255,255,255,0.08)', color: '#fff', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 7, borderWidth: 1, borderColor: 'rgba(231,169,58,0.45)' },
   invite: { backgroundColor: semantic.socialFill, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
   inviteText: { color: '#fff', fontWeight: '800', fontSize: 13 },
-  board: { marginHorizontal: 12, marginTop: 6, backgroundColor: 'rgba(30,8,48,0.84)', borderRadius: 16, padding: 8, gap: 6, borderWidth: 1.5, borderColor: 'rgba(231,169,58,0.7)' },
+  board: { marginHorizontal: 8, marginTop: 4, backgroundColor: 'rgba(30,8,48,0.84)', borderRadius: 14, paddingHorizontal: 6, paddingVertical: 4, gap: 3, borderWidth: 1.5, borderColor: 'rgba(231,169,58,0.7)' },
   boardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6 },
   boardKind: { color: PK.goldText, fontWeight: '800', fontSize: 14 },
   live: { color: PK.dim, fontSize: 12, fontWeight: '700' },
@@ -904,27 +904,27 @@ const st = StyleSheet.create({
   pillMarkText: { color: '#5B0F33', fontSize: 9, lineHeight: 12, fontWeight: '900', fontStyle: 'italic', letterSpacing: 0.3 },
   pillClock: { color: '#fff', fontSize: 11, lineHeight: 14, fontWeight: '900', fontVariant: ['tabular-nums'] },
   mini: { width: 20, height: 20, borderRadius: 10, marginRight: -4, borderWidth: 1, borderColor: colors.bg },
-  arenaRim: { marginHorizontal: 12, marginTop: 6 },
-  arena: { backgroundColor: 'rgba(30,8,48,0.86)', borderRadius: 16.5, padding: 8, gap: 8 },
-  half: { flex: 1, minWidth: 0, borderRadius: 14, borderWidth: 1, paddingVertical: 6, paddingHorizontal: 4, gap: 6 },
+  arenaRim: { marginHorizontal: 8, marginTop: 4 },
+  arena: { backgroundColor: 'rgba(30,8,48,0.86)', borderRadius: 16.5, padding: 5, gap: 4 },
+  half: { flex: 1, minWidth: 0, borderRadius: 12, borderWidth: 1, paddingVertical: 3, paddingHorizontal: 2, gap: 3 },
   halfHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 4, gap: 4 },
   halfName: { fontWeight: '800', fontSize: 12, flexShrink: 1 },
   halfCount: { color: PK.dim, fontSize: 11, fontWeight: '700' },
-  halfSeats: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', rowGap: 6 },
+  halfSeats: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', rowGap: 3 },
   awayRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, paddingHorizontal: 4 },
   away: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   awayText: { color: PK.dim, fontSize: 12 },
-  others: { marginHorizontal: 12, marginTop: 6, gap: 4 },
+  others: { marginHorizontal: 8, marginTop: 4, gap: 2 },
   othersTitle: { color: colors.textDim, fontSize: 12, fontWeight: '700' },
   othersRow: { flexDirection: 'row' },
   center: { flex: 1, backgroundColor: SCRIM, alignItems: 'center', justifyContent: 'center', padding: 16 },
   detailWrap: { width: '100%', maxWidth: 420, maxHeight: '88%' },
-  detailBody: { padding: 14, paddingTop: 10, gap: 12 },
-  podium: { flexDirection: 'row', justifyContent: 'center', alignItems: 'flex-start', gap: 6 },
-  podiumPlace: { alignItems: 'center', gap: 4, flex: 1, minWidth: 0 },
+  detailBody: { paddingHorizontal: 10, paddingVertical: 8, gap: 7 },
+  podium: { flexDirection: 'row', justifyContent: 'center', alignItems: 'flex-start', gap: 4 },
+  podiumPlace: { alignItems: 'center', gap: 2, flex: 1, minWidth: 0 },
   podiumPts: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   podiumPtsText: { color: PK.goldText, fontWeight: '800', fontSize: 14, fontVariant: ['tabular-nums'] },
-  restGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 10 },
+  restGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6 },
   restCell: { width: 62, alignItems: 'center', gap: 2 },
   restCrown: { position: 'absolute', top: -8, alignSelf: 'center' },
   restName: { color: '#fff', fontSize: 11, fontWeight: '700', maxWidth: 62 },
@@ -935,7 +935,7 @@ const st = StyleSheet.create({
   teamColScore: { color: '#fff', fontWeight: '800', fontSize: 20, fontVariant: ['tabular-nums'] },
   teamVs: { position: 'absolute', right: -20, top: 22, zIndex: 2 },
   roomCover: { width: 64, height: 64, borderRadius: 14 },
-  danger: { backgroundColor: 'rgba(217,58,69,0.18)', borderRadius: 999, paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: colors.red },
+  danger: { backgroundColor: 'rgba(217,58,69,0.18)', borderRadius: 999, paddingVertical: 8, alignItems: 'center', borderWidth: 1, borderColor: colors.red },
   dangerText: { color: '#FF7A82', fontWeight: '900' },
   prompt: { position: 'absolute', left: 12, right: 12, top: 96, zIndex: 40, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#2A0B45', borderRadius: 16, padding: 10, borderWidth: 1.5, borderColor: '#E7A93A' },
   decline: { borderRadius: 999, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)', paddingHorizontal: 12, paddingVertical: 9 },

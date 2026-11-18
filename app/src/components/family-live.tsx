@@ -543,7 +543,7 @@ function MyFamily({ detail, onChange, reload, onRanking }: { detail: fam.FamilyD
         );
   const doneToday = ov ? ov.tasks.filter((t) => t.points > 0).length : 0;
   const leave = () =>
-    showAlert('Aileden ayrıl', role === 'owner' ? 'Ayrılırsan liderlik bir yardımcıya (yoksa en eski üyeye) geçer.' : `${f.name} ailesinden ayrılmak istiyor musun?`, [
+    showAlert('Aileden ayrıl', `${role === 'owner' ? 'Ayrılırsan liderlik bir yardımcıya (yoksa en eski üyeye) geçer.' : `${f.name} ailesinden ayrılmak istiyor musun?`}${detail.leaveDays ? `\n\nYayıncı olduğun için ${detail.leaveDays} gün başka bir aileye katılamazsın.` : ''}`, [
       { text: 'Vazgeç', style: 'cancel' },
       {
         text: 'Ayrıl',

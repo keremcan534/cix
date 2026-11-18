@@ -3,7 +3,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams, type Href } from 'expo-router';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Image, Modal, Pressable, ScrollView, StyleSheet, View, type ColorValue } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, View, type ColorValue } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
@@ -18,6 +18,7 @@ import { giftById, giftShelf, useLiveCatalog } from '@/lib/live/catalog-live';
 import { EMPTY_AREA, loadGuardArea, sendGuardCard } from '@/lib/live/guard';
 import { GUARD_CARD, guardPoints, type GuardArea } from '@/lib/guard-core';
 import { GiftWallBanner, GuardBadge, GuardBanner, RelationshipBanner } from '@/components/person-showcase';
+import { CoverPhoto } from '@/components/cover-photo';
 import { bondDays } from '@/data/bonds';
 import { privacyOf } from '@/data/privacy';
 import { countryArt } from '@/data/rooms-ui';
@@ -601,7 +602,7 @@ export default function UserProfile() {
             <View style={styles.coverCard}>
               {/* No photo yet: a light portrait silhouette (the face fallback's dark disc would break the glass). */}
               {(isMe && pendingAvatar) || user.avatar ? (
-                <Photo uri={(isMe && pendingAvatar) || user.avatar} kind="face" style={StyleSheet.absoluteFill} />
+                <CoverPhoto uri={(isMe && pendingAvatar) || user.avatar} />
               ) : (
                 <View style={styles.coverEmpty} accessibilityLabel="Fotoğraf yok">
                   <Ionicons name="person" size={84} color="#F2B5D0" style={{ marginBottom: -12 }} />

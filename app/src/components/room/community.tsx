@@ -1,7 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useState } from 'react';
-import { Image, Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
+import { Switch } from '@/components/luxe-switch';
 import { Text, TextInput } from '@/components/text';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { ROOM_ICON_ART } from '@/components/RoomArt';

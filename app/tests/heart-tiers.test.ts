@@ -164,9 +164,9 @@ describe('Kalp sözleri', () => {
   });
 
   test('başlık seviye ve görünüm adıyla', () => {
-    assert.equal(heartTitle(0), 'Kalp Lv.0');
-    assert.equal(heartTitle(3), 'Kalp Lv.3 · Işıltı');
-    assert.equal(heartTitle(10), 'Kalp Lv.10 · Sonsuz');
+    assert.equal(heartTitle(0), 'Sohbet Kalbi Lv.0');
+    assert.equal(heartTitle(3), 'Sohbet Kalbi Lv.3 · Işıltı');
+    assert.equal(heartTitle(10), 'Sohbet Kalbi Lv.10 · Sonsuz');
   });
 });
 

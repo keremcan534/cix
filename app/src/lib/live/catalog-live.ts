@@ -33,7 +33,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSyncExternalStore } from 'react';
 
 import { GIFTS_PAUSED } from '@/data/gifts-paused';
-import { GIFTS, type Gift, type GiftCat } from '@/data/mock';
+import { GIFTS, isBondGift, type Gift, type GiftCat } from '@/data/mock';
 import { RULES, type Rules } from '@/data/rules';
 import { selfExchangeRate } from '@/lib/coins-bank';
 import { parseLiveEmoji, type LiveEmoji } from '@/lib/emoji-live-core';
@@ -111,7 +111,7 @@ function campaignOf(raw: unknown): LiveCampaign | null {
   return { percent, startsAt: new Date(start).toISOString(), endsAt: new Date(end).toISOString(), label };
 }
 
-const CATS: readonly GiftCat[] = ['hot', 'couple', 'gameplay', 'privilege'];
+const CATS: readonly GiftCat[] = ['hot', 'couple', 'family', 'gameplay', 'privilege'];
 const COMPILED_IDS = new Set(GIFTS.map((g) => g.id));
 /** Nothing the server lists is near these; anything past them is a mistake, not a gift to show. */
 const REMOTE_MAX = 200;
@@ -250,7 +250,7 @@ function liveGiftOf<G extends Gift>(g: G, c: LiveCatalog | null): G {
 /** Whether the server's list alone says what is on the shelves (gifts=2, and it listed anything). */
 const trusted = (c: LiveCatalog | null): c is LiveCatalog & { shelf: string[] } => !!c?.shelf?.length;
 
-type Views = { c: LiveCatalog | null; shelf: Gift[]; byId: Map<string, Gift> };
+type Views = { c: LiveCatalog | null; shelf: Gift[]; plain: Gift[]; byId: Map<string, Gift> };
 let views: Views | null = null;
 /** The gifts as they are now, worked out once per copy of the catalog (the same objects until it changes). */
 function viewsOf(c: LiveCatalog | null): Views {
@@ -260,7 +260,7 @@ function viewsOf(c: LiveCatalog | null): Views {
   for (const g of c?.remote ?? []) if (!byId.has(g.id)) byId.set(g.id, g);
   const listed = trusted(c) ? c.shelf.map((id) => byId.get(id)).filter((g): g is Gift => !!g) : [];
   const shelf = listed.length ? listed : [...(c?.remote ?? []), ...visibleGifts(GIFTS, c)];
-  views = { c, shelf, byId };
+  views = { c, shelf, plain: shelf.filter((g) => !isBondGift(g.id)), byId };
   return views;
 }
 
@@ -295,9 +295,14 @@ export function bagGifts<G extends Gift>(compiled: G[], c: LiveCatalog | null = 
 /**
  * Every gift that may be sent now, in the shelves' order. From a server that says it all: its list (the admins' and
  * the app's own as they are now). Otherwise the admins' gifts the server lists (first, in its order: they lead their
- * shelves), then the compiled ones visibleGifts leaves. The same array until the catalog changes.
+ * shelves), then the compiled ones visibleGifts leaves. The same array until the catalog changes. Bond gifts are left
+ * out: only the room's gift panel can send one, as a bond request (roomGiftShelf).
  */
 export function giftShelf(c: LiveCatalog | null = current): Gift[] {
+  return viewsOf(c).plain;
+}
+/** The room's gift panel: giftShelf and the bond gifts of its Aile ve Dost shelf. */
+export function roomGiftShelf(c: LiveCatalog | null = current): Gift[] {
   return viewsOf(c).shelf;
 }
 
@@ -401,7 +406,8 @@ export function fetchLiveCatalog(): Promise<unknown> {
       // gifts=2: the whole story about the app's own gifts too; emoji=1: the emoji panel's packs; levels=1: Seviye ve
       // VIP ayarları (server/api/gifts.mjs).
       // shop=1: the shop's frames and entry effects (Yönetim › Mağaza).
-      const res = await fetch(`${BASE}/api/catalog?gifts=2&emoji=1&levels=1&shop=1`, { signal: ctrl.signal });
+      // family=1: this app has the Aile ve Dost shelf.
+      const res = await fetch(`${BASE}/api/catalog?gifts=2&family=1&emoji=1&levels=1&shop=1`, { signal: ctrl.signal });
       if (!res.ok) throw new Error(`Sunucu hatası (${res.status})`);
       const body: unknown = await res.json();
       fetchedAt = Date.now();

@@ -1,9 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, Share, StyleSheet, Switch, View } from 'react-native';
+import { Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Switch } from '@/components/luxe-switch';
 import { ContactNote } from '@/components/contact-note';
 import { Text, TextInput } from '@/components/text';
 import { Avatar, Card, GradientButton, Header, StateIcon, TextLink } from '@/components/ui';

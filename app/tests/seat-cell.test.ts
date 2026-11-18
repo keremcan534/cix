@@ -103,7 +103,7 @@ describe('Konuşma halkası', () => {
   });
 
   test('ızgara yuvası: geniş yüzde de pay yan koltuğa uzanmaz', () => {
-    const slot = gridSlot(374, 5, 60);
+    const slot = gridSlot(374, 5);
     assert.ok(ringReach(60, seatRoom(60, slot)) <= (slot - 60) / 2);
   });
 });

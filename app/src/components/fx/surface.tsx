@@ -43,7 +43,7 @@ export function EdgeLight({ inset = 14, strength = 0.16 }: { inset?: number; str
 export function Gloss({ radius = 999, strength = 0.4 }: { radius?: number; strength?: number }) {
   return (
     <LinearGradient
-      colors={[`rgba(255,255,255,${strength})`, 'rgba(255,255,255,0.03)']}
+      colors={[`rgba(255,255,255,${strength})`, 'rgba(255,255,255,0)']}
       style={[s.gloss, { borderTopLeftRadius: radius, borderTopRightRadius: radius }]}
     />
   );

@@ -9,9 +9,10 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useState, type ReactNode } from 'react';
-import { Platform, Pressable, ScrollView, Switch, View } from 'react-native';
+import { Platform, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Switch } from '@/components/luxe-switch';
 import { Text, TextInput } from '@/components/text';
 import { LiveCoinsBank } from '@/components/coins-bank-live';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
@@ -413,7 +414,7 @@ function AgencyTab() {
 function BdTab() {
   const { rules } = useApp();
   const bank = useBank();
-  const { colors, semantic, dark } = useTheme();
+  const { colors, semantic } = useTheme();
   const styles = useStyles();
   const toggle = (
     <Card style={[styles.row, { paddingVertical: 12 }]}>
@@ -422,7 +423,7 @@ function BdTab() {
         <Text style={styles.dim}>Gerçekte yalnızca BD rolüne sahip hesaplar görür.</Text>
       </View>
       {/* The off track is a step darker than the card in the light scheme, where cardAlt would vanish on white. */}
-      <Switch value={bank.bdView} onValueChange={setBdView} trackColor={{ false: dark ? colors.cardAlt : colors.border, true: colors.primary }} thumbColor="#fff" />
+      <Switch value={bank.bdView} onValueChange={setBdView} />
     </Card>
   );
   if (!bank.bdView)

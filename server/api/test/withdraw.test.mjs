@@ -26,6 +26,7 @@ describe('para çekme', () => {
   test('hazırlık: yayıncıya 99.995 açık elmas', async () => {
     [host, fan, admin, other] = await Promise.all(['Yayıncı', 'Hayran', 'Yönetici', 'Başkası'].map((n) => signUp(n)));
     await h.sql.query("UPDATE users SET role = 'admin' WHERE id = $1", [admin.user.id]);
+    await h.sql.query("UPDATE users SET gender = 'Kadın' WHERE id = ANY($1::uuid[])", [[host.user.id, other.user.id, admin.user.id]]); // streamer-rule.mjs: who may take money out
     for (let i = 0; i < 10; i++) await ok(call('POST', '/api/wallet/test-topup', { amount: 10_000, ref: ref() }, fan.session));
     await ok(call('POST', '/api/gifts/send', { to: host.user.id, giftId: 'g8', count: 5, ref: ref() }, fan.session));
     const e = await ok(call('GET', '/api/wallet/earnings', null, host.session));

@@ -106,7 +106,7 @@ import { roomFollowRoutes } from './room-follow.mjs';
 import { roomMemberRoutes } from './room-members.mjs';
 import { roomOwnerRoutes } from './room-owner.mjs';
 import { roomContribRoutes } from './room-contrib.mjs';
-import { roomRocketRoutes, startRocketSweep, stopRocketSweep } from './room-rocket.mjs';
+import { roomRocketRoutes, sendRocketFx, startRocketSweep, stopRocketSweep } from './room-rocket.mjs';
 import { roomDecorRoutes, startDecorSweep, stopDecorSweep } from './room-decor.mjs';
 import { bossSeatRoutes, startBossSweep, stopBossSweep } from './boss-seat.mjs';
 import { startStaffSweep, stopStaffSweep } from './room-autoclose.mjs';
@@ -442,6 +442,7 @@ const server = http.createServer(async (req, res) => {
     try {
       if (name.startsWith('g/')) await sendCustomFx(req, res, name.slice(2));
       else if (name.startsWith('s/')) await sendShopFx(req, res, name.slice(2));
+      else if (name.startsWith('r/')) await sendRocketFx(req, res, name.slice(2));
       else if (name.startsWith('art/')) sendArt(req, res, name.slice(4));
       else sendFx(req, res, name);
     } catch (e) {

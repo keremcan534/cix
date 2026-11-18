@@ -346,7 +346,9 @@ function BondRow({ owner, bond, now, canEnd, onEnd }: { owner: User; bond: Bond;
   return (
     <View style={styles.bondRow}>
       <View style={styles.lv}>
-        <Text style={styles.lvText}>Lv.{bond.level}</Text>
+        <Text style={styles.lvText}>
+          {k.label} Lv.{bond.level}
+        </Text>
       </View>
       {canEnd && (
         <Pressable style={styles.endBtn} onPress={onEnd} hitSlop={8} accessibilityLabel="Bağı bitir">

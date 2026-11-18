@@ -4,7 +4,7 @@
 //   GET  /api/bonds?user=                        → { hidden, bonds }                    (someone's active bonds; mine without user;
 //                                                                                        hidden: only the viewer's own bond with them)
 //   GET  /api/bonds/requests                     → { incoming, outgoing }               (my pending requests)
-//   POST /api/bonds/request  { to, kind, ref }   → { bond, user, replay }
+//   POST /api/bonds/request  { to, kind, ref, room? } → { bond, user, replay }   (room: sent from a room's gift panel, the room sees the gift)
 //   POST /api/bonds/respond  { id, accept }      → { bond }
 //   POST /api/bonds/withdraw { id }              → { bond }                             (the requester takes it back)
 //   POST /api/bonds/end      { id }              → { bond }                             (either side, any time)
@@ -19,6 +19,7 @@
 // message that answers the other's adds 1 (at most 10 a day). Points never drop; ending resets the level.
 import { recordIncome } from './agency-lib.mjs';
 import { HttpError, auth, blockedBetween, claimRef, db, env, int, limit, move, once, readJson, tx, userId } from './core.mjs';
+import { roomPacket } from './live.mjs';
 import { notify } from './push.mjs';
 import { giftDiamonds, spendCoins } from './wallet.mjs';
 import { KINDS, LEVELS, REWARDS, levelOf } from './bond-rules.mjs';
@@ -30,6 +31,9 @@ const PENDING_MAX = 10;
 const COOLDOWN_DAYS = 7;
 /** People asked about at once by /api/bonds/among (a room's mics and Balkon). */
 const AMONG_MAX = 80;
+/** A room's announcement of a bond gift has an id of its own, far from any gift_events row's (the phones drop repeats by it). */
+const ROOM_EVENT_BASE = 9_000_000_000_000;
+const voiceRoom = (room) => /^(?:oda-)?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/.exec(typeof room === 'string' ? room : '')?.[1] ?? null;
 
 export const scoreOf = (b) => Math.floor(Number(b.gift_coins) / 100) + Number(b.talk_points);
 
@@ -255,6 +259,9 @@ export const bondRoutes = {
     if (!row.rowCount) throw new HttpError(409, 'Bu kişiyle bekleyen bir bağ isteği var');
     const bond = await view(Number(row.rows[0].id), me.id);
     if (!res.replay) notify([to], { title: 'Bağ isteği', body: `${me.name} seninle ${k.label} bağı kurmak istiyor`, data: { type: 'bond', id: bond.id } });
+    // From a room's Aile ve Dost shelf: the room sees the gift go, best effort.
+    const room = res.replay ? null : voiceRoom(b.room);
+    if (room) void roomPacket(`oda-${room}`, { type: 'gift', giftId: `bag-${kind}`, count: 1, from: me.id, to, eventId: ROOM_EVENT_BASE + bond.id }).catch(() => {});
     return { ...res, bond };
   },
 

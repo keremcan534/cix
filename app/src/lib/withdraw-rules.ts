@@ -12,6 +12,17 @@ export const WITHDRAW_STATUS_LABEL: Record<WithdrawStatus, string> = {
   cancelled: 'İptal edildi',
 };
 
+/** Whether this account may take money out (server streamer-rule.mjs): `why` says what to do when it may not. */
+export type CashOut = { allowed: boolean; code: string | null; why: string | null };
+/** The server's answer; null when it says nothing (an older server) or something odd. */
+export function parseCashOut(raw: unknown): CashOut | null {
+  const o = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : null;
+  if (!o || typeof o.allowed !== 'boolean') return null;
+  return { allowed: o.allowed, code: typeof o.code === 'string' ? o.code : null, why: typeof o.why === 'string' ? o.why.slice(0, 300) : null };
+}
+/** Whether a screen offers Para Çek and Anında bozdur: not until the server said; an older server doesn't say and allows. */
+export const offersCashOut = (live: boolean, s: { loaded: boolean; cashOut: CashOut | null }) => !live || (s.loaded && s.cashOut?.allowed !== false);
+
 export const cleanAccount = (raw: string) => raw.toUpperCase().replace(/[^A-Z0-9]/g, '');
 
 /**

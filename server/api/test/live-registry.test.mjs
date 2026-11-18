@@ -80,6 +80,8 @@ describe('defaults are today', () => {
       room_staff_away_minutes: 5,
       boss_seat_coins: 25_000,
       boss_seat_minutes: 10,
+      family_cashout_members: 10,
+      family_rejoin_days: 90,
       event_min_room_level: 1,
       event_min_lead_minutes: 30,
       event_max_minutes: 180,
@@ -148,6 +150,8 @@ describe('defaults are today', () => {
       'room_staff_away_minutes',
       'boss_seat_coins',
       'boss_seat_minutes',
+      'family_cashout_members',
+      'family_rejoin_days',
       'event_min_room_level',
       'event_min_lead_minutes',
       'event_max_minutes',
@@ -190,7 +194,7 @@ describe('validate', () => {
     assert.deepEqual(validate('gifts_hidden', ['g3', 'g1']), ['g1', 'g3']);
     refused(() => validate('gifts_hidden', ['g999']), /bilinmeyen/);
     refused(() => validate('gifts_hidden', [1]), /bilinmeyen/);
-    assert.equal(validate('gifts_hidden', [...GIFTS.keys()]).length, 66);
+    assert.equal(validate('gifts_hidden', [...GIFTS.keys()]).length, 73);
     const eight = PACKS.slice(0, 8).map((p) => p.id);
     assert.deepEqual(validate('packs_hidden', eight), eight);
     refused(() => validate('packs_hidden', PACKS.map((p) => p.id)), /En az bir paket/);

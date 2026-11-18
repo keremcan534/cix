@@ -19,7 +19,7 @@ import { HttpError, REF, auth, blockedBetween, contactError, countRefusal, db, e
 import { bondTalk } from './bonds.mjs';
 import { checkSequence, getRules, isNumberOnly } from './contact-filter.mjs';
 import { verifyUpload } from './media.mjs';
-import { pairOf, payOneOnOne } from './one-on-one.mjs';
+import { pairOf, payOneOnOne, wantsMessagePush } from './one-on-one.mjs';
 import { dmRefusal } from './privacy.mjs';
 import { line } from './live-line.mjs';
 import { notify } from './push.mjs';
@@ -136,7 +136,10 @@ export const messageRoutes = {
       row = (await insert(db)).rows[0];
     }
     if (!row) return replay();
-    notify([to], { title: me.name, body: image ? `${PHOTO_TEXT} gönderdi` : body, data: { type: 'message', from: me.id } });
+    // Their notification preferences decide; the message itself has arrived either way, and never waits for this.
+    wantsMessagePush(db, to, me.id)
+      .then((yes) => yes && notify([to], { title: me.name, body: image ? `${PHOTO_TEXT} gönderdi` : body, data: { type: 'message', from: me.id } }))
+      .catch((e) => console.error('message push', e.message));
     // Talking back and forth raises a bond; never fails the message.
     bondTalk(me.id, to, Number(row.id)).catch((e) => console.error('bond talk', e.message));
     if (!price) return { message: out(row), replay: false };

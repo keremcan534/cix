@@ -29,6 +29,7 @@ import { recordIncome } from './agency-lib.mjs';
 import { voidRefundedBonds } from './bonds.mjs';
 import { refundItems } from './economy.mjs';
 import { voidRefundedBags } from './lucky-bags.mjs';
+import { assertCashOut } from './streamer-rule.mjs';
 
 const TRANSFER_MAX = 100_000_000;
 const DIAMONDS_MAX = 1_000_000_000;
@@ -265,6 +266,8 @@ export const jetonRoutes = {
       const rows = await lockUsers(c, [u.id, bank]);
       if (rows.get(bank)?.role !== 'coins_bank') throw new HttpError(404, 'Jeton Noktası bulunamadı');
       await claimRef(c, u.id, 'diamond', b.ref);
+      // The bank pays the seller outside the app: taking money out, as Para Çek is (streamer-rule.mjs).
+      await assertCashOut(c, u.id);
       const transfer = await insertTransfer(
         c,
         "INSERT INTO coin_transfers (kind, from_user, to_user, coins, diamonds, value_tl, actor, ip, ref) VALUES ('diamond_sale', $1, $2, $3, $4, $5, $1, $6, $7) RETURNING id",

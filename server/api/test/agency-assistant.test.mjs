@@ -82,6 +82,16 @@ describe('Ajans asistanı', () => {
     // Candidates: the agency's own people, not the owner, not an assistant already.
     const cands = ok(await owner.get(`/api/agency/assistants/candidates?id=${T.id}`)).users.map((u) => u.id);
     assert.ok(cands.includes(a2.id) && !cands.includes(helper.id) && !cands.includes(owner.id) && !cands.includes(outsider.id));
+    // The centre raises the limit by hand (1, then 3, then 5), at most 10.
+    const limit = (max) => admin.post('/api/admin/agency/settings', { key: 'assistant_policy', value: { max }, reason: 'Asistan sınırı' });
+    refused(await limit(11), 400, 'en çok 10');
+    for (const max of [3, 5, 10]) {
+      ok(await limit(max), `sınır ${max}`);
+      const now = ok(await owner.get(`/api/agency/assistants?id=${T.id}`));
+      assert.equal(now.max, max);
+      assert.equal(now.canAdd, true);
+    }
+    ok(await limit(1), 'sınır geri');
   });
 
   test('asistanın kodu: katılan yayıncı asistanın getirdiği olarak kaydedilir', async () => {

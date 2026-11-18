@@ -42,7 +42,7 @@ describe('Görsel dosyaları', () => {
 
   test('katalogdaki her hediyenin ve Lucky paketinin görseli var', () => {
     const giftArt = read('components/GiftArt.tsx');
-    for (const g of GIFTS) assert.match(giftArt, new RegExp(`^  ${g.id}: \\{ sm:`, 'm'), `${g.id} ${g.name}`);
+    for (const g of GIFTS) assert.match(giftArt, new RegExp(`^  '?${g.id}'?: \\{ sm:`, 'm'), `${g.id} ${g.name}`);
     for (const id of ['lk1', 'lk2', 'lk3', 'lk4']) assert.match(giftArt, new RegExp(`^  ${id}: \\{ sm:`, 'm'), id);
   });
 

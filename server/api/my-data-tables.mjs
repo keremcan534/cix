@@ -21,6 +21,7 @@ export const EXPORTED = [
 /** Tables that point at an account but are not that person's to receive, with the reason. */
 export const NOT_EXPORTED = {
   admin_permissions: 'staff access settings',
+  family_cooldowns: 'the date a rule lets someone join another family again; the families they were in are in family_members',
   audit_events: 'staff action log (who on the staff did what)',
   event_log: 'an event’s change log (staff review decisions); the person’s own events are in events',
   sanction_audit_logs: 'staff action log of sanctions',
