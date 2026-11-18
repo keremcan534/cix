@@ -13,15 +13,20 @@
 //   GET  /api/rooms/rocket?room=<id or oda-id>   the room's rocket today for the phones (see roomRocket)
 //   GET  /api/admin/rocket                       → { config, version, updatedAt, limits, items, recent }
 //   POST /api/admin/rocket/config { config, version } → { config, version, updatedAt }
+//   POST /api/admin/rocket/video { level, video }     → { videos }   a level's launch video (null takes it off)
+//   GET|HEAD /api/fx/r/rocket-<level>.mp4             → the video (public), listed in the catalog's `fx` as entry rocket-<level>
 //
 // The room hears a launch and its winners ('rocket' packets: event 'launch', then 'paid'); its phones read the state
 // again. An older app drops a packet it doesn't know and never asks for the state: it shows no rocket, its gifts still
 // fill it, and what its owner wins is theirs all the same.
 import crypto from 'node:crypto';
 
-import { HttpError, UUID, auth, clientIp, db, env, limit, readJson, tx } from './core.mjs';
+import { HttpError, UUID, auth, clientIp, db, env, int, limit, readJson, tx } from './core.mjs';
 import { SHOP, SHOP_PAUSED } from './catalog.mjs';
+import { addVideoTable, canConvert, canSvga, kickJobs, videoOf } from './custom-gifts.mjs';
 import { grantInTx } from './economy.mjs';
+import { FX_PATH } from './fx.mjs';
+import { keyOf, removeFiles, sendFile } from './media.mjs';
 import { roomPacket } from './live.mjs';
 import { panelDetail } from './panel.mjs';
 import { notify } from './push.mjs';
@@ -79,6 +84,37 @@ const prizeView = (p) =>
     : { kind: 'item', sku: p.sku, name: itemName(p.sku), itemKind: paidItem(p.sku)?.kind ?? null, days: p.days, winners: p.winners };
 /** A prize in a sentence: "750 jeton", "Neon Halka (3 gün)". */
 const prizeText = (p) => (p.kind === 'coins' ? `${fmt(p.amount)} jeton` : `${itemName(p.sku)} (${p.days} gün)`);
+
+// --- The launch videos (the panel's, one a level) ------------------------------------------------------------------
+let videos = { rev: 0, rows: new Map() };
+/** Reads the five rows again. */
+export async function refreshRocketVideos(q = db) {
+  const r = await q.query('SELECT * FROM room_rocket_videos');
+  videos = { rev: r.rows.reduce((m, x) => Math.max(m, Number(x.rev)), 0), rows: new Map(r.rows.map((x) => [x.id, x])) };
+}
+addVideoTable({ table: 'room_rocket_videos', rev: 'room_rocket_video_rev', what: 'rocket', refresh: () => refreshRocketVideos() });
+/** Added to the catalog's `v`: a new video makes the phones read the catalog again. */
+export const rocketVideosRev = () => videos.rev;
+/** The catalog's `fx` rows: an older app's filter refuses the /r/ address, so it never downloads one. */
+export const rocketFx = () =>
+  [...videos.rows.values()].filter((x) => x.video_url).map((x) => ({ kind: 'entry', id: x.id, url: `${FX_PATH}r/${x.id}.mp4?v=${x.video_v}`, bytes: Number(x.video_bytes), ms: Number(x.video_ms ?? 0) }));
+/** GET or HEAD /api/fx/r/rocket-<level>.mp4. */
+export async function sendRocketFx(req, res, name) {
+  const m = /^(rocket-[1-5])\.mp4$/.exec(name);
+  const key = m && videos.rows.get(m[1])?.video_url ? keyOf(videos.rows.get(m[1]).video_url) : null;
+  if (!key) return void res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' }).end('Bulunamadı');
+  await sendFile(req, res, key);
+}
+/** The five levels as the panel shows them. */
+const videosView = () =>
+  [1, 2, 3, 4, 5].map((level) => {
+    const x = videos.rows.get(`rocket-${level}`);
+    return {
+      level,
+      video: x?.video_url ? { url: `${FX_PATH}r/${x.id}.mp4?v=${x.video_v}`, bytes: Number(x.video_bytes), ms: Number(x.video_ms ?? 0) } : null,
+      job: x?.job_status ? { status: x.job_status, error: x.job_error ?? null } : null,
+    };
+  });
 
 // --- Fuel (inside the gift's transaction) -----------------------------------------------------------------------
 /**
@@ -231,6 +267,7 @@ let sweep = null;
 /** Pays launches nobody paid (the process stopped between the gift and the payout). */
 export function startRocketSweep() {
   if (sweep) return;
+  void refreshRocketVideos().catch((e) => console.error('room rocket videos', String(e?.message ?? e).slice(0, 200)));
   let busy = false;
   sweep = setInterval(async () => {
     if (busy) return;
@@ -361,6 +398,9 @@ export const roomRocketRoutes = {
       updatedAt: cur.updatedAt,
       limits: ROCKET_LIMITS,
       items: prizeItems(),
+      videos: videosView(),
+      convert: await canConvert(),
+      svga: await canSvga(),
       recent: recent.rows.map((x) => ({ id: Number(x.id), room: { id: x.room_id, title: x.title }, day: x.day, level: x.level, goal: Number(x.goal), launchedAt: x.launched_at, paidAt: x.paid_at, winners: x.winners })),
     };
   },
@@ -399,5 +439,50 @@ export const roomRocketRoutes = {
     kept = null;
     states.clear();
     return out;
+  },
+
+  /**
+   * A level's launch video: a ready stacked MP4, or a transparent source (an SVGA, WebM or MOV) converted in the
+   * background, as a gift's. The video in use stays until the new one is ready. null takes it off (the drawn rocket).
+   */
+  async 'POST /api/admin/rocket/video'(req) {
+    const a = await admin(req);
+    limit(`rocket-admin:${a.id}`, 30, 'Çok fazla kayıt, biraz bekle');
+    const b = await readJson(req, 4096);
+    const level = int(b.level, 1, 5);
+    if (!level) throw new HttpError(400, 'Seviye 1–5 olmalı');
+    const video = await videoOf(b.video);
+    if (video === undefined) throw new HttpError(400, 'Video seçilmedi');
+    const id = `rocket-${level}`;
+    const drop = [];
+    await tx(async (c) => {
+      await c.query('INSERT INTO room_rocket_videos (id) VALUES ($1) ON CONFLICT (id) DO NOTHING', [id]);
+      const cur = (await c.query('SELECT * FROM room_rocket_videos WHERE id = $1 FOR UPDATE', [id])).rows[0];
+      drop.push(cur.job_source, cur.job_preview);
+      if (video === null || video.kind === 'stacked') {
+        drop.push(cur.video_url);
+        await c.query(
+          `UPDATE room_rocket_videos SET video_url = $2, video_bytes = $3, video_ms = $4, video_v = $5, job_status = NULL, job_source = NULL, job_error = NULL,
+                  job_preview = NULL, job_tries = 0, rev = nextval('room_rocket_video_rev'), updated_at = now() WHERE id = $1`,
+          [id, video?.url ?? null, video?.bytes ?? null, video?.ms ?? null, video?.v ?? null],
+        );
+      } else {
+        await c.query(
+          `UPDATE room_rocket_videos SET job_status = 'processing', job_source = $2, job_fill = $3, job_opaque = $4, job_error = NULL, job_preview = NULL, job_tries = 0,
+                  job_at = now(), rev = nextval('room_rocket_video_rev'), updated_at = now() WHERE id = $1`,
+          [id, video.url, video.fill, video.opaque === true],
+        );
+      }
+      await c.query('INSERT INTO audit_events (actor, action, target, detail, ip) VALUES ($1, $2, NULL, $3, $4)', [
+        a.id,
+        'rocket.video',
+        JSON.stringify({ level, before: cur.video_url, after: video?.url ?? null, kind: video?.kind ?? null, ...panelDetail(a) }),
+        clientIp(req),
+      ]);
+    });
+    removeFiles(drop.filter(Boolean));
+    await refreshRocketVideos();
+    if (video?.kind === 'source') kickJobs();
+    return { videos: videosView() };
   },
 };

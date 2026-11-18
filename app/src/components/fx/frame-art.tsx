@@ -26,6 +26,7 @@ const ART: Record<string, Art> = {
   'fr-laurel': made('fr-laurel', require('../../../assets/frames/fr-laurel.png'), '#F6BD60'),
   'fr-crown-silver': made('fr-crown-silver', require('../../../assets/frames/fr-crown-silver.png'), '#13D9DF'),
   'fr-crown-gold': made('fr-crown-gold', require('../../../assets/frames/fr-crown-gold.png'), '#F6BD60'),
+  'fr-wing-rose': made('fr-wing-rose', require('../../../assets/frames/fr-wing-rose.png'), '#FF5FA2'),
   'fr-wing-coral': made('fr-wing-coral', require('../../../assets/frames/fr-wing-coral.png'), '#FF6576'),
   'fr-wing-sky': made('fr-wing-sky', require('../../../assets/frames/fr-wing-sky.png'), '#13D9DF'),
 };

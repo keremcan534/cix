@@ -47,11 +47,13 @@
 // shopItemsRev(). The shop sells at the price, days and VIP level set here (economy.mjs sellable). An older app never
 // asks: it shows its compiled shop and buys by the app's names and prices, refused (update_required, nothing taken)
 // when an item's price or days moved; it draws nothing for an admin's item someone wears.
+import crypto from 'node:crypto';
+
 import { HttpError, auth, clientIp, db, env, int, limit, readJson, text, tx } from './core.mjs';
 import { SEAT_COLORS, SEAT_DEFAULT, SHOP, SHOP_PAUSED } from './catalog.mjs';
-import { addVideoTable, canConvert, canSvga, imageInfo, kickJobs, videoOf } from './custom-gifts.mjs';
+import { addVideoTable, canConvert, canSvga, imageInfo, kickJobs, svgaFrame, videoOf } from './custom-gifts.mjs';
 import { FX_PATH } from './fx.mjs';
-import { keyOf, kindMax, readStored, removeFiles, sendFile, storageOn, verifyUpload } from './media.mjs';
+import { keyOf, kindMax, readStored, removeFiles, sendFile, storageOn, verifyUpload, writeStored } from './media.mjs';
 import { panelDetail } from './panel.mjs';
 
 const positive = (v, d) => {
@@ -513,8 +515,8 @@ async function bubbleArt(url) {
 }
 /**
  * A frame's moving version: an animated WebP, transparent, square or nearly, 128–512 px, up to 3 MB. It is the same
- * frame as the still picture (the same hole); GIF and SVGA aren't taken (a GIF's edges are jagged, SVGA needs a player
- * the app doesn't have).
+ * frame as the still picture (the same hole). A GIF isn't taken (its edges are jagged); an SVGA becomes this WebP first
+ * (POST /api/admin/shop/frame-svga), since the app has no SVGA player.
  */
 async function motionArt(url) {
   const info = await pictureOf(url, 'Hareketli çerçeveyi', SHOP_LIMITS.motionBytes);
@@ -715,6 +717,24 @@ export const shopRoutes = {
       convert: await canConvert(),
       svga: await canSvga(),
     };
+  },
+
+  /**
+   * An SVGA for a frame, uploaded as a gift's source: answers the still picture and the moving WebP made from it, the
+   * addresses a frame is then saved with (art, motion). The SVGA itself is deleted once it is converted.
+   */
+  async 'POST /api/admin/shop/frame-svga'(req) {
+    const a = await admin(req);
+    writeLimit(a);
+    const b = await readJson(req);
+    if (typeof b.source !== 'string' || !b.source) throw bad('SVGA dosyasını önce yükle');
+    const out = await svgaFrame(b.source, SHOP_LIMITS.motionBytes);
+    const name = `shopframe/${keyOf(b.source).split('/')[1]}/${Date.now().toString(36)}-${crypto.randomBytes(6).toString('base64url')}`;
+    const art = await writeStored(`${name}.png`, out.still, 'image/png');
+    const motion = await writeStored(`${name}.webp`, out.motion, 'image/webp');
+    removeFiles([b.source]);
+    await audited(db, a, 'shop.frame_svga', { art, motion, px: out.px, bytes: out.motion.length }, req);
+    return { art, motion, px: out.px, bytes: out.motion.length };
   },
 
   /**

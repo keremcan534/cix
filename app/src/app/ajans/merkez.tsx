@@ -930,11 +930,11 @@ function RulesTab({ name, ask }: { name: string; ask: AskFn }) {
               title: 'Ajans başına asistan',
               message: `Bir ajans aynı anda en fazla bu kadar asistan atayabilir. Şu an ${fmtD(v.assistant_policy?.max ?? 1)}. Var olan asistanlar etkilenmez.`,
               confirm: 'Kaydet',
-              field: { label: 'Yeni sınır (0–20)', placeholder: String(v.assistant_policy?.max ?? 1), keyboard: 'numeric' },
+              field: { label: 'Yeni sınır (0–10)', placeholder: String(v.assistant_policy?.max ?? 1), keyboard: 'numeric' },
             });
             if (!r) return;
             const max = /^\d{1,2}$/.test(r.field) ? Number(r.field) : NaN;
-            if (!(max >= 0 && max <= 20)) return showAlert('Geçersiz değer', '0 ile 20 arasında bir sayı yaz.');
+            if (!(max >= 0 && max <= 10)) return showAlert('Geçersiz değer', '0 ile 10 arasında bir sayı yaz.');
             await runAction(q.demo, () => centerNet.saveSetting('assistant_policy', { max }, r.reason), 'Kural kaydedildi.', q.reload);
           };
           return (

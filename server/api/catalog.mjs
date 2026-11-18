@@ -59,8 +59,16 @@ const GIFT_ROWS = [
   ['c11', 'Lunapark Randevusu', '🎡', 49_950, 'couple'],
   ['c12', 'Aşk Ateşi', '❤️‍🔥', 1_999, 'couple'],
   ['c13', 'Pırlanta Yüzük', '💍', 19_999, 'couple'],
-  // Koruma (guards.mjs): sending it makes the sender the receiver's guardian.
-  ['koruma', 'Koruma Kartı', '🛡️', 999, 'couple'],
+  // Aile ve Dost. Koruma (guards.mjs): sending it makes the sender the receiver's guardian.
+  ['koruma', 'Koruma Kartı', '🛡️', 999, 'family'],
+  // The bond gifts (bond-rules.mjs, the same names and prices): sent from the shelf they are a bond request (bonds.mjs).
+  ['bag-kardes', 'Kardeş Bilekliği', '📿', 1_000, 'family'],
+  ['bag-baci', 'Bacı Kolyesi', '💛', 1_000, 'family'],
+  ['bag-agabey', 'Ağabey Saati', '⌚', 1_000, 'family'],
+  ['bag-abla', 'Abla Broşu', '🌸', 1_000, 'family'],
+  ['bag-yenge', 'Yenge Çiçeği', '💐', 1_000, 'family'],
+  ['bag-enishte', 'Enişte Kravatı', '👔', 1_000, 'family'],
+  ['bag-kanka', 'Kanka Rozeti', '🏅', 500, 'family'],
   ['v1', 'Zümrüt Saat', '⌚', 4_950, 'privilege', 2],
   ['v2', 'Gizemli Gül', '🥀', 350, 'privilege', 2],
   ['v3', 'Sihirli Şapka', '🎩', 19_950, 'privilege', 3],
@@ -81,6 +89,8 @@ const GIFT_ROWS = [
  * custom-gifts.mjs giftOf / builtinGift, never these values alone.
  */
 export const GIFTS = new Map(GIFT_ROWS.map(([id, name, emoji, price, cat, minSvip = 0]) => [id, Object.freeze({ id, name, emoji, price, cat, minSvip })]));
+/** The bond gifts on the Aile ve Dost shelf: never sent as a plain gift, their price is the bond's (bond-rules.mjs). */
+export const BOND_GIFTS = new Set([...GIFTS.keys()].filter((id) => id.startsWith('bag-')));
 /**
  * Off the shelf for now (the owner, 14 Nov): every gift with no animation of their own (no video in fx.mjs, no show in
  * the app's data/gift-shows); the four standard ones (Gül, Kalp, Kahve, Pasta) went too, the same evening. GET
@@ -189,6 +199,7 @@ const SHOP_ROWS = [
   ['fr-laurel', 'frame', 'Altın Defne', 2_000, 30, 0],
   ['fr-crown-silver', 'frame', 'Gümüş Taç', 4_000, 30, 2],
   ['fr-crown-gold', 'frame', 'Kraliyet Kanatları', 9_000, null, 4],
+  ['fr-wing-rose', 'frame', 'Aşk Kanatları', 3_000, 30, 0],
   ['fr-wing-coral', 'frame', 'Melek Kalp · Pembe', 3_000, 30, 0],
   ['fr-wing-sky', 'frame', 'Melek Kalp · Turkuaz', 3_000, 30, 0],
   ['en-sparkle', 'entry', 'Işıltı', 200, 7, 0],

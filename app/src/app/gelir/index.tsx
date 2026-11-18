@@ -18,6 +18,7 @@ import { callsAvailable, liveMode } from '@/lib/live';
 import { liveRules, useLiveCatalog } from '@/lib/live/catalog-live';
 import { useLiveEarnings, useLiveLedger } from '@/lib/live/earnings';
 import { useServerWithdrawals } from '@/lib/live/withdraw';
+import { offersCashOut } from '@/lib/withdraw-rules';
 import { diamondValueTl, selfExchangeRate } from '@/lib/coins-bank';
 import { activeLocks, lockLabel, lockLength, lockProgress, nextUnlock, timeLeft, type DiamondLock } from '@/lib/diamond-locks';
 import { diamondIncome, giftOfReason, ledgerTime, type LedgerEntry } from '@/lib/ledger-view';
@@ -83,6 +84,8 @@ export default function IncomeScreen() {
   const liveCat = useLiveCatalog();
   const per10k = Math.floor(10_000 * selfExchangeRate(live ? liveRules(liveCat) : RULES));
   const pendingWithdraw = live ? withdrawState.list.find((w) => w.status === 'pending') : undefined;
+  // Men's accounts don't take money out (server streamer-rule.mjs): Çevir stays, Para Çek and bozdurma go.
+  const cashOut = offersCashOut(live, withdrawState);
   const { colors, semantic, ink } = useTheme();
   const styles = useStyles();
   const [exchange, setExchange] = useState(false);
@@ -147,7 +150,7 @@ export default function IncomeScreen() {
             <View style={styles.part} accessible accessibilityLabel={`Çekilebilir: ${fmt(free)} elmas, yaklaşık ${usd(free)}`}>
               <View style={styles.partHead}>
                 <Ionicons name="lock-open" size={14} color={semantic.successText} />
-                <Text style={styles.partLabel} numberOfLines={1}>Çekilebilir</Text>
+                <Text style={styles.partLabel} numberOfLines={1}>{cashOut ? 'Çekilebilir' : 'Kullanılabilir'}</Text>
               </View>
               <Text style={styles.partN} numberOfLines={1} adjustsFontSizeToFit>{fmt(free)}</Text>
               <Text style={styles.partSub} numberOfLines={1}>≈ {usd(free)}</Text>
@@ -169,15 +172,19 @@ export default function IncomeScreen() {
             </View>
             <Ionicons name="chevron-forward" size={18} color={semantic.moneyInk} />
           </Pressable>
-          <View style={{ flexDirection: 'row', gap: 12, marginTop: 10 }}>
-            <Pressable style={styles.outlineBtn} onPress={() => router.push('/yayinci/cek')}>
-              <Text style={styles.outlineText}>Para Çek</Text>
-            </Pressable>
-            {/* Live: Para Çek's Jeton Noktası way (the server moves the diamonds); the demo keeps its own screen. */}
-            <Pressable style={styles.outlineBtn} onPress={live ? () => router.push({ pathname: '/yayinci/cek', params: { yol: 'jeton' } }) : instant}>
-              <Text style={styles.outlineText}>{live ? 'Jeton Noktası' : 'Anında bozdur'}</Text>
-            </Pressable>
-          </View>
+          {cashOut ? (
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 10 }}>
+              <Pressable style={styles.outlineBtn} onPress={() => router.push('/yayinci/cek')}>
+                <Text style={styles.outlineText}>Para Çek</Text>
+              </Pressable>
+              {/* Live: Para Çek's Jeton Noktası way (the server moves the diamonds); the demo keeps its own screen. */}
+              <Pressable style={styles.outlineBtn} onPress={live ? () => router.push({ pathname: '/yayinci/cek', params: { yol: 'jeton' } }) : instant}>
+                <Text style={styles.outlineText}>{live ? 'Jeton Noktası' : 'Anında bozdur'}</Text>
+              </Pressable>
+            </View>
+          ) : (
+            !!withdrawState.cashOut?.why && <Text style={[styles.exchangeSub, { marginTop: 8 }]}>{withdrawState.cashOut.why}</Text>
+          )}
           {pendingWithdraw && (
             <Text style={[styles.exchangeSub, { marginTop: 8 }]} onPress={() => router.push('/yayinci/cek')}>
               Bekleyen çekim talebi: {fmt(pendingWithdraw.diamonds)} elmas. Sonuçlanana kadar bakiyeden ayrı tutulur.
@@ -192,7 +199,7 @@ export default function IncomeScreen() {
           <Art name="finans-haftalik-odeme-banka" size={26} />
           <View style={{ flex: 1 }}>
             <Text style={styles.rowTitle}>Jeton Noktası</Text>
-            <Text style={styles.dim}>{live ? 'Jeton Noktaları, anında bozdurma ve işlemlerin' : 'Cüzdan, kazançlar, ödemeler ve kurallar'}</Text>
+            <Text style={styles.dim}>{!live ? 'Cüzdan, kazançlar, ödemeler ve kurallar' : cashOut ? 'Jeton Noktaları, anında bozdurma ve işlemlerin' : 'Jeton Noktaları ve işlemlerin'}</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
         </Pressable>

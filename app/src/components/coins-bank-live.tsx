@@ -23,6 +23,8 @@ import { bankSaleError, diamondSaleError, diamondValueTl, transferLine } from '@
 import { message, myServerId, rememberUser } from '@/lib/live';
 import { useLiveEarnings } from '@/lib/live/earnings';
 import { jetonNow, refreshJeton, sellCoins, sellDiamonds, useJeton, type JetonStock } from '@/lib/live/jeton';
+import { useServerWithdrawals } from '@/lib/live/withdraw';
+import { offersCashOut } from '@/lib/withdraw-rules';
 import { blockedFeature } from '@/lib/remote-control';
 import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
@@ -37,6 +39,8 @@ const DIAMOND_PRESETS = [1_000, 10_000, 100_000];
 export function LiveCoinsBank() {
   const { coins, blocked } = useApp();
   const data = useJeton();
+  // Selling diamonds to a Jeton Noktası is taking money out (server streamer-rule.mjs).
+  const cashOut = offersCashOut(true, useServerWithdrawals());
   // The store keeps the last good answer; nothing at all after a read means it failed.
   const [failed, setFailed] = useState(false);
   const styles = useStyles();
@@ -59,7 +63,7 @@ export function LiveCoinsBank() {
           ) : (
             <>
               {data.mine && <BankSale stock={data.stock?.coins ?? coins} buyers={data.buyers.filter((b) => !blocked.has(b.id))} />}
-              {!data.mine && <DiamondSale banks={data.banks} />}
+              {!data.mine && cashOut && <DiamondSale banks={data.banks} />}
               <Banks banks={data.banks} />
               <History rows={data.transfers} />
             </>

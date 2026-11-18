@@ -11,6 +11,7 @@ export const FRAME_ART_SIZES: Record<string, FrameArtSize> = {
   'fr-laurel': { hole: 0.2502, reach: { x: 0.37, top: 0.492, bottom: 0.381 } },
   'fr-crown-silver': { hole: 0.2091, reach: { x: 0.323, top: 0.492, bottom: 0.437 } },
   'fr-crown-gold': { hole: 0.1777, reach: { x: 0.303, top: 0.478, bottom: 0.431 } },
+  'fr-wing-rose': { hole: 0.3021, reach: { x: 0.498, top: 0.444, bottom: 0.48 } },
   'fr-wing-coral': { hole: 0.2065, reach: { x: 0.32, top: 0.456, bottom: 0.437 } },
   'fr-wing-sky': { hole: 0.2092, reach: { x: 0.325, top: 0.464, bottom: 0.442 } },
 };

@@ -144,7 +144,7 @@ describe('(b) yeni gelen, içerideki kişilerin girişlerini tekrar görmez', ()
     assert.deepEqual(p.chat.slice(-4), ['Oda Sahibi odadan ayrıldı', 'Yönetici odadan ayrıldı', 'Oda Sahibi odaya girdi', 'Yönetici odaya girdi']);
   });
 
-  test('başkasının bağlantısı kopup bir dakika içinde gelince satır var, efekt yok; sonra gelince efekt de var', () => {
+  test('başkasının bağlantısı kopup birkaç saniyede gelince satır var, efekt yok; sonra gelince efekt de var', () => {
     const p = phone(newbie, T);
     p.sync([{ ...kaan, at: T + 5 * S }], T + 6 * S);
     assert.deepEqual(p.played(), ['KaaN:dragon']);
@@ -226,13 +226,33 @@ describe('(d) çift bildirimi yalnız aynı anda ilk girişte, kendi girişlerin
 });
 
 describe('satıştan kalkan giriş efektleri', () => {
-  test('takılı kalmış olsa da oynamaz; VIP ya da rütbe bandı yerine geçer', async () => {
+  test('takılı kalmış olsa da kendi efekti oynamaz; yerine düz giriş bandı çıkar', async () => {
     const { entryPlanOf } = await import('@/lib/room-entrance');
     // The drawn ones, and the gift clips that were sold as entries for a few hours.
     for (const entry of ['en-sparkle', 'en-thunder', 'en-comet', 'en-roket', 'en-aslan', 'en-otomobil']) {
-      assert.equal(entryPlanOf({ entry, vipLevel: 0 }), null, entry);
+      assert.equal(entryPlanOf({ entry, vipLevel: 0 })?.fx, 'vip', entry);
       assert.equal(entryPlanOf({ entry, noble: 2, vipLevel: 0 })?.fx, 'vip', `${entry} + rütbe`);
     }
     assert.equal(entryPlanOf({ entry: 'en-dragon', vipLevel: 0 })?.fx, 'dragon');
+  });
+});
+
+describe('giriş bandını odadaki herkes görür (müşteri notu, 18 Kasım)', () => {
+  test('yalnız VIP seviyesi olan da bant alır, seviyesi bantta yazar', () => {
+    const plan = entryPlanOf({ vipLevel: 4 });
+    assert.equal(plan?.fx, 'vip');
+    assert.equal(plan?.badge, 'VIP 4');
+    assert.equal(entryPlanOf({ vipLevel: 0 }), null, 'hiçbir şeyi olmayanın bandı yok');
+  });
+
+  test('telefonun henüz bilmediği yeni efekt: boş geçmez, düz bant çıkar', () => {
+    assert.equal(entryPlanOf({ entry: 'sx-yeni-efekt', vipLevel: 0 })?.fx, 'vip');
+  });
+
+  test('çıkıp 15 saniyeden sonra dönen giriş sayılır; daha kısası bağlantı kopması', () => {
+    const fresh = (away: number) => entranceView({ fresh: true, at: T, away }).effect;
+    assert.equal(RETURN_MS, 15_000);
+    assert.equal(fresh(RETURN_MS), true);
+    assert.equal(fresh(RETURN_MS - 1), false);
   });
 });

@@ -185,7 +185,7 @@ Son güncelleme: preview-96 sonrası (Küçült, çanta yağmuru, @bahset düzel
 | 6 | Ajans sahibinin ana ekranı | Çalışıyor | |
 | 7 | Haftalık/aylık kazanç ve dışa aktarma | Telefonda denenmeli | Artık gerçek dosya (.csv, Excel'de açılır) |
 | 8 | Referans ajanslar | Çalışıyor | |
-| 9–12 | Eşleşme (3 hak, 58 saniye, ücretler) | Çalışıyor | İki karşı cinsten hesap aynı anda aramada olmalı |
+| 9–12 | Eşleşme (3 hak, 58 saniye, ücretler) | Çalışıyor. Kimsenin ödemediği eşleşme (iki yayıncı) de süresi dolunca kesilir | İki karşı cinsten hesap aynı anda aramada olmalı |
 | 13 | Birebir: mesaj, sesli/görüntülü arama | Kurulum bekliyor | Uygulama kapalıyken arama çalması Firebase dosyaları girilince açılır |
 | 14, 16–18 | Ücretler, karşılıklı takipte mesaj ücretsiz | Çalışıyor | Ücretler sadece onaylı ajans yayıncısıyla konuşunca görünür. Yönetim panelinden değişir |
 | 15 | Kalp seviyesiyle arama açılması | Telefonda denenmeli | Arama kilitleri çalışıyor. Mesajda fotoğraf (yayıncıyla kalp Lv.3) depo kurulunca açıldı |

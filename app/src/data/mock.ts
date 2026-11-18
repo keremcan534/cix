@@ -114,7 +114,7 @@ export type Moment = {
   time: string;
 };
 
-export type GiftCat = 'hot' | 'gameplay' | 'couple' | 'privilege';
+export type GiftCat = 'hot' | 'gameplay' | 'couple' | 'family' | 'privilege';
 export type Gift = {
   id: string;
   name: string;
@@ -311,6 +311,9 @@ export const MOMENTS: Moment[] = [
   { id: 'm5', userId: 'u9', text: 'Bugün kim ders çalışıyor? Lo-fi odasındayım, gelin 📚', likes: 54, comments: 7, time: '8 sa' },
 ];
 
+/** A bond gift of the Aile ve Dost shelf: sent, it is a bond request (server/api/bonds.mjs), never a plain gift. */
+export const isBondGift = (id: string) => id.startsWith('bag-');
+
 const couple = (id: string, name: string, emoji: string, price: number, badge?: Gift['badge']): Gift => ({
   id,
   name,
@@ -384,8 +387,16 @@ export const GIFTS: Gift[] = [
   couple('c11', 'Lunapark Randevusu', '🎡', 49_950, '3D'),
   couple('c12', 'Aşk Ateşi', '❤️‍🔥', 1_999),
   couple('c13', 'Pırlanta Yüzük', '💍', 19_999, 'music'),
-  // Koruma (server/api/guards.mjs): sending it makes the sender the receiver's guardian.
-  couple('koruma', 'Koruma Kartı', '🛡️', 999),
+  // --- Aile ve Dost. Koruma (server/api/guards.mjs): sending it makes the sender the receiver's guardian. ---
+  { id: 'koruma', name: 'Koruma Kartı', emoji: '🛡️', price: 999, cat: 'family' },
+  // The bond gifts (data/bonds BOND_KINDS, the same names and prices).
+  { id: 'bag-kardes', name: 'Kardeş Bilekliği', emoji: '📿', price: 1_000, cat: 'family' },
+  { id: 'bag-baci', name: 'Bacı Kolyesi', emoji: '💛', price: 1_000, cat: 'family' },
+  { id: 'bag-agabey', name: 'Ağabey Saati', emoji: '⌚', price: 1_000, cat: 'family' },
+  { id: 'bag-abla', name: 'Abla Broşu', emoji: '🌸', price: 1_000, cat: 'family' },
+  { id: 'bag-yenge', name: 'Yenge Çiçeği', emoji: '💐', price: 1_000, cat: 'family' },
+  { id: 'bag-enishte', name: 'Enişte Kravatı', emoji: '👔', price: 1_000, cat: 'family' },
+  { id: 'bag-kanka', name: 'Kanka Rozeti', emoji: '🏅', price: 500, cat: 'family' },
   // --- Ayrıcalık (SVIP-gated) ---
   { id: 'v1', name: 'Zümrüt Saat', emoji: '⌚', price: 4_950, cat: 'privilege', minSvip: 2 },
   { id: 'v2', name: 'Gizemli Gül', emoji: '🥀', price: 350, cat: 'privilege', minSvip: 2 },

@@ -7,13 +7,13 @@ import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
 
-import { HeartGlyph, HeartLink } from '@/components/heart-level';
+import { CHAT_HEART, ChatHeartMark } from '@/components/heart-level';
 import { ProfileGiftSheet } from '@/components/profile-gift-sheet';
 import { Text } from '@/components/text';
 import { intimacyOf } from '@/data/messages-ui';
 import { type Gift, type User } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
-import { heartShare, heartTier, heartTitle, heartView, lvAt, nextLookText, type HeartView } from '@/lib/heart-tiers';
+import { heartShare, heartTitle, heartView, lvAt, nextLookText, type HeartView } from '@/lib/heart-tiers';
 import { liveGift, liveMode, message, toServer } from '@/lib/live';
 import { giftShelf, useLiveCatalog } from '@/lib/live/catalog-live';
 import { loadPair, MODE_NAME, type CallGate, type CallMode, type Pair } from '@/lib/live/one-on-one';
@@ -63,38 +63,28 @@ export function nextUnlock(p: Pair): string | null {
 }
 
 /**
- * Under the chat's header: the heart between the two of us in its look (from the pulse look on, our two photos with
- * heartbeats travelling between them), its level, and what it opens next (a paid pair) or what its next look brings.
- * A tap says how it grows and that it cools when the two go quiet (server one-on-one.mjs heartPoints).
+ * Under the chat's header: the chat heart in its turquoise speech bubble (the relationship's pink heart is another
+ * thing: Çift, İlişki Duvarı), its level, and what it opens next (a paid pair) or what its next look brings. A tap says
+ * how it grows and that it cools when the two go quiet (server one-on-one.mjs heartPoints).
  */
-export function HeartBar({ heart, pair, them }: { heart: HeartView; pair: Pair | null; them: User }) {
+export function HeartBar({ heart, pair }: { heart: HeartView; pair: Pair | null }) {
   const styles = useStyles();
-  const { colors } = useTheme();
-  const { me } = useApp();
   const { points, level, next } = heart;
-  const tier = heartTier(level);
   const paid = paidPair(pair);
   const hint = (paid && nextUnlock(pair)) || nextLookText(level) || 'Kalbiniz en parlak hâlinde';
   const grows = 'Sohbet ve hediye kalbi büyütür';
-  const linked = tier.line === 'one' || tier.line === 'both';
   const explain = () =>
     showAlert(heartTitle(level), `${hint}.
 
-Sohbet ettikçe ve hediyeleştikçe kalbiniz büyür. Bir süre konuşmazsanız yavaş yavaş soğur ve seviyesi düşebilir.`);
+Sohbet ettikçe ve hediyeleştikçe sohbet kalbiniz büyür. Bir süre konuşmazsanız yavaş yavaş soğur ve seviyesi düşebilir. İlişki Duvarı'ndaki Çift bağınızdan ayrıdır.`);
   return (
     <Pressable
       onPress={explain}
-      style={[styles.heart, tier.rim && { borderColor: `${tier.rim}99` }]}
+      style={styles.heart}
       accessibilityRole="button"
       accessibilityLabel={`${heartTitle(level)}. ${hint}. Ayrıntı için dokun`}
     >
-      {linked ? (
-        <View style={styles.link}>
-          <HeartLink level={level} me={{ uri: me.avatar, name: me.name }} them={{ uri: them.avatar, name: them.name }} size="sm" />
-        </View>
-      ) : (
-        <HeartGlyph level={level} size={22} />
-      )}
+      <ChatHeartMark level={level} />
       <View style={{ flex: 1, gap: 4 }}>
         <View style={styles.heartRow}>
           <Text style={styles.heartLevel} numberOfLines={1}>
@@ -103,7 +93,7 @@ Sohbet ettikçe ve hediyeleştikçe kalbiniz büyür. Bir süre konuşmazsanız 
           <Text style={styles.heartPoints}>{next === null ? fmt(points) : `${fmt(points)} / ${fmt(next)}`}</Text>
         </View>
         <View style={styles.track}>
-          <View style={[styles.fill, { width: `${Math.round(heartShare(heart) * 100)}%`, backgroundColor: tier.id === 'none' ? colors.pink : tier.tint }]} />
+          <View style={[styles.fill, { width: `${Math.round(heartShare(heart) * 100)}%` }]} />
         </View>
         <Text style={styles.heartHint} numberOfLines={1}>
           {hint} · {grows}
@@ -214,15 +204,14 @@ const useStyles = makeStyles(({ colors, dark }) => ({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: radius.lg,
-    backgroundColor: dark ? 'rgba(255,101,118,0.1)' : 'rgba(200,48,74,0.06)',
+    backgroundColor: CHAT_HEART.soft,
     borderWidth: 1,
-    borderColor: dark ? 'rgba(255,101,118,0.28)' : 'rgba(200,48,74,0.18)',
+    borderColor: CHAT_HEART.line,
   },
-  link: { width: 96 },
   heartRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 },
-  heartLevel: { color: colors.pink, fontWeight: '800', fontSize: 13, flexShrink: 1 },
+  heartLevel: { color: CHAT_HEART.tint, fontWeight: '800', fontSize: 13, flexShrink: 1 },
   heartPoints: { color: colors.textDim, fontSize: 11, fontWeight: '600' },
   track: { height: 5, borderRadius: 3, backgroundColor: dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.07)', overflow: 'hidden' },
-  fill: { height: 5, borderRadius: 3 },
+  fill: { height: 5, borderRadius: 3, backgroundColor: CHAT_HEART.tint },
   heartHint: { color: colors.textDim, fontSize: 11 },
 }));

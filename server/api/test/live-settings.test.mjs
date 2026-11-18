@@ -71,7 +71,7 @@ describe('nothing saved', () => {
     assert.deepEqual(await config(), { minVersion: null, updateUrl: null, notice: null, adminSite: null, featuresOff: ['dm'], v: 0, ...SIGN_IN });
     const [st, cat] = await call('GET', '/api/catalog');
     assert.equal(st, 200);
-    // 66 gifts, 41 of them off the shelf for now (catalog.mjs GIFTS_PAUSED).
+    // 73 gifts: 41 off the shelf for now (catalog.mjs GIFTS_PAUSED), 7 bond gifts only for an app with their shelf.
     assert.equal(cat.gifts.length, 25);
     assert.equal(cat.packs.length, 9);
   });
@@ -109,7 +109,7 @@ describe('nothing saved', () => {
         ...['rewards_off', 'welcome_coins', 'invite_coins', 'invite_daily_cap'],
         ...['casino_off', 'casino_open', 'casino_max_bet', 'casino_daily_rounds', 'rocket_house_pct'],
         ...['room_decor_off', 'room_bg_custom_price', 'room_bg_custom_days'],
-        ...['room_staff_away_minutes', 'boss_seat_coins', 'boss_seat_minutes'],
+        ...['room_staff_away_minutes', 'boss_seat_coins', 'boss_seat_minutes', 'family_cashout_members', 'family_rejoin_days'],
         ...['event_min_room_level', 'event_min_lead_minutes', 'event_max_minutes', 'event_max_capacity', 'event_grace_minutes', 'event_strike_limit', 'event_block_days', 'event_reminders_off'],
         'lucky_announce_min_coins',
         'admin_site',

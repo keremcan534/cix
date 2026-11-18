@@ -50,7 +50,7 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 
 import { artUrl } from './art.mjs';
-import { GIFTS, GIFTS_PAUSED } from './catalog.mjs';
+import { BOND_GIFTS, GIFTS, GIFTS_PAUSED } from './catalog.mjs';
 import { HttpError, auth, clientIp, db, env, int, limit, readJson, text, tx } from './core.mjs';
 import { FX_PATH, giftClip, mp4Duration } from './fx.mjs';
 import { panelDetail } from './panel.mjs';
@@ -67,10 +67,11 @@ const FFPROBE = env.FFPROBE || 'ffprobe';
 const PYTHON = env.PYTHON || 'python3';
 const SVGA_TOOL = path.join(import.meta.dirname, 'tools', 'svga-to-fx.py');
 const ICON_TOOL = path.join(import.meta.dirname, 'tools', 'icon-fit.py');
+const FRAME_TOOL = path.join(import.meta.dirname, 'tools', 'svga-to-webp.py');
 /** A conversion that fails for no reason of the file's own (storage, a restart) is tried this many times. */
 const MAX_TRIES = 3;
 
-export const CATS = ['hot', 'couple', 'gameplay', 'privilege'];
+export const CATS = ['hot', 'couple', 'family', 'gameplay', 'privilege'];
 /** The rules the panel shows and every save checks. */
 export const LIMITS = Object.freeze({
   nameMin: 2,
@@ -222,7 +223,8 @@ const listed = () => allGifts().filter((g) => g.enabled);
  * on the shelves ({ id, name, price, cat, minSvip, emoji, custom: true }). Undefined for anything else.
  */
 export function giftOf(id) {
-  if (typeof id !== 'string') return undefined;
+  // A bond gift goes as a bond request (bonds.mjs), which holds its coins until the other person answers.
+  if (typeof id !== 'string' || BOND_GIFTS.has(id)) return undefined;
   const app = builtinGift(id);
   if (app) return { id, name: app.name, emoji: app.emoji, price: app.price, cat: app.cat, minSvip: app.minSvip, builtin: true };
   const g = snap.rows.get(id);
@@ -257,15 +259,17 @@ export function checkShownPrice(gift, shown) {
  * minSvip, emoji, icon, custom: true } (an older app skips it); the app's own: { id, name, emoji, price, cat, minSvip }
  * as changed, and `icon` when it was replaced (an app reading gifts=2 draws these; an older one only takes the id).
  * `app2`: the phone reads it all (?gifts=2); otherwise the app's gifts whose price was changed are left out, since
- * that app would show its own price.
+ * that app would show its own price. `family`: the phone has the Aile ve Dost shelf (?family=1); an older one gets no
+ * bond gifts and sees that shelf's other gifts on İkili, where Koruma Kartı was.
  */
-export function catalogGifts({ app2 = false, hidden = new Set() } = {}) {
+export function catalogGifts({ app2 = false, hidden = new Set(), family = false } = {}) {
   const out = [];
   for (const g of listed()) {
+    const cat = family || g.cat !== 'family' ? g.cat : 'couple';
     if (g.builtin) {
-      if (hidden.has(g.id) || (!app2 && g.price !== GIFTS.get(g.id).price)) continue;
-      out.push({ id: g.id, name: g.name, emoji: g.emoji, price: g.price, cat: g.cat, minSvip: g.minSvip, ...(g.icon ? { icon: g.icon } : {}) });
-    } else out.push({ id: g.id, name: g.name, price: g.price, cat: g.cat, minSvip: g.minSvip, emoji: g.emoji, icon: g.icon, custom: true });
+      if (hidden.has(g.id) || (!family && BOND_GIFTS.has(g.id)) || (!app2 && g.price !== GIFTS.get(g.id).price)) continue;
+      out.push({ id: g.id, name: g.name, emoji: g.emoji, price: g.price, cat, minSvip: g.minSvip, ...(g.icon ? { icon: g.icon } : {}) });
+    } else out.push({ id: g.id, name: g.name, price: g.price, cat, minSvip: g.minSvip, emoji: g.emoji, icon: g.icon, custom: true });
   }
   return out;
 }
@@ -274,16 +278,16 @@ const fxUrl = (id, v) => `${FX_PATH}g/${id}.mp4?v=${v}`;
  * GET /api/catalog `fx`, next to fx.mjs's list: the admins' gifts' videos (those on the shelves) and the videos the
  * app's own gifts were given instead of theirs (on the shelves or not: they can still be sent), at this server.
  */
-export const giftFx = (hidden = new Set()) =>
+export const giftFx = (hidden = new Set(), family = false) =>
   allGifts()
-    .filter((g) => g.video && !hidden.has(g.id) && (g.builtin || g.enabled))
+    .filter((g) => g.video && !hidden.has(g.id) && (g.builtin || g.enabled) && (family || !BOND_GIFTS.has(g.id)))
     .map((g) => ({ kind: 'gift', id: g.id, url: fxUrl(g.id, g.video.v), bytes: g.video.bytes, ms: g.video.ms }));
 /** The app's gifts whose own clip (fx.mjs) isn't played: given another video, or stopped. fx.mjs leaves them out. */
 export const replacedClips = () => new Set([...snap.rows.values()].filter((r) => r.builtin && (r.video || r.videoOff)).map((r) => r.id));
 
 /** GET or HEAD /api/fx/g/<id>.mp4: the gift's stacked video from the storage (a taken-down one's too, for the panel's preview). */
 export async function sendCustomFx(req, res, name) {
-  const m = /^([a-z][0-9]{1,9})\.mp4$/.exec(name);
+  const m = /^([a-z][a-z0-9-]{0,31})\.mp4$/.exec(name);
   const g = m ? snap.rows.get(m[1]) : null;
   const key = g && !g.deleted && g.video ? keyOf(g.video.url) : null;
   if (!key) return void res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' }).end('Bulunamadı');
@@ -524,7 +528,7 @@ async function checkSource(url, fill) {
  * An SVGA's header, read here before the converter runs (bounded, with clear refusals): its size, frame rate and
  * frames. SVGA 2.x is a zlib-compressed protobuf (MovieEntity: 2 params, 3 images); 1.x (a zip) isn't read.
  */
-export function svgaInfo(buf) {
+export function svgaInfo(buf, { minMs = LIMITS.videoMinMs } = {}) {
   if (buf.subarray(0, 2).toString('latin1') === 'PK') throw new FileError('SVGA 1.x okunmuyor: animasyonu SVGA 2.x olarak dışa aktar');
   let b;
   try {
@@ -584,7 +588,7 @@ export function svgaInfo(buf) {
   if (fps > 60) throw new FileError(`SVGA saniyede en çok 60 kare olabilir (bu ${p.fps})`);
   const ms = Math.round((p.frames / fps) * 1000);
   if (ms > LIMITS.videoMaxMs + 500) throw new FileError(`Video en çok ${seconds(LIMITS.videoMaxMs)} saniye olabilir (bu ${seconds(ms)} sn)`);
-  if (ms < LIMITS.videoMinMs) throw new FileError(`Video en az ${seconds(LIMITS.videoMinMs)} saniye olmalı`);
+  if (ms < minMs) throw new FileError(`Video en az ${seconds(minMs)} saniye olmalı`);
   return { ...p, fps, ms };
 }
 
@@ -602,6 +606,36 @@ async function convertSvga(input, dir, fill, { opaque = false } = {}) {
     throw new FileError('SVGA çevrilemedi: dosya bozuk ya da desteklenmeyen bir özellik var');
   }
   return stackedResult(output, SVGA_OPAQUE_TEXT, { opaque });
+}
+
+/**
+ * A shop frame from the SVGA uploaded at `url` (tools/svga-to-webp.py): its still PNG and animated WebP, at most
+ * `maxBytes`. The phones play the WebP; no SVGA player is needed. { still, motion, px }.
+ */
+export async function svgaFrame(url, maxBytes) {
+  const key = keyOf(url);
+  if (!key?.startsWith('giftsource/') || !key.endsWith('.svga')) throw new HttpError(400, 'SVGA dosyasını önce yükle');
+  if (!(await canSvga()) || !fs.existsSync(FRAME_TOOL)) throw new HttpError(400, 'Bu sunucu SVGA çeviremiyor: hareketli WebP yükle');
+  await verifyUpload(url, 'giftsource');
+  return temp(async (dir) => {
+    const [input, still, motion] = ['frame.svga', 'still.png', 'motion.webp'].map((f) => path.join(dir, f));
+    await downloadStored(key, input, LIMITS.svgaBytes);
+    try {
+      svgaInfo(await fs.promises.readFile(input), { minMs: 100 });
+    } catch (e) {
+      throw e instanceof FileError ? new HttpError(400, e.message) : e;
+    }
+    const r = await run(PYTHON, ['-I', '-X', 'utf8', FRAME_TOOL, input, still, motion, '--max-bytes', String(maxBytes)], { timeout: 4 * 60_000, keep: 4096, nice: true });
+    if (r.code !== 0) {
+      console.error('frame svga', r.code, r.err.slice(-300));
+      if (/nothing visible/.test(r.err)) throw new HttpError(400, 'SVGA’da görünen bir şey yok');
+      if (/no transparency/.test(r.err)) throw new HttpError(400, 'SVGA’nın hiçbir yeri saydam değil: çerçevenin ortası ve çevresi saydam olmalı');
+      if (/not animated/.test(r.err)) throw new HttpError(400, 'SVGA’da hareket yok: durağan çerçeve için PNG yükle');
+      if (/too big/.test(r.err)) throw new HttpError(400, 'SVGA küçültünce de çok büyük kalıyor: daha kısa ya da sade bir animasyon yükle');
+      throw new HttpError(400, 'SVGA çevrilemedi: dosya bozuk ya da desteklenmeyen bir özellik var');
+    }
+    return { still: await fs.promises.readFile(still), motion: await fs.promises.readFile(motion), px: Number(JSON.parse(r.out.toString('utf8')).px) };
+  });
 }
 
 // --- Turning a transparent source into a stacked video (one at a time, in the background) -------------------
@@ -953,7 +987,7 @@ const priceOf = (v) => {
   return n;
 };
 const catOf = (v) => {
-  if (!CATS.includes(v)) throw new HttpError(400, 'Raf Popüler, İkili, Kutlama ya da Özel olmalı');
+  if (!CATS.includes(v)) throw new HttpError(400, 'Raf Popüler, İkili, Aile ve Dost, Kutlama ya da Özel olmalı');
   return v;
 };
 /** The VIP level a gift needs: only on the Özel shelf (1–10); 0 elsewhere. */
@@ -1390,6 +1424,9 @@ export const customGiftRoutes = {
     writeLimit(a);
     const b = await readJson(req, 8192);
     const id = idOf(b.id, { app: true });
+    // A bond gift's price is the bond's (bond-rules.mjs) and it stays on its shelf; its name, picture and video may change.
+    if (BOND_GIFTS.has(id) && b.price !== undefined && b.price !== GIFTS.get(id).price) throw new HttpError(400, 'Bağ hediyesinin fiyatı Bağlar kuralından gelir, buradan değişmez');
+    if (BOND_GIFTS.has(id) && b.cat !== undefined && b.cat !== 'family') throw new HttpError(400, 'Bağ hediyesi Aile ve Dost rafında kalır');
     if (GIFTS.has(id)) return updateApp(req, a, id, b);
     const cur = snap.rows.get(id);
     if (!cur || cur.deleted) throw new HttpError(404, 'Hediye bulunamadı');

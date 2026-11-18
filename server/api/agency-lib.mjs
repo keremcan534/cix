@@ -212,7 +212,7 @@ export function validateSetting(key, value, cur) {
     }
     case 'assistant_policy': {
       const v = { ...cur.assistant_policy, ...obj(value, key) };
-      return { max: whole(v.max, 0, 20, 'Ajans asistanı sınırı') };
+      return { max: whole(v.max, 0, 10, 'Ajans asistanı sınırı') };
     }
     default:
       return bad('Bilinmeyen ayar');

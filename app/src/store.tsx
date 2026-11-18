@@ -74,6 +74,11 @@ export type Settings = {
   showCurrentRoom: boolean;
   dmFrom: DmFrom;
   callsFrom: CallsFrom;
+  /** Mesajlar's preferences (components/message-prefs): the calls I take, the messages that notify my phone. */
+  voiceCalls: boolean;
+  videoCalls: boolean;
+  messagePush: boolean;
+  pushCloseOnly: boolean;
   profilePublic: boolean;
   notifySocial: boolean;
   notifyFinance: boolean;
@@ -514,6 +519,10 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       showCurrentRoom: true,
       dmFrom: 'everyone',
       callsFrom: 'everyone',
+      voiceCalls: true,
+      videoCalls: true,
+      messagePush: true,
+      pushCloseOnly: true,
       profilePublic: true,
       notifySocial: true,
       notifyFinance: true,

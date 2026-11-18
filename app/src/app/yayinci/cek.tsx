@@ -166,6 +166,21 @@ export default function Withdraw() {
       },
     ]);
 
+  // An account that may not take money out (server streamer-rule.mjs) has no form here; a request of theirs still open
+  // can be followed on Gelir.
+  if (live && server.cashOut?.allowed === false)
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+        <Header title="Para çek" />
+        <View style={{ padding: 16 }}>
+          <Card style={{ gap: 6 }}>
+            <Ionicons name="lock-closed" size={22} color={colors.textDim} />
+            <Text style={styles.dim}>{server.cashOut.why ?? 'Bu hesap para çekemez.'}</Text>
+          </Card>
+        </View>
+      </SafeAreaView>
+    );
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <Header title="Para çek" />

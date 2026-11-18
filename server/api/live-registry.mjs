@@ -351,6 +351,9 @@ const ROOM_AMOUNTS = {
   room_staff_away_minutes: { field: 'roomStaffAwayMinutes', label: 'Yetkilisiz oda kapanır (dakika)', default: 5, bounds: { min: 1, max: 60, step: 1, big: 3 }, unit: ' dakika', help: 'Odada oda sahibi ya da yöneticisi bu kadar dakika yoksa herkes sesli odadan çıkarılır ve oda, yetkilisi gelene kadar kapalı kalır. Kısa bir bağlantı kopması odayı kapatmasın diye çok kısa tutma.', text: (a, b) => `Yetkilisiz kalan oda ${a} → ${b} dakika sonra kapanır.` },
   boss_seat_coins: { field: 'bossSeatCoins', label: 'Patron koltuğu: tek seferde en az', default: 25_000, bounds: { min: 1_000, max: 1_000_000, step: 1_000, money: true }, unit: ' jeton', help: 'Patron koltuğu boşken odada tek seferde bu kadar jetonluk hediye gönderen koltuğa oturur. Koltuktaki kişi etkilenmez.', text: (a, b) => `Boş koltuğa oturmak için tek seferde ${a} → ${b} jeton.` },
   boss_seat_minutes: { field: 'bossSeatMinutes', label: 'Patron koltuğu süresi (dakika)', default: 10, bounds: { min: 1, max: 60, step: 1 }, unit: ' dakika', help: 'Koltuğa oturan bu kadar dakika oturur; koltuktayken gönderdiği her hediye süreyi bir o kadar uzatır. Süren oturuşun bitişi değişmez.', text: (a, b) => `Patron koltuğunda oturma ve uzatma ${a} → ${b} dakika.` },
+  // Aile (streamer-rule.mjs, families.mjs): the owners' numbers, 18 Nov.
+  family_cashout_members: { group: 'Aile', field: 'familyCashoutMembers', label: 'Aile sahibinin çekim hakkı: en az üye', default: 10, bounds: { min: 0, max: 500, step: 1 }, unit: ' üye', help: 'Erkek hesaplar para çekemez; ajans sahipleri ile en az bu kadar üyeli ailenin sahibi hariç. Bu aile sahipleri yayıncı da sayılır. Aile kurmak ucuz olduğu için düşük tutma.', text: (a, b) => `Aile sahibinin çekim hakkı için gereken üye ${a} → ${b}.` },
+  family_rejoin_days: { group: 'Aile', field: 'familyRejoinDays', label: 'Aileden ayrılan yayıncının bekleme süresi', default: 90, bounds: { min: 0, max: 365, step: 1 }, unit: ' gün', help: 'Kendi isteğiyle aileden ayrılan yayıncı bu kadar gün başka bir aileye katılamaz ve aile kuramaz. Ayrıldığı aileye dönebilir. Aileden çıkarılan kişi beklemez.', text: (a, b) => `Aileden ayrılan yayıncının bekleme süresi ${a} → ${b} gün.` },
 };
 /** The room keys as registry entries; a coin amount that more than doubles or halves, or a close sooner than 3 minutes, asks twice. */
 const roomEntries = () =>
@@ -359,7 +362,7 @@ const roomEntries = () =>
       k,
       {
         field: x.field,
-        group: ROOMS,
+        group: x.group ?? ROOMS,
         label: x.label,
         help: x.help,
         type: 'int',

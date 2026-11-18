@@ -31,6 +31,8 @@ describe('Para: aynı anda rastgele işlemler', () => {
     const admin = await signUp('Yönetici');
     await q("UPDATE users SET role = 'admin' WHERE id = $1", [admin.user.id]);
     const people = await Promise.all(Array.from({ length: 10 }, (_, i) => signUp(`Kişi ${i}`)));
+    // Women's accounts: they may sell diamonds (streamer-rule.mjs).
+    await h.sql.query("UPDATE users SET gender = 'Kadın' WHERE id = ANY($1::uuid[])", [people.map((x) => x.user.id)]);
     const bank = await signUp('Jeton Noktası');
     await ok(call('POST', '/api/admin/jeton/bank', { user: bank.user.id, enabled: true }, admin.session), 'banka');
     await ok(call('POST', '/api/admin/jeton/wholesale', { bank: bank.user.id, coins: 500_000, paymentRef: 'DEKONT-1', ref: rnd(6) }, admin.session), 'toptan');

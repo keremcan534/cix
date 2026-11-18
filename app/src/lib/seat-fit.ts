@@ -15,11 +15,10 @@ export const FACE_MAX = 96;
  */
 export const FACE_STD = 52;
 /**
- * A mic's slot past its face: the room for its frame and the gap to the next face. Every row has the same step
- * (FACE_STD + SLOT_PAD, or its share of a narrow row), four or five to a row alike, and the slots follow the faces:
- * a smaller face (a short phone) closes the row up instead of leaving wide gaps between the seats.
+ * The widest step between two mics. A row shares the stage's whole width (the customer's note, 18 Nov: three or four
+ * seats huddled in the middle left empty sides), so this only keeps one or two seats from drifting to the edges.
  */
-const SLOT_PAD = 26;
+const STEP_MAX = 136;
 /** The host's face when it has a row of its own (and a couple room's main seats'): a little bigger. */
 const HOST_MAX = 112;
 /** Between two rows of seats (the stage's and the classic grid's row gap). */
@@ -73,17 +72,14 @@ export const easedChange = (a: Fitted, b: Fitted) => a.cols !== b.cols || Math.a
 /** The grid's inner width (the room's padding taken off). */
 const gridWidth = (width: number) => Math.max(200, Math.min(width, 640) - 16);
 
-/**
- * The width one mic takes: its face and SLOT_PAD, or its share of the row when the row is narrower. The rows stay
- * together in the middle, the same step for four or five to a row, so a new mic count doesn't spread or squeeze them.
- */
-export const gridSlot = (w: number, cols: number, face: number) => Math.min(Math.floor(w / cols), face + SLOT_PAD);
+/** The width one mic takes: its equal share of the row, so the seats spread across the stage. */
+export const gridSlot = (w: number, cols: number) => Math.min(Math.floor(w / cols), STEP_MAX);
 
 function gridAt(seats: number, w: number, cols: number, face: number, o: FitOpts): Fitted {
   const rows = Math.ceil(seats / cols);
   // The Patron seat has the row above the mics to itself; the host's mic is the grid's first, as big as the rest.
   const top = o.boss ? bossHeight() + ROW_GAP : 0;
-  return { cols, slot: gridSlot(w, cols, face), face, host: face, height: 8 + top + rows * seatHeight(face) + Math.max(0, rows - 1) * ROW_GAP };
+  return { cols, slot: gridSlot(w, cols), face, host: face, height: 8 + top + rows * seatHeight(face) + Math.max(0, rows - 1) * ROW_GAP };
 }
 
 /**
@@ -155,12 +151,11 @@ export function layoutPlan(s: LayoutSchema, width: number, pkRoom: boolean): Lay
   const inner = Math.max(240, Math.min(width, 640) - PAD * 2);
   const stage = s.slots.filter((x) => x.area === 'stage');
   const bands = pkRoom && stage.some((x) => x.team);
-  // The widest mic row must fit on one line. Each mic takes the classic grid's step (FACE_STD + SLOT_PAD) or its share
-  // of a narrower row, so a layout's rows look like the classic grid's: the same faces, the same gaps.
+  // The widest mic row must fit on one line and shares the stage's width, as the classic grid's rows do.
   const micCols = Math.max(3, ...[...Array(s.rows).keys()].map((r) => stage.filter((x) => x.row === r && x.kind === 'mic').length));
   const micGap = 0;
   const rowW = inner - (bands ? 12 : 0);
-  const micW = Math.floor(clamp(rowW / micCols, 40, FACE_STD + SLOT_PAD));
+  const micW = Math.floor(clamp(rowW / micCols, 40, STEP_MAX));
   // Seven team mics on a narrow phone leave less than a face and its margins: they keep the smallest face.
   return { inner, micGap, micW, maxFace: Math.max(FACE_MIN, Math.min(FACE_MAX, micW - SIDE)), bands, sided: s.slots.some((x) => x.area === 'side') };
 }
@@ -170,10 +165,9 @@ export function layoutSizes(plan: LayoutPlan, face: number) {
   const host = hostFaceOf(face);
   const mainW = Math.round(clamp(plan.inner / 3, 84, 120));
   return {
-    // A smaller face (a short phone) takes a narrower slot: the row closes up, no wide gaps open.
-    mic: { width: Math.min(plan.micW, face + SLOT_PAD), size: face },
+    mic: { width: plan.micW, size: face },
     /** The host alone on its row. */
-    host: { width: Math.max(Math.min(plan.micW, face + SLOT_PAD), host + 2 * SIDE), size: host },
+    host: { width: Math.max(plan.micW, host + 2 * SIDE), size: host },
     /** A couple room's two main seats. */
     main: { width: mainW, size: Math.min(host, mainW - 20) },
   };

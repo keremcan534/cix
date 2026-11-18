@@ -42,10 +42,10 @@ export async function loadBondRequests() {
   return { incoming: r.incoming.map(toBond), outgoing: r.outgoing.map(toBond) };
 }
 
-/** Sends the bond gift with the request; the coins are held until the other person answers. */
-export async function liveRequestBond(to: string, kind: BondKind) {
+/** Sends the bond gift with the request; the coins are held until the other person answers. `room`: sent in that room, which sees the gift. */
+export async function liveRequestBond(to: string, kind: BondKind, room?: string) {
   const id = serverId(to);
-  const r = await once(`bond:${id}:${kind}`, (ref) => api.requestBond(id, kind, ref));
+  const r = await once(`bond:${id}:${kind}`, (ref) => api.requestBond(id, kind, ref, room));
   applyServerUser(r, `Bağ isteği: ${BOND_KINDS[kind].label} (${BOND_KINDS[kind].gift})`);
   return toBond(r.bond);
 }

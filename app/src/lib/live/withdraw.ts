@@ -5,7 +5,7 @@ import { useEffect, useSyncExternalStore } from 'react';
 
 import * as api from '@/lib/api';
 import { applyServerUser, expectReturn, liveMode, once } from '@/lib/live';
-import type { WithdrawMethod, WithdrawStatus } from '@/lib/withdraw-rules';
+import { parseCashOut, type CashOut, type WithdrawMethod, type WithdrawStatus } from '@/lib/withdraw-rules';
 
 export type ServerWithdrawal = {
   id: number;
@@ -21,10 +21,10 @@ export type ServerWithdrawal = {
   decidedAt: string | null;
 };
 type Rules = { minDiamonds: number; maxDiamonds: number; weeklyDiamonds: number; weekUsed: number };
-type ListAnswer = { withdrawals: ServerWithdrawal[]; withdrawable: number; locked: number; rules: Rules };
-export type WithdrawState = { list: ServerWithdrawal[]; withdrawable: number; locked: number; rules: Rules | null; loaded: boolean };
+type ListAnswer = { withdrawals: ServerWithdrawal[]; withdrawable: number; locked: number; rules: Rules; cashOut?: unknown };
+export type WithdrawState = { list: ServerWithdrawal[]; withdrawable: number; locked: number; rules: Rules | null; loaded: boolean; cashOut: CashOut | null };
 
-let state: WithdrawState = { list: [], withdrawable: 0, locked: 0, rules: null, loaded: false };
+let state: WithdrawState = { list: [], withdrawable: 0, locked: 0, rules: null, loaded: false, cashOut: null };
 const listeners = new Set<() => void>();
 const set = (patch: Partial<WithdrawState>) => {
   state = { ...state, ...patch };
@@ -46,7 +46,7 @@ export async function loadWithdrawals() {
   const wasPending = new Set(state.list.filter((w) => w.status === 'pending').map((w) => w.id));
   const back = r.withdrawals.filter((w) => w.status === 'rejected' && wasPending.has(w.id)).reduce((s, w) => s + w.diamonds, 0);
   if (back) expectReturn(back);
-  set({ list: r.withdrawals, withdrawable: r.withdrawable, locked: r.locked, rules: r.rules, loaded: true });
+  set({ list: r.withdrawals, withdrawable: r.withdrawable, locked: r.locked, rules: r.rules, loaded: true, cashOut: parseCashOut(r.cashOut) });
   return r;
 }
 

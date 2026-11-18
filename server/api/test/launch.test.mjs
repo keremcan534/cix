@@ -230,6 +230,8 @@ describe('Bildirimler', () => {
     const gone = `ExponentPushToken[Gone${rnd(8)}]`;
     assert.equal((await call('POST', '/api/push/register', { token: live, platform: 'ios' }, a.session))[1].registered, true);
     await call('POST', '/api/push/register', { token: gone, platform: 'android' }, a.session);
+    // At first only people close to me notify (privacy.mjs pushCloseOnly; push-fcm.test.mjs): this one hears from everyone.
+    assert.equal((await call('PATCH', '/api/me/privacy', { pushCloseOnly: false }, a.session))[0], 200);
 
     await call('POST', '/api/messages', { to: a.user.id, text: 'Akşam odada mısın?', ref: rnd(6) }, b.session);
     assert.ok(await until(() => pushed.some((m) => m.to === live && m.body === 'Akşam odada mısın?')), 'mesaj bildirimi');

@@ -2,7 +2,8 @@
 // app and marks the request paid.
 //
 //   POST /api/wallet/withdraw            { diamonds, method, details: { holder, account }, ref } → { user, replay, withdrawal }
-//   GET  /api/wallet/withdrawals                                       → { withdrawals, withdrawable, locked, rules }
+//   GET  /api/wallet/withdrawals                                       → { withdrawals, withdrawable, locked, rules, cashOut }
+//   GET  /api/wallet/cash-out                                          → { allowed, code, why }   may I take money out (streamer-rule.mjs)
 //   POST /api/wallet/withdrawals/cancel  { id }                        → { user, withdrawal }   (pending only)
 //   GET  /api/admin/withdrawals?status=pending|paid|rejected|cancelled|all   (admin) → { playMoney, rows }
 //   POST /api/admin/withdrawals/decide   { id, approve, note }         (admin) → { withdrawal }
@@ -25,6 +26,7 @@ import { HttpError, auth, claimRef, clientIp, db, int, move, once, readJson, sel
 import { WITHDRAW, diamondValueUsd } from './catalog.mjs';
 import { live } from './live-settings.mjs';
 import { notify } from './push.mjs';
+import { assertCashOut, cashOutOf } from './streamer-rule.mjs';
 import { PLAY_MONEY, diamondState, everHadPlayMoney, spendDiamonds } from './wallet.mjs';
 
 const fmt = (n) => n.toLocaleString('tr-TR');
@@ -107,7 +109,8 @@ export const withdrawRoutes = {
       // A second copy of the same request waits on the row, then finds the ref (a replay).
       await c.query('SELECT 1 FROM users WHERE id = $1 FOR UPDATE', [u.id]);
       await claimRef(c, u.id, 'diamond', b.ref);
-      // The live limits after the ref check, so a retry of a request made before a lower limit still replays.
+      // Who may take money out, and the live limits, after the ref check: a retry of a request that went through replays.
+      await assertCashOut(c, u.id);
       if (n > rules.maxDiamonds) throw new HttpError(400, range);
       if (n > rules.weeklyDiamonds) throw new HttpError(400, `7 günde en çok ${fmt(rules.weeklyDiamonds)} elmas çekilebilir`);
       if ((await c.query("SELECT 1 FROM withdrawals WHERE user_id = $1 AND status = 'pending'", [u.id])).rowCount) {
@@ -134,7 +137,14 @@ export const withdrawRoutes = {
       withdrawable: s.withdrawable,
       locked: s.locked,
       rules: { ...rulesNow(), weekUsed: await weekUsed(db, u.id) },
+      cashOut: await cashOutOf(db, u.id),
     };
+  },
+
+  /** Whether I may take money out: the new app hides Para Çek and Anında bozdur when I may not. */
+  async 'GET /api/wallet/cash-out'(req) {
+    const u = await auth(req);
+    return cashOutOf(db, u.id);
   },
 
   async 'POST /api/wallet/withdrawals/cancel'(req) {

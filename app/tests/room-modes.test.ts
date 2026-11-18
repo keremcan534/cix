@@ -88,7 +88,7 @@ describe('Katalog', () => {
   });
   test('şema içeriği: sinemada ve videoda ortak ekran, seste yok; PK takım yerleşiminde kırmızı/mavi bölgeler eşit', () => {
     assert.ok(layoutsOf('cinema').every((l) => l.layoutSchema.content));
-    assert.ok(layoutsOf('video').every((l) => l.layoutSchema.content));
+    assert.ok(layoutsOf('video').every((l) => !l.layoutSchema.content), 'Video düzeninde YouTube ekranı yok');
     assert.ok(layoutsOf('audio').every((l) => !l.layoutSchema.content));
     const team = layoutById('audio-9-team')!.layoutSchema.slots;
     assert.equal(team.filter((s) => s.team === 'red').length, 4);

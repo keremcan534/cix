@@ -1,14 +1,14 @@
 // Aile: families on the server, so every phone sees the same families, members and chat.
 //
 //   GET  /api/families?q=                     → { families, mine }        (top 50 by this week's power; q filters by name)
-//   GET  /api/family?id=                      → { family, members, myRole, requested, requests }   (no id: mine, or family null)
+//   GET  /api/family?id=                      → { family, members, myRole, requested, requests, rejoinAt, leaveDays }   (no id: mine, or family null)
 //   POST /api/families      { name, ref }     → { family, user, replay }  (founding fee FAMILY_COST coins)
 //   POST /api/family/join   { id, join? }     → { joined } | { requested } (join: false takes my request back)
 //   POST /api/family/request { userId, accept } → { members }             (the leader or a helper)
 //   POST /api/family/invite { userId }        → { invited }               (the leader or a helper: someone with no family)
 //   GET  /api/family/invites                  → { invites }               (mine, open families only, newest first)
 //   POST /api/family/invite/answer { id, accept } → { joined }            (accept joins; decline drops the invite)
-//   POST /api/family/leave                    → { left: true }
+//   POST /api/family/leave                    → { left: true, rejoinAt }   (rejoinAt: a streamer's wait, else null)
 //   POST /api/family/kick   { userId }        → { members }               (the leader: anyone; a helper: members)
 //   POST /api/family/role   { userId, role }  → { members }               (the leader; role 'owner' hands the family over)
 //   POST /api/family/settings { announcement?, joinMode?, tag?, theme? } → { family }   (announcement: leader or helper; the rest: leader)
@@ -19,12 +19,16 @@
 // joined (gift_events), so it can't be bought or faked apart from real gifts; its level and size limit follow from
 // that (FAMILY_XP, the same table as the app's data/rules). When the leader leaves, the earliest helper (else the
 // earliest member) leads; the last one out closes the family. Names, announcements and chat pass the contact
-// filter, and a mute on public text (sanctions 'post') stops chatting.
+// filter, and a mute on public text (sanctions 'post') stops chatting. A streamer (streamer-rule.mjs) who leaves of
+// their own accord can't join or found another family for family_rejoin_days (Canlı ayarlar, 90 to begin with); going
+// back to the family they left is allowed, and someone the family put out doesn't wait.
 import { HttpError, auth, blockedBetween, db, int, limit, once, publicText, readJson, tx, userId } from './core.mjs';
 import { notify } from './push.mjs';
 import { assertMay } from './sanctions.mjs';
 import { spendCoins } from './wallet.mjs';
 import { FAMILY_THEMES } from './family-rules.mjs';
+import { live } from './live-settings.mjs';
+import { isStreamer } from './streamer-rule.mjs';
 
 /** The founding fee (app: data/kabile KABILE_CREATE_COST). */
 export const FAMILY_COST = 500;
@@ -170,6 +174,21 @@ export async function familyOf(uid, q = db) {
   return r.rowCount ? { id: String(r.rows[0].id), name: r.rows[0].name, role: r.rows[0].role } : null;
 }
 
+/** When `uid` may join another family again; null when they may now. `family`: the one they want (the one they left is open to them). */
+async function rejoinAt(q, uid, family = null) {
+  const r = await q.query('SELECT family_id, until FROM family_cooldowns WHERE user_id = $1 AND until > now()', [uid]);
+  const row = r.rows[0];
+  return row && (family === null || Number(row.family_id) !== Number(family)) ? row.until : null;
+}
+const dayText = (d) => new Date(d).toLocaleDateString('tr-TR', { timeZone: 'Europe/Istanbul', day: 'numeric', month: 'long', year: 'numeric' });
+/** Refuses a move into another family while the wait runs. `self`: the person is asking themself. */
+async function assertRejoin(q, uid, family, self = true) {
+  const until = await rejoinAt(q, uid, family);
+  if (!until) return;
+  const text = self ? `Aileden kendi isteğinle ayrıldın: ${dayText(until)} tarihine kadar başka bir aileye katılamazsın` : `Bu yayıncı ${dayText(until)} tarihine kadar başka bir aileye katılamaz`;
+  throw Object.assign(new HttpError(409, text), { extra: { code: 'family_rejoin_wait', until } });
+}
+
 const managers = async (id) =>
   (await db.query("SELECT user_id FROM family_members WHERE family_id = $1 AND role IN ('owner', 'helper')", [id])).rows.map((x) => x.user_id);
 
@@ -195,7 +214,8 @@ export const familyRoutes = {
     const mine = await myMembership(me.id);
     const raw = url.searchParams.get('id');
     const id = raw ? familyId(raw) : mine ? Number(mine.family_id) : null;
-    if (!id) return { family: null, members: [], myRole: null, requested: false, requests: [] };
+    const wait = await rejoinAt(db, me.id);
+    if (!id) return { family: null, members: [], myRole: null, requested: false, requests: [], rejoinAt: wait, leaveDays: null };
     const family = await familyView(id);
     const myRole = mine && Number(mine.family_id) === id ? mine.role : null;
     const requested = !myRole && (await db.query('SELECT 1 FROM family_requests WHERE family_id = $1 AND user_id = $2', [id, me.id])).rowCount > 0;
@@ -205,6 +225,9 @@ export const familyRoutes = {
       myRole,
       requested,
       requests: myRole === 'owner' || myRole === 'helper' ? await requestsOf(id) : [],
+      rejoinAt: wait,
+      // A streamer's wait if they left this family now, for the question the app asks first; null: none.
+      leaveDays: myRole && live().familyRejoinDays > 0 && (await isStreamer(db, me.id)) ? live().familyRejoinDays : null,
     };
   },
 
@@ -217,6 +240,7 @@ export const familyRoutes = {
       // The same request twice at once: the second waited for the first and finds its fee already taken.
       if ((await c.query("SELECT 1 FROM ledger WHERE user_id = $1 AND currency = 'coin' AND ref = $2", [me.id, b.ref])).rowCount) return;
       if (await myMembership(me.id, c)) throw new HttpError(409, 'Zaten bir ailedesin');
+      await assertRejoin(c, me.id, null);
       if ((await c.query('SELECT 1 FROM families WHERE lower(name) = lower($1) AND closed_at IS NULL', [name])).rowCount)
         throw new HttpError(409, 'Bu isimde bir aile var');
       await spendCoins(c, me.id, FAMILY_COST, `Aile kurma: ${name}`, b.ref);
@@ -239,6 +263,7 @@ export const familyRoutes = {
     const out = await tx(async (c) => {
       const f = await lockFamily(c, id);
       if (await myMembership(me.id, c)) throw new HttpError(409, 'Zaten bir ailedesin');
+      await assertRejoin(c, me.id, id);
       await assertRoom(c, id);
       if (f.join_mode === 'open') {
         await addMember(c, id, me.id);
@@ -267,6 +292,7 @@ export const familyRoutes = {
       if (!r.rowCount) throw new HttpError(404, 'Bu istek artık yok');
       if (b.accept !== true) return null;
       if (await myMembership(who, c)) throw new HttpError(409, 'Bu kişi artık başka bir ailede');
+      await assertRejoin(c, who, id, false);
       await assertRoom(c, id);
       await addMember(c, id, who);
       return f.name;
@@ -291,6 +317,7 @@ export const familyRoutes = {
       await roleIn(c, me.id, id, ['owner', 'helper']);
       if (!(await c.query('SELECT 1 FROM users WHERE id = $1 AND deleted_at IS NULL', [who])).rowCount) throw new HttpError(404, 'Kullanıcı bulunamadı');
       if (await myMembership(who, c)) throw new HttpError(409, 'Bu kişi zaten bir ailede');
+      await assertRejoin(c, who, id, false);
       await assertRoom(c, id);
       const r = await c.query(
         `INSERT INTO family_invites (family_id, user_id, invited_by) VALUES ($1, $2, $3)
@@ -335,6 +362,7 @@ export const familyRoutes = {
       const inv = await c.query('DELETE FROM family_invites WHERE family_id = $1 AND user_id = $2', [id, me.id]);
       if (!inv.rowCount) throw new HttpError(404, 'Bu davet artık yok');
       if (await myMembership(me.id, c)) throw new HttpError(409, 'Zaten bir ailedesin');
+      await assertRejoin(c, me.id, id);
       await assertRoom(c, id);
       await addMember(c, id, me.id);
       return f.name;
@@ -345,9 +373,21 @@ export const familyRoutes = {
 
   async 'POST /api/family/leave'(req) {
     const me = await auth(req);
-    const gone = await tx((c) => leaveFamily(c, me.id));
-    if (!gone) throw new HttpError(409, 'Bir ailede değilsin');
-    return { left: true };
+    const days = live().familyRejoinDays;
+    const out = await tx(async (c) => {
+      // Asked before they leave: leading the family may be what makes them a streamer.
+      const wait = days > 0 && (await isStreamer(c, me.id));
+      const family = await leaveFamily(c, me.id);
+      if (!family || !wait) return { family, until: null };
+      const r = await c.query(
+        `INSERT INTO family_cooldowns (user_id, family_id, until) VALUES ($1, $2, now() + make_interval(days => $3::int))
+         ON CONFLICT (user_id) DO UPDATE SET family_id = EXCLUDED.family_id, until = EXCLUDED.until, created_at = now() RETURNING until`,
+        [me.id, family, days],
+      );
+      return { family, until: r.rows[0].until };
+    });
+    if (!out.family) throw new HttpError(409, 'Bir ailede değilsin');
+    return { left: true, rejoinAt: out.until };
   },
 
   async 'POST /api/family/kick'(req) {

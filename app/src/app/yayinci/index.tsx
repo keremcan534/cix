@@ -17,6 +17,8 @@ import { IS_DEMO } from '@/lib/build';
 import { liveMode, oneOnOneOpen } from '@/lib/live';
 import { useLiveCallStats } from '@/lib/live/call-log';
 import { useLiveEarnings } from '@/lib/live/earnings';
+import { useServerWithdrawals } from '@/lib/live/withdraw';
+import { offersCashOut } from '@/lib/withdraw-rules';
 import { RULES, pct, settlement, usd } from '@/data/rules';
 import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
@@ -101,6 +103,8 @@ function Dashboard() {
   const diamonds = fromServer ? server.diamonds : app.diamonds;
   const free = fromServer ? server.withdrawable : app.withdrawableDiamonds;
   const locked = fromServer ? server.locked : app.lockedDiamonds;
+  // Men's accounts don't take money out (server streamer-rule.mjs).
+  const cashOut = offersCashOut(live, useServerWithdrawals());
   // The join window runs from sign-up; once it has passed the host is already on the management account.
   const [joinedDays] = useState(() => (me.joinedAt ? Math.floor((Date.now() - new Date(me.joinedAt).getTime()) / 86_400_000) : 0));
   const joinDaysLeft = Math.max(0, RULES.hostAgencyJoinDays - joinedDays);
@@ -131,24 +135,26 @@ function Dashboard() {
           <View style={styles.balanceSplit}>
             <View style={styles.balancePart}>
               <Ionicons name="lock-open" size={13} color="#fff" />
-              <Text style={styles.balancePartText} numberOfLines={1}>Çekilebilir {free.toLocaleString('tr-TR')}</Text>
+              <Text style={styles.balancePartText} numberOfLines={1}>{cashOut ? 'Çekilebilir' : 'Kullanılabilir'} {free.toLocaleString('tr-TR')}</Text>
             </View>
             <View style={styles.balancePart}>
               <Ionicons name="lock-closed" size={13} color="#fff" />
               <Text style={styles.balancePartText} numberOfLines={1}>Kilitli {locked.toLocaleString('tr-TR')}</Text>
             </View>
           </View>
-          <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
-            <Pressable style={styles.balanceBtn} onPress={() => router.push('/yayinci/cek')}>
-              <Ionicons name="cash-outline" size={18} color="#fff" />
-              <Text style={styles.balanceBtnText}>Para çek</Text>
-            </Pressable>
-            {/* Live: /coins-bank is the server's Jeton Noktası, where the diamonds are sold to a bank. */}
-            <Pressable style={styles.balanceBtn} onPress={exchange}>
-              <Ionicons name="flash-outline" size={18} color="#fff" />
-              <Text style={styles.balanceBtnText}>Anında bozdur</Text>
-            </Pressable>
-          </View>
+          {cashOut && (
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
+              <Pressable style={styles.balanceBtn} onPress={() => router.push('/yayinci/cek')}>
+                <Ionicons name="cash-outline" size={18} color="#fff" />
+                <Text style={styles.balanceBtnText}>Para çek</Text>
+              </Pressable>
+              {/* Live: /coins-bank is the server's Jeton Noktası, where the diamonds are sold to a bank. */}
+              <Pressable style={styles.balanceBtn} onPress={exchange}>
+                <Ionicons name="flash-outline" size={18} color="#fff" />
+                <Text style={styles.balanceBtnText}>Anında bozdur</Text>
+              </Pressable>
+            </View>
+          )}
         </LinearGradient>
 
         <View style={[styles.affil, { borderColor: agency ? colors.green : colors.gold }]}>

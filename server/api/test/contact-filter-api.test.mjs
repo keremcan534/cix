@@ -123,6 +123,7 @@ describe('iletişim filtresi: uçlar', () => {
     // Withdrawal details are for the payout and only staff read them.
     for (let i = 0; i < 10; i++) await ok(call('POST', '/api/wallet/test-topup', { amount: 10_000, ref: ref() }, a.session));
     await ok(call('POST', '/api/gifts/send', { to: b.user.id, giftId: 'g8', count: 5, ref: ref() }, a.session));
+    await h.sql.query("UPDATE users SET gender = 'Kadın' WHERE id = $1", [b.user.id]); // streamer-rule.mjs: who may take money out
     const w = await ok(
       call('POST', '/api/wallet/withdraw', { diamonds: 50_000, method: 'iban', details: { holder: 'Burak Demir', account: 'TR33 0006 1005 1978 6457 8413 26' }, ref: ref() }, b.session),
     );

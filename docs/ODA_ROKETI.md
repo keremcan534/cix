@@ -40,6 +40,7 @@ Oyun Salonu'ndaki Yörünge ("patlamadan önce çık") ayrı bir oyundur; deği�
 - **Her seviye:**
   - Hedef (jeton, 1.000–100.000.000). Sayfa, gün içinde toplam kaç jetonda kalkacağını yazar.
   - Ödüller: tür (jeton ya da mağaza eşyası), miktar ya da eşya ve gün, kaç kişiye. En çok 6 ödül, ödül başına en çok 50 kişi. Sıra okla değişir.
+- **Kalkış videoları:** her seviyeye ayrı SVGA yüklenir (saydam WebM, ProRes .mov ya da hazır yığılmış MP4 de olur, en çok 15 saniye). Sunucu hediyelerdeki gibi telefon videosuna çevirir. Video yoksa ya da telefona inmediyse Roket hediyesinin resmi uçar. Yeni APK gösterir.
 - **Son kalkışlar:** zaman, oda, seviye, hedef, kazanan sayısı.
 - **Yetki:** `app.rocket` (finans yöneticisi; süper yönetici). Her kayıt denetim kaydına yazılır (önce ve sonra).
 - Kaydedilen ayar hemen geçerli. O gün kalkmış seviyeler kalktıkları anki ödülleriyle kalır.

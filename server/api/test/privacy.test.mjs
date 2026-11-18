@@ -31,6 +31,37 @@ async function streamer(name) {
   return a;
 }
 
+describe('Mesajlar tercihleri', () => {
+  test('sesli ve görüntülü arama ayrı ayrı kapanır; arayan nedenini görür, geri aranmak da kapalıdır', async () => {
+    const man = await signUp('Tercih Arayan');
+    const star = await streamer('Tercih Yaren');
+    await q("INSERT INTO gift_events (sender, recipient, gift_id, count, unit_price, total, place, ref) VALUES ($1, $2, 'gul', 1, 100000, 100000, 'chat', $3)", [man.user.id, star.user.id, rnd(6)]);
+    assert.equal((await call('PATCH', '/api/me/privacy', { voiceCalls: 'hayır' }, star.session))[0], 400, 'yalnız açık ya da kapalı');
+
+    await setPrivacy(star.session, { voiceCalls: false });
+    let p = await pair(man.session, star.user.id);
+    assert.equal(p.calls.voice.open, false);
+    assert.equal(p.calls.voice.why, 'Tercih Yaren şu an sesli arama kabul etmiyor.');
+    assert.equal(p.calls.video.open, true, 'görüntülü açık kalır');
+    const [st, j] = await call('POST', '/api/calls', { to: star.user.id, mode: 'voice', ref: rnd(6) }, man.session);
+    assert.equal(st, 403);
+    assert.equal(j.code, 'locked');
+    assert.equal((await q('SELECT count(*)::int AS n FROM calls WHERE caller = $1', [man.user.id])).rows[0].n, 0, 'arama çalmaz');
+
+    await setPrivacy(star.session, { voiceCalls: true, videoCalls: false });
+    p = await pair(man.session, star.user.id);
+    assert.equal(p.calls.voice.open, true);
+    assert.equal(p.calls.video.why, 'Tercih Yaren şu an görüntülü arama kabul etmiyor.');
+
+    // Her own calls stay open: the choice is about who reaches her.
+    await setPrivacy(star.session, { voiceCalls: false, videoCalls: false });
+    assert.equal((await pair(star.session, man.user.id)).calls.voice.open, true, 'kendisi arayabilir');
+    // "Beni kimler arayabilir?" speaks first.
+    await setPrivacy(star.session, { callsFrom: 'nobody' });
+    assert.equal((await pair(man.session, star.user.id)).calls.voice.why, 'Tercih Yaren şu an arama kabul etmiyor.');
+  });
+});
+
 describe('Gizlilik ayarları', () => {
   test('varsayılanlar, değiştirmek, geçersiz değer; varsayılana dönen satır silinir, hesapla gider', async () => {
     const a = await signUp('Ayar A');
@@ -42,6 +73,10 @@ describe('Gizlilik ayarları', () => {
       dmFrom: 'everyone',
       callsFrom: 'everyone',
       invitesFrom: 'everyone',
+      voiceCalls: true,
+      videoCalls: true,
+      messagePush: true,
+      pushCloseOnly: true,
     });
     const p = await setPrivacy(a.session, { showOnline: false, dmFrom: 'mutual' });
     assert.equal(p.showOnline, false);

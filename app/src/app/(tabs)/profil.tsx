@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router, useLocalSearchParams, type Href } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -26,7 +26,6 @@ import { IS_DEMO } from '@/lib/build';
 import { casinoVisible, useGames } from '@/lib/games';
 import { liveMode, myServerId, oneOnOneOpen, useServerRooms } from '@/lib/live';
 import { liveSignOut } from '@/lib/live/account';
-import { useIsAdmin } from '@/lib/live/admin';
 import { loadMyList } from '@/lib/live/follows';
 import { useMeStats } from '@/lib/live/me-stats';
 import { splitTies, tiesOf, type TieSide } from '@/lib/follow-ties';
@@ -58,14 +57,11 @@ const SUPPORT: Item[] = [
   { icon: 'shield-checkmark-outline', label: 'Güvenlik Merkezi', onPress: () => router.push('/ayarlar') },
   { icon: 'settings-outline', label: 'Ayarlar', onPress: () => router.push('/ayarlar') },
 ];
-/** Agency applications on the server are approved in Ajans Merkezi › Onaylar (platform admins). */
-const CENTER: Item = { icon: 'briefcase-outline', label: 'Ajans Merkezi (başvuru onayları)', onPress: () => router.push('/ajans/merkez' as Href) };
 
 export default function ProfileScreen() {
   const { coins, isHost, following, blocked, me, logout, vipLevel, equipped, wealthLevel, paidGames, charmLevel, agencyId, myRoom, svipLevel, nobleTier, inventory, vipDays } = useApp();
   const { colors, semantic } = useTheme();
   const styles = useStyles();
-  const isAdmin = useIsAdmin();
   const { casino } = useGames();
   const specialId = cosmeticById(equipped.specialId);
   const noble = nobleInfo(nobleTier);
@@ -284,7 +280,7 @@ export default function ProfileScreen() {
         )}
 
         <Group items={main.filter(visible)} />
-        <Group items={[...GROWTH.filter(visible), ...(isAdmin ? [CENTER] : [])]} />
+        <Group items={GROWTH.filter(visible)} />
         <Group items={SUPPORT} />
 
         <Pressable style={styles.logout} onPress={() =>

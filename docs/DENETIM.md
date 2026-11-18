@@ -96,6 +96,7 @@ modunda olması, hata takibi olmaması ve kırık kodun birleşmeden önce yakal
 
 ## 🟠 Önemli: ilk haftalarda
 
+0. **Para çekme kuralı cinsiyet beyanına dayanıyor (siz: karar):** Erkek hesaplar 18 Kasım'dan beri para çekemiyor ([`YAYINCI_KURALLARI.md`](YAYINCI_KURALLARI.md)). Cinsiyet hesap sahibinin kendi seçimi: kendini kadın seçen erkek hesap kuralı aşar. Ödeme öncesi kimlik kontrolü bu açığı kapatır.
 1. **Reklam ölçümü yok (siz + Claude):** Uygulamada analitik ya da yükleme kaynağı ölçümü yok. Reklam ekibi hangi
    reklamın kullanıcı ve ödeme getirdiğini göremez. Firebase Analytics ve Google Ads dönüşümü, ya da AppsFlyer / Adjust
    gibi bir ölçüm hizmeti kurulmalı.
@@ -160,3 +161,7 @@ modunda olması, hata takibi olmaması ve kırık kodun birleşmeden önce yakal
 2. **Açılış listesi:** Yayın günü adım adım (Kritik 3); test sunucusu kurulumu (Kritik 6).
 3. **Uçtan uca testler ve gece kontrolü** (Sonra).
 4. Sizden gelecek hesaplar geldikçe: Sentry, analitik, push, görsel moderasyon bağlantıları.
+
+## Mesaj bildirimi varsayılanı (18 Kasım 2026, sahip kararı)
+
+Mesajlar'daki "Yalnızca samimi kişilerden bildirim al" seçeneği herkeste açık başlar. Bu yüzden karşılıklı takipleşmeyen ve aralarında kalp seviyesi olmayan birinin mesajı telefona bildirim düşürmez. Yayıncılar, ilk kez yazıp ücret ödeyen kişinin mesajını uygulamayı açınca görür; yayıncı geliri düşerse ilk bakılacak yer burasıdır. Eski APK bu seçeneği göstermediği için eski APK kullanan kişi kapatamaz. Varsayılan `server/api/privacy.mjs` ve `migrations/095_contact_prefs.sql` içindedir.

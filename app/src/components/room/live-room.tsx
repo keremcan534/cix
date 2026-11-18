@@ -89,7 +89,8 @@ import { useRoomLook } from '@/components/room/decor';
 import { StageLayout } from '@/components/room/stage-layout';
 import { FitStage } from '@/components/room/fit-stage';
 import { useRoomBonds } from '@/components/room/room-bonds';
-import { BOND_KINDS, bondTint, bubbleBondOf, jointEntries, micLinkOf, roomBondKey, type JointState, type RoomBond } from '@/data/bonds';
+import { BOND_KINDS, bondTint, bubbleBondOf, jointEntries, micLinkOf, roomBondKey, type BondKind, type JointState, type RoomBond } from '@/data/bonds';
+import { liveRequestBond } from '@/lib/live/bonds';
 import { Avatar } from '@/components/ui';
 import { AGENCIES } from '@/data/agency';
 import { BOSS_SEAT_MIN_LEVEL, COSMETICS, MUSIC_CATALOG, STANDARD_EMOJI, adminCapacity, cosmeticById, djCapacity, memberLimit, micCapacity, roomIdText, roomLevel, roomTypeInfo, ROOM_LEVEL_REWARDS, type RoomTheme, type Track } from '@/data/catalog';
@@ -412,7 +413,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     const entryItem = worn && (!worn.retired || worn.remote) ? worn : undefined;
     const ride = cosmeticById(equipped.ride);
     const noble = nobleInfo(nobleTier);
-    if (!entryItem && !ride && !GATES.entryBanner(svipLevel, nobleTier)) return null;
+    // One taken out of the shop still brings the plain banner, as on everyone else's phone (lib/room-entrance).
+    if (worn?.kind !== 'entry' && !ride && !GATES.entryBanner(svipLevel, nobleTier)) return null;
     const who = `${noble ? `${noble.emoji} ${noble.name} ` : ''}${svipLevel ? `VIP ${svipLevel} · ` : ''}${ME.name}`;
     const text = `${entryItem?.emoji ?? '✨'} ${ride ? `${ride.emoji} ${ride.name} ile ` : ''}${who} odaya girdi!`;
     const badge = [noble?.emoji, svipLevel ? `VIP ${svipLevel}` : ''].filter(Boolean).join(' ') || undefined;
@@ -1078,9 +1080,15 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       if (v.line) addMsg({ system: true, text: `${name} odaya girdi` });
       const sid = toServer(uid);
       if (!v.effect || !sid) return;
-      void loadLooks([sid]).then(() => {
+      // Read now, not from a copy of a few minutes ago: what they wear may be new. A read that fails is tried once more.
+      const playEntry = () => {
         const show = entryShowOf(lookOf(sid), name, userById(uid).avatar);
         if (show) queueEntry({ id: `in:${uid}:${j.at}`, who: [uid], show });
+      };
+      const asked = nowMs();
+      void loadLooks([sid], asked).then(() => {
+        if (lookOf(sid)) return playEntry();
+        setTimeout(() => void loadLooks([sid], asked).then(playEntry), 1_500);
       });
     },
     onLeave: (uid, name) => {
@@ -2742,6 +2750,27 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     after(n);
     return n > 0;
   };
+  /**
+   * A bond gift from the Aile ve Dost shelf: a bond request (server/api/bonds.mjs). The coins wait until they answer and
+   * come back if they refuse; the room sees the gift go.
+   */
+  const sendBondGift = (gift: Gift, to: string) => {
+    setGiftOpen(false);
+    if (offlineBlocked() || blockedFeature('gifts')) return;
+    const kind = gift.id.slice('bag-'.length) as BondKind;
+    const sent = () => {
+      successHaptic();
+      showGift('me', [to], gift, 1);
+      addMsg({ system: true, text: `🤝 ${userById(to).name} kabul edince ${BOND_KINDS[kind].label} bağınız kurulur; kabul etmezse jetonun geri döner.` });
+    };
+    if (real)
+      return void liveRequestBond(to, kind, id).then(sent, (e) => {
+        errorHaptic();
+        showAlert('Bağ isteği gönderilemedi', errorText(e));
+      });
+    if (liveMode()) return showAlert('Hediye gönderilemedi', 'Bu örnek odada hediye gönderilemez. Hediyeleri gerçek odalarda gönderebilirsin.');
+    if (app.spendCoins(gift.price, `Bağ isteği: ${BOND_KINDS[kind].label} (${gift.name})`)) sent();
+  };
   /** The wheel's next send of a coin gift, to whoever of its people is still in the room; true when all got it. */
   const giftAgain = async (spec: ComboSpec) => {
     const gift = giftById(spec.giftId);
@@ -3966,6 +3995,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         coins={coins}
         onSend={sendGift}
         onSendLucky={sendLuckyGift}
+        onSendBond={sendBondGift}
       />
       <ActionSheet visible={!!sheet} title={sheet?.title} options={sheet?.options ?? []} onClose={() => (setSheet(null), backToMenu())} />
       {reporting.sheet}
@@ -4171,7 +4201,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       {panel === 'rocket' && roomRocket.rocket && (
         <RocketSheet rocket={roomRocket.rocket} onClose={closePanel} onGift={() => (setPanel(null), setGiftTo(null), setGiftOpen(true))} />
       )}
-      {roomRocket.show && !settings.effectsOff && <RocketShow news={roomRocket.show} still={settings.reduceMotion} onDone={roomRocket.next} />}
+      {roomRocket.show && !settings.effectsOff && <RocketShow key={`${roomRocket.show.launch}:${roomRocket.show.event}`} news={roomRocket.show} still={settings.reduceMotion} muted={fxMuted} onDone={roomRocket.next} />}
       {real && panel === 'bag' && (
         <LuckyBagSheet
           visible

@@ -193,6 +193,7 @@ describe('Jeton Noktası', () => {
     const host = await signUp('Yayıncı');
     await buy(fan.session, 'coins_5000');
     assert.equal((await gift(fan.session, host, 5000))[0], 200);
+    await h.sql.query("UPDATE users SET gender = 'Kadın' WHERE id = $1", [host.user.id]); // streamer-rule.mjs: who may take money out
     const sell = (to, diamonds, ref = rnd(6)) => call('POST', '/api/jeton/sell-diamonds', { bank: to.user.id, diamonds, ref }, host.session);
     assert.equal((await sell(bank, 1000))[0], 409, 'kilitli');
     await unlock(host);

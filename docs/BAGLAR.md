@@ -4,6 +4,8 @@
 
 Sekmede iki bölüm var: **Çift** ve **Aile ve Dost** (diğer yedi tür). Aile ve Dost boşken yedi tür resmi ve fiyatıyla görünür; başkasının profilinde birine dokununca fiyat bir kez sorulur ve istek gider. Doluyken bağların üstünde türlerin adları yazar. Sohbetteki **kalp** başka bir şeydir: iki kişinin yakınlığı, hediye ve sohbetle dolar, sessiz kalınca düşer (`one-on-one.mjs`, [`SUNUCU.md`](SUNUCU.md)).
 
+Odadaki hediye panelinde **Aile ve Dost** rafı var: Koruma Kartı ve yedi bağ hediyesi. Bu raftan gönderilen bağ hediyesi bağ isteğidir: jeton bekletilir, kabul edilince bağ kurulur, reddedilirse geri döner. Tek kişiye, birer birer gider. Panelde Hediyeler › Aile ve Dost rafından adı, ikonu ve videosu değişir; fiyatı bu sayfadaki kuraldan gelir. Eski APK'lar bu rafı görmez; Koruma Kartı onlarda İkili rafında kalır.
+
 ## Kurallar
 
 | Tür | Bağ hediyesi | Fiyat | Bir kişide en fazla |

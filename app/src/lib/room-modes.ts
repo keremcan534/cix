@@ -306,7 +306,7 @@ function controlled(roomId: string, actorId: string, action: string): { ok: fals
     log(roomId, actorId, `Reddedildi: ${action}`, s.playback?.videoId ?? '-', false, why);
     return fail(why);
   }
-  if (!layoutById(s.layoutId)?.layoutSchema.content) return fail('Bu düzende ortak ekran yok. Video veya Sinema Salonu düzeni seç.');
+  if (!layoutById(s.layoutId)?.layoutSchema.content) return fail('Bu düzende ortak ekran yok. Sinema Salonu düzeni seç.');
   return { ok: true, s };
 }
 /** Opens a YouTube link for the whole room (validated; only the video id is stored). Starts playing. */

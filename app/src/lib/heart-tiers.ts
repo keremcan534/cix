@@ -96,10 +96,10 @@ export function nextLookText(level: number): string | null {
   return next?.brings ? `${lvAt(next.from)} ${next.brings}` : null;
 }
 
-/** "Kalp Lv.7 · Tutku" (level 0 has no look name). */
+/** "Sohbet Kalbi Lv.7 · Tutku" (level 0 has no look name): the chat's heart, named apart from the relationship's. */
 export const heartTitle = (level: number) => {
   const l = clampLevel(level);
-  return l === 0 ? 'Kalp Lv.0' : `Kalp Lv.${l} · ${heartTier(l).name}`;
+  return l === 0 ? 'Sohbet Kalbi Lv.0' : `Sohbet Kalbi Lv.${l} · ${heartTier(l).name}`;
 };
 
 /** Whether the heart moves: its look moves, and neither "Animasyonları azalt" nor "Efektleri kapat" is on. */

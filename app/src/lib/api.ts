@@ -953,7 +953,7 @@ export type ServerBond = {
 };
 export const bonds = (user?: string) => call<{ hidden: boolean; bonds: ServerBond[] }>('GET', user ? `/api/bonds?user=${encodeURIComponent(user)}` : '/api/bonds');
 export const bondRequests = () => call<{ incoming: ServerBond[]; outgoing: ServerBond[] }>('GET', '/api/bonds/requests');
-export const requestBond = (to: string, kind: string, ref = newRef()) => call<{ user: ServerUser; replay: boolean; bond: ServerBond }>('POST', '/api/bonds/request', { to, kind, ref });
+export const requestBond = (to: string, kind: string, ref = newRef(), room?: string) => call<{ user: ServerUser; replay: boolean; bond: ServerBond }>('POST', '/api/bonds/request', { to, kind, ref, ...(room ? { room } : {}) });
 export const respondBond = (id: number, accept: boolean) => call<{ bond: ServerBond }>('POST', '/api/bonds/respond', { id, accept }).then((r) => r.bond);
 export const withdrawBond = (id: number) => call<{ bond: ServerBond }>('POST', '/api/bonds/withdraw', { id }).then((r) => r.bond);
 export const endBond = (id: number) => call<{ bond: ServerBond }>('POST', '/api/bonds/end', { id }).then((r) => r.bond);
@@ -1058,6 +1058,10 @@ export type ServerPrivacy = {
   dmFrom: 'everyone' | 'following' | 'mutual';
   callsFrom: 'everyone' | 'following' | 'nobody';
   invitesFrom: 'everyone' | 'following' | 'nobody';
+  voiceCalls: boolean;
+  videoCalls: boolean;
+  messagePush: boolean;
+  pushCloseOnly: boolean;
 };
 export const myPrivacy = () => call<{ privacy: ServerPrivacy }>('GET', '/api/me/privacy').then((r) => r.privacy);
 /** Changes some settings; the answer is all of them as the server has them now. */

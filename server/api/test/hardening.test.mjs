@@ -90,6 +90,7 @@ describe('yayın sunucusu', () => {
 
   test('para çekme: gerçek parayla sunucuda yönetici öder', async () => {
     await ok(call('POST', '/api/gifts/send', { to: host.user.id, giftId: 'c3', count: 1, ref: ref() }, buyer.session));
+    await h.sql.query("UPDATE users SET gender = 'Kadın' WHERE id = $1", [host.user.id]); // streamer-rule.mjs: who may take money out
     const w = (await ok(call('POST', '/api/wallet/withdraw', { diamonds: 50_000, method: 'iban', details: { holder: 'Ada Yılmaz', account: 'DE89 3704 0044 0532 0130 00' }, ref: ref() }, host.session))).withdrawal;
     assert.equal(w.usd, 10);
     const list = await ok(call('GET', '/api/admin/withdrawals', null, admin.session));
@@ -203,6 +204,7 @@ describe('yayın sunucusu', () => {
     await ok(buyGoogle(buyer.session, 'coins_100000', `paid${rnd(12)}`));
     await ok(call('POST', '/api/gifts/send', { to: host.user.id, giftId: 'c3', count: 1, ref: ref() }, buyer.session));
     await h.credit((await h.account('Eski test')).user.id, 10);
+    await h.sql.query("UPDATE users SET gender = 'Kadın' WHERE id = $1", [host.user.id]); // streamer-rule.mjs: who may take money out
     const w = (await ok(call('POST', '/api/wallet/withdraw', { diamonds: 50_000, method: 'other', details: { holder: 'Ada Yılmaz', account: 'Wise: ada@example.com' }, ref: ref() }, host.session))).withdrawal;
     const row = (await ok(call('GET', '/api/admin/withdrawals', null, admin.session))).rows.find((x) => x.id === w.id);
     assert.equal(row.payable, false);
