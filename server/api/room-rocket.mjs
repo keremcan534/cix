@@ -30,6 +30,7 @@ import { keyOf, removeFiles, sendFile } from './media.mjs';
 import { roomPacket } from './live.mjs';
 import { panelDetail } from './panel.mjs';
 import { notify } from './push.mjs';
+import { systemNotice } from './system-notices.mjs';
 import { DEFAULT_ROCKET, PRIZE_ITEM_KINDS, ROCKET_LIMITS, checkRocket, drawWinners, isRocketError, levelEnds, levelsFull, prizeSlots, splitFuel } from './room-rocket-rules.mjs';
 // rooms.mjs reaches this file through gifts.mjs; its functions are only used inside handlers, after both have loaded.
 import { liveKitName } from './rooms.mjs';
@@ -220,7 +221,7 @@ export async function settleLaunch(id) {
         }
       }
       await c.query('INSERT INTO room_rocket_wins (launch_id, slot, user_id, prize, ref, outcome) VALUES ($1, $2, $3, $4, $5, $6)', [l.id, n, user, JSON.stringify(prize), ref, outcome]);
-      wins.push({ user, prize, outcome });
+      wins.push({ user, prize, outcome, ref });
     }
     await c.query('UPDATE room_rocket_launches SET paid_at = now(), winners = $2 WHERE id = $1', [l.id, wins.length]);
     return { launch: { id: Number(l.id), roomId: l.room_id, level: l.level }, wins };
@@ -242,6 +243,23 @@ async function announcePaid(done) {
   });
   for (const w of wins.filter((x) => x.outcome === 'paid')) {
     notify([w.user], { title: 'Oda roketi', body: `Lv.${launch.level} roketinden ${prizeText(w.prize)} kazandın`, data: { type: 'rocket', room: launch.roomId } });
+    // SimilarClub Sistem: only a prize that was really given (the push above rings already).
+    const item = w.prize.kind === 'item';
+    await systemNotice({
+      target: w.user,
+      category: 'rocket',
+      ref: w.ref ?? `rocket:${launch.id}:${w.user}`,
+      title: '🚀 Roket Ödülü',
+      body: [
+        'Katıldığın roket etkinliği tamamlandı.',
+        `Etkinlik: Oda roketi Lv.${launch.level}`,
+        `Kazandığın ödül: ${prizeText(w.prize)}`,
+        item ? 'Ödülün Çantam bölümüne eklendi.' : 'Ödülün hesabına başarıyla tanımlandı.',
+      ].join('\n'),
+      data: { launch: launch.id, level: launch.level, room: launch.roomId, prize: w.prize, status: 'done' },
+      link: item ? '/canta' : '/cuzdan',
+      push: false,
+    });
   }
 }
 

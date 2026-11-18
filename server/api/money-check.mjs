@@ -15,6 +15,9 @@
 //            a bond, a Şanslı çanta and Çantam paid the coins before, or not in coins
 //   paid     every paid message or call minute (paid_events) took its coins from the payer and, when someone earns
 //            it, gave them the same in diamonds
+//   holds    every paid message that waited for an answer (message_holds) took its coins from the payer (`{ref}`);
+//            once answered in time it paid the streamer as much (`{ref}-in`, and a paid_events row), once ended
+//            without that it gave back what it says it did (`{ref}:iade`), and while it waits it did neither
 //
 // `since` (a ledger id): only the accounts with a ledger row after it, and only those rows for `chain` and `moved`.
 // 0 checks everything. The live server watches from migration 071 on (money_check_from); its earlier rows, the test
@@ -80,6 +83,21 @@ export const MONEY_CHECKS = {
             LEFT JOIN ledger r ON r.user_id = p.earner AND r.currency = 'diamond' AND r.ref = p.ref || '-in'
            WHERE ($1::bigint = 0 OR p.payer IN (SELECT user_id FROM ledger WHERE id > $1))
              AND (s.amount IS DISTINCT FROM -p.coins OR (p.earner IS NOT NULL AND r.amount IS DISTINCT FROM p.coins))`,
+  },
+  holds: {
+    message: (n) => `${n} cevap bekleyen ücretli mesajda alınan, yayıncıya geçen ya da iade edilen jeton tutmuyor`,
+    sql: `SELECT h.message_id, h.payer, h.earner, h.coins, h.status, h.returned, -s.amount AS paid, r.amount AS got, b.amount AS back, p.coins AS event
+            FROM message_holds h
+            LEFT JOIN ledger s ON s.user_id = h.payer AND s.currency = 'coin' AND s.ref = h.ref
+            LEFT JOIN ledger r ON r.user_id = h.earner AND r.currency = 'diamond' AND r.ref = h.ref || '-in'
+            LEFT JOIN ledger b ON b.user_id = h.payer AND b.currency = 'coin' AND b.ref = h.ref || ':iade'
+            LEFT JOIN paid_events p ON p.ref = h.ref
+           WHERE ($1::bigint = 0 OR h.payer IN (SELECT user_id FROM ledger WHERE id > $1) OR h.earner IN (SELECT user_id FROM ledger WHERE id > $1))
+             AND (s.amount IS DISTINCT FROM -h.coins
+                  OR (h.status = 'won' AND (r.amount IS DISTINCT FROM h.coins OR p.coins IS DISTINCT FROM h.coins OR b.amount IS NOT NULL))
+                  OR (h.status IN ('expired', 'withdrawn') AND (r.amount IS NOT NULL OR p.coins IS NOT NULL OR coalesce(b.amount, 0) <> h.returned))
+                  OR (h.status = 'expired' AND h.returned <> h.coins)
+                  OR (h.status = 'pending' AND (r.amount IS NOT NULL OR b.amount IS NOT NULL OR p.coins IS NOT NULL)))`,
   },
 };
 

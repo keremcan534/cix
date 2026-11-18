@@ -182,9 +182,9 @@ describe('Etkinlik ödülü', () => {
     assert.equal((await itemIn(ev.owner, 'fr-neon'))?.source, 'event', 'başlatan da geldi');
     assert.equal(await itemIn(away, 'fr-neon'), undefined, 'gelmeyen almaz');
     assert.equal((await ok(call('GET', `/api/events/one?id=${ev.id}`, null, fan.session), 'etkinlik')).event.reward.given, 2);
-    const notices = async () => (await h.sql.query("SELECT body FROM team_notices WHERE target = $1 AND title = 'Etkinlik ödülü'", [fan.user.id])).rows;
+    const notices = async () => (await h.sql.query("SELECT body FROM team_notices WHERE target = $1 AND category = 'event_reward'", [fan.user.id])).rows;
     assert.equal((await notices()).length, 1);
-    assert.match((await notices())[0].body, /“Ödüllü Gece” etkinliğine katıldığın için .+ Çantam’ına geldi/);
+    assert.match((await notices())[0].body, /“Ödüllü Gece” etkinliğine katıldığın için .+ kazandın!\nÖdülün Çantam bölümüne eklendi/);
 
     // Given again (a restart midway, a second sweep): nothing more, nobody hears it twice.
     await h.sql.query('UPDATE events SET reward_done_at = NULL WHERE id = $1', [ev.id]);

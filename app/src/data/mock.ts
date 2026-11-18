@@ -159,6 +159,8 @@ export type Conversation = {
     noRetry?: boolean;
     /** Live mode, my message: the other person has read it. */
     read?: boolean;
+    /** Live mode: an automatic message or a quick reply (server/api/auto-chat.mjs); the bubble labels it. */
+    source?: 'auto_streamer' | 'auto_opener' | 'quick_reply';
   }[];
   unread: number;
 };

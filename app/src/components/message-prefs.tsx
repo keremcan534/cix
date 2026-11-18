@@ -1,5 +1,7 @@
 // The smiley beside Mesajlar's filters: which calls I take and which messages show a notification on my phone. The
 // server keeps and enforces the choices (server/api/privacy.mjs); each is saved as soon as it moves (lib/live/privacy).
+// Below them, live only, Otomatik mesaj's choices (lib/live/auto-chat): automatic conversation starts reach me, the
+// system may start conversations in my name (a man), my automatic messages go out (a woman streamer).
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
@@ -8,6 +10,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Switch } from '@/components/luxe-switch';
 import { Text } from '@/components/text';
+import { showAlert } from '@/lib/alert';
+import { message } from '@/lib/live';
+import { setAutoChoice, useAutoMe, type AutoMe } from '@/lib/live/auto-chat';
 import { useLivePrivacy, usePrivacySetter } from '@/lib/live/privacy';
 import { useApp } from '@/store';
 import { makeStyles, SCRIM, useTheme } from '@/theme';
@@ -54,8 +59,49 @@ function PrefsSheet({ onClose }: { onClose: () => void }) {
             </View>
           );
         })}
+        <AutoRows />
       </View>
     </Modal>
+  );
+}
+
+type AutoKey = 'autoReceive' | 'autoOpener' | 'autoSend';
+const AUTO_ROWS: { key: AutoKey; icon: IconName; title: string; sub: string; shown: (a: AutoMe) => boolean; value: (a: AutoMe) => boolean }[] = [
+  { key: 'autoReceive', icon: 'chatbubbles', title: 'Otomatik sohbet başlangıçlarını al', sub: 'Yayıncıların otomatik mesajları ve sistemin başlattığı sohbetler sana gelir; “Otomatik” diye işaretlidir.', shown: () => true, value: (a) => a.receive },
+  {
+    key: 'autoOpener',
+    icon: 'sparkles',
+    title: 'Benim adıma ücretsiz sohbet başlat',
+    sub: 'Sistem senin adına günde birkaç ücretsiz “Merhaba” mesajı gönderir; karşı tarafta otomatik olarak görünür. Senden jeton düşmez.',
+    shown: (a) => !!a.opener,
+    value: (a) => !!a.opener?.sending,
+  },
+  { key: 'autoSend', icon: 'paper-plane', title: 'Otomatik mesajlarım gönderilsin', sub: 'Çevrimiçiyken şablonlarından biri yeni kullanıcılara gider (günde en çok 10).', shown: (a) => a.tools, value: (a) => !!a.auto?.sending },
+];
+
+/** Otomatik mesaj's choices (a live build only; each row only where it applies to me). */
+function AutoRows() {
+  const a = useAutoMe();
+  const { colors } = useTheme();
+  const s = useStyles();
+  if (!a) return null;
+  const save = (k: AutoKey, v: boolean) =>
+    void (k === 'autoOpener' ? setAutoChoice('autoOpenerSeen', true).then(() => setAutoChoice(k, v)) : setAutoChoice(k, v)).catch((e) => showAlert('Ayar kaydedilemedi', message(e)));
+  return (
+    <>
+      {AUTO_ROWS.filter((r) => r.shown(a)).map((r) => (
+        <View key={r.key} style={s.row}>
+          <View style={s.icon}>
+            <Ionicons name={r.icon} size={19} color={colors.primaryText} />
+          </View>
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={s.rowTitle}>{r.title}</Text>
+            <Text style={s.rowSub}>{r.sub}</Text>
+          </View>
+          <Switch value={r.value(a)} accessibilityLabel={r.title} onValueChange={(v) => save(r.key, v)} />
+        </View>
+      ))}
+    </>
   );
 }
 

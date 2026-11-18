@@ -71,13 +71,17 @@ describe('Birebir mesaj', () => {
     const again = await ok(dm(man.session, star.user.id, 'Selam', ref), 'tekrar');
     assert.equal(again.replay, true);
     assert.equal((await me(man.session)).coins, 760, 'tekrar bir daha ödemez');
+    // The 5-minute rule (message-holds.mjs): the coins wait for her answer.
+    assert.equal((await me(star.session)).diamonds, 0, 'cevap gelene kadar elmas beklemede');
+    assert.equal(sent.hold.coins, 240);
+
+    const back = await ok(dm(star.session, man.user.id, 'Hoş geldin'), 'yayıncı yazar');
+    assert.equal(back.price, undefined);
+    assert.deepEqual(back.reward, { diamonds: 240, count: 1 }, 'zamanında cevap elması getirir');
     assert.equal((await me(star.session)).diamonds, 240, 'yayıncıya elmas');
     const ev = await q("SELECT kind, coins, earner FROM paid_events WHERE payer = $1", [man.user.id]);
     assert.deepEqual(ev.rows, [{ kind: 'message', coins: 240, earner: star.user.id }]);
     assert.equal((await q("SELECT count(*)::int AS n FROM income_events WHERE streamer_id = $1 AND source_type = 'message'", [star.user.id])).rows[0].n, 1, 'ajans geliri');
-
-    const back = await ok(dm(star.session, man.user.id, 'Hoş geldin'), 'yayıncı yazar');
-    assert.equal(back.price, undefined);
     assert.equal((await pair(star.session, man.user.id)).dmPrice, 0);
 
     const income = await ok(call('GET', '/api/wallet/income?period=all', null, star.session), 'gelir');

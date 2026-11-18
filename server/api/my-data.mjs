@@ -585,8 +585,20 @@ export async function exportOf(c, uid) {
     album: await all('SELECT url, created_at FROM profile_photos WHERE user_id = $1 ORDER BY id', (x) => ({ url: x.url, at: x.created_at })),
   };
   const privacy = {
-    settings: (await all('SELECT profile_public, show_online, show_last_seen, show_current_room, dm_from, calls_from, invites_from, voice_calls, video_calls, message_push, push_close_only, updated_at FROM privacy_settings WHERE user_id = $1'))[0] ?? null,
+    settings: (await all('SELECT profile_public, show_online, show_last_seen, show_current_room, dm_from, calls_from, invites_from, voice_calls, video_calls, message_push, push_close_only, auto_receive, auto_opener, auto_opener_seen, auto_send, updated_at FROM privacy_settings WHERE user_id = $1'))[0] ?? null,
     callHistoryClearedAt: (await all('SELECT cleared_at FROM call_history_cleared WHERE user_id = $1'))[0]?.cleared_at ?? null,
+  };
+  // Otomatik mesaj (auto-chat.mjs, message-holds.mjs): my own templates, the rights I used, the automatic messages
+  // sent in my name or to me, and the paid messages that waited for an answer (mine or to me).
+  const autoChat = {
+    templates: await all('SELECT no, body, updated_at FROM auto_templates WHERE user_id = $1 ORDER BY no', (x) => ({ no: x.no, text: x.body, at: x.updated_at })),
+    rightsUsed: await all('SELECT day, kind, used FROM auto_quota WHERE user_id = $1 ORDER BY day, kind', (x) => ({ day: x.day, kind: x.kind, used: x.used })),
+    sent: await all('SELECT kind, recipient, template_no, created_at, replied_at FROM auto_sends WHERE sender = $1 ORDER BY id', (x) => ({ kind: x.kind, to: x.recipient, template: x.template_no, at: x.created_at, answeredAt: x.replied_at })),
+    received: await all('SELECT kind, sender, created_at, replied_at FROM auto_sends WHERE recipient = $1 ORDER BY id', (x) => ({ kind: x.kind, from: x.sender, at: x.created_at, answeredAt: x.replied_at })),
+    waitedForAnswer: await all(
+      'SELECT payer, earner, coins, status, delivered_at, deadline_at, replied_at, returned FROM message_holds WHERE payer = $1 OR earner = $1 ORDER BY message_id',
+      (x) => ({ role: x.payer === uid ? 'paid' : 'earner', with: x.payer === uid ? x.earner : x.payer, coins: num(x.coins), status: x.status, at: x.delivered_at, deadline: x.deadline_at, answeredAt: x.replied_at, returned: num(x.returned) }),
+    ),
   };
   const roomSocial = {
     micInvitesSent: await all('SELECT room_id, to_user, seat, status, created_at, answered_at FROM room_mic_invites WHERE from_user = $1 ORDER BY id', (x) => ({
@@ -641,6 +653,7 @@ export async function exportOf(c, uid) {
     visits,
     profileMore,
     privacy,
+    autoChat,
     roomSocial,
     safety,
     support: await ticketsOf(c, uid),

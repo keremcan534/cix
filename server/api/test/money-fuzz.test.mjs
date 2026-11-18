@@ -1,5 +1,5 @@
 // Many people moving money at once, in random order (docs/PARA_DENETIMI.md): top-ups, purchases, gifts, Çevir,
-// bonds, Şanslı çanta, the shop, Oyun Salonu (Canlı Yörünge's fuel and escapes too), Jeton Noktası sales and diamond
+// bonds, Şanslı çanta, paid messages waiting for the streamer's answer (answers, quick replies, time running out), the shop, Oyun Salonu (Canlı Yörünge's fuel and escapes too), Jeton Noktası sales and diamond
 // sales, store refunds, with some
 // requests sent twice at the same moment. Whatever the order, no request may fail with a server error, and the
 // harness's money checks after this file (money-check.mjs) must find every coin and diamond where the ledger says.
@@ -10,7 +10,7 @@ import { rnd, startApi } from './harness.mjs';
 
 // Locks of 0 days: gifted diamonds can leave at once, so Çevir and diamond sales run on them too.
 // Canlı Yörünge's rounds run fast: a 0,4 s window and a climb of e^(3t).
-const h = startApi({ BOND_SWEEP_MS: '200', BAG_SWEEP_MS: '200', LOCK_DAYS_STORE: '0', LOCK_DAYS_JETON: '0', TEST_TOPUP_DAILY: '100000000', AGENCY_JOBS: '0', ROCKET_BET_MS: '400', ROCKET_IGNITE_MS: '0', ROCKET_PAUSE_MS: '100', ROCKET_RATE: '3' });
+const h = startApi({ BOND_SWEEP_MS: '200', BAG_SWEEP_MS: '200', HOLD_SWEEP_MS: '200', AUTO_CHAT_SWEEP_MS: '0', LOCK_DAYS_STORE: '0', LOCK_DAYS_JETON: '0', TEST_TOPUP_DAILY: '100000000', AGENCY_JOBS: '0', ROCKET_BET_MS: '400', ROCKET_IGNITE_MS: '0', ROCKET_PAUSE_MS: '100', ROCKET_RATE: '3' });
 const { call, signUp } = h;
 const q = async (sql, args) => (await h.sql.query(sql, args)).rows;
 const ok = async (p, what) => {
@@ -31,8 +31,10 @@ describe('Para: aynı anda rastgele işlemler', () => {
     const admin = await signUp('Yönetici');
     await q("UPDATE users SET role = 'admin' WHERE id = $1", [admin.user.id]);
     const people = await Promise.all(Array.from({ length: 10 }, (_, i) => signUp(`Kişi ${i}`)));
-    // Women's accounts: they may sell diamonds (streamer-rule.mjs).
+    // Women's accounts: they may sell diamonds (streamer-rule.mjs). Half of them are older than the days to pick an
+    // agency, so streamers the centre holds: a message from the others to them is paid and waits for an answer.
     await h.sql.query("UPDATE users SET gender = 'Kadın' WHERE id = ANY($1::uuid[])", [people.map((x) => x.user.id)]);
+    await h.sql.query("UPDATE users SET created_at = now() - interval '4 days' WHERE id = ANY($1::uuid[])", [people.slice(0, 5).map((x) => x.user.id)]);
     const bank = await signUp('Jeton Noktası');
     await ok(call('POST', '/api/admin/jeton/bank', { user: bank.user.id, enabled: true }, admin.session), 'banka');
     await ok(call('POST', '/api/admin/jeton/wholesale', { bank: bank.user.id, coins: 500_000, paymentRef: 'DEKONT-1', ref: rnd(6) }, admin.session), 'toptan');
@@ -74,6 +76,15 @@ describe('Para: aynı anda rastgele işlemler', () => {
       [6, async (u) => {
         const id = pick(await bagIds());
         return id ? ['çanta kapma', 'POST', '/api/lucky-bags/grab', { id }, u.session] : null;
+      }],
+      // A message: paid (and held) from someone who isn't a streamer to one who is; from a streamer, an answer that
+      // settles what waits for her. A quick reply (only a streamer's, only to someone who wrote: else refused).
+      [8, async (u) => ['mesaj', 'POST', '/api/messages', { to: other(u).user.id, text: pick(['Selam', 'Merhaba, nasılsın?', '.']), ref: rnd(6) }, u.session]],
+      [2, async (u) => ['hazır cevap', 'POST', '/api/messages', { to: other(u).user.id, quick: 1, ref: rnd(6) }, u.session]],
+      // A held message's time runs out now: the sweep gives its coins back, or pays an answer that came in time.
+      [2, async () => {
+        await q("UPDATE message_holds SET deadline_at = now() - interval '1 minute' WHERE message_id = (SELECT message_id FROM message_holds WHERE status = 'pending' ORDER BY random() LIMIT 1)");
+        return null;
       }],
       [6, async (u) => {
         const [sku, price] = pick(shop);
@@ -135,9 +146,10 @@ describe('Para: aynı anda rastgele işlemler', () => {
     // What is still waiting ends now: bags draw, bonds run out, and the sweeps settle them.
     await q("UPDATE lucky_bags SET closes_at = now() - interval '1 second' WHERE status = 'open'");
     await q("UPDATE bonds SET expires_at = now() - interval '1 second' WHERE status = 'pending'");
+    await q("UPDATE message_holds SET deadline_at = now() - interval '1 minute' WHERE status = 'pending'");
     for (let i = 0; i < 50; i++) {
       const [w] = await q(
-        "SELECT (SELECT count(*) FROM lucky_bags WHERE status = 'open') + (SELECT count(*) FROM bonds WHERE status = 'pending') + (SELECT count(*) FROM rocket_rounds WHERE state IN ('fly', 'settling')) AS n",
+        "SELECT (SELECT count(*) FROM lucky_bags WHERE status = 'open') + (SELECT count(*) FROM bonds WHERE status = 'pending') + (SELECT count(*) FROM message_holds WHERE status = 'pending') + (SELECT count(*) FROM rocket_rounds WHERE state IN ('fly', 'settling')) AS n",
       );
       if (Number(w.n) === 0) break;
       await new Promise((r) => setTimeout(r, 100));
@@ -147,7 +159,7 @@ describe('Para: aynı anda rastgele işlemler', () => {
     const [open] = await q("SELECT (SELECT count(*) FROM lucky_bags WHERE status = 'open') AS bags, (SELECT count(*) FROM bonds WHERE status = 'pending') AS bonds");
     assert.deepEqual([Number(open.bags), Number(open.bonds)], [0, 0], 'bekleyen çanta ve bağ kalmadı');
     // Enough of each kind actually went through for the run to mean something.
-    for (const label of ['hediye', 'çevir', 'mağaza', 'oyun', 'satın alma']) assert.ok((seen.get(`${label} 200`) ?? 0) > 0, `${label} hiç geçmedi (${summary})`);
+    for (const label of ['hediye', 'çevir', 'mağaza', 'oyun', 'satın alma', 'mesaj']) assert.ok((seen.get(`${label} 200`) ?? 0) > 0, `${label} hiç geçmedi (${summary})`);
     console.log(`para karıştırma: tohum ${startSeed}; ${summary}`);
   });
 });

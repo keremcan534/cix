@@ -112,6 +112,9 @@ describe('nothing saved', () => {
         ...['room_staff_away_minutes', 'boss_seat_coins', 'boss_seat_minutes', 'family_cashout_members', 'family_rejoin_days'],
         ...['event_min_room_level', 'event_min_lead_minutes', 'event_max_minutes', 'event_max_capacity', 'event_grace_minutes', 'event_strike_limit', 'event_block_days', 'event_reminders_off'],
         'lucky_announce_min_coins',
+        ...['auto_chat_off', 'auto_daily', 'quick_daily', 'opener_daily', 'auto_gap_minutes', 'auto_man_daily', 'auto_man_gap_minutes', 'auto_quiet_cut', 'auto_new_days', 'auto_new_weight', 'auto_reply_weight'],
+        ...['auto_online_weight', 'auto_streamer_coef', 'auto_busy_pending', 'auto_active_minutes', 'auto_online_minutes', 'template_max_chars', 'template_min_chars', 'reply_minutes', 'reply_grace_seconds'],
+        ...['message_notice_min', 'reply_min_chars', 'perf_warn_rate', 'perf_warn_min', 'perf_warn_days', 'perf_warn_gap_days', 'auto_templates_default', 'auto_opener_pool', 'auto_quick_pool', 'system_notices_off'],
         'admin_site',
       ],
     );

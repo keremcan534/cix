@@ -77,6 +77,11 @@ describe('Gizlilik ayarları', () => {
       videoCalls: true,
       messagePush: true,
       pushCloseOnly: true,
+      // Otomatik mesaj (auto-chat.mjs): on, a man's start in his name on too (the owners' decision) once his app told him.
+      autoReceive: true,
+      autoOpener: true,
+      autoOpenerSeen: false,
+      autoSend: true,
     });
     const p = await setPrivacy(a.session, { showOnline: false, dmFrom: 'mutual' });
     assert.equal(p.showOnline, false);
