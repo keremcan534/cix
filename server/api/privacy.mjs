@@ -25,6 +25,8 @@
 //   - messagePush off: messages still arrive, my phone shows no notification for them (one-on-one.mjs wantsMessagePush).
 //   - pushCloseOnly on: only people close to me notify: we follow each other, or there is a heart level between us.
 //   - invitesFrom: inviteRefusal / mayInvite, for room and mic invites.
+//   - autoReceive, autoOpener, autoOpenerSeen, autoSend: Otomatik mesaj (auto-chat.mjs). autoOpenerSeen can only be
+//     turned on (the app says it showed what a conversation start in my name is).
 // A block either way refuses all three. The other person is never told which setting refused them beyond the
 // reason the demo shows ("… yalnızca takip ettiği kişilerden mesaj alıyor").
 import { HttpError, auth, db, limit, readJson } from './core.mjs';
@@ -41,6 +43,13 @@ export const PRIVACY_DEFAULTS = Object.freeze({
   videoCalls: true,
   messagePush: true,
   pushCloseOnly: true,
+  // Otomatik mesaj (auto-chat.mjs): automatic conversation starts reach me; the system may start conversations in my
+  // name (men; on from the start, the owners' decision, 18 Nov 2026); my app told me what that is (only then does one
+  // go out, so an older APK that can't show it or switch it off sends nothing); my automatic messages go out (streamers).
+  autoReceive: true,
+  autoOpener: true,
+  autoOpenerSeen: false,
+  autoSend: true,
 });
 const COLUMN = {
   profilePublic: 'profile_public',
@@ -54,6 +63,10 @@ const COLUMN = {
   videoCalls: 'video_calls',
   messagePush: 'message_push',
   pushCloseOnly: 'push_close_only',
+  autoReceive: 'auto_receive',
+  autoOpener: 'auto_opener',
+  autoOpenerSeen: 'auto_opener_seen',
+  autoSend: 'auto_send',
 };
 const CHOICES = { dmFrom: ['everyone', 'following', 'mutual'], callsFrom: ['everyone', 'following', 'nobody'], invitesFrom: ['everyone', 'following', 'nobody'] };
 /** A session seen this recently is online (as Keşfet has always counted it). */
@@ -205,6 +218,8 @@ function patchOf(b) {
     // Own keys only: 'toString' or '__proto__' are not settings.
     if (!Object.hasOwn(COLUMN, k)) throw new HttpError(400, 'Geçersiz ayar');
     if (Object.hasOwn(CHOICES, k) ? !CHOICES[k].includes(v) : typeof v !== 'boolean') throw new HttpError(400, 'Geçersiz ayar değeri');
+    // Shown once is shown: the app can't take it back.
+    if (k === 'autoOpenerSeen' && v !== true) throw new HttpError(400, 'Geçersiz ayar değeri');
     set[COLUMN[k]] = v;
   }
   if (!Object.keys(set).length) throw new HttpError(400, 'Değişecek ayar yok');

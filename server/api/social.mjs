@@ -148,6 +148,9 @@ export async function eraseAccount(c, id, phone) {
     await c.query('DELETE FROM profile_photos WHERE user_id = $1', [id]);
     await c.query('UPDATE users SET gender_hidden = false WHERE id = $1', [id]);
     await c.query('DELETE FROM messages WHERE sender = $1 OR recipient = $1', [id]);
+    // Their own wording of the automatic messages (auto-chat.mjs). The rights used and the sends stay as records; a
+    // paid message still waiting for an answer goes back to its payer at its time (message-holds.mjs sweep).
+    await c.query('DELETE FROM auto_templates WHERE user_id = $1', [id]);
     // With them, how much they chatted with each other person (the heart's chat_days).
     await c.query('DELETE FROM chat_days WHERE lo = $1 OR hi = $1', [id]);
     // The wait after leaving a family as a streamer (families.mjs).

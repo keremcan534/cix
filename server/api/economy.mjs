@@ -27,6 +27,7 @@
 // moved one is a 409 price_changed and nothing moves. One that shows the compiled rows (the old-app spend, a buy
 // without `days`) gets update_required once the item differs from its compiled row, so nobody pays for other days or
 // another price than shown.
+import { itemNotice } from './system-notices.mjs';
 import { HttpError, REF, UUID, auth, claimRef, clientIp, db, env, int, limit, once, readJson, text, tx, userId } from './core.mjs';
 import { FREE_MICFX, MAX_AHEAD_DAYS, PAID_ONLY, SHOP, SHOP_PAUSED, SLOTS, labelOf } from './catalog.mjs';
 import { nobleItem, vipItemNeed, vipLevelOf } from './levels.mjs';
@@ -593,7 +594,11 @@ export const economyRoutes = {
       await audit(c, a.id, 'economy.grant', id, { entitlement: eid, sku: item.sku, days, reason }, clientIp(req));
       return { replay: false, item: itemOf((await c.query('SELECT * FROM entitlements WHERE id = $1', [eid])).rows[0], now) };
     });
-    if (!out.replay) void announceLook(id);
+    if (!out.replay) {
+      void announceLook(id);
+      // SimilarClub Sistem: the gift is in their Çantam (the staff's reason stays in the audit, not in the notice).
+      void itemNotice({ target: id, ref, item, days, origin: 'SimilarClub yönetimi', why: `SimilarClub yönetiminden sana ${item.name} hediye edildi!` });
+    }
     return out;
   },
 

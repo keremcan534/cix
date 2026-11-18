@@ -31,6 +31,12 @@ export const panelOn = () => KEY.length >= KEY_MIN;
 
 /** What Finance Control may call: `METHOD path`. */
 export const PANEL_ROUTES = new Set([
+  // Otomatik mesaj ve SimilarClub Sistem (auto-chat.mjs, system-notices.mjs): the report, a day's summaries and
+  // warnings run again, and the notices sent and failed per category. The numbers and texts are Canlı ayarlar.
+  'GET /api/admin/auto-chat/report',
+  'POST /api/admin/auto-chat/daily',
+  'POST /api/admin/auto-chat/round',
+  'GET /api/admin/system-notices',
   // Hediyeler (custom-gifts.mjs: the admins' and the app's own) and its uploads (media.mjs kinds gifticon, giftvideo,
   // giftsource).
   'GET /api/admin/gifts',

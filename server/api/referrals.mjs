@@ -29,6 +29,7 @@
 // other reward coins (tasks, check-in), these credits are not sent to the finance panel (finance-sync.mjs).
 // Kept: my code and who entered whose code with the reward's state, while both accounts exist; both go with either
 // account (social.mjs eraseAccount). The coins paid stay in the ledger as accounting records, without names.
+import { bonusNotice } from './system-notices.mjs';
 import crypto from 'node:crypto';
 
 import { HttpError, UUID, auth, blockedBetween, clientIp, db, limit, liveBan, move, readJson, text, tx, userId } from './core.mjs';
@@ -89,6 +90,10 @@ export async function welcomeNewAccount(uid) {
       if ((await c.query("SELECT 1 FROM ledger WHERE user_id = $1 AND currency = 'coin' AND ref = $2", [uid, WELCOME_REF])).rowCount) return null;
       await creditCoins(c, uid, [{ channel: 'odul', amount: s.welcomeCoins }], 'Hoş geldin hediyesi', WELCOME_REF, null, { detail: { reward: 'welcome' } });
       return (await c.query('SELECT * FROM users WHERE id = $1', [uid])).rows[0];
+    }).then((u) => {
+      // After the coins are committed; a notice never fails the sign-in (systemNotice never throws).
+      if (u) void bonusNotice({ target: uid, ref: WELCOME_REF, origin: 'Hoş geldin hediyesi', what: `${s.welcomeCoins.toLocaleString('tr-TR')} ödül jetonu`, detail: ['Ödül jetonları mağazada kullanılır.'], data: { coins: s.welcomeCoins }, link: '/magaza', push: false });
+      return u;
     });
   } catch (e) {
     console.error('welcome coins', uid, String(e?.message ?? e).slice(0, 200));
@@ -159,7 +164,12 @@ export async function settleReferral(inviteeId) {
     paid = { inviter: f.inviter_id, coins };
     return 'paid';
   });
-  if (paid) notify([paid.inviter], { title: 'Davet ödülü', body: `Davet ettiğin arkadaşın ilk odasına girdi: ${paid.coins.toLocaleString('tr-TR')} jeton hesabına eklendi.`, data: { type: 'invite' } });
+  if (paid) {
+    notify([paid.inviter], { title: 'Davet ödülü', body: `Davet ettiğin arkadaşın ilk odasına girdi: ${paid.coins.toLocaleString('tr-TR')} jeton hesabına eklendi.`, data: { type: 'invite' } });
+    const what = `${paid.coins.toLocaleString('tr-TR')} ödül jetonu`;
+    void bonusNotice({ target: paid.inviter, ref: ref('inviter', inviteeId), origin: 'Davet ödülü', what, detail: ['Davet ettiğin arkadaşın ilk odasına girdi.'], data: { coins: paid.coins }, push: false });
+    void bonusNotice({ target: inviteeId, ref: ref('invitee', inviteeId), origin: 'Davet ödülü', what, detail: ['Davetle katıldığın için.'], data: { coins: paid.coins } });
+  }
   return out;
 }
 

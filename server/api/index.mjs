@@ -78,6 +78,9 @@ import { live, liveSettingsRoutes, refreshLive, startLiveSync, stopLiveSync } fr
 import { mediaRoutes, sendFile } from './media.mjs';
 import { luckyBagRoutes, startBagSweep, stopBagSweep } from './lucky-bags.mjs';
 import { messageRoutes } from './messages.mjs';
+import { autoChatRoutes, startAutoChat, stopAutoChat } from './auto-chat.mjs';
+import { startHoldSweep, stopHoldSweep } from './message-holds.mjs';
+import { startCallNoticeSweep, stopCallNoticeSweep, systemNoticeRoutes } from './system-notices.mjs';
 import { momentRoutes } from './moments.mjs';
 import { oneOnOneRoutes, startCallSweep, stopCallSweep } from './one-on-one.mjs';
 import { callLogRoutes } from './call-log.mjs';
@@ -342,6 +345,8 @@ const routes = {
   ...spendLimitRoutes,
   ...referralRoutes,
   ...messageRoutes,
+  ...autoChatRoutes,
+  ...systemNoticeRoutes,
   ...oneOnOneRoutes,
   ...privacyRoutes,
   ...callLogRoutes,
@@ -511,6 +516,9 @@ function shutdown(signal) {
   stopLiveSync();
   stopOtpSweep();
   stopCallSweep();
+  stopHoldSweep();
+  stopAutoChat();
+  stopCallNoticeSweep();
   stopBagSweep();
   stopRocketSweep();
   stopDecorSweep();
@@ -552,6 +560,9 @@ startSanctionSweep();
 startLiveSync();
 startOtpSweep();
 startCallSweep();
+startHoldSweep();
+startAutoChat();
+startCallNoticeSweep();
 startBagSweep();
 startRocketSweep();
 startDecorSweep();

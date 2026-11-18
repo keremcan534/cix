@@ -15,6 +15,7 @@ import { markChatOpen } from '@/lib/open-chat';
 import { noteRefusal } from '@/lib/sanctions';
 import { liveMode, message, myServerId, rememberUser, toLocal, toServer } from '@/lib/live';
 import { onLine } from '@/lib/live/live-line';
+import { forgetAutoChat, noteThread } from '@/lib/live/auto-chat';
 import { isServerId } from '@/data/mock';
 
 const SEEN_KEY = 'similarclub:dm-seen';
@@ -60,6 +61,7 @@ export function forgetSeen() {
   saved = { seen: {}, hidden: {} };
   readTimers.forEach(clearTimeout);
   readTimers.clear();
+  forgetAutoChat();
   void AsyncStorage.multiRemove([SEEN_KEY, HIDDEN_KEY]).catch(() => {});
 }
 
@@ -105,8 +107,13 @@ function serial<T>(job: () => Promise<T>): Promise<T> {
   return run;
 }
 
+/** A page of the thread; the newest one also tells the open chat its rewards, fees and the server's clock (lib/live/auto-chat). */
 const page = (peer: string, before?: number) =>
-  api.apiRequest<{ messages: api.DirectMessage[] }>('GET', `/api/messages?with=${encodeURIComponent(peer)}${before ? `&before=${before}` : ''}`).then((r) => r.messages);
+  api.apiRequest<{ messages: api.DirectMessage[]; serverNow?: string }>('GET', `/api/messages?with=${encodeURIComponent(peer)}${before ? `&before=${before}` : ''}`).then((r) => {
+    const rows = Array.isArray(r?.messages) ? r.messages : [];
+    if (!before) noteThread(peer, rows, r?.serverNow);
+    return rows;
+  });
 
 async function syncPeer(peer: string, app: Inbox, unread: number | null) {
   const g = gen;

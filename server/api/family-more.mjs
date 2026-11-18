@@ -12,6 +12,7 @@
 // exchanged or withdrawn), once per person and week whichever family they were in, when their family's week (gift
 // coins of its members) reached it and they did something for the family this week. The weekly bonus is shown as an
 // estimate (family level rate × the week): paying it is a management decision, nothing here pays it.
+import { bonusNotice } from './system-notices.mjs';
 import { HttpError, auth, claimRef, db, limit, once, readJson } from './core.mjs';
 import { CHEST_MIN_CONTRIBUTION, CP_GIFT_IDS, FAMILY_CHESTS, FAMILY_RATES, FAMILY_TASKS, taskPoints } from './family-rules.mjs';
 import { WEEK, familyView, membersOf, myMembership, statsOf } from './families.mjs';
@@ -198,6 +199,7 @@ export const familyMoreRoutes = {
       await creditCoins(c, me.id, [{ channel: 'odul', amount: chest.coins }], `Aile sandığı: ${chest.name}`, b.ref, null, { detail: { family: Number(mine.family_id), chest: chest.id } });
     });
     if (out.replay && !(await db.query('SELECT 1 FROM family_chest_claims WHERE user_id = $1 AND ref = $2', [me.id, b.ref])).rowCount) throw new HttpError(409, 'Geçersiz istek kimliği');
+    if (!out.replay) void bonusNotice({ target: me.id, ref: `chest:${o.week.start}:${chest.id}`, origin: `Aile sandığı (${chest.name})`, what: `${chest.coins.toLocaleString('tr-TR')} ödül jetonu`, data: { coins: chest.coins, chest: chest.id } });
     return { ...out, coins: chest.coins };
   },
 };

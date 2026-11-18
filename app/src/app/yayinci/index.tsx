@@ -23,6 +23,7 @@ import { RULES, pct, settlement, usd } from '@/data/rules';
 import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
+import { MessageToolsCard } from '@/components/message-tools-card';
 
 const DAYS = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Bugün'];
 
@@ -47,6 +48,8 @@ export default function HostCenter() {
       <SafeAreaView style={styles.safe}>
         <Header title="Yayıncı Merkezi" />
         <ScrollView contentContainerStyle={{ padding: 16, gap: 14 }}>
+          {/* The server may count her a streamer already (an agency, the centre): her message tools are here. */}
+          <MessageToolsCard />
           <LinearGradient colors={gradientDeep} style={styles.hero}>
             <Icon3D name="mic" size={64} />
             <Text style={styles.heroTitle}>Yayıncı ol, kazanmaya başla</Text>
@@ -160,6 +163,8 @@ function Dashboard() {
             </View>
           )}
         </LinearGradient>
+
+        <MessageToolsCard />
 
         <View style={[styles.affil, { borderColor: agency ? colors.green : colors.gold }]}>
           {agency ? (

@@ -1,5 +1,7 @@
-// Mesajlar › Similar Ekibi: everything the management sends (events, updates, rewards, rules, announcements, and
-// notices for me alone), newest first, 30 a page (server/api/team.mjs). Opening it marks what it shows as seen.
+// Mesajlar › SimilarClub Sistem (Similar Ekibi in older apps): everything the management sends (events, updates,
+// rewards, rules, announcements, and notices for me alone) and my account's own notices (earnings, rewards, warnings:
+// server/api/system-notices.mjs), newest first, 30 a page (server/api/team.mjs). Opening it marks what it shows as seen.
+// Nobody can write here: it has no composer, only the server's notices.
 // The demo shows a few sample notices.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, type Href } from 'expo-router';
@@ -8,7 +10,7 @@ import { ActivityIndicator, FlatList, Image, Modal, Pressable, RefreshControl, V
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
-import { Button, Header } from '@/components/ui';
+import { Button, Header, VerifiedBadge } from '@/components/ui';
 import { ago } from '@/lib/admin-format';
 import { liveMode } from '@/lib/live';
 import { TEAM_KIND_LABEL, markTeamSeen, teamPage, type TeamKind, type TeamNotice } from '@/lib/live/team';
@@ -23,6 +25,22 @@ const KIND_ICON: Record<TeamKind, keyof typeof Ionicons.glyphMap> = {
   reward: 'gift',
   rule: 'shield-checkmark',
   notice: 'megaphone',
+};
+
+/** SimilarClub Sistem's categories (server/api/auto-chat-rules.mjs NOTICE_CATEGORIES): their symbol and colour. */
+const CATEGORY: Record<string, { icon: keyof typeof Ionicons.glyphMap; color: string; label: string }> = {
+  voice_call: { icon: 'call', color: '#0EA5E9', label: 'Sesli arama' },
+  video_call: { icon: 'videocam', color: '#7C3AED', label: 'Görüntülü arama' },
+  call_paid: { icon: 'receipt', color: '#475569', label: 'Görüşme' },
+  message_summary: { icon: 'diamond', color: '#0891B2', label: 'Mesaj kazancı' },
+  message_reward: { icon: 'diamond', color: '#0891B2', label: 'Mesaj kazancı' },
+  pk: { icon: 'trophy', color: '#D97706', label: 'PK' },
+  rocket: { icon: 'rocket', color: '#DB2777', label: 'Roket' },
+  event_reward: { icon: 'trophy', color: '#4F46E5', label: 'Etkinlik' },
+  bag_gift: { icon: 'gift', color: '#D97706', label: 'Dijital hediye' },
+  bonus: { icon: 'gift', color: '#16A34A', label: 'Bonus' },
+  performance: { icon: 'warning', color: '#EA580C', label: 'Uyarı' },
+  quota: { icon: 'notifications', color: '#64748B', label: 'Bilgi' },
 };
 
 const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();
@@ -100,7 +118,15 @@ function InboxBody({ onClose, onUnread }: { onClose: () => void; onUnread: (n: n
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <Header title="Similar Ekibi" onBack={onClose} />
+      <Header
+        title="SimilarClub Sistem"
+        onBack={onClose}
+        right={
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} accessibilityLabel="Resmî SimilarClub hesabı">
+            <VerifiedBadge />
+          </View>
+        }
+      />
       {items === null ? (
         failed ? (
           <View style={s.center}>
@@ -142,6 +168,11 @@ function InboxBody({ onClose, onUnread }: { onClose: () => void; onUnread: (n: n
           renderItem={({ item }) => <NoticeCard n={item} href={noticeHref(item.link ?? undefined, live)} onOpen={open} />}
         />
       )}
+      {/* One-way: only the server writes here. */}
+      <View style={s.closed}>
+        <Ionicons name="lock-closed-outline" size={14} color={colors.textDim} />
+        <Text style={s.closedText}>Bu resmî bildirim sohbetine mesaj gönderilemez.</Text>
+      </View>
     </SafeAreaView>
   );
 }
@@ -153,25 +184,26 @@ const KIND_COLOR: Record<TeamKind, string> = { event: '#4F46E5', update: '#0891B
 function NoticeCard({ n, href, onOpen }: { n: TeamNotice; href: string | undefined; onOpen: (href: string) => void }) {
   const { colors } = useTheme();
   const s = useStyles();
-  const color = KIND_COLOR[n.kind] ?? KIND_COLOR.notice;
+  const cat = n.category ? CATEGORY[n.category] : undefined;
+  const color = cat?.color ?? KIND_COLOR[n.kind] ?? KIND_COLOR.notice;
   return (
     <Pressable
       style={({ pressed }) => [s.card, pressed && href ? { opacity: 0.85 } : null]}
       disabled={!href}
       onPress={href ? () => onOpen(href) : undefined}
       accessibilityRole={href ? 'button' : undefined}
-      accessibilityLabel={`${TEAM_KIND_LABEL[n.kind]}${n.personal ? ', sana özel' : ''}: ${n.title}`}
+      accessibilityLabel={`${cat?.label ?? TEAM_KIND_LABEL[n.kind] ?? 'Duyuru'}${n.personal ? ', sana özel' : ''}: ${n.title}`}
     >
       <View style={s.head}>
         <View style={[s.badge, { backgroundColor: color }]}>
-          <Ionicons name={KIND_ICON[n.kind]} size={18} color="#fff" />
+          <Ionicons name={cat?.icon ?? KIND_ICON[n.kind] ?? 'megaphone'} size={18} color="#fff" />
         </View>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={s.title} numberOfLines={2}>
             {n.title}
           </Text>
           <Text style={s.meta}>
-            {n.personal ? 'Sana özel · ' : `${TEAM_KIND_LABEL[n.kind]} · `}
+            {cat ? `${cat.label} · ` : n.personal ? 'Sana özel · ' : `${TEAM_KIND_LABEL[n.kind] ?? 'Duyuru'} · `}
             {ago(n.createdAt)}
           </Text>
         </View>
@@ -194,4 +226,6 @@ const useStyles = makeStyles(({ colors, lift }) => ({
   image: { width: '100%', aspectRatio: 2, borderRadius: radius.md, backgroundColor: colors.cardAlt },
   title: { color: colors.text, fontSize: 15, lineHeight: 20, fontWeight: '800' },
   body: { color: colors.textDim, fontSize: 14, lineHeight: 20 },
+  closed: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderTopWidth: 1, borderTopColor: colors.border },
+  closedText: { color: colors.textDim, fontSize: 12 },
 }));

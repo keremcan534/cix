@@ -308,7 +308,7 @@ describe('Yönetim › Mağaza', () => {
     await refused(add({ plate: { ...base, anim: 'spin' } }), 400, /belirme/);
     await refused(add({ plate: { ...base, show: 'hayır' } }), 400, /ad yazılsın/);
     // The icon: a PNG or WebP of a size the shop can draw; only an entry effect has one.
-    await refused(add({ icon: await upload(admin, 'shopframe', png(40, 40), 'image/png') }), 400, /İkon her yönde 64–1024/);
+    await refused(add({ icon: await upload(admin, 'shopframe', png(40, 40), 'image/png') }), 400, /İkon her yönde 64–4096/);
     await refused(post('', { kind: 'bubble', name: 'İkonlu Balon', price: 100, days: 7, icon: await upload(admin, 'shopframe', png(128, 128), 'image/png') }), 400, /ikon yalnız giriş efektine/);
 
     const icon = await upload(admin, 'shopframe', png(192, 192), 'image/png');
@@ -324,6 +324,14 @@ describe('Yönetim › Mağaza', () => {
     // A new icon replaces the old one; null takes it away and the shop shows the banner alone.
     const icon2 = await upload(admin, 'shopframe', png(128, 128), 'image/png');
     assert.deepEqual((await ok(post('/update', { id: e.id, icon: icon2 }), 'yeni ikon')).item.icon, { url: icon2, px: 128 });
+    // A big icon is taken and made smaller for the phones (custom-gifts.mjs fitPicture): at most 512 px and 512 KB.
+    const big = await upload(admin, 'shopframe', png(1500, 1500), 'image/png');
+    const shrunk = (await ok(post('/update', { id: e.id, icon: big }), 'büyük ikon')).item.icon;
+    assert.notEqual(shrunk.url, big, 'küçültülmüş kopya');
+    assert.ok(shrunk.px <= 512, `en çok 512 piksel (bu ${shrunk.px})`);
+    const smallFile = await fetch(shrunk.url);
+    assert.equal(smallFile.status, 200);
+    assert.ok((await smallFile.arrayBuffer()).byteLength <= 512 * 1024);
     assert.equal((await ok(post('/update', { id: e.id, icon: null }), 'ikonsuz')).item.icon, null);
     assert.equal((await inCatalog(e.id)).icon, undefined);
     // The app's own entry effects keep the app's pictures.
@@ -331,7 +339,7 @@ describe('Yönetim › Mağaza', () => {
     const audit = (await h.sql.query("SELECT detail FROM audit_events WHERE action = 'shop.update' ORDER BY id DESC LIMIT 1")).rows[0].detail;
     // The audit keeps the stored address (the storage's own); the panel and the phones get the API's: the same file.
     const file = (u) => u.slice(u.indexOf('shopframe/'));
-    assert.deepEqual([file(audit.before.icon_url), audit.after.icon_url], [file(icon2), null]);
+    assert.deepEqual([file(audit.before.icon_url), audit.after.icon_url], [file(shrunk.url), null]);
   });
 
   test('kaynak videodan giriş efekti sunucuda çevrilir (hediyelerle aynı çevirici)', { skip: NO_FFMPEG }, async () => {

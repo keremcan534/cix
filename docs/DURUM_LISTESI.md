@@ -129,6 +129,21 @@ Son güncelleme: preview-96 sonrası (Küçült, çanta yağmuru, @bahset düzel
   - Durum: Telefonda denenmeli. Kodu bu bilgisayarda derlenemedi; ilk derleme GitHub'daki APK yapımında. Denerken iki telefonla görüntülü ara, karşı telefonda maskenin yüzde durduğuna, kafa hızlı dönünce ve kamera çevrilince yüzün bir an bile görünmediğine bak. Eski Android yüz bulucusu yandan ve uzaktan yüzü zor bulur, o zaman görüntü kareli gider.
   - iPhone'da ve eski APK'larda maske düğmesi görünmez.
 
+## Otomatik mesaj, 5 dakika kuralı ve SimilarClub Sistem (yeni APK)
+
+Ayrıntı: [`OTOMATIK_MESAJ.md`](OTOMATIK_MESAJ.md).
+
+- **5 dakika kuralı (sunucu, eski APK dahil):** yayıncıya giden ücretli mesajın elması ancak yayıncı 5 dakika içinde cevap verirse geçer. Cevap gelmezse jeton erkeğe geri döner. Eski APK'daki yayıncı geri sayımı görmez ama kural onu da kapsar.
+- **Elmas göstergesi (yeni APK):** yayıncı, gelen ücretli mesajın altında "💎 +240 Elmas · 04:35 kaldı" görür; cevap verince "kazanıldı", süre geçince "Ödül süresi doldu". Erkek kendi mesajının altında yalnız kendi jetonunu görür (bekliyor, ödendi, iade edildi).
+- **Otomatik Mesajlarım (yeni APK, Yayıncı Merkezi):** onaylı kadın yayıncı 10 mesajını kendi yazar ya da varsayılan kalır; günde 10 otomatik mesaj, çevrimiçiyken yeni erkek kullanıcılara gider. Karşı tarafta "Otomatik mesaj" yazar.
+- **Hazır cevap (yeni APK):** sohbette ⚡ düğmesi, günde 10 hak. Bitince yazarak cevap verip kazanmaya devam eder.
+- **Erkeğin ücretsiz sohbet başlangıcı (yeni APK):** varsayılan açık; ilk seferde Mesajlar'da ne olduğu anlatılır, "İstemiyorum" ile kapanır. Anlatılmadan (eski APK) hiç gitmez. Ücretsizdir, elmas kazandırmaz.
+- **Mesaj Performansım (yeni APK):** ortalama cevap süresi, 5 dakikada cevap oranı, kazanılan ve kaçırılan elmas; bugün, 7 gün, 30 gün, tarih aralığı.
+- **Ajans ofisi › Mesaj performansı (yeni APK):** ajansın yayıncıları tek tek, yalnız sayılar.
+- **SimilarClub Sistem:** Mesajlar'daki "Similar Ekibi" yeni APK'da bu adla açılır, cevap yazılamaz. Arama kazancı, görüşme bilgisi, günlük mesaj özeti, PK sonucu, roket, etkinlik, çanta hediyesi, bonus ve uyarılar buraya düşer. Eski APK'da aynı bildirimler Similar Ekibi'nde ödül/duyuru kartı olarak görünür.
+- **Telefonda denenmeli:** geri sayım, hazır cevap penceresi, iki telefonla 5 dakika içinde ve sonra cevap.
+- **Panel:** bütün sayılar ve metinler finans paneli › Canlı ayarlar › Otomatik mesaj ve SimilarClub Sistem'de kendiliğinden görünür. Rapor sayfası (yayıncı, ajans, şüpheli ikililer) için sunucu hazır, panel sayfası henüz yok.
+
 ## Depo (R2): kuruldu, az yer kaplıyor
 
 - **Kurulum:** Anahtarlar 9 Kasım'da girildi, sunucuya yazıldı. Fotoğraf ve şarkı yükleme açık.

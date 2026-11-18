@@ -12,6 +12,7 @@
 // The history is the calls table itself (kept as accounting records, so it adds nothing to store): calls, not
 // Eşleşme, once they are over. People blocked either way and deleted accounts are left out. Clearing keeps one
 // number per person (call_history_cleared), deleted with the account. Weeks and days are Turkey's.
+import { bonusNotice } from './system-notices.mjs';
 import { grantBackpack } from './backpack.mjs';
 import { HttpError, auth, claimRef, db, limit, once } from './core.mjs';
 import { live } from './live-settings.mjs';
@@ -129,6 +130,11 @@ export const callLogRoutes = {
       items = await grantTaskRewards(c, me.id, 'call', ref);
     });
     const replay = out.replay;
+    if (!replay) {
+      // SimilarClub Sistem: the task's coins, the gift in Çantam and any items, once (the task's own ref).
+      const extra = [backpack && `Çantana ${backpack.count} hediye eklendi.`, ...items.map((x) => `${x.name} (${x.days ? `${x.days} gün` : 'süresiz'}) Çantam’a eklendi.`)].filter(Boolean);
+      void bonusNotice({ target: me.id, ref, origin: 'Günlük görev', what: `${CALL_TASK.reward} ödül jetonu`, detail: extra, data: { coins: CALL_TASK.reward, backpack, items } });
+    }
     return { ...out, task: { ...task, claimed: true, items: await taskItems('call') }, backpack: replay ? null : backpack, items: replay ? [] : items };
   },
 

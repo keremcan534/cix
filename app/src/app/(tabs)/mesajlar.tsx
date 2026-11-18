@@ -23,6 +23,7 @@ import { makeStyles, useTheme, type Theme } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
 import { Backdrop, Gloss, PressableScale } from '@/components/fx/surface';
 import { TeamInbox } from '@/components/team-inbox';
+import { OpenerNotice } from '@/components/opener-notice';
 import { teamUnread } from '@/lib/live/team';
 import { messagePreview } from '@/components/ReactionArt';
 import { liveMode, message, oneOnOneOpen, toLocal, toServer, useServerRoomList } from '@/lib/live';
@@ -178,10 +179,12 @@ export default function MessagesScreen() {
   const messagesHeader = (
     <View>
       <View style={styles.hubs}>
-        <HubTile title="Similar Ekibi" sub="Duyuru, etkinlik, ödül" art={HUB_ART.team} tint={['#2B4FD8', '#5B21B6']} badge={teamNew} onPress={() => setTeamOpen(true)} />
+        {/* SimilarClub Sistem (server/api/system-notices.mjs): Similar Ekibi's announcements and my account's notices. */}
+        <HubTile title="SimilarClub Sistem" sub="Kazanç, ödül, duyuru" art={HUB_ART.team} tint={['#2B4FD8', '#5B21B6']} badge={teamNew} onPress={() => setTeamOpen(true)} />
         <HubTile title="Çevrim içi hizmet" sub="Destek ekibine yaz" art={HUB_ART.support} tint={['#0B7A86', '#14532D']} onPress={() => router.push('/destek')} />
         <HubTile title="Ajansım" sub="Ajans ve kazanç" art={HUB_ART.agency} tint={['#9A4A12', '#6B1F3A']} onPress={() => router.push('/ajans')} />
       </View>
+      {live && <OpenerNotice />}
       <View style={styles.chipRow}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={styles.chips}>
           {FILTERS.map((f) => (

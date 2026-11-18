@@ -11,6 +11,8 @@ Müşterinin notları ve sahibin kararları (18 Kasım 2026). Kod: `server/api/s
 
 Yayıncı olmak birebir mesaj ve aramada kimin ödeyip kimin kazandığını belirler.
 
+**Ücretli mesajda 5 dakika kuralı (18 Kasım 2026):** yayıncı ücretli mesajın elmasını ancak 5 dakika içinde cevap verirse alır; cevap gelmezse jeton gönderene iade edilir. Otomatik mesaj, hazır cevap ve şablonlar yalnız kadın yayıncılarda. Ayrıntı: [`OTOMATIK_MESAJ.md`](OTOMATIK_MESAJ.md).
+
 ## Kim para çekebilir
 
 | Hesap | Para Çek | Jeton Noktası'na elmas bozdurma | Çevir (elmas → jeton) |

@@ -166,3 +166,15 @@ modunda olması, hata takibi olmaması ve kırık kodun birleşmeden önce yakal
 ## Mesaj bildirimi varsayılanı (18 Kasım 2026, sahip kararı)
 
 Mesajlar'daki "Yalnızca samimi kişilerden bildirim al" seçeneği herkeste açık başlar. Bu yüzden karşılıklı takipleşmeyen ve aralarında kalp seviyesi olmayan birinin mesajı telefona bildirim düşürmez. Yayıncılar, ilk kez yazıp ücret ödeyen kişinin mesajını uygulamayı açınca görür; yayıncı geliri düşerse ilk bakılacak yer burasıdır. Eski APK bu seçeneği göstermediği için eski APK kullanan kişi kapatamaz. Varsayılan `server/api/privacy.mjs` ve `migrations/095_contact_prefs.sql` içindedir.
+
+## Otomatik mesaj ve 5 dakika kuralı (18 Kasım 2026)
+
+Şartname V2.0 uygulandı ([`OTOMATIK_MESAJ.md`](OTOMATIK_MESAJ.md)). Sahiplerin kararları: cevapsız kalan ücretli mesajın jetonu erkeğe iade edilir; erkek adına ücretsiz sohbet başlangıcı varsayılan açık, kapatılabilir.
+
+- **Eski APK'daki yayıncı (siz: bir ayar):** 5 dakika kuralı sunucuda, herkese birden başlar. Eski APK geri sayımı göstermez; o yayıncı cevap vermeyi bilmeden kazanç kaçırabilir. Yeni APK dağıtılınca Canlı ayarlar › Zorunlu sürüm yükseltilmeli. O zamana kadar istenirse Canlı ayarlar › Otomatik mesaj › "Mesaj cevap süresi" 0 yapılır: eski hâl (yayıncı hemen kazanır, iade yok).
+- **Erkek ajans ve aile sahipleri (siz: karar):** yayıncı kuralı onları da yayıncı sayıyor; ücretli mesajdan kazanmaya devam ederler (aynı 5 dakika kuralıyla). Şartname "erkek kullanıcılar mesaj kazancından elmas kazanamaz" diyor. Otomatik mesaj, hazır cevap ve şablonlar yalnız kadın yayıncılarda. Erkek yayıncıların mesaj kazancı kapatılsın mı, karar sizin.
+- **Sistemin başlattığı mesaja ödül (siz: karar, şartnamenin "canlıya almadan önce" maddesi):** bugün güvenli kural uygulanıyor: erkek adına gönderilen ücretsiz başlangıç hiç elmas üretmez; erkeğin sonraki gerçek (ücretli) mesajı normal kurala girer. Ayrı bir promosyon ödülü ve bütçesi yapılmadı.
+- **Kişi adına mesaj (mağaza):** ücretsiz başlangıç karşı tarafta "Otomatik sohbet başlangıcı", gönderende "Senin adına gönderilen…" diye yazıyor ve uygulama anlatmadan gitmiyor. Google Play incelemesinde sorulursa bu açıklama gösterilebilir.
+- **Panel sayfası (Claude, sonra):** Canlı ayarlar kendiliğinden görünüyor. Rapor (yayıncı ve ajans performansı, hazır cevap kullanımı, şüpheli ikililer, bildirim kayıtları) için sunucu uçları `PANEL_ROUTES`'ta hazır; panel deposunda sayfası ve `APP_ROUTES` izni yapılmadı.
+- **Yük:** eşleştirme dakikada bir, en çok 100 yayıncı ve 500 aday erkekle çalışır; ücretli mesaj başına bir satır daha yazılır. Yük testi bu sürümle tekrarlanmadı; canlı kullanıcı artınca `server/infra/loadtest/` ile denenmeli.
+
