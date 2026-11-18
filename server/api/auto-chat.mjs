@@ -232,6 +232,8 @@ async function sendAuto(kind, from, to) {
   if (await dmRefusal(db, from.id, to)) return null;
   const s = live();
   const row = await tx(async (c) => {
+    // Both rows in id order first, as every message does (messages.mjs keyLock).
+    await c.query('SELECT 1 FROM users WHERE id = ANY($1::uuid[]) ORDER BY id FOR KEY SHARE', [[from.id, to]]);
     const quota = kind === 'streamer' ? await takeQuota(c, from.id, 'auto', s.autoDaily) : await takeQuota(c, from.id, 'opener', s.openerDaily);
     if (quota === null) return null;
     let no;

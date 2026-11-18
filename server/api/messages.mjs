@@ -34,6 +34,12 @@ import { notify } from './push.mjs';
 import { assertMay } from './sanctions.mjs';
 
 const PAGE = 50;
+/**
+ * Both people's rows, in id order, before a message names them. The message's keys are checked against both rows
+ * (sender first): without this a message could hold one person's row and wait for the other's while a gift, a bond or
+ * a refund that locks both in id order waits the other way round (test/money-fuzz.test.mjs found it).
+ */
+export const keyLock = (c, a, b) => c.query('SELECT 1 FROM users WHERE id = ANY($1::uuid[]) ORDER BY id FOR KEY SHARE', [[a, b]]);
 const out = (m, me = null) => ({
   id: Number(m.id),
   from: m.sender,
@@ -165,6 +171,7 @@ export const messageRoutes = {
     } else if (quickNo) {
       // One of today's quick replies, taken with the message: a refusal or a replay takes none.
       row = await tx(async (c) => {
+        await keyLock(c, me.id, to);
         const r = await insert(c);
         if (!r.rowCount) return null;
         quickUsed = await takeQuota(c, me.id, 'quick', live().quickDaily);
@@ -175,7 +182,10 @@ export const messageRoutes = {
         throw e;
       });
     } else {
-      row = (await insert(db)).rows[0];
+      row = await tx(async (c) => {
+        await keyLock(c, me.id, to);
+        return (await insert(c)).rows[0];
+      });
     }
     if (!row) return replay();
     // Their notification preferences decide; the message itself has arrived either way, and never waits for this.
