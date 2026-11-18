@@ -51,7 +51,7 @@ import crypto from 'node:crypto';
 
 import { HttpError, auth, clientIp, db, env, int, limit, readJson, text, tx } from './core.mjs';
 import { SEAT_COLORS, SEAT_DEFAULT, SHOP, SHOP_PAUSED } from './catalog.mjs';
-import { addVideoTable, canConvert, canSvga, imageInfo, kickJobs, svgaFrame, videoOf } from './custom-gifts.mjs';
+import { addVideoTable, canConvert, canSvga, fitPicture, imageInfo, kickJobs, svgaFrame, videoOf } from './custom-gifts.mjs';
 import { FX_PATH } from './fx.mjs';
 import { keyOf, kindMax, readStored, removeFiles, sendFile, storageOn, verifyUpload, writeStored } from './media.mjs';
 import { panelDetail } from './panel.mjs';
@@ -121,7 +121,8 @@ export const SHOP_LIMITS = Object.freeze({
   priceMax: 10_000_000,
   daysMax: 365,
   vipMax: 15,
-  frameBytes: kindMax('shopframe'),
+  // A frame is served as uploaded: kept at what phones load comfortably (the upload kind takes more, for icons).
+  frameBytes: 4 * 1024 * 1024,
   framePxMin: 128,
   framePxMax: 1024,
   holeMin: 0.1,
@@ -150,18 +151,23 @@ export const SHOP_LIMITS = Object.freeze({
     secondsMax: 20,
     anims: PLATE_ANIMS,
   }),
-  // An entry effect's icon in the shop: a PNG or WebP, drawn small.
-  iconBytes: 512 * 1024,
+  // An entry effect's icon in the shop: a PNG or WebP, drawn small. Any size up to the upload's is taken; a bigger one
+  // than phones need is made smaller on save (iconServe*, custom-gifts.mjs fitPicture), as gift icons are.
+  iconBytes: kindMax('shopframe'),
   iconPxMin: 64,
-  iconPxMax: 1024,
+  iconPxMax: 4096,
+  iconServePx: 512,
+  iconServeBytes: 512 * 1024,
   // A bubble's picture: drawn at a third of its size (made at 3×, as a phone's screen), its corners as they are.
   bubbleBytes: 1024 * 1024,
   bubblePxMin: 64,
   bubblePxMax: 1024,
-  // A wave's spark picture: drawn small, four of them turning on the ring.
-  sparkBytes: 512 * 1024,
+  // A wave's spark picture: drawn small, four of them turning on the ring; made smaller on save like the icon.
+  sparkBytes: kindMax('shopframe'),
   sparkPxMin: 64,
-  sparkPxMax: 512,
+  sparkPxMax: 4096,
+  sparkServePx: 512,
+  sparkServeBytes: 512 * 1024,
   waveStyles: WAVE_STYLES,
   itemsMax: 200,
 });
@@ -495,7 +501,14 @@ async function pictureOf(url, what, max) {
   const buf = await readStored(key, max);
   const info = imageInfo(buf);
   if (!info) throw bad(`${what} PNG ya da WebP olmalı`);
-  return { ...info, bytes: buf.length };
+  return { ...info, bytes: buf.length, buf, key };
+}
+/** A small picture kept as uploaded when phones can take it, else made smaller (custom-gifts.mjs fitPicture). */
+async function served(url, info, maxPx, maxBytes, what) {
+  if (info.bytes <= maxBytes && Math.max(info.width, info.height) <= maxPx) return { url, px: info.width };
+  const small = await fitPicture(info.buf, info.key, { maxPx, maxBytes, what, size: `${info.width} × ${info.height}` });
+  const px = imageInfo(await readStored(keyOf(small), maxBytes))?.width ?? Math.min(info.width, maxPx);
+  return { url: small, px };
 }
 /** A frame's picture: a transparent PNG or WebP, square or nearly, 128–1024 px, still (the moving one goes apart). */
 async function frameArt(url) {
@@ -527,20 +540,20 @@ async function motionArt(url) {
   if (info.width < lo || info.width > hi) throw bad(`Hareketli çerçeve ${lo}–${hi} piksel olmalı (bu ${info.width}); telefon onu küçük çizer, büyüğü boşuna yer kaplar`);
   return { url, px: info.width, bytes: info.bytes };
 }
-/** An entry effect's icon in the shop: a PNG or WebP, 64–1024 px each way, up to 512 KB. */
+/** An entry effect's icon in the shop: a PNG or WebP, 64–4096 px each way; phones get at most 512 px and 512 KB. */
 async function iconArt(url) {
   const info = await pictureOf(url, 'İkon resmini', SHOP_LIMITS.iconBytes);
   const { iconPxMin: lo, iconPxMax: hi } = SHOP_LIMITS;
   if (info.width < lo || info.height < lo || info.width > hi || info.height > hi) throw bad(`İkon her yönde ${lo}–${hi} piksel olmalı (bu ${info.width} × ${info.height})`);
-  return { url, px: info.width };
+  return served(url, info, SHOP_LIMITS.iconServePx, SHOP_LIMITS.iconServeBytes, 'İkon');
 }
-/** A wave's spark picture: a transparent PNG or WebP, 64–512 px, up to 512 KB. */
+/** A wave's spark picture: a transparent PNG or WebP, 64–4096 px; phones get at most 512 px and 512 KB. */
 async function sparkArt(url) {
   const info = await pictureOf(url, 'Parıltı resmini', SHOP_LIMITS.sparkBytes);
   if (!info.alpha) throw bad('Parıltı resminde saydamlık yok: şeklin çevresi saydam olmalı');
   const { sparkPxMin: lo, sparkPxMax: hi } = SHOP_LIMITS;
   if (info.width < lo || info.height < lo || info.width > hi || info.height > hi) throw bad(`Parıltı resmi her yönde ${lo}–${hi} piksel olmalı (bu ${info.width} × ${info.height})`);
-  return { url, px: info.width };
+  return served(url, info, SHOP_LIMITS.sparkServePx, SHOP_LIMITS.sparkServeBytes, 'Parıltı resmi');
 }
 const colorOf = (v, what) => {
   if (typeof v === 'string' && /^#[0-9A-Fa-f]{6}$/.test(v)) return v.toUpperCase();

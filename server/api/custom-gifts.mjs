@@ -360,22 +360,33 @@ async function checkIcon(url) {
   if (Math.max(w, h) / Math.min(w, h) > 1.25) throw new HttpError(400, `İkon kare olmalı (bu ${w} × ${h})`);
   if (!info.alpha) throw new HttpError(400, 'İkon saydam olmalı: arka planı silinmiş PNG ya da WebP yükle');
   if (buf.length <= LIMITS.iconServeBytes && Math.max(w, h) <= LIMITS.iconServePx) return { url, upload: null };
-  const big = `İkon en fazla ${LIMITS.iconServePx} piksel ve ${mb(LIMITS.iconServeBytes)} MB olabilir`;
-  if (!(await canFitIcon())) throw new HttpError(400, `${big} (bu ${w} × ${h}, ${mb(buf.length)} MB): bu sunucu küçültemiyor`);
+  return { url: await fitPicture(buf, key, { maxPx: LIMITS.iconServePx, maxBytes: LIMITS.iconServeBytes, what: 'İkon', size: `${w} × ${h}` }), upload: url };
+}
+
+/**
+ * A stored picture (`buf`, at storage key `key`) made small enough for phones: at most `maxPx` on its longer side and
+ * `maxBytes` (tools/icon-fit.py: an optimised PNG, transparency kept), stored beside the upload under the same folder.
+ * Resolves with its address; a 400 in Turkish when it can't (no Pillow here, unreadable, too detailed). Also used by
+ * Yönetim › Mağaza (shop-items.mjs) for entry effect icons and wave sparks.
+ */
+export async function fitPicture(buf, key, { maxPx, maxBytes, what, size = '' }) {
+  const big = `${what} en fazla ${maxPx} piksel ve ${maxBytes >= 1024 * 1024 ? `${mb(maxBytes)} MB` : `${Math.round(maxBytes / 1024)} KB`} olabilir`;
+  if (!(await canFitIcon())) throw new HttpError(400, `${big}${size ? ` (bu ${size})` : ''}: bu sunucu küçültemiyor`);
   const small = await temp(async (dir) => {
     const input = path.join(dir, 'icon');
     const output = path.join(dir, 'small.png');
     await fs.promises.writeFile(input, buf);
-    const r = await run(PYTHON, ['-I', ICON_TOOL, input, output, '--max-px', String(LIMITS.iconServePx), '--max-bytes', String(LIMITS.iconServeBytes)], { timeout: 60_000, keep: 4096, nice: true });
+    const r = await run(PYTHON, ['-I', ICON_TOOL, input, output, '--max-px', String(maxPx), '--max-bytes', String(maxBytes)], { timeout: 60_000, keep: 4096, nice: true });
     if (r.code !== 0) {
-      console.error('gift icon fit', r.code, r.err.slice(-300));
-      throw new HttpError(400, /too detailed/.test(r.err) ? `${big}: bu resim küçültünce de çok büyük kalıyor, daha sade bir ikon yükle` : 'İkon okunamadı: PNG ya da WebP olmalı');
+      console.error('picture fit', r.code, r.err.slice(-300));
+      throw new HttpError(400, /too detailed/.test(r.err) ? `${big}: bu resim küçültünce de çok büyük kalıyor, daha sade bir resim yükle` : `${what} okunamadı: PNG ya da WebP olmalı`);
     }
     return fs.promises.readFile(output);
   });
   // Under the uploader's folder, like every stored file (media.mjs FILE_KEY).
-  const smallKey = `gifticon/${key.split('/')[1]}/${Date.now().toString(36)}-${crypto.randomBytes(6).toString('base64url')}.png`;
-  return { url: await writeStored(smallKey, small, 'image/png'), upload: url };
+  const [kind, folder] = key.split('/');
+  const smallKey = `${kind}/${folder}/${Date.now().toString(36)}-${crypto.randomBytes(6).toString('base64url')}.png`;
+  return writeStored(smallKey, small, 'image/png');
 }
 
 /** Runs a program; resolves with its exit code, its stdout (up to `keep` bytes) and the end of its stderr. Never through a shell. */

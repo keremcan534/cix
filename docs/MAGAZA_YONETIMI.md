@@ -40,7 +40,7 @@ Beş sekme var: **Giriş efektleri**, **Çerçeveler**, **Sohbet balonları**, *
     - **Yer değiştirme:** ad önizlemede sürüklenerek taşınır; sağ alt köşedeki tutamaçla plaka genişler ve yazı büyür. Ok tuşları ince ayar yapar (Shift ile daha büyük adım). Kaydırıcılar da durur.
     - **Yazının görünüşü:** büyük harf (Türkçe kurala göre: i → İ), harf aralığı, gölge ya da parlama (renk ve yayılma), kontur (renk ve kalınlık), adın arkasında yuvarlak bir bant (renk ve saydamlık).
     - **Zamanı:** ad videonun kaçıncı saniyesinde görünür ve kaçıncı saniyesinde kaybolur (0: video bitene kadar). Görünme şekli: hemen, solarak, büyüyerek ya da yükselerek. "Hareketi azalt" açık telefonda büyüme ve yükselme yerine solarak gelir.
-  - **İkon (isteğe bağlı):** mağazada efektin bandının üstünde görünen resim. PNG ya da WebP, her yönde 64–1024 px, en çok 512 KB. Kare ve 192 px önerilir. Yoksa yalnız bant görünür.
+  - **İkon (isteğe bağlı):** mağazada efektin bandının üstünde görünen resim. PNG ya da WebP, her yönde 64–4096 px, en çok 10 MB. Telefonlar için 512 px ve 512 KB'tan büyüğünü sunucu kaydederken kendisi küçültür (saydamlık korunur). Kare ve 192 px önerilir. Yoksa yalnız bant görünür.
   - **Önizleme:** videonun üstünde örnek bir adla gösterilir. Oynat / durdur, baştan oynat, döngü, ses ve zaman çubuğu vardır. Video istenen anda durdurulup ad yerleştirilebilir; "Şu andan görünsün" ve "Şu anda kaybolsun" düğmeleri zamanı o ana koyar.
   - **Uzun ad:** plakaya sığacak kadar küçülür, tek satır kalır.
 - **Yeni sohbet balonu:**
@@ -52,7 +52,7 @@ Beş sekme var: **Giriş efektleri**, **Çerçeveler**, **Sohbet balonları**, *
   - **Önizleme:** kısa ve uzun bir mesaj, odadaki koyu zeminde.
 - **Yeni ses dalgası:**
   - **Stil:** Halka (tek renk), Çift halka (iki renk; dıştaki sesle daha çok açılır), Dönen renkler (2–4 renk), Yayılan halka (tek renk), Parıltı (halka rengi ve dönen dört şekil).
-  - **Parıltı resmi (isteğe bağlı):** saydam PNG ya da WebP, 64–512 px, en çok 512 KB. Kalp ya da yıldız gibi bir şekil; noktaların yerine döner.
+  - **Parıltı resmi (isteğe bağlı):** saydam PNG ya da WebP, 64–4096 px, en çok 10 MB; 512 px ve 512 KB'tan büyüğünü sunucu kendisi küçültür. Kalp ya da yıldız gibi bir şekil; noktaların yerine döner.
   - **Önizleme:** konuşan bir yüzün çevresinde.
 - **Koltuk renkleri:** odadaki boş ve kilitli mikrofonların rengi. Oda sahibi rengi odası için alır, odadaki herkes görür.
   - Her rengin adı, rengi, fiyatı ve süresi (gün; 0 = süresiz) değişir; uygulamanın altı renginin rengi de. **Yeni koltuk rengi** ile renk eklenir.
