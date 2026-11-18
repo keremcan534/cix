@@ -27,6 +27,7 @@
 //   POST /api/agency/independence { id, reason, ref }     POST /api/agency/change-parent { id, toCode, reason, ref }
 //   POST /api/agency/sub/close { id, reason, ref }        POST /api/agency/appeal { id, subject, body }
 //   GET  /api/agency/notices?id=
+import { agencyMessagePerformance, periodOf } from './auto-chat.mjs';
 import { HttpError, REF, UUID, assertClean, auth, db, readJson, text, tx } from './core.mjs';
 import {
   AGENCY_PERMS,
@@ -587,6 +588,17 @@ export const agencyRoutes = {
       tiers: x.s.tiers,
       performance: x.s.performance,
     };
+  },
+
+  /**
+   * Mesaj performansı (docs/OTOMATIK_MESAJ.md §11.2): how the agency's own streamers answer paid messages in the
+   * period, one row each, the agency's totals and the change from the period before. Figures only: never a message.
+   */
+  async 'GET /api/agency/message-performance'(req, url) {
+    const x = await ctx(db, req);
+    const a = await agencyFor(db, x, url.searchParams.get('id'), 'streamers.view');
+    const p = periodOf(url);
+    return { agency: { id: a.id, name: a.name }, period: p.period, range: p.range ?? null, ...(await agencyMessagePerformance(db, a.id, p)) };
   },
 
   async 'GET /api/agency/report'(req, url) {

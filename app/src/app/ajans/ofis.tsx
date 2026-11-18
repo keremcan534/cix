@@ -3,6 +3,7 @@
 // sub-agencies, performance and tiers, earnings with the commission ledger and payouts, requests and transfers,
 // and the team. Every number and every permission comes from server/api/agency.mjs; actions are refused there
 // when not allowed. Without a server connection the labelled example data is shown and actions are disabled.
+import { AgencyMessagePerf } from '@/components/agency-message-perf';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
@@ -73,7 +74,7 @@ import { liveMode } from '@/lib/live';
 import { useApp } from '@/store';
 import { colors, fonts, semantic, space } from '@/theme';
 
-type Tab = 'summary' | 'streamers' | 'subs' | 'performance' | 'earnings' | 'requests' | 'team' | 'assistants' | 'more';
+type Tab = 'summary' | 'streamers' | 'subs' | 'performance' | 'messages' | 'earnings' | 'requests' | 'team' | 'assistants' | 'more';
 type AskFn = (a: Ask) => Promise<{ reason: string; field: string } | null>;
 type Ctx = { o: Overview; id: string; name: string; demo: boolean; reload: () => void; ask: AskFn; can: (p: string) => boolean; acting: boolean };
 
@@ -96,6 +97,8 @@ export default function AgencyOffice() {
     { key: 'streamers', label: 'Yayıncılar', perm: 'streamers.view' },
     { key: 'subs', label: 'Referans ajanslar', perm: 'subagencies.view', hidden: !!o && o.agency.level > 1, badge: o?.counts.pending_subs },
     { key: 'performance', label: 'Performans', perm: 'reports.performance' },
+    // Otomatik mesaj: how the agency's streamers answer paid messages (figures only, server/api/auto-chat.mjs).
+    { key: 'messages', label: 'Mesaj performansı', perm: 'streamers.view', hidden: !live },
     { key: 'earnings', label: 'Kazanç', perm: 'reports.commission' },
     { key: 'requests', label: 'Talepler', perm: 'streamers.view', badge: o ? o.counts.pending_requests + o.counts.pending_transfers : 0 },
     { key: 'team', label: 'Ekip', perm: 'staff.manage', hidden: !!o && !['owner', 'staff'].includes(o.viewer) },
@@ -132,6 +135,8 @@ export default function AgencyOffice() {
                 <Subs c={ctx} />
               ) : cur.key === 'performance' ? (
                 <PerformanceTab c={ctx} />
+              ) : cur.key === 'messages' ? (
+                <AgencyMessagePerf agencyId={ctx.id} />
               ) : cur.key === 'earnings' ? (
                 <Earnings c={ctx} />
               ) : cur.key === 'requests' ? (

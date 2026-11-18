@@ -16,6 +16,7 @@ import { EXCHANGE, GIFTS, PACKS, SHOP, WITHDRAW, exchangeCoins } from './catalog
 import { DAILY_ROUNDS as CASINO_DAILY_ROUNDS, GAMES as CASINO_GAMES, STAKES as CASINO_STAKES } from './casino-rules.mjs';
 import { REMINDER_KINDS, REMINDER_LABEL } from './event-rules.mjs';
 import { HOUSE_PCT as ROCKET_HOUSE_PCT } from './rocket-live-rules.mjs';
+import { AUTO_CHAT, AUTO_PARTS, AUTO_PART_LABEL, AUTO_PART_OFF, AUTO_TEXTS, NOTICE_CATEGORIES, NOTICE_LABEL, linesOf } from './auto-chat-rules.mjs';
 
 /** Every feature that can be switched off (features.mjs ROUTES). `games` is mostly in the app; Rüzgâr Gülü is on the server. */
 export const FEATURES = ['gifts', 'purchases', 'topup', 'exchange', 'jeton', 'games', 'dm', 'rooms', 'withdraw', 'shop'];
@@ -123,6 +124,11 @@ export function defaultsOf(e = process.env) {
     event_reminders_off: [],
     // Every Şanslı win is announced in every room (the owner's wish, Güncelleme 5).
     lucky_announce_min_coins: 0,
+    // Otomatik mesaj (auto-chat-rules.mjs): the spec's numbers and texts, every part on, every SimilarClub Sistem notice on.
+    auto_chat_off: [],
+    ...Object.fromEntries(Object.entries(AUTO_CHAT).map(([k, x]) => [k, x.default])),
+    ...Object.fromEntries(Object.entries(AUTO_TEXTS).map(([k, x]) => [k, x.default])),
+    system_notices_off: [],
   };
 }
 const CASINO_TOP = CASINO_STAKES.wide[CASINO_STAKES.wide.length - 1];
@@ -457,6 +463,95 @@ const OFF_EFFECT = {
   rooms: 'Yeni oda açılamaz, odalara girilemez.',
   withdraw: 'Yeni para çekme talebi alınmaz; bekleyen talepler sürer.',
   shop: 'Mağazadan alım durur (eski uygulamalar dahil); alınmış ürünler kalır ve giyilebilir.',
+};
+
+/**
+ * Otomatik mesaj (auto-chat.mjs, message-holds.mjs, system-notices.mjs): the switches, the numbers, the texts (one
+ * message per line) and SimilarClub Sistem's categories. A change of the reply window more than doubles or halves asks
+ * twice: it decides who gets a paid message's coins.
+ */
+const AUTO = 'Otomatik mesaj';
+const NOTICES = 'SimilarClub Sistem';
+const autoEntries = () => {
+  const parts = { options: AUTO_PARTS, labels: AUTO_PART_LABEL, max: AUTO_PARTS.length };
+  const cats = { options: NOTICE_CATEGORIES, labels: NOTICE_LABEL, max: NOTICE_CATEGORIES.length };
+  return {
+    auto_chat_off: {
+      field: 'autoChatOff',
+      group: AUTO,
+      label: 'Kapalı bölümler',
+      help: 'Kapatılan bölüm sunucuda hemen durur. Gönderilmiş mesajlar kalır; cevap bekleyen ücretli mesajların süresi işler.',
+      type: 'set',
+      bounds: parts,
+      parse: (v) => setOf(v, parts, 'Kapalı bölümler'),
+      big: () => false,
+      impact(before, after) {
+        const out = added(before, after).map((k) => AUTO_PART_OFF[k]);
+        const on = added(after, before);
+        if (on.length) out.push(`Yeniden açılır: ${on.map((k) => AUTO_PART_LABEL[k]).join(', ')}.`);
+        return out.join(' ') || 'Görünür bir etkisi yok.';
+      },
+    },
+    ...Object.fromEntries(
+      Object.entries(AUTO_CHAT).map(([k, x]) => [
+        k,
+        {
+          field: x.field,
+          group: AUTO,
+          label: x.label,
+          help: x.help,
+          type: 'int',
+          bounds: x.bounds,
+          parse: (v) => wholeOf(v, x.bounds, x.label, x.unit),
+          big: (before, after) => after !== null && !!x.bounds.money && (after === 0 || before === 0 || after > before * 2 || after * 2 < before),
+          impact: (before, after) => x.text(fmt(before), fmt(after)),
+        },
+      ]),
+    ),
+    ...Object.fromEntries(
+      Object.entries(AUTO_TEXTS).map(([k, x]) => [
+        k,
+        {
+          field: x.field,
+          group: AUTO,
+          label: x.label,
+          help: x.help,
+          type: 'text',
+          bounds: { max: 4000 },
+          parse(v) {
+            if (typeof v !== 'string') bad(`${x.label} metin olmalı`);
+            if (v.length > 4000) bad(`${x.label} en çok 4.000 karakter olabilir`);
+            if (CONTROL.test(v)) bad(`${x.label}: satır sonu dışında özel karakter olamaz`);
+            const lines = linesOf(v, 1000);
+            if (!lines.length) bad(`${x.label}: en az bir satır gerekli`);
+            if (lines.length > x.lines) bad(`${x.label}: en çok ${x.lines} satır olabilir`);
+            if (lines.some((l) => l.length > 300)) bad(`${x.label}: bir satır en çok 300 karakter olabilir`);
+            return lines.join('\n');
+          },
+          big: () => false,
+          impact: (before, after) => `${linesOf(after).length} satır: “${linesOf(after)[0] ?? ''}”${linesOf(after).length > 1 ? ' …' : ''}`,
+        },
+      ]),
+    ),
+    system_notices_off: {
+      field: 'systemNoticesOff',
+      group: NOTICES,
+      label: 'Kapalı bildirimler',
+      help: 'SimilarClub Sistem sohbetine (eski uygulamada Similar Ekibi) gitmeyecek bildirim türleri. Para ve ödül işlemleri bildirimden bağımsız yapılır.',
+      type: 'set',
+      bounds: cats,
+      parse: (v) => setOf(v, cats, 'Kapalı bildirimler'),
+      big: () => false,
+      impact(before, after) {
+        const off = added(before, after);
+        const on = added(after, before);
+        const out = [];
+        if (off.length) out.push(`Gitmez: ${off.map((k) => NOTICE_LABEL[k]).join(', ')}.`);
+        if (on.length) out.push(`Yeniden gider: ${on.map((k) => NOTICE_LABEL[k]).join(', ')}.`);
+        return out.join(' ') || 'Görünür bir etkisi yok.';
+      },
+    },
+  };
 };
 
 // --- Checks ----------------------------------------------------------------------------------------------------
@@ -817,6 +912,7 @@ export const REGISTRY = {
   ...roomEntries(),
   ...eventEntries(),
   ...winEntries(),
+  ...autoEntries(),
   admin_site: {
     field: 'adminSite',
     group: 'Yönetim',
@@ -943,6 +1039,10 @@ export function snapshotOf(rows = [], e = process.env, { v = 0 } = {}) {
     ...Object.fromEntries(Object.entries(EVENT_RULES).map(([k, x]) => [x.field, val(k)])),
     eventRemindersOff: readOnlySet(val('event_reminders_off')),
     luckyAnnounceMinCoins: val('lucky_announce_min_coins'),
+    autoChatOff: readOnlySet(val('auto_chat_off')),
+    ...Object.fromEntries(Object.entries(AUTO_CHAT).map(([k, x]) => [x.field, val(k)])),
+    ...Object.fromEntries(Object.entries(AUTO_TEXTS).map(([k, x]) => [x.field, val(k)])),
+    systemNoticesOff: readOnlySet(val('system_notices_off')),
     invalid: Object.freeze([...invalid]),
   });
 }

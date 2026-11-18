@@ -29,6 +29,7 @@ import { recordIncome } from './agency-lib.mjs';
 import { voidRefundedBonds } from './bonds.mjs';
 import { refundItems } from './economy.mjs';
 import { voidRefundedBags } from './lucky-bags.mjs';
+import { HELD_EARNERS, voidRefundedHolds } from './message-holds.mjs';
 import { assertCashOut } from './streamer-rule.mjs';
 
 const TRANSFER_MAX = 100_000_000;
@@ -130,8 +131,10 @@ export async function refundPurchase(c, id, { actor = null, ip = '', source = 'a
       "SELECT b FROM bonds WHERE status = 'pending' AND EXISTS (SELECT 1 FROM jsonb_array_elements(held_lots) p WHERE (p->>'lot')::bigint = ANY($1::bigint[]))",
       [lots.map((l) => l.id)],
     );
+    // A paid message waiting for its answer (message-holds.mjs): its streamer, for the same reason.
+    const holdPeople = await c.query(HELD_EARNERS, [lots.map((l) => l.id)]);
     return {
-      users: [...new Set([...lots.map((l) => l.user_id), ...locks.map((k) => k.user_id), ...bondPeople.rows.map((x) => x.b)])],
+      users: [...new Set([...lots.map((l) => l.user_id), ...locks.map((k) => k.user_id), ...bondPeople.rows.map((x) => x.b), ...holdPeople.rows.map((x) => x.earner)])],
       bags: openBags.rows.map((b) => Number(b.id)),
     };
   };
@@ -173,9 +176,11 @@ export async function refundPurchase(c, id, { actor = null, ip = '', source = 'a
       });
     coins += take;
   }
-  // Coins the trail's owners hold for a pending bond or an open Şanslı çanta came from these lots too: they go
-  // with the purchase, so they can't come back later or turn into someone's diamonds after this refund.
-  const escrowCoins = (await voidRefundedBonds(c, lots.map((l) => Number(l.id)))) + (await voidRefundedBags(c, lots.map((l) => Number(l.id))));
+  // Coins the trail's owners hold for a pending bond, an open Şanslı çanta or a paid message waiting for its answer
+  // came from these lots too: they go with the purchase, so they can't come back later or turn into someone's
+  // diamonds after this refund.
+  const lotIds = lots.map((l) => Number(l.id));
+  const escrowCoins = (await voidRefundedBonds(c, lotIds)) + (await voidRefundedBags(c, lotIds)) + (await voidRefundedHolds(c, lotIds));
   coins += escrowCoins;
   for (const k of locks) {
     const amount = Number(k.amount);

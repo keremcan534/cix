@@ -4,6 +4,9 @@
 // With a real person the server prices each message (1v1, components/one-on-one-bar): free on a mutual follow
 // or between two people who aren't streamers; the heart bar and the gift button come from there too. The heart bar
 // shows with a paid pair, and with anyone once the heart between us has a level (the demo: its sample hearts).
+// Otomatik mesaj (lib/live/auto-chat): under a paid message a streamer received, the diamonds she earns by answering
+// in 5 minutes and the time left; under my own paid message what became of its coins; a label on automatic messages and
+// quick replies; and a woman streamer's quick-reply button once the other person wrote to her.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
@@ -36,6 +39,8 @@ import { HeartBar, heartOf, paidPair, useChatGift, usePair } from '@/components/
 import { liveMode, message as errorText, refreshWallet, toServer } from '@/lib/live';
 import type { Pair } from '@/lib/live/one-on-one';
 import { MESSAGE_REPORT_REASONS, isLiveUser, liveDm, reportDm, syncThread, useLiveThread, type SendResult } from '@/lib/live/messages';
+import { sendQuick, serverNowMs, useAutoMe, useThreadExtras } from '@/lib/live/auto-chat';
+import { feeLine, rewardLine, sourceLabel } from '@/lib/msg-reward';
 import { uploadPhoto } from '@/lib/live/profile';
 import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
@@ -97,6 +102,23 @@ export function ChatThread({
   const [typing, setTyping] = useState(false);
   const replyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const Body = avoidKeyboard ? KeyboardAvoid : View;
+  // The 5-minute rule and quick replies (server/api/message-holds.mjs, auto-chat.mjs): a live chat only.
+  const extras = useThreadExtras(user.id);
+  const auto = useAutoMe();
+  const quick = real && auto?.tools && auto.quick?.on ? auto.quick : null;
+  const wroteToMe = messages.some((m) => !m.fromMe);
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [quickBusy, setQuickBusy] = useState(false);
+  const pickQuick = async (no: number) => {
+    setQuickOpen(false);
+    if (quickBusy) return;
+    setQuickBusy(true);
+    const r = await sendQuick(user.id, no);
+    setQuickBusy(false);
+    if (!r.ok) return showAlert(r.quota ? 'Hazır cevap hakkın bitti' : 'Gönderilemedi', r.reason);
+    void syncThread(user.id, { importDms }).catch(() => {});
+    if (r.done) showAlert('Hazır cevap hakkın bitti', r.done);
+  };
 
   useEffect(() => {
     markRead(user.id);
@@ -303,6 +325,7 @@ export function ChatThread({
           renderItem={({ item }) =>
             item.fromMe ? (
               <Pressable onLongPress={() => setPicked(item)} delayLongPress={350} style={styles.mine} accessibilityHint="Seçenekler için basılı tut">
+                {!!sourceLabel(item.source ?? extras(item.sid)?.source, true) && <Text style={[styles.autoLabel, { alignSelf: 'flex-end' }]}>{sourceLabel(item.source ?? extras(item.sid)?.source, true)}</Text>}
                 <LinearGradient colors={gradientDeep} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.bubble, styles.mineBubble]}>
                   {!!item.image && <Image source={{ uri: item.image }} style={styles.photo} resizeMode="cover" accessibilityLabel="Fotoğraf" />}
                   {!(item.image && item.text === 'Fotoğraf') && <MessageText text={item.text} style={styles.bubbleText} />}
@@ -328,9 +351,12 @@ export function ChatThread({
                     </Pressable>
                   )}
                 </LinearGradient>
+                {/* My paid message: its coins only (never what the other one earns). */}
+                {!!extras(item.sid)?.fee && <Text style={styles.feeLine}>{feeLine(extras(item.sid)!.fee!)}</Text>}
               </Pressable>
             ) : (
               <View style={{ gap: 6 }}>
+                {!!sourceLabel(item.source ?? extras(item.sid)?.source, false) && <Text style={styles.autoLabel}>{sourceLabel(item.source ?? extras(item.sid)?.source, false)}</Text>}
                 <Pressable onLongPress={() => setPicked(item)} delayLongPress={350} style={[styles.bubble, styles.theirs]} accessibilityHint="Seçenekler için basılı tut">
                   {!!item.image && <Image source={{ uri: item.image }} style={styles.photo} resizeMode="cover" accessibilityLabel="Fotoğraf" />}
                   {!(item.image && item.text === 'Fotoğraf') && <MessageText text={item.text} style={[styles.bubbleText, styles.theirsText]} />}
@@ -338,6 +364,7 @@ export function ChatThread({
                   {item.event && <EventCard event={item.event} theirs />}
                   <Text style={[styles.time, styles.theirsTime]}>{messageTime(item)}</Text>
                 </Pressable>
+                {!!extras(item.sid)?.reward && <RewardNote line={rewardLine(extras(item.sid)!.reward!, serverNowMs())} />}
                 <SafetyNote
                   text={item.text}
                   onReport={() =>
@@ -410,6 +437,16 @@ export function ChatThread({
               <Ionicons name="image-outline" size={23} color={colors.textDim} />
             </Pressable>
           )}
+          {quick && wroteToMe && !isBlocked && !dmMuted && (
+            <Pressable
+              onPress={() => setQuickOpen(true)}
+              disabled={quickBusy}
+              style={{ opacity: quick.left > 0 && !quickBusy ? 1 : 0.45 }}
+              accessibilityLabel={`Hazır cevap, bugün ${quick.left}/${quick.total} hakkın var`}
+              hitSlop={6}>
+              <Ionicons name="flash-outline" size={23} color={colors.gold} />
+            </Pressable>
+          )}
           {/* Wraps up to a few lines; the keyboard's send key sends and the keyboard stays open for the next one.
               Web: Enter sends, Shift+Enter is a new line (lib/enter-sends). */}
           <TextInput
@@ -436,6 +473,14 @@ export function ChatThread({
       {report.sheet}
       {gift.sheet}
       <ActionSheet visible={!!picked} options={messageOptions} onClose={() => setPicked(null)} />
+      {quick && (
+        <ActionSheet
+          visible={quickOpen}
+          title={quick.left > 0 ? `Bugünkü hazır cevap hakkın: ${quick.left}/${quick.total}` : (quick.done ?? 'Bugünkü hazır cevap hakkın bitti')}
+          options={quick.left > 0 ? quick.replies.map((r) => ({ label: r.text, icon: 'flash-outline' as const, onPress: () => void pickQuick(r.no) })) : []}
+          onClose={() => setQuickOpen(false)}
+        />
+      )}
       <ActionSheet
         visible={!!reporting}
         title="Bu mesajı neden şikâyet ediyorsun?"
@@ -486,6 +531,19 @@ function EventCard({ event, theirs }: { event: EventShareCard; theirs?: boolean 
   );
 }
 
+/** Under a paid message a streamer received: the diamonds, the time left or what came of it (lib/msg-reward). */
+function RewardNote({ line }: { line: ReturnType<typeof rewardLine> }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
+  const color = line.tone === 'gold' ? colors.gold : line.tone === 'ok' ? '#34D399' : colors.textDim;
+  return (
+    <View style={[styles.reward, { borderColor: `${color}66` }]} accessibilityLabel={[line.title, line.sub].filter(Boolean).join('. ')}>
+      <Text style={[styles.rewardTitle, { color }]}>{line.title}</Text>
+      {!!line.sub && <Text style={styles.rewardSub}>{line.sub}</Text>}
+    </View>
+  );
+}
+
 function SafetyNote({ text, onReport }: { text: string; onReport: () => void }) {
   const { colors } = useTheme();
   const styles = useStyles();
@@ -503,6 +561,11 @@ function SafetyNote({ text, onReport }: { text: string; onReport: () => void }) 
 }
 
 const useStyles = makeStyles(({ colors, lift, ink, dark }) => ({
+  autoLabel: { color: colors.textDim, fontSize: 11, fontWeight: '700', marginBottom: 2 },
+  feeLine: { color: colors.textDim, fontSize: 11, alignSelf: 'flex-end', marginTop: 3, textAlign: 'right' },
+  reward: { alignSelf: 'flex-start', maxWidth: '88%', borderWidth: 1, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: 'rgba(246,189,96,0.08)' },
+  rewardTitle: { fontSize: 13, fontWeight: '800' },
+  rewardSub: { color: colors.textDim, fontSize: 11, marginTop: 1 },
   safety: { flexDirection: 'row', alignItems: 'center', gap: 8, maxWidth: '88%', backgroundColor: 'rgba(246,189,96,0.12)', borderColor: 'rgba(246,189,96,0.4)', borderWidth: 1, borderRadius: 12, padding: 10 },
   safetyText: { color: colors.text, fontSize: 12, lineHeight: 17, flex: 1 },
   safetyLink: { color: colors.gold, fontWeight: '800', fontSize: 13 },

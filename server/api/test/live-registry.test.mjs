@@ -6,6 +6,7 @@ import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 
 import { EXCHANGE, GIFTS, PACKS, SHOP, WITHDRAW, exchangeCoins } from '../catalog.mjs';
+import { DEFAULT_OPENERS, DEFAULT_QUICK, DEFAULT_TEMPLATES } from '../auto-chat-rules.mjs';
 import {
   DEFAULTS,
   FEATURES,
@@ -91,6 +92,37 @@ describe('defaults are today', () => {
       event_block_days: 14,
       event_reminders_off: [],
       lucky_announce_min_coins: 0,
+      // Otomatik mesaj and SimilarClub Sistem (auto-chat-rules.mjs): the spec's numbers (V2.0, 18 Nov 2026).
+      auto_chat_off: [],
+      auto_daily: 10,
+      quick_daily: 10,
+      opener_daily: 2,
+      auto_gap_minutes: 20,
+      auto_man_daily: 3,
+      auto_man_gap_minutes: 120,
+      auto_quiet_cut: 50,
+      auto_new_days: 7,
+      auto_new_weight: 40,
+      auto_reply_weight: 30,
+      auto_online_weight: 20,
+      auto_streamer_coef: 50,
+      auto_busy_pending: 3,
+      auto_active_minutes: 10,
+      auto_online_minutes: 15,
+      template_max_chars: 200,
+      template_min_chars: 5,
+      reply_minutes: 5,
+      reply_grace_seconds: 10,
+      message_notice_min: 0,
+      reply_min_chars: 2,
+      perf_warn_rate: 50,
+      perf_warn_min: 10,
+      perf_warn_days: 3,
+      perf_warn_gap_days: 3,
+      auto_templates_default: DEFAULT_TEMPLATES.join('\n'),
+      auto_opener_pool: DEFAULT_OPENERS.join('\n'),
+      auto_quick_pool: DEFAULT_QUICK.join('\n'),
+      system_notices_off: [],
     });
     assert.equal(EXCHANGE.usdTry, 49.8);
     assert.equal(WITHDRAW.maxDiamonds, 5_000_000);
@@ -161,6 +193,36 @@ describe('defaults are today', () => {
       'event_block_days',
       'event_reminders_off',
       'lucky_announce_min_coins',
+      'auto_chat_off',
+      'auto_daily',
+      'quick_daily',
+      'opener_daily',
+      'auto_gap_minutes',
+      'auto_man_daily',
+      'auto_man_gap_minutes',
+      'auto_quiet_cut',
+      'auto_new_days',
+      'auto_new_weight',
+      'auto_reply_weight',
+      'auto_online_weight',
+      'auto_streamer_coef',
+      'auto_busy_pending',
+      'auto_active_minutes',
+      'auto_online_minutes',
+      'template_max_chars',
+      'template_min_chars',
+      'reply_minutes',
+      'reply_grace_seconds',
+      'message_notice_min',
+      'reply_min_chars',
+      'perf_warn_rate',
+      'perf_warn_min',
+      'perf_warn_days',
+      'perf_warn_gap_days',
+      'auto_templates_default',
+      'auto_opener_pool',
+      'auto_quick_pool',
+      'system_notices_off',
       'admin_site',
     ]);
     for (const k of ['need_level', 'need_points', 'min_age', 'lucky_min_age', 'diamonds_per_usd', 'coin_diamond_ratio', 'lock_hours', 'test_daily', 'allow_test_topup', 'gift_prices', 'pack_prices', 'pack_coins', 'product_ids', 'sms_provider', '__proto__', 'constructor', 'toString']) {
@@ -394,6 +456,26 @@ describe('Kazanç duyurusu', () => {
     assert.equal(impactOf('lucky_announce_min_coins', 500, 0), 'Şanslı hediyede her kazanç bütün odalarda duyurulur.');
     assert.equal(snapshotOf([]).luckyAnnounceMinCoins, 0);
     assert.equal(snapshotOf([{ key: 'lucky_announce_min_coins', value: 2_000 }]).luckyAnnounceMinCoins, 2_000);
+  });
+});
+
+describe('Otomatik mesaj', () => {
+  test('cevap süresi para kuralı: 0 ya da iki katı iki kez sorar; metinler satır satır', () => {
+    assert.equal(REGISTRY.reply_minutes.group, 'Otomatik mesaj');
+    assert.equal(isBig('reply_minutes', 5, 0), true, 'kuralı kapatmak');
+    assert.equal(isBig('reply_minutes', 0, 5), true, 'kuralı açmak');
+    assert.equal(isBig('reply_minutes', 5, 15), true);
+    assert.equal(isBig('reply_minutes', 5, 7), false);
+    assert.equal(isBig('auto_daily', 10, 50), false, 'sayılar para değil');
+    assert.match(impactOf('reply_minutes', 5, 0), /hemen alır, iade olmaz/);
+    assert.equal(validate('auto_quick_pool', ' Merhaba \n\n Selam '), 'Merhaba\nSelam');
+    refused(() => validate('auto_quick_pool', '\n \n'), /en az bir satır/);
+    refused(() => validate('auto_templates_default', Array.from({ length: 11 }, (_, i) => `Şablon ${i}`).join('\n')), /en çok 10 satır/);
+    refused(() => validate('auto_opener_pool', 'x'.repeat(301)), /300 karakter/);
+    assert.deepEqual(validate('system_notices_off', ['bonus', 'pk']), ['pk', 'bonus']);
+    refused(() => validate('system_notices_off', ['nope']), /bilinmeyen/);
+    const s = snapshotOf([{ key: 'auto_chat_off', value: ['quick'] }, { key: 'reply_minutes', value: 0 }]);
+    assert.deepEqual([s.autoChatOff.has('quick'), s.replyMinutes, s.autoDaily, s.systemNoticesOff.size], [true, 0, 10, 0]);
   });
 });
 

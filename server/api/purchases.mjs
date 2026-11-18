@@ -33,6 +33,7 @@
 // (packs_hidden) is only left out of the catalog: verifying one still credits it.
 //
 // The VIP subscription (Abonelik) goes through the same stores and helpers, with the same rules: vip.mjs.
+import { bonusNotice } from './system-notices.mjs';
 import crypto from 'node:crypto';
 
 import { HttpError, auth, db, env, readJson, selfUser, sha, tx } from './core.mjs';
@@ -178,7 +179,7 @@ async function credit(u, platform, pack, transactionId, play, purchaseTime) {
     if (e.code === '23505' && /transaction/.test(e.constraint ?? e.detail ?? '')) throw new HttpError(409, 'Bu satın alma başka bir hesapta kullanıldı');
     throw e;
   };
-  return tx(async (c) => {
+  const out = await tx(async (c) => {
     await c.query('SELECT 1 FROM users WHERE id = $1 FOR UPDATE', [u.id]);
     const prev = (await c.query('SELECT user_id, coins, bonus, campaign_bonus FROM purchases WHERE platform = $1 AND transaction_id = $2', [platform, transactionId])).rows[0];
     if (prev) {
@@ -222,6 +223,12 @@ async function credit(u, platform, pack, transactionId, play, purchaseTime) {
     if (!sandbox) await c.query('UPDATE users SET svip_xp = svip_xp + $2 WHERE id = $1', [u.id, pack.coins]);
     return { replay: false, coins: pack.coins, bonus, campaignBonus: kampanya };
   }).catch(taken);
+  // SimilarClub Sistem: the gifts on top of the pack (first purchase, campaign), once the coins are committed.
+  if (!out.replay && (out.bonus || out.campaignBonus)) {
+    const parts = [out.bonus && `${out.bonus.toLocaleString('tr-TR')} jeton ilk alım hediyesi`, out.campaignBonus && `${out.campaignBonus.toLocaleString('tr-TR')} jeton kampanya hediyesi`].filter(Boolean);
+    void bonusNotice({ target: u.id, ref, origin: out.bonus ? 'İlk alım hediyesi' : 'Kampanya', what: parts.join(' ve '), detail: [`Satın aldığın paket: ${out.coins.toLocaleString('tr-TR')} jeton.`], data: { coins: out.coins, bonus: out.bonus, campaignBonus: out.campaignBonus } });
+  }
+  return out;
 }
 
 export const purchaseRoutes = {

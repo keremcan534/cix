@@ -12,6 +12,8 @@
 //   POST /api/admin/team/remove { id }    → { removed }           (admin)
 //
 // A link is a path in the app ('/siralama', '/oda/…'); a picture is one an admin uploaded (media.mjs kind notice).
+// The server's own notices (earnings, rewards, warnings: system-notices.mjs, SimilarClub Sistem in a new app) are one
+// person's notices in the same list, with their category and figures.
 import { HttpError, auth, db, env, int, limit, readJson, text, userId } from './core.mjs';
 import { PERIODS, topBoard } from './gifts.mjs';
 import { notify } from './push.mjs';
@@ -41,6 +43,8 @@ const view = (x) => ({
   link: x.link ?? null,
   personal: x.target !== null,
   createdAt: x.created_at.toISOString(),
+  // SimilarClub Sistem's own notices (system-notices.mjs): what it tells of and its figures; an older app ignores both.
+  ...(x.category ? { category: x.category, data: x.data ?? {}, system: true } : {}),
 });
 
 /** Notices I can read: everyone's and mine, not removed. */

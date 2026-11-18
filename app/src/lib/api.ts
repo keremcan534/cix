@@ -1063,6 +1063,9 @@ export type ServerPrivacy = {
   messagePush: boolean;
   pushCloseOnly: boolean;
 };
+/** Otomatik mesaj's choices (server/api/auto-chat.mjs, saved with the privacy settings); lib/live/auto-chat reads them. */
+export type AutoChoices = { autoReceive?: boolean; autoOpener?: boolean; autoOpenerSeen?: boolean; autoSend?: boolean };
+export const updateAutoChoices = (patch: AutoChoices) => call<{ privacy: ServerPrivacy & AutoChoices }>('PATCH', '/api/me/privacy', patch);
 export const myPrivacy = () => call<{ privacy: ServerPrivacy }>('GET', '/api/me/privacy').then((r) => r.privacy);
 /** Changes some settings; the answer is all of them as the server has them now. */
 export const updatePrivacy = (patch: Partial<ServerPrivacy>) => call<{ privacy: ServerPrivacy }>('PATCH', '/api/me/privacy', patch).then((r) => r.privacy);

@@ -9,11 +9,12 @@
 //   GET  /api/admin/level-rewards                              → { rules, items, systems }
 //   POST /api/admin/level-rewards        { system, level, sku, days? }  → { rule }
 //   POST /api/admin/level-rewards/delete { id }                 → { deleted }
+import { itemNotice } from './system-notices.mjs';
 import { HttpError, auth, clientIp, db, int, limit, readJson, tx } from './core.mjs';
 import { MAX_AHEAD_DAYS } from './catalog.mjs';
 // economy.mjs reads the rewards in GET /api/economy and this file gives them with its grantReward: used only inside
 // handlers, so the two may import each other.
-import { grantReward, pickReward, rewardChoices } from './economy.mjs';
+import { grantReward, pickReward, rewardChoices, rewardItem } from './economy.mjs';
 import { SYSTEM_NAMES, docsNow } from './levels.mjs';
 import { panelDetail } from './panel.mjs';
 import { levelsOf } from './profiles.mjs';
@@ -47,7 +48,8 @@ export async function claimLevelRewards(uid, vip) {
   if (due.some((r) => r.system !== 'vip')) Object.assign(levels, (await levelsOf([uid], { fresh: true }))[uid]);
   due = due.filter((r) => (levels[r.system] ?? 0) >= r.level);
   if (!due.length) return 0;
-  return tx(async (c) => {
+  const told = [];
+  const given = await tx(async (c) => {
     let given = 0;
     for (const r of due) {
       // Taken by a read running at the same time: that one gives it.
@@ -57,10 +59,18 @@ export async function claimLevelRewards(uid, vip) {
       if (ok) {
         await c.query('UPDATE level_reward_claims SET given = true WHERE rule_id = $1 AND user_id = $2', [r.id, uid]);
         given++;
+        told.push(r);
       }
     }
     return given;
   });
+  // SimilarClub Sistem, once the items are committed (ref level:<rule>, once each).
+  for (const r of told) {
+    const item = rewardItem(r.sku);
+    const origin = `${SYSTEM_NAMES[r.system]} ${r.level}`;
+    if (item) await itemNotice({ target: uid, ref: `level:${r.id}`, item, days: r.days ?? item.days ?? null, origin, why: `${origin} seviyesine ulaştığın için ${item.name} kazandın!` });
+  }
+  return given;
 }
 
 // --- The panel -----------------------------------------------------------------------------------------------

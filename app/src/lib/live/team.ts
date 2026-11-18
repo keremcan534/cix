@@ -7,7 +7,20 @@ import * as api from '@/lib/api';
 import { uploadPhoto, type PickedImage } from '@/lib/live/profile';
 
 export type TeamKind = 'event' | 'update' | 'reward' | 'rule' | 'notice';
-export type TeamNotice = { id: string; kind: TeamKind; title: string; body: string; imageUrl: string | null; link: string | null; personal: boolean; createdAt: string };
+export type TeamNotice = {
+  id: string;
+  kind: TeamKind;
+  title: string;
+  body: string;
+  imageUrl: string | null;
+  link: string | null;
+  personal: boolean;
+  createdAt: string;
+  /** SimilarClub Sistem's own notices (server/api/system-notices.mjs): what it tells of and its figures; older servers send neither. */
+  category?: string;
+  data?: Record<string, unknown>;
+  system?: boolean;
+};
 export type BannerEvent = TeamNotice & { endsAt: string };
 export type BoardKey = 'agency' | 'charm' | 'wealth';
 export type BoardPeriod = 'day' | 'week' | 'month';

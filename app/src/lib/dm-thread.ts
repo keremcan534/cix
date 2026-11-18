@@ -19,10 +19,15 @@ export type ServerDm = {
   event?: { id: number; title: string | null; startsAt?: string | null } | null;
   createdAt: string;
   readAt?: string | null;
+  /** An automatic message or a quick reply (newer servers, server/api/auto-chat.mjs); the bubble labels it. */
+  source?: string;
 };
 /** The card of a server message's event, or undefined. */
 const eventCard = (d: ServerDm) => (d.event && Number.isSafeInteger(d.event.id) ? { event: { id: d.event.id, title: d.event.title ?? 'Etkinlik', startsAt: d.event.startsAt ?? null } } : null);
 export type ThreadSync = { peer: string; after: number; hidden?: readonly number[] };
+const SOURCES = ['auto_streamer', 'auto_opener', 'quick_reply'];
+/** The source of an automatic message or a quick reply, or nothing (a message typed by its writer, an older server). */
+const sourceOf = (d: ServerDm) => (typeof d.source === 'string' && SOURCES.includes(d.source) ? { source: d.source as 'auto_streamer' | 'auto_opener' | 'quick_reply' } : null);
 
 const pad = (n: number) => String(n).padStart(2, '0');
 /** 'HH:MM' of an ISO time on this phone's clock, or '' when it can't be read. */
@@ -74,7 +79,7 @@ export function mergeThread(local: readonly ChatMessage[], server: readonly Serv
       out[pending] = { ...withoutFailure(out[pending]), sid: d.id, at: d.createdAt, ...seen };
       known.set(d.id, pending);
     } else {
-      out.push({ id: `s${d.id}`, fromMe: mine, text: d.text, time: clockOf(d.createdAt), at: d.createdAt, sid: d.id, ...(d.image && { image: d.image }), ...eventCard(d), ...seen });
+      out.push({ id: `s${d.id}`, fromMe: mine, text: d.text, time: clockOf(d.createdAt), at: d.createdAt, sid: d.id, ...(d.image && { image: d.image }), ...eventCard(d), ...sourceOf(d), ...seen });
       known.set(d.id, out.length - 1);
       if (!mine) incoming++;
     }
