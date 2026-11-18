@@ -10,12 +10,13 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Art, type ArtName } from '@/components/Art';
 import { Gloss } from '@/components/fx/surface';
 import { LUDO_COLORS, LudoBoard, type BoardHandle, type BoardToken } from '@/components/games/room/ludo-board';
 import { RoomArtImage, roomArt } from '@/components/games/room/table-art';
-import { ActionButton, EndCard, SeatFace, alpha, useTableFx } from '@/components/games/room/table-kit';
+import { ActionButton, EndCard, SeatFace, alpha, tallSheetHeight, useTableFx } from '@/components/games/room/table-kit';
 import { Text } from '@/components/text';
 import type { LudoServerTable } from '@/lib/api';
 import { playSfx, warmSfx } from '@/lib/game-sound';
@@ -113,6 +114,7 @@ function LudoStage({
 }) {
   const { still } = useTableFx();
   const win = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const [width, setWidth] = useState(0);
   const [frame, setFrame] = useState(() => frameOf(view, me));
   const [die, setDie] = useState<DieFace>({ face: view.die, spinning: false, color: null });
@@ -245,9 +247,11 @@ function LudoStage({
     onPick?.(token);
   };
 
-  // In a room's sheet the header, the voice strip and the players' rows leave this much for the board.
-  const room = fit ? Math.max(288, win.height * 0.78 - 276) : 430;
-  const size = Math.floor(Math.min(width, 430, room));
+  // In a room's sheet the header, the voice strip, the players' rows and the sheet's bottom padding (6dp above the
+  // phone's navigation bar: components/games/game-panel) leave this much for the board, so the die stays in sight.
+  const room = fit ? Math.max(216, tallSheetHeight(win.height) - SHEET_ROWS - Math.max(14, insets.bottom + 6)) : 430;
+  // 4dp clear on each side: the turn's clock and halo stick out of the players at the corners.
+  const size = Math.floor(Math.min(width - 8, 430, room));
   const count = MODES[v.mode] ?? 2;
   const seatAt = (corner: number) => v.colors.findIndex((c) => cornerOf(c, turns) === corner);
   const chip = (corner: number) => {
@@ -284,7 +288,7 @@ function LudoStage({
         <View style={{ width: size, gap: 6 }}>
           <View style={s.row}>
             {chip(0)}
-            <Text style={s.line} numberOfLines={2} accessibilityLiveRegion="polite">
+            <Text style={s.line} numberOfLines={3} accessibilityLiveRegion="polite">
               {frame.line}
             </Text>
             {chip(1)}
@@ -302,7 +306,8 @@ function LudoStage({
             {chip(3)}
             <View style={s.dieBlock}>
               <Die size={46} face={die.face} spinning={die.spinning} color={die.spinning ? die.color : active} ready={canRoll} onPress={roll} still={still} />
-              <Text style={[s.hint, v.turn === me && playing && { color: semantic.actionText }]} numberOfLines={1}>
+              {/* Android has no lower limit for the shrinking, so a very long name keeps its ellipsis instead. */}
+              <Text style={[s.hint, v.turn === me && playing && { color: semantic.actionText }]} numberOfLines={1} adjustsFontSizeToFit={hint.length <= 20}>
                 {hint}
               </Text>
             </View>
@@ -316,6 +321,8 @@ function LudoStage({
 
 /** The width of the die and its caption between the two players of the lower row. */
 const DIE_BLOCK = 104;
+/** What the sheet takes above and below the board: header and voice strip 100, padding 8, the players' rows and gaps 144. */
+const SHEET_ROWS = 252;
 const FACES = [1, 2, 3, 4, 5, 6] as const;
 
 /** The die on its pad: it hops and tumbles while `spinning`, lands a little too big and tilted and settles on the face thrown; lit and tappable when it is mine to throw. */
@@ -431,13 +438,20 @@ function PlayerChip({
 }) {
   const c = LUDO_COLORS[color];
   const right = side === 'right';
-  const textWidth = width - FACE - 8;
+  // A small board's corners: a smaller face leaves the name room.
+  const narrow = width < 100;
+  const face = narrow ? 36 : FACE;
+  const gap = narrow ? 6 : 8;
+  const textWidth = width - face - gap;
+  // The first name is enough here; the practice table's "Rakip 1", "Rakip 2" would all read the same without the number.
+  const shown = mine ? 'Sen' : seat.id.startsWith('rakip-') ? seat.name : first(seat.name);
   return (
-    <View style={[p.chip, { width, flexDirection: right ? 'row-reverse' : 'row' }]} accessibilityLabel={`${mine ? 'Sen' : seat.name}, ${c.name}, ${home}/${count} taş evde${active ? ', sıra onda' : ''}`}>
-      <SeatFace seat={seat} size={FACE} color={c.base} active={active} endsAt={endsAt} total={total} winner={winner} tinted />
+    <View style={[p.chip, { width, gap, flexDirection: right ? 'row-reverse' : 'row' }]} accessibilityLabel={`${mine ? 'Sen' : seat.name}, ${c.name}, ${home}/${count} taş evde${active ? ', sıra onda' : ''}`}>
+      <SeatFace seat={seat} size={face} color={c.base} active={active} endsAt={endsAt} total={total} winner={winner} tinted />
       <View style={{ width: textWidth, gap: 4, alignItems: right ? 'flex-end' : 'flex-start' }}>
-        <Text style={[p.name, active && { color: colors.text }]} numberOfLines={1}>
-          {mine ? 'Sen' : seat.name}
+        {/* Android has no lower limit for the shrinking, so a very long name keeps its ellipsis instead. */}
+        <Text style={[p.name, active && { color: colors.text }]} numberOfLines={1} adjustsFontSizeToFit={shown.length <= 8}>
+          {shown}
         </Text>
         <View style={p.pips}>
           {Array.from({ length: count }, (_, i) => (
@@ -457,7 +471,9 @@ function FreeSeat({ side, width }: { side: 'left' | 'right'; width: number }) {
       <View style={p.free}>
         <Ionicons name="add" size={18} color={colors.textDim} />
       </View>
-      <Text style={p.freeText}>Boş koltuk</Text>
+      <Text style={p.freeText} numberOfLines={2} adjustsFontSizeToFit>
+        Boş koltuk
+      </Text>
     </View>
   );
 }
@@ -479,7 +495,9 @@ function Choice<T extends string | number>({ label, value, options, onChange }: 
           accessibilityState={{ checked: v === value }}
           accessibilityLabel={text}
         >
-          <Text style={[s.optionText, v === value && { color: '#FFFFFF' }]}>{text}</Text>
+          <Text style={[s.optionText, v === value && { color: '#FFFFFF' }]} numberOfLines={1} adjustsFontSizeToFit>
+            {text}
+          </Text>
         </Pressable>
       ))}
     </View>
@@ -611,6 +629,11 @@ export function LudoLive({ table, busy, onMove, onAgain, children }: { table: Lu
       </View>
     );
   const waiting = table.status === 'waiting';
+  const info = (
+    <Text style={s.note}>
+      {waiting ? `${table.seats.length}/${table.max} oyuncu · en az ${table.min} · ${modeLabel(view.mode)}` : table.mySeat < 0 && table.status === 'playing' ? 'Masayı izliyorsun; el bitince boş koltuğa oturabilirsin.' : modeLabel(view.mode)}
+    </Text>
+  );
   return (
     <View style={{ gap: 10 }}>
       <LudoStage
@@ -620,28 +643,35 @@ export function LudoLive({ table, busy, onMove, onAgain, children }: { table: Lu
         free={waiting && table.seats.length < table.max}
         busy={busy}
         turnEndsAt={table.turnEndsAt ? Date.parse(table.turnEndsAt) : null}
+        // A waiting table's buttons lie over its empty board, as a practice game's settings do: "Başlat" stays in sight.
+        cover={
+          waiting ? (
+            <View style={s.setup}>
+              {info}
+              {children}
+            </View>
+          ) : undefined
+        }
         onAgain={onAgain}
         onRoll={() => onMove({ roll: true })}
         onPick={(token) => onMove({ token })}
       />
-      <Text style={s.note}>
-        {waiting ? `${table.seats.length}/${table.max} oyuncu · en az ${table.min} · ${modeLabel(view.mode)}` : table.mySeat < 0 && table.status === 'playing' ? 'Masayı izliyorsun; el bitince boş koltuğa oturabilirsin.' : modeLabel(view.mode)}
-      </Text>
-      {children}
+      {!waiting && info}
+      {!waiting && children}
     </View>
   );
 }
 
 const s = StyleSheet.create({
   stage: { alignItems: 'center', alignSelf: 'stretch' },
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 48 },
   line: { flex: 1, color: colors.textDim, fontSize: 12, lineHeight: 16, textAlign: 'center', paddingHorizontal: 4 },
   dieBlock: { width: DIE_BLOCK, alignItems: 'center', gap: 2 },
   hint: { color: colors.textDim, fontSize: 12, lineHeight: 16, fontWeight: '800', maxWidth: DIE_BLOCK },
   setup: { alignSelf: 'stretch', gap: 10, backgroundColor: colors.card, borderRadius: 20, padding: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', borderTopColor: 'rgba(255,255,255,0.22)', boxShadow: '0 12px 28px rgba(0,0,0,0.55)' },
   choice: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   choiceLabel: { color: colors.textDim, fontSize: 12, fontWeight: '700', width: 54 },
-  option: { flex: 1, minHeight: 36, borderRadius: 999, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
+  option: { flex: 1, minHeight: 44, borderRadius: 999, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2 },
   optionOn: { backgroundColor: colors.primary, borderColor: colors.primary },
   optionText: { color: colors.text, fontSize: 12, fontWeight: '800' },
   note: { color: colors.textDim, fontSize: 12, lineHeight: 17, textAlign: 'center' },
@@ -658,7 +688,7 @@ const p = StyleSheet.create({
   pips: { flexDirection: 'row', gap: 3 },
   pip: { width: 8, height: 8, borderRadius: 4, borderWidth: 1.5 },
   free: { width: FACE, height: FACE, borderRadius: 999, borderWidth: 1.5, borderColor: colors.border, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
-  freeText: { color: colors.textDim, fontSize: 12, fontWeight: '700' },
+  freeText: { flexShrink: 1, color: colors.textDim, fontSize: 12, fontWeight: '700' },
 });
 const w = StyleSheet.create({
   veil: { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(8,15,30,0.55)', borderRadius: 16 },

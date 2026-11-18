@@ -6,6 +6,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Empty, NetState, Panel, Line, Pill, Section, ns } from '@/components/agency-net';
 import { DepthCard } from '@/components/fx/surface';
@@ -130,18 +131,22 @@ function AssistantCard({ a, onShare, onRemove }: { a: Assistant; onShare: () => 
 }
 
 function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  const insets = useSafeAreaInsets();
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <KeyboardAvoid style={st.wrap}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Kapat" />
-        <DepthCard style={st.sheet}>
+        {/* Above the navigation buttons; the title stays, the body scrolls when it doesn't fit. */}
+        <DepthCard style={[st.sheet, { marginTop: space.md + insets.top, marginBottom: space.md + insets.bottom }]}>
           <View style={ns.rowBetween}>
             <Text style={st.title}>{title}</Text>
             <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel="Kapat">
               <Ionicons name="close" size={22} color={colors.textDim} />
             </Pressable>
           </View>
-          {children}
+          <ScrollView style={{ flexGrow: 0 }} keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: space.lg }}>
+            {children}
+          </ScrollView>
         </DepthCard>
       </KeyboardAvoid>
     </Modal>
@@ -193,7 +198,7 @@ function AddSheet({ agencyId, rate, demo, onClose, onDone }: { agencyId: string;
     <Sheet title="Asistan ekle" onClose={onClose}>
       <Text style={st.msg}>Ajansının yayıncılarından ya da ekibinden birini seç.</Text>
       <TextInput value={term} onChangeText={(t) => (setTerm(t), setPick(null))} placeholder="Ada göre ara" placeholderTextColor={colors.textDim} autoCapitalize="none" autoCorrect={false} maxLength={40} style={ns.input} accessibilityLabel="Ada göre ara" />
-      <ScrollView style={{ maxHeight: 220 }} keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: space.xs }}>
+      <ScrollView style={{ maxHeight: 160 }} nestedScrollEnabled keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: space.xs }}>
         {demo ? (
           <Text style={st.hint}>Sunucuya bağlanılamadığı için liste gösterilemiyor.</Text>
         ) : found?.q !== q ? (
@@ -267,7 +272,7 @@ function RulesSheet({ max, rate, onClose }: { max: number; rate: number; onClose
   ];
   return (
     <Sheet title="Asistan kuralları" onClose={onClose}>
-      <ScrollView style={{ maxHeight: 440 }} contentContainerStyle={{ gap: space.md }}>
+      <ScrollView style={{ maxHeight: 440 }} nestedScrollEnabled contentContainerStyle={{ gap: space.md }}>
         {rules.map((r, i) => (
           <View key={i} style={{ flexDirection: 'row', gap: space.sm }}>
             <Text style={st.ruleNo}>{i + 1}.</Text>
@@ -337,7 +342,7 @@ const st = StyleSheet.create({
   rule: { color: semantic.actionText, fontSize: 12.5, lineHeight: 18 },
   ruleNo: { color: colors.textDim, fontSize: 14, lineHeight: 20, fontWeight: '700', minWidth: 18 },
   wrap: { flex: 1, justifyContent: 'flex-end', backgroundColor: SCRIM },
-  sheet: { margin: space.md, padding: space.xl, gap: space.lg, borderRadius: radius.xl, ...edge.card },
+  sheet: { margin: space.md, padding: space.xl, gap: space.lg, borderRadius: radius.xl, flexShrink: 1, maxHeight: '88%', ...edge.card },
   title: { color: '#fff', fontSize: 19, fontFamily: fonts.display, flex: 1 },
   msg: { color: colors.textDim, fontSize: 14, lineHeight: 20 },
   hint: { color: colors.textDim, fontSize: 13, lineHeight: 19, paddingVertical: space.sm },

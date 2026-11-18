@@ -3,7 +3,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, usePathname } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { AppState, Platform, Pressable, StyleSheet, Vibration, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { priceLine } from '@/components/call-stage';
@@ -12,12 +12,39 @@ import { Text } from '@/components/text';
 import { hangUp, liveCalls, MODE_NAME, otherId, useCall, watchCalls } from '@/lib/live/one-on-one';
 import { colors, semantic } from '@/theme';
 
+/** The buzz of a ringing call: wait, buzz, pause, buzz, then again from the start. */
+const RING_BUZZ = [0, 600, 400, 600, 1200];
+/** The server ends an unanswered call after 40 s (one-on-one.mjs RING_S): without a connection the phone never hears it. */
+const RING_MAX_MS = 45_000;
+
+/** Buzzes while the call rings on screen, and never past RING_MAX_MS even if the end of the call doesn't arrive. */
+function useRingBuzz(ringing: boolean) {
+  useEffect(() => {
+    if (!ringing || Platform.OS !== 'android') return;
+    const until = Date.now() + RING_MAX_MS;
+    const ring = () => {
+      if (AppState.currentState === 'active' && Date.now() < until) Vibration.vibrate(RING_BUZZ, true);
+      else Vibration.cancel();
+    };
+    ring();
+    const sub = AppState.addEventListener('change', ring);
+    const stop = setTimeout(() => Vibration.cancel(), RING_MAX_MS);
+    return () => {
+      clearTimeout(stop);
+      sub.remove();
+      Vibration.cancel();
+    };
+  }, [ringing]);
+}
+
 export function IncomingCall() {
   useEffect(() => (liveCalls() ? watchCalls() : undefined), []);
   const call = useCall();
   const path = usePathname();
   const [busy, setBusy] = useState(false);
-  if (!liveCalls() || !call || !call.incoming || call.status !== 'ringing' || path.startsWith('/arama')) return null;
+  const ringing = liveCalls() && !!call && call.incoming && call.status === 'ringing' && !path.startsWith('/arama');
+  useRingBuzz(ringing);
+  if (!ringing) return null;
   const peer = otherId(call);
   const answer = () =>
     router.push({ pathname: '/arama/[id]', params: { id: peer, mode: call.mode === 'voice' ? 'sesli' : 'goruntulu', call: String(call.id), answer: '1' } });
@@ -36,7 +63,8 @@ export function IncomingCall() {
           <Text style={s.name} numberOfLines={1}>
             {call.other.name}
           </Text>
-          <Text style={s.dim} numberOfLines={1}>
+          {/* Wraps instead of cutting: what the call earns or costs comes last and is read before answering. */}
+          <Text style={s.dim} numberOfLines={4}>
             {MODE_NAME[call.mode]} arıyor · {priceLine(call)}
           </Text>
         </View>

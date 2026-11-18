@@ -5,7 +5,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Image, Pressable, StyleSheet, View, type GestureResponderEvent } from 'react-native';
+import { Animated, Easing, Image, Pressable, StyleSheet, View, useWindowDimensions, type GestureResponderEvent } from 'react-native';
 
 import { Text } from '@/components/text';
 import { EdgeLight, Gloss, PressableScale, glow } from '@/components/fx/surface';
@@ -55,6 +55,10 @@ const TH = 33;
 
 export function OkeyTable({ roomId, me, crowd }: { roomId: string; me: Player; crowd: Player[] }) {
   const settings = useSettings();
+  // Thirteen tiles and their gaps fit the rack on every phone: the panel's padding (28) and the rack's edge (10) are off the width.
+  const { width } = useWindowDimensions();
+  const tw = Math.min(TW, Math.floor((width - 38 - (ROW - 1) * GAP) / ROW));
+  const th = Math.round((tw * TH) / TW);
   const [viewer] = useState<SeatHolder>(() => ({ id: viewerKey(me.id), name: me.name, avatar: me.avatar, bot: false }));
   const table = useOkeyTable(roomId);
   const [note, setNote] = useState('');
@@ -111,9 +115,9 @@ export function OkeyTable({ roomId, me, crowd }: { roomId: string; me: Player; c
     const id = slots[slot];
     if (id === null) return;
     if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return setSelected((cur) => (cur === id ? null : id));
-    if (dy < -TH * 1.6 && myTurn && v.phase === 'discard') return discard(id);
-    const row = Math.min(1, Math.max(0, Math.floor(slot / ROW) + Math.round(dy / (TH + GAP))));
-    const col = Math.min(ROW - 1, Math.max(0, (slot % ROW) + Math.round(dx / (TW + GAP))));
+    if (dy < -th * 1.6 && myTurn && v.phase === 'discard') return discard(id);
+    const row = Math.min(1, Math.max(0, Math.floor(slot / ROW) + Math.round(dy / (th + GAP))));
+    const col = Math.min(ROW - 1, Math.max(0, (slot % ROW) + Math.round(dx / (tw + GAP))));
     setSlots(moveOnRack(slots, slot, row * ROW + col));
     setSelected(null);
   };
@@ -172,7 +176,7 @@ export function OkeyTable({ roomId, me, crowd }: { roomId: string; me: Player; c
         </View>
         <View style={s.feltRow}>
           <SeatChip v={v} seat={at.left} canSeat={canSeat} seated={seated} viewer={viewer} roomId={roomId} onNote={setNote} reduceMotion={settings.reduceMotion} />
-          <View style={s.center}>
+          <View style={[s.center, !v.indicator && { flexShrink: 1 }]}>
             {v.indicator ? (
               <>
                 <Pressable onPress={() => draw('pile')} disabled={!myTurn || v.phase !== 'draw'} accessibilityLabel={`Ortadan taş çek, ${v.pile} taş kaldı`}>
@@ -188,7 +192,7 @@ export function OkeyTable({ roomId, me, crowd }: { roomId: string; me: Player; c
                 </View>
               </>
             ) : (
-              <Text style={s.tiny}>Taşlar el başlayınca dağıtılır</Text>
+              <Text style={[s.tiny, { flexShrink: 1 }]}>Taşlar el başlayınca dağıtılır</Text>
             )}
           </View>
           <SeatChip v={v} seat={at.right} canSeat={canSeat} seated={seated} viewer={viewer} roomId={roomId} onNote={setNote} reduceMotion={settings.reduceMotion} />
@@ -224,7 +228,7 @@ export function OkeyTable({ roomId, me, crowd }: { roomId: string; me: Player; c
 
       {seated && v.myHand.length > 0 && (
         <>
-          <Rack slots={slots} tiles={tileById} okey={v.okey!} selected={selected} onDrop={onDrop} onTapSlot={tapSlot} />
+          <Rack slots={slots} tiles={tileById} okey={v.okey!} selected={selected} tw={tw} th={th} onDrop={onDrop} onTapSlot={tapSlot} />
           <View style={s.actions}>
             <Action label="Seri diz" icon="git-commit-outline" onPress={() => setSlots(arrangeRuns(v.myHand, v.okey!))} />
             <Action label="Çift diz" icon="copy-outline" onPress={() => setSlots(arrangePairs(v.myHand, v.okey!))} />
@@ -349,7 +353,11 @@ function TileFace({ t, w, h, okey, lifted }: { t: Tile; w: number; h: number; ok
         <Text style={{ fontSize: h * 0.5, color: '#0F766E' }}>★</Text>
       ) : (
         <>
-          <Text style={[s.num, { fontSize: h * 0.5, lineHeight: h * 0.62, color: INK[t.c] }]}>{t.n}</Text>
+          {/* A tile is a drawing of a fixed size: the phone's text size doesn't grow its number, or 10-13 would break in two on a narrow tile. */}
+          {/* It shrinks a little where a "10" would be cut to "1…": an okey's thick rim leaves 15 dp on a 19 dp tile. */}
+          <Text style={[s.num, { fontSize: h * 0.5, lineHeight: h * 0.62, color: INK[t.c] }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} allowFontScaling={false}>
+            {t.n}
+          </Text>
           <View style={[s.pip, { backgroundColor: INK[t.c], width: h * 0.14, height: h * 0.14 }]} />
         </>
       )}
@@ -362,6 +370,8 @@ function Rack({
   tiles,
   okey,
   selected,
+  tw,
+  th,
   onDrop,
   onTapSlot,
 }: {
@@ -369,6 +379,9 @@ function Rack({
   tiles: Map<number, Tile>;
   okey: Face;
   selected: number | null;
+  /** A tile's size on this phone. */
+  tw: number;
+  th: number;
   onDrop: (slot: number, dx: number, dy: number) => void;
   onTapSlot: (slot: number) => void;
 }) {
@@ -383,9 +396,9 @@ function Rack({
             const id = slot < RACK_SLOTS ? slots[slot] : null;
             const t = id !== null ? tiles.get(id) : undefined;
             return (
-              <View key={slot} style={[s.slot, dragging === slot && { zIndex: 10 }]}>
+              <View key={slot} style={[s.slot, { width: tw, height: th }, dragging === slot && { zIndex: 10 }]}>
                 {t ? (
-                  <DragTile slot={slot} tile={t} okey={okey} lifted={selected === t.id} onDrop={onDrop} onDrag={setDragging} />
+                  <DragTile slot={slot} tile={t} okey={okey} lifted={selected === t.id} w={tw} h={th} onDrop={onDrop} onDrag={setDragging} />
                 ) : (
                   <Pressable style={StyleSheet.absoluteFill} onPress={() => onTapSlot(slot)} accessibilityLabel={`Boş yuva ${slot + 1}`} />
                 )}
@@ -398,7 +411,7 @@ function Rack({
   );
 }
 
-function DragTile({ slot, tile, okey, lifted, onDrop, onDrag }: { slot: number; tile: Tile; okey: Face; lifted: boolean; onDrop: (slot: number, dx: number, dy: number) => void; onDrag: (slot: number | null) => void }) {
+function DragTile({ slot, tile, okey, lifted, w, h, onDrop, onDrag }: { slot: number; tile: Tile; okey: Face; lifted: boolean; w: number; h: number; onDrop: (slot: number, dx: number, dy: number) => void; onDrag: (slot: number | null) => void }) {
   const [pos] = useState(() => new Animated.ValueXY());
   // Plain responder props (re-read on every event), so a re-render mid-drag keeps the gesture.
   const startRef = useRef({ x: 0, y: 0 });
@@ -423,7 +436,7 @@ function DragTile({ slot, tile, okey, lifted, onDrop, onDrag }: { slot: number; 
       onResponderRelease={(e) => end(e, true)}
       onResponderTerminate={(e) => end(e, false)}
       accessible accessibilityRole="button" accessibilityLabel={label} style={{ transform: [{ translateX: pos.x }, { translateY: Animated.add(pos.y, lifted ? -6 : 0) }] }}>
-      <TileFace t={tile} w={TW} h={TH} okey={okey} lifted={lifted} />
+      <TileFace t={tile} w={w} h={h} okey={okey} lifted={lifted} />
     </Animated.View>
   );
 }
@@ -454,7 +467,7 @@ const s = StyleSheet.create({
   pile: { width: 34, height: 46, borderRadius: 6, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)' },
   pileText: { color: semantic.actionInk, fontFamily: fonts.display, fontSize: 16, lineHeight: 20 },
   tiny: { color: 'rgba(255,255,255,0.72)', fontSize: 11, textAlign: 'center' },
-  seat: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 999, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.12)', backgroundColor: 'rgba(4,22,29,0.55)', paddingVertical: 3, paddingLeft: 3, paddingRight: 5, maxWidth: 124, overflow: 'hidden' },
+  seat: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 999, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.12)', backgroundColor: 'rgba(4,22,29,0.55)', paddingVertical: 3, paddingLeft: 3, paddingRight: 5, maxWidth: 124, flexShrink: 1, overflow: 'hidden' },
   seatOpen: { borderStyle: 'dashed', borderColor: semantic.action },
   seatGlow: { backgroundColor: 'rgba(19,217,223,0.22)', borderRadius: 999 },
   av: { width: 26, height: 26, borderRadius: 13 },
@@ -478,7 +491,7 @@ const s = StyleSheet.create({
   meld: { flexDirection: 'row', gap: 1 },
   rack: { borderRadius: 12, paddingVertical: 6, paddingHorizontal: 4, gap: 4, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', boxShadow: '0 6px 14px rgba(0,0,0,0.4)' },
   rackRow: { flexDirection: 'row', justifyContent: 'center', gap: GAP, borderBottomWidth: 2, borderColor: 'rgba(0,0,0,0.25)', paddingBottom: 2 },
-  slot: { width: TW, height: TH, borderRadius: 5, backgroundColor: 'rgba(0,0,0,0.12)' },
+  slot: { borderRadius: 5, backgroundColor: 'rgba(0,0,0,0.12)' },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
   action: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 999, paddingVertical: 9, paddingHorizontal: 14, backgroundColor: colors.cardAlt, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
   actionPrimary: { backgroundColor: semantic.action, borderColor: semantic.actionEdge },

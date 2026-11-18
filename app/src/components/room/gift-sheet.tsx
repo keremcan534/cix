@@ -13,7 +13,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Image, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
@@ -64,8 +64,16 @@ const SHELF_NOTE: Record<Shelf, string> = {
 /** Live: only the server's rewards fill the backpack (today the call task). */
 const LIVE_BAG_NOTE = 'Görev ödüllerin. Gönderirken jeton harcanmaz.';
 const COUNTS = [1, 5, 10, 25, 50, 100, 250];
-/** Over a room leaving the sheet less than this (every phone), the compact layout. */
+/** Over a room leaving the sheet at least this under the Balkon line, the gift level stays under the title. */
 const COMPACT_UNDER = 600;
+/** One row of the grid: a 108 dp tile and the 3 dp around it. */
+const TILE_ROW = 114;
+/** Rows the sheet opens with over a room; the part of the next row shows that the grid scrolls. */
+const ROWS_SHOWN = 3.35;
+/** The sheet's fixed parts over a room: title row 46, people 58, shelves 44, action row 54. */
+const ROOM_CHROME = 46 + 58 + 44 + 54;
+/** What the gift level under the title adds to the title row. */
+const LEVEL_ROW = 4;
 const COUNT_LABELS: Record<number, string> = { 5: 'Selam', 25: 'Alkış', 100: 'Coşku', 250: 'Şölen' };
 /** Sender gift level: Lv(n+1) needs LEVEL_XP[n] coins spent in total. */
 const LEVEL_XP = [0, 870, 5_000, 20_000, 60_000, 150_000, 400_000, 1_000_000, 2_500_000, 6_000_000];
@@ -121,15 +129,19 @@ export function GiftSheet({
 }) {
   const { svipLevel, spentTotal, me, spendBlock, wealthLevel } = useApp();
   // Android modals draw edge to edge: the Gönder row must sit above the navigation bar.
-  const { bottom: navBar } = useSafeAreaInsets();
-  // Over the room the sheet rises at most to the Balkon line (lib/sheet-space), so the mics stay in sight while a gift
-  // is picked. On a phone that is under half the screen: the sheet is laid out compactly there (no handle or level
-  // line, the people without their heading, a shelf note only where it explains something, the total in the button
-  // and a notice only for Şanslı or when something is wrong).
+  const { top: statusBar, bottom: navBar } = useSafeAreaInsets();
+  const { width: screenW } = useWindowDimensions();
+  // Over the room this one sheet may rise above the Balkon line (lib/sheet-space) and cover part of the mics: picking a
+  // gift needs at least three rows in sight. It has a height of its own, so its top doesn't jump between shelves, and
+  // gives way only to the status bar (the scrim keeps that much). It is laid out compactly there (no handle, the people
+  // without their heading, a shelf note only where it carries a rule, the total in the button and a notice only for
+  // Şanslı or when something is wrong).
   const roomSpace = useRoomSheetSpace();
-  const compact = roomSpace !== null && roomSpace < COMPACT_UNDER;
+  const compact = roomSpace !== null;
+  const showLevel = roomSpace === null || roomSpace >= COMPACT_UNDER;
   const maxHeight = useSheetMax(0.82);
   const padBottom = Math.max(compact ? space.sm : space.lg, navBar + 8);
+  const roomHeight = Math.max(roomSpace ?? 0, ROOM_CHROME + (showLevel ? LEVEL_ROW : 0) + padBottom + ROWS_SHOWN * TILE_ROW + 4);
   const lucky = useLucky();
   const catalog = useLiveCatalog();
   // The admins' gifts (Yönetim › Hediyeler) lead their shelves; then the compiled ones the server still lists.
@@ -295,12 +307,16 @@ export function GiftSheet({
     shelf !== 'fav' && shelf !== 'bag' && shelf !== 'lucky' ? (
       <Pressable
         onPress={() => setSort((x) => (x === 'default' ? 'asc' : x === 'asc' ? 'desc' : 'default'))}
+        hitSlop={{ top: 6, bottom: 6 }}
         style={[g.sortBtn, compact && g.sortBtnBar]}
         accessibilityRole="button"
         accessibilityLabel={`Fiyata göre sırala: ${sort === 'asc' ? 'artan' : sort === 'desc' ? 'azalan' : 'varsayılan'}`}
       >
         <Ionicons name={sort === 'asc' ? 'arrow-up' : sort === 'desc' ? 'arrow-down' : 'swap-vertical'} size={14} color={colors.primaryText} />
-        <Text style={g.sortText}>{sort === 'asc' ? 'Ucuzdan' : sort === 'desc' ? 'Pahalıdan' : 'Fiyat'}</Text>
+        {/* Compact: one word, so a tap doesn't resize the shelves beside it; the arrow shows the direction. */}
+        <Text style={g.sortText} numberOfLines={1}>
+          {compact ? 'Fiyat' : sort === 'asc' ? 'Ucuzdan' : sort === 'desc' ? 'Pahalıdan' : 'Fiyat'}
+        </Text>
       </Pressable>
     ) : null;
   // Compact: the total is in the button; a notice only for Şanslı (its odds) or when something is wrong.
@@ -308,15 +324,17 @@ export function GiftSheet({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={g.scrim} onPress={onClose} accessibilityLabel="Hediye panelini kapat" />
-      <View style={[g.sheet, { maxHeight, paddingBottom: padBottom }]}>
+      <Pressable style={[g.scrim, compact && { minHeight: statusBar + 8 }]} onPress={onClose} accessibilityLabel="Hediye panelini kapat" />
+      <View style={[g.sheet, compact ? { height: roomHeight, flexShrink: 1 } : { maxHeight }, { paddingBottom: padBottom }]}>
         {!compact && <View style={g.handle} />}
 
         {/* Header: title, quiet gift level, balance, explicit close */}
-        <View style={[g.header, compact && { paddingTop: space.sm }]}>
-          <View style={{ flex: 1, gap: 4 }}>
-            <Text style={g.title}>Hediye gönder</Text>
-            {!compact && (
+        <View style={[g.header, compact && g.headerSlim]}>
+          <View style={{ flex: 1, minWidth: 0, gap: compact ? 2 : 4 }}>
+            <Text style={[g.title, compact && g.titleSlim]} numberOfLines={compact ? 1 : undefined} adjustsFontSizeToFit={compact} minimumFontScale={0.85}>
+              {compact && screenW < 360 ? 'Hediye' : 'Hediye gönder'}
+            </Text>
+            {showLevel && (
             <View style={g.levelRow} accessibilityLabel={`Hediye seviyen ${level}`}>
               <Text style={g.levelText} numberOfLines={1}>
                 Hediye seviyen:{'\u00A0'}
@@ -328,7 +346,7 @@ export function GiftSheet({
             </View>
             )}
           </View>
-          <Pressable onPress={goWallet} style={g.balance} accessibilityRole="button" accessibilityLabel={`Bakiye ${fmt(coins)} jeton, jeton yükle`}>
+          <Pressable onPress={goWallet} hitSlop={{ top: 4, bottom: 4 }} style={g.balance} accessibilityRole="button" accessibilityLabel={`Bakiye ${fmt(coins)} jeton, jeton yükle`}>
             <Icon3D name="coin" size={20} />
             <RollingNumber value={coins} style={g.balanceText} />
             <Ionicons name="add-circle" size={18} color={semantic.money} />
@@ -339,7 +357,7 @@ export function GiftSheet({
         </View>
 
         {/* Who */}
-        <View style={[g.section, compact && { paddingBottom: space.sm }]}>
+        <View style={[g.section, compact && { paddingBottom: 6 }]}>
           {!compact && (
             <Text style={g.label}>
               Kime
@@ -347,19 +365,22 @@ export function GiftSheet({
             </Text>
           )}
           {roomIds.length === 0 ? (
-            <Text style={g.dim}>Odada hediye gönderebileceğin kimse yok.</Text>
+            <Text style={[g.dim, { paddingRight: space.lg }]}>Odada hediye gönderebileceğin kimse yok.</Text>
           ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={g.whoRow}>
-              {seated.map(({ id, seat }) => (
-                <PersonPick key={id} uri={userById(id).avatar} tag={String(seat)} on={targets.includes(id)} label={`${seat}. mikrofon, ${userById(id).name}`} onPress={() => togglePerson(id)} />
-              ))}
-              {pickedListeners.map((id) => (
-                <PersonPick key={id} uri={userById(id).avatar} tag="🎧" on label={`Dinleyici, ${userById(id).name}`} onPress={() => togglePerson(id)} />
-              ))}
-              <View style={g.groupGap} />
+            <View style={g.whoBar}>
+              {/* The group picks stay in sight; the people run to the screen's edge, a cut avatar shows they scroll. */}
               <GroupPick icon="home" on={roomAll} label={`Odadaki herkes: mikrofondakiler ve dinleyiciler, ${roomIds.length} kişi`} onPress={() => pickGroup(roomIds, roomAll)} />
               {micIds.length > 0 && <GroupPick icon="mic" on={micAll} label={`Mikrofondaki herkes, ${micIds.length} kişi`} onPress={() => pickGroup(micIds, micAll)} />}
-            </ScrollView>
+              {seated.length + pickedListeners.length > 0 && <View style={g.groupGap} />}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={g.whoRow}>
+                {seated.map(({ id, seat }) => (
+                  <PersonPick key={id} uri={userById(id).avatar} tag={String(seat)} on={targets.includes(id)} label={`${seat}. mikrofon, ${userById(id).name}`} onPress={() => togglePerson(id)} />
+                ))}
+                {pickedListeners.map((id) => (
+                  <PersonPick key={id} uri={userById(id).avatar} tag="🎧" on label={`Dinleyici, ${userById(id).name}`} onPress={() => togglePerson(id)} />
+                ))}
+              </ScrollView>
+            </View>
           )}
         </View>
 
@@ -370,7 +391,7 @@ export function GiftSheet({
             const on = shelf === s.key;
             const n = s.key === 'bag' ? Object.values(bag).filter((x) => x > 0).length : 0;
             return (
-              <Pressable key={s.key} onPress={() => pickShelf(s.key)} style={[g.shelf, on && g.shelfOn]} accessibilityRole="tab" accessibilityState={{ selected: on }}>
+              <Pressable key={s.key} onPress={() => pickShelf(s.key)} hitSlop={{ top: 4, bottom: 4 }} style={[g.shelf, on && g.shelfOn]} accessibilityRole="tab" accessibilityState={{ selected: on }}>
                 {s.icon && <Ionicons name={s.icon} size={14} color={on ? '#fff' : colors.textDim} />}
                 <Text style={[g.shelfText, on && { color: '#fff' }]}>
                   {s.label}
@@ -382,31 +403,27 @@ export function GiftSheet({
         </ScrollView>
         {compact && sortBtn}
         </View>
-        {/* Compact: only the Şanslı note, which carries the disclaimer. */}
-        {(!compact || shelf === 'lucky') && (
+        {/* The notes that carry a rule (Şanslı, Aile ve Dost) open the grid below instead, in full. */}
+        {!compact && shelf !== 'lucky' && (
         <View style={g.noteRow}>
-          {/* The Şanslı note carries the disclaimer: always shown in full. */}
-          <Text style={[g.dim, { flex: 1 }]} numberOfLines={shelf === 'lucky' ? undefined : 2}>
-            {shelf === 'privilege' ? `${SHELF_NOTE.privilege} Senin seviyen: VIP ${svipLevel}.` : shelf === 'bag' && live ? LIVE_BAG_NOTE : SHELF_NOTE[shelf]}
+          <Text style={[g.dim, { flex: 1 }]} numberOfLines={2}>
+            {shelf === 'family' ? '' : shelf === 'privilege' ? `${SHELF_NOTE.privilege} Senin seviyen: VIP ${svipLevel}.` : shelf === 'bag' && live ? LIVE_BAG_NOTE : SHELF_NOTE[shelf]}
           </Text>
-          {isLucky && (
-            <Pressable onPress={() => setLuckyView((v) => (v === 'odds' ? 'history' : 'odds'))} style={g.sortBtn} accessibilityRole="button">
-              <Ionicons name={luckyView === 'odds' ? 'time-outline' : 'stats-chart-outline'} size={14} color={colors.primaryText} />
-              <Text style={g.sortText}>{luckyView === 'odds' ? 'Geçmişim' : 'Olasılıklar'}</Text>
-            </Pressable>
-          )}
-          {!compact && sortBtn}
+          {sortBtn}
         </View>
         )}
 
         {/* What: grid */}
         {/* Keyed by shelf: each shelf opens at its top, not at the previous shelf's scroll offset. */}
-        <ScrollView key={shelf} style={[g.gridScroll, compact && { minHeight: 96 }]} contentContainerStyle={g.grid}>
+        <ScrollView key={shelf} style={compact ? g.gridFill : g.gridScroll} contentContainerStyle={g.grid}>
+          {/* Şanslı's disclaimer and the bond gifts' refund rule: always shown in full, at the top of their shelf. */}
+          {(shelf === 'lucky' || shelf === 'family') && <Text style={[g.dim, g.shelfNote]}>{SHELF_NOTE[shelf]}</Text>}
           {isLucky ? (
             <LuckyShelf
               gifts={lucky.config.gifts}
               selected={lg}
               view={luckyView}
+              onToggleView={() => setLuckyView((v) => (v === 'odds' ? 'history' : 'odds'))}
               history={lucky.records.filter((r) => r.userId === 'me')}
               version={lucky.config.version}
               onPick={(id) => {
@@ -446,7 +463,7 @@ export function GiftSheet({
         </ScrollView>
 
         {/* How much + one action */}
-        <View style={[g.footer, compact && { paddingTop: space.sm }]}>
+        <View style={[g.footer, compact && { paddingTop: 6 }]}>
           {!compact && (
           <View style={g.summary}>
             <GiftArt giftId={isLucky ? lg.id : gift.id} emoji={isLucky ? lg.emoji : gift.emoji} size={36} textStyle={g.summaryArt} />
@@ -477,7 +494,7 @@ export function GiftSheet({
           )}
 
           <View style={g.actions}>
-            <Pressable onPress={() => setCountOpen((o) => !o)} style={g.countBtn} accessibilityRole="button" accessibilityLabel={`Adet ${count}, değiştir`}>
+            <Pressable onPress={() => setCountOpen((o) => !o)} style={[g.countBtn, compact && { height: 48 }]} accessibilityRole="button" accessibilityLabel={`Adet ${count}, değiştir`}>
               <Text style={g.countText}>×{count}</Text>
               <Ionicons name={countOpen ? 'chevron-down' : 'chevron-up'} size={14} color={colors.text} />
             </Pressable>
@@ -495,7 +512,7 @@ export function GiftSheet({
           <>
             <Pressable style={StyleSheet.absoluteFill} onPress={() => setCountOpen(false)} accessibilityLabel="Adet seçimini kapat" />
             {/* Just over the ×N button, whatever the navigation bar under the sheet. */}
-            <View style={[g.countPopup, { bottom: padBottom + 60 }, compact && g.countPopupWide]}>
+            <View style={[g.countPopup, { bottom: padBottom + (compact ? 54 : 60) }, compact && g.countPopupWide, compact && { width: Math.min(300, screenW - 32) }]}>
               {COUNTS.map((n) => (
                 <Pressable
                   key={n}
@@ -525,7 +542,7 @@ function PersonPick({ uri, tag, on, label, onPress }: { uri: string; tag: string
   return (
     <Pressable onPress={onPress} style={g.pick} accessibilityRole="checkbox" accessibilityState={{ checked: on }} accessibilityLabel={label} hitSlop={4}>
       <View style={[g.pickRing, on && g.pickRingOn]}>
-        <Avatar uri={uri} size={42} />
+        <Avatar uri={uri} size={36} />
       </View>
       <View style={[g.pickTag, on && g.pickTagOn]}>
         <Text style={[g.pickTagText, on && { color: semantic.actionInk }]}>{tag}</Text>
@@ -537,7 +554,7 @@ function GroupPick({ icon, on, label, onPress }: { icon: 'home' | 'mic'; on: boo
   return (
     <Pressable onPress={onPress} style={g.pick} accessibilityRole="checkbox" accessibilityState={{ checked: on }} accessibilityLabel={label} hitSlop={4}>
       <View style={[g.pickRing, g.groupDisc, on && g.pickRingOn]}>
-        <Ionicons name={icon} size={22} color={on ? semantic.action : colors.text} />
+        <Ionicons name={icon} size={20} color={on ? semantic.action : colors.text} />
       </View>
       <View style={[g.pickTag, g.groupTag, on && g.pickTagOn]}>
         <Text style={[g.pickTagText, on && { color: semantic.actionInk }]}>Tümü</Text>
@@ -547,7 +564,7 @@ function GroupPick({ icon, on, label, onPress }: { icon: 'home' | 'mic'; on: boo
 }
 
 /** Lucky packages, then either the full odds table of the selected one or the user's own Lucky history. */
-function LuckyShelf({ gifts, selected, view, history, version, onPick }: { gifts: LuckyGift[]; selected: LuckyGift; view: 'odds' | 'history'; history: LuckyRecord[]; version: number; onPick: (id: string) => void }) {
+function LuckyShelf({ gifts, selected, view, onToggleView, history, version, onPick }: { gifts: LuckyGift[]; selected: LuckyGift; view: 'odds' | 'history'; onToggleView: () => void; history: LuckyRecord[]; version: number; onPick: (id: string) => void }) {
   const top = maxMult(selected);
   return (
     <View style={{ width: '100%' }}>
@@ -557,22 +574,35 @@ function LuckyShelf({ gifts, selected, view, history, version, onPick }: { gifts
           const off = !!unavailable(it);
           return (
             <Pressable key={it.id} onPress={() => onPick(it.id)} style={g.tileWrap} accessibilityRole="button" accessibilityState={{ selected: on }} accessibilityLabel={`${it.name}, Şanslı, ${fmt(it.price)} jeton, en yüksek ×${maxMult(it)}${off ? ', şu an kapalı' : ''}`}>
-              <View style={[g.tile, on && g.tileOn]}>
-                <GiftArt giftId={it.id} emoji={it.emoji} size={42} style={off && { opacity: 0.4 }} textStyle={[g.tileArt, off && { opacity: 0.4 }]} />
-                <Text style={g.tileName} numberOfLines={2}>
-                  {it.name}
-                </Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                  <Icon3D name="coin" size={13} />
-                  <Text style={g.tilePrice}>{fmt(it.price)}</Text>
+              <View style={[g.tile, g.tileLucky, on && g.tileOn]}>
+                <View style={g.tileArtBox}>
+                  <GiftArt giftId={it.id} emoji={it.emoji} size={44} style={off && { opacity: 0.4 }} textStyle={[g.tileArt, off && { opacity: 0.4 }]} />
                 </View>
-                <View style={[g.badge, { backgroundColor: off ? colors.cardAlt : 'rgba(34,197,94,0.25)' }]}>
+                {/* On a line of its own: ×1.000 is wider than the corner of a tile. */}
+                <View style={[g.luckyBadge, { backgroundColor: off ? colors.cardAlt : 'rgba(34,197,94,0.25)' }]}>
                   <Text style={g.badgeText}>{off ? 'Kapalı' : `×${fmt(maxMult(it))}`}</Text>
+                </View>
+                <View style={g.tileNameBox}>
+                  <Text style={g.tileName} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.85}>
+                    {it.name}
+                  </Text>
+                </View>
+                <View style={g.tilePriceRow}>
+                  <Icon3D name="coin" size={12} />
+                  <Text style={g.tilePrice} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                    {fmt(it.price)}
+                  </Text>
                 </View>
               </View>
             </Pressable>
           );
         })}
+      </View>
+      <View style={g.luckyToggle}>
+        <Pressable onPress={onToggleView} hitSlop={{ top: 6, bottom: 6 }} style={g.sortBtn} accessibilityRole="button">
+          <Ionicons name={view === 'odds' ? 'time-outline' : 'stats-chart-outline'} size={14} color={colors.primaryText} />
+          <Text style={g.sortText}>{view === 'odds' ? 'Geçmişim' : 'Olasılıklar'}</Text>
+        </Pressable>
       </View>
       {view === 'odds' ? (
         <View style={g.odds} accessibilityLabel={`${selected.name} olasılık tablosu`}>
@@ -603,7 +633,7 @@ function LuckyShelf({ gifts, selected, view, history, version, onPick }: { gifts
                 <Text style={g.summaryName} numberOfLines={1}>
                   {r.giftName} → {userById(r.toId).name}
                 </Text>
-                <Text style={g.dim} numberOfLines={1}>
+                <Text style={g.dim} numberOfLines={2}>
                   {r.at} · harcanan {fmt(r.price)} · ayar v{r.configVersion}
                 </Text>
               </View>
@@ -639,21 +669,29 @@ function GiftTile({
   return (
     <Pressable onPress={onPress} onLongPress={onLongPress} delayLongPress={350} style={g.tileWrap} accessibilityRole="button" accessibilityState={{ selected }} accessibilityLabel={a11y} accessibilityHint="Uzun bas: favorilere ekle veya çıkar">
       <View style={[g.tile, selected && g.tileOn]}>
-        <GiftArt giftId={gift.id} emoji={gift.emoji} size={42} style={locked && { opacity: 0.4 }} textStyle={[g.tileArt, locked && { opacity: 0.4 }]} />
-        <Text style={[g.tileName, locked && { color: colors.textDim }]} numberOfLines={2}>
-          {gift.name}
-        </Text>
+        <View style={g.tileArtBox}>
+          <GiftArt giftId={gift.id} emoji={gift.emoji} size={44} style={locked && { opacity: 0.4 }} textStyle={[g.tileArt, locked && { opacity: 0.4 }]} />
+        </View>
+        <View style={g.tileNameBox}>
+          <Text style={[g.tileName, locked && { color: colors.textDim }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.85}>
+            {gift.name}
+          </Text>
+        </View>
         {locked ? (
           <View style={g.lockPill}>
             <Ionicons name="lock-closed" size={10} color={colors.gold} />
             <Text style={g.lockText}>VIP {gift.minSvip}</Text>
           </View>
         ) : stock !== undefined ? (
-          <Text style={[g.tilePrice, { color: semantic.success }]}>Ücretsiz · {stock}</Text>
+          <Text style={[g.tilePrice, { color: semantic.success }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+            Ücretsiz · {stock}
+          </Text>
         ) : (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-            <Icon3D name="coin" size={13} />
-            <Text style={g.tilePrice}>{fmt(gift.price)}</Text>
+          <View style={g.tilePriceRow}>
+            <Icon3D name="coin" size={12} />
+            <Text style={g.tilePrice} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+              {fmt(gift.price)}
+            </Text>
           </View>
         )}
         {badge === 'music' ? (
@@ -664,7 +702,7 @@ function GiftTile({
           </View>
         ) : null}
         {favorite && <Ionicons name="star" size={12} color={colors.gold} style={g.favMark} />}
-        {selected && <Ionicons name="checkmark-circle" size={18} color={colors.primaryText} style={g.check} />}
+        {selected && <Ionicons name="checkmark-circle" size={16} color={colors.primaryText} style={g.check} />}
       </View>
     </Pressable>
   );
@@ -675,7 +713,9 @@ const g = StyleSheet.create({
   sheet: { backgroundColor: colors.card, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, paddingBottom: space.lg, ...edge.sheet },
   handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border, marginTop: space.sm },
   header: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingHorizontal: space.lg, paddingTop: space.md, paddingBottom: space.sm },
+  headerSlim: { paddingTop: 6, paddingBottom: 4 },
   title: { color: colors.text, fontSize: type.title, fontWeight: '800' },
+  titleSlim: { fontSize: type.bodyL },
   levelRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   levelText: { color: colors.textDim, fontSize: type.caption },
   levelTrack: { width: 56, flexShrink: 1, height: 4, borderRadius: 2, backgroundColor: colors.cardAlt, overflow: 'hidden' },
@@ -684,20 +724,23 @@ const g = StyleSheet.create({
   coin: { fontSize: 15 },
   balanceText: { color: semantic.money, fontWeight: '800', fontSize: type.body, fontVariant: ['tabular-nums'] },
   close: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center' },
-  section: { paddingHorizontal: space.lg, gap: space.sm, paddingBottom: space.md },
-  label: { color: colors.text, fontSize: type.body, fontWeight: '700' },
+  // No right padding: the people's row runs to the screen's edge.
+  section: { paddingLeft: space.lg, gap: space.sm, paddingBottom: space.md },
+  label: { color: colors.text, fontSize: type.body, fontWeight: '700', paddingRight: space.lg },
   dim: { color: colors.textDim, fontSize: type.caption, lineHeight: 17 },
-  whoRow: { gap: 10, alignItems: 'flex-start', paddingRight: space.sm },
-  pick: { alignItems: 'center', width: 52 },
-  pickRing: { width: 50, height: 50, borderRadius: 25, borderWidth: 2.5, borderColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
+  whoBar: { flexDirection: 'row', alignItems: 'flex-start', gap: space.sm },
+  whoRow: { gap: space.sm, alignItems: 'flex-start', paddingRight: space.lg },
+  pick: { alignItems: 'center', width: 48 },
+  pickRing: { width: 44, height: 44, borderRadius: 22, borderWidth: 2.5, borderColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
   pickRingOn: { borderColor: semantic.action },
   groupDisc: { backgroundColor: colors.cardAlt, borderColor: colors.border },
   pickTag: { marginTop: -10, minWidth: 30, height: 18, borderRadius: 9, paddingHorizontal: 6, backgroundColor: '#0B1322', borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
-  groupTag: { minWidth: 40 },
+  // Slimmer sides: "Tümü" at the largest text size would otherwise fill the 48 dp pick to the last pixel and could wrap.
+  groupTag: { minWidth: 40, paddingHorizontal: 4 },
   pickTagOn: { backgroundColor: semantic.action, borderColor: semantic.action },
   pickTagText: { color: '#fff', fontSize: 11, fontWeight: '900', fontVariant: ['tabular-nums'] },
   groupGap: { width: 1, alignSelf: 'stretch', marginVertical: 8, backgroundColor: colors.border },
-  odds: { marginHorizontal: 4, marginTop: space.sm, padding: space.md, borderRadius: radius.md, backgroundColor: 'rgba(255,255,255,0.03)', gap: 2 },
+  odds: { marginHorizontal: 3, marginTop: space.xs, padding: space.md, borderRadius: radius.md, backgroundColor: 'rgba(255,255,255,0.03)', gap: 2 },
   oddsHead: { flexDirection: 'row', paddingBottom: 4, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   oddsHeadText: { color: colors.textDim, fontWeight: '700' },
   oddsRow: { flexDirection: 'row', paddingVertical: 5, borderRadius: 6 },
@@ -708,31 +751,44 @@ const g = StyleSheet.create({
   personOn: { backgroundColor: colors.primary, borderColor: colors.primary },
   personText: { color: colors.textDim, fontSize: type.body, fontWeight: '700', flexShrink: 1 },
   shelfBar: { flexDirection: 'row', alignItems: 'center' },
-  shelves: { gap: space.sm, paddingHorizontal: space.lg, paddingBottom: space.sm, alignItems: 'center' },
+  shelves: { gap: space.sm, paddingHorizontal: space.lg, paddingVertical: space.xs, alignItems: 'center' },
   shelf: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 36, paddingHorizontal: space.md, borderRadius: radius.pill, backgroundColor: colors.cardAlt },
   shelfOn: { backgroundColor: colors.primary },
   shelfText: { color: colors.textDim, fontSize: type.body, fontWeight: '700' },
   noteRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingHorizontal: space.lg, minHeight: 32 },
   sortBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 32, paddingHorizontal: space.sm },
   sortText: { color: colors.primaryText, fontSize: type.caption, fontWeight: '700' },
-  // Compact: at the shelves' end, level with them.
-  sortBtnBar: { paddingRight: space.lg, marginBottom: space.sm },
-  gridScroll: { flexGrow: 0, flexShrink: 1, minHeight: 180 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: space.md, paddingBottom: space.sm },
-  tileWrap: { width: '25%', padding: 4 },
-  tile: { flexGrow: 1, alignItems: 'center', gap: 2, paddingTop: space.md, paddingBottom: space.sm, paddingHorizontal: 4, borderRadius: radius.md, borderWidth: 2, borderColor: 'transparent', backgroundColor: 'rgba(255,255,255,0.03)' },
+  // Compact: at the shelves' end, one width whatever the sort, set apart so no shelf reads as covered by it.
+  sortBtnBar: { width: 68, justifyContent: 'center', paddingHorizontal: space.sm, borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: colors.border },
+  gridScroll: { flexGrow: 0, flexShrink: 1, minHeight: 0 },
+  // Compact: the sheet has its own height, the grid takes what the fixed parts leave.
+  gridFill: { flex: 1, minHeight: 0 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: space.sm, paddingBottom: space.sm },
+  shelfNote: { width: '100%', paddingHorizontal: space.sm, paddingBottom: 6 },
+  luckyToggle: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: space.xs },
+  tileWrap: { width: '25%', padding: 3 },
+  // One height for every tile: art, two lines kept for the name, and the price on the same line across a row.
+  tile: { height: 108, alignItems: 'center', paddingTop: 4, paddingBottom: 3, paddingHorizontal: 2, borderRadius: radius.md, borderWidth: 2, borderColor: 'transparent', backgroundColor: 'rgba(255,255,255,0.03)' },
+  // Şanslı: one line more, for the top multiplier.
+  tileLucky: { height: 124 },
   tileOn: { borderColor: colors.primaryText, backgroundColor: semantic.tonal },
-  tileArt: { fontSize: 34, lineHeight: 42 },
+  tileArtBox: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  // An emoji in place of a picture grows with the phone's text size and still has to fit the 44 dp box.
+  tileArt: { fontSize: 30, lineHeight: 38 },
+  tileNameBox: { flex: 1, alignSelf: 'stretch', minHeight: 0, alignItems: 'center', justifyContent: 'center' },
   // Two lines, broken between words ("Şans / Yoncası"), instead of "Şans Yon…".
   tileName: { color: colors.text, fontSize: type.caption, fontWeight: '600', maxWidth: '100%', textAlign: 'center' },
-  tilePrice: { color: colors.textDim, fontSize: type.caption, fontVariant: ['tabular-nums'] },
+  tilePriceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, maxWidth: '100%' },
+  tilePrice: { color: colors.textDim, fontSize: type.caption, fontVariant: ['tabular-nums'], flexShrink: 1 },
   lockPill: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(251,191,36,0.14)', borderRadius: radius.pill, paddingHorizontal: 6, paddingVertical: 1 },
   lockText: { color: colors.gold, fontSize: 11, fontWeight: '800' },
-  badge: { position: 'absolute', top: 4, right: 4, minWidth: 20, height: 16, borderRadius: 5, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
+  badge: { position: 'absolute', top: 2, right: 2, minWidth: 20, height: 16, borderRadius: 5, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
+  luckyBadge: { alignSelf: 'center', minWidth: 20, height: 16, borderRadius: 5, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
   badgeText: { color: colors.text, fontSize: 10, fontWeight: '900' },
-  musicBadge: { position: 'absolute', top: 3, right: 3, width: 20, height: 20 },
-  favMark: { position: 'absolute', top: 5, left: 6 },
-  check: { position: 'absolute', bottom: 34, right: 4 },
+  musicBadge: { position: 'absolute', top: 2, right: 2, width: 20, height: 20 },
+  // The left corner, clear of the name: the selection above, the favourite star under it.
+  favMark: { position: 'absolute', top: 20, left: 4 },
+  check: { position: 'absolute', top: 2, left: 2 },
   footer: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, paddingHorizontal: space.lg, paddingTop: space.md, gap: space.sm },
   summary: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   summaryArt: { fontSize: 28 },
@@ -748,7 +804,7 @@ const g = StyleSheet.create({
   countPopup: { position: 'absolute', left: space.lg, backgroundColor: colors.cardAlt, borderRadius: radius.lg, paddingVertical: 6, minWidth: 200, borderWidth: 1, borderColor: colors.border },
   countOption: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.lg, minHeight: 44 },
   // Compact: two columns, so the list stays inside the shorter sheet (Android takes no touch outside it).
-  countPopupWide: { flexDirection: 'row', flexWrap: 'wrap', width: 300 },
+  countPopupWide: { flexDirection: 'row', flexWrap: 'wrap' },
   countOptionHalf: { width: '50%', paddingHorizontal: space.md },
   countOptionN: { color: colors.text, fontWeight: '800', fontSize: type.body, width: 52, fontVariant: ['tabular-nums'] },
 });

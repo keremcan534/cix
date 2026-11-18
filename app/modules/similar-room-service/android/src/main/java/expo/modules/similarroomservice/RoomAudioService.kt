@@ -65,10 +65,18 @@ class RoomAudioService : Service() {
     super.onDestroy()
   }
 
-  // The app swiped away from recents: the room ends with it.
+  // The app swiped away from recents: the room ends with it. The process goes too, or the voices and the mic would
+  // run on with no screen to stop them; the next start offers the way back into the room.
   override fun onTaskRemoved(rootIntent: Intent?) {
     stopSelf()
     super.onTaskRemoved(rootIntent)
+    android.os.Process.killProcess(android.os.Process.myPid())
+  }
+
+  // The status bar draws only the icon's shape: the transparent one expo-notifications generates, not the app icon.
+  private fun smallIcon(): Int {
+    val icon = resources.getIdentifier("notification_icon", "drawable", packageName)
+    return if (icon != 0) icon else applicationInfo.icon
   }
 
   private fun build(title: String, text: String): Notification {
@@ -84,7 +92,7 @@ class RoomAudioService : Service() {
     val open = packageManager.getLaunchIntentForPackage(packageName)?.apply { flags = Intent.FLAG_ACTIVITY_SINGLE_TOP }
     val tap = open?.let { PendingIntent.getActivity(this, 0, it, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE) }
     return NotificationCompat.Builder(this, CHANNEL)
-      .setSmallIcon(applicationInfo.icon)
+      .setSmallIcon(smallIcon())
       .setContentTitle(title)
       .setContentText(text)
       .setContentIntent(tap)

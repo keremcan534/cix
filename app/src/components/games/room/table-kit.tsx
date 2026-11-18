@@ -5,6 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, View, useWindowDimensions, type StyleProp, type ViewStyle } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EdgeLight, Gloss, PressableScale, Shine } from '@/components/fx/surface';
 import { Photo } from '@/components/photo';
@@ -29,13 +30,20 @@ export function useTableFx() {
 }
 
 /**
- * The height a board may take in the game's sheet (components/games/game-panel: it starts 22% down the screen) after
- * the sheet's header and the voice strip and `chrome`, the game's own rows round the board. In a full screen there
- * is more room than this, so it holds there too.
+ * How tall a tall game's sheet is on a screen `h` dp high (components/games/game-panel): 78% of it, and on a short
+ * phone up to 590dp, so a table still fits above the navigation buttons.
+ */
+export const tallSheetHeight = (h: number) => Math.max(h * 0.78, Math.min(h - 52, 590));
+
+/**
+ * The height a board may take in the game's sheet after the sheet's header, the voice strip, its bottom padding (at
+ * least 14dp, 6dp above the phone's navigation bar: components/games/game-panel) and `chrome`, the game's own rows
+ * round the board. In a full screen there is more room than this, so it holds there too.
  */
 export function useBoardRoom(chrome: number) {
   const { height } = useWindowDimensions();
-  return Math.max(220, Math.floor(height * 0.78 - SHEET_CHROME - chrome));
+  const insets = useSafeAreaInsets();
+  return Math.max(180, Math.floor(tallSheetHeight(height) - SHEET_CHROME - Math.max(0, insets.bottom - 8) - chrome));
 }
 const SHEET_CHROME = 128;
 
@@ -270,7 +278,8 @@ export function StatusLine({ text, lit, tint = semantic.action }: { text: string
   return (
     <View style={[k.status, lit && { backgroundColor: alpha(tint, 0.14), borderColor: alpha(tint, 0.45) }]} accessibilityLiveRegion="polite">
       {lit && <Animated.View style={[k.statusDot, { backgroundColor: tint, boxShadow: `0 0 8px ${tint}`, opacity: beat }]} />}
-      <Text style={[k.statusText, lit && { color: colors.text }]} numberOfLines={1}>
+      {/* Lit lines are fixed words and the clock, which must stay readable; a line with a player's name keeps its ellipsis. */}
+      <Text style={[k.statusText, lit && { color: colors.text }]} numberOfLines={1} adjustsFontSizeToFit={lit}>
         {text}
       </Text>
     </View>
@@ -303,6 +312,8 @@ export function DuelHeader({
   tints: string[];
   token: (seat: number) => ReactNode;
 }) {
+  // The narrowest phones: a smaller face leaves the words room. The right plate keeps 6dp outside its face for the token.
+  const narrow = useWindowDimensions().width < 340;
   const plate = (seat: number) => {
     const who = seats[seat];
     const right = seat === 1;
@@ -312,18 +323,22 @@ export function DuelHeader({
           <View style={k.free}>
             <Ionicons name="add" size={20} color={colors.textDim} />
           </View>
-          <Text style={k.plateHint}>Boş koltuk</Text>
+          <Text style={[k.plateHint, { flexShrink: 1 }]} numberOfLines={2}>
+            Boş koltuk
+          </Text>
         </Plate>
       );
     const active = playing && turn === seat;
+    const shown = seat === me ? 'Sen' : firstName(who.name);
     return (
-      <Plate active={active} tint={tints[seat]} style={[k.plateFill, right && k.plateRight]} label={`${seat === me ? 'Sen' : who.name}, ${wins[seat] ?? 0} el${active ? ', sıra onda' : ''}`}>
-        <SeatFace seat={who} size={48} color={tints[seat]} active={active} endsAt={endsAt} winner={!playing && winner === seat} tinted badge={token(seat)} />
+      <Plate active={active} tint={tints[seat]} style={[k.plateFill, right && k.plateRight, narrow && k.plateNarrow, narrow && right && k.plateNarrowRight]} label={`${seat === me ? 'Sen' : who.name}, ${wins[seat] ?? 0} el${active ? ', sıra onda' : ''}`}>
+        <SeatFace seat={who} size={narrow ? 40 : 48} color={tints[seat]} active={active} endsAt={endsAt} winner={!playing && winner === seat} tinted badge={token(seat)} />
         <View style={{ flex: 1, alignItems: right ? 'flex-end' : 'flex-start' }}>
-          <Text style={[k.plateName, active && { color: colors.text }]} numberOfLines={1}>
-            {seat === me ? 'Sen' : firstName(who.name)}
+          {/* Android has no lower limit for the shrinking, so a very long name keeps its ellipsis instead. */}
+          <Text style={[k.plateName, active && { color: colors.text }]} numberOfLines={1} adjustsFontSizeToFit={shown.length <= 8}>
+            {shown}
           </Text>
-          <Text style={[k.plateHint, active && { color: tints[seat] }]} numberOfLines={1}>
+          <Text style={[k.plateHint, active && { color: tints[seat] }]} numberOfLines={1} adjustsFontSizeToFit>
             {!playing ? (winner === seat ? 'Kazandı' : ' ') : active ? (seat === me ? 'Sıra sende' : 'Oynuyor…') : 'Bekliyor'}
           </Text>
         </View>
@@ -536,7 +551,7 @@ const k = StyleSheet.create({
   actionText: { color: semantic.actionInk, fontFamily: fonts.displayBold, fontSize: 16, lineHeight: 22 },
   ghost: { minHeight: 44, borderRadius: 999, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.cardAlt, paddingHorizontal: 16 },
   ghostText: { color: colors.text, fontWeight: '800', fontSize: 13 },
-  small: { minHeight: 40, paddingHorizontal: 14 },
+  small: { minHeight: 44, paddingHorizontal: 14 },
   veil: { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(8,15,30,0.6)', borderRadius: 18, zIndex: 30 },
   endCard: { alignItems: 'center', gap: 4, paddingHorizontal: 22, paddingTop: 14, paddingBottom: 14, borderRadius: 22, borderWidth: 1.5, minWidth: 210, overflow: 'hidden' },
   cup: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.55)', boxShadow: '0 4px 12px rgba(0,0,0,0.45)' },
@@ -550,10 +565,12 @@ const k = StyleSheet.create({
   plate: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 60, borderRadius: 18, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.08)', paddingHorizontal: 7, paddingVertical: 5, overflow: 'hidden' },
   plateFill: { flex: 1 },
   plateRight: { flexDirection: 'row-reverse' },
+  plateNarrow: { gap: 6, paddingHorizontal: 5 },
+  plateNarrowRight: { paddingLeft: 4, paddingRight: 6 },
   plateName: { color: colors.textDim, fontSize: 14, lineHeight: 19, fontWeight: '800' },
   plateHint: { color: colors.textDim, fontSize: 11, lineHeight: 15, fontWeight: '700' },
   free: { width: 48, height: 48, borderRadius: 24, borderWidth: 1.5, borderColor: colors.border, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
   score: { alignItems: 'center', minWidth: 52 },
   scoreText: { color: colors.text, fontFamily: fonts.display, fontSize: 20, lineHeight: 26 },
-  scoreLabel: { color: colors.textDim, fontSize: 9, lineHeight: 12, fontWeight: '800', letterSpacing: 1 },
+  scoreLabel: { color: colors.textDim, fontSize: 12, lineHeight: 16, fontWeight: '800', letterSpacing: 0.5 },
 });

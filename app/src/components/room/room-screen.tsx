@@ -3,7 +3,7 @@
 // else can only mute or pause for themselves, which never changes the room.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useState } from 'react';
-import { Image, Linking, Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Image, Linking, Modal, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 
 import { Text, TextInput } from '@/components/text';
 import { YouTubePlayer } from '@/components/room/youtube-player';
@@ -79,7 +79,12 @@ export function RoomScreen({
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, [ticking]);
-  const h = Math.round(Math.min(width - space.lg * 2, 640) * 9 / 16);
+  // On a short phone a playing video gives way, so the mics under it stay in sight. The empty and error cards keep the
+  // full height: their words and button don't fit in the shorter one.
+  const { height: winH } = useWindowDimensions();
+  const full = Math.round(Math.min(width - space.md * 2, 640) * 9 / 16);
+  const showsVideo = !!playback && playback.playbackStatus !== 'error' && !loadError;
+  const h = winH < 700 && showsVideo ? Math.min(full, Math.max(120, Math.round(winH * 0.2))) : full;
 
   const run = (r: Result<{ playback?: PlaybackState }>, text?: string) => {
     if (!r.ok) showAlert('Yapılamadı', r.reason);
@@ -264,7 +269,7 @@ function LinkModal({ visible, link, setLink, error, onOpen, onClose }: { visible
 }
 
 const st = StyleSheet.create({
-  wrap: { marginHorizontal: space.lg, marginTop: space.sm, gap: 6 },
+  wrap: { marginHorizontal: space.md, marginTop: space.sm, gap: 6 },
   head: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   headText: { color: colors.text, fontWeight: '800', fontSize: 13 },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,0.35)', borderRadius: radius.pill, paddingHorizontal: 7, paddingVertical: 2 },
@@ -278,7 +283,7 @@ const st = StyleSheet.create({
   ctlBig: { width: 44, height: 44, borderRadius: 22, backgroundColor: semantic.action },
   dim: { color: colors.textDim, fontSize: 12, lineHeight: 17 },
   warn: { color: colors.gold, fontSize: 12, lineHeight: 17 },
-  bar: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginHorizontal: space.lg, marginTop: space.sm, padding: space.md, borderRadius: radius.md, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: colors.border },
+  bar: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginHorizontal: space.md, marginTop: space.sm, padding: space.md, borderRadius: radius.md, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: colors.border },
   barText: { color: colors.text, fontWeight: '700', flex: 1 },
   primary: { backgroundColor: semantic.action, borderRadius: radius.pill, paddingHorizontal: space.lg, paddingVertical: 10, alignItems: 'center' },
   primaryText: { color: semantic.actionInk, fontWeight: '800' },

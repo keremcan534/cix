@@ -15,6 +15,7 @@ import { Avatar, VerifiedBadge } from '@/components/ui';
 import { messageTime } from '@/data/messages-ui';
 import { userById } from '@/data/mock';
 import { CallButtons } from '@/components/one-on-one-bar';
+import { useKeyboardOpen } from '@/lib/keyboard-open';
 import { callsAvailable, liveCalls, loadProfile } from '@/lib/live';
 import { isLiveUser } from '@/lib/live/messages';
 import { useSheetMax } from '@/lib/sheet-space';
@@ -36,7 +37,8 @@ export function InboxSheet({ visible, onClose }: { visible: boolean; onClose: ()
     onClose();
   };
   const user = openId ? userById(openId) : null;
-  const { top } = useSafeAreaInsets();
+  const { top, bottom } = useSafeAreaInsets();
+  const keyboardOpen = useKeyboardOpen();
   // The list, and a chat lower still; over the room never above its Balkon line (lib/sheet-space).
   const listHeight = useSheetMax(0.78);
   const threadHeight = useSheetMax(0.6);
@@ -59,7 +61,8 @@ export function InboxSheet({ visible, onClose }: { visible: boolean; onClose: ()
     <Modal visible={visible} transparent animationType="slide" onRequestClose={() => (openId ? setOpenId(null) : close())}>
       <KeyboardAvoid style={[s.root, { paddingTop: top + 8 }]}>
         <Pressable style={s.backdrop} onPress={close} accessibilityLabel="Kapat" />
-        <View style={[s.sheet, { height: user ? threadHeight : listHeight }]}>
+        {/* The sheet runs to the screen's bottom: its reply box and last row stay over the navigation bar (not over the keyboard). */}
+        <View style={[s.sheet, { height: user ? threadHeight : listHeight, paddingBottom: keyboardOpen ? 12 : Math.max(12, bottom + 4) }]}>
           <View style={s.handle} />
           {user ? (
             <ChatThread
@@ -82,7 +85,7 @@ export function InboxSheet({ visible, onClose }: { visible: boolean; onClose: ()
                   <Avatar uri={user.avatar} size={34} online={user.online} />
                   <View style={{ flex: 1 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                      <Text style={s.name} numberOfLines={1}>
+                      <Text style={[s.name, { flexShrink: 1 }]} numberOfLines={1}>
                         {user.name}
                       </Text>
                       {user.verified && <VerifiedBadge />}

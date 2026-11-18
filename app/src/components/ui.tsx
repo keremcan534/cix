@@ -144,6 +144,8 @@ export function Button({
         })
       }
       disabled={disabled}
+      // Up and down only: a small button is wide enough, and its neighbour in a row may be close (approve, reject).
+      hitSlop={small ? { top: 5, bottom: 5 } : undefined}
       accessibilityRole="button"
       accessibilityState={{ disabled }}
       style={({ pressed }) => [{ opacity: disabled && !face ? 0.5 : 1 }, pressed && { transform: [{ scale: 0.97 }] }, style]}
@@ -173,7 +175,7 @@ export function CoinPill({ coins, onPress }: { coins: number; onPress?: () => vo
   const { colors } = useTheme();
   const styles = useStyles();
   return (
-    <Pressable onPress={onPress} style={styles.coin}>
+    <Pressable onPress={onPress} hitSlop={onPress ? 8 : undefined} style={styles.coin}>
       <Icon3D name="coin" size={18} />
       <RollingNumber value={coins} style={styles.coinText} />
       {onPress && <Ionicons name="add-circle" size={16} color={colors.gold} />}
@@ -185,6 +187,8 @@ const useStyles = makeStyles(({ colors }) => ({
   vip: { borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1 },
   vipText: { color: '#3B2300', fontSize: 11, fontWeight: '800' },
   btn: {
+    // Beside a taller neighbour (a label on two lines) the face fills the row's height too.
+    flexGrow: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -194,7 +198,7 @@ const useStyles = makeStyles(({ colors }) => ({
     paddingHorizontal: 22,
   },
   btnSmall: { minHeight: BUTTON_SMALL, paddingVertical: 5, paddingHorizontal: 14 },
-  btnText: { color: '#fff', fontWeight: '700', fontSize: 15, letterSpacing: 0.1 },
+  btnText: { color: '#fff', fontWeight: '700', fontSize: 15, letterSpacing: 0.1, flexShrink: 1, textAlign: 'center' },
   coin: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -216,7 +220,7 @@ const useStyles = makeStyles(({ colors }) => ({
   textLinkCenter: { alignSelf: 'center' },
   headerTitle: { color: colors.text, fontSize: 18, fontFamily: fonts.displayBold, letterSpacing: -0.2, flexShrink: 1, maxWidth: '60%', textAlign: 'center', marginHorizontal: 6 },
   headerRight: { flexDirection: 'row', alignItems: 'center', flexShrink: 0 },
-  headerSide: { flex: 1, flexBasis: 0, flexDirection: 'row', alignItems: 'center' },
+  headerSide: { flex: 1, flexBasis: 0, minWidth: 40, flexDirection: 'row', alignItems: 'center' },
   headerBack: { width: 40, height: 40, justifyContent: 'center' },
 }));
 
@@ -230,7 +234,7 @@ export function TextLink({ title, onPress, color: own, center }: {
   const styles = useStyles();
   const color = own ?? colors.primaryText;
   return (
-    <Pressable onPress={onPress} hitSlop={6} accessibilityRole="link" style={[styles.textLink, center && styles.textLinkCenter]}>
+    <Pressable onPress={onPress} hitSlop={{ top: 13, bottom: 13, left: 6, right: 6 }} accessibilityRole="link" style={[styles.textLink, center && styles.textLinkCenter]}>
       <Text style={{ color, fontWeight: '700' }}>{title}</Text>
       <Ionicons name="chevron-forward" size={14} color={color} />
     </Pressable>
@@ -240,13 +244,13 @@ export function TextLink({ title, onPress, color: own, center }: {
 export function Header({ title, right, onBack }: { title: string; right?: ReactNode; onBack?: () => void }) {
   const { colors } = useTheme();
   const styles = useStyles();
-  // Both sides are at least as wide as what sits on the right (a coin pill, a text action), so the title stays on
-  // the screen's centre line and gives way (smaller, then "…") instead of running into a wide right side.
+  // The right side is at least as wide as what sits on it (a coin pill, a text action); the left only keeps the back
+  // button. The title stays on the screen's centre line while there is room and moves left, whole, when the right is wide.
   const [rightW, setRightW] = useState(0);
   const side = rightW > 40 ? { minWidth: rightW } : null;
   return (
     <View style={styles.header}>
-      <View style={[styles.headerSide, side]}>
+      <View style={styles.headerSide}>
         <Pressable onPress={() => (onBack ? onBack() : goBack())} hitSlop={8} style={styles.headerBack} accessibilityRole="button" accessibilityLabel="Geri">
           <Ionicons name="chevron-back" size={26} color={colors.text} />
         </Pressable>

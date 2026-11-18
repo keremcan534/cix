@@ -143,7 +143,9 @@ export type LayoutPlan = {
 
 /** A row of mics that is all video tiles: their width and height. */
 export function videoTile(plan: Pick<LayoutPlan, 'inner'>, count: number) {
-  const w = Math.floor(clamp((plan.inner - (count - 1) * 8) / count, 96, count === 1 ? plan.inner * 0.72 : 220));
+  // Three to a row on the narrowest phones are a little under 96 px rather than the third falling to a line of its own.
+  const fits = (plan.inner - (count - 1) * 8) / count;
+  const w = Math.floor(clamp(fits, Math.min(96, fits), count === 1 ? plan.inner * 0.72 : 220));
   return { w, h: Math.round(clamp(w * 0.72, 96, 170)) };
 }
 
@@ -179,7 +181,7 @@ export function layoutHeight(s: LayoutSchema, plan: LayoutPlan, face: number, o:
   if (plan.sided) {
     // The big video and the side column (60 px seats, 38 px faces) as StageLayout draws them; rows under it as usual.
     const side = s.slots.filter((x) => x.area === 'side');
-    const sideCols = side.length > 5 ? 2 : 1;
+    const sideCols = side.length > 6 ? 3 : side.length > 3 ? 2 : 1;
     const bigH = Math.round(clamp((plan.inner - 60 * sideCols - 8) * 0.95, 150, 320));
     const sideRows = Math.ceil(side.length / sideCols);
     const block = Math.max(bigH, sideRows * seatHeight(38) + (sideRows - 1) * 6);

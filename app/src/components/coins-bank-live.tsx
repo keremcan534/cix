@@ -83,7 +83,9 @@ function Balance({ coins, stock }: { coins: number; stock: JetonStock | null }) 
       <Text style={styles.heroLabel}>{stock ? 'Jeton stoğun' : 'Jeton bakiyesi'}</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <Icon3D name="coin" size={40} />
-        <Text style={styles.heroN}>{fmt(stock?.coins ?? coins)}</Text>
+        <Text style={styles.heroN} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+          {fmt(stock?.coins ?? coins)}
+        </Text>
       </View>
       {stock ? (
         stock.channels.map((c) => (
@@ -337,7 +339,7 @@ const useStyles = makeStyles(({ colors, semantic, ink, dark }) => ({
   body: { padding: 16, gap: 12, paddingBottom: 48 },
   hero: { borderRadius: 24, padding: 20, gap: 4, borderWidth: 1, borderColor: colors.border, ...(dark ? {} : { boxShadow: LIGHT_SHADOW }) },
   heroLabel: { color: ink(0.9), fontSize: 14 },
-  heroN: { color: colors.text, fontSize: 36, fontWeight: '900' },
+  heroN: { color: colors.text, fontSize: 36, fontWeight: '900', flexShrink: 1 },
   heroSub: { color: ink(0.8), fontSize: 12 },
   heroBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 12, borderWidth: 1.5, borderColor: dark ? ink(0.85) : 'rgba(184,31,102,0.45)', borderRadius: 999, paddingVertical: 10, backgroundColor: dark ? ink(0.12) : semantic.tonal },
   heroBtnText: { color: dark ? colors.text : semantic.tonalText, fontWeight: '800', fontSize: 15 },

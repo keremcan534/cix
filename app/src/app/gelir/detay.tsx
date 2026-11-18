@@ -90,7 +90,9 @@ export default function EarningsDetail() {
           ] as const
         ).map(([k, l]) => (
           <Pressable key={k} onPress={() => setMain(k)} style={[styles.tab, main === k && styles.tabActive]}>
-            <Text style={[styles.tabText, main === k && { color: colors.text }]}>{l}</Text>
+            <Text style={[styles.tabText, main === k && { color: colors.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+              {l}
+            </Text>
           </Pressable>
         ))}
       </View>
@@ -120,14 +122,14 @@ export default function EarningsDetail() {
               )}
             </View>
 
-            <View style={styles.subTabs}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.subTabs}>
               {SUBS.map(([k, l]) => (
                 <Pressable key={k} onPress={() => setSub(k)} style={styles.subTab}>
                   <Text style={[styles.subText, sub === k && styles.subActive]}>{l}</Text>
                   <View style={[styles.subBar, sub === k && { backgroundColor: colors.primary }]} />
                 </Pressable>
               ))}
-            </View>
+            </ScrollView>
 
             <View style={styles.list}>
               {live && liveList(sub)}

@@ -13,7 +13,7 @@ import type { LayoutSlot, RoomLayout } from '@/data/room-layouts';
 import { Art } from '@/components/Art';
 import type { ArenaSlot } from '@/components/room/pk';
 import type { TrackRef } from '@/lib/call-media';
-import { layoutPlan, layoutSizes, videoTile as videoSize } from '@/lib/seat-fit';
+import { layoutPlan, layoutSizes, seatHeight, videoTile as videoSize } from '@/lib/seat-fit';
 import { colors, radius, semantic, space } from '@/theme';
 
 const PAD = 12;
@@ -119,11 +119,14 @@ export function StageLayout({
 
   // Big video with mics in a column next to it.
   if (side.length) {
-    const sideCols = side.length > 5 ? 2 : 1;
+    // The same columns as lib/seat-fit layoutHeight: the mics stand beside the video, not in a column far taller than it.
+    const sideCols = side.length > 6 ? 3 : side.length > 3 ? 2 : 1;
     const sideW = 60 * sideCols;
+    const sideRows = Math.ceil(side.length / sideCols);
     const first = stage.filter((x) => x.row === 0);
     const bigW = inner - sideW - space.sm;
-    const bigH = Math.round(clamp(bigW * 0.95, 150, 320));
+    // As tall as the mics beside it, so no empty block is left under the video.
+    const bigH = Math.max(Math.round(clamp(bigW * 0.95, 150, 320)), sideRows * seatHeight(38) + (sideRows - 1) * 6);
     return (
       <View style={st.wrap}>
         <View style={{ flexDirection: 'row', gap: space.sm, alignItems: 'flex-start' }}>

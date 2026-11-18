@@ -56,6 +56,8 @@ export function useSalonFx() {
 
 /** The game's root: stage on top taking the free height, controls under it. */
 export const salonScreen: ViewStyle = { flex: 1, gap: SALON.gap };
+/** The same on a phone too short for it all on one screen (slot-kit's useShortGame). */
+export const salonScreenShort: ViewStyle = { flex: 1, gap: space.sm };
 
 /** The size of a box as it is laid out (0 until then). For a flexible area whose content is sized from it. */
 export function useBox() {

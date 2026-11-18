@@ -1,8 +1,8 @@
 // Push notifications in a live build (server/api/push.mjs): calls ring, messages, gifts and follows arrive while
 // the app is closed. This phone's Firebase token goes to the server, which sends through Firebase Cloud
 // Messaging. It needs the Firebase file in the build (preview.yml writes it from the GOOGLE_SERVICES_JSON secret)
-// and the server's Firebase key (FCM_SERVICE_ACCOUNT); without the file the token can't be read and nothing
-// happens (no permission prompt for notifications that could never come).
+// and the server's Firebase key (FCM_SERVICE_ACCOUNT); without the file the token can't be read. Permission is asked
+// either way: from Android 13 the "room is open" notification of a running room needs it too.
 //
 // Calls use their own Android channel (highest importance, the phone's ringtone sound), so a call shows on top
 // and rings; a tap opens the app, where the incoming call card (components/incoming-call) answers it.
@@ -10,6 +10,7 @@ import { router } from 'expo-router';
 import { Platform } from 'react-native';
 
 import * as api from '@/lib/api';
+import { isOpenChat } from '@/lib/open-chat';
 import { pushTarget } from '@/lib/push-target';
 
 type Notifications = typeof import('expo-notifications');
@@ -39,10 +40,16 @@ export function startPush(): Promise<void> {
       });
       await N.setNotificationChannelAsync('default', { name: 'Bildirimler', importance: N.AndroidImportance.HIGH, sound: 'default' });
     }
-    // Shown while the app is open as well (a message in another chat, a gift), with its sound.
+    // Shown while the app is open as well (a message in another chat, a gift), with its sound; the chat on screen
+    // shows its own messages.
     N.setNotificationHandler({
-      handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false }),
+      handleNotification: async (n) => {
+        const show = !isOpenChat(n.request.content.data);
+        return { shouldShowBanner: show, shouldShowList: show, shouldPlaySound: show, shouldSetBadge: false };
+      },
     });
+    const perm = await N.getPermissionsAsync();
+    if (!perm.granted && perm.canAskAgain) await N.requestPermissionsAsync();
     let device: string;
     try {
       device = String((await N.getDevicePushTokenAsync()).data);
@@ -51,14 +58,16 @@ export function startPush(): Promise<void> {
       started = null;
       return;
     }
-    const perm = await N.getPermissionsAsync();
-    if (!perm.granted && perm.canAskAgain) await N.requestPermissionsAsync();
     await send(device);
     subs.push(N.addPushTokenListener((t) => void send(String(t.data))));
     subs.push(N.addNotificationResponseReceivedListener((r) => open(r.notification.request.content.data)));
     // The tap that opened the app from closed.
     const first = N.getLastNotificationResponse();
-    if (first) open(first.notification.request.content.data);
+    if (first) {
+      open(first.notification.request.content.data);
+      // Once: signing in again later doesn't open it a second time.
+      N.clearLastNotificationResponse();
+    }
   })().catch((e) => {
     started = null;
     console.warn('[bildirim]', e instanceof Error ? e.message : String(e));

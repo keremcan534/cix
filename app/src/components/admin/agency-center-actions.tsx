@@ -6,6 +6,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState, type ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ns } from '@/components/agency-net';
 import { DepthCard } from '@/components/fx/surface';
@@ -50,6 +51,7 @@ export function CenterActions({ nodes, demo, after }: { nodes: TreeNode[]; demo:
 }
 
 function CreateSheet({ nodes, close, done }: { nodes: TreeNode[]; close: () => void; done: () => void }) {
+  const insets = useSafeAreaInsets();
   const [name, setName] = useState('');
   const [parentId, setParentId] = useState('');
   const [person, setPerson] = useState<Person | null>(null);
@@ -81,7 +83,7 @@ function CreateSheet({ nodes, close, done }: { nodes: TreeNode[]; close: () => v
     <Modal visible transparent animationType="fade" onRequestClose={close}>
       <KeyboardAvoid style={st.wrap}>
         <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel="Kapat" />
-        <DepthCard style={st.sheet}>
+        <DepthCard style={[st.sheet, { marginTop: space.md + insets.top, marginBottom: space.md + insets.bottom }]}>
           <ScrollView contentContainerStyle={{ gap: space.lg }} keyboardShouldPersistTaps="handled">
             <Text style={st.title}>Ajans oluştur</Text>
             <Text style={ns.dim}>Merkezin oluşturduğu ajans hemen onaylanır. Sahibini şimdi seçebilir ya da sonra atayabilirsin.</Text>
@@ -240,6 +242,7 @@ const st = StyleSheet.create({
     margin: space.md,
     padding: space.xl,
     borderRadius: radius.xl,
+    flexShrink: 1,
     maxHeight: '88%',
     ...edge.card,
   },

@@ -19,15 +19,19 @@ export function UpdatePrompt() {
   const update = useAppUpdate();
   const install = useInstallState();
   const [later, setLater] = useState(false);
+  // Hidden for this download only: the card floats over every screen, and Ayarlar keeps showing the progress.
+  const [hidden, setHidden] = useState(false);
   const insets = useSafeAreaInsets();
   const { semantic } = useTheme();
   const s = useStyles();
   useEffect(() => {
     void cleanOldDownloads();
   }, []);
-  if (Platform.OS !== 'android' || !update || (later && install.phase === 'idle')) return null;
-
   const busy = install.phase === 'downloading' || install.phase === 'installing';
+  // A failure brings the card back, and the next download shows it again.
+  if (hidden && !busy) setHidden(false);
+  if (Platform.OS !== 'android' || !update || (later && install.phase === 'idle') || (hidden && busy)) return null;
+
   const pct = install.phase === 'downloading' ? Math.round(install.progress * 100) : 0;
   const line =
     install.phase === 'downloading'
@@ -55,7 +59,13 @@ export function UpdatePrompt() {
             <View style={[s.fill, { width: `${Math.max(3, pct)}%` }]} />
           </View>
         )}
-        {!busy && (
+        {busy ? (
+          <View style={s.actions}>
+            <Pressable onPress={() => setHidden(true)} style={s.later} accessibilityRole="button" hitSlop={6}>
+              <Text style={s.laterText}>Gizle</Text>
+            </Pressable>
+          </View>
+        ) : (
           <View style={s.actions}>
             <Pressable onPress={() => setLater(true)} style={s.later} accessibilityRole="button" hitSlop={6}>
               <Text style={s.laterText}>Sonra</Text>

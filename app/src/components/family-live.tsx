@@ -8,7 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FlatList, Modal, Pressable, ScrollView, Share, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ActionSheet, type SheetOption } from '@/components/ActionSheet';
 import { MemberPicker, useFamilyGift } from '@/components/family-center-live';
@@ -148,25 +148,29 @@ function FamilyList({
       <KeyboardAvoid style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }} keyboardShouldPersistTaps="handled">
           {invs.length > 0 && (
-            <Card style={{ gap: 6 }}>
+            <Card style={{ gap: 12 }}>
               <Text style={styles.title}>Davetlerin · {invs.length}</Text>
               {invs.map((i) => (
-                <View key={i.family.id} style={styles.row}>
-                  <Avatar uri={i.family.leader.avatarUrl ?? undefined} name={i.family.name} size={40} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.name} numberOfLines={1}>
-                      {i.family.name}
-                    </Text>
-                    <Text style={styles.dim} numberOfLines={1}>
-                      Lv.{i.family.level} · {i.family.members}/{i.family.capacity} üye · {i.by.name} davet etti
-                    </Text>
+                <View key={i.family.id} style={{ gap: 2 }}>
+                  <View style={styles.row}>
+                    <Avatar uri={i.family.leader.avatarUrl ?? undefined} name={i.family.name} size={40} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.name} numberOfLines={1}>
+                        {i.family.name}
+                      </Text>
+                      <Text style={styles.dim} numberOfLines={2}>
+                        Lv.{i.family.level} · {i.family.members}/{i.family.capacity} üye · {i.by.name} davet etti
+                      </Text>
+                    </View>
                   </View>
-                  <Pressable style={[styles.pill, { backgroundColor: colors.cardAlt }]} onPress={() => void answerInvite(i, false)} accessibilityLabel={`${i.family.name} davetini reddet`}>
-                    <Text style={styles.name}>Reddet</Text>
-                  </Pressable>
-                  <Pressable style={[styles.pill, { backgroundColor: colors.primary }]} onPress={() => void answerInvite(i, true)} accessibilityLabel={`${i.family.name} davetini kabul et`}>
-                    <Text style={styles.pillText}>Katıl</Text>
-                  </Pressable>
+                  <View style={styles.pillRow}>
+                    <Pressable style={[styles.pill, { backgroundColor: colors.cardAlt }]} hitSlop={{ top: 6, bottom: 6 }} onPress={() => void answerInvite(i, false)} accessibilityLabel={`${i.family.name} davetini reddet`}>
+                      <Text style={styles.name}>Reddet</Text>
+                    </Pressable>
+                    <Pressable style={[styles.pill, { backgroundColor: colors.primary }]} hitSlop={{ top: 6, bottom: 6 }} onPress={() => void answerInvite(i, true)} accessibilityLabel={`${i.family.name} davetini kabul et`}>
+                      <Text style={styles.pillText}>Katıl</Text>
+                    </Pressable>
+                  </View>
                 </View>
               ))}
             </Card>
@@ -203,7 +207,10 @@ function FamilyList({
                       {f.name}
                     </Text>
                     <Text style={styles.dim} numberOfLines={1}>
-                      Lv.{f.level} · {f.members}/{f.capacity} üye · bu hafta {fmt(f.weekly)} güç
+                      Lv.{f.level} · {f.members}/{f.capacity} üye
+                    </Text>
+                    <Text style={styles.dim} numberOfLines={1}>
+                      Bu hafta {fmt(f.weekly)} güç
                     </Text>
                   </View>
                   <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
@@ -294,13 +301,16 @@ function Summary({ f }: { f: fam.LiveFamily }) {
       <LinearGradient colors={themeOf(f.theme).colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.banner}>
         <Avatar uri={f.leader.avatarUrl ?? undefined} name={f.name} size={56} />
         <View style={{ flex: 1 }}>
-          <View style={[styles.row, { gap: 6, paddingVertical: 0 }]}>
-            <Text style={[styles.big, styles.onBand, { flexShrink: 1 }]} numberOfLines={1}>
-              {f.name}
-            </Text>
+          <Text style={[styles.big, styles.onBand]} numberOfLines={1}>
+            {f.name}
+          </Text>
+          {/* The tag sits with the leader's line, so a long tag doesn't take the family name's width. It wraps: on a narrow phone a long tag would leave the leader's name no room. */}
+          <View style={[styles.row, { gap: 6, rowGap: 2, paddingVertical: 0, flexWrap: 'wrap' }]}>
             {!!f.tag && <Text style={styles.tag}>{f.tag}</Text>}
+            <Text style={[styles.bandDim, { flexShrink: 1 }]} numberOfLines={1}>
+              Lider: {f.leader.name}
+            </Text>
           </View>
-          <Text style={styles.bandDim}>Lider: {f.leader.name}</Text>
         </View>
         <Text style={[styles.lv, { color: colors.gold }]}>Lv.{f.level}</Text>
       </LinearGradient>
@@ -323,7 +333,9 @@ function Stat({ label, value }: { label: string; value: string }) {
   const styles = useStyles();
   return (
     <View style={styles.stat}>
-      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>
+        {value}
+      </Text>
       <Text style={styles.dim}>{label}</Text>
     </View>
   );
@@ -335,10 +347,10 @@ function Tile({ icon, title, sub, onPress }: { icon: keyof typeof Ionicons.glyph
   return (
     <Pressable onPress={onPress} style={styles.tile} accessibilityRole="button" accessibilityLabel={sub ? `${title}, ${sub}` : title}>
       <Ionicons name={icon} size={22} color={colors.primary} />
-      <Text style={styles.name} numberOfLines={1}>
+      <Text style={styles.name} numberOfLines={2}>
         {title}
       </Text>
-      <Text style={styles.dim} numberOfLines={1}>
+      <Text style={styles.dim} numberOfLines={2}>
         {sub}
       </Text>
     </Pressable>
@@ -376,6 +388,7 @@ function OnlineRow({ m }: { m: NonNullable<fam.FamilyOverview['online']>[number]
 function InviteSheet({ members, onClose }: { members: fam.FamilyMember[]; onClose: () => void }) {
   const styles = useStyles();
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const [people, setPeople] = useState<api.UserCard[] | null>(null);
   const [sent, setSent] = useState<Set<string>>(() => new Set());
   useEffect(() => {
@@ -401,7 +414,8 @@ function InviteSheet({ members, onClose }: { members: fam.FamilyMember[]; onClos
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.scrim} onPress={onClose} accessibilityLabel="Kapat" />
-      <View style={styles.sheet}>
+      {/* The modal draws under the navigation buttons; the cap keeps a long list's title clear of the status bar. */}
+      <View style={[styles.sheet, { maxHeight: '88%', paddingBottom: Math.max(28, insets.bottom + 8) }]}>
         <View style={styles.row}>
           <Text style={[styles.title, { flex: 1 }]}>Üye davet et</Text>
           <Pressable hitSlop={10} onPress={onClose} accessibilityLabel="Kapat">
@@ -459,7 +473,7 @@ function Members({ members, myRole, onMenu }: { members: fam.FamilyMember[]; myR
             </View>
             {m.role !== 'member' && <Text style={styles.role}>{fam.ROLE_NAME[m.role]}</Text>}
             {manage && (
-              <Pressable hitSlop={10} onPress={() => onMenu?.(m)} accessibilityLabel={`${m.name} için seçenekler`}>
+              <Pressable hitSlop={14} onPress={() => onMenu?.(m)} accessibilityLabel={`${m.name} için seçenekler`}>
                 <Ionicons name="ellipsis-horizontal" size={18} color={colors.textDim} />
               </Pressable>
             )}
@@ -598,7 +612,7 @@ function MyFamily({ detail, onChange, reload, onRanking }: { detail: fam.FamilyD
             <Card style={{ gap: 10 }}>
               <View style={styles.row}>
                 <Text style={[styles.title, { flex: 1 }]}>Bu hafta</Text>
-                <Pressable onPress={onRanking} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Bu hafta ${ov.rank}. sıradasınız. Aile sıralamasını gör`}>
+                <Pressable onPress={onRanking} hitSlop={14} accessibilityRole="button" accessibilityLabel={`Bu hafta ${ov.rank}. sıradasınız. Aile sıralamasını gör`}>
                   <Text style={styles.rankChip}>Sıra #{ov.rank} ›</Text>
                 </Pressable>
               </View>
@@ -674,7 +688,7 @@ function MyFamily({ detail, onChange, reload, onRanking }: { detail: fam.FamilyD
                   <Text style={styles.pillText}>Kaydet</Text>
                 </Pressable>
               </View>
-              <Text style={styles.dim}>Adının yanında görünür. En fazla 8 harf ya da rakam.</Text>
+              <Text style={styles.dim}>Aile adının altında görünür. En fazla 8 harf ya da rakam.</Text>
               <Text style={styles.label}>Tema</Text>
               <View style={styles.themes}>
                 {KABILE_THEMES.map((t) => {
@@ -690,7 +704,7 @@ function MyFamily({ detail, onChange, reload, onRanking }: { detail: fam.FamilyD
                       <LinearGradient colors={t.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.swatch}>
                         {locked && <Ionicons name="lock-closed" size={14} color="#fff" />}
                       </LinearGradient>
-                      <Text style={styles.themeName} numberOfLines={1}>
+                      <Text style={styles.themeName} numberOfLines={2}>
                         {t.name}
                       </Text>
                     </Pressable>
@@ -700,22 +714,24 @@ function MyFamily({ detail, onChange, reload, onRanking }: { detail: fam.FamilyD
             </Card>
           )}
           {manager && detail.requests.length > 0 && (
-            <Card style={{ gap: 4 }}>
+            <Card style={{ gap: 12 }}>
               <Text style={styles.title}>Katılma istekleri · {detail.requests.length}</Text>
               {detail.requests.map((r) => (
-                <View key={r.id} style={styles.row}>
-                  <Pressable onPress={() => openProfile(r.id)} style={[styles.row, { flex: 1 }]}>
+                <View key={r.id} style={{ gap: 2 }}>
+                  <Pressable onPress={() => openProfile(r.id)} style={styles.row}>
                     <Avatar uri={r.avatarUrl ?? undefined} name={r.name} size={36} />
                     <Text style={[styles.name, { flex: 1 }]} numberOfLines={1}>
                       {r.name}
                     </Text>
                   </Pressable>
-                  <Pressable style={[styles.pill, { backgroundColor: colors.cardAlt }]} onPress={() => answer(r.id, false)} accessibilityLabel={`${r.name} isteğini reddet`}>
-                    <Text style={styles.name}>Reddet</Text>
-                  </Pressable>
-                  <Pressable style={[styles.pill, { backgroundColor: colors.primary }]} onPress={() => answer(r.id, true)} accessibilityLabel={`${r.name} isteğini kabul et`}>
-                    <Text style={styles.pillText}>Kabul</Text>
-                  </Pressable>
+                  <View style={styles.pillRow}>
+                    <Pressable style={[styles.pill, { backgroundColor: colors.cardAlt }]} hitSlop={{ top: 6, bottom: 6 }} onPress={() => answer(r.id, false)} accessibilityLabel={`${r.name} isteğini reddet`}>
+                      <Text style={styles.name}>Reddet</Text>
+                    </Pressable>
+                    <Pressable style={[styles.pill, { backgroundColor: colors.primary }]} hitSlop={{ top: 6, bottom: 6 }} onPress={() => answer(r.id, true)} accessibilityLabel={`${r.name} isteğini kabul et`}>
+                      <Text style={styles.pillText}>Kabul</Text>
+                    </Pressable>
+                  </View>
                 </View>
               ))}
             </Card>
@@ -736,7 +752,7 @@ function MyFamily({ detail, onChange, reload, onRanking }: { detail: fam.FamilyD
               const here = f.level >= p.from && f.level <= p.to;
               return (
                 <View key={p.from} style={[styles.perk, here && { borderColor: colors.primary }]}>
-                  <Text style={[styles.perkLv, here && { color: colors.primary }]}>
+                  <Text style={[styles.perkLv, here && { color: colors.primary }]} numberOfLines={1}>
                     Lv.{p.from}–{p.to}
                   </Text>
                   <Text style={[styles.dim, { flex: 1 }, here && { color: colors.text }]}>{p.text}</Text>
@@ -825,7 +841,8 @@ export function LiveFamilyChat() {
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <Header title="Aile sohbeti" />
       {!closed && (
-        <View style={styles.quick}>
+        // Scrolls on a narrow phone; never shrinks, so the row keeps its height when the keyboard opens.
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ flexGrow: 0, flexShrink: 0 }} contentContainerStyle={styles.quick}>
           {(
             [
               ['checkbox-outline', 'Görevler', KABILE_ROUTES.merkez],
@@ -833,12 +850,12 @@ export function LiveFamilyChat() {
               ['people-outline', 'Ailem', KABILE_ROUTES.profile],
             ] as const
           ).map(([icon, label, href]) => (
-            <Pressable key={label} style={styles.quickChip} onPress={() => router.push(href)} accessibilityRole="link" accessibilityLabel={label}>
+            <Pressable key={label} style={styles.quickChip} hitSlop={{ top: 6, bottom: 6 }} onPress={() => router.push(href)} accessibilityRole="link" accessibilityLabel={label}>
               <Ionicons name={icon} size={15} color={colors.primary} />
               <Text style={styles.name}>{label}</Text>
             </Pressable>
           ))}
-        </View>
+        </ScrollView>
       )}
       {closed ? (
         <View style={{ padding: 24, gap: 12 }}>
@@ -909,6 +926,7 @@ const useStyles = makeStyles(({ colors, semantic, edge }) => ({
   barFill: { height: 6, backgroundColor: semantic.money },
   pill: { borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7 },
   pillText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  pillRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8 },
   leave: { alignSelf: 'center', paddingVertical: 12, paddingHorizontal: 20 },
   leaveText: { color: semantic.danger, fontWeight: '700' },
   msgRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
@@ -920,18 +938,18 @@ const useStyles = makeStyles(({ colors, semantic, edge }) => ({
   banner: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16 },
   scrim: { flex: 1, backgroundColor: SCRIM },
   sheet: { backgroundColor: colors.card, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 16, paddingBottom: 28, gap: 8, ...edge.sheet },
-  quick: { flexDirection: 'row', gap: 8, paddingHorizontal: 12, paddingTop: 4, paddingBottom: 6 },
+  quick: { flexDirection: 'row', gap: 8, paddingHorizontal: 12, paddingTop: 6, paddingBottom: 6 },
   quickChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, backgroundColor: colors.card },
   onBand: { color: '#fff' },
   bandDim: { color: 'rgba(255,255,255,0.78)', fontSize: 13, lineHeight: 18 },
   tag: { color: '#fff', fontSize: 11, fontWeight: '800', letterSpacing: 0.6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.6)', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1 },
   tiles: { flexDirection: 'row', gap: 8 },
-  tile: { flex: 1, backgroundColor: colors.card, borderRadius: 16, padding: 12, gap: 4 },
+  tile: { flex: 1, backgroundColor: colors.card, borderRadius: 16, padding: 8, gap: 4 },
   rankChip: { color: colors.gold, fontWeight: '800', fontSize: 13 },
   themes: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   theme: { width: '31%', borderRadius: 12, borderWidth: 2, borderColor: 'transparent', padding: 4, gap: 4 },
   swatch: { height: 44, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   themeName: { color: colors.text, fontSize: 12, fontWeight: '600', textAlign: 'center' },
   perk: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: colors.border, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 8 },
-  perkLv: { color: colors.textDim, fontWeight: '800', fontSize: 12, width: 52 },
+  perkLv: { color: colors.textDim, fontWeight: '800', fontSize: 12, width: 64 },
 }));

@@ -11,6 +11,7 @@ import { AppState } from 'react-native';
 import * as api from '@/lib/api';
 import { isContactBlocked } from '@/lib/contact-filter';
 import { hideIds, settle, type ServerDm, type ThreadSync } from '@/lib/dm-thread';
+import { markChatOpen } from '@/lib/open-chat';
 import { noteRefusal } from '@/lib/sanctions';
 import { liveMode, message, myServerId, rememberUser, toLocal, toServer } from '@/lib/live';
 import { onLine } from '@/lib/live/live-line';
@@ -172,9 +173,11 @@ export function useLiveThread(userId: string, app: Inbox) {
     const off = onLine((e) => {
       if ((e.type === 'message' || e.type === 'message_read') && e.from === peer) tick();
     });
+    const closed = peer ? markChatOpen(peer) : undefined;
     return () => {
       clearInterval(t);
       off();
+      closed?.();
     };
   }, [userId]);
 }

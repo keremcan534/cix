@@ -5,6 +5,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Animated, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 
 import { Text, TextInput } from '@/components/text';
@@ -297,11 +298,13 @@ export function Quote({ text }: { text: string }) {
 /** The bottom card over the panel (not dimmed); tapping outside closes it. */
 export function Overlay({ onClose, children, label }: { onClose: () => void; children: ReactNode; label: string }) {
   const s = useStyles();
+  const insets = useSafeAreaInsets();
   return (
     <View style={StyleSheet.absoluteFill}>
       <Pressable style={s.dim} onPress={onClose} accessibilityRole="button" accessibilityLabel="Kapat" />
       <KeyboardAvoid style={s.sheetWrap} pointerEvents="box-none">
-        <View style={s.sheet} accessibilityViewIsModal accessibilityLabel={label}>
+        {/* absoluteFill ignores the panel's safe-area padding: the sheet keeps its last controls above the navigation buttons. */}
+        <View style={[s.sheet, { paddingBottom: Math.max(space.xxl, insets.bottom + space.md) }]} accessibilityViewIsModal accessibilityLabel={label}>
           <View style={s.grabber} />
           {children}
         </View>
@@ -381,6 +384,7 @@ export function InputSheet({ spec, onClose }: { spec: SheetSpec; onClose: () => 
 export function Toast({ text, onDone }: { text: string; onDone: () => void }) {
   const s = useStyles();
   const { semantic } = useTheme();
+  const insets = useSafeAreaInsets();
   const [o] = useState(() => new Animated.Value(0));
   const done = useRef(onDone);
   useEffect(() => {
@@ -397,7 +401,7 @@ export function Toast({ text, onDone }: { text: string; onDone: () => void }) {
     return () => a.stop();
   }, [text, o]);
   return (
-    <Animated.View style={[s.toast, { opacity: o }]} pointerEvents="none" accessibilityLiveRegion="polite" accessibilityRole="alert">
+    <Animated.View style={[s.toast, { opacity: o, bottom: insets.bottom + space.lg }]} pointerEvents="none" accessibilityLiveRegion="polite" accessibilityRole="alert">
       <Ionicons name="checkmark-circle" size={18} color={semantic.success} />
       <Text style={s.toastText}>{text}</Text>
     </Animated.View>

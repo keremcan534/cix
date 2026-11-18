@@ -131,7 +131,8 @@ export default function ProfileScreen() {
           </Pressable>
           <View style={{ flex: 1, gap: 5 }}>
             <View style={styles.nameRow}>
-              <Text style={styles.name} numberOfLines={2}>
+              {/* One word stays on one line and shrinks: with two lines Android would break it mid-word instead. */}
+              <Text style={styles.name} numberOfLines={/\s/.test(me.name.trim()) ? 2 : 1} adjustsFontSizeToFit minimumFontScale={0.45}>
                 {me.name}
               </Text>
               {me.verified && <VerifiedBadge size={16} />}
@@ -143,13 +144,13 @@ export default function ProfileScreen() {
             </View>
             <AffiliationPills user={me} />
             {publicId !== null && (
-              <Pressable onPress={() => copyText(publicId, 'ID')} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Pressable onPress={() => copyText(publicId, 'ID')} hitSlop={{ top: 4, bottom: 12 }} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                 <Text style={[styles.id, specialId && { color: colors.gold, fontWeight: '800' }]}>ID:{specialId ? `${publicId} ✦` : publicId}</Text>
                 <Ionicons name="copy-outline" size={13} color={colors.textDim} />
               </Pressable>
             )}
           </View>
-          <Pressable style={styles.completion} onPress={() => router.push('/kullanici/me')} accessibilityLabel="Profil tamamlama">
+          <Pressable style={styles.completion} onPress={() => router.push('/kullanici/me')} hitSlop={{ top: 9, bottom: 9 }} accessibilityLabel="Profil tamamlama">
             <Ionicons name="person-outline" size={14} color={colors.text} />
             <Text style={{ color: colors.text, fontWeight: '700', fontSize: 12 }}>%{completion}</Text>
             <View style={styles.redDot} />
@@ -167,13 +168,20 @@ export default function ProfileScreen() {
 
         <View style={styles.card}>
           <Pressable style={styles.rechargeRow} onPress={() => router.push('/cuzdan')} accessibilityLabel="Yükleme">
-            <Text style={styles.h2}>Yükleme</Text>
+            <Text style={styles.h2} maxFontSizeMultiplier={1}>
+              Yükleme
+            </Text>
             <View style={styles.rewardTag}>
               <Ionicons name="gift" size={11} color={semantic.moneyText} />
-              <Text style={styles.rewardText}>Ödül</Text>
+              <Text style={styles.rewardText} maxFontSizeMultiplier={1}>
+                Ödül
+              </Text>
             </View>
             <Icon3D name="coin" size={20} />
-            <Text style={styles.coinN}>{coins.toLocaleString('tr-TR')}</Text>
+            {/* The whole balance always shows: it shrinks to fit, it is never cut. */}
+            <Text style={styles.coinN} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.45}>
+              {coins.toLocaleString('tr-TR')}
+            </Text>
             <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
           </Pressable>
           <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -183,14 +191,14 @@ export default function ProfileScreen() {
               title="VIP"
               sub={svipLevel ? `VIP ${svipLevel}` : 'Yok'}
               colors={['#D02E78', '#4A1630']}
-              icon={<Art name={SVIP_LEVELS[Math.max(0, Math.min(SVIP_LEVELS.length, svipLevel) - 1)].art} size={34} style={!svipLevel && { opacity: 0.6 }} />}
+              icon={<Art name={SVIP_LEVELS[Math.max(0, Math.min(SVIP_LEVELS.length, svipLevel) - 1)].art} size={30} style={!svipLevel && { opacity: 0.6 }} />}
               onPress={() => router.push({ pathname: '/vip', params: { tab: 'svip' } })}
             />
             <StatusCard
               title="Abonelik"
               sub={vipDays > 0 ? `${vipDays} gün` : 'Yok'}
               colors={['#B7832E', '#4A3410']}
-              icon={<Icon3D name="crown" size={34} style={{ opacity: vipDays > 0 ? 1 : 0.9 }} />}
+              icon={<Icon3D name="crown" size={30} style={{ opacity: vipDays > 0 ? 1 : 0.9 }} />}
               onPress={() => router.push({ pathname: '/vip', params: { tab: 'vip' } })}
             />
             <StatusCard
@@ -198,7 +206,7 @@ export default function ProfileScreen() {
               sub={noble ? `${noble.emoji} ${noble.name}` : 'Henüz yok'}
               colors={['#7A2E4A', '#3A1A2E']}
               dot={!noble}
-              icon={<Art name={noble?.art ?? NOBLE_TIERS[0].art} size={34} style={!noble && { opacity: 0.6 }} />}
+              icon={<Art name={noble?.art ?? NOBLE_TIERS[0].art} size={30} style={!noble && { opacity: 0.6 }} />}
               onPress={() => router.push({ pathname: '/vip', params: { tab: 'noble' } })}
             />
           </View>
@@ -270,7 +278,7 @@ export default function ProfileScreen() {
                 .map(([id, e, l]) => (
                   <Pressable key={id} style={styles.gameTile} onPress={() => router.push({ pathname: '/oyunlar', params: { oyun: id } })} accessibilityLabel={l}>
                     <GameIcon id={id} emoji={e} size={26} />
-                    <Text style={{ color: colors.text, fontSize: 11, fontWeight: '700' }} numberOfLines={1}>
+                    <Text style={{ color: colors.text, fontSize: 11, fontWeight: '700', textAlign: 'center' }} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.8}>
                       {l}
                     </Text>
                   </Pressable>
@@ -328,7 +336,7 @@ function StatusCard({ title, sub, colors: c, dot, icon, onPress }: { title: stri
         <Text style={styles.statusTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
           {title}
         </Text>
-        <Text style={styles.statusSub} numberOfLines={1}>
+        <Text style={styles.statusSub} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
           {sub}
         </Text>
         <View style={{ position: 'absolute', right: 6, bottom: 6 }} pointerEvents="none">
@@ -360,10 +368,15 @@ function Stat({ n, label, onPress, dot }: { n: number | null; label: string; onP
   return (
     <Pressable style={{ flex: 1, alignItems: 'center', gap: 4 }} onPress={onPress} disabled={!onPress}>
       <View style={{ flexDirection: 'row' }}>
-        <Text style={styles.statN}>{n === null ? '–' : n.toLocaleString('tr-TR')}</Text>
-        {dot && <View style={[styles.redDot, { marginLeft: 2 }]} />}
+        <Text style={styles.statN} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+          {n === null ? '–' : n.toLocaleString('tr-TR')}
+        </Text>
+        {/* Beside the number without taking width, so it stays centred over its label. */}
+        {dot && <View style={[styles.redDot, { position: 'absolute', right: -9, top: 2 }]} />}
       </View>
-      <Text style={styles.statL}>{label}</Text>
+      <Text style={styles.statL} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -383,19 +396,19 @@ const useStyles = makeStyles(({ colors, semantic, lift, dark }) => ({
   statL: { color: colors.textDim, fontSize: 13 },
   card: { backgroundColor: colors.card, borderRadius: 18, marginHorizontal: 16, padding: 14, gap: 12, ...lift },
   rechargeRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  h2: { color: colors.text, fontSize: 22, fontWeight: '800' },
+  h2: { color: colors.text, fontSize: 18, fontWeight: '800' },
   rewardTag: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: dark ? 'rgba(246,189,96,0.14)' : 'rgba(246,189,96,0.22)', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
   rewardText: { color: semantic.moneyText, fontWeight: '700', fontSize: 12 },
-  coinN: { color: colors.gold, fontWeight: '800', fontSize: 18, marginLeft: 'auto' },
-  status: { borderRadius: 14, padding: 12, paddingRight: 10, height: 80, justifyContent: 'center', gap: 4, overflow: 'hidden' },
+  coinN: { color: colors.gold, fontWeight: '800', fontSize: 18, marginLeft: 'auto', flexShrink: 1 },
+  status: { borderRadius: 14, padding: 12, paddingRight: 10, height: 96, justifyContent: 'flex-start', gap: 4, overflow: 'hidden' },
   statusTitle: { color: '#fff', fontSize: 18, fontWeight: '900' },
-  // Short of the corner picture, so "Henüz yok" never runs under it.
-  statusSub: { color: 'rgba(255,255,255,0.85)', fontSize: 12, paddingRight: 26 },
+  // The corner picture sits below this line, so "Henüz yok" has the tile's whole width.
+  statusSub: { color: 'rgba(255,255,255,0.85)', fontSize: 12 },
   shortIcon: { width: 60, height: 60, borderRadius: 18, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center' },
   gameCard: { marginHorizontal: 16, backgroundColor: colors.card, borderRadius: 16, padding: 12, gap: 10, borderWidth: 1, borderColor: 'rgba(246,189,96,0.35)', ...(dark ? {} : { boxShadow: lift.boxShadow }) },
   gameHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   gameRow: { flexDirection: 'row', gap: 8 },
-  gameTile: { flex: 1, alignItems: 'center', gap: 2, backgroundColor: colors.cardAlt, borderRadius: 12, paddingVertical: 8 },
+  gameTile: { flex: 1, alignItems: 'center', gap: 2, backgroundColor: colors.cardAlt, borderRadius: 12, paddingVertical: 8, paddingHorizontal: 2 },
   roomCta: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, backgroundColor: colors.card, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: 'rgba(56,189,248,0.4)', ...(dark ? {} : { boxShadow: lift.boxShadow }) },
   menuRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 15 },
   sep: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },

@@ -194,6 +194,6 @@ const useStyles = makeStyles(({ colors, semantic, edge, ink }) => ({
   name: { color: colors.text, fontSize: 13, fontWeight: '700' },
   tagOn: { color: semantic.actionText, fontSize: 12, fontWeight: '800' },
   tagHave: { color: colors.textDim, fontSize: 12, fontWeight: '700' },
-  priceRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  price: { color: colors.gold, fontVariant: ['tabular-nums'], fontSize: 12, fontWeight: '800' },
+  priceRow: { flexDirection: 'row', alignItems: 'center', gap: 3, maxWidth: '100%', paddingHorizontal: 4 },
+  price: { color: colors.gold, fontVariant: ['tabular-nums'], fontSize: 12, fontWeight: '800', flexShrink: 1, textAlign: 'center' },
 }));

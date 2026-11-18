@@ -62,6 +62,9 @@ async function accessToken() {
 
 const short = (body) => (body.length > 140 ? `${body.slice(0, 139)}…` : body);
 
+// Firebase refuses a message whose data uses a reserved key: the sender travels as `sender` (app lib/push-target).
+const FCM_DATA_KEY = { from: 'sender' };
+
 /** The Firebase message for one phone: a ringing call on the "calls" channel, the rest on "default". */
 export function fcmMessage(token, { title, body, data = {} }) {
   const ringing = data.type === 'call' && !data.missed;
@@ -70,7 +73,7 @@ export function fcmMessage(token, { title, body, data = {} }) {
       token,
       notification: { title, body: short(body) },
       // Firebase's data values are strings.
-      data: Object.fromEntries(Object.entries(data).map(([k, v]) => [k, String(v)])),
+      data: Object.fromEntries(Object.entries(data).map(([k, v]) => [FCM_DATA_KEY[k] ?? k, String(v)])),
       android: {
         priority: 'HIGH',
         // A call is only worth ringing while it can still be answered.
@@ -95,7 +98,8 @@ async function sendFcm(tokens, n) {
     if (res.ok) continue;
     const j = await res.json().catch(() => ({}));
     const codes = (j.error?.details ?? []).map((d) => d?.errorCode);
-    if (res.status === 404 || codes.includes('UNREGISTERED') || codes.includes('INVALID_ARGUMENT')) gone.push(token);
+    // INVALID_ARGUMENT can be about the message rather than the phone, so it never deletes a token.
+    if (res.status === 404 || codes.includes('UNREGISTERED')) gone.push(token);
     else if (res.status === 401) access = null;
     else console.error('firebase push', res.status);
   }

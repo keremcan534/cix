@@ -5,16 +5,18 @@ import type { Href } from 'expo-router';
 /** Where a tapped notification opens (its data from the server's notify calls). */
 export function pushTarget(data: Record<string, unknown> | undefined): Href | null {
   const s = (k: string) => (typeof data?.[k] === 'string' ? (data[k] as string) : null);
+  // Firebase carries the sender as `sender` (its data can't use `from`); Expo's pushes still say `from`.
+  const from = s('sender') ?? s('from');
   switch (data?.type) {
     case 'message':
-      return s('from') ? (`/sohbet/${s('from')}` as Href) : '/(tabs)/mesajlar';
+      return from ? (`/sohbet/${from}` as Href) : '/(tabs)/mesajlar';
     case 'gift':
     case 'follow':
-      return s('from') ? (`/kullanici/${s('from')}` as Href) : '/bildirimler';
+      return from ? (`/kullanici/${from}` as Href) : '/bildirimler';
     // Someone opened my profile (server/api/social.mjs): with the Abonelik the notice names them and opens them;
     // without it, it names nobody and opens my visitors (blurred) on the Ben tab.
     case 'visit':
-      return s('from') ? (`/kullanici/${s('from')}` as Href) : ('/(tabs)/profil?ziyaretciler=1' as Href);
+      return from ? (`/kullanici/${from}` as Href) : ('/(tabs)/profil?ziyaretciler=1' as Href);
     case 'family_joined':
     case 'family_request':
     case 'family_invite':

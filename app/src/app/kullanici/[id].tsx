@@ -571,15 +571,16 @@ export default function UserProfile() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <ScrollView
-        contentContainerStyle={{ paddingBottom: isMe ? 40 : 110 }}
+        contentContainerStyle={{ paddingBottom: (isMe ? 40 : 110) + insets.bottom }}
         onScroll={(e) => onScroll(e.nativeEvent.contentOffset.y)}
         scrollEventThrottle={16}
       >
         {/* The client's design: no banner across the top. The avatar with its frame and the photo large beside it,
             then the name, handle, badges, status and bio on light glass pills (the same in either scheme). */}
         <View style={[styles.sheet, { paddingTop: insets.top + BAR_H + 6 }]}>
-          <View style={styles.idRow}>
-            <View style={styles.avatarWrap}>
+          {/* A purchased frame reaches past the photo: kept on screen and painted over the cover and the name pill. */}
+          <View style={[styles.idRow, isMe && !!equipped.frame && { zIndex: 2, marginBottom: 6 }]}>
+            <View style={[styles.avatarWrap, isMe && !!equipped.frame && { marginLeft: 12, zIndex: 2 }]}>
               {isMe ? (
                 <Pressable onPress={() => pickPhoto(false)} accessibilityLabel="Profil fotoğrafını değiştir">
                   {/* A frame from the store wins over the bond frame. */}
@@ -614,7 +615,8 @@ export default function UserProfile() {
                   <Guardian guardian={guardian} />
                 </View>
               ) : guardArea.guardian ? (
-                <View style={styles.guardianOver}>
+                // The card clips its content, and this badge has no top padding to absorb the demo's -10.
+                <View style={[styles.guardianOver, { top: 2 }]}>
                   <GuardBadge person={guardArea.guardian} onPress={() => router.push(`/kullanici/${guardArea.guardian!.id}`)} />
                 </View>
               ) : null}
@@ -673,21 +675,22 @@ export default function UserProfile() {
               <Text style={styles.statusText}>{isMe ? 'Durumun gizli' : 'Durum gizli'}</Text>
             )}
             {!!user.city && (
-              <>
+              // No room beside "Son görülme …" on a narrow phone: the place takes a second line instead of being cut to a few letters.
+              <View style={styles.statusPlace}>
                 <View style={styles.statusSep} />
                 <Ionicons name="location-outline" size={14} color={glass.plum} />
-                <Text style={styles.statusText}>
+                <Text style={[styles.statusText, { flexShrink: 1 }]} numberOfLines={1}>
                   {user.city}
                   {/* Live: the server's distance by city ("Aynı şehir", "350 km"); the demo's sample one. */}
                   {!isMe && settings.cityDiscovery && (live ? (distanceText ? ` · ${distanceText}` : null) : ` · ${user.distanceKm} km`)}
                 </Text>
-              </>
+              </View>
             )}
           </View>
 
           {/* The bio on its own pill; mine with the pencil that opens the form. Someone else's only when written. */}
           {(isMe || !!user.bio) && (
-            <Pressable style={styles.bioPill} disabled={!isMe} onPress={openEdit} accessibilityLabel={isMe ? 'Hakkımda yazısını düzenle' : undefined}>
+            <Pressable style={[styles.bioPill, !isMe && { paddingRight: 12 }]} disabled={!isMe} onPress={openEdit} accessibilityLabel={isMe ? 'Hakkımda yazısını düzenle' : undefined}>
               <Text style={[styles.bio, !user.bio && { color: glass.plum }]}>{user.bio || 'Kendini birkaç kelimeyle anlat…'}</Text>
               {isMe && (
                 <View style={styles.bioEdit}>
@@ -776,8 +779,8 @@ export default function UserProfile() {
                     {/* The public ID their own Ben tab shows (live: a special ID they wear, else the one made from their server id). */}
                     {publicId !== null && (
                       <InfoRow icon="person-outline" label="ID">
-                        <Pressable style={styles.row} onPress={copyId} hitSlop={6} accessibilityLabel="ID kopyala">
-                          <Text selectable style={[styles.infoValue, special?.kind === 'specialId' && { color: '#975A16' }]}>
+                        <Pressable style={[styles.row, { flexShrink: 1 }]} onPress={copyId} hitSlop={6} accessibilityLabel="ID kopyala">
+                          <Text selectable style={[styles.infoValue, { flexShrink: 1 }, special?.kind === 'specialId' && { color: '#975A16' }]} numberOfLines={1} ellipsizeMode="middle">
                             {special?.kind === 'specialId' ? `${publicId} ✦` : publicId}
                           </Text>
                           <Ionicons name="copy-outline" size={16} color={glass.plum} />
@@ -786,8 +789,8 @@ export default function UserProfile() {
                     )}
                     {!!user.username && (
                       <InfoRow icon="at-outline" label="Kullanıcı adı">
-                        <Pressable style={styles.row} onPress={copyUsername} hitSlop={6} accessibilityLabel="Kullanıcı adını kopyala">
-                          <Text selectable style={styles.infoValue}>
+                        <Pressable style={[styles.row, { flexShrink: 1 }]} onPress={copyUsername} hitSlop={6} accessibilityLabel="Kullanıcı adını kopyala">
+                          <Text selectable style={[styles.infoValue, { flexShrink: 1 }]} numberOfLines={1} ellipsizeMode="middle">
                             @{user.username}
                           </Text>
                           <Ionicons name="copy-outline" size={16} color={glass.plum} />
@@ -837,7 +840,9 @@ export default function UserProfile() {
                 <Pressable onPress={openEdit} accessibilityRole="button" accessibilityLabel={`Profilini tamamla: yüzde ${completion}. Profili düzenle`}>
                   <LinearGradient colors={['#E0287D', '#9B5DE5', '#38BDF8']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.rewardCard}>
                     <View style={styles.row}>
-                      <Text style={styles.rewardTitle}>Profilini tamamla</Text>
+                      <Text style={styles.rewardTitle} numberOfLines={2}>
+                        Profilini tamamla
+                      </Text>
                       <View style={{ flex: 1 }} />
                       <View style={styles.editPill}>
                         <Text style={styles.editPillText}>Profili Düzenle</Text>
@@ -875,7 +880,7 @@ export default function UserProfile() {
             {(!live || counts?.photos !== undefined) && (album.length > 0 || isMe) && (
               <View style={styles.section}>
                 <SectionTitle title={`Albüm${isMe ? ` · ${myAlbumCount}/${LIMITS.photos}` : ''}`} onPress={() => setTab('dinamik')} />
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -16 }} contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}>
                   {isMe && myAlbumCount < LIMITS.photos && (
                     <Pressable
                       style={[styles.photo, styles.addPhoto]}
@@ -896,7 +901,7 @@ export default function UserProfile() {
                         {isMe && (live ? liveId !== undefined : me.photos?.includes(p)) && (
                           <Pressable
                             style={styles.removePhoto}
-                            hitSlop={6}
+                            hitSlop={11}
                             onPress={() => (liveId !== undefined ? removeFromAlbum(liveId) : updateMe({ photos: (me.photos ?? []).filter((x) => x !== p) }))}
                             accessibilityLabel="Fotoğrafı kaldır"
                           >
@@ -918,7 +923,7 @@ export default function UserProfile() {
                   {extras.height > 0 && <Chip icon="resize-outline" label={`${extras.height}cm`} />}
                   {extras.weight > 0 && <Chip icon="barbell-outline" label={`${extras.weight}kg`} />}
                   {!!extras.job && <Chip icon="briefcase-outline" label={extras.job} />}
-                  {extras.languages.length > 0 && <Chip icon="language-outline" label={extras.languages.join('、')} />}
+                  {extras.languages.length > 0 && <Chip icon="language-outline" label={extras.languages.join(', ')} />}
                   {!!extras.zodiac && <Chip icon="star-outline" label={extras.zodiac} />}
                   {user.interests?.map((i) => (
                     <Chip key={i} label={i} />
@@ -1015,6 +1020,8 @@ export default function UserProfile() {
       {/* Fixed top bar; collapses into a solid bar with the tabs once scrolled past the header. */}
       {/* Fixed glass buttons over the page; scrolled past the header, a glass pill with the name and the tabs below it. */}
       <View pointerEvents="box-none" style={[styles.topBar, collapsed && { backgroundColor: colors.bg }]}>
+        {/* The page never scrolls under the clock and the status icons. */}
+        <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: insets.top, backgroundColor: colors.bg }} />
         <View style={[styles.topRow, collapsed && styles.topRowOn, { marginTop: insets.top + (collapsed ? 3 : 0) }]}>
           <Pressable hitSlop={6} onPress={() => goBack()} style={[styles.iconBtn, !collapsed && styles.iconBtnLift]} accessibilityLabel="Geri">
             <Ionicons name="chevron-back" size={22} color={glass.ink} />
@@ -1184,7 +1191,9 @@ function Stat({ n, label, onPress }: { n: number | null; label: string; onPress?
   const styles = useStyles();
   return (
     <Pressable style={{ flex: 1, alignItems: 'center' }} onPress={onPress} disabled={!onPress} accessibilityLabel={n === null ? label : `${n.toLocaleString('tr-TR')} ${label}`}>
-      <Text style={styles.statN}>{n === null ? '—' : n.toLocaleString('tr-TR')}</Text>
+      <Text style={styles.statN} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>
+        {n === null ? '—' : n.toLocaleString('tr-TR')}
+      </Text>
       <Text style={styles.statL}>{label}</Text>
     </Pressable>
   );
@@ -1226,7 +1235,7 @@ function AffiliationSection({ title, icon, item, empty, emptyHref }: { title: st
       <Pressable style={styles.familyCard} onPress={go} disabled={!go} accessibilityRole={go ? 'button' : undefined} accessibilityLabel={item ? `${title}: ${item.name}, ${item.sub}` : `${empty}. ${title === 'Ajans' ? 'Ajansa' : 'Aileye'} katıl`}>
         <View style={styles.familyEmoji}>{item?.emoji ? <Text style={{ fontSize: 24 }}>{item.emoji}</Text> : <Ionicons name={icon} size={22} color={glass.deep} />}</View>
         <View style={{ flex: 1, gap: 2 }}>
-          <Text style={[styles.roomTitle, !item && styles.emptyTitle]} numberOfLines={1}>
+          <Text style={[styles.roomTitle, !item && styles.emptyTitle]} numberOfLines={item ? 1 : 2}>
             {item ? item.name : empty}
           </Text>
           {item && (
@@ -1286,7 +1295,8 @@ function InfoRow({ icon, label, hint, children }: { icon: keyof typeof Ionicons.
   return (
     <View style={styles.infoRow}>
       <Ionicons name={icon} size={19} color={glass.plum} />
-      <View style={{ flex: 1, gap: 2 }}>
+      {/* The label keeps its width; a long value gives way instead. */}
+      <View style={{ flex: 1, minWidth: 110, gap: 2 }}>
         <Text style={styles.infoLabel}>{label}</Text>
         {hint && (
           <View style={styles.row}>
@@ -1295,7 +1305,7 @@ function InfoRow({ icon, label, hint, children }: { icon: keyof typeof Ionicons.
           </View>
         )}
       </View>
-      {children}
+      <View style={{ flexShrink: 1 }}>{children}</View>
     </View>
   );
 }
@@ -1323,7 +1333,7 @@ function FanClubCard({ name, club }: { name: string; club: FanClub | undefined }
       </View>
       <Text style={styles.glassMeta}>{fan.next ? `Sonraki: ${fan.next.name} (${fan.next.min} puan) → ${fan.next.reward}` : 'En üst kulüp seviyesi'}</Text>
       <Text style={styles.glassMeta}>Puan kazan: takip et (+10), odasına katıl (+5), odada kal (+2/dk), görevler; hediye zorunlu değil.</Text>
-      <Pressable onPress={() => setShowHistory((v) => !v)}>
+      <Pressable onPress={() => setShowHistory((v) => !v)} hitSlop={{ top: 14, bottom: 14 }}>
         <Text style={{ color: glass.deep, fontWeight: '700', fontSize: 12 }}>{showHistory ? 'Puan geçmişini gizle' : 'Puan geçmişi'}</Text>
       </Pressable>
       {showHistory &&
@@ -1381,7 +1391,7 @@ function WallBanner({ title, colors: bg, right, onPress, subtitle, children }: {
           <LinearGradient colors={['#FEF3C7', '#FBBF24']} style={styles.wallRibbon}>
             <Text style={styles.wallTitle}>{title}</Text>
           </LinearGradient>
-          <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 2 }}>{right}</View>
+          <View style={{ flex: 1, minWidth: 78, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 2 }}>{right}</View>
         </View>
         {subtitle && <Text style={styles.wallSub}>{subtitle}</Text>}
         {children}
@@ -1510,7 +1520,9 @@ function OnurTab({
       )}
 
       <View style={[styles.sectionHead, { marginTop: 6 }]}>
-        <Text style={[styles.sectionTitle, { color: colors.text, fontSize: 18 }]}>Hediye Koleksiyonu</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text, fontSize: 18, flexShrink: 1 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+          Hediye Koleksiyonu
+        </Text>
         <View style={{ flex: 1 }} />
         <Text style={styles.meta}>
           Toplanan <Text style={{ color: colors.text, fontWeight: '800' }}>{lit}</Text>/{giftWall.length}
@@ -1771,17 +1783,21 @@ function PrivateStats(p: { coins: number; diamonds: number; vipUntil: string | n
       <View style={styles.privateRow}>
         <Pressable style={styles.privateCell} onPress={() => router.push('/cuzdan')} accessibilityLabel="Jeton bakiyesi">
           <Icon3D name="coin" size={26} />
-          <Text style={styles.privateValue}>{n(p.coins)}</Text>
+          <Text style={styles.privateValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+            {n(p.coins)}
+          </Text>
           <Text style={styles.glassMeta}>Jeton</Text>
         </Pressable>
         <Pressable style={styles.privateCell} onPress={() => router.push('/gelir')} accessibilityLabel="Elmas bakiyesi">
           <Icon3D name="diamond" size={26} />
-          <Text style={styles.privateValue}>{n(p.diamonds)}</Text>
+          <Text style={styles.privateValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+            {n(p.diamonds)}
+          </Text>
           <Text style={styles.glassMeta}>Elmas</Text>
         </Pressable>
         <Pressable style={styles.privateCell} onPress={() => router.push('/vip')} accessibilityLabel="VIP durumu">
           <Icon3D name="crown" size={26} />
-          <Text style={styles.privateValue} numberOfLines={1}>
+          <Text style={styles.privateValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
             {p.vipUntil ?? 'Yok'}
           </Text>
           <Text style={styles.glassMeta}>{p.vipUntil ? 'VIP bitişi' : 'VIP'}</Text>
@@ -1812,7 +1828,8 @@ const useStyles = makeStyles(({ colors, semantic, lift, ink, dark, edge }) => ({
   flag: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   flagText: { color: glass.plum, fontSize: 13, fontWeight: '700' },
   handlePill: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', backgroundColor: glass.fill, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 4, borderWidth: 1, borderColor: glass.rim },
-  statusPill: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', backgroundColor: glass.fill, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5, borderWidth: 1, borderColor: glass.rim },
+  statusPill: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, rowGap: 2, alignSelf: 'flex-start', maxWidth: '100%', backgroundColor: glass.fill, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5, borderWidth: 1, borderColor: glass.rim },
+  statusPlace: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1, maxWidth: '100%' },
   statusText: { color: glass.plum, fontSize: 13 },
   statusSep: { width: 1, height: 14, backgroundColor: glass.line, marginHorizontal: 2 },
   genderText: { color: '#fff', fontSize: 12, fontWeight: '800' },
@@ -1854,19 +1871,19 @@ const useStyles = makeStyles(({ colors, semantic, lift, ink, dark, edge }) => ({
   sectionHead: { flexDirection: 'row', alignItems: 'center' },
   sectionTitle: { color: colors.textDim, fontSize: 16, fontWeight: '800' },
   rewardCard: { borderRadius: 20, padding: 14, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.55)', boxShadow: glass.shadow },
-  rewardTitle: { color: '#fff', fontSize: 17, fontFamily: fonts.display, textShadowColor: 'rgba(0,0,0,0.2)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
+  rewardTitle: { flexShrink: 1, color: '#fff', fontSize: 17, fontFamily: fonts.display, textShadowColor: 'rgba(0,0,0,0.2)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
   rewardSub: { color: '#fff', fontWeight: '700', fontSize: 13 },
   rewardTrack: { flex: 1, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.3)', overflow: 'hidden' },
   rewardFill: { height: 6, backgroundColor: '#fff', borderRadius: 3 },
   rewardPct: { color: '#fff', fontWeight: '900', fontSize: 13, backgroundColor: 'rgba(255,255,255,0.25)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 1, overflow: 'hidden' },
-  editPill: { flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: '#fff', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5 },
+  editPill: { flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: '#fff', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5 },
   editPillText: { color: glass.deep, fontWeight: '800', fontSize: 13 },
   infoBox: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: glass.white, borderRadius: 18, padding: 12, borderWidth: 1, borderColor: glass.line, boxShadow: glass.shadow },
   infoIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   infoText: { color: glass.ink, flex: 1, fontSize: 14 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: glass.white, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: glass.line },
-  chipText: { color: glass.ink, fontSize: 14 },
+  chip: { maxWidth: '100%', flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: glass.white, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: glass.line },
+  chipText: { color: glass.ink, fontSize: 14, flexShrink: 1 },
   infoCard: { backgroundColor: glass.white, borderRadius: 18, paddingHorizontal: 14, overflow: 'hidden', borderWidth: 1, borderColor: glass.line, boxShadow: glass.shadow },
   infoRows: { marginTop: -1 },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, borderTopWidth: 1, borderTopColor: glass.line },
@@ -1897,7 +1914,7 @@ const useStyles = makeStyles(({ colors, semantic, lift, ink, dark, edge }) => ({
   statusNote: { color: colors.gold, fontSize: 13, marginTop: 8 },
   privateCard: { backgroundColor: glass.white, borderRadius: 18, padding: 12, gap: 10, borderWidth: 1, borderColor: glass.line, boxShadow: glass.shadow },
   privateRow: { flexDirection: 'row', gap: 8 },
-  privateCell: { flex: 1, alignItems: 'center', gap: 2, backgroundColor: glass.well, borderRadius: 14, paddingVertical: 10 },
+  privateCell: { flex: 1, alignItems: 'center', gap: 2, backgroundColor: glass.well, borderRadius: 14, paddingVertical: 10, paddingHorizontal: 4 },
   privateValue: { color: glass.ink, fontFamily: fonts.display, fontSize: 15 },
   fieldError: { color: semantic.danger, fontSize: 12, marginTop: 4, fontWeight: '600' },
   editChip: { backgroundColor: colors.cardAlt, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: 'transparent' },
@@ -1941,8 +1958,8 @@ const useStyles = makeStyles(({ colors, semantic, lift, ink, dark, edge }) => ({
   slot: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: dark ? 'rgba(255,255,255,0.06)' : colors.card, borderRadius: 16, padding: 14, ...lift },
   slotNo: { color: colors.pink, fontSize: 15, fontWeight: '700', width: 16, textAlign: 'center' },
   inviteBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 999, paddingVertical: 13 },
-  bottom: { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10, backgroundColor: colors.bg, borderTopWidth: 1, borderTopColor: colors.border },
-  followBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 46, borderRadius: 23, backgroundColor: semantic.socialFill },
+  bottom: { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10, backgroundColor: colors.bg, borderTopWidth: 1, borderTopColor: colors.border },
+  followBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 44, borderRadius: 22, backgroundColor: semantic.socialFill },
   followingBtn: { backgroundColor: colors.cardAlt, borderWidth: 1, borderColor: colors.border },
   followText: { color: '#fff', fontWeight: '800', fontSize: 15 },
   followingText: { color: colors.text },
@@ -1954,6 +1971,6 @@ const useStyles = makeStyles(({ colors, semantic, lift, ink, dark, edge }) => ({
   input: { backgroundColor: colors.cardAlt, color: colors.text, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15 },
   cancelBtn: { paddingVertical: 12, paddingHorizontal: 20, borderRadius: 999, backgroundColor: colors.cardAlt, alignItems: 'center' },
   pickRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, borderRadius: 14 },
-  presence: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12, backgroundColor: dark ? 'rgba(255,95,162,0.15)' : 'rgba(208,46,120,0.09)', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: dark ? '#F0468E' : 'rgba(184,31,102,0.4)' },
+  presence: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4, backgroundColor: dark ? 'rgba(255,95,162,0.15)' : 'rgba(208,46,120,0.09)', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: dark ? '#F0468E' : 'rgba(184,31,102,0.4)' },
   presenceGo: { color: '#fff', fontWeight: '800', backgroundColor: '#F0468E', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 6, overflow: 'hidden' },
 }));

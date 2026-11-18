@@ -148,13 +148,15 @@ export function PressableScale({
   style,
   onPress,
   to = 0.96,
+  fill,
   ...rest
-}: Omit<PressableProps, 'style' | 'children'> & { children: ReactNode; style?: StyleProp<ViewStyle>; to?: number }) {
+}: Omit<PressableProps, 'style' | 'children'> & { children: ReactNode; style?: StyleProp<ViewStyle>; to?: number; /** Grows with a stretched parent, so cards in one row end level. */ fill?: boolean }) {
   const press = useSpringPress(to);
   const v = press.scale;
   return (
     <Pressable
       {...rest}
+      style={fill ? s.fill : undefined}
       onPressIn={press.onPressIn}
       onPressOut={press.onPressOut}
       onPress={
@@ -165,7 +167,7 @@ export function PressableScale({
         })
       }
     >
-      <Animated.View style={[style, { transform: [{ scale: v }] }]}>{children}</Animated.View>
+      <Animated.View style={[fill && s.fill, style, { transform: [{ scale: v }] }]}>{children}</Animated.View>
     </Pressable>
   );
 }
@@ -178,6 +180,7 @@ const s = StyleSheet.create({
   edge: { position: 'absolute', top: 0, height: 1 },
   gloss: { position: 'absolute', top: 0, left: 0, right: 0, height: '52%' },
   shine: { position: 'absolute', top: -30, bottom: -30, width: SHINE_W },
+  fill: { flexGrow: 1 },
 });
 
 const useDepth = makeStyles(({ surface, dark }) => ({

@@ -21,6 +21,12 @@ describe('Bildirime dokununca açılan ekran', () => {
     assert.equal(pushTarget(undefined), '/bildirimler');
   });
 
+  test('Firebase gönderen kişiyi sender olarak taşır', () => {
+    assert.equal(pushTarget({ type: 'message', sender: 'abc' }), '/sohbet/abc');
+    assert.equal(pushTarget({ type: 'gift', sender: 'u9' }), '/kullanici/u9');
+    assert.equal(pushTarget({ type: 'visit', sender: 'u4' }), '/kullanici/u4');
+  });
+
   test('profil ziyareti: abonelikle bakan kişi, abonelik yoksa bulanık ziyaretçi listesi', () => {
     assert.equal(pushTarget({ type: 'visit', from: 'u4' }), '/kullanici/u4');
     assert.equal(pushTarget({ type: 'visit' }), '/(tabs)/profil?ziyaretciler=1');

@@ -89,7 +89,9 @@ export function ContribBoard({
   const paddingBottom = useSheetBottom(16);
   // Over a room the sheet reaches the Balkon line at most (lib/sheet-space): the podium and the list scroll
   // between the tabs and my own place.
-  const height = useSheetMax(0.88);
+  // A short phone's busy room still leaves it 460, or the podium and the list have no room between the fixed rows.
+  const limit = useSheetMax(0.88);
+  const height = typeof limit === 'number' ? Math.max(limit, Math.min(460, Math.round(win.height * 0.88))) : limit;
   const [side, setSide] = useState<ContribSide>('sent');
   const [period, setPeriod] = useState<ContribPeriod>('day');
   const tone = SIDE[side];
@@ -197,7 +199,9 @@ export function ContribBoard({
               <Pressable key={t.key} onPress={() => pick(setSide, t.key)} style={s.tab} accessibilityRole="tab" aria-selected={on} hitSlop={6}>
                 <View style={s.tabRow}>
                   <Art name={SIDE[t.key].art} size={24} style={!on && s.faded} />
-                  <Text style={[s.tabText, on && s.tabTextOn]}>{t.label}</Text>
+                  <Text style={[s.tabText, on && s.tabTextOn]} maxFontSizeMultiplier={1}>
+                    {t.label}
+                  </Text>
                 </View>
                 <View style={[s.tabBar, on && { backgroundColor: SIDE[t.key].accent }]} />
               </Pressable>
@@ -360,7 +364,7 @@ const useStyles = makeStyles(({ colors, ink, edge, surface }) => ({
   sheet: { backgroundColor: colors.card, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, overflow: 'hidden', ...edge.sheet },
   glow: { position: 'absolute', left: 0, right: 0, top: 0, height: 220 },
   handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: ink(0.18), marginTop: space.sm },
-  tabs: { flexDirection: 'row', justifyContent: 'center', gap: space.xxl, paddingTop: space.md, paddingHorizontal: 48 },
+  tabs: { flexDirection: 'row', justifyContent: 'center', gap: space.lg, paddingTop: space.md, paddingHorizontal: 48 },
   tab: { alignItems: 'center', gap: 6 },
   tabRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   tabText: { color: colors.textDim, fontFamily: fonts.displayBold, fontSize: type.title },

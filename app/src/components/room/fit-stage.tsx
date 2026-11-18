@@ -5,8 +5,8 @@
 // fit, the chat gives way, down to its least height; only past that (a small phone with many boards on) does the
 // stage scroll. A drag of the chat's handle redraws only this part, not the room.
 // A board or banner that comes over the mics (music, a poll, a PK's board and the points under the names) adds to the
-// stage and the mics keep their sizes: the chat gives way for it. Only when the chat is at its least do the faces get
-// smaller.
+// stage and the mics keep their sizes: the chat gives way for it. Only when the chat is down to two whole messages
+// (lib/room-split CHAT_ROOM) do the faces get smaller.
 // The stage's height is a number worked out from the room, never what is left over: a keyboard (the room's own or a
 // sheet's), the emoji panel, a note over the controls or the chat itself can't shrink it, cut it or move it. The
 // emoji panel (`overlay`) lies over the chat, under the Balkon bar, never over it.
@@ -19,6 +19,16 @@ import { useSettings } from '@/store';
 
 /** A real change of the mics' sizes (a banner came or went, another layout) glides into place. */
 const GLIDE = { duration: 260, update: { type: LayoutAnimation.Types.easeInEaseOut } };
+
+/**
+ * The stage reaches this far up into the header's lower padding: the first row's host frame and crown rise above the
+ * seat and would be cut by the scroll view's edge. The seats themselves stay where they were (the same top padding).
+ */
+const HEADROOM = 8;
+
+const chatInFlow: ViewStyle = { flex: 1, minHeight: 0 };
+/** Three of the chat's short typing lines (17 px each) over the lower mics. */
+const chatOverMics: ViewStyle = { position: 'absolute', left: 0, right: 0, bottom: 0, height: 64, backgroundColor: 'rgba(12,8,20,0.88)', zIndex: 5 };
 
 const same = (a: Fitted | null, b: Fitted) => !!a && a.face === b.face && a.cols === b.cols && a.height === b.height && a.slot === b.slot && a.host === b.host;
 
@@ -34,6 +44,7 @@ export function FitStage({
   balcony,
   chat,
   overlay,
+  typing = false,
   onLine,
   onTouchStart,
 }: {
@@ -67,6 +78,8 @@ export function FitStage({
   chat: (onBasis: (px: number) => void) => ReactNode;
   /** A panel opened from the bottom (the emoji panel): it lies over the chat, from the Balkon line down. */
   overlay?: ReactNode;
+  /** The room's own keyboard is up: on a short phone the last lines of the chat then lie over the lower mics. */
+  typing?: boolean;
   /** The Balkon line: the stage and the Balkon bar's height, from this part's top. */
   onLine?: (px: number) => void;
   onTouchStart?: () => void;
@@ -100,14 +113,19 @@ export function FitStage({
   // What the stage holds: the boards and the mics (as fitted, or as drawn when they are taller or not fitted).
   const holds = topH + Math.max(fitted?.height ?? 0, drawn) + STAGE_PAD;
   const height = known && (fitted || drawn > 0) ? (fitted ? stageHeight(holds, box, bar) : stageHeight(holds, box, bar, basis, floor)) : null;
-  const style: StyleProp<ViewStyle> = height !== null ? { height, flexGrow: 0, flexShrink: 0 } : { flexGrow: 0, flexShrink: 1 };
-  const line = stageH + bar;
+  const style: StyleProp<ViewStyle> = height !== null ? { height: height + HEADROOM, marginTop: -HEADROOM, flexGrow: 0, flexShrink: 0 } : { marginTop: -HEADROOM, flexGrow: 0, flexShrink: 1 };
+  const line = stageH > 0 ? stageH - HEADROOM + bar : 0;
+  // Mics hidden under the Balkon bar: the scroll bar stays in sight, so people can tell the stage scrolls.
+  const scrolls = height !== null && holds > height;
+  // Typing on a short phone: the keyboard leaves the chat no line under the Balkon bar. The mics don't move, so the
+  // chat's last lines lie over their lower part, and nothing of the stage shows through the field's buttons.
+  const squeezed = typing && own > 0 && own - line < 60;
   useEffect(() => {
     if (line > 0) onLine?.(line);
   }, [line, onLine]);
   return (
-    <View style={{ flex: 1 }} onLayout={measure(setOwn)}>
-      <ScrollView style={style} onLayout={measure(setStageH)} onTouchStart={onTouchStart} contentContainerStyle={{ paddingBottom: STAGE_PAD, flexGrow: 1 }} showsVerticalScrollIndicator={false} alwaysBounceVertical={false}>
+    <View style={[{ flex: 1 }, squeezed && { overflow: 'hidden' }]} onLayout={measure(setOwn)}>
+      <ScrollView style={style} onLayout={measure(setStageH)} onTouchStart={onTouchStart} contentContainerStyle={{ paddingTop: HEADROOM, paddingBottom: STAGE_PAD, flexGrow: 1 }} showsVerticalScrollIndicator={scrolls} persistentScrollbar={scrolls} alwaysBounceVertical={false}>
         <View onLayout={measure(setTopH)}>
           {top}
           {pkTop}
@@ -118,7 +136,8 @@ export function FitStage({
         </View>
       </ScrollView>
       <View onLayout={measure(setBar)}>{balcony}</View>
-      {chatNode}
+      {/* Always this wrapper, so the chat keeps its lists and reading position when it moves over the mics. */}
+      <View style={squeezed ? chatOverMics : chatInFlow}>{chatNode}</View>
       {overlay ? <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, top: line }}>{overlay}</View> : null}
     </View>
   );

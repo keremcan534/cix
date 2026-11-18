@@ -66,7 +66,8 @@ function Heading({ title }: { title: string }) {
 const useStyles = makeStyles(() => ({
   bar: { flexDirection: 'row', minHeight: 44 },
   back: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  big: { color: '#fff', fontSize: 44, fontWeight: '900', textAlign: 'center', marginTop: -36 },
+  // Only as wide as the word: it rises beside the back button and must not take that button's taps.
+  big: { alignSelf: 'center', color: '#fff', fontSize: 44, fontWeight: '900', textAlign: 'center', marginTop: -36 },
   intro: { color: '#fff', fontSize: 15, lineHeight: 22, textAlign: 'center' },
   // The page is the same in either scheme (the design's pink sheet); the text stays dark purple on it.
   card: { backgroundColor: 'rgba(255,240,250,0.94)', borderRadius: 24, padding: 18, gap: 10 },

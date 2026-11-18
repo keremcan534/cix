@@ -224,7 +224,8 @@ function TierEmblem({ tier, on, reached, onPress }: { tier: LevelTier; on: boole
   const s = useStyles();
   return (
     <Pressable onPress={onPress} style={s.tier} accessibilityRole="button" accessibilityState={{ selected: on }} accessibilityLabel={`${tier.name}, seviye ${Math.max(1, tier.from)}–${tier.to}${reached ? '' : ', henüz ulaşılmadı'}`}>
-      <View style={{ height: 76, justifyContent: 'center' }}>
+      {/* Tall enough for the selected emblem (90): the row scrolls sideways, so anything above it is cut. */}
+      <View style={{ height: 92, justifyContent: 'center' }}>
         {tier.emblem ? (
           // The emblem art is a finished, upright diamond with a clear margin; drawn 1.25× so the stone itself
           // spans about the width of the drawn diamond below.

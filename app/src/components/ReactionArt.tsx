@@ -303,6 +303,13 @@ function emojiPieces(text: string, base: number, key: string) {
   );
 }
 
+/** A line height set for the words is too small for the larger emoji: Android then cuts the emoji and the letters' tails. */
+const roomy = (style: StyleProp<TextStyle>, base: number) => {
+  const lh = StyleSheet.flatten(style)?.lineHeight;
+  const need = Math.ceil((base + 5) * 1.26);
+  return lh && lh < need ? [style, { lineHeight: need }] : style;
+};
+
 // @bahset: a name in the line stands out; mine in gold on a light of its own, so I see it's me at a glance.
 const MENTION: TextStyle = { color: '#FF94C2', fontFamily: fonts.displayBold };
 const MENTION_ME: TextStyle = { color: colors.gold, fontFamily: fonts.displayBold, backgroundColor: 'rgba(246,189,96,0.18)' };
@@ -314,7 +321,7 @@ export function EmojiText({ text, style, mentions, me }: { text: string; style?:
   if (named?.some((r) => r.name)) {
     const base = StyleSheet.flatten(style)?.fontSize ?? 15;
     return (
-      <Text style={style}>
+      <Text style={named.some((r) => !r.name && emojiRuns(r.text).some((x) => x.emoji)) ? roomy(style, base) : style}>
         {named.map((r, i) =>
           r.name ? (
             <Text key={i} style={same(r.name, me) ? MENTION_ME : MENTION}>
@@ -332,7 +339,7 @@ export function EmojiText({ text, style, mentions, me }: { text: string; style?:
   const runs = emojiRuns(text);
   if (!runs.some((r) => r.emoji)) return <Text style={style}>{text}</Text>;
   const base = StyleSheet.flatten(style)?.fontSize ?? 15;
-  return <Text style={style}>{emojiPieces(text, base, 'e')}</Text>;
+  return <Text style={roomy(style, base)}>{emojiPieces(text, base, 'e')}</Text>;
 }
 
 export function MessageText({ text, style, size = 44 }: { text: string; style?: StyleProp<TextStyle>; size?: number }) {

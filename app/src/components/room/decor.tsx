@@ -241,7 +241,10 @@ function Frame({ visible, onClose, onShow, title, ctl, children }: { visible: bo
         ) : ctl.error ? (
           <View style={s.center}>
             <Text style={s.dim}>{ctl.error}</Text>
-            <Btn title="Tekrar dene" onPress={ctl.reload} />
+            {/* Alone in the middle it is only as wide as its words: this keeps it a proper button. */}
+            <View style={{ minWidth: 140 }}>
+              <Btn title="Tekrar dene" onPress={ctl.reload} />
+            </View>
           </View>
         ) : (
           <View style={s.center}>
@@ -261,7 +264,9 @@ function Btn({ title, onPress, primary, danger, disabled }: { title: string; onP
       accessibilityRole="button"
       accessibilityLabel={title}
       style={[s.btn, primary && { backgroundColor: colors.primary, borderColor: colors.primary }, danger && { borderColor: colors.red }, disabled && { opacity: 0.45 }]}>
-      <Text style={[s.btnText, danger && { color: colors.red }]}>{title}</Text>
+      <Text style={[s.btnText, danger && { color: colors.red }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+        {title}
+      </Text>
     </Pressable>
   );
 }
@@ -610,8 +615,8 @@ const s = StyleSheet.create({
   badge: { position: 'absolute', top: 6, left: 6, color: '#fff', fontSize: 11, fontWeight: '800', backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, overflow: 'hidden' },
   check: { position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
   price: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  priceText: { color: colors.gold, fontSize: 12, fontWeight: '700' },
-  btn: { alignItems: 'center', justifyContent: 'center', borderRadius: 999, paddingVertical: 10, paddingHorizontal: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)' },
+  priceText: { color: colors.gold, fontSize: 12, fontWeight: '700', flexShrink: 1 },
+  btn: { alignItems: 'center', justifyContent: 'center', borderRadius: 999, paddingVertical: 10, paddingHorizontal: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)' },
   btnText: { color: '#fff', fontWeight: '800', fontSize: 13, textAlign: 'center' },
   notice: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', borderRadius: 12, padding: 10 },
   customArt: { width: 112, aspectRatio: 9 / 16, borderRadius: 12, overflow: 'hidden', backgroundColor: '#34333B' },

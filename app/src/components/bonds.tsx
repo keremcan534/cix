@@ -116,7 +116,7 @@ export function BondBadge({ bond, onPress }: { bond: Bond | null; onPress: () =>
   if (!bond || !hasReward(bond.level, 'rozet')) return null;
   const k = BOND_KINDS[bond.kind];
   return (
-    <Pressable onPress={onPress} accessibilityLabel={`${k.label} bağı, seviye ${bond.level}`}>
+    <Pressable onPress={onPress} hitSlop={{ top: 8, bottom: 13, left: 6, right: 6 }} accessibilityLabel={`${k.label} bağı, seviye ${bond.level}`}>
       <LinearGradient colors={bond.kind === 'cift' ? ['#FF6F91', '#C2185B'] : ['#22B8CF', '#3B5BDB']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.badge}>
         <Ionicons name={k.icon} size={11} color="#fff" />
         <Text style={styles.badgeText}>
@@ -243,18 +243,20 @@ export function BondsTab({ user, isMe, state, isBlocked, onMeetInvite }: { user:
     <View style={{ padding: 16, gap: 14 }}>
       <LinearGradient colors={dark ? ['#4A1F33', '#22172A', colors.card] : ['#FDE6EA', '#FFF4F6', colors.card]} style={styles.card}>
         <View style={styles.row}>
-          <Pressable style={styles.iconBtn} onPress={rules} accessibilityLabel="Bağlar nasıl işler?">
+          <Pressable style={styles.iconBtn} onPress={rules} hitSlop={5} accessibilityLabel="Bağlar nasıl işler?">
             <Ionicons name="help" size={18} color={colors.primaryText} />
           </Pressable>
           <View style={styles.segment}>
             {(['cift', 'diger'] as const).map((k) => (
               <Pressable key={k} style={[styles.segmentItem, seg === k && styles.segmentActive]} onPress={() => setSeg(k)} accessibilityRole="tab" accessibilityState={{ selected: seg === k }}>
-                <Text style={[styles.segmentText, seg === k && { color: '#fff' }]}>{k === 'cift' ? 'Çift' : 'Aile ve Dost'}</Text>
+                <Text style={[styles.segmentText, seg === k && { color: '#fff' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                  {k === 'cift' ? 'Çift' : 'Aile ve Dost'}
+                </Text>
               </Pressable>
             ))}
           </View>
           {isMe ? (
-            <Pressable style={styles.iconBtn} onPress={togglePrivacy} accessibilityLabel={hidden ? 'Bağlarımı göster' : 'Bağlarımı gizle'}>
+            <Pressable style={styles.iconBtn} onPress={togglePrivacy} hitSlop={5} accessibilityLabel={hidden ? 'Bağlarımı göster' : 'Bağlarımı gizle'}>
               <Ionicons name={hidden ? 'eye-off' : 'eye'} size={18} color={colors.primaryText} />
             </Pressable>
           ) : (
@@ -351,7 +353,7 @@ function BondRow({ owner, bond, now, canEnd, onEnd }: { owner: User; bond: Bond;
         </Text>
       </View>
       {canEnd && (
-        <Pressable style={styles.endBtn} onPress={onEnd} hitSlop={8} accessibilityLabel="Bağı bitir">
+        <Pressable style={styles.endBtn} onPress={onEnd} hitSlop={10} accessibilityLabel="Bağı bitir">
           <Ionicons name="ellipsis-horizontal" size={16} color={colors.textDim} />
         </Pressable>
       )}
@@ -448,7 +450,7 @@ function KindShelf({ onPick }: { onPick?: (kind: BondKind) => void }) {
 function SmallButton({ title, onPress, primary, disabled }: { title: string; onPress: () => void; primary?: boolean; disabled?: boolean }) {
   const styles = useStyles();
   return (
-    <Pressable onPress={onPress} disabled={disabled} style={({ pressed }) => [styles.small, primary && styles.smallPrimary, (pressed || disabled) && { opacity: 0.7 }]} accessibilityRole="button">
+    <Pressable onPress={onPress} disabled={disabled} hitSlop={{ top: 7, bottom: 7 }} style={({ pressed }) => [styles.small, primary && styles.smallPrimary, (pressed || disabled) && { opacity: 0.7 }]} accessibilityRole="button">
       <Text style={[styles.smallText, primary && { color: '#fff' }]}>{title}</Text>
     </Pressable>
   );

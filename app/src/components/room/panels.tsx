@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useState } from 'react';
 import { Image, Linking, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Switch } from '@/components/luxe-switch';
 import { Text, TextInput } from '@/components/text';
@@ -14,6 +14,7 @@ import { MUSIC_CATALOG, type Track } from '@/data/catalog';
 import { userById } from '@/data/mock';
 import { goBack } from '@/lib/nav';
 import { showAlert } from '@/lib/alert';
+import { useKeyboardOpen } from '@/lib/keyboard-open';
 import { useSheetMax } from '@/lib/sheet-space';
 import { colors, semantic } from '@/theme';
 
@@ -22,14 +23,17 @@ const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).
 /** `foot`: the sheet's main button, under the body. Over a room the sheet stops at the Balkon line
  *  (lib/sheet-space): the body scrolls, the title and the foot stay in sight. */
 function Sheet({ visible, onClose, title, art, children, foot, tall }: { visible: boolean; onClose: () => void; title: string; art?: number; children: React.ReactNode; foot?: React.ReactNode; tall?: boolean }) {
-  const paddingBottom = useSheetBottom();
+  const sheetBottom = useSheetBottom();
   const maxHeight = useSheetMax(tall ? 0.85 : 0.7);
+  const { top } = useSafeAreaInsets();
+  const keyboardOpen = useKeyboardOpen();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      {/* The modal does not shrink for the keyboard (edge to edge): the sheet rises above it as a whole. */}
-      <KeyboardAvoid style={{ flex: 1 }}>
+      {/* The modal does not shrink for the keyboard (edge to edge): the sheet rises above it as a whole, stops under the
+          status bar and shrinks there (its body scrolls). */}
+      <KeyboardAvoid style={{ flex: 1, paddingTop: top }}>
         <Pressable style={roomStyles.scrim} onPress={onClose} />
-        <View style={[roomStyles.sheet, { maxHeight, paddingBottom }]}>
+        <View style={[roomStyles.sheet, { flexShrink: 1, maxHeight, paddingBottom: keyboardOpen ? 16 : sheetBottom }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
             {art && <Image source={art} style={{ width: 30, height: 30, marginRight: 8 }} />}
             <Text style={[roomStyles.sheetTitle, { flex: 1, marginBottom: 0 }]}>{title}</Text>
@@ -280,9 +284,9 @@ export function EnvelopeSendModal({ visible, onClose, onSend, coins }: { visible
   );
 }
 
-export function EnvelopeDrop({ from, seconds, onGrab }: { from: string; seconds: number; onGrab: () => void }) {
+export function EnvelopeDrop({ from, seconds, top, onGrab }: { from: string; seconds: number; /** Under the mics: the room's place for its notices (live-room `noticeTop`). */ top: number; onGrab: () => void }) {
   return (
-    <Pressable style={styles.envelope} onPress={onGrab} accessibilityLabel="Zarfı kap">
+    <Pressable style={[styles.envelope, { top }]} onPress={onGrab} accessibilityLabel="Zarfı kap">
       <Image source={ROOM_ICON_ART.envelope} style={{ width: 44, height: 44 }} />
       <Text style={styles.envelopeText}>{userById(from).name} zarf attı!</Text>
       <Text style={styles.envelopeTimer}>Kap · {seconds}s</Text>
@@ -336,14 +340,18 @@ export function RequestsModal({ visible, onClose, requests, onAccept, onReject, 
       {requests.length === 0 && <Text style={styles.dim}>Bekleyen istek yok.</Text>}
       {requests.map((id, i) => (
         <View key={id} style={styles.row}>
-          <Text style={{ color: colors.gold, fontWeight: '800', width: 18 }}>{i + 1}</Text>
+          <Text style={{ color: colors.gold, fontWeight: '800', minWidth: 18 }} numberOfLines={1}>
+            {i + 1}
+          </Text>
           <Avatar uri={userById(id).avatar} size={38} />
-          <Text style={{ color: '#fff', flex: 1 }}>{userById(id).name}</Text>
-          <Pressable style={[styles.smallBtn, { backgroundColor: semantic.successFill }]} onPress={() => onAccept(id)}>
+          <Text style={{ color: '#fff', flex: 1 }} numberOfLines={1}>
+            {userById(id).name}
+          </Text>
+          <Pressable style={[styles.smallBtn, { backgroundColor: semantic.successFill }]} onPress={() => onAccept(id)} hitSlop={{ top: 7, bottom: 7 }}>
             <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>Kabul</Text>
           </Pressable>
-          <Pressable style={[styles.smallBtn, { backgroundColor: colors.cardAlt }]} onPress={() => onReject(id)}>
-            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>Sıradan çıkar</Text>
+          <Pressable style={[styles.smallBtn, { backgroundColor: colors.cardAlt }]} onPress={() => onReject(id)} hitSlop={{ top: 7, bottom: 7 }} accessibilityRole="button" accessibilityLabel="Sıradan çıkar">
+            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>Çıkar</Text>
           </Pressable>
         </View>
       ))}
@@ -361,7 +369,7 @@ const styles = StyleSheet.create({
   musicBar: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 12, marginTop: 4, backgroundColor: 'rgba(0,0,0,0.35)', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6 },
   musicTrack: { height: 3, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 2, marginTop: 4, overflow: 'hidden' },
   smallBtn: { backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
-  envelope: { position: 'absolute', right: 12, top: 180, backgroundColor: '#B91C1C', borderRadius: 16, padding: 10, alignItems: 'center', borderWidth: 2, borderColor: colors.gold },
+  envelope: { position: 'absolute', right: 12, backgroundColor: '#B91C1C', borderRadius: 16, padding: 10, alignItems: 'center', borderWidth: 2, borderColor: colors.gold },
   envelopeText: { color: '#fff', fontSize: 11, fontWeight: '700' },
   envelopeTimer: { color: colors.gold, fontSize: 12, fontWeight: '900' },
   diceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', marginBottom: 12 },

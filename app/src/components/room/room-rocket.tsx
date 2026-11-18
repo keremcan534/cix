@@ -240,7 +240,7 @@ export function RocketShow({ news, still, muted, onDone }: { news: RocketNews; s
 }
 
 const s = StyleSheet.create({
-  pill: { flexDirection: 'row', alignItems: 'center', gap: 3, height: 20, paddingLeft: 2, paddingRight: 7, borderRadius: 999, borderWidth: 1, backgroundColor: 'rgba(8,15,30,0.55)', marginRight: 6 },
+  pill: { flexDirection: 'row', alignItems: 'center', gap: 3, height: 20, paddingLeft: 2, paddingRight: 7, borderRadius: 999, borderWidth: 1, backgroundColor: 'rgba(8,15,30,0.55)' },
   pillArt: { width: 16, height: 16 },
   pillText: { color: '#fff', fontSize: 11, fontWeight: '700' },
   scrim: { flex: 1, backgroundColor: SCRIM },
@@ -259,7 +259,7 @@ const s = StyleSheet.create({
   goal: { color: colors.textDim, fontSize: 12, textAlign: 'center', marginTop: 4 },
   section: { color: '#fff', fontWeight: '800', fontSize: 13, marginTop: 14, marginBottom: 6 },
   prizes: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  prize: { width: '31%', minWidth: 92, alignItems: 'center', gap: 2, padding: 8, borderRadius: 14, borderWidth: 1, backgroundColor: 'rgba(255,255,255,0.04)' },
+  prize: { width: '31%', minWidth: 88, alignItems: 'center', gap: 2, padding: 8, borderRadius: 14, borderWidth: 1, backgroundColor: 'rgba(255,255,255,0.04)' },
   prizeName: { color: '#fff', fontSize: 12, fontWeight: '700', textAlign: 'center' },
   prizeMeta: { color: colors.textDim, fontSize: 10, textAlign: 'center' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 },

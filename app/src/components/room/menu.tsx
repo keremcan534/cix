@@ -8,6 +8,7 @@ import { Text } from '@/components/text';
 import { FloatIcon, Halo, hueAt } from '@/components/fx/float';
 import { EdgeLight, PressableScale } from '@/components/fx/surface';
 import { icon3dSourceFor } from '@/components/Icon3D';
+import { useSheetBottom } from '@/components/room/parts';
 import { useSheetMax } from '@/lib/sheet-space';
 import { SCRIM, colors, edge, fonts, semantic } from '@/theme';
 
@@ -33,13 +34,14 @@ const SHEET = '#111B2E';
 export function RoomMenuSheet({ visible, onClose, sections }: { visible: boolean; onClose: () => void; sections: MenuSection[] }) {
   // It stops at the room's Balkon line (lib/sheet-space): the sections scroll.
   const maxHeight = useSheetMax(0.78);
+  const paddingBottom = useSheetBottom(24);
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Menüyü kapat" />
       <LinearGradient colors={['#1B2944', SHEET]} locations={[0, 0.35]} style={[styles.sheet, { maxHeight }]}>
         <EdgeLight inset={40} strength={0.35} />
         <View style={styles.handle} />
-        <ScrollView contentContainerStyle={{ paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={{ paddingBottom }} showsVerticalScrollIndicator={false}>
           {sections.map((s) => (
             <View key={s.title} style={{ marginBottom: 10 }}>
               <Text style={styles.title}>{s.title}</Text>
@@ -87,10 +89,11 @@ export function RoomMenuSheet({ visible, onClose, sections }: { visible: boolean
 function Tile({ item, hue, index, onPress }: { item: MenuItem; hue: string; index: number; onPress: () => void }) {
   return (
     <View style={styles.tileCell}>
-      <PressableScale accessibilityLabel={item.label} onPress={onPress}>
+      {/* The room over the plate is inside the press area: a touch outside a parent's bounds never arrives on Android. */}
+      <PressableScale style={styles.tilePress} accessibilityLabel={item.label} onPress={onPress}>
         <LinearGradient colors={[`${hue}50`, `${hue}10`]} style={[styles.plate, { borderColor: `${hue}55`, boxShadow: `0 6px 16px ${hue}26` }]}>
           <EdgeLight inset={12} strength={0.45} />
-          <Text style={styles.tileLabel} numberOfLines={1}>
+          <Text style={styles.tileLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} maxFontSizeMultiplier={1}>
             {item.label}
           </Text>
         </LinearGradient>
@@ -105,7 +108,7 @@ function Tile({ item, hue, index, onPress }: { item: MenuItem; hue: string; inde
             <FloatIcon source={item.art ?? icon3dSourceFor(item.emoji)} emoji={item.emoji} size={58} hue={hue} bob delay={index * 230} />
           )}
         </View>
-        <View style={{ position: 'absolute', top: 4, left: 8 }}>
+        <View style={{ position: 'absolute', top: 28, left: 8 }}>
           <Badge badge={item.badge} />
         </View>
       </PressableScale>
@@ -120,9 +123,9 @@ function Badge({ badge }: { badge: MenuItem['badge'] }) {
         <Ionicons name={badge === 'on' ? 'checkmark' : 'close'} size={12} color={badge === 'on' ? semantic.successInk : '#fff'} />
       </View>
     );
-  if (badge === 'SOON') return <Text style={[styles.ribbon, { backgroundColor: colors.cardAlt, color: colors.textDim }]}>Yakında</Text>;
-  if (badge === 'HOT' || badge === 'NEW') return <Text style={[styles.ribbon, { backgroundColor: badge === 'HOT' ? colors.red : colors.primary }]}>{badge === 'NEW' ? 'YENİ' : badge}</Text>;
-  if (typeof badge === 'number' && badge > 0) return <Text style={[styles.ribbon, { backgroundColor: colors.red, left: undefined, right: -4 }]}>{badge}</Text>;
+  if (badge === 'SOON') return <Text style={[styles.ribbon, styles.ribbonStart, { backgroundColor: colors.cardAlt, color: colors.textDim }]}>Yakında</Text>;
+  if (badge === 'HOT' || badge === 'NEW') return <Text style={[styles.ribbon, styles.ribbonStart, { backgroundColor: badge === 'HOT' ? colors.red : colors.primary }]}>{badge === 'NEW' ? 'YENİ' : badge}</Text>;
+  if (typeof badge === 'number' && badge > 0) return <Text style={[styles.ribbon, styles.ribbonEnd, { backgroundColor: colors.red }]}>{badge}</Text>;
   return null;
 }
 
@@ -138,11 +141,15 @@ const styles = StyleSheet.create({
   cell: { alignItems: 'center', gap: 8, paddingVertical: 12 },
   label: { color: '#E6ECF7', fontSize: 12, textAlign: 'center', maxWidth: 84 },
   tool: { width: 52, height: 52, borderRadius: 18, borderWidth: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  tileCell: { width: '33.33%', padding: 5, paddingTop: 24 },
-  plate: { borderRadius: 18, borderWidth: 1, paddingTop: 44, paddingBottom: 10, paddingHorizontal: 6, alignItems: 'center' },
+  tileCell: { width: '33.33%', padding: 5, paddingTop: 0 },
+  tilePress: { paddingTop: 24 },
+  plate: { borderRadius: 18, borderWidth: 1, paddingTop: 44, paddingBottom: 10, paddingHorizontal: 3, alignItems: 'center' },
   tileLabel: { color: '#fff', fontFamily: fonts.displayBold, fontSize: 14, lineHeight: 18 },
   tileGlyph: { width: 58, height: 58, alignItems: 'center', justifyContent: 'center' },
-  tileIcon: { position: 'absolute', top: -24, left: 0, right: 0, alignItems: 'center', pointerEvents: 'none' },
+  tileIcon: { position: 'absolute', top: 0, left: 0, right: 0, alignItems: 'center', pointerEvents: 'none' },
   state: { position: 'absolute', right: -2, bottom: -2, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: SHEET },
-  ribbon: { position: 'absolute', top: -6, left: -4, color: '#fff', fontSize: 11, fontWeight: '900', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1, overflow: 'hidden' },
+  ribbon: { position: 'absolute', top: -6, color: '#fff', fontSize: 11, fontWeight: '900', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1, overflow: 'hidden' },
+  // One side each: a ribbon pinned to both would stretch across its icon.
+  ribbonStart: { left: -4 },
+  ribbonEnd: { right: -4 },
 });

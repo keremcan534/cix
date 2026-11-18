@@ -76,6 +76,7 @@ Müşterinin videosunda klavye açılınca sohbet koltukların üstüne çıkıy
   - Sohbet sekmeleri ve tutamak gizlenir.
   - Son mesajlar tek satır halinde ("İsim: mesaj") Balkon ile yazı alanı arasında görünür. 891 dp boyunda bir telefonda (Galaxy A sınıfı) bu iki satırdır.
 - **Alttan açılan pencereler:** En fazla Balkon çizgisine kadar açılır (`app/src/lib/sheet-space.ts`). Oda bu çizgiyi ölçer, her alt pencere boyunu oradan alır ve içeriği kayar.
+  - İki istisna var (19 Kasım 2026 arayüz çalışması, sahip onayı bekliyor): oda üstündeki hediye paneli en az 3 sıra hediye gösterecek kadar çizginin üstüne çıkar. Kısa telefonlarda ve kalabalık odalarda diğer pencereler de en az 400 dp açılır (`SHEET_LEAST`, `app/src/lib/room-split.ts`).
   - Emoji paneli de çizginin altında açılır.
   - Hediye penceresi orada sıkışık düzendedir: tutamak ve seviye satırı yok, raf notu yalnız Şanslı'da, toplam tutar düğmede, uyarı yalnız sorun varsa. Adet listesi iki sütundur.
   - Sınırlanan pencereler: hediye, kişi kartı, menü, Odadaki Kullanıcılar, üye listesi, Mesajlar (sohbet ve hediye dahil), katkı sıralaması, müzik, oda kartı, Patron koltuğu, düzen seçici, koltuk rengi, PK kurulumu, Şanslı çanta, anket/hedef/etkinlik/soru, paylaş, efektler, moderasyon ve seçenek pencereleri.
@@ -101,4 +102,4 @@ Müşterinin videosunda klavye açılınca sohbet koltukların üstüne çıkıy
 - **Düzen:**
   - Emoji panelini açınca koltuklar kıpırdamamalı; tablette katkı kürsüsü sığmalı.
   - **Oda iki parça:** Odada yazı alanına dokun, birkaç mesaj yaz ve gönder, klavyeyi geri tuşuyla kapat. Koltuklar ve Balkon çubuğu hiç küçülmemeli, kaymamalı, örtülmemeli. Yazarken son mesajlar Balkon'un altında görünmeli.
-  - Hediye, kişi kartı, menü, kişiler ve mesajlar pencereleri Balkon çizgisine kadar açılmalı; içleri kaymalı.
+  - Kişi kartı, menü, kişiler ve mesajlar pencereleri Balkon çizgisine kadar açılmalı (kısa telefonda en az 400 dp); içleri kaymalı. Hediye paneli çizginin üstüne çıkar ve en az 3 sıra hediye gösterir.

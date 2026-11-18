@@ -113,7 +113,7 @@ export default function Leaderboard() {
       </ScrollView>
       <View style={styles.periods}>
         {PERIOD_KEYS.map((p) => (
-          <Pressable key={p} onPress={() => setPeriod(p)}>
+          <Pressable key={p} onPress={() => setPeriod(p)} hitSlop={{ top: 13, bottom: 13, left: 12, right: 12 }}>
             <Text style={[styles.period, period === p && styles.periodActive]}>{p === 'daily' ? 'Günlük' : p === 'weekly' ? 'Haftalık' : 'Aylık'}</Text>
           </Pressable>
         ))}

@@ -9,7 +9,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import * as ImagePicker from 'expo-image-picker';
-import { FlatList, Image, Platform, Pressable, View } from 'react-native';
+import { FlatList, Image, Keyboard, Platform, Pressable, View } from 'react-native';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { onWebEnter } from '@/lib/enter-sends';
 
@@ -46,6 +46,8 @@ import { showSanction } from '@/lib/sanctions';
 type ChatMessage = Conversation['messages'][number];
 /** The server's limit for one message (server/api/messages.mjs). */
 const MAX_LENGTH = 1000;
+/** 44 dp tall, and apart from each other across the composer's 10 dp gaps. */
+const COMPOSER_ICON_SLOP = { top: 10, bottom: 10, left: 5, right: 5 };
 
 export function ChatThread({
   user,
@@ -391,11 +393,19 @@ export function ChatThread({
         <ContactNote text={refused} />
         {emojiOpen && <EmojiPanel onPick={(e) => (stickerIdOf(e) ? send(e) : edit((d) => d + e))} onClose={() => setEmojiOpen(false)} />}
         <View style={styles.inputRow}>
-          <Pressable onPress={() => setEmojiOpen((v) => !v)} accessibilityLabel="Emoji" hitSlop={6}>
+          {/* The panel and the keyboard take turns: together they leave no room for the messages on a small phone. */}
+          <Pressable
+            onPress={() => {
+              if (!emojiOpen) Keyboard.dismiss();
+              setEmojiOpen(!emojiOpen);
+            }}
+            accessibilityLabel="Emoji"
+            hitSlop={COMPOSER_ICON_SLOP}
+            style={styles.composerIcon}>
             <Ionicons name={emojiOpen ? 'close-circle' : 'happy-outline'} size={26} color={colors.textDim} />
           </Pressable>
           {!missing && !isBlocked && (
-            <Pressable onPress={gift.open} accessibilityLabel="Hediye gönder" hitSlop={6}>
+            <Pressable onPress={gift.open} accessibilityLabel="Hediye gönder" hitSlop={COMPOSER_ICON_SLOP} style={styles.composerIcon}>
               <Ionicons name="gift-outline" size={24} color={colors.pink} />
             </Pressable>
           )}
@@ -403,10 +413,10 @@ export function ChatThread({
             <Pressable
               onPress={() => void sendPhoto()}
               disabled={sendingPhoto}
-              style={{ opacity: photoOpen && !sendingPhoto ? 1 : 0.45 }}
+              style={[styles.composerIcon, { opacity: photoOpen && !sendingPhoto ? 1 : 0.45 }]}
               accessibilityLabel={photoOpen ? 'Fotoğraf gönder' : 'Fotoğraf (kilitli)'}
               accessibilityState={{ disabled: !photoOpen || sendingPhoto, busy: sendingPhoto }}
-              hitSlop={6}>
+              hitSlop={COMPOSER_ICON_SLOP}>
               <Ionicons name="image-outline" size={23} color={colors.textDim} />
             </Pressable>
           )}
@@ -415,6 +425,7 @@ export function ChatThread({
           <TextInput
             value={draft}
             onChangeText={edit}
+            onFocus={() => setEmojiOpen(false)}
             onSubmitEditing={() => send()}
             onKeyPress={Platform.OS === 'web' ? (e) => onWebEnter(e, () => send()) : undefined}
             submitBehavior="submit"
@@ -426,7 +437,7 @@ export function ChatThread({
             style={styles.input}
             returnKeyType="send"
           />
-          <Pressable onPress={() => send()} accessibilityLabel="Gönder">
+          <Pressable onPress={() => send()} accessibilityLabel="Gönder" hitSlop={4}>
             <LinearGradient colors={gradientDeep} style={styles.sendBtn}>
               <Ionicons name="send" size={18} color="#fff" />
             </LinearGradient>
@@ -512,7 +523,7 @@ const useStyles = makeStyles(({ colors, lift, ink, dark }) => ({
   moreText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
   introName: { color: colors.text, fontSize: 18, fontWeight: '700' },
   bubble: { maxWidth: '78%', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 8 },
-  photo: { width: 200, height: 200, borderRadius: 12, marginTop: 2, marginBottom: 4, backgroundColor: 'rgba(0,0,0,0.2)' },
+  photo: { width: 190, height: 190, borderRadius: 12, marginTop: 2, marginBottom: 4, backgroundColor: 'rgba(0,0,0,0.2)' },
   // My bubble sits in a pressable row (long press): the row aligns right and the bubble inside keeps the width limit.
   mine: { alignSelf: 'flex-end', maxWidth: '78%' },
   mineBubble: { maxWidth: '100%', borderBottomRightRadius: 4 },
@@ -525,7 +536,7 @@ const useStyles = makeStyles(({ colors, lift, ink, dark }) => ({
   time: { color: 'rgba(255,255,255,0.6)', fontSize: 11, alignSelf: 'flex-end', marginTop: 2 },
   refusedText: { color: '#FECACA', fontWeight: '700', alignSelf: 'stretch', textAlign: 'right', lineHeight: 15 },
   theirsTime: { color: ink(0.6) },
-  roomCard: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6, padding: 8, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.25)', minWidth: 200 },
+  roomCard: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6, padding: 8, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.25)', minWidth: 190 },
   roomCardTheirs: { backgroundColor: dark ? 'rgba(0,0,0,0.25)' : colors.cardAlt },
   roomCover: { width: 44, height: 44, borderRadius: 10 },
   eventIcon: { width: 44, height: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#7C3AED' },
@@ -535,7 +546,9 @@ const useStyles = makeStyles(({ colors, lift, ink, dark }) => ({
   notice: { paddingHorizontal: 16, paddingVertical: 6, color: colors.textDim, textAlign: 'center', fontSize: 12 },
   paywall: { flexDirection: 'row', alignItems: 'center', alignSelf: 'center', gap: 6, marginHorizontal: 16, marginVertical: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: 'rgba(246,189,96,0.1)', borderWidth: 1, borderColor: 'rgba(246,189,96,0.3)' },
   paywallText: { color: colors.gold, fontSize: 12, fontWeight: '600', flexShrink: 1 },
-  inputRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderTopWidth: 1, borderTopColor: colors.border },
+  // The buttons stay at the bottom as the message grows, level with its last line.
+  inputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 10, padding: 10, borderTopWidth: 1, borderTopColor: colors.border },
+  composerIcon: { marginBottom: 8 },
   input: {
     flex: 1,
     backgroundColor: colors.card,

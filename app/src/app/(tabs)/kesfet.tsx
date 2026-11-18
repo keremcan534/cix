@@ -291,9 +291,11 @@ function QuickTile({ id, title, subtitle, emoji, colors: fill, count, onPress }:
   const styles = useStyles();
   const { width } = useWindowDimensions();
   const w = Math.floor((Math.min(width, 640) - 32 - (count - 1) * 8) / count);
+  // Only the call tile (one of four) has a subtitle: where it shows, every tile keeps that line, so the art stays level.
+  const subRow = w >= 88 && count === 4;
   return (
     <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={subtitle ? `${title}, ${subtitle}` : title} style={({ pressed }) => pressed && { opacity: 0.85 }}>
-      <LinearGradient colors={fill} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={[styles.tile, { width: w, height: Math.round(w * 1.12), boxShadow: `0 6px 16px ${fill[1]}66` }]}>
+      <LinearGradient colors={fill} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={[styles.tile, { width: w, height: Math.max(Math.round(w * 1.12) + (subRow ? 8 : 0), 88), boxShadow: `0 6px 16px ${fill[1]}66` }]}>
         <LinearGradient colors={['rgba(255,255,255,0.42)', 'rgba(255,255,255,0)']} style={styles.tileGloss} pointerEvents="none" />
         <View style={styles.tileArt}>
           <TileArt id={id} emoji={emoji} size={Math.min(40, w * 0.42)} />
@@ -301,9 +303,9 @@ function QuickTile({ id, title, subtitle, emoji, colors: fill, count, onPress }:
         <Text style={styles.tileTitle} numberOfLines={2}>
           {title}
         </Text>
-        {subtitle && w >= 88 ? (
-          <Text style={styles.tileSub} numberOfLines={1}>
-            {subtitle}
+        {subRow ? (
+          <Text style={styles.tileSub} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+            {subtitle ?? ' '}
           </Text>
         ) : null}
       </LinearGradient>
@@ -317,7 +319,9 @@ function MatchChip({ score }: { score: number }) {
   const good = score >= 50;
   return (
     <View style={[styles.matchChip, { borderColor: good ? HOME.pink : HOME.plum }]} accessibilityLabel={`Yüzde ${score} benzer`}>
-      <Text style={[styles.matchText, { color: good ? HOME.deep : HOME.plum }]}>%{score} benzer</Text>
+      <Text style={[styles.matchText, { color: good ? HOME.deep : HOME.plum }]} numberOfLines={1}>
+        %{score} benzer
+      </Text>
     </View>
   );
 }
@@ -505,13 +509,14 @@ const useStyles = makeStyles(({ colors, lift, dark, edge }) => ({
   greetHearts: { flexDirection: 'row', alignItems: 'flex-start' },
   greetHeartSmall: { marginLeft: -4, marginTop: -8 },
   tiles: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 10 },
-  tile: { borderRadius: 20, padding: 8, overflow: 'hidden', alignItems: 'center', justifyContent: 'flex-end', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.55)' },
+  tile: { borderRadius: 20, paddingHorizontal: 3, paddingVertical: 8, overflow: 'hidden', alignItems: 'center', justifyContent: 'flex-end', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.55)' },
   tileGloss: { position: 'absolute', left: 0, right: 0, top: 0, height: '48%' },
   tileArt: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   tileArtRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   tileWifi: { position: 'absolute', right: -8, top: -8 },
-  // White on the coloured tile; a soft shadow keeps it readable on the light end of each gradient.
-  tileTitle: { color: '#fff', fontFamily: fonts.display, fontSize: 13, lineHeight: 16, textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.25)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
+  // White on the coloured tile; a soft shadow keeps it readable on the light end of each gradient. Two lines tall
+  // (at the largest text too) on every tile, so a one-line title leaves its art level with the others'.
+  tileTitle: { color: '#fff', fontFamily: fonts.display, fontSize: 13, lineHeight: 16, minHeight: 37, textAlign: 'center', textAlignVertical: 'center', textShadowColor: 'rgba(0,0,0,0.25)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
   tileSub: { color: 'rgba(255,255,255,0.92)', fontSize: 10, textAlign: 'center' },
   tabsBar: {
     flexDirection: 'row',
@@ -547,7 +552,7 @@ const useStyles = makeStyles(({ colors, lift, dark, edge }) => ({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
     marginHorizontal: 16,
     marginBottom: 8,
     padding: 8,
@@ -563,12 +568,12 @@ const useStyles = makeStyles(({ colors, lift, dark, edge }) => ({
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' },
   name: { color: HOME.ink, fontFamily: fonts.display, fontSize: 16, maxWidth: 130 },
   chips: { flexDirection: 'row', gap: 5, alignItems: 'center', flexWrap: 'wrap' },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: HOME.line, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: HOME.line, borderRadius: 999, paddingHorizontal: 6, paddingVertical: 2 },
   chipText: { color: HOME.ink, fontSize: 12 },
-  matchChip: { backgroundColor: '#FFFFFF', borderWidth: 1.5, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 1 },
+  matchChip: { backgroundColor: '#FFFFFF', borderWidth: 1.5, borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1 },
   matchText: { fontSize: 12, fontWeight: '800' },
   cardSep: { width: 1, alignSelf: 'stretch', marginVertical: 8, backgroundColor: HOME.line },
-  actions: { gap: 5, alignItems: 'stretch', width: 92 },
+  actions: { gap: 5, alignItems: 'stretch', width: 82 },
   hiBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: 999, paddingVertical: 7, boxShadow: '0 3px 8px rgba(216,23,94,0.35)' },
   hiText: { color: '#fff', fontWeight: '800', fontSize: 14 },
   chatBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: 999, paddingVertical: 6, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: HOME.line },

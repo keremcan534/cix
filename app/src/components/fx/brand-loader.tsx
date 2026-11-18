@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { Animated, Easing, Platform, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
-import { Text } from '@/components/text';
+import { MAX_FONT_SCALE, Text } from '@/components/text';
 import { useSettings } from '@/store';
 import { colors as brand, useTheme } from '@/theme';
 
@@ -15,7 +15,7 @@ function Letter({ ch, color, gold, size }: { ch: string; color: string; gold: An
   return (
     <View>
       <Text style={[type, { color }]}>{ch}</Text>
-      <Animated.Text style={[type, StyleSheet.absoluteFill, { color: brand.gold, fontFamily: 'JakartaExtraBold', opacity: gold }]}>{ch}</Animated.Text>
+      <Animated.Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={[type, StyleSheet.absoluteFill, { color: brand.gold, fontFamily: 'JakartaExtraBold', fontWeight: 'normal', opacity: gold }]}>{ch}</Animated.Text>
     </View>
   );
 }

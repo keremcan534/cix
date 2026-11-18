@@ -95,7 +95,7 @@ export function EventThemeLayer({ event }: { event: api.EventItem | null }) {
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
       {art && (
         <>
-          <Image source={art} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          <Image source={art} style={[StyleSheet.absoluteFill, { width: '100%', height: '100%' }]} resizeMode="cover" />
           {/* Darker at the top (the header) and the bottom (chat), so the room's words stay readable on it. */}
           <LinearGradient colors={['rgba(0,0,0,0.45)', 'rgba(0,0,0,0.12)', 'rgba(0,0,0,0.5)']} locations={[0, 0.4, 1]} style={StyleSheet.absoluteFill} />
         </>

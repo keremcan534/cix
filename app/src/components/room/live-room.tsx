@@ -210,6 +210,10 @@ const reactionKey = () => Date.now() + Math.random();
 const SLOW_MS = 10_000;
 /** Room the chat leaves on its right for the Rüzgâr Gülü shortcut (styles.wheelBtn: 46 wide disc, 10 from the edge). */
 const WHEEL_ROOM = 62;
+/** From the screen's right edge, past the lucky bag float (80 px) or the repeat wheel (90 px) that holds the chat's corner. */
+const CORNER_ROOM = 92;
+/** The header's small buttons: 44 px tall to the finger, without reaching their neighbours across the 8 px gaps. */
+const HEAD_SLOP = { top: 12, bottom: 12, left: 4, right: 4 };
 /** What a stage cue (lib/fx-queue) draws: a gift's video, a big gift's show, the other gifts' pop, a full-screen Hareketli. */
 type StagePlay =
   | { kind: 'video'; gift: Gift; media: NonNullable<ReturnType<typeof giftVideoOf>> }
@@ -606,6 +610,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const [headerH, setHeaderH] = useState(0);
   const [controlsH, setControlsH] = useState(0);
   const [balkonLine, setBalkonLine] = useState(0);
+  // The notes over the controls (a mute, a refused line, @ names): what floats over the chat's corner stays above them.
+  const [notesH, setNotesH] = useState(0);
   const sheetRoom = sheetSpace(roomH, insets.bottom, headerH, balkonLine);
   // Seat emoji reactions currently playing, by user id.
   const [reactions, setReactions] = useState<Record<string, SeatReactionData>>({});
@@ -3652,6 +3658,23 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // Minimized: the host hides this view, so drawing seats, chat and effects would be wasted work on
   // every room tick. Session, audio and timers live in hooks above and keep running.
   if (!full) return <View style={{ flex: 1, backgroundColor: colors.bg }}>{gamePanel}</View>;
+  // The notices floating over the room start under the Balkon bar, over the chat, so they never lie on the mics (while
+  // typing the chat has no room for them: right under the header).
+  const noticeTop = typing || !headerH || !balkonLine ? insets.top + headerH + 4 : insets.top + headerH + balkonLine + 6;
+  // A question to answer (its card is at most 134 px tall) stays clear of the controls however short the chat is.
+  const promptTop = roomH ? Math.max(insets.top + headerH + 4, Math.min(noticeTop, insets.top + roomH - controlsH - 134)) : noticeTop;
+  // While one is up, passing news (a win, an arrival) waits for its turn, so nothing lies over the question.
+  const promptUp = (!!myInvite && !offline) || (real && canManage && !!incomingPk && !offline) || !!moving;
+  // The chat's lower right corner: the shortcuts float just above the controls and the notes over them.
+  const overBar = insets.bottom + controlsH + notesH + 8;
+  const bagsUp = real && bags.bags.some((b) => !blocked.has(b.from.id));
+  // The bag float stands on the wheel shortcut (61 px) or the repeat wheel (94 px) when the chat is tall enough for
+  // both under its tabs (41 px); otherwise it takes their corner, the shortcut stays in the menu and the repeat wheel
+  // stands beside it.
+  const bagLift = combo ? 102 : 72;
+  const bagsStack = overBar + bagLift + 99 <= insets.bottom + roomH - headerH - balkonLine - 41;
+  // Narrow phones: the buttons close up, so the chat's field keeps room for its words.
+  const narrowBar = win.width < 380;
   return (
     <RoomRoot sheetSpace={sheetRoom}>
       <StageBackdrop theme={theme} background={look.stage} freeId={look.freeId} />
@@ -3670,8 +3693,12 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           }}
         >
           <View style={styles.header} onLayout={(e) => setHeaderH(Math.round(e.nativeEvent.layout.height))}>
-            <Pressable onPress={() => setPanel('info')} accessibilityLabel="Oda kartı" hitSlop={4}>
+            <Pressable onPress={() => setPanel('info')} accessibilityLabel={`Oda kartı, Lv.${level}`} hitSlop={4}>
               <Avatar uri={userById(hostId).avatar} size={36} />
+              {/* On the photo's lower edge, so the room's name keeps the line's width. */}
+              <View style={styles.levelBadge} pointerEvents="none">
+                <Text style={styles.levelText}>Lv.{level}</Text>
+              </View>
             </Pressable>
             <View style={{ flex: 1 }}>
               <Pressable onPress={() => setPanel('info')} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
@@ -3679,9 +3706,6 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                 <Text style={styles.title} numberOfLines={1}>
                   {title}
                 </Text>
-                <View style={styles.levelBadge}>
-                  <Text style={styles.levelText}>Lv.{level}</Text>
-                </View>
                 {hostId !== 'me' && <RoomFollowHeart roomId={id} title={title} />}
               </Pressable>
               <View style={styles.subLine}>
@@ -3705,7 +3729,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
               </View>
             </View>
             {canManage && (micQueue || queue.length > 0) && (
-              <Pressable onPress={() => setPanel('requests')} accessibilityLabel={`Konuşma istekleri, ${queue.length} kişi`} hitSlop={6}>
+              <Pressable onPress={() => setPanel('requests')} accessibilityLabel={`Konuşma istekleri, ${queue.length} kişi`} hitSlop={HEAD_SLOP}>
                 <Art name="oda-konusmaci-kuyrugu-el-kaldir" size={25} />
                 {queue.length > 0 && (
                   <View style={styles.reqBadge}>
@@ -3714,20 +3738,22 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                 )}
               </Pressable>
             )}
-            {top3.length > 0 && (
-              <Pressable onPress={() => setPanel('contrib')} style={{ flexDirection: 'row' }} accessibilityLabel="İlk 3 katkı">
+            {/* The top three open the same board as the trophy, which stands in for them until someone has given. */}
+            {top3.length > 0 ? (
+              <Pressable onPress={() => setPanel('contrib')} style={{ flexDirection: 'row' }} accessibilityLabel="İlk 3 katkı" hitSlop={HEAD_SLOP}>
                 {top3.map((uid, i) => (
-                  <View key={uid} style={[styles.topAvatar, { marginLeft: i ? -8 : 0, borderColor: ['#FBBF24', '#CBD5E1', '#F59E0B'][i] }]}>
+                  <View key={uid} style={[styles.topAvatar, { marginLeft: i ? -14 : 0, borderColor: ['#FBBF24', '#CBD5E1', '#F59E0B'][i] }]}>
                     <Avatar uri={userById(uid).avatar} size={24} />
                   </View>
                 ))}
               </Pressable>
+            ) : (
+              <Pressable onPress={() => setPanel('contrib')} accessibilityLabel="Katkı sıralaması" hitSlop={HEAD_SLOP}>
+                <Ionicons name="trophy" size={20} color={colors.gold} />
+              </Pressable>
             )}
-            <Pressable onPress={() => setPanel('contrib')} accessibilityLabel="Katkı sıralaması" hitSlop={6}>
-              <Ionicons name="trophy" size={20} color={colors.gold} />
-            </Pressable>
             {(isOwn || !!liveSettings) && (
-              <Pressable onPress={() => setPanel('settings')} accessibilityLabel="Oda ayarları" hitSlop={6}>
+              <Pressable onPress={() => setPanel('settings')} accessibilityLabel="Oda ayarları" hitSlop={HEAD_SLOP}>
                 <Ionicons name="settings-outline" size={20} color="#fff" />
               </Pressable>
             )}
@@ -3747,6 +3773,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             box={steadyBox(roomH, headerH, controlsH)}
             floor={strip ? 0 : 120}
             onLine={setBalkonLine}
+            typing={typing}
             guess={Math.round(win.height * 0.34)}
             onTouchStart={emojiOpen ? () => setEmojiOpen(false) : undefined}
             top={
@@ -3820,7 +3847,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
               />
             }
             chat={(onBasis) => (
-              <ChatFeed messages={messages} visible={visibleInAll} renderItem={renderChat} renderTyping={renderTyping} screenHeight={win.height} fill={typing} onLarge={setSeatsSmall} onBasis={onBasis} hidden={emojiOpen && !typing} onTouch={emojiOpen ? () => setEmojiOpen(false) : undefined} sideRoom={wheelShown ? WHEEL_ROOM : 0} />
+              <ChatFeed messages={messages} visible={visibleInAll} renderItem={renderChat} renderTyping={renderTyping} screenHeight={win.height} fill={typing} onLarge={setSeatsSmall} onBasis={onBasis} hidden={emojiOpen && !typing} onTouch={emojiOpen ? () => setEmojiOpen(false) : undefined} sideRoom={wheelShown || (bagsUp && !typing) ? WHEEL_ROOM : 0} />
             )}
             overlay={
               emojiOpen && (
@@ -3850,43 +3877,46 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             }
           />
           {mentionNote && (
-            <View key={mentionNote.n} style={styles.mentionNote} pointerEvents="none" accessibilityLiveRegion="polite">
+            <View key={mentionNote.n} style={[styles.mentionNote, { bottom: controlsH + notesH + 8 }]} pointerEvents="none" accessibilityLiveRegion="polite">
               <Text style={styles.mentionNoteAt}>@</Text>
               <Text style={styles.mentionNoteText} numberOfLines={1}>
                 {mentionNote.name} senden bahsetti
               </Text>
             </View>
           )}
-          {chatMuted || voiceMuted ? (
-            <View style={{ paddingHorizontal: 12, paddingBottom: 6, gap: 6 }}>
-              {chatMuted && <MuteBanner s={chatMuted} text="Yazılı susturma" />}
-              {voiceMuted && voiceMuted.id !== chatMuted?.id && <MuteBanner s={voiceMuted} text="Sesli susturma" />}
-            </View>
-          ) : null}
-          <ContactNote text={chatRefused} />
-          {mentionPeople.length > 0 && (
-            <ScrollView horizontal keyboardShouldPersistTaps="always" showsHorizontalScrollIndicator={false} contentContainerStyle={styles.mentionRow}>
-              {mentionPeople.map((u) => (
-                <Pressable key={u.id} style={styles.mentionChip} onPress={() => editDraft((d) => insertMention(d, u.name))} accessibilityRole="button" accessibilityLabel={`${u.name} kişisinden bahset`}>
-                  <Avatar uri={u.avatar} name={u.name} size={22} />
-                  <Text style={styles.mentionName} numberOfLines={1}>
-                    {u.name}
-                  </Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-          )}
+          <View onLayout={(e) => setNotesH(Math.round(e.nativeEvent.layout.height))}>
+            {chatMuted || voiceMuted ? (
+              <View style={{ paddingHorizontal: 12, paddingBottom: 6, gap: 6 }}>
+                {chatMuted && <MuteBanner s={chatMuted} text="Yazılı susturma" />}
+                {voiceMuted && voiceMuted.id !== chatMuted?.id && <MuteBanner s={voiceMuted} text="Sesli susturma" />}
+              </View>
+            ) : null}
+            <ContactNote text={chatRefused} />
+            {mentionPeople.length > 0 && (
+              <ScrollView horizontal keyboardShouldPersistTaps="always" showsHorizontalScrollIndicator={false} contentContainerStyle={styles.mentionRow}>
+                {mentionPeople.map((u) => (
+                  <Pressable key={u.id} style={styles.mentionChip} onPress={() => editDraft((d) => insertMention(d, u.name))} accessibilityRole="button" accessibilityLabel={`${u.name} kişisinden bahset`}>
+                    <Avatar uri={u.avatar} name={u.name} size={22} />
+                    <Text style={styles.mentionName} numberOfLines={1}>
+                      {u.name}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            )}
+          </View>
           {/* While typing only the field and a send button stay, so the field is wide; the `&&` slots keep the
               field in the same place in the tree, so it keeps its focus and the keyboard stays up. */}
           <View
-            style={[styles.bottom, typing && { paddingVertical: 4 }]}
+            style={[styles.bottom, narrowBar && styles.bottomNarrow, typing && { paddingVertical: 4 }]}
             onLayout={(e) => {
               // The controls as they are with no keyboard up (the field and a send button while typing).
               if (!typing) setControlsH(Math.round(e.nativeEvent.layout.height));
             }}
           >
             {!typing && <RoundBtn label="Menü" icon="ellipsis-horizontal" onPress={() => (setPanel('menu'), void refreshCasino())} />}
-            <View style={styles.inputWrap}>
+            {/* The whole pill opens the keyboard, not only the words' narrow strip. */}
+            <Pressable style={[styles.inputWrap, narrowBar && styles.inputWrapNarrow]} onPress={() => inputRef.current?.focus()} accessible={false}>
               <Pressable
                 onPress={() => {
                   // The panel and the keyboard take turns in the chat's place, so the stage never has both under it.
@@ -3896,7 +3926,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                 accessibilityLabel={amSeated ? 'Emoji gönder' : 'Emoji ekle'}
                 hitSlop={8}
               >
-                <Ionicons name={emojiOpen ? 'close-circle' : 'happy-outline'} size={24} color={colors.textDim} />
+                <Ionicons name={emojiOpen ? 'close-circle' : 'happy-outline'} size={narrowBar ? 22 : 24} color={colors.textDim} />
               </Pressable>
               <TextInput
                 ref={inputRef}
@@ -3910,23 +3940,25 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                 }}
                 onBlur={() => setInputFocused(false)}
                 editable={!chatBlocked}
-                placeholder={chatBlocked ? 'Sohbete yazman kısıtlı' : 'Yaz…'}
+                placeholder={chatBlocked ? 'Kısıtlı' : 'Yaz…'}
+                accessibilityLabel={chatBlocked ? 'Sohbete yazman kısıtlı' : undefined}
                 placeholderTextColor={colors.textDim}
                 maxLength={300}
-                style={styles.input}
+                style={[styles.input, narrowBar && { paddingRight: 4 }]}
                 returnKeyType="send"
               />
-            </View>
+            </Pressable>
             {typing && (
               <Pressable onPress={() => send()} disabled={!draft.trim()} accessibilityRole="button" accessibilityLabel="Gönder" style={[styles.sendBtn, !draft.trim() && { opacity: 0.45 }]}>
                 <Ionicons name="send" size={18} color="#fff" />
               </Pressable>
             )}
-            {!typing && roomType === 'qa' && <RoundBtn label="Sorular" icon="help" onPress={() => setPanel('qa')} badge={questions.filter((q) => !q.picked).length} />}
+            {/* Narrow phones reach the questions from the menu (with the same count), so the field keeps its width. */}
+            {!typing && roomType === 'qa' && win.width >= 400 && <RoundBtn label="Sorular" icon="help" onPress={() => setPanel('qa')} badge={questions.filter((q) => !q.picked).length} />}
             {!typing && <RoundBtn label="Mesajlar" icon="chatbubble-ellipses" onPress={() => setInboxOpen(true)} badge={inboxUnread} />}
             {/* The mic and "Oda sesi" side by side, small. A speaker keeps the mic while typing; the raise-hand button waits. */}
             {typing && !amSeated ? null : (
-              <View style={styles.micGroup}>
+              <View style={[styles.micGroup, narrowBar && { gap: 4 }]}>
                 {amSeated ? (
                   <MicBtn
                     state={!micOn ? 'off' : sending ? 'on' : 'held'}
@@ -3955,13 +3987,13 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         </KeyboardAvoid>
       </SafeAreaView>
 
-      {envelope && <EnvelopeDrop from={envelope.from} seconds={envelope.seconds} onGrab={grabEnvelope} />}
+      {envelope && <EnvelopeDrop from={envelope.from} seconds={envelope.seconds} top={noticeTop} onGrab={grabEnvelope} />}
       {/* Over the Rüzgâr Gülü or the repeat wheel (or where they would be): the room's bags, one page each, with their times. */}
       {real && bags.bags.length > 0 && (
         <LuckyBagFloat
           bags={bags.bags.filter((b) => !blocked.has(b.from.id))}
           now={bags.now}
-          bottom={wheelShown || combo ? 222 : 150}
+          bottom={bagsStack && (wheelShown || combo) ? overBar + bagLift : overBar}
           still={settings.reduceMotion}
           onOpen={(b) => {
             setBagOutcome(null);
@@ -4423,8 +4455,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         />
       )}
       {showCrowns && pkEnded && <CrownScreen pk={pkEnded} still={settings.reduceMotion || settings.effectsOff} onClose={() => markPkSeen(`${pkEnded.id}:crowns`)} onProfile={openProfileFromPk} />}
-      {full && myInvite && !offline && <MicInvitePrompt key={myInvite.id} invite={myInvite} onAnswer={answerMyInvite} />}
-      {full && real && canManage && incomingPk && !myInvite && !offline && <CrossPkInvitePrompt key={incomingPk.id} invite={incomingPk} busy={pkAnswering} onAnswer={answerIncomingPk} />}
+      {full && myInvite && !offline && <MicInvitePrompt key={myInvite.id} invite={myInvite} top={promptTop} onAnswer={answerMyInvite} />}
+      {full && real && canManage && incomingPk && !myInvite && !offline && <CrossPkInvitePrompt key={incomingPk.id} invite={incomingPk} busy={pkAnswering} top={promptTop} onAnswer={answerIncomingPk} />}
       {session && <SessionTestSheet visible={panel === 'session'} session={session} onClose={closePanel} onKickMe={kickMeTest} />}
       <SeatMenu anchor={seatMenu?.anchor ?? null} title={seatMenu?.title} items={seatMenu?.items ?? []} onClose={() => setSeatMenu(null)} />
       {person && (
@@ -4439,21 +4471,21 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         />
       )}
       {moving && (
-        <Pressable style={styles.moveBanner} onPress={() => setMoving(null)} accessibilityLabel="Koltuk değiştirmeyi iptal et">
+        <Pressable style={[styles.moveBanner, { top: noticeTop }]} onPress={() => setMoving(null)} accessibilityLabel="Koltuk değiştirmeyi iptal et">
           <Text style={styles.moveText}>{userById(moving).name} için boş bir koltuğa dokun · iptal için buraya dokun</Text>
         </Pressable>
       )}
       {flights.length > 0 && <GiftFlights flights={flights} onDone={(k) => setFlights((f) => f.filter((x) => x.key !== k))} />}
       {gamePanel}
       {game && gameMin && (
-        <Pressable style={styles.gameChip} onPress={() => setGameMin(false)} accessibilityLabel="Oyuna dön">
+        <Pressable style={[styles.gameChip, { bottom: overBar }, (bagsUp || !!combo) && { right: CORNER_ROOM, maxWidth: win.width - CORNER_ROOM - 12 }]} onPress={() => setGameMin(false)} accessibilityLabel="Oyuna dön">
           <Text style={styles.gameChipText}>🎮 Oyun devam ediyor · aç</Text>
         </Pressable>
       )}
       {/* Rüzgâr Gülü shortcut: one tap from the room, only where the Oyun Salonu exists (Cömertlik Lv.2+). It steps
           aside while the emoji panel, the keyboard or a refusal note is up, so it never covers their text. */}
-      {wheelShown && (
-        <Pressable style={styles.wheelBtn} onPress={() => (setGame({ kind: 'wheel' }), setGameMin(false))} accessibilityRole="button" accessibilityLabel="Rüzgâr Gülü">
+      {wheelShown && (!bagsUp || bagsStack) && (
+        <Pressable style={[styles.wheelBtn, { bottom: overBar }]} onPress={() => (setGame({ kind: 'wheel' }), setGameMin(false))} accessibilityRole="button" accessibilityLabel="Rüzgâr Gülü">
           <SalonArt
             name="oyun-ruzgar-gulu"
             size={46}
@@ -4476,13 +4508,14 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           price={comboGift.price * combo.each * combo.to.length}
           count={combo.count}
           restartKey={combo.key}
+          right={bagsUp && !bagsStack ? CORNER_ROOM : undefined}
           onPress={tapCombo}
           onExpire={() => setCombo(null)}
         />
       )}
       {luckyFx && <LuckyResult key={luckyFx[0].txId} records={luckyFx} still={settings.effectsOff || settings.reduceMotion} onDone={() => setLuckyFx(null)} />}
       {/* Platform-wide win announcements (every room shows every win). */}
-      {visible && <WinBanner top={110} still={settings.reduceMotion} />}
+      {visible && !promptUp && <WinBanner top={typing && bagRain ? insets.top + 176 : noticeTop + (entries.now && !entryMedia ? 66 : 0)} still={settings.reduceMotion} />}
       {entries.now &&
         (entryMedia ? (
           // A video entry (Ejderha): the name banner over the full-screen clip, which ends the turn; the team's own
@@ -4490,8 +4523,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           <VideoFx key={entries.now.id} media={entryMedia} muted={fxMuted} onDone={nextEntry}>
             {entries.now.show.plate ? <PlateName name={entries.now.show.name} plate={entries.now.show.plate} /> : <EntryEffect show={entries.now.show} />}
           </VideoFx>
-        ) : (
-          <EntryEffect key={entries.now.id} show={entries.now.show} still={settings.reduceMotion} onDone={nextEntry} />
+        ) : promptUp ? null : (
+          <EntryEffect key={entries.now.id} show={entries.now.show} still={settings.reduceMotion} top={noticeTop - 18} onDone={nextEntry} />
         ))}
     </RoomRoot>
   );
@@ -4507,26 +4540,26 @@ function RoomRoot({ sheetSpace: space, children }: { sheetSpace: number | null; 
 }
 
 const styles = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 8 },
+  // Over the stage's headroom (components/room/fit-stage), so its buttons keep their whole touch area.
+  header: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingTop: 4, paddingBottom: 8, zIndex: 1 },
   title: { color: '#fff', fontSize: 15, fontWeight: '700', flexShrink: 1 },
   sub: { color: colors.textDim, fontSize: 12 },
   subRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  subLine: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  subLine: { flexDirection: 'row', alignItems: 'center', gap: 6, overflow: 'hidden' },
   subShrink: { flexShrink: 1, minWidth: 0, overflow: 'hidden' },
-  levelBadge: { backgroundColor: colors.primary, borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1, borderWidth: 1, borderColor: 'rgba(165,243,245,0.35)', boxShadow: '0 0 8px rgba(255,95,162,0.35)' },
-  levelText: { color: '#fff', fontSize: 11, fontWeight: '800' },
+  levelBadge: { position: 'absolute', bottom: -4, alignSelf: 'center', backgroundColor: colors.primary, borderRadius: 6, paddingHorizontal: 4, borderWidth: 1, borderColor: 'rgba(165,243,245,0.35)', boxShadow: '0 0 8px rgba(255,95,162,0.35)' },
+  levelText: { color: '#fff', fontSize: 10, lineHeight: 13, fontWeight: '800' },
   reqBadge: { position: 'absolute', top: -4, right: -6, backgroundColor: colors.red, borderRadius: 8, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center' },
   reqBadgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
-  moveBanner: { position: 'absolute', left: 12, right: 12, top: 110, backgroundColor: semantic.action, borderRadius: 12, padding: 10, zIndex: 35 },
+  moveBanner: { position: 'absolute', left: 12, right: 12, backgroundColor: semantic.action, borderRadius: 12, padding: 10, zIndex: 35 },
   moveText: { color: semantic.actionInk, fontWeight: '800', textAlign: 'center', fontSize: 13 },
-  gameChip: { position: 'absolute', right: 12, bottom: 96, backgroundColor: semantic.action, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9, zIndex: 30 },
+  gameChip: { position: 'absolute', right: 12, backgroundColor: semantic.action, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9, zIndex: 30 },
   gameChipText: { color: semantic.actionInk, fontWeight: '900', fontSize: 13 },
-  wheelBtn: { position: 'absolute', right: 10, bottom: 150, alignItems: 'center', gap: 2, zIndex: 30 },
+  wheelBtn: { position: 'absolute', right: 10, alignItems: 'center', gap: 2, zIndex: 30 },
   // @bahset: the note over the chat when someone writes my name; it goes by itself.
   mentionNote: {
     position: 'absolute',
     alignSelf: 'center',
-    bottom: 72,
     maxWidth: '86%',
     flexDirection: 'row',
     alignItems: 'center',
@@ -4556,7 +4589,8 @@ const styles = StyleSheet.create({
   guestGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', rowGap: 10 },
   // Küçült: the mics as one short strip (ten to a row, from the left), the chat takes the rest.
   micStrip: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-start', paddingHorizontal: 8, paddingTop: 6, paddingBottom: 2, rowGap: 6 },
-  bottom: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 8 },
+  bottom: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 6 },
+  bottomNarrow: { gap: 4, paddingHorizontal: 8 },
   mentionRow: { gap: 6, paddingHorizontal: 10, paddingTop: 4 },
   mentionChip: { flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: 160, paddingLeft: 3, paddingRight: 10, paddingVertical: 3, borderRadius: 999, backgroundColor: 'rgba(15,23,42,0.85)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
   mentionName: { color: colors.text, fontSize: 13, fontWeight: '700', flexShrink: 1 },
@@ -4566,6 +4600,7 @@ const styles = StyleSheet.create({
   queueChipText: { color: '#fff', fontSize: 12, flexShrink: 1 },
   eventBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 12, marginTop: 6, backgroundColor: 'rgba(245,158,11,0.25)', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
   inputWrap: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', borderTopColor: 'rgba(255,255,255,0.24)', borderRadius: 999, paddingLeft: 10, height: BAR_BTN },
+  inputWrapNarrow: { paddingLeft: 6, gap: 2 },
   input: { flex: 1, minWidth: 0, color: '#fff', paddingRight: 14, paddingVertical: 10, fontSize: 15 },
   sendBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
 });

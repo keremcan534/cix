@@ -6,6 +6,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
 import { Art, type ArtName } from '@/components/Art';
@@ -17,6 +18,7 @@ import { roomIdText } from '@/data/catalog';
 import { roomById, userById } from '@/data/mock';
 import { IS_DEMO } from '@/lib/build';
 import { compact } from '@/lib/compact';
+import { useKeyboardOpen } from '@/lib/keyboard-open';
 import { liveMode } from '@/lib/live';
 import { cancelLivePk, endLiveCrossPk, inviteLiveCrossPk, startLivePk, useCrossPkRooms, type IncomingCrossPk } from '@/lib/live/pk';
 import {
@@ -156,17 +158,20 @@ export function PkSetupSheet({ visible, roomId, starterId, micUsers, offline, on
   const modeOff = mode === 'solo' ? soloOff : teamOff;
   // However many are on the mics (none too): people who take a mic during the PK join it.
   const canStart = !offline && !busy && !modeOff && (mode === 'solo' || method === 'manual' || (!!draft && !draftStale));
-  const paddingBottom = useSheetBottom(16);
+  const sheetBottom = useSheetBottom(16);
   // Over a room it stops at the Balkon line (lib/sheet-space): the choices scroll, the start button stays under them.
   const maxHeight = useSheetMax(0.86);
+  const { top } = useSafeAreaInsets();
+  const keyboardOpen = useKeyboardOpen();
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      {/* The modal does not shrink for the keyboard (edge to edge): the sheet rises above it as a whole. */}
-      <KeyboardAvoid style={{ flex: 1 }}>
+      {/* The modal does not shrink for the keyboard (edge to edge): the sheet rises above it as a whole, stops under the
+          status bar and shrinks there (its body scrolls). */}
+      <KeyboardAvoid style={{ flex: 1, paddingTop: top }}>
         <Pressable style={st.backdrop} onPress={onClose} accessibilityLabel="Kapat" />
-        <GoldRim sheet radius={26} width={2} style={{ maxHeight }} inner={{ flexShrink: 1 }}>
-          <PkBackdrop style={[st.sheet, { paddingBottom }]}>
+        <GoldRim sheet radius={26} width={2} style={{ maxHeight, flexShrink: 1 }} inner={{ flexShrink: 1 }}>
+          <PkBackdrop style={[st.sheet, { paddingBottom: keyboardOpen ? 16 : sheetBottom }]}>
             <View style={st.closeAt}>
               <CloseBtn onPress={onClose} label="PK panelini kapat" />
             </View>
@@ -177,7 +182,7 @@ export function PkSetupSheet({ visible, roomId, starterId, micUsers, offline, on
               </View>
               <View style={st.tagline}>
                 <LinearGradient colors={['transparent', PK.goldEdge]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={st.taglineLine} />
-                <Text style={st.taglineText} numberOfLines={1}>
+                <Text style={st.taglineText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                   Mikrofon puanlarıyla heyecanlı bir mücadele başlat!
                 </Text>
                 <LinearGradient colors={[PK.goldEdge, 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={st.taglineLine} />
@@ -509,7 +514,9 @@ export function PkBoard({ pk, viewerRoomId, canManage }: { pk: PkSession; viewer
     <>
       <Pressable style={st.board} onPress={() => setOpen(true)} accessibilityLabel="PK ayrıntıları">
         <View style={st.boardTop}>
-          <Text style={st.boardKind}>Odalar arası PK</Text>
+          <Text style={st.boardKind} numberOfLines={1}>
+            Odalar arası PK
+          </Text>
           <TimerPill text={plainClock(pk, now)} />
         </View>
         <Versus pk={pk} left={teamLabel(pk, red, viewerRoomId)} right={teamLabel(pk, blue, viewerRoomId)} banners={false} />
@@ -561,8 +568,12 @@ export function TeamArena({
           <Pressable onPress={() => setOpen(true)} accessibilityRole="button" accessibilityLabel="Takım PK ayrıntıları" style={{ gap: 6 }}>
             <View style={st.boardTop}>
               <View style={st.artRow}>
-                <Text style={st.boardKind}>Takım PK</Text>
-                <Text style={st.live}>· {STATUS_LABEL[pk.status]}</Text>
+                <Text style={st.boardKind} numberOfLines={1}>
+                  Takım PK
+                </Text>
+                <Text style={st.live} numberOfLines={1}>
+                  · {STATUS_LABEL[pk.status]}
+                </Text>
               </View>
               <TimerPill text={plainClock(pk, now)} />
             </View>
@@ -812,15 +823,15 @@ export function PkDetail({ pk, open, onClose, viewerRoomId, canManage }: { pk: P
  * Odalar arası PK invite to this room, for its owner and admins (live mode): who invites, how long, the time left to
  * answer. Gone when the time is up (the server then refuses an answer anyway).
  */
-export function CrossPkInvitePrompt({ invite, busy, onAnswer }: { invite: IncomingCrossPk; busy: boolean; onAnswer: (accept: boolean) => void }) {
+export function CrossPkInvitePrompt({ invite, busy, top, onAnswer }: { invite: IncomingCrossPk; busy: boolean; /** Under the mics: the room's place for a question (live-room `promptTop`). */ top: number; onAnswer: (accept: boolean) => void }) {
   const now = useNow(true);
   const left = Math.max(0, Math.ceil((invite.expiresAt - now) / 1000));
   const from = roomById(invite.fromRoomId);
   if (left <= 0) return null;
   return (
-    <View style={st.prompt} accessibilityLiveRegion="polite" accessibilityLabel={`${roomTitle(invite.fromRoomId)} odası seni ${invite.durationMin} dakikalık PK’ya davet ediyor`}>
+    <View style={[st.prompt, { top }]} accessibilityLiveRegion="polite" accessibilityLabel={`${roomTitle(invite.fromRoomId)} odası seni ${invite.durationMin} dakikalık PK’ya davet ediyor`}>
       {from.cover ? <Photo uri={from.cover} kind="cover" seed={from.id} style={[st.av, { borderRadius: 10 }]} /> : <Art name="pk-takim-pk" size={34} />}
-      <View style={{ flex: 1, minWidth: 0 }}>
+      <View style={st.promptText}>
         <Text style={st.memberName} numberOfLines={2}>
           {roomTitle(invite.fromRoomId)} odanı PK’ya davet ediyor
         </Text>
@@ -828,12 +839,15 @@ export function CrossPkInvitePrompt({ invite, busy, onAnswer }: { invite: Incomi
           Odalar arası PK · {invite.durationMin} dk · {left} sn
         </Text>
       </View>
-      <Pressable style={[st.decline, busy && st.disabled]} disabled={busy} onPress={() => onAnswer(false)} accessibilityLabel="PK davetini reddet">
-        <Text style={st.declineText}>Reddet</Text>
-      </Pressable>
-      <Pressable style={[st.accept, busy && st.disabled]} disabled={busy} onPress={() => onAnswer(true)} accessibilityLabel="PK davetini kabul et">
-        <Text style={st.acceptText}>Kabul</Text>
-      </Pressable>
+      {/* On a line of their own, so the invite's sentence is never cut beside them. */}
+      <View style={st.promptBtns}>
+        <Pressable style={[st.decline, busy && st.disabled]} disabled={busy} onPress={() => onAnswer(false)} accessibilityLabel="PK davetini reddet">
+          <Text style={st.declineText}>Reddet</Text>
+        </Pressable>
+        <Pressable style={[st.accept, busy && st.disabled]} disabled={busy} onPress={() => onAnswer(true)} accessibilityLabel="PK davetini kabul et">
+          <Text style={st.acceptText}>Kabul</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -859,7 +873,7 @@ const st = StyleSheet.create({
   modes: { flexDirection: 'row', gap: 8 },
   vsAt: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
   modeCard: { flex: 1, minWidth: 0 },
-  modeFill: { borderRadius: 16, paddingVertical: 6, paddingHorizontal: 6, gap: 1, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)' },
+  modeFill: { flexGrow: 1, borderRadius: 16, paddingVertical: 6, paddingHorizontal: 6, gap: 1, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)' },
   modeTick: { position: 'absolute', top: 5, right: 5 },
   modeArt: { alignItems: 'center' },
   modeStand: { width: 64, height: 10, borderRadius: 32, marginTop: -6, opacity: 0.9 },
@@ -887,9 +901,9 @@ const st = StyleSheet.create({
   inviteText: { color: '#fff', fontWeight: '800', fontSize: 13 },
   board: { marginHorizontal: 8, marginTop: 4, backgroundColor: 'rgba(30,8,48,0.84)', borderRadius: 14, paddingHorizontal: 6, paddingVertical: 4, gap: 3, borderWidth: 1.5, borderColor: 'rgba(231,169,58,0.7)' },
   boardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6 },
-  boardKind: { color: PK.goldText, fontWeight: '800', fontSize: 14 },
-  live: { color: PK.dim, fontSize: 12, fontWeight: '700' },
-  artRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  boardKind: { color: PK.goldText, fontWeight: '800', fontSize: 14, flexShrink: 1 },
+  live: { color: PK.dim, fontSize: 12, fontWeight: '700', flexShrink: 1 },
+  artRow: { flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1, minWidth: 0 },
   boardBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   versus: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   versusNames: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
@@ -937,7 +951,9 @@ const st = StyleSheet.create({
   roomCover: { width: 64, height: 64, borderRadius: 14 },
   danger: { backgroundColor: 'rgba(217,58,69,0.18)', borderRadius: 999, paddingVertical: 8, alignItems: 'center', borderWidth: 1, borderColor: colors.red },
   dangerText: { color: '#FF7A82', fontWeight: '900' },
-  prompt: { position: 'absolute', left: 12, right: 12, top: 96, zIndex: 40, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#2A0B45', borderRadius: 16, padding: 10, borderWidth: 1.5, borderColor: '#E7A93A' },
+  prompt: { position: 'absolute', left: 12, right: 12, zIndex: 40, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, backgroundColor: '#2A0B45', borderRadius: 16, padding: 10, borderWidth: 1.5, borderColor: '#E7A93A' },
+  promptText: { flexBasis: '78%', flexGrow: 1, flexShrink: 1, minWidth: 0 },
+  promptBtns: { flexDirection: 'row', gap: 8, marginLeft: 'auto' },
   decline: { borderRadius: 999, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)', paddingHorizontal: 12, paddingVertical: 9 },
   declineText: { color: '#fff', fontWeight: '800', fontSize: 13 },
   accept: { backgroundColor: semantic.action, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9 },

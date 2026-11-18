@@ -214,7 +214,7 @@ export function SanctionSheet() {
     <Modal visible={!!shown} transparent animationType="slide" onRequestClose={() => showSanction(null)}>
       <Pressable style={styles.scrim} onPress={() => showSanction(null)} accessibilityLabel="Kapat" />
       <KeyboardAvoid style={styles.sheetWrap} pointerEvents="box-none">
-        <View style={[styles.sheet, { paddingBottom: insets.bottom + space.lg }]}>
+        <View style={[styles.sheet, { paddingBottom: insets.bottom + space.lg, marginTop: insets.top }]}>
           <View style={styles.grip} />
           <Text style={styles.sheetTitle}>{shown?.label ?? ''}</Text>
           <ScrollView contentContainerStyle={{ gap: space.md }} keyboardShouldPersistTaps="handled">
@@ -304,7 +304,7 @@ const useStyles = makeStyles(({ colors, semantic }) => ({
   link: { color: colors.primaryText, fontWeight: '700' },
   scrim: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.5)' },
   sheetWrap: { flex: 1, justifyContent: 'flex-end' },
-  sheet: { backgroundColor: colors.bg, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, paddingHorizontal: space.lg, paddingTop: space.sm, gap: space.md, maxHeight: '88%' },
+  sheet: { backgroundColor: colors.bg, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, paddingHorizontal: space.lg, paddingTop: space.sm, gap: space.md, maxHeight: '88%', flexShrink: 1 },
   grip: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border },
   sheetTitle: { color: colors.text, fontSize: 18, fontWeight: '800' },
   banner: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingHorizontal: space.md, paddingVertical: 8, borderRadius: radius.md, backgroundColor: colors.card, borderWidth: StyleSheet.hairlineWidth, borderColor: semantic.danger },

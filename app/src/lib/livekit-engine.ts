@@ -204,6 +204,8 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
     const cams = () => showCams(r);
     [RoomEvent.TrackSubscribed, RoomEvent.TrackUnsubscribed, RoomEvent.TrackMuted, RoomEvent.TrackUnmuted, RoomEvent.LocalTrackPublished, RoomEvent.LocalTrackUnpublished, RoomEvent.ParticipantDisconnected].forEach((ev) => r.on(ev, cams));
     r.on(RoomEvent.Reconnected, () => {
+      // A mic tap during the drop couldn't reach the connection: what the screen shows is what is sent.
+      setMic(r, s.publishing);
       if (seat !== null) pushSeat(r);
       tell(r, { type: 'connected' });
     });

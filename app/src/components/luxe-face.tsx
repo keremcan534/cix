@@ -1,5 +1,6 @@
 // The gold-rimmed button faces (app/assets/luxe), cut from the owners' luxury set. A face is three slices: the round
 // ends keep their shape at any size and the strip between them stretches, so no button shows a join.
+import { useState } from 'react';
 import { Image, StyleSheet, View } from 'react-native';
 
 const FACES = {
@@ -23,9 +24,17 @@ export const luxeMinWidth = (height: number) => height * 2;
 
 function Slices({ name, h, hidden }: { name: LuxeFaceName; h: number; hidden?: boolean }) {
   const [left, mid, right] = FACES[name];
-  const end = { width: h, height: '100%' } as const;
+  // A label on two lines makes the button taller: the square ends widen with it, so they stay round, but never past the middle.
+  const [endW, setEndW] = useState(h);
+  const end = { width: endW, height: '100%' } as const;
   return (
-    <View style={[s.row, hidden && s.hidden]}>
+    <View
+      style={[s.row, hidden && s.hidden]}
+      onLayout={(e) => {
+        const box = e.nativeEvent.layout;
+        setEndW(Math.min(box.width / 2, Math.max(h, box.height)));
+      }}
+    >
       <Image source={left} style={end} resizeMode="stretch" accessibilityIgnoresInvertColors />
       <Image source={mid} style={s.mid} resizeMode="stretch" accessibilityIgnoresInvertColors />
       <Image source={right} style={end} resizeMode="stretch" accessibilityIgnoresInvertColors />
@@ -47,7 +56,8 @@ export function LuxeFace({ name, h, down, pressed }: { name: LuxeFaceName; h: nu
 }
 
 const s = StyleSheet.create({
-  row: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, flexDirection: 'row', pointerEvents: 'none' },
+  // Clipped, so no slice is ever drawn outside its button, not even before the first measure.
+  row: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, flexDirection: 'row', overflow: 'hidden', pointerEvents: 'none' },
   hidden: { opacity: 0 },
   // Half a point under each end, so no hairline shows on any screen density.
   mid: { flex: 1, height: '100%', marginHorizontal: -0.5 },

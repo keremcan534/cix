@@ -5,7 +5,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { memo, useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Image, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Animated, Easing, Image, Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Switch } from '@/components/luxe-switch';
@@ -42,7 +42,7 @@ function Chips<T extends number>({ values, value, onPick, label }: { values: T[]
       {values.map((v) => {
         const on = v === value;
         return (
-          <Pressable key={v} onPress={() => onPick(v)} style={[s.chip, on && s.chipOn]} accessibilityRole="button" accessibilityState={{ selected: on }}>
+          <Pressable key={v} onPress={() => onPick(v)} hitSlop={{ top: 4, bottom: 4 }} style={[s.chip, on && s.chipOn]} accessibilityRole="button" accessibilityState={{ selected: on }}>
             <Text style={[s.chipText, on && s.chipTextOn]}>{label(v)}</Text>
           </Pressable>
         );
@@ -112,13 +112,24 @@ export function LuckyBagSheet({ visible, room, rules, coins, svipLevel, onClose,
         </View>
 
         {/* Jeton or Hediye scrolls with the choices it switches: a short sheet keeps its height for them. */}
-        <ScrollView style={{ flexGrow: 0, flexShrink: 1 }} contentContainerStyle={{ paddingBottom: 6 }} showsVerticalScrollIndicator={false}>
-          <View style={s.segment}>
-            {(['coins', 'gift'] as const).map((k) => (
-              <Pressable key={k} onPress={() => setKind(k)} style={[s.segItem, kind === k && s.segOn]} accessibilityRole="tab" accessibilityState={{ selected: kind === k }}>
-                <Text style={[s.segText, kind === k && s.segTextOn]}>{k === 'coins' ? 'Jeton' : 'Hediye'}</Text>
-              </Pressable>
-            ))}
+        {/* To the sheet's edges, so the gift row inside can run to the screen's edge. */}
+        <ScrollView style={s.choices} contentContainerStyle={s.choicesIn}>
+          <View style={s.segRow}>
+            <View style={s.segment}>
+              {(['coins', 'gift'] as const).map((k) => (
+                <Pressable key={k} onPress={() => setKind(k)} style={[s.segItem, kind === k && s.segOn]} accessibilityRole="tab" accessibilityState={{ selected: kind === k }}>
+                  <Text style={[s.segText, kind === k && s.segTextOn]}>{k === 'coins' ? 'Jeton' : 'Hediye'}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <Pressable onPress={toWallet} hitSlop={{ top: 6, bottom: 6 }} style={s.wallet} accessibilityRole="button" accessibilityLabel={`Bakiye ${fmt(coins)} jeton. Jeton yükle`}>
+              <Text style={s.walletText} numberOfLines={1}>
+                Bakiye <RollingNumber value={coins} />
+              </Text>
+              <Text style={s.walletLink} numberOfLines={1}>
+                Jeton yükle
+              </Text>
+            </Pressable>
           </View>
           {kind === 'coins' ? (
             <>
@@ -130,13 +141,13 @@ export function LuckyBagSheet({ visible, room, rules, coins, svipLevel, onClose,
           ) : (
             <>
               <Text style={s.label}>Hediye</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.giftRow} contentContainerStyle={s.giftRowIn}>
                 {gifts.map((g) => {
                   const on = g.id === gift?.id;
                   return (
                     <Pressable key={g.id} onPress={() => setGiftId(g.id)} style={[s.gift, on && s.chipOn]} accessibilityRole="button" accessibilityLabel={`${g.name}, ${fmt(g.price)} jeton`} accessibilityState={{ selected: on }}>
                       <GiftArt giftId={g.id} emoji={g.emoji} size={40} />
-                      <Text style={s.giftName} numberOfLines={1}>
+                      <Text style={s.giftName} numberOfLines={2}>
                         {g.name}
                       </Text>
                       <View style={s.priceRow}>
@@ -167,25 +178,23 @@ export function LuckyBagSheet({ visible, room, rules, coins, svipLevel, onClose,
         </ScrollView>
 
         <View style={s.total}>
-          <View style={{ flex: 1 }}>
-            <Text style={s.totalLabel}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={s.totalLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
               Toplam · {packets} pay · {delayName(d).toLowerCase()}
             </Text>
             <View style={s.priceRow}>
               <Icon3D name="coin" size={20} />
-              <Text style={s.totalValue}>{fmt(total)}</Text>
+              <Text style={s.totalValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                {fmt(total)}
+              </Text>
             </View>
           </View>
-          <Pressable onPress={toWallet} style={s.wallet} accessibilityRole="button" accessibilityLabel={`Bakiye ${fmt(coins)} jeton. Jeton yükle`}>
-            <Text style={s.walletText}>
-              Bakiye <RollingNumber value={coins} />
+          <Pressable onPress={send} disabled={busy || (kind === 'gift' && !gift)} style={[s.send, s.sendBeside, (short || busy) && { opacity: 0.55 }]} accessibilityRole="button" accessibilityLabel={`Çantayı gönder, ${fmt(total)} jeton`}>
+            <Text style={s.sendText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+              {busy ? 'Gönderiliyor…' : short ? 'Bakiye yetmiyor' : 'Gönder'}
             </Text>
-            <Text style={s.walletLink}>Jeton yükle</Text>
           </Pressable>
         </View>
-        <Pressable onPress={send} disabled={busy || (kind === 'gift' && !gift)} style={[s.send, (short || busy) && { opacity: 0.55 }]} accessibilityRole="button" accessibilityLabel={`Çantayı gönder, ${fmt(total)} jeton`}>
-          <Text style={s.sendText}>{busy ? 'Gönderiliyor…' : short ? 'Bakiye yetmiyor' : 'Gönder'}</Text>
-        </Pressable>
       </View>
     </Modal>
   );
@@ -193,12 +202,13 @@ export function LuckyBagSheet({ visible, room, rules, coins, svipLevel, onClose,
 
 /** One falling bag: where it starts across the screen, when it first falls, how long a fall takes, its sway, size. */
 type Drop = { x: number; delay: number; duration: number; sway: number; size: number };
-/** A new set of falling bags across `width`, spread so they don't bunch up (impure: once per show). Slow enough to
+/** A new set of falling bags across `width`, spread so they don't bunch up and their sway (up to 30 dp) stays on the
+ *  screen (impure: once per show). Slow enough to
  *  catch: a bag takes about 3.6 to 5.1 s from top to bottom (10 % faster than the 4 to 5.6 s before), and they keep
  *  coming for as long as the bag falls. */
 function makeDrops(count: number, width: number): Drop[] {
   return Array.from({ length: count }, (_, i) => ({
-    x: Math.round(((i + Math.random() * 0.8) / count) * Math.max(0, width - 72)),
+    x: 30 + Math.round(((i + Math.random() * 0.8) / count) * Math.max(0, width - 132)),
     delay: Math.round(Math.random() * 2800),
     duration: Math.round((4000 + Math.random() * 1600) / 1.1),
     sway: Math.round((Math.random() - 0.5) * 60),
@@ -404,13 +414,13 @@ export function LuckyBagRain({ bag, now, width, height, still, onJoin, onOpen }:
       >
         <Pressable onPress={tap} style={[s.rainInner, bag.joined && s.rainJoined]} accessibilityRole="button" accessibilityLabel={`${title}: ${sub}`}>
           <Animated.View style={{ transform: [{ scale: glow.interpolate({ inputRange: [0, 1], outputRange: [1, 1.12] }) }] }}>
-            <Image source={ROOM_ICON_ART.envelope} style={{ width: 56, height: 56 }} />
+            <Image source={ROOM_ICON_ART.envelope} style={{ width: 44, height: 44 }} />
           </Animated.View>
-          <View style={{ flex: 1, gap: 2 }}>
-            <Text style={s.rainTitle} numberOfLines={1}>
+          <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+            <Text style={s.rainTitle} numberOfLines={2}>
               {title}
             </Text>
-            <Text style={s.rainSub} numberOfLines={1}>
+            <Text style={s.rainSub} numberOfLines={2}>
               {sub}
             </Text>
           </View>
@@ -496,6 +506,9 @@ export type BagOutcome = { got: BagGot | null; grabs: BagGrab[]; bagId?: number 
  */
 export function LuckyBagCard({ bag: first, now, outcome, onClose, onJoin }: { bag: Bag; now: number; outcome?: BagOutcome | null; onClose: () => void; onJoin: (b: Bag) => Promise<void> }) {
   const [busy, setBusy] = useState(false);
+  // The modal draws under the system bars: the card stays between them and its winners' list gives way.
+  const insets = useSafeAreaInsets();
+  const { width: screenW, height: screenH } = useWindowDimensions();
   // The draw's result: given by the room (it heard the draw), or read here for a bag drawn before it opened.
   const [fetched, setFetched] = useState<BagOutcome | null>(null);
   const res = outcome ?? (fetched && fetched.bagId === first.id ? fetched : null);
@@ -531,8 +544,8 @@ export function LuckyBagCard({ bag: first, now, outcome, onClose, onJoin }: { ba
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={[s.scrim, s.center]} onPress={onClose}>
-        <Pressable style={[s.card, got && s.cardWon]} onPress={() => {}}>
+      <Pressable style={[s.scrim, s.center, { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12 }]} onPress={onClose}>
+        <Pressable style={[s.card, got && s.cardWon, { maxHeight: screenH - insets.top - insets.bottom - 24 }]} onPress={() => {}}>
           <Pressable onPress={onClose} hitSlop={10} style={s.cardClose} accessibilityLabel="Kapat">
             <Ionicons name="close" size={20} color="rgba(255,255,255,0.75)" />
           </Pressable>
@@ -593,7 +606,7 @@ export function LuckyBagCard({ bag: first, now, outcome, onClose, onJoin }: { ba
           {grabs && (
             <View style={s.list}>
               <Text style={s.listTitle}>{grabs.length ? `Kazananlar · ${grabs.length}` : 'Kimse katılmadı, çanta sahibine döndü'}</Text>
-              <ScrollView style={{ maxHeight: 220 }}>
+              <ScrollView style={{ maxHeight: 220, flexShrink: 1 }}>
                 {grabs.map((g) => (
                   <View key={g.user.id} style={s.grab}>
                     <Avatar uri={g.user.avatarUrl ?? undefined} name={g.user.name} size={28} />
@@ -601,9 +614,10 @@ export function LuckyBagCard({ bag: first, now, outcome, onClose, onJoin }: { ba
                       {g.user.name}
                     </Text>
                     {best === g && grabs.length > 1 && (
-                      <View style={s.luckiest}>
+                      <View style={s.luckiest} accessible accessibilityLabel="En şanslı">
                         <Ionicons name="trophy" size={11} color="#1B1300" />
-                        <Text style={s.luckiestText}>En şanslı</Text>
+                        {/* A narrow phone keeps the width for the winner's name. */}
+                        {screenW >= 360 && <Text style={s.luckiestText}>En şanslı</Text>}
                       </View>
                     )}
                     <Text style={s.grabValue}>{bag.kind === 'gift' ? `×${fmt(g.units)}` : fmt(g.coins)}</Text>
@@ -625,8 +639,11 @@ const s = StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
   title: { color: '#fff', fontSize: 17, fontWeight: '800' },
   sub: { color: colors.textDim, fontSize: 12, marginTop: 1 },
-  segment: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 999, padding: 3, marginBottom: 6 },
-  segItem: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: 999 },
+  choices: { flexGrow: 0, flexShrink: 1, marginHorizontal: -16 },
+  choicesIn: { paddingHorizontal: 16, paddingBottom: 6 },
+  segRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 6 },
+  segment: { flex: 1, minWidth: 0, flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 999, padding: 3 },
+  segItem: { flex: 1, alignItems: 'center', paddingVertical: 11, borderRadius: 999 },
   segOn: { backgroundColor: GOLD },
   segText: { color: colors.textDim, fontWeight: '700', fontSize: 14 },
   segTextOn: { color: '#1B1300' },
@@ -636,20 +653,25 @@ const s = StyleSheet.create({
   chipOn: { borderColor: GOLD, backgroundColor: 'rgba(246,189,96,0.14)' },
   chipText: { color: '#fff', fontWeight: '700', fontSize: 13 },
   chipTextOn: { color: GOLD },
-  gift: { width: 84, alignItems: 'center', paddingVertical: 8, paddingHorizontal: 4, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', backgroundColor: 'rgba(255,255,255,0.04)', gap: 3 },
-  giftName: { color: '#fff', fontSize: 11, fontWeight: '600', maxWidth: 76 },
+  giftRow: { marginHorizontal: -16 },
+  giftRowIn: { gap: 8, paddingHorizontal: 16 },
+  gift: { width: 88, alignItems: 'center', paddingVertical: 8, paddingHorizontal: 4, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', backgroundColor: 'rgba(255,255,255,0.04)', gap: 3 },
+  // Two lines kept for every name, so the prices line up across the row.
+  giftName: { color: '#fff', fontSize: 12, fontWeight: '600', textAlign: 'center', minHeight: 36 },
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   giftPrice: { color: GOLD, fontSize: 11, fontWeight: '700' },
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.05)' },
   switchText: { flex: 1, color: '#fff', fontSize: 13, fontWeight: '600' },
   note: { color: colors.textDim, fontSize: 11, marginTop: 10, lineHeight: 16 },
-  total: { flexDirection: 'row', alignItems: 'center', marginTop: 12, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.14)' },
+  total: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8, paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.14)' },
   totalLabel: { color: colors.textDim, fontSize: 11, fontWeight: '600', marginBottom: 2 },
-  totalValue: { color: GOLD, fontSize: 22, fontWeight: '900' },
-  wallet: { alignItems: 'flex-end' },
+  totalValue: { color: GOLD, fontSize: 22, fontWeight: '900', flexShrink: 1 },
+  // Wide enough for a nine-digit balance at the largest text size; the segment beside it gives way.
+  wallet: { alignItems: 'flex-end', maxWidth: 136 },
   walletText: { color: colors.textDim, fontSize: 11 },
   walletLink: { color: colors.primaryText, fontSize: 13, fontWeight: '800', marginTop: 2 },
   send: { marginTop: 12, height: 50, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: GOLD, boxShadow: '0 6px 18px rgba(246,189,96,0.35)' },
+  sendBeside: { marginTop: 0, width: 136, paddingHorizontal: 8 },
   sendText: { color: '#1B1300', fontSize: 16, fontWeight: '900', letterSpacing: 0.3 },
   // Over the Rüzgâr Gülü (live-room places it): a pager of the room's bags.
   float: { position: 'absolute', right: 6, width: FLOAT_W + 4, paddingVertical: 6, borderRadius: 20, alignItems: 'center', backgroundColor: 'rgba(26,14,4,0.86)', borderWidth: 1.5, borderColor: 'rgba(246,189,96,0.6)', boxShadow: '0 6px 18px rgba(0,0,0,0.45)', zIndex: 31 },
@@ -668,7 +690,7 @@ const s = StyleSheet.create({
   burst: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
   burstRing: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, borderWidth: 3, borderColor: GOLD, boxShadow: '0 0 14px rgba(246,189,96,0.7)' },
   rainCard: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
-  rainInner: { width: '88%', maxWidth: 380, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 22, backgroundColor: '#1A1208', borderWidth: 1.5, borderColor: GOLD, boxShadow: '0 12px 32px rgba(0,0,0,0.5), 0 0 22px rgba(246,189,96,0.35)' },
+  rainInner: { width: '92%', maxWidth: 380, flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 22, backgroundColor: '#1A1208', borderWidth: 1.5, borderColor: GOLD, boxShadow: '0 12px 32px rgba(0,0,0,0.5), 0 0 22px rgba(246,189,96,0.35)' },
   rainTitle: { color: '#fff', fontSize: 15, fontWeight: '800' },
   rainSub: { color: GOLD, fontSize: 13, fontWeight: '700' },
   rainGo: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, backgroundColor: GOLD },
@@ -689,7 +711,7 @@ const s = StyleSheet.create({
   waitLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: '600' },
   waitValue: { color: GOLD, fontSize: 30, fontWeight: '900', fontVariant: ['tabular-nums'] },
   openBtn: { marginTop: 0 },
-  list: { marginTop: 14, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.14)' },
+  list: { flexShrink: 1, marginTop: 14, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.14)' },
   listTitle: { color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: '700', marginBottom: 8 },
   grab: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 },
   grabName: { flex: 1, color: '#fff', fontSize: 13, fontWeight: '600' },

@@ -7,7 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Animated, Easing, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon3D } from '@/components/Icon3D';
 import { Photo } from '@/components/photo';
@@ -44,6 +44,7 @@ type Props = {
 };
 
 export function MatchLobby({ avatar, waiting, status, still, gate, rights, busy, error, onAccept, onStart, onCancel }: Props) {
+  const insets = useSafeAreaInsets();
   return (
     <View style={s.screen}>
       <StatusBar style="dark" />
@@ -51,7 +52,7 @@ export function MatchLobby({ avatar, waiting, status, still, gate, rights, busy,
       <View style={[s.blob, { top: -90, right: -110, width: 280, height: 280 }]} />
       <View style={[s.blob, { top: 300, left: -150, width: 260, height: 260 }]} />
       <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
-        <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[s.scroll, { paddingBottom: insets.bottom + 24 }]} showsVerticalScrollIndicator={false}>
           <View style={s.head}>
             <Pressable style={s.back} onPress={() => goBack()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Geri">
               <Ionicons name="chevron-back" size={24} color={INK.deep} />
@@ -324,7 +325,7 @@ function AdultGate({ onAccept }: { onAccept: () => void }) {
 const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#FFEAF4', overflow: 'hidden' },
   blob: { position: 'absolute', borderRadius: 200, backgroundColor: 'rgba(255,255,255,0.4)' },
-  scroll: { paddingHorizontal: 16, paddingBottom: 40, gap: 14, width: '100%', maxWidth: 520, alignSelf: 'center' },
+  scroll: { paddingHorizontal: 16, gap: 14, width: '100%', maxWidth: 520, alignSelf: 'center' },
   head: { alignItems: 'center', paddingTop: 4 },
   back: { position: 'absolute', left: 0, top: 10, width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.6)', boxShadow: '0 3px 10px rgba(184,31,102,0.14)' },
   mark: { width: 62, height: 44 },
@@ -354,7 +355,7 @@ const s = StyleSheet.create({
   arc: { position: 'absolute', borderWidth: 2.5, borderTopColor: 'transparent', borderBottomColor: 'transparent', borderLeftColor: '#FFA6DC', borderRightColor: '#FFA6DC' },
   camera: { width: 54, height: 40, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   modeTitle: { color: '#fff', fontSize: 23, fontWeight: '900' },
-  pill: { maxWidth: '100%', paddingHorizontal: 14, paddingVertical: 4, borderRadius: 999, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.8)' },
+  pill: { maxWidth: '100%', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.8)' },
   pillText: { color: '#fff', fontSize: 13, fontWeight: '700' },
   cancel: { backgroundColor: 'rgba(255,250,252,0.9)', borderRadius: 999, paddingVertical: 15, alignItems: 'center', borderWidth: 1.5, borderColor: 'rgba(184,31,102,0.35)' },
   cancelText: { color: INK.deep, fontWeight: '800', fontSize: 15 },

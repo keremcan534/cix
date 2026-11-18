@@ -104,7 +104,8 @@ modunda olması, hata takibi olmaması ve kırık kodun birleşmeden önce yakal
    denetlenmiyor (yazı filtreleniyor). 18+ sosyal uygulamada çıplaklık ya da şiddet içeren tek bir görsel mağazadan
    kaldırılmaya yol açabilir. Google Vision SafeSearch, AWS Rekognition ya da Sightengine eklenmeli.
 3. **Push bildirimleri (siz: Firebase dosyaları):** Uygulama kapalıyken arama çalmıyor, mesaj bildirimi gitmiyor.
-   Kullanıcıyı geri getirmenin ana yolu bu.
+   Kullanıcıyı geri getirmenin ana yolu bu. Kod tarafındaki engel 19 Kasım 2026'da kalktı: Firebase'in reddettiği `from`
+   alanı artık `sender` olarak gidiyor. Kalan iş `GOOGLE_SERVICES_JSON` ve `FCM_SERVICE_ACCOUNT` dosyaları ile yeni APK.
 4. **Uzaktan güncelleme yok (siz: Expo hesabı):** Her düzeltme yeni APK demek. EAS Update kodu hazır.
 5. **Telefonda denenmemiş özellikler:** [`DURUM_LISTESI.md`](DURUM_LISTESI.md)'de "Telefonda denenmeli" yazan 11
    madde var (gerçek ses, gürültü engelleme, mikrofon eşzamanı…). Yayından önce gerçek telefonlarla bir deneme turu

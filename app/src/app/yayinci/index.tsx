@@ -130,16 +130,18 @@ function Dashboard() {
       <ScrollView contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: 40 }}>
         <LinearGradient colors={['#0EA5E9', '#D02E78']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.balance}>
           <Text style={styles.balanceLabel}>Elmas bakiyesi</Text>
-          <Text style={styles.balanceN}>💎 {diamonds.toLocaleString('tr-TR')}</Text>
+          <Text style={styles.balanceN} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+            💎 {diamonds.toLocaleString('tr-TR')}
+          </Text>
           <Text style={styles.balanceLabel}>≈ {usd(diamonds)}</Text>
           <View style={styles.balanceSplit}>
             <View style={styles.balancePart}>
               <Ionicons name="lock-open" size={13} color="#fff" />
-              <Text style={styles.balancePartText} numberOfLines={1}>{cashOut ? 'Çekilebilir' : 'Kullanılabilir'} {free.toLocaleString('tr-TR')}</Text>
+              <Text style={styles.balancePartText}>{cashOut ? 'Çekilebilir' : 'Kullanılabilir'} {free.toLocaleString('tr-TR')}</Text>
             </View>
             <View style={styles.balancePart}>
               <Ionicons name="lock-closed" size={13} color="#fff" />
-              <Text style={styles.balancePartText} numberOfLines={1}>Kilitli {locked.toLocaleString('tr-TR')}</Text>
+              <Text style={styles.balancePartText}>Kilitli {locked.toLocaleString('tr-TR')}</Text>
             </View>
           </View>
           {cashOut && (
@@ -151,7 +153,9 @@ function Dashboard() {
               {/* Live: /coins-bank is the server's Jeton Noktası, where the diamonds are sold to a bank. */}
               <Pressable style={styles.balanceBtn} onPress={exchange}>
                 <Ionicons name="flash-outline" size={18} color="#fff" />
-                <Text style={styles.balanceBtnText}>Anında bozdur</Text>
+                <Text style={styles.balanceBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                  Anında bozdur
+                </Text>
               </Pressable>
             </View>
           )}
@@ -178,10 +182,10 @@ function Dashboard() {
 
         <Card style={{ gap: 10 }}>
           <View style={styles.rowBetween}>
-            <Text style={styles.cardTitle}>
+            <Text style={[styles.cardTitle, { flex: 1, marginRight: 8 }]}>
               Yayıncı seviyesi: Lv.{current.level} {current.name}
             </Text>
-            <Text style={styles.dim}>{totalDiamonds.toLocaleString('tr-TR')} 💎</Text>
+            <Text style={[styles.dim, { flexShrink: 0 }]}>{totalDiamonds.toLocaleString('tr-TR')} 💎</Text>
           </View>
           <View style={styles.track}>
             <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.fill, { width: `${progress * 100}%` }]} />
@@ -199,9 +203,13 @@ function Dashboard() {
           <View style={styles.chart}>
             {weekly.map((v, i) => (
               <View key={i} style={styles.barCol}>
-                <Text style={styles.barValue}>{v >= 1000 ? `${(v / 1000).toLocaleString('tr-TR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}k` : v}</Text>
+                <Text style={styles.barValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                  {v >= 1000 ? `${(v / 1000).toLocaleString('tr-TR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}k` : v}
+                </Text>
                 <View style={[styles.bar, { height: Math.max(4, (v / max) * 110) }, i === 6 && { backgroundColor: semantic.action }]} />
-                <Text style={styles.barLabel}>{DAYS[i]}</Text>
+                <Text style={styles.barLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                  {DAYS[i]}
+                </Text>
               </View>
             ))}
           </View>
@@ -317,8 +325,8 @@ function Line({ label, value, bold, dim }: { label: string; value: string; bold?
   const styles = useStyles();
   return (
     <View style={styles.rowBetween}>
-      <Text style={[styles.dim, bold && { color: colors.text, fontWeight: '800' }]}>{label}</Text>
-      <Text style={{ color: dim ? colors.textDim : bold ? colors.green : colors.text, fontWeight: bold ? '800' : '600' }}>{value}</Text>
+      <Text style={[styles.dim, { flex: 1, marginRight: 8 }, bold && { color: colors.text, fontWeight: '800' }]}>{label}</Text>
+      <Text style={{ color: dim ? colors.textDim : bold ? colors.green : colors.text, fontWeight: bold ? '800' : '600', flexShrink: 0, textAlign: 'right' }}>{value}</Text>
     </View>
   );
 }
@@ -329,7 +337,9 @@ function Stat({ label, value }: { label: string; value: string }) {
   return (
     <Card style={{ flex: 1, gap: 4 }}>
       <Text style={styles.dim}>{label}</Text>
-      <Text style={{ color: colors.text, fontSize: 18, fontWeight: '800' }}>{value}</Text>
+      <Text style={{ color: colors.text, fontSize: 18, fontWeight: '800' }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+        {value}
+      </Text>
     </Card>
   );
 }
@@ -346,10 +356,10 @@ const useStyles = makeStyles(({ colors, lift }) => ({
   balance: { borderRadius: 20, padding: 20, gap: 2 },
   balanceLabel: { color: 'rgba(255,255,255,0.85)' },
   balanceN: { color: '#fff', fontSize: 34, fontWeight: '900' },
-  balanceBtn: { flex: 1, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 999, paddingVertical: 10 },
-  balanceBtnText: { color: '#fff', fontWeight: '700' },
-  balanceSplit: { flexDirection: 'row', gap: 8, marginTop: 10 },
-  balancePart: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(4,22,29,0.22)', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, flexShrink: 1 },
+  balanceBtn: { flex: 1, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 999, paddingVertical: 10, paddingHorizontal: 4 },
+  balanceBtnText: { color: '#fff', fontWeight: '700', flexShrink: 1 },
+  balanceSplit: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
+  balancePart: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(4,22,29,0.22)', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, maxWidth: '100%' },
   balancePartText: { color: '#fff', fontSize: 12, fontWeight: '700', flexShrink: 1 },
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   cardTitle: { color: colors.text, fontWeight: '700', fontSize: 15 },

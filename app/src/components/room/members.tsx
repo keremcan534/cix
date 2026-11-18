@@ -301,7 +301,7 @@ function MemberListSheet(p: RoomMembersProps & { visible: boolean; onClose: () =
         <Text style={styles.dim}>
           Üye kontenjanı {p.memberJoined.toLocaleString('tr-TR')} / {p.cap.toLocaleString('tr-TR')} · oda sahibi ve yöneticiler kontenjana sayılmaz.
         </Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, flexShrink: 0 }} contentContainerStyle={styles.chips} accessibilityRole="tablist">
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, flexShrink: 0, marginHorizontal: -16 }} contentContainerStyle={styles.chips} accessibilityRole="tablist">
           {filters.map((f) => {
             const on = f.key === filter;
             const n = counts?.[f.key];
@@ -453,7 +453,8 @@ const styles = StyleSheet.create({
   followBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 999, borderWidth: 1, borderColor: 'rgba(255,255,255,0.28)', paddingHorizontal: 12, paddingVertical: 7 },
   followBtnOn: { borderColor: 'rgba(255,101,118,0.55)', backgroundColor: 'rgba(255,101,118,0.12)' },
   followText: { color: '#fff', fontWeight: '700', fontSize: 13 },
-  chips: { gap: 8, paddingVertical: 2 },
+  // Edge to edge in the sheet: the next filter shows cut at the screen's side, so the row reads as scrollable.
+  chips: { gap: 8, paddingVertical: 2, paddingHorizontal: 16 },
   chip: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: 'rgba(255,255,255,0.08)' },
   chipOn: { backgroundColor: semantic.action },
   chipText: { color: '#fff', fontWeight: '700', fontSize: 13 },

@@ -62,7 +62,7 @@ export function EventCover({ e, height, radius = 18 }: { e: Pick<EventItem, 'cov
           </>
         )}
       </LinearGradient>
-      {art && !e.coverUrl && <Image source={art} style={styles.fill} resizeMode="cover" />}
+      {art && !e.coverUrl && <Image source={art} style={[styles.fill, { width: '100%', height: '100%' }]} resizeMode="cover" />}
       {e.coverUrl && <FadeImage source={{ uri: e.coverUrl }} style={styles.fill} resizeMode="cover" />}
     </View>
   );
@@ -137,6 +137,6 @@ const useStyles = makeStyles(({ colors }) => ({
   host: { color: colors.textDim, fontSize: 13, flex: 1 },
   metaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   meta: { flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1 },
-  metaText: { color: colors.textDim, fontSize: 12.5, fontWeight: '600' },
+  metaText: { color: colors.textDim, fontSize: 12.5, fontWeight: '600', flexShrink: 1 },
   mine: { flexDirection: 'row', alignItems: 'center', gap: 5 },
 }));

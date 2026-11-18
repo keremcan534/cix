@@ -77,7 +77,7 @@ export default function StoreScreen() {
           {[...COSMETIC_KINDS.filter((k) => k.kind !== 'ride'), { kind: 'emoji' as const, label: 'Çıkartma paketleri', emoji: '' }].map((k) => {
             const art = k.kind === 'emoji' ? EMOJI_PACKS_ICON : STORE_TAB_ART[k.kind];
             return (
-              <Pressable key={k.kind} onPress={() => setTab(k.kind)} style={[styles.tab, styles.tabRow, tab === k.kind && styles.tabActive]}>
+              <Pressable key={k.kind} onPress={() => setTab(k.kind)} hitSlop={{ top: 4, bottom: 4 }} style={[styles.tab, styles.tabRow, tab === k.kind && styles.tabActive]}>
                 {art ? <Image source={art} style={{ width: 18, height: 18 }} /> : <Text style={styles.tabText}>{k.emoji}</Text>}
                 <Text style={[styles.tabText, tab === k.kind && { color: t.semantic.actionInk }]}>{k.label}</Text>
               </Pressable>
@@ -108,22 +108,26 @@ export default function StoreScreen() {
                   <Text style={styles.meta}>
                     {p.stickers.length} çıkartma · {p.animated ? 'animasyonlu · kalıcı' : p.price || p.minVip ? 'kalıcı' : 'ücretsiz'}
                   </Text>
-                  {owned ? (
-                    <Text style={styles.owned}>✓ Açık</Text>
-                  ) : p.minVip && !p.price ? (
-                    <View>
-                      <GlossButton label={`VIP ${p.minVip}`} tone="locked" small icon={<Ionicons name="lock-closed" size={12} color={t.dark ? '#C7D2E5' : t.colors.textDim} />} />
-                    </View>
-                  ) : (
-                    <PressableScale
-                      onPress={() => {
-                        const err = buyEmojiPack(p.id);
-                        if (err) showAlert('Satın alınamadı', err);
-                      }}
-                    >
-                      <GlossButton label={String(p.price)} small icon={<Icon3D name="coin" size={16} />} />
-                    </PressableScale>
-                  )}
+                  {/* Pinned to the card bottom, as on the other tabs. */}
+                  <View style={styles.cta}>
+                    {owned ? (
+                      <Text style={styles.owned}>✓ Açık</Text>
+                    ) : p.minVip && !p.price ? (
+                      <View>
+                        <GlossButton label={`VIP ${p.minVip}`} tone="locked" small icon={<Ionicons name="lock-closed" size={12} color={t.dark ? '#C7D2E5' : t.colors.textDim} />} />
+                      </View>
+                    ) : (
+                      <PressableScale
+                        hitSlop={7}
+                        onPress={() => {
+                          const err = buyEmojiPack(p.id);
+                          if (err) showAlert('Satın alınamadı', err);
+                        }}
+                      >
+                        <GlossButton label={String(p.price)} small icon={<Icon3D name="coin" size={16} />} />
+                      </PressableScale>
+                    )}
+                  </View>
                 </Shelf>
               );
             })
@@ -132,7 +136,10 @@ export default function StoreScreen() {
               const isEquipped = equipped[c.kind] === c.id;
               return (
                 <Shelf key={c.id} hue={c.color?.[0] ?? hueAt(i)} on={isEquipped}>
-                  <ItemPreview item={c} avatar={me.avatar} voice={voiceOf(me.gender, me.showGender !== false)} still={settings.reduceMotion} />
+                  {/* One height for every kind of preview, so names and durations line up across a row. */}
+                  <View style={styles.previewSlot}>
+                    <ItemPreview item={c} avatar={me.avatar} voice={voiceOf(me.gender, me.showGender !== false)} still={settings.reduceMotion} />
+                  </View>
                   {(c.kind === 'entry' || c.kind === 'ride') && (
                     <Pressable onPress={() => playPreview(c)} style={styles.previewBtn} accessibilityRole="button" accessibilityLabel={`${c.name} önizle`}>
                       <Ionicons name="play" size={12} color={t.colors.primaryText} />
@@ -148,15 +155,15 @@ export default function StoreScreen() {
                   {/* Pinned to the card bottom so prices line up when a name wraps to two lines. */}
                   <View style={styles.cta}>
                     {owned ? (
-                      <PressableScale onPress={() => equip(isEquipped ? null : c.id, c.kind)}>
+                      <PressableScale hitSlop={7} onPress={() => equip(isEquipped ? null : c.id, c.kind)}>
                         <GlossButton label={isEquipped ? 'Çıkar' : 'Kullan'} tone={isEquipped ? 'locked' : 'action'} small />
                       </PressableScale>
                     ) : c.minVip && vipLevel < c.minVip ? (
-                      <PressableScale onPress={() => router.push('/vip')}>
+                      <PressableScale hitSlop={7} onPress={() => router.push('/vip')}>
                         <GlossButton label={`VIP ${c.minVip}`} tone="locked" small icon={<Ionicons name="lock-closed" size={12} color={t.dark ? '#C7D2E5' : t.colors.textDim} />} />
                       </PressableScale>
                     ) : (
-                      <PressableScale onPress={() => buy(c)}>
+                      <PressableScale hitSlop={7} onPress={() => buy(c)}>
                         <GlossButton label={c.price.toLocaleString('tr-TR')} small icon={<Icon3D name="coin" size={16} />} />
                       </PressableScale>
                     )}
@@ -180,10 +187,11 @@ export default function StoreScreen() {
 }
 
 const useStyles = makeStyles((t) => ({
+  previewSlot: { height: 104, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center' },
   previewBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, height: 30, borderRadius: 999, backgroundColor: t.dark ? 'rgba(255,95,162,0.18)' : 'rgba(208,46,120,0.11)' },
   previewText: { color: t.colors.primaryText, fontWeight: '700', fontSize: 12 },
   tabTrack: { marginHorizontal: 16, marginBottom: 12, borderRadius: 999, overflow: 'hidden', ...glassChipOf(t) },
-  tab: { paddingHorizontal: 13, paddingVertical: 6, borderRadius: 999 },
+  tab: { paddingHorizontal: 13, paddingVertical: 9, borderRadius: 999 },
   tabActive: { backgroundColor: t.semantic.action, boxShadow: '0 3px 12px rgba(255,95,162,0.4)' },
   tabText: { color: t.colors.textDim, fontFamily: fonts.displayBold, fontSize: 13, lineHeight: 18 },
   tabRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
@@ -193,7 +201,7 @@ const useStyles = makeStyles((t) => ({
   packPreview: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, height: 64 },
   freeNote: { width: '100%', color: t.colors.textDim, fontSize: 12, textAlign: 'center' },
   name: { color: t.colors.text, fontFamily: fonts.display, fontSize: 16, lineHeight: 21, textAlign: 'center' },
-  meta: { color: t.colors.textDim, fontSize: 12 },
+  meta: { color: t.colors.textDim, fontSize: 12, textAlign: 'center' },
   owned: { color: t.colors.green, fontWeight: '700', paddingVertical: 7 },
   footer: { color: t.colors.textDim, fontSize: 12, textAlign: 'center', paddingBottom: 12 },
 }));

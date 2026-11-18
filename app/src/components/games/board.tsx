@@ -16,12 +16,12 @@ import { BetStack, TrayChip, chipLook } from '@/components/games/fx/chips';
 import { firstCoinAt, useFlights } from '@/components/games/fx/flights';
 import { GameInfoSheet } from '@/components/games/fx/info-sheet';
 import { ResultTrail, pushTrail, type TrailItem } from '@/components/games/fx/result-trail';
-import { ContactShadow, SALON, SalonStage, SideButton, StageHeader, StageStatus, WideAction, salonScreen, symbolShadow, tabular, useBox, wideInk, type StatusTone } from '@/components/games/fx/salon';
+import { ContactShadow, SALON, SalonStage, SideButton, StageHeader, StageStatus, WideAction, salonScreen, salonScreenShort, symbolShadow, tabular, useBox, wideInk, type StatusTone } from '@/components/games/fx/salon';
 import { OPTION_ART, SalonArt, salonArt } from '@/components/games/fx/salon-art';
 import { chipOf, isHotResult, litRange, optionShare, percentText, planLight, resultShare, shortCoins } from '@/components/games/fx/spin-plan';
 import { RimBulbs, SpinBlur, WheelPointer, useWheelSpin, type WheelSpin } from '@/components/games/fx/wheel-stage';
 import { useWinFx } from '@/components/games/fx/win-fx';
-import { BalancePill, fmt, sleep } from '@/components/games/slot-kit';
+import { BalancePill, fmt, sleep, useShortGame } from '@/components/games/slot-kit';
 import { Text } from '@/components/text';
 import { BOARDS, LUCKY_WHEEL, type Board, type BoardOption, type BoardResult } from '@/lib/board-games';
 import type { BoardId } from '@/lib/casino-odds';
@@ -107,6 +107,8 @@ export function BoardPlayer({ id, entry }: { id: BoardId; entry: Entry }) {
   const game = casino.find((g) => g.id === id)!;
   // The middle of the stage (the wheel, the ring, the cards) takes the height the phone leaves it.
   const mid = useBox();
+  // A short phone: the stage gives way (smaller floors, the last results under the controls) so the play button shows.
+  const short = useShortGame(entry);
   const [shine, setShine] = useState(0);
   const [chip, setChip] = useState(game.bets[0]);
   const [bets, setBets] = useState<Record<string, number>>({});
@@ -385,9 +387,10 @@ export function BoardPlayer({ id, entry }: { id: BoardId; entry: Entry }) {
   let middleOfStage: React.JSX.Element | null = null;
   if (!midH) middleOfStage = null;
   else if (id === 'slot') {
-    // The three option cards under the wheel are this tall.
-    const cardsH = Math.round(Math.max(66, Math.min(92, midH * 0.2)));
-    const size = Math.round(Math.max(170, Math.min(midW - 30, midH - cardsH - 30, 360)));
+    // The three option cards under the wheel are this tall (never under c.card's minHeight: they would spill out of
+    // their row). Under 160 the wheel's fruit labels run into each other.
+    const cardsH = Math.round(Math.max(short ? 62 : 66, Math.min(92, midH * 0.2)));
+    const size = Math.round(Math.max(short ? 160 : 170, Math.min(midW - 30, midH - cardsH - 30, 360)));
     middleOfStage = (
       <>
         <FruitWheel size={size} spin={spin} halo={look.halo} slice={running ? null : slice} result={running ? null : (shown?.result ?? null)} />
@@ -395,7 +398,7 @@ export function BoardPlayer({ id, entry }: { id: BoardId; entry: Entry }) {
       </>
     );
   } else if (id === 'foodwheel') {
-    const box = Math.round(Math.max(236, Math.min(midW, midH - 8, 420)));
+    const box = Math.round(Math.max(short ? 204 : 236, Math.min(midW, midH - 8, 420)));
     const cell = Math.round(box * 0.25);
     const radius = (box - cell) / 2 - 2;
     const result = running ? null : (shown?.result ?? null);
@@ -417,8 +420,8 @@ export function BoardPlayer({ id, entry }: { id: BoardId; entry: Entry }) {
     );
   } else {
     const cardW = (midW - 18) / 4;
-    const deckH = Math.round(Math.max(84, Math.min(130, midH * 0.26)));
-    const cardH = Math.round(Math.max(74, Math.min(cardW * 1.5, (midH - deckH - 8 - 12 - 8) / 2)));
+    const deckH = Math.round(Math.max(short ? 64 : 84, Math.min(130, midH * 0.26)));
+    const cardH = Math.round(Math.max(short ? 68 : 74, Math.min(cardW * 1.5, (midH - deckH - 8 - 12 - 8) / 2)));
     const result = shown?.result ?? null;
     middleOfStage = (
       <View style={{ alignSelf: 'stretch', gap: 8 }}>
@@ -428,17 +431,21 @@ export function BoardPlayer({ id, entry }: { id: BoardId; entry: Entry }) {
     );
   }
 
+  const trailRow = (
+    <View style={{ alignSelf: 'stretch' }}>
+      <ResultTrail items={trail} />
+    </View>
+  );
+
   return (
-    <View ref={root} collapsable={false} style={salonScreen} onLayout={(e) => setWidth(Math.round(e.nativeEvent.layout.width))}>
-      <SalonStage colors={look.colors} accent={look.frame} win={shine} minHeight={id === 'magiccard' ? 340 : 360} inner={{ alignItems: 'center' }}>
+    <View ref={root} collapsable={false} style={short ? salonScreenShort : salonScreen} onLayout={(e) => setWidth(Math.round(e.nativeEvent.layout.width))}>
+      <SalonStage colors={look.colors} accent={look.frame} win={shine} minHeight={short ? undefined : id === 'magiccard' ? 340 : 360} inner={{ alignItems: 'center' }}>
         <StageHeader title={look.title} kicker={look.kicker} onInfo={() => setInfo(true)} style={{ alignSelf: 'stretch' }} />
         <View style={s.middle} onLayout={mid.onLayout}>
           {middleOfStage}
         </View>
         <StageStatus text={status.text} tone={status.tone} amount={status.amount} label={status.label} />
-        <View style={{ alignSelf: 'stretch' }}>
-          <ResultTrail items={trail} />
-        </View>
+        {!short && trailRow}
         {win.layer}
       </SalonStage>
 
@@ -484,6 +491,7 @@ export function BoardPlayer({ id, entry }: { id: BoardId; entry: Entry }) {
           <Text style={[s.playText, s.playIdle, wideInk(true)]}>Önce fişini koy</Text>
         )}
       </WideAction>
+      {short && trailRow}
       {fly.layer}
 
       <GameInfoSheet visible={info} onClose={() => setInfo(false)} title={game.name} rules={game.rules}>
@@ -860,7 +868,7 @@ const p = StyleSheet.create({
   plateWin: { borderColor: '#FFE08A', boxShadow: '0 0 22px rgba(255,224,138,0.85)' },
   well: { position: 'absolute', boxShadow: 'inset 0 3px 8px rgba(70,85,110,0.45)' },
   name: { color: '#2A1A0A', fontWeight: '900', marginTop: -2 },
-  wait: { color: '#6B7690', fontSize: 10, fontWeight: '800', marginTop: 2 },
+  wait: { color: '#6B7690', fontSize: 10, lineHeight: 13, fontWeight: '800', marginTop: 2, textAlign: 'center' },
 });
 
 const d = StyleSheet.create({

@@ -60,7 +60,8 @@ describe('Firebase bildirimleri', () => {
     const m = sent.find((x) => x.message.token === live);
     assert.equal(m.url, '/v1/projects/similar-test/messages:send');
     assert.equal(m.auth, 'Bearer ya29.test');
-    assert.deepEqual([m.message.notification.title, m.message.data.type, m.message.data.from, m.message.android.notification.channel_id], ['Yeni takipçi', 'follow', b.user.id, 'default']);
+    assert.deepEqual([m.message.notification.title, m.message.data.type, m.message.data.sender, m.message.android.notification.channel_id], ['Yeni takipçi', 'follow', b.user.id, 'default']);
+    assert.equal(m.message.data.from, undefined, 'Firebase "from" anahtarını kabul etmez');
 
     // The access token came from a JWT signed with the service account's key.
     const jwt = grants[0].get('assertion').split('.');

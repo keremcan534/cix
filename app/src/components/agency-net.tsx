@@ -7,6 +7,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { createContext, useContext, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 
 import { ContactNote } from '@/components/contact-note';
@@ -91,7 +92,7 @@ export function Kpi({ label, value, sub, icon, tone = 'action' }: { label: strin
             <Ionicons name={icon} size={14} color={c} />
           </View>
         )}
-        <Text style={s.kpiLabel} numberOfLines={1}>
+        <Text style={s.kpiLabel} numberOfLines={2}>
           {label}
         </Text>
       </View>
@@ -99,7 +100,7 @@ export function Kpi({ label, value, sub, icon, tone = 'action' }: { label: strin
         {value}
       </Text>
       {!!sub && (
-        <Text style={s.kpiSub} numberOfLines={1}>
+        <Text style={s.kpiSub} numberOfLines={2}>
           {sub}
         </Text>
       )}
@@ -325,6 +326,7 @@ type AskResult = { reason: string; field: string };
 
 /** A sheet that collects a written reason (and one extra field when needed); returns null when cancelled. */
 export function useAsk(): [ReactNode, (a: Ask) => Promise<AskResult | null>] {
+  const insets = useSafeAreaInsets();
   const [ask, setAsk] = useState<(Ask & { resolve: (v: AskResult | null) => void }) | null>(null);
   const [reason, setReason] = useState('');
   const [field, setField] = useState('');
@@ -355,25 +357,28 @@ export function useAsk(): [ReactNode, (a: Ask) => Promise<AskResult | null>] {
     <Modal visible={!!ask} transparent animationType="fade" onRequestClose={() => close(null)}>
       <KeyboardAvoid style={s.sheetWrap}>
         <Pressable style={StyleSheet.absoluteFill} onPress={() => close(null)} accessibilityLabel="Kapat" />
-        <DepthCard style={s.sheet}>
-          <Text style={s.sheetTitle}>{ask?.title}</Text>
-          {!!ask?.message && <Text style={s.sheetMsg}>{ask.message}</Text>}
-          {ask?.field && (
+        {/* Above the navigation buttons; the body scrolls when the keyboard leaves too little room. */}
+        <DepthCard style={[s.sheet, { marginTop: space.md + insets.top, marginBottom: space.md + insets.bottom }]}>
+          <ScrollView style={{ flexGrow: 0 }} keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: space.lg }}>
+            <Text style={s.sheetTitle}>{ask?.title}</Text>
+            {!!ask?.message && <Text style={s.sheetMsg}>{ask.message}</Text>}
+            {ask?.field && (
+              <View style={{ gap: 6 }}>
+                <Text style={s.fieldLabel}>{ask.field.label}</Text>
+                <TextInput value={field} onChangeText={setField} placeholder={ask.field.placeholder} placeholderTextColor={colors.textDim} keyboardType={ask.field.keyboard ?? 'default'} autoCapitalize={ask.field.caps === false ? 'none' : 'characters'} style={s.input} />
+              </View>
+            )}
             <View style={{ gap: 6 }}>
-              <Text style={s.fieldLabel}>{ask.field.label}</Text>
-              <TextInput value={field} onChangeText={setField} placeholder={ask.field.placeholder} placeholderTextColor={colors.textDim} keyboardType={ask.field.keyboard ?? 'default'} autoCapitalize={ask.field.caps === false ? 'none' : 'characters'} style={s.input} />
+              <Text style={s.fieldLabel}>{ask?.reasonLabel ?? 'Gerekçe'}</Text>
+              <TextInput value={reason} onChangeText={editReason} placeholder={ask?.placeholder ?? 'Kısa bir açıklama yaz'} placeholderTextColor={colors.textDim} multiline maxLength={300} style={[s.input, { minHeight: 84, textAlignVertical: 'top' }]} />
+              <Text style={s.foot}>Kayda geçer ve denetim geçmişinde görünür.</Text>
+              <ContactNote text={refused} style={{ marginHorizontal: 0, marginBottom: 0 }} />
             </View>
-          )}
-          <View style={{ gap: 6 }}>
-            <Text style={s.fieldLabel}>{ask?.reasonLabel ?? 'Gerekçe'}</Text>
-            <TextInput value={reason} onChangeText={editReason} placeholder={ask?.placeholder ?? 'Kısa bir açıklama yaz'} placeholderTextColor={colors.textDim} multiline maxLength={300} style={[s.input, { minHeight: 84, textAlignVertical: 'top' }]} />
-            <Text style={s.foot}>Kayda geçer ve denetim geçmişinde görünür.</Text>
-            <ContactNote text={refused} style={{ marginHorizontal: 0, marginBottom: 0 }} />
-          </View>
-          <View style={{ flexDirection: 'row', gap: space.sm }}>
-            <Button title="Vazgeç" variant="ghost" onPress={() => close(null)} style={{ flex: 1 }} />
-            <Button title={ask?.confirm ?? 'Gönder'} variant={ask?.danger ? 'danger' : 'hero'} disabled={!ok} onPress={confirm} style={{ flex: 1 }} />
-          </View>
+            <View style={{ flexDirection: 'row', gap: space.sm }}>
+              <Button title="Vazgeç" variant="ghost" onPress={() => close(null)} style={{ flex: 1 }} />
+              <Button title={ask?.confirm ?? 'Gönder'} variant={ask?.danger ? 'danger' : 'hero'} disabled={!ok} onPress={confirm} style={{ flex: 1 }} />
+            </View>
+          </ScrollView>
         </DepthCard>
       </KeyboardAvoid>
     </Modal>
@@ -390,7 +395,7 @@ export const ns = StyleSheet.create({
 
 const s = StyleSheet.create({
   demo: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: space.md, paddingHorizontal: 12, paddingVertical: 9, borderRadius: radius.pill, backgroundColor: 'rgba(246,189,96,0.12)', borderWidth: 1, borderColor: 'rgba(246,189,96,0.32)', alignSelf: 'flex-start' },
-  demoText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  demoText: { color: '#fff', fontSize: 12, fontWeight: '700', flexShrink: 1 },
   demoRetry: { color: semantic.money, fontSize: 12, fontWeight: '700', marginLeft: 4 },
   center: { paddingVertical: 60, alignItems: 'center', justifyContent: 'center' },
   errTitle: { color: '#fff', fontSize: 17, fontFamily: fonts.displayBold },
@@ -400,9 +405,10 @@ const s = StyleSheet.create({
   panel: { padding: space.lg, gap: space.md },
   kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
   kpi: { flexGrow: 1, flexBasis: '46%', padding: 14, gap: 4 },
-  kpiHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  kpiHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
   kpiIcon: { width: 22, height: 22, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
-  kpiLabel: { color: colors.textDim, fontSize: 12, fontWeight: '600', flex: 1 },
+  // The first line stays centred on the 22dp icon when the label takes two lines.
+  kpiLabel: { color: colors.textDim, fontSize: 12, lineHeight: 16, marginTop: 3, fontWeight: '600', flex: 1 },
   kpiValue: { color: '#fff', fontSize: 21, fontFamily: fonts.display, letterSpacing: -0.3, fontVariant: ['tabular-nums'] },
   kpiSub: { color: colors.textDim, fontSize: 12, fontVariant: ['tabular-nums'] },
   splitTrack: { flexDirection: 'row', height: 14, borderRadius: 4, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.04)' },
@@ -438,9 +444,9 @@ const s = StyleSheet.create({
   empty: { alignItems: 'center', gap: 8, paddingVertical: 28 },
   line: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: space.md, paddingVertical: 2 },
   lineLabel: { color: colors.textDim, fontSize: 13, flexShrink: 1 },
-  lineValue: { color: colors.text, fontSize: 13.5, fontWeight: '600', fontVariant: ['tabular-nums'], textAlign: 'right' },
+  lineValue: { color: colors.text, fontSize: 13.5, fontWeight: '600', fontVariant: ['tabular-nums'], textAlign: 'right', flexShrink: 1 },
   sheetWrap: { flex: 1, justifyContent: 'flex-end', backgroundColor: SCRIM },
-  sheet: { margin: space.md, padding: space.xl, gap: space.lg, borderRadius: radius.xl, ...edge.card },
+  sheet: { margin: space.md, padding: space.xl, gap: space.lg, borderRadius: radius.xl, flexShrink: 1, maxHeight: '88%', ...edge.card },
   sheetTitle: { color: '#fff', fontSize: 19, fontFamily: fonts.display },
   sheetMsg: { color: colors.textDim, fontSize: 14, lineHeight: 20 },
   fieldLabel: { color: colors.textDim, fontSize: 12, fontWeight: '700' },

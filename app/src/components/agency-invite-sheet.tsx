@@ -5,6 +5,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DepthCard } from '@/components/fx/surface';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
@@ -18,6 +19,7 @@ const AGENCY_TEXT = { this: 'Zaten ajansında', other: 'Başka bir ajansa bağl�
 
 /** Mounted while open; `onSent` runs after the server took the invite. */
 export function InviteSheet({ agencyId, onClose, onSent }: { agencyId: string; onClose: () => void; onSent?: () => void }) {
+  const insets = useSafeAreaInsets();
   const [q, setQ] = useState('');
   const [found, setFound] = useState<{ q: string; users: Invitee[]; error: string | null } | null>(null);
   const [pick, setPick] = useState<Invitee | null>(null);
@@ -57,76 +59,79 @@ export function InviteSheet({ agencyId, onClose, onSent }: { agencyId: string; o
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <KeyboardAvoid style={s.wrap}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Kapat" />
-        <DepthCard style={s.sheet}>
-          <Text style={s.title}>Yayıncı davet et</Text>
-          <Text style={s.msg}>Yayıncının uygulamada görünen adını ya da kullanıcı adını yaz, listeden seç. Davet kabul edilince yayıncı ajansına bağlanır.</Text>
-          <View style={{ gap: 6 }}>
-            <Text style={s.label}>Ad veya kullanıcı adı</Text>
-            <TextInput
-              value={q}
-              onChangeText={(t) => {
-                setQ(t);
-                setPick(null);
-              }}
-              placeholder="Örn. Defne"
-              placeholderTextColor={colors.textDim}
-              autoCapitalize="none"
-              autoCorrect={false}
-              maxLength={40}
-              style={s.input}
-              accessibilityLabel="Ad veya kullanıcı adı"
-            />
-          </View>
+        {/* Above the navigation buttons; the whole body scrolls, so the search box stays reachable over the keyboard. */}
+        <DepthCard style={[s.sheet, { marginTop: space.md + insets.top, marginBottom: space.md + insets.bottom }]}>
+          <ScrollView style={{ flexGrow: 0 }} keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: space.lg }}>
+            <Text style={s.title}>Yayıncı davet et</Text>
+            <Text style={s.msg}>Yayıncının uygulamada görünen adını ya da kullanıcı adını yaz, listeden seç. Davet kabul edilince yayıncı ajansına bağlanır.</Text>
+            <View style={{ gap: 6 }}>
+              <Text style={s.label}>Ad veya kullanıcı adı</Text>
+              <TextInput
+                value={q}
+                onChangeText={(t) => {
+                  setQ(t);
+                  setPick(null);
+                }}
+                placeholder="Örn. Defne"
+                placeholderTextColor={colors.textDim}
+                autoCapitalize="none"
+                autoCorrect={false}
+                maxLength={40}
+                style={s.input}
+                accessibilityLabel="Ad veya kullanıcı adı"
+              />
+            </View>
 
-          <ScrollView style={{ maxHeight: 260 }} keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: space.xs }}>
-            {!long ? (
-              <Text style={s.hint}>Aramak için en az {MIN} harf yaz.</Text>
-            ) : searching ? (
-              <ActivityIndicator color={colors.textDim} style={{ paddingVertical: space.md }} />
-            ) : found?.error ? (
-              <Text style={[s.hint, { color: semantic.danger }]}>{found.error}</Text>
-            ) : users.length === 0 ? (
-              <Text style={s.hint}>Bu adla kimse bulunamadı. Adı profilinde göründüğü gibi yaz ya da kullanıcı adını dene.</Text>
-            ) : (
-              users.map((u) => {
-                const on = pick?.id === u.id;
-                const taken = u.agency ? AGENCY_TEXT[u.agency] : null;
-                return (
-                  <Pressable
-                    key={u.id}
-                    disabled={!!taken}
-                    onPress={() => setPick(on ? null : u)}
-                    style={[s.row, on && s.rowOn, taken && { opacity: 0.5 }]}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: on, disabled: !!taken }}
-                    accessibilityLabel={u.name}
-                  >
-                    <Avatar uri={u.avatarUrl ?? undefined} name={u.name} size={38} />
-                    <View style={{ flex: 1, minWidth: 0 }}>
-                      <Text style={s.name} numberOfLines={1}>
-                        {u.name}
-                      </Text>
-                      {(!!u.username || !!taken) && (
-                        <Text style={s.sub} numberOfLines={2}>
-                          {[u.username ? `@${u.username}` : null, taken].filter(Boolean).join(' · ')}
+            <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: space.xs }}>
+              {!long ? (
+                <Text style={s.hint}>Aramak için en az {MIN} harf yaz.</Text>
+              ) : searching ? (
+                <ActivityIndicator color={colors.textDim} style={{ paddingVertical: space.md }} />
+              ) : found?.error ? (
+                <Text style={[s.hint, { color: semantic.danger }]}>{found.error}</Text>
+              ) : users.length === 0 ? (
+                <Text style={s.hint}>Bu adla kimse bulunamadı. Adı profilinde göründüğü gibi yaz ya da kullanıcı adını dene.</Text>
+              ) : (
+                users.map((u) => {
+                  const on = pick?.id === u.id;
+                  const taken = u.agency ? AGENCY_TEXT[u.agency] : null;
+                  return (
+                    <Pressable
+                      key={u.id}
+                      disabled={!!taken}
+                      onPress={() => setPick(on ? null : u)}
+                      style={[s.row, on && s.rowOn, taken && { opacity: 0.5 }]}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: on, disabled: !!taken }}
+                      accessibilityLabel={u.name}
+                    >
+                      <Avatar uri={u.avatarUrl ?? undefined} name={u.name} size={38} />
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={s.name} numberOfLines={1}>
+                          {u.name}
                         </Text>
-                      )}
-                    </View>
-                    {on && <Ionicons name="checkmark-circle" size={22} color={semantic.actionText} />}
-                  </Pressable>
-                );
-              })
-            )}
-          </ScrollView>
+                        {(!!u.username || !!taken) && (
+                          <Text style={s.sub} numberOfLines={2}>
+                            {[u.username ? `@${u.username}` : null, taken].filter(Boolean).join(' · ')}
+                          </Text>
+                        )}
+                      </View>
+                      {on && <Ionicons name="checkmark-circle" size={22} color={semantic.actionText} />}
+                    </Pressable>
+                  );
+                })
+              )}
+            </ScrollView>
 
-          <View style={{ gap: 6 }}>
-            <Text style={s.label}>Davet notu (isteğe bağlı)</Text>
-            <TextInput value={note} onChangeText={setNote} placeholder="Kısa bir not yaz" placeholderTextColor={colors.textDim} multiline maxLength={300} style={[s.input, { minHeight: 64, textAlignVertical: 'top' }]} />
-          </View>
-          <View style={{ flexDirection: 'row', gap: space.sm }}>
-            <Button title="Vazgeç" variant="ghost" onPress={onClose} style={{ flex: 1 }} />
-            <Button title="Davet gönder" disabled={!pick || busy} onPress={send} style={{ flex: 1 }} />
-          </View>
+            <View style={{ gap: 6 }}>
+              <Text style={s.label}>Davet notu (isteğe bağlı)</Text>
+              <TextInput value={note} onChangeText={setNote} placeholder="Kısa bir not yaz" placeholderTextColor={colors.textDim} multiline maxLength={300} style={[s.input, { minHeight: 64, textAlignVertical: 'top' }]} />
+            </View>
+            <View style={{ flexDirection: 'row', gap: space.sm }}>
+              <Button title="Vazgeç" variant="ghost" onPress={onClose} style={{ flex: 1 }} />
+              <Button title="Davet gönder" disabled={!pick || busy} onPress={send} style={{ flex: 1 }} />
+            </View>
+          </ScrollView>
         </DepthCard>
       </KeyboardAvoid>
     </Modal>
@@ -135,7 +140,7 @@ export function InviteSheet({ agencyId, onClose, onSent }: { agencyId: string; o
 
 const s = StyleSheet.create({
   wrap: { flex: 1, justifyContent: 'flex-end', backgroundColor: SCRIM },
-  sheet: { margin: space.md, padding: space.xl, gap: space.lg, borderRadius: radius.xl, ...edge.card },
+  sheet: { margin: space.md, padding: space.xl, gap: space.lg, borderRadius: radius.xl, flexShrink: 1, maxHeight: '88%', ...edge.card },
   title: { color: '#fff', fontSize: 19, fontFamily: fonts.display },
   msg: { color: colors.textDim, fontSize: 14, lineHeight: 20 },
   label: { color: colors.textDim, fontSize: 12, fontWeight: '700' },

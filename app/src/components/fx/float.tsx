@@ -94,7 +94,7 @@ export function BreakoutCard({
   const s = useStyles();
   const lift = iconSize * (featured ? 0.3 : 0.42);
   return (
-    <PressableScale onPress={onPress} accessibilityLabel={label} accessibilityRole="button" style={[{ marginTop: lift }, dim && { opacity: 0.5 }, style]}>
+    <PressableScale fill onPress={onPress} accessibilityLabel={label} accessibilityRole="button" style={[{ marginTop: lift }, dim && { opacity: 0.5 }, style]}>
       <LinearGradient
         colors={[`${hue}59`, `${hue}14`, dark ? '#101C30' : '#FFFFFF']}
         locations={[0, 0.45, 1]}
@@ -137,7 +137,7 @@ const useStyles = makeStyles(({ dark }) => ({
   // The contact shadow is softer and navy on paper, where a black blot would look muddy.
   contact: { position: 'absolute', alignSelf: 'center', borderRadius: 999, backgroundColor: dark ? 'rgba(0,0,0,0.22)' : 'rgba(64,20,40,0.12)', boxShadow: dark ? '0 0 10px 5px rgba(0,0,0,0.28)' : '0 0 10px 5px rgba(64,20,40,0.10)' },
   emoji: { textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 3 }, textShadowRadius: 6 },
-  card: { borderRadius: 22, borderWidth: 1, padding: 14, gap: 6 },
+  card: { flexGrow: 1, borderRadius: 22, borderWidth: 1, padding: 14, gap: 6 },
   icon: { position: 'absolute', pointerEvents: 'none' },
   btn: { flexDirection: 'row', gap: 4, minHeight: GLOSS_HEIGHT, minWidth: luxeMinWidth(GLOSS_HEIGHT), paddingHorizontal: 20, paddingVertical: 5, alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-start' },
   btnSmall: { minHeight: GLOSS_SMALL, minWidth: luxeMinWidth(GLOSS_SMALL), paddingHorizontal: 14, paddingVertical: 3 },

@@ -4,6 +4,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
 import { layoutSummary, type ModeId, type RoomLayout } from '@/data/room-layouts';
@@ -31,7 +32,10 @@ export function LayoutPreview({ layout, width, pkRoom }: { layout: RoomLayout; w
   }, 0);
   const byHeight = (PREVIEW_H - 8 - screenH - (s.rows - 1) * 3) / units;
   const byWidth = (width - 8 - (side.length ? 14 : 0)) / (cols * 1.45);
-  const dot = Math.max(4, Math.min(11, Math.floor(Math.min(byHeight, byWidth))));
+  // A row of video tiles (each 2.6 dots wide, 3 px apart) has to fit the preview too.
+  const videoMax = Math.max(0, ...[...Array(s.rows).keys()].map((r) => stage.filter((x) => x.row === r && x.kind === 'video').length));
+  const byVideo = videoMax ? (width - 8 - (videoMax - 1) * 3) / (videoMax * 2.6) : 99;
+  const dot = Math.max(4, Math.min(11, Math.floor(Math.min(byHeight, byWidth, byVideo))));
   const paired = new Set(s.pairs.flat());
   const slot = (i: number) => {
     const x = s.slots[i];
@@ -96,6 +100,7 @@ export function LayoutPickerSheet({
   const [gridW, setGridW] = useState(0);
   // Over a room it stops at the Balkon line (lib/sheet-space): the cards scroll under the tabs.
   const maxHeight = useSheetMax(0.82);
+  const { bottom } = useSafeAreaInsets();
   // Reopening starts on the room's current mode and without an old message.
   const [wasVisible, setWasVisible] = useState(visible);
   if (visible !== wasVisible) {
@@ -146,7 +151,7 @@ export function LayoutPickerSheet({
             {note.text}
           </Text>
         )}
-        <ScrollView contentContainerStyle={{ paddingBottom: space.lg }} onLayout={(e) => setGridW(e.nativeEvent.layout.width)}>
+        <ScrollView contentContainerStyle={{ paddingBottom: Math.max(space.lg, bottom + space.md) }} onLayout={(e) => setGridW(e.nativeEvent.layout.width)}>
           <View style={st.grid}>
             {cardW > 0 &&
               layoutsOf(tab, { pkRoom, keep: layoutId }).map((l) => {

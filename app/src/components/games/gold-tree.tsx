@@ -15,7 +15,7 @@ import { Reel, type ReelHandle } from '@/components/games/fx/reel';
 import { ContactShadow, SALON, SalonStage, StageHeader, StageStatus, SymbolPlate, salonScreen, symbolShadow, useBox, type StatusTone } from '@/components/games/fx/salon';
 import { SKIN_GAP, SKIN_PAD, SKIN_RIM, SkinCabinet, SkinPlate, fitSkin, slotSkinOf, windowRadius } from '@/components/games/fx/slot-skin';
 import { useWinFx } from '@/components/games/fx/win-fx';
-import { SpinControls, fmt, sleep } from '@/components/games/slot-kit';
+import { SpinControls, fmt, sleep, useShortGame } from '@/components/games/slot-kit';
 import { playSfx, warmSfx } from '@/lib/game-sound';
 import { casinoAccess, useGames, type Entry } from '@/lib/games';
 import { playRound } from '@/lib/live/casino';
@@ -94,6 +94,7 @@ export function GoldTreePlayer({ entry }: { entry: Entry }) {
   const win = useWinFx();
   const skin = slotSkinOf('goldtree');
   const show = useJackpotShow(skin);
+  const short = useShortGame(entry);
   useEffect(() => {
     balance.current = coins + gameCoins;
   });
@@ -115,7 +116,8 @@ export function GoldTreePlayer({ entry }: { entry: Entry }) {
   // A skin's reels fill its cabinet's window instead (fx/slot-skin).
   const fit = skin && area.w && area.h ? fitSkin(skin, area.w, area.h, 3, 3) : null;
   const gap = skin ? SKIN_GAP : GAP;
-  const CELL = skin ? (fit ? Math.max(30, fit.cellH) : 70) : fitW && fitH ? Math.max(48, Math.min(Math.round(fitW * 1.1), fitH, 150)) : 70;
+  // A skin's stop never outgrows the cabinet's window: a taller one would push the bottom row behind the cabinet.
+  const CELL = skin ? (fit ? Math.max(10, fit.cellH) : 70) : fitW && fitH ? Math.max(48, Math.min(Math.round(fitW * 1.1), fitH, 150)) : 70;
   const cellW = skin ? (fit ? fit.reelW - 2 * SKIN_RIM : 0) : fitW ? Math.min(fitW, Math.round(CELL * 1.3)) : 0;
   const coin = fit ? fit.symSize : Math.round(CELL * 0.8);
   // The reels keep the same pace in symbols a second however tall a stop is.
@@ -252,6 +254,7 @@ export function GoldTreePlayer({ entry }: { entry: Entry }) {
       onSpin={play}
       look={{ ring: ['#FFF1C9', '#F6BD60', '#B7832E'], core: ['#C93C4F', '#5A1020'], ink: SALON.win }}
       art={skin?.spin.src}
+      short={short}
     />
   );
   const infoSheet = (
@@ -401,7 +404,7 @@ const t = StyleSheet.create({
   coinHole: { backgroundColor: '#FEF3C7', borderWidth: 2, borderColor: '#92400E' },
   blank: { height: 5, borderRadius: 3, backgroundColor: 'rgba(15,23,42,0.15)' },
   // In the skin's pictures: no stage of the shell's, the game panel's picture behind it (fx/slot-skin).
-  skinStage: { flex: 1, minHeight: 330 },
+  skinStage: { flex: 1, minHeight: 300 },
   skinHead: { paddingRight: 40, paddingTop: 2 },
   skinWindow: { position: 'absolute', flexDirection: 'row', gap: SKIN_GAP },
   skinReel: { borderRadius: 6, borderWidth: SKIN_RIM, borderColor: 'transparent' },

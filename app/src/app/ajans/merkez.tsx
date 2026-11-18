@@ -1130,7 +1130,7 @@ function TiersEditor({ tiers, onSave }: { tiers: Tier[]; onSave: (t: Tier[]) => 
       </View>
       {tiers.map((t, i) => (
         <View key={t.key} style={st.tableRow}>
-          <Text style={[st.lineValue, { flex: 1, textAlign: 'left' }]} numberOfLines={1}>
+          <Text style={[st.lineValue, { flex: 1, textAlign: 'left' }]} numberOfLines={3}>
             {t.name}
           </Text>
           <TextInput
@@ -1456,7 +1456,7 @@ const st = StyleSheet.create({
   check: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   inline: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   smallInput: { width: 72, paddingVertical: 8, textAlign: 'center' },
-  amountRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
+  amountRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', gap: 6 },
   amount: {
     color: '#fff',
     fontSize: 24,
@@ -1520,8 +1520,8 @@ const st = StyleSheet.create({
   },
   tableHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   tableRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  cell: { width: 84, textAlign: 'center' },
-  cellInput: { paddingVertical: 8 },
+  cell: { width: 68, textAlign: 'center' },
+  cellInput: { paddingVertical: 8, paddingHorizontal: 6 },
   weightRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   weightTrack: {
     height: 6,

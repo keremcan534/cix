@@ -46,7 +46,16 @@ export function Shelf({ hue, on, children }: { hue: string; on?: boolean; childr
   );
 }
 
-export function ItemPreview({ item, avatar, voice, still }: { item: Cosmetic; avatar: string; voice: string; still?: boolean }) {
+/** Every preview in one slot of the tallest preview's height, so the names under neighbouring tiles line up. */
+export function ItemPreview(props: { item: Cosmetic; avatar: string; voice: string; still?: boolean }) {
+  return (
+    <View style={{ height: 104, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center' }}>
+      <PreviewBody {...props} />
+    </View>
+  );
+}
+
+function PreviewBody({ item, avatar, voice, still }: { item: Cosmetic; avatar: string; voice: string; still?: boolean }) {
   const { colors } = useTheme();
   const styles = useItemStyles();
   if (item.kind === 'wave')
