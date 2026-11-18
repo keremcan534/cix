@@ -425,16 +425,17 @@ export async function rewardEvents() {
       for (const uid of who) {
         if (await tx((c) => grantReward(c, uid, e.reward_sku, { days: e.reward_days ?? undefined, source: 'event', ref, origin: e.title }))) got.push(uid);
       }
-      const given = who.length ? (await db.query('SELECT count(*)::int AS n FROM entitlements WHERE user_id = ANY($1::uuid[]) AND ref = $2', [who, ref])).rows[0].n : 0;
-      // A second server giving the same event at once (each person still gets it once): the last to finish counts all.
-      await db.query('UPDATE events SET reward_done_at = coalesce(reward_done_at, now()), reward_given = greatest(coalesce(reward_given, 0), $2) WHERE id = $1', [e.id, given]);
+      // SimilarClub Sistem (system-notices.mjs), once per person (ref event:<id>), after each grant is committed and
+      // before the event is marked done: a done event has told everyone it gave to.
       if (got.length) {
-        // SimilarClub Sistem (system-notices.mjs), once per person (ref event:<id>), after the grant is committed.
         const days = e.reward_days ?? item.days ?? null;
         for (const uid of got)
           await itemNotice({ target: uid, category: 'event_reward', ref, item, days, origin: e.title, why: `“${e.title}” etkinliğine katıldığın için ${item.name} kazandın!`, push: false });
-        notify(got, { title: 'Etkinlik ödülü', body: `${item.name} Çantam’ında`, data: { type: 'event', id: String(e.id) } });
       }
+      const given = who.length ? (await db.query('SELECT count(*)::int AS n FROM entitlements WHERE user_id = ANY($1::uuid[]) AND ref = $2', [who, ref])).rows[0].n : 0;
+      // A second server giving the same event at once (each person still gets it once): the last to finish counts all.
+      await db.query('UPDATE events SET reward_done_at = coalesce(reward_done_at, now()), reward_given = greatest(coalesce(reward_given, 0), $2) WHERE id = $1', [e.id, given]);
+      if (got.length) notify(got, { title: 'Etkinlik ödülü', body: `${item.name} Çantam’ında`, data: { type: 'event', id: String(e.id) } });
     }
   } finally {
     rewarding = false;

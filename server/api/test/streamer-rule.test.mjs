@@ -29,10 +29,11 @@ const cashOut = (s) => ok(call('GET', '/api/wallet/cash-out', null, s.session));
 /** A family led by `owner` with `members` people, the leader among them. */
 async function familyOf(owner, members) {
   await h.credit(owner.user.id, 500, { channel: 'google' });
-  const f = await ok(call('POST', '/api/families', { name: `Aile ${rnd(6)}`, ref: ref() }, owner.session));
+  // A visible name: rnd(3) is digits only (harness.mjs); 12 hex characters can spell a handle the contact filter refuses.
+  const f = await ok(call('POST', '/api/families', { name: `Aile ${rnd(3)}`, ref: ref() }, owner.session));
   await q("UPDATE families SET join_mode = 'open' WHERE id = $1", [f.family.id]);
   for (let i = 1; i < members; i++) {
-    const m = await signUp(`Üye ${rnd(4)}`);
+    const m = await signUp(`Üye ${rnd(3)}`);
     await q("INSERT INTO family_members (user_id, family_id, role) VALUES ($1, $2, 'member')", [m.user.id, f.family.id]);
   }
   return f.family;
@@ -68,7 +69,7 @@ describe('para çekme kuralı', () => {
 
   test('ajans sahibi erkek çekebilir; onaysız ajans saymaz', async () => {
     const owner = await person('Ajans Sahibi', 'Erkek');
-    const a = (await ok(call('POST', '/api/admin/agency/create', { name: `Ajans ${rnd(5)}`, owner: owner.user.id }, admin.session))).agency;
+    const a = (await ok(call('POST', '/api/admin/agency/create', { name: `Ajans ${rnd(3)}`, owner: owner.user.id }, admin.session))).agency;
     assert.equal((await cashOut(owner)).allowed, true);
     await q("UPDATE agencies SET status = 'suspended' WHERE id = $1", [a.id]);
     assert.equal((await cashOut(owner)).allowed, false);
@@ -108,7 +109,7 @@ describe('yayıncı kimdir', () => {
     await q("UPDATE users SET created_at = now() - interval '40 days' WHERE id = $1", [older.user.id]);
     assert.equal((await pair(man, older)).streamer, false);
     const owner = await person('Sahip', 'Erkek');
-    await ok(call('POST', '/api/admin/agency/create', { name: `Ajans ${rnd(5)}`, owner: owner.user.id }, admin.session));
+    await ok(call('POST', '/api/admin/agency/create', { name: `Ajans ${rnd(3)}`, owner: owner.user.id }, admin.session));
     assert.equal((await pair(man, owner)).streamer, true);
   });
 });
@@ -132,7 +133,7 @@ describe('aileden ayrılan yayıncı 90 gün başka aileye giremez', () => {
     const r = await refused(call('POST', '/api/family/join', { id: f2.id }, s.session), 409, /başka bir aileye katılamazsın/);
     assert.equal(r.code, 'family_rejoin_wait');
     await h.credit(s.user.id, 500, { channel: 'google' });
-    await refused(call('POST', '/api/families', { name: `Yeni ${rnd(5)}`, ref: ref() }, s.session), 409, /katılamazsın/);
+    await refused(call('POST', '/api/families', { name: `Yeni ${rnd(3)}`, ref: ref() }, s.session), 409, /katılamazsın/);
     await refused(call('POST', '/api/family/invite', { userId: s.user.id }, lead2.session), 409, /katılamaz/);
     await ok(call('POST', '/api/family/join', { id: f1.id }, s.session), 'ayrıldığı aile');
     await ok(call('POST', '/api/family/leave', {}, s.session));
