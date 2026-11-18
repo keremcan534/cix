@@ -2,9 +2,10 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState, type ComponentRef } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Switch, View, useWindowDimensions } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Switch } from '@/components/luxe-switch';
 import { Text } from '@/components/text';
 import { decayLineOf, nobleRightsOf, nobleTiersOf, subPlansOf, subRightsOf, vipLevelsOf, vipRightsOf } from '@/lib/levels-live-core';
 import { useLevels } from '@/lib/live/levels-live';
@@ -389,7 +390,7 @@ function Vip() {
           ).map(([k, l], i) => (
             <View key={k} style={[styles.toggleRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: ink(0.1) }]}>
               <Text style={{ color: colors.textDim, fontSize: 15, flex: 1 }}>{l}</Text>
-              <Switch value={(live || vipDays > 0) && settings[k]} onValueChange={(v) => toggleHide(k, v)} trackColor={{ true: '#E8B979' }} thumbColor="#fff" accessibilityLabel={l} />
+              <Switch value={(live || vipDays > 0) && settings[k]} onValueChange={(v) => toggleHide(k, v)} accessibilityLabel={l} />
             </View>
           ))}
         </View>

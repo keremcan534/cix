@@ -6,7 +6,8 @@ import { memo, useEffect, useState, type ReactNode } from 'react';
 import { Animated, Easing, Image, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Text } from '@/components/text';
-import { EdgeLight, Gloss, PressableScale } from '@/components/fx/surface';
+import { EdgeLight, PressableScale } from '@/components/fx/surface';
+import { LuxeFace, luxeMinWidth, type LuxeFaceName } from '@/components/luxe-face';
 import { useSettings } from '@/store';
 import { fonts, makeStyles, useTheme } from '@/theme';
 
@@ -113,24 +114,23 @@ export function BreakoutCard({
 
 /** The primary call to action on a card: glossy, lit, in the display face. */
 export function GlossButton({ label, tone = 'money', small, icon }: { label: string; tone?: 'money' | 'action' | 'locked'; small?: boolean; /** Drawn before the label, e.g. a coin. */ icon?: ReactNode }) {
-  const { dark } = useTheme();
   const s = useStyles();
-  const look = (dark ? TONES : LIGHT_TONES)[tone];
+  const look = TONES[tone];
   return (
-    <LinearGradient colors={look.colors} style={[s.btn, small && s.btnSmall, tone !== 'locked' && { boxShadow: `0 4px 14px ${look.glow}` }]}>
-      {tone !== 'locked' && <Gloss strength={0.2} />}
+    <View style={[s.btn, small && s.btnSmall]}>
+      <LuxeFace name={look.face} h={small ? GLOSS_SMALL : GLOSS_HEIGHT} />
       {icon}
       <Text style={[s.btnText, small && { fontSize: 14 }, { color: look.ink }]}>{label}</Text>
-    </LinearGradient>
+    </View>
   );
 }
-const TONES = {
-  money: { colors: ['#FFD98A', '#F2A93B'] as const, ink: '#3B2300', glow: 'rgba(246,189,96,0.5)' },
-  action: { colors: ['#FF94C2', '#F0468E'] as const, ink: '#2A0A18', glow: 'rgba(255,95,162,0.45)' },
-  locked: { colors: ['rgba(255,255,255,0.10)', 'rgba(255,255,255,0.05)'] as const, ink: '#C7D2E5', glow: 'transparent' },
+const GLOSS_HEIGHT = 36;
+const GLOSS_SMALL = 30;
+const TONES: Record<'money' | 'action' | 'locked', { face: LuxeFaceName; ink: string }> = {
+  money: { face: 'money', ink: '#3B2300' },
+  action: { face: 'hero', ink: '#fff' },
+  locked: { face: 'off', ink: '#6B4C5A' },
 };
-// The locked key is a faint wash of the scheme's ink; the bright fills look the same in both schemes.
-const LIGHT_TONES = { ...TONES, locked: { colors: ['rgba(42,21,32,0.08)', 'rgba(42,21,32,0.04)'] as const, ink: '#7A5868', glow: 'transparent' } };
 
 const useStyles = makeStyles(({ dark }) => ({
   glow: { position: 'absolute', pointerEvents: 'none' },
@@ -139,7 +139,7 @@ const useStyles = makeStyles(({ dark }) => ({
   emoji: { textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 3 }, textShadowRadius: 6 },
   card: { borderRadius: 22, borderWidth: 1, padding: 14, gap: 6 },
   icon: { position: 'absolute', pointerEvents: 'none' },
-  btn: { flexDirection: 'row', gap: 4, borderRadius: 999, paddingHorizontal: 20, paddingVertical: 7, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', alignSelf: 'flex-start' },
-  btnSmall: { paddingHorizontal: 14, paddingVertical: 5 },
+  btn: { flexDirection: 'row', gap: 4, minHeight: GLOSS_HEIGHT, minWidth: luxeMinWidth(GLOSS_HEIGHT), paddingHorizontal: 20, paddingVertical: 5, alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-start' },
+  btnSmall: { minHeight: GLOSS_SMALL, minWidth: luxeMinWidth(GLOSS_SMALL), paddingHorizontal: 14, paddingVertical: 3 },
   btnText: { fontFamily: fonts.displayBold, fontSize: 15, lineHeight: 21 },
 }));

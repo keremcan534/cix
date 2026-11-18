@@ -3,6 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { memo, useState, type ReactNode } from 'react';
 import { Pressable, View, type StyleProp, type ViewStyle } from 'react-native';
 
+import { LuxeFace, luxeMinWidth, type LuxeFaceName } from '@/components/luxe-face';
 import { Text } from '@/components/text';
 import { cosmeticById } from '@/data/catalog';
 import { vipTier } from '@/data/economy';
@@ -100,9 +101,12 @@ export function VipBadge() {
 
 export type ButtonVariant = 'hero' | 'money' | 'tonal' | 'ghost' | 'danger';
 
+const BUTTON_HEIGHT = 48;
+const BUTTON_SMALL = 34;
+
 /**
- * One button, five jobs. Only `hero` (one per screen) and `money` (coins/gifts) get the raised,
- * press-down "key" look, so the eye finds them first; the rest stay flat.
+ * One button, five jobs, each on its gold-rimmed face (components/luxe-face). `ghost` is words alone, and a button
+ * that can't be pressed wears the pale face.
  */
 export function Button({
   title,
@@ -121,19 +125,14 @@ export function Button({
   variant?: ButtonVariant;
   disabled?: boolean;
 }) {
-  const { colors, semantic, gradient } = useTheme();
+  const { colors, semantic, dark } = useTheme();
   const styles = useStyles();
   const raised = variant === 'hero' || variant === 'money';
-  // A thin key edge: enough to feel pressable, not a toy.
-  const edge = 2;
-  const fg = variant === 'money' ? semantic.moneyInk : variant === 'tonal' ? semantic.tonalText : variant === 'ghost' ? colors.primaryText : variant === 'danger' ? semantic.danger : semantic.actionInk;
-  const body = [styles.btn, small && styles.btnSmall, !raised && { backgroundColor: variant === 'tonal' ? semantic.tonal : 'transparent' }, variant === 'danger' && styles.btnDanger];
-  const label = (
-    <>
-      {icon && <Ionicons name={icon} size={small ? 15 : 19} color={fg} />}
-      <Text style={[styles.btnText, small && { fontSize: 13 }, { color: fg }]}>{title}</Text>
-    </>
-  );
+  const face: LuxeFaceName | null = variant === 'ghost' ? null : disabled ? 'off' : variant === 'money' ? 'money' : variant === 'danger' ? 'coral' : variant === 'tonal' ? (dark ? 'plum' : 'glass') : 'hero';
+  const down: LuxeFaceName | undefined = face === 'hero' ? 'heroDown' : face === 'money' ? 'moneyDown' : undefined;
+  const faceHeight = small ? BUTTON_SMALL : BUTTON_HEIGHT;
+  // Each ink is the one that reads on its face.
+  const fg = face === 'off' ? '#6B4C5A' : variant === 'money' ? semantic.moneyInk : variant === 'tonal' ? semantic.tonalText : variant === 'ghost' ? colors.primaryText : variant === 'danger' ? semantic.actionInk : '#fff';
   return (
     <Pressable
       onPress={
@@ -147,24 +146,15 @@ export function Button({
       disabled={disabled}
       accessibilityRole="button"
       accessibilityState={{ disabled }}
-      style={({ pressed }) => [{ opacity: disabled ? 0.5 : 1 }, !raised && pressed && { transform: [{ scale: 0.96 }] }, style]}
+      style={({ pressed }) => [{ opacity: disabled && !face ? 0.5 : 1 }, pressed && { transform: [{ scale: 0.97 }] }, style]}
     >
-      {({ pressed }) =>
-        raised ? (
-          // The darker edge below the face is the "key"; pressing moves the face down onto it.
-          <View style={{ borderRadius: 999, backgroundColor: variant === 'money' ? semantic.moneyEdge : semantic.actionEdge, paddingBottom: pressed ? 0 : edge, marginTop: pressed ? edge : 0 }}>
-            {variant === 'money' ? (
-              <View style={[...body, { backgroundColor: semantic.money }]}>{label}</View>
-            ) : (
-              <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={body}>
-                {label}
-              </LinearGradient>
-            )}
-          </View>
-        ) : (
-          <View style={body}>{label}</View>
-        )
-      }
+      {({ pressed }) => (
+        <View style={[styles.btn, small && styles.btnSmall, !!face && { minWidth: luxeMinWidth(faceHeight) }]}>
+          {face && <LuxeFace name={face} h={faceHeight} down={down} pressed={pressed} />}
+          {icon && <Ionicons name={icon} size={small ? 15 : 19} color={fg} />}
+          <Text style={[styles.btnText, small && { fontSize: 13 }, { color: fg }]}>{title}</Text>
+        </View>
+      )}
     </Pressable>
   );
 }
@@ -191,7 +181,7 @@ export function CoinPill({ coins, onPress }: { coins: number; onPress?: () => vo
   );
 }
 
-const useStyles = makeStyles(({ colors, semantic }) => ({
+const useStyles = makeStyles(({ colors }) => ({
   vip: { borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1 },
   vipText: { color: '#3B2300', fontSize: 11, fontWeight: '800' },
   btn: {
@@ -199,12 +189,11 @@ const useStyles = makeStyles(({ colors, semantic }) => ({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingVertical: 13,
+    minHeight: BUTTON_HEIGHT,
+    paddingVertical: 10,
     paddingHorizontal: 22,
-    borderRadius: 999,
   },
-  btnSmall: { paddingVertical: 7, paddingHorizontal: 14 },
-  btnDanger: { borderWidth: 1.5, borderColor: semantic.danger },
+  btnSmall: { minHeight: BUTTON_SMALL, paddingVertical: 5, paddingHorizontal: 14 },
   btnText: { color: '#fff', fontWeight: '700', fontSize: 15, letterSpacing: 0.1 },
   coin: {
     flexDirection: 'row',

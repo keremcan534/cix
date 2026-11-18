@@ -7,9 +7,10 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, Switch, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Switch } from '@/components/luxe-switch';
 import { Text, TextInput } from '@/components/text';
 import { Photo } from '@/components/photo';
 import { Button } from '@/components/ui';
@@ -241,7 +242,7 @@ function GuardSettingsSheet({ settings, onClose, onSaved }: { settings: GuardMin
             <Text style={styles.settingLabel}>Korumayı kapat</Text>
             <Text style={styles.settingHint}>Kapalıyken kimse yeni koruyucun olamaz; olanlar kalır. Başkalarının korumalarını yine görürsün.</Text>
           </View>
-          <Switch value={off} disabled={busy} onValueChange={(v) => void toggleOff(v)} trackColor={{ false: colors.border, true: colors.primary }} accessibilityLabel="Korumayı kapat" />
+          <Switch value={off} disabled={busy} onValueChange={(v) => void toggleOff(v)} accessibilityLabel="Korumayı kapat" />
         </View>
         <View style={{ gap: 6 }}>
           <Text style={styles.settingLabel}>Koruma alanı eşiği</Text>

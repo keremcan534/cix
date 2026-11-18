@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { FlatList, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { FlatList, Image, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
@@ -11,6 +11,7 @@ import { Art, artSource, type ArtName } from '@/components/Art';
 import { FloatIcon } from '@/components/fx/float';
 import { SCENES } from '@/components/fx/scenes';
 import { Backdrop, DepthCard, EdgeLight, Glass, Gloss, PressableScale, Shine, glow } from '@/components/fx/surface';
+import { LUXE_ROUND, LuxeFace, luxeMinWidth } from '@/components/luxe-face';
 import { icon3dSource } from '@/components/Icon3D';
 import { SimilarityChip } from '@/components/similarity';
 import { Avatar, Button } from '@/components/ui';
@@ -74,7 +75,7 @@ export default function RoomsScreen() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [headerH, setHeaderH] = useState(64);
   const insets = useSafeAreaInsets();
-  const { colors, semantic, gradient } = useTheme();
+  const { colors } = useTheme();
   const styles = useStyles();
 
   // Live mode (test APK): only the rooms real people opened on our server; the demo rooms and people stay out.
@@ -264,10 +265,10 @@ export default function RoomsScreen() {
 
       <View style={[styles.fab, { bottom: TAB_BAR_HEIGHT + insets.bottom + 18 }]}>
         <PressableScale to={0.9} onPress={() => router.push('/oda/yeni')} accessibilityLabel="Oda oluştur">
-          <LinearGradient colors={gradient} style={[styles.fabInner, glow('rgba(255,95,162,0.5)', 14, 4)]}>
-            <Gloss />
-            <Ionicons name="add" size={30} color={semantic.actionInk} />
-          </LinearGradient>
+          <View style={[styles.fabInner, glow('rgba(255,95,162,0.5)', 14, 4)]}>
+            <Image source={LUXE_ROUND} style={StyleSheet.absoluteFill} resizeMode="contain" accessibilityIgnoresInvertColors />
+            <Ionicons name="add" size={30} color="#fff" />
+          </View>
         </PressableScale>
       </View>
 
@@ -290,7 +291,7 @@ const WHY_ICON: Record<RoomMatch['why'], keyof typeof Ionicons.glyphMap> = { per
 /** The screen's lead: the open room whose host has the most in common with you, and why (lib/closest). */
 function ClosestRoomCard({ match }: { match: RoomMatch }) {
   const { room, host, score, reason, why } = match;
-  const { colors, semantic, gradient } = useTheme();
+  const { colors, semantic } = useTheme();
   const styles = useStyles();
   return (
     <PressableScale style={{ marginHorizontal: 16 }} to={0.98} onPress={() => router.push(`/oda/${room.id}`)} accessibilityRole="button" accessibilityLabel={`Sana en yakın oda: ${room.title}, yüzde ${score} benzer. ${reason}. Katıl`}>
@@ -326,10 +327,10 @@ function ClosestRoomCard({ match }: { match: RoomMatch }) {
               </Text>
             </View>
           </View>
-          <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.heroJoin}>
-            <Gloss strength={0.3} />
+          <View style={styles.heroJoin}>
+            <LuxeFace name="hero" h={JOIN_HEIGHT} />
             <Text style={styles.heroJoinText}>Katıl</Text>
-          </LinearGradient>
+          </View>
         </View>
         <Shine radius={18} every={8000} />
       </DepthCard>
@@ -337,7 +338,7 @@ function ClosestRoomCard({ match }: { match: RoomMatch }) {
   );
 }
 
-// Shortcuts as a shelf of objects standing on their own light, not a row of small chips. Four, not five:
+// Shortcuts as lit tiles that fill the row edge to edge, so no screen width leaves wide gaps between them. Four, not five:
 // the game hub already lists every game, so the shelf doesn't feature one.
 function QuickStrip({ coins, checkedInToday }: { coins: number; checkedInToday: boolean }) {
   const { colors } = useTheme();
@@ -352,12 +353,12 @@ function QuickStrip({ coins, checkedInToday }: { coins: number; checkedInToday: 
     <View style={styles.shelf}>
       {items.map((it, i) => (
         <View key={it.key} style={{ flex: 1 }}>
-          <PressableScale style={styles.shelfItem} onPress={it.onPress} accessibilityLabel={it.a11y ?? it.label}>
+          <PressableScale style={[styles.shelfItem, { backgroundColor: `${it.hue}1F`, borderColor: `${it.hue}47` }]} onPress={it.onPress} accessibilityLabel={it.a11y ?? it.label}>
             <View>
-              <FloatIcon source={it.source} size={42} hue={it.hue} bob delay={i * 280} />
+              <FloatIcon source={it.source} size={46} hue={it.hue} bob delay={i * 280} />
               {it.dot && <View style={[styles.dot, { top: 0, right: 0 }]} />}
             </View>
-            <Text style={[styles.shelfText, it.key === 'coins' && { color: colors.gold }]} numberOfLines={1}>
+            <Text style={[styles.shelfText, it.key === 'coins' && { color: colors.gold }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
               {it.label}
             </Text>
           </PressableScale>
@@ -749,6 +750,8 @@ function RoomSearch({ visible, rooms, onClose }: { visible: boolean; rooms: Room
   );
 }
 
+const JOIN_HEIGHT = 38;
+
 // Shadow under cards and photo frames: deep and black at night, a soft navy lift on paper.
 const SOFT_SHADOW = '0 1px 2px rgba(64,20,40,0.05), 0 6px 16px rgba(64,20,40,0.06)';
 
@@ -780,16 +783,16 @@ const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark, edge
   heroBody: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12 },
   heroHost: { width: 44, height: 44, margin: 4 },
   heroTitle: { color: colors.text, fontFamily: fonts.display, fontSize: 17, lineHeight: 22 },
-  heroJoin: { borderRadius: 999, paddingHorizontal: 18, paddingVertical: 9, overflow: 'hidden' },
-  heroJoinText: { color: semantic.actionInk, fontWeight: '900', fontSize: 14 },
+  heroJoin: { minHeight: JOIN_HEIGHT, minWidth: luxeMinWidth(JOIN_HEIGHT), paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center' },
+  heroJoinText: { color: '#fff', fontWeight: '900', fontSize: 14 },
   // similar people
   person: { alignItems: 'center', width: 66, gap: 1 },
   personAvatar: { width: 54, height: 54, margin: 5 },
   personLive: { position: 'absolute', right: -3, bottom: -3, width: 18, height: 18, borderRadius: 9, backgroundColor: semantic.live, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.bg },
   personPct: { color: colors.textDim, fontSize: 11, fontWeight: '800' },
   // quick strip
-  shelf: { flexDirection: 'row', paddingHorizontal: 8, paddingTop: 4 },
-  shelfItem: { alignItems: 'center', gap: 6 },
+  shelf: { flexDirection: 'row', gap: 6, paddingHorizontal: 16 },
+  shelfItem: { alignItems: 'center', gap: 5, paddingTop: 9, paddingBottom: 8, borderRadius: 16, borderWidth: 1, overflow: 'hidden' },
   shelfText: { color: colors.text, fontSize: 11, fontWeight: '700' },
   // category bar
   catBar: { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -854,5 +857,5 @@ const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark, edge
   // to fade out, and the negative margin keeps the list's place in the layout.
   glowRoom: { marginVertical: -16 },
   glowRoomInner: { paddingVertical: 16 },
-  fabInner: { width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)', overflow: 'hidden' },
+  fabInner: { width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center' },
 }));

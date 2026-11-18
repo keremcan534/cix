@@ -3,9 +3,10 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, type Href } from 'expo-router';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Image, Modal, Pressable, ScrollView, StyleSheet, Switch, View, type HostInstance } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, View, type HostInstance } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Switch } from '@/components/luxe-switch';
 import { Text, TextInput } from '@/components/text';
 import { Art, type ArtName } from '@/components/Art';
 import { GiftArt } from '@/components/GiftArt';
@@ -177,7 +178,6 @@ function Row({
         <Switch
           value={toggle.value}
           onValueChange={(v) => (locked ? showAlert('Kilitli', locked) : toggle.onChange(v))}
-          trackColor={{ true: colors.green, false: '#555' }}
           accessibilityLabel={`${label} anahtarı`}
         />
       ) : (

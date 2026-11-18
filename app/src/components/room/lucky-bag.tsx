@@ -5,9 +5,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { memo, useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Image, Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Animated, Easing, Image, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Switch } from '@/components/luxe-switch';
 import { GiftArt } from '@/components/GiftArt';
 import { Icon3D } from '@/components/Icon3D';
 import { ROOM_ICON_ART } from '@/components/RoomArt';
@@ -157,7 +158,7 @@ export function LuckyBagSheet({ visible, room, rules, coins, svipLevel, onClose,
           <View style={s.switchRow}>
             <Ionicons name="people-outline" size={18} color={colors.textDim} />
             <Text style={s.switchText}>Yalnızca beni takip edenler açabilir</Text>
-            <Switch value={followers} onValueChange={setFollowers} trackColor={{ true: colors.primary, false: 'rgba(255,255,255,0.18)' }} thumbColor="#fff" />
+            <Switch value={followers} onValueChange={setFollowers} />
           </View>
           <Text style={s.note}>
             {kind === 'gift' ? 'Her pay, açan kişiye senden gönderilmiş bir hediye sayılır. ' : ''}

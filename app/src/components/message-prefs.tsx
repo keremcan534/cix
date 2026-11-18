@@ -2,10 +2,11 @@
 // server keeps and enforces the choices (server/api/privacy.mjs); each is saved as soon as it moves (lib/live/privacy).
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useState } from 'react';
-import { Animated, Modal, Pressable, StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Switch } from '@/components/luxe-switch';
 import { Text } from '@/components/text';
 import { useLivePrivacy, usePrivacySetter } from '@/lib/live/privacy';
 import { useApp } from '@/store';
@@ -20,48 +21,6 @@ const ROWS: { key: PrefKey; icon: IconName; title: string; sub: string }[] = [
   { key: 'messagePush', icon: 'notifications', title: 'Mesaj bildirimleri al', sub: 'Kapalıyken mesajlar yine gelir, telefonuna bildirim düşmez.' },
   { key: 'pushCloseOnly', icon: 'heart', title: 'Yalnızca samimi kişilerden bildirim al', sub: 'Karşılıklı takipleştiğin ya da aranızda kalp seviyesi olan kişiler.' },
 ];
-
-const THUMB = 24;
-const TRACK = { w: 50, h: 30 };
-
-/** A modern on-off switch: the thumb slides, the track lights up. */
-function Toggle({ value, disabled, label, onChange }: { value: boolean; disabled?: boolean; label: string; onChange: (v: boolean) => void }) {
-  const { colors, gradient } = useTheme();
-  const { settings } = useApp();
-  const [at] = useState(() => new Animated.Value(value ? 1 : 0));
-  useEffect(() => {
-    Animated.timing(at, { toValue: value ? 1 : 0, duration: settings.reduceMotion ? 0 : 160, useNativeDriver: true }).start();
-  }, [value, at, settings.reduceMotion]);
-  const travel = TRACK.w - THUMB - 6;
-  return (
-    <Pressable
-      onPress={() => onChange(!value)}
-      disabled={disabled}
-      hitSlop={8}
-      style={[{ width: TRACK.w, height: TRACK.h, borderRadius: TRACK.h / 2, backgroundColor: colors.border, overflow: 'hidden' }, disabled && { opacity: 0.45 }]}
-      accessibilityRole="switch"
-      accessibilityLabel={label}
-      accessibilityState={{ checked: value, disabled: !!disabled }}
-    >
-      <Animated.View style={[StyleSheet.absoluteFill, { opacity: at }]}>
-        <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
-      </Animated.View>
-      <Animated.View
-        style={{
-          position: 'absolute',
-          left: 3,
-          top: 3,
-          width: THUMB,
-          height: THUMB,
-          borderRadius: THUMB / 2,
-          backgroundColor: '#fff',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-          transform: [{ translateX: at.interpolate({ inputRange: [0, 1], outputRange: [0, travel] }) }],
-        }}
-      />
-    </Pressable>
-  );
-}
 
 function PrefsSheet({ onClose }: { onClose: () => void }) {
   const { settings } = useApp();
@@ -91,7 +50,7 @@ function PrefsSheet({ onClose }: { onClose: () => void }) {
                 <Text style={s.rowTitle}>{r.title}</Text>
                 <Text style={s.rowSub}>{r.sub}</Text>
               </View>
-              <Toggle value={settings[r.key]} disabled={off} label={r.title} onChange={(v) => set(r.key, v)} />
+              <Switch value={settings[r.key]} disabled={off} accessibilityLabel={r.title} onValueChange={(v) => set(r.key, v)} />
             </View>
           );
         })}
