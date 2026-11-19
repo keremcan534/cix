@@ -182,18 +182,23 @@ export function GiftScore({ text, tone, size = 20 }: { text: string; tone: 'pink
 /** Two sides' shares: pink from the left, blue from the right, "%60" and "%40" written on them. */
 export function ShareBar({ left, right, height = 22 }: { left: number; right: number; height?: number }) {
   const total = left + right;
-  // Whole percents that add up to 100; nothing scored yet: half each.
+  // Whole percents that add up to 100; nothing scored yet: half each. A side never draws under 18 of the bar, so its
+  // percent stays readable; the number written on it is the exact one.
   const l = total > 0 ? Math.round((left / total) * 100) : 50;
   const r = 100 - l;
   return (
     <GoldRim radius={height} width={1.5} style={{ alignSelf: 'stretch' }}>
       <View style={[styles.shareTrack, { height }]} accessibilityLabel={`Sol yüzde ${l}, sağ yüzde ${r}`}>
-        <LinearGradient colors={['#FF4FA3', '#D21C7F']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ flex: Math.max(l, 6), justifyContent: 'center', paddingLeft: 10 }}>
-          <Text style={styles.shareText}>%{l}</Text>
+        <LinearGradient colors={['#FF4FA3', '#D21C7F']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ flex: Math.max(l, 18), justifyContent: 'center', paddingLeft: 10 }}>
+          <Text style={styles.shareText} numberOfLines={1}>
+            %{l}
+          </Text>
         </LinearGradient>
         <View style={styles.shareCut} />
-        <LinearGradient colors={['#2F7BFF', '#45B8FF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ flex: Math.max(r, 6), justifyContent: 'center', alignItems: 'flex-end', paddingRight: 10 }}>
-          <Text style={styles.shareText}>%{r}</Text>
+        <LinearGradient colors={['#2F7BFF', '#45B8FF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ flex: Math.max(r, 18), justifyContent: 'center', alignItems: 'flex-end', paddingRight: 10 }}>
+          <Text style={styles.shareText} numberOfLines={1}>
+            %{r}
+          </Text>
         </LinearGradient>
       </View>
     </GoldRim>

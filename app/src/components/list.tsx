@@ -166,6 +166,7 @@ export function ChoiceChips<T extends string | number>({ value, options, onChang
             onPress={() => onChange(v)}
             accessibilityRole="radio"
             accessibilityState={{ selected: on }}
+            hitSlop={{ top: 3, bottom: 3 }}
             style={[s.chip, on && s.chipOn]}
           >
             {lead}
@@ -194,7 +195,7 @@ const useStyles = makeStyles(({ colors, surface, dark }) => ({
   block: { paddingHorizontal: 14, paddingVertical: 12, gap: 10 },
   blockTitle: { color: colors.text, fontSize: 15, fontWeight: '600' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.cardAlt, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: 'transparent' },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 38, backgroundColor: colors.cardAlt, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: 'transparent' },
   chipOn: { backgroundColor: dark ? 'rgba(255,95,162,0.16)' : 'rgba(208,46,120,0.10)', borderColor: dark ? 'rgba(255,95,162,0.55)' : 'rgba(184,31,102,0.45)' },
   chipText: { color: colors.textDim, fontWeight: '600', fontSize: 13 },
   chipTextOn: { color: colors.text },

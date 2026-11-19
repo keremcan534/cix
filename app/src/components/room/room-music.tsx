@@ -10,12 +10,14 @@ import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
 import * as DocumentPicker from 'expo-document-picker';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { useSheetBottom } from '@/components/room/parts';
 import { Text, TextInput } from '@/components/text';
 import { showAlert } from '@/lib/alert';
 import { mixWithVoices } from '@/lib/audio-mode';
+import { useKeyboardOpen } from '@/lib/keyboard-open';
 import { message } from '@/lib/live';
 import {
   LIBRARY_MAX,
@@ -166,7 +168,9 @@ const subOf = (t: { seconds: number; artist?: string }) => [mmss(t.seconds), t.a
 export function LiveMusicSheet({ visible, onClose, room, music, canPlay, enabled, setEnabled, volume, setVolume, onDone }: Props) {
   const s = useStyles();
   const t = useTheme();
-  const paddingBottom = useSheetBottom();
+  const sheetBottom = useSheetBottom();
+  const { top } = useSafeAreaInsets();
+  const keyboardOpen = useKeyboardOpen();
   // Over a room the sheet reaches the Balkon line at most (lib/sheet-space): the list takes what the player leaves.
   const height = useSheetMax(0.78);
   const maxHeight = useSheetMax(0.92);
@@ -257,9 +261,10 @@ export function LiveMusicSheet({ visible, onClose, room, music, canPlay, enabled
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
-      <KeyboardAvoid style={{ flex: 1 }}>
+      {/* It rises above the keyboard as a whole, stops under the status bar and shrinks there (the list scrolls). */}
+      <KeyboardAvoid style={{ flex: 1, paddingTop: top }}>
         <Pressable style={s.scrim} onPress={close} accessibilityLabel="Kapat" />
-        <View style={[s.sheet, { height, maxHeight, paddingBottom }]}>
+        <View style={[s.sheet, { flexShrink: 1, height, maxHeight, paddingBottom: keyboardOpen ? 16 : sheetBottom }]}>
           <View style={s.grip} />
           {view === 'library' && may ? (
             <Library list={shown.list} onBack={() => setView('list')} onAdd={addTracks} />
@@ -786,7 +791,7 @@ function Library({ list, onBack, onAdd }: { list: QueueTrack[]; onBack: () => vo
       <View style={s.libBar}>
         <Pressable style={[s.secondary, !!upload && { opacity: 0.7 }]} onPress={addFromPhone} disabled={!!upload} accessibilityRole="button">
           {upload ? <ActivityIndicator size="small" color={t.semantic.actionText} /> : <Ionicons name="phone-portrait-outline" size={18} color={t.semantic.actionText} />}
-          <Text style={s.secondaryText} numberOfLines={1}>
+          <Text style={s.secondaryText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
             {upload ? `Yükleniyor ${upload.done}/${upload.total}` : 'Telefondan ekle'}
           </Text>
         </Pressable>
@@ -794,7 +799,7 @@ function Library({ list, onBack, onAdd }: { list: QueueTrack[]; onBack: () => vo
           {busy ? (
             <ActivityIndicator size="small" color={t.semantic.actionInk} />
           ) : (
-            <Text style={[s.primaryText, !picked.length && s.primaryTextOff]} numberOfLines={1}>
+            <Text style={[s.primaryText, !picked.length && s.primaryTextOff]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
               Çalma listesine ekle{picked.length ? ` (${picked.length})` : ''}
             </Text>
           )}
@@ -874,8 +879,8 @@ const useStyles = makeStyles(({ colors, semantic, surface, edge, ink }) => ({
   pickAll: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.sm, paddingHorizontal: space.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: surface.hairline, marginBottom: space.xs },
   pickAllText: { flex: 1, color: colors.text, fontSize: 14, fontWeight: '600' },
   libBar: { flexDirection: 'row', gap: space.md, paddingTop: space.md, borderTopWidth: StyleSheet.hairlineWidth, borderColor: surface.hairline, marginHorizontal: -space.lg, paddingHorizontal: space.lg },
-  secondary: { flex: 1, height: 46, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: semantic.tonal },
-  secondaryText: { color: semantic.tonalText, fontSize: 14, fontWeight: '700' },
+  secondary: { flex: 1, height: 46, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: space.sm, backgroundColor: semantic.tonal },
+  secondaryText: { color: semantic.tonalText, fontSize: 14, fontWeight: '700', flexShrink: 1 },
   primary: { flex: 1.3, height: 46, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: semantic.action, paddingHorizontal: space.sm },
   primaryOff: { backgroundColor: ink(0.08) },
   primaryText: { color: semantic.actionInk, fontSize: 14, fontWeight: '800' },

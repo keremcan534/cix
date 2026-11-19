@@ -175,7 +175,7 @@ function EventCenter({ open }: { open: NonNullable<CenterOpen> }) {
         <TextInput
           value={q}
           onChangeText={setQ}
-          placeholder="Etkinlik, oda, düzenleyen veya tür ara"
+          placeholder="Etkinlik, oda, kişi veya tür ara"
           placeholderTextColor={colors.textDim}
           style={styles.searchInput}
           returnKeyType="search"

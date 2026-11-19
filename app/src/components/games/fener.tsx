@@ -14,7 +14,7 @@ import { GameInfoSheet } from '@/components/games/fx/info-sheet';
 import { SalonArt } from '@/components/games/fx/salon-art';
 import { SalonStage, StageHeader, StageStatus, glowNumber, salonScreen, useBox, type StatusTone } from '@/components/games/fx/salon';
 import { useWinFx } from '@/components/games/fx/win-fx';
-import { SpinControls, fmt, sleep } from '@/components/games/slot-kit';
+import { SpinControls, fmt, sleep, useShortGame } from '@/components/games/slot-kit';
 import { BRIGHTNESS, CARGO, COLS, FENER_MAX, ROWS, STORM_SPINS, STORM_TRIGGER, cargoLabel, type FCell, type FSpin } from '@/lib/fener-slot';
 import { playSfx, warmSfx } from '@/lib/game-sound';
 import { casinoAccess, useGames, type Entry } from '@/lib/games';
@@ -99,6 +99,7 @@ export function FenerPlayer({ entry }: { entry: Entry }) {
   const [sails] = useState(() => Array.from({ length: ROWS }, () => Array.from({ length: COLS }, () => new Animated.Value(0))));
   const [falls] = useState(() => Array.from({ length: COLS }, (_, c) => fallOf(drop, c)));
   const win = useWinFx();
+  const short = useShortGame(entry);
   const alive = useRef(true);
   const stopAuto = useRef(false);
   const balance = useRef(coins + gameCoins);
@@ -453,6 +454,7 @@ export function FenerPlayer({ entry }: { entry: Entry }) {
         onSpin={play}
         look={{ ring: ['#FFF1C9', '#F6BD60', '#B7832E'], core: ['#1D3060', '#060A1C'], ink: LIGHT }}
         caption={`Bir turda en çok ${fmt(bet * FENER_MAX)}`}
+        short={short}
       />
 
       <GameInfoSheet visible={info} onClose={() => setInfo(false)} title={game.name} rules={game.rules}>

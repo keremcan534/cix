@@ -129,19 +129,14 @@ function HubBody({ d, demo, reload, askFor }: { d: Me; demo: boolean; reload: ()
       {invites.length > 0 && (
         <ListGroup label="Davetler">
           {invites.map((r) => (
-            <ListRow
-              key={r.id}
-              icon="mail-unread-outline"
-              tone="social"
-              title={`${r.agency.name} seni davet ediyor`}
-              subtitle={[r.note, `Kod ${r.agency.code} · ${fmtDate(r.createdAt)}`].filter(Boolean).join('\n')}
-              right={
-                <View style={{ flexDirection: 'row', gap: 6 }}>
-                  <Button title="Reddet" variant="ghost" small onPress={() => runAction(demo, () => agencyNet.respond(r.id, false), 'Davet reddedildi.', reload)} />
-                  <Button title="Kabul" variant="tonal" small onPress={() => runAction(demo, () => agencyNet.respond(r.id, true), `${r.agency.name} ajansına katıldın.`, reload)} />
-                </View>
-              }
-            />
+            // One keyed view: the group draws one separator, and the buttons leave the whole row to the text.
+            <View key={r.id}>
+              <ListRow icon="mail-unread-outline" tone="social" title={`${r.agency.name} seni davet ediyor`} subtitle={[r.note, `Kod ${r.agency.code} · ${fmtDate(r.createdAt)}`].filter(Boolean).join('\n')} />
+              <View style={st.rowActions}>
+                <Button title="Reddet" variant="ghost" small onPress={() => runAction(demo, () => agencyNet.respond(r.id, false), 'Davet reddedildi.', reload)} />
+                <Button title="Kabul" variant="tonal" small onPress={() => runAction(demo, () => agencyNet.respond(r.id, true), `${r.agency.name} ajansına katıldın.`, reload)} />
+              </View>
+            </View>
           ))}
         </ListGroup>
       )}
@@ -214,7 +209,7 @@ export function TransferCard({ t }: { t: Transfer }) {
   return (
     <View style={st.transfer}>
       <View style={ns.rowBetween}>
-        <Text style={[ns.title, { fontSize: 15 }]}>{TRANSFER_TEXT[t.kind]}</Text>
+        <Text style={[ns.title, { fontSize: 15, flex: 1 }]}>{TRANSFER_TEXT[t.kind]}</Text>
         <Pill text={TRANSFER_STATUS[t.status]} tone={statusTone(t.status)} />
       </View>
       {!!(t.streamer?.name ?? t.agency?.name) && <Text style={[ns.title, { fontSize: 14 }]}>{t.streamer?.name ?? t.agency?.name}</Text>}
@@ -451,6 +446,7 @@ const st = StyleSheet.create({
   monogram: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,95,162,0.14)', borderWidth: 1, borderColor: 'rgba(255,95,162,0.3)' },
   monoText: { color: semantic.action, fontSize: 20, fontFamily: fonts.display },
   pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  rowActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 6, paddingHorizontal: 14, paddingBottom: 10 },
   note: { color: colors.textDim, fontSize: 12, lineHeight: 17 },
   transfer: { gap: 8, padding: space.md, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.04)' },
   found: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md, borderRadius: 14, backgroundColor: 'rgba(255,95,162,0.08)', borderWidth: 1, borderColor: 'rgba(255,95,162,0.25)' },

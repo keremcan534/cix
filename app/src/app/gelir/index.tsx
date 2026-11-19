@@ -139,7 +139,9 @@ export default function IncomeScreen() {
             <Text style={styles.balanceLabel}>Toplam elmas · {usd(diamonds)}</Text>
             <Ionicons name="help-circle-outline" size={18} color={ink(0.9)} />
           </Pressable>
-          <Text style={styles.balanceN}>{fmt(diamonds)}</Text>
+          <Text style={styles.balanceN} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+            {fmt(diamonds)}
+          </Text>
           {/* The two parts of the balance on one bar: green may leave now, grey waits for its lock. */}
           <View style={styles.meter} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
             {free > 0 && <View style={[styles.meterFree, { flex: free }]} />}
@@ -161,7 +163,7 @@ export default function IncomeScreen() {
                 <Text style={styles.partLabel} numberOfLines={1}>Kilitli</Text>
               </View>
               <Text style={styles.partN} numberOfLines={1} adjustsFontSizeToFit>{fmt(locked)}</Text>
-              <Text style={styles.partSub} numberOfLines={1}>{next ? `İlki ${timeLeft(next, now)} sonra açılır` : 'Kilitli elmas yok'}</Text>
+              <Text style={styles.partSub} numberOfLines={2}>{next ? `İlki ${timeLeft(next, now)} sonra açılır` : 'Kilitli elmas yok'}</Text>
             </View>
           </View>
           <Pressable style={({ pressed }) => [styles.exchangeBtn, pressed && { transform: [{ scale: 0.98 }] }]} onPress={() => setExchange(true)} accessibilityRole="button" accessibilityLabel="Elmasları jetona çevir">

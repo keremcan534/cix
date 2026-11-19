@@ -26,6 +26,8 @@ const KIND: Record<Notice['kind'], { icon: keyof typeof Ionicons.glyphMap; tone:
 };
 /** Notices saved before icons were glyph names hold an emoji; those show their kind's icon. */
 const iconOf = (n: Notice) => (n.icon in Ionicons.glyphMap ? n.icon : KIND[n.kind].icon);
+/** A notice that leads nowhere can't be read anywhere else, so it shows whole; one with a link stays short. */
+const linesOf = (n: Notice) => (noticeHref(n.href, liveMode()) ? 2 : undefined);
 
 export default function NotificationsScreen() {
   const { notifications, markNotificationsRead, markNoticeRead } = useApp();
@@ -74,10 +76,10 @@ export default function NotificationsScreen() {
           <Pressable style={({ pressed }) => [styles.row, !item.read && styles.unread, pressed && styles.pressed]} onPress={() => open(item)}>
             <StateIcon name={iconOf(item)} size={42} tone={KIND[item.kind].tone} />
             <View style={{ flex: 1, gap: 2 }}>
-              <Text style={[styles.title, item.read && { fontWeight: '600' }]} numberOfLines={2}>
+              <Text style={[styles.title, item.read && { fontWeight: '600' }]} numberOfLines={linesOf(item)}>
                 {item.title}
               </Text>
-              <Text style={styles.body} numberOfLines={2}>
+              <Text style={styles.body} numberOfLines={linesOf(item)}>
                 {item.body}
               </Text>
             </View>
@@ -98,7 +100,7 @@ export default function NotificationsScreen() {
 }
 
 const useStyles = makeStyles(({ colors, semantic, lift, ink, dark }) => ({
-  tab: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, backgroundColor: colors.card, ...lift },
+  tab: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, backgroundColor: colors.card, ...lift },
   tabActive: { backgroundColor: colors.primary },
   tabText: { color: colors.textDim, fontWeight: '700', fontSize: 12 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 12, paddingHorizontal: 12, paddingVertical: 12, borderRadius: 16 },

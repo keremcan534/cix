@@ -181,12 +181,12 @@ export default function TaskCenter() {
                         </View>
                       )}
                       {server && items.length > 0 && (
-                        <Text style={styles.taskReward} numberOfLines={1} accessibilityLabel={`ve Çantam’a ${items.join(', ')}`}>
+                        <Text style={[styles.taskReward, { flexShrink: 1, minWidth: 0 }]} numberOfLines={1} accessibilityLabel={`ve Çantam’a ${items.join(', ')}`}>
                           {' '}
                           + {items.join(', ')}
                         </Text>
                       )}
-                      <Text style={[styles.dim, { marginLeft: 'auto' }]}>
+                      <Text style={[styles.dim, { marginLeft: 'auto', flexShrink: 0 }]}>
                         {progress}/{goal}
                       </Text>
                     </View>

@@ -54,6 +54,8 @@ const TOP_H = 76;
 const CHROME = 330;
 const LIFT = 14;
 const FLY_MS = 340;
+/** The box a word said over the table is centred in. */
+const BURST_W = 132;
 
 /** True when `b` is the state `a` already showed, read again. */
 const sameStep = (a: CardsView, b: CardsView) => a.deal === b.deal && a.n === b.n && a.status === b.status && a.me === b.me;
@@ -68,7 +70,8 @@ const sorted = (ids: number[]) =>
 
 /** Where each of my cards lies: a fan across the width, in two rows when one would crowd them, the playable ones raised. */
 function layoutHand(ids: number[], width: number, cw: number, raised: (id: number) => boolean) {
-  const room = width - 8 - cw;
+  // 8dp clear on each side: the outer cards of a fan are turned, which widens them.
+  const room = width - 16 - cw;
   const perRow = Math.max(1, Math.floor(room / 21) + 1);
   const half = Math.ceil(ids.length / 2);
   const rows = ids.length > perRow ? [ids.slice(0, half), ids.slice(half)] : [ids];
@@ -175,7 +178,7 @@ function Flight({ from, to, delay, w }: { from: Point; to: Point; delay: number;
 }
 
 /** A word that pops over a seat or the table and fades: a missed turn, cards taken, SON KART. */
-function Burst({ at, text, icon, color, delay = 0, still }: { at: Point; text: string; icon?: keyof typeof Ionicons.glyphMap; color: string; delay?: number; still: boolean }) {
+function Burst({ at, stage, text, icon, color, delay = 0, still }: { at: Point; /** The stage's width: a word over an end seat stays on it. */ stage: number; text: string; icon?: keyof typeof Ionicons.glyphMap; color: string; delay?: number; still: boolean }) {
   const [t] = useState(() => new Animated.Value(0));
   useEffect(() => {
     const a = Animated.sequence([
@@ -190,11 +193,13 @@ function Burst({ at, text, icon, color, delay = 0, still }: { at: Point; text: s
   return (
     <Animated.View
       pointerEvents="none"
-      style={[s.burst, { left: at.x - 60, top: at.y - 13, opacity: t.interpolate({ inputRange: [0, 1, 2], outputRange: [0, 1, 0] }), transform: [{ scale: t.interpolate({ inputRange: [0, 1, 2], outputRange: [0.4, 1, 1.1] }) }, { translateY: t.interpolate({ inputRange: [0, 1, 2], outputRange: [8, 0, -10] }) }] }]}
+      style={[s.burst, { left: Math.max(0, Math.min(stage - BURST_W, at.x - BURST_W / 2)), top: at.y - 13, opacity: t.interpolate({ inputRange: [0, 1, 2], outputRange: [0, 1, 0] }), transform: [{ scale: t.interpolate({ inputRange: [0, 1, 2], outputRange: [0.4, 1, 1.1] }) }, { translateY: t.interpolate({ inputRange: [0, 1, 2], outputRange: [8, 0, -10] }) }] }]}
     >
       <View style={[s.burstPill, { backgroundColor: color }]}>
         {icon && <Ionicons name={icon} size={13} color="#04161D" />}
-        <Text style={s.burstText}>{text}</Text>
+        <Text style={s.burstText} numberOfLines={1}>
+          {text}
+        </Text>
       </View>
     </Animated.View>
   );
@@ -217,13 +222,13 @@ function Direction({ dir, color, size, still }: { dir: 1 | -1; color: string; si
 }
 
 /** Someone else at the table: their face with the turn's clock, their name and how many cards they hold. */
-function Rival({ seat, count, active, endsAt, winner, waiting }: { seat: Seat; count: number; active: boolean; endsAt: number | null; winner: boolean; waiting: boolean }) {
+function Rival({ seat, size, nameW, count, active, endsAt, winner, waiting }: { seat: Seat; /** Their face and the widest their name may be: a full table leaves each seat less. */ size: number; nameW: number; count: number; active: boolean; endsAt: number | null; winner: boolean; waiting: boolean }) {
   const one = count === 1 && !waiting;
   return (
     <View style={s.rival} accessibilityLabel={`${seat.name}${waiting ? '' : `, ${count} kart`}${active ? ', sıra onda' : ''}`}>
       <SeatFace
         seat={seat}
-        size={SEAT}
+        size={size}
         color={semantic.action}
         active={active}
         endsAt={endsAt}
@@ -236,7 +241,7 @@ function Rival({ seat, count, active, endsAt, winner, waiting }: { seat: Seat; c
           )
         }
       />
-      <Text style={[s.rivalName, active && { color: colors.text }]} numberOfLines={1}>
+      <Text style={[s.rivalName, { maxWidth: nameW }, active && { color: colors.text }]} numberOfLines={1}>
         {firstName(seat.name)}
       </Text>
     </View>
@@ -246,7 +251,7 @@ function Rival({ seat, count, active, endsAt, winner, waiting }: { seat: Seat; c
 function CardsStage({ view, endsAt, busy, onMove, children }: { view: CardsView; endsAt: number | null; busy?: boolean; onMove: (m: CardsMove) => void; children?: ReactNode }) {
   const { still, fx } = useTableFx();
   // The felt grows with the room the sheet has; the cards on it with the felt.
-  const feltH = Math.min(230, Math.max(164, useBoardRoom(0) - CHROME));
+  const feltH = Math.min(230, Math.max(140, useBoardRoom(0) - CHROME));
   const [width, setWidth] = useState(0);
   // The state shown before this one: what changed between the two is what the screen plays.
   // The same step read again (the room's packet after my own move, a turn's end) keeps what it is compared with, so
@@ -278,7 +283,7 @@ function CardsStage({ view, endsAt, busy, onMove, children }: { view: CardsView;
   const feltY = TOP_H + 4;
   const handY = feltY + feltH + 36;
   const cx = width / 2;
-  const cy = feltY + feltH / 2 - 6;
+  const cy = feltY + feltH / 2;
   const pileAt = { x: cx - pw * 0.84, y: cy };
   const topAt = { x: cx + pw * 0.58, y: cy };
   const masa = roomArt('renk-masa');
@@ -363,11 +368,15 @@ function CardsStage({ view, endsAt, busy, onMove, children }: { view: CardsView;
           ? view.drawn !== null
             ? 'Çektiğin kart uyuyor: at ya da tut'
             : any
-              ? 'Sıra sende: parlayan kartlardan birini at'
+              ? 'Sıra sende: parlayan bir kartı at'
               : 'Uyan kartın yok: desteden çek'
           : `${firstName(turnSeat?.name ?? '')} oynuyor…`;
   // No cards yet (a table still waiting): the fan takes no room.
   const stageH = handY + (me >= 0 && hand.length ? handH : 0);
+  // Four colours side by side across the narrowest table.
+  const tile = Math.min(72, Math.floor((width - 48) / 4));
+  // The colour and direction chips clear the played card: only a short felt needs them this near its edge.
+  const chipY = feltY + (feltH < 165 ? 8 : 14);
 
   return (
     <View style={{ gap: 10 }}>
@@ -376,9 +385,10 @@ function CardsStage({ view, endsAt, busy, onMove, children }: { view: CardsView;
           <>
             {rivals.map((seat) => {
               const at = seatAt(seat);
+              const each = width / rivals.length;
               return (
                 <View key={seats[seat].id} style={{ position: 'absolute', left: at.x - 34, top: at.y - SEAT / 2, width: 68, alignItems: 'center' }}>
-                  <Rival seat={seats[seat]} count={view.counts[seat] ?? 0} active={playing && view.turn === seat} endsAt={endsAt} winner={status === 'over' && view.winner === seat} waiting={top === null || status === 'waiting'} />
+                  <Rival seat={seats[seat]} size={each < 60 ? 40 : SEAT} nameW={Math.min(66, Math.floor(each) - 4)} count={view.counts[seat] ?? 0} active={playing && view.turn === seat} endsAt={endsAt} winner={status === 'over' && view.winner === seat} waiting={top === null || status === 'waiting'} />
                 </View>
               );
             })}
@@ -413,12 +423,12 @@ function CardsStage({ view, endsAt, busy, onMove, children }: { view: CardsView;
                   <TopCard key={`${stamp}:${top}`} id={top} w={pw} from={enter} tilt={((top * 37) % 13) - 6} still={still} />
                 </View>
                 {/* The colour to follow, said in words and with its emblem. */}
-                <LinearGradient colors={[tint.light, tint.base, tint.deep]} style={[s.gem, { top: feltY + 14, borderColor: tint.light, boxShadow: `0 0 12px ${tint.base}` }]} accessibilityLabel={`Renk ${tint.name}`}>
+                <LinearGradient colors={[tint.light, tint.base, tint.deep]} style={[s.gem, { top: chipY, borderColor: tint.light, boxShadow: `0 0 12px ${tint.base}` }]} accessibilityLabel={`Renk ${tint.name}`}>
                   <Gloss strength={0.3} />
                   <Emblem color={view.color} size={13} />
                   <Text style={s.gemText}>{tint.name}</Text>
                 </LinearGradient>
-                <View style={[s.dirChip, { top: feltY + 14 }]}>
+                <View style={[s.dirChip, { top: chipY }]}>
                   <Ionicons name="refresh" size={12} color={colors.textDim} style={{ transform: [{ scaleX: view.dir }] }} />
                   <Text style={s.dirText}>{view.dir === 1 ? 'Saat yönü' : 'Ters yön'}</Text>
                 </View>
@@ -444,10 +454,10 @@ function CardsStage({ view, endsAt, busy, onMove, children }: { view: CardsView;
             <View key={stamp} style={StyleSheet.absoluteFill} pointerEvents="none">
               {!still && event?.took && event.took[0] !== me && Array.from({ length: Math.min(4, event.took[1]) }, (_, i) => <Flight key={i} from={pileAt} to={seatAt(event.took![0])} delay={(event.type === 'play' ? FLY_MS : 0) + i * 110} w={40} />)}
               {!still && dealt && rivals.flatMap((seat, ri) => [0, 1, 2].map((i) => <Flight key={`${seat}-${i}`} from={pileAt} to={seatAt(seat)} delay={ri * 70 + i * 190} w={40} />))}
-              {event && event.skipped !== null && <Burst at={{ x: seatAt(event.skipped).x, y: seatAt(event.skipped).y + (event.skipped === me ? -handH / 2 - 8 : 4) }} text={event.took ? `+${event.took[1]} kart` : 'Sıra geçti'} icon={event.took ? 'layers' : 'ban'} color={event.took ? semantic.social : semantic.money} delay={still ? 0 : FLY_MS} still={still} />}
-              {event?.turned && event.skipped === null && <Burst at={{ x: cx, y: cy - 62 }} text="Yön değişti" icon="swap-vertical" color={semantic.money} delay={still ? 0 : FLY_MS} still={still} />}
-              {event?.one && <Burst at={{ x: seatAt(event.seat).x, y: seatAt(event.seat).y + (event.seat === me ? -handH / 2 - 8 : 30) }} text="SON KART!" icon="flame" color="#FFD166" delay={still ? 200 : FLY_MS + 500} still={still} />}
-              {event?.mixed && <Burst at={{ x: pileAt.x, y: pileAt.y - 56 }} text="Deste karıldı" icon="shuffle" color={semantic.action} still={still} />}
+              {event && event.skipped !== null && <Burst stage={width} at={{ x: seatAt(event.skipped).x, y: seatAt(event.skipped).y + (event.skipped === me ? -handH / 2 - 8 : 4) }} text={event.took ? `+${event.took[1]} kart` : 'Sıra geçti'} icon={event.took ? 'layers' : 'ban'} color={event.took ? semantic.social : semantic.money} delay={still ? 0 : FLY_MS} still={still} />}
+              {event?.turned && event.skipped === null && <Burst stage={width} at={{ x: cx, y: cy - 62 }} text="Yön değişti" icon="swap-vertical" color={semantic.money} delay={still ? 0 : FLY_MS} still={still} />}
+              {event?.one && <Burst stage={width} at={{ x: seatAt(event.seat).x, y: seatAt(event.seat).y + (event.seat === me ? -handH / 2 - 8 : 30) }} text="SON KART!" icon="flame" color="#FFD166" delay={still ? 200 : FLY_MS + 500} still={still} />}
+              {event?.mixed && <Burst stage={width} at={{ x: pileAt.x, y: pileAt.y - 56 }} text="Deste karıldı" icon="shuffle" color={semantic.action} still={still} />}
             </View>
 
             {/* My cards. */}
@@ -475,7 +485,7 @@ function CardsStage({ view, endsAt, busy, onMove, children }: { view: CardsView;
                       accessibilityRole="button"
                       accessibilityLabel={c.name}
                     >
-                      <LinearGradient colors={[c.light, c.base, c.deep]} style={s.pickerColor}>
+                      <LinearGradient colors={[c.light, c.base, c.deep]} style={[s.pickerColor, { width: tile }]}>
                         <Gloss radius={16} strength={0.3} />
                         <Emblem color={i} size={24} />
                         <Text style={s.pickerName}>{c.name}</Text>
@@ -499,7 +509,7 @@ function CardsStage({ view, endsAt, busy, onMove, children }: { view: CardsView;
         <Plate active={myTurn} tint={semantic.action} style={s.mine}>
           <SeatFace seat={seats[me]} size={44} color={semantic.action} active={myTurn} endsAt={endsAt} />
           <View style={{ flex: 1 }}>
-            <Text style={s.mineName} numberOfLines={1}>
+            <Text style={s.mineName} numberOfLines={1} adjustsFontSizeToFit>
               Sen · {hand.length} kart
             </Text>
             <Text style={s.mineHint} numberOfLines={1}>
@@ -621,7 +631,7 @@ export function CardsLive({ table, busy, onMove, children }: { table: CardsServe
 
 const s = StyleSheet.create({
   feltRim: { position: 'absolute', left: 6, top: 6, right: 6, bottom: 6, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', borderStyle: 'dashed' },
-  rival: { alignItems: 'center', gap: 2 },
+  rival: { alignItems: 'center', gap: 5 },
   rivalName: { color: colors.textDim, fontSize: 11, lineHeight: 14, fontWeight: '800', maxWidth: 66 },
   count: { minWidth: 20, height: 26, borderRadius: 5, borderWidth: 1.5, borderColor: '#5DEBEF', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, boxShadow: '0 2px 4px rgba(0,0,0,0.5)' },
   countText: { color: colors.text, fontSize: 12, lineHeight: 15, fontWeight: '900' },
@@ -636,20 +646,20 @@ const s = StyleSheet.create({
   dirText: { color: colors.textDim, fontSize: 11, lineHeight: 14, fontWeight: '800' },
   log: { position: 'absolute', left: 12, right: 12, color: colors.textDim, fontSize: 11, lineHeight: 15, textAlign: 'center' },
   prompt: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
-  burst: { position: 'absolute', width: 120, alignItems: 'center', zIndex: 20 },
+  burst: { position: 'absolute', width: BURST_W, alignItems: 'center', zIndex: 20 },
   burstPill: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 999, paddingHorizontal: 9, height: 26, borderWidth: 1.5, borderColor: '#0A1426', boxShadow: '0 3px 8px rgba(0,0,0,0.45)' },
   burstText: { color: '#04161D', fontSize: 12, lineHeight: 16, fontWeight: '900' },
   picker: { position: 'absolute', left: 0, right: 0, borderRadius: 28, backgroundColor: 'rgba(8,15,30,0.88)', alignItems: 'center', justifyContent: 'center', gap: 12, zIndex: 25 },
   pickerTitle: { color: colors.text, fontFamily: fonts.displayBold, fontSize: 16, lineHeight: 22 },
   pickerRow: { flexDirection: 'row', gap: 8 },
-  pickerColor: { width: 72, height: 78, borderRadius: 16, alignItems: 'center', justifyContent: 'center', gap: 4, borderWidth: 2, borderColor: 'rgba(255,255,255,0.85)', overflow: 'hidden', boxShadow: '0 6px 14px rgba(0,0,0,0.5)' },
+  pickerColor: { height: 78, borderRadius: 16, alignItems: 'center', justifyContent: 'center', gap: 4, borderWidth: 2, borderColor: 'rgba(255,255,255,0.85)', overflow: 'hidden', boxShadow: '0 6px 14px rgba(0,0,0,0.5)' },
   pickerName: { color: '#FFFFFF', fontSize: 12, lineHeight: 16, fontWeight: '900' },
-  mine: { gap: 10, paddingHorizontal: 10, paddingVertical: 8 },
+  mine: { gap: 6, paddingHorizontal: 10, paddingVertical: 8 },
   mineName: { color: colors.text, fontSize: 14, lineHeight: 19, fontWeight: '800' },
   mineHint: { color: colors.textDim, fontSize: 12, lineHeight: 16, fontWeight: '700' },
   sizes: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   sizesLabel: { color: colors.textDim, fontSize: 12, fontWeight: '700', width: 54 },
-  size: { flex: 1, minHeight: 36, borderRadius: 999, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
+  size: { flex: 1, minHeight: 44, borderRadius: 999, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
   sizeOn: { backgroundColor: colors.primary, borderColor: colors.primary },
   sizeText: { color: colors.text, fontSize: 12, fontWeight: '800' },
   note: { color: colors.textDim, fontSize: 12, lineHeight: 17, textAlign: 'center' },

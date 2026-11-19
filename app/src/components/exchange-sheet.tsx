@@ -4,7 +4,7 @@
 // Only the withdrawable part can be exchanged; locked diamonds (lib/diamond-locks) wait for their lock.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
-import { Modal, Pressable, View } from 'react-native';
+import { Modal, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 
@@ -40,7 +40,8 @@ export function ExchangeSheet({ visible, onClose, split }: { visible: boolean; o
   const { colors, semantic } = useTheme();
   const s = useStyles();
   // Android modals draw edge to edge: keep the button row above the navigation bar.
-  const paddingBottom = Math.max(28, useSafeAreaInsets().bottom + 8);
+  const insets = useSafeAreaInsets();
+  const paddingBottom = Math.max(28, insets.bottom + 8);
   const [raw, setRaw] = useState('');
   const [focused, setFocused] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -84,7 +85,7 @@ export function ExchangeSheet({ visible, onClose, split }: { visible: boolean; o
     <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
       <KeyboardAvoid style={{ flex: 1 }}>
         <Pressable style={s.backdrop} onPress={close} accessibilityLabel="Kapat" />
-        <View style={[s.sheet, { paddingBottom }]}>
+        <View style={[s.sheet, { paddingBottom, marginTop: insets.top, flexShrink: 1 }]}>
           <View style={s.handle} />
           <View style={s.head}>
             <Text style={s.title}>Jetona çevir</Text>
@@ -92,73 +93,76 @@ export function ExchangeSheet({ visible, onClose, split }: { visible: boolean; o
               <Ionicons name="close" size={18} color={colors.textDim} />
             </Pressable>
           </View>
-          <Text style={s.sub}>Elmasların, uygulamadaki jeton fiyatıyla anında jetona dönüşür. Ücret kesilmez.</Text>
+          {/* A short phone's number pad leaves less room than the sheet needs. paddingTop: s.sub's negative margin. */}
+          <ScrollView style={{ flexShrink: 1, marginTop: -4 }} contentContainerStyle={{ gap: 12, paddingTop: 4 }} keyboardShouldPersistTaps="handled">
+            <Text style={s.sub}>Elmasların, uygulamadaki jeton fiyatıyla anında jetona dönüşür. Ücret kesilmez.</Text>
 
-          <View style={[s.field, focused && { borderColor: semantic.actionText }]}>
-            <Icon3D name="diamond" size={26} />
-            <TextInput
-              value={raw ? fmt(amount) : ''}
-              onChangeText={(t) => setRaw(t.replace(/\D/g, '').replace(/^0+/, '').slice(0, 12))}
-              keyboardType="number-pad"
-              placeholder="0"
-              placeholderTextColor={colors.textDim}
-              onFocus={() => setFocused(true)}
-              onBlur={() => setFocused(false)}
-              style={s.input}
-              accessibilityLabel="Çevrilecek elmas"
-            />
-            <Text style={s.unit}>elmas</Text>
-          </View>
-          <Text style={s.balance}>
-            Çekilebilir: {fmt(free)} 💎{locked > 0 ? ` · Kilitli: ${fmt(locked)} 💎` : ''}
-          </Text>
+            <View style={[s.field, focused && { borderColor: semantic.actionText }]}>
+              <Icon3D name="diamond" size={26} />
+              <TextInput
+                value={raw ? fmt(amount) : ''}
+                onChangeText={(t) => setRaw(t.replace(/\D/g, '').replace(/^0+/, '').slice(0, 12))}
+                keyboardType="number-pad"
+                placeholder="0"
+                placeholderTextColor={colors.textDim}
+                onFocus={() => setFocused(true)}
+                onBlur={() => setFocused(false)}
+                style={s.input}
+                accessibilityLabel="Çevrilecek elmas"
+              />
+              <Text style={s.unit}>elmas</Text>
+            </View>
+            <Text style={s.balance}>
+              Çekilebilir: {fmt(free)} 💎{locked > 0 ? ` · Kilitli: ${fmt(locked)} 💎` : ''}
+            </Text>
 
-          <View style={s.chips}>
-            {SHARES.map((c) => {
-              const n = Math.floor(free * c.f);
-              const on = raw !== '' && amount === n;
-              return (
-                <Pressable key={c.label} disabled={n < RULES.exchangeMinDiamonds} onPress={() => setRaw(String(n))} style={[s.chip, on && s.chipOn, n < RULES.exchangeMinDiamonds && { opacity: 0.4 }]} accessibilityRole="button" accessibilityState={{ selected: on }}>
-                  <Text style={[s.chipText, on && { color: semantic.actionInk }]}>{c.label}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
+            <View style={s.chips}>
+              {SHARES.map((c) => {
+                const n = Math.floor(free * c.f);
+                const on = raw !== '' && amount === n;
+                return (
+                  <Pressable key={c.label} disabled={n < RULES.exchangeMinDiamonds} onPress={() => setRaw(String(n))} style={[s.chip, on && s.chipOn, n < RULES.exchangeMinDiamonds && { opacity: 0.4 }]} accessibilityRole="button" accessibilityState={{ selected: on }}>
+                    <Text style={[s.chipText, on && { color: semantic.actionInk }]}>{c.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
 
-          <View style={s.preview}>
-            <View style={s.side}>
-              <Text style={s.sideLabel}>VERİLEN</Text>
-              <View style={s.sideRow}>
-                <Icon3D name="diamond" size={20} />
-                <Text style={[s.sideN, s.diamondN]} numberOfLines={1} adjustsFontSizeToFit>{fmt(amount)}</Text>
+            <View style={s.preview}>
+              <View style={s.side}>
+                <Text style={s.sideLabel}>VERİLEN</Text>
+                <View style={s.sideRow}>
+                  <Icon3D name="diamond" size={20} />
+                  <Text style={[s.sideN, s.diamondN]} numberOfLines={1} adjustsFontSizeToFit>{fmt(amount)}</Text>
+                </View>
+              </View>
+              <View style={s.arrow}>
+                <Ionicons name="arrow-forward" size={18} color={semantic.actionInk} />
+              </View>
+              <View style={[s.side, { alignItems: 'flex-end' }]}>
+                <Text style={s.sideLabel}>ALINAN</Text>
+                <View style={s.sideRow}>
+                  <Icon3D name="coin" size={20} />
+                  <Text style={[s.sideN, { color: semantic.moneyText }]} numberOfLines={1} adjustsFontSizeToFit>{fmt(quote.ok ? quote.coins : 0)}</Text>
+                </View>
               </View>
             </View>
-            <View style={s.arrow}>
-              <Ionicons name="arrow-forward" size={18} color={semantic.actionInk} />
-            </View>
-            <View style={[s.side, { alignItems: 'flex-end' }]}>
-              <Text style={s.sideLabel}>ALINAN</Text>
-              <View style={s.sideRow}>
-                <Icon3D name="coin" size={20} />
-                <Text style={[s.sideN, { color: semantic.moneyText }]} numberOfLines={1} adjustsFontSizeToFit>{fmt(quote.ok ? quote.coins : 0)}</Text>
-              </View>
-            </View>
-          </View>
-          <Text style={s.rate}>
-            Kur: 10.000 elmas = {fmt(per10k)} jeton · En az {fmt(RULES.exchangeMinDiamonds)} elmas
-          </Text>
-          <Text style={[s.note, !quote.ok && raw !== '' && { color: semantic.danger }]}>
-            {tooFew
-              ? locked > 0
-                ? `Çevirmek için en az ${fmt(RULES.exchangeMinDiamonds)} çekilebilir elmas gerekir; kilitli elmasların açılınca çevirebilirsin.`
-                : `Çevirmek için en az ${fmt(RULES.exchangeMinDiamonds)} elmas gerekir.`
-              : !quote.ok && raw !== ''
-                ? quote.reason
-                : `Çeviriden sonra: ${fmt(diamonds - (quote.ok ? amount : 0))} 💎 · ${fmt(coins + (quote.ok ? quote.coins : 0))} jeton`}
-          </Text>
+            <Text style={s.rate}>
+              Kur: 10.000 elmas = {fmt(per10k)} jeton · En az {fmt(RULES.exchangeMinDiamonds)} elmas
+            </Text>
+            <Text style={[s.note, !quote.ok && raw !== '' && { color: semantic.danger }]}>
+              {tooFew
+                ? locked > 0
+                  ? `Çevirmek için en az ${fmt(RULES.exchangeMinDiamonds)} çekilebilir elmas gerekir; kilitli elmasların açılınca çevirebilirsin.`
+                  : `Çevirmek için en az ${fmt(RULES.exchangeMinDiamonds)} elmas gerekir.`
+                : !quote.ok && raw !== ''
+                  ? quote.reason
+                  : `Çeviriden sonra: ${fmt(diamonds - (quote.ok ? amount : 0))} 💎 · ${fmt(coins + (quote.ok ? quote.coins : 0))} jeton`}
+            </Text>
 
-          <Button title={quote.ok ? `${fmt(quote.coins)} jetona çevir` : 'Çevir'} icon="swap-horizontal" variant="money" disabled={!quote.ok || busy} onPress={submit} />
-          <Text style={s.fine}>Çevrilen elmas nakde dönmez; jetonları hediye, oyun ve mağazada kullanabilirsin.</Text>
+            <Button title={quote.ok ? `${fmt(quote.coins)} jetona çevir` : 'Çevir'} icon="swap-horizontal" variant="money" disabled={!quote.ok || busy} onPress={submit} />
+            <Text style={s.fine}>Çevrilen elmas nakde dönmez; jetonları hediye, oyun ve mağazada kullanabilirsin.</Text>
+          </ScrollView>
         </View>
       </KeyboardAvoid>
     </Modal>

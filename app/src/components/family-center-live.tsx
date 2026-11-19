@@ -204,7 +204,7 @@ export function LiveFamilyTasks() {
       <Header
         title="Görevler"
         right={
-          <Pressable style={[styles.pill, ov.checkedIn && { opacity: 0.6 }]} onPress={() => void checkIn()} accessibilityLabel="Aile yoklaması" accessibilityState={{ disabled: ov.checkedIn }}>
+          <Pressable style={[styles.pill, ov.checkedIn && { opacity: 0.6 }]} hitSlop={{ top: 9, bottom: 9 }} onPress={() => void checkIn()} accessibilityLabel="Aile yoklaması" accessibilityState={{ disabled: ov.checkedIn }}>
             <Text style={styles.pillText}>{ov.checkedIn ? 'Yoklama alındı' : 'Yoklama ver'}</Text>
           </Pressable>
         }
@@ -212,14 +212,18 @@ export function LiveFamilyTasks() {
       <ScrollView contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: 40 }}>
         <Card style={{ gap: 12 }}>
           <View style={styles.row}>
-            <StateIcon name="shield-checkmark-outline" />
+            <StateIcon name="shield-checkmark-outline" size={48} />
             <View style={{ flex: 1 }}>
               <Text style={styles.dim}>Ailenin bu haftaki gücü</Text>
-              <Text style={styles.big}>{fmt(ov.week.power)}</Text>
+              <Text style={styles.big} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+                {fmt(ov.week.power)}
+              </Text>
             </View>
             <View style={styles.mineBox}>
               <Text style={styles.dim}>Katkım</Text>
-              <Text style={styles.mineValue}>{fmt(mine)}</Text>
+              <Text style={styles.mineValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+                {fmt(mine)}
+              </Text>
             </View>
           </View>
           <View style={styles.chests}>
@@ -228,10 +232,18 @@ export function LiveFamilyTasks() {
               return (
                 <Pressable key={c.id} style={styles.chest} onPress={() => void chest(c)} accessibilityRole="button" accessibilityLabel={`${name}: ${c.coins} ödül jetonu, ${c.claimed ? 'alındı' : c.reached ? 'açılabilir' : 'kilitli'}`}>
                   <Ionicons name={c.claimed ? 'cube-outline' : 'cube'} size={30} color={CHEST_TINT[c.id] ?? colors.primary} />
-                  <Text style={styles.chestNeed}>{fmt(c.need)}</Text>
+                  <Text style={styles.chestNeed} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                    {fmt(c.need)}
+                  </Text>
                   <Text style={styles.chestReward}>{c.coins} ödül jetonu</Text>
                   <View style={[styles.alBtn, !c.reached && { backgroundColor: colors.cardAlt }, c.claimed && { backgroundColor: colors.border }]}>
-                    {c.claimed || c.reached ? <Text style={styles.btnText}>{c.claimed ? 'Alındı' : 'Al'}</Text> : <Ionicons name="lock-closed" size={14} color={colors.textDim} />}
+                    {c.claimed || c.reached ? (
+                      <Text style={styles.btnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                        {c.claimed ? 'Alındı' : 'Al'}
+                      </Text>
+                    ) : (
+                      <Ionicons name="lock-closed" size={14} color={colors.textDim} />
+                    )}
                   </View>
                 </Pressable>
               );
@@ -337,7 +349,7 @@ export function LiveFamilyPairs() {
                   <Avatar uri={p.b?.avatarUrl ?? undefined} name={p.b?.name ?? ''} size={36} />
                 </Pressable>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.taskTitle} numberOfLines={1}>
+                  <Text style={styles.taskTitle} numberOfLines={2}>
                     {p.a?.name} · {p.b?.name}
                   </Text>
                   <Text style={styles.dim}>{isBondKind(p.kind) ? BOND_KINDS[p.kind].label : 'Bağ'}</Text>
@@ -368,13 +380,13 @@ const useStyles = makeStyles(({ colors, semantic, dark }) => ({
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   pill: { backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
   pillText: { color: '#fff', fontWeight: '800', fontSize: 12 },
-  mineBox: { backgroundColor: colors.cardAlt, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8, alignItems: 'center' },
+  mineBox: { backgroundColor: colors.cardAlt, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8, alignItems: 'center', maxWidth: 96 },
   mineValue: { color: colors.text, fontWeight: '800', fontSize: 16 },
   chests: { flexDirection: 'row', gap: 8 },
   chest: { flex: 1, alignItems: 'center', backgroundColor: colors.cardAlt, borderRadius: 14, paddingVertical: 10, paddingHorizontal: 4, gap: 4 },
   chestNeed: { color: semantic.tonalText, fontSize: 12, fontWeight: '800' },
   chestReward: { color: colors.textDim, fontSize: 11, textAlign: 'center' },
-  alBtn: { backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 5, minWidth: 54, alignItems: 'center' },
+  alBtn: { backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 6, paddingVertical: 5, minWidth: 0, alignSelf: 'stretch', alignItems: 'center', marginTop: 'auto' },
   btnText: { color: '#fff', fontWeight: '800', fontSize: 13 },
   task: { borderTopWidth: 1, borderTopColor: colors.border, paddingVertical: 12, gap: 6, marginTop: 6 },
   taskIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: dark ? 'rgba(255,95,162,0.2)' : 'rgba(208,46,120,0.12)', alignItems: 'center', justifyContent: 'center' },

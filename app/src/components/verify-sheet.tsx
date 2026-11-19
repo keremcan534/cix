@@ -6,6 +6,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, Linking, Modal, Pressable, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CodeBoxes, useResendWait } from '@/components/code-boxes';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
@@ -63,6 +64,8 @@ function SheetBody({ kind, open, onClose }: { kind: CodeKind; open: boolean; onC
   const { verify } = useRemoteConfig();
   const { colors, semantic } = useTheme();
   const s = useStyles();
+  // Android modals draw edge to edge: keep the last button above the navigation bar.
+  const paddingBottom = Math.max(28, useSafeAreaInsets().bottom + 8);
   const byWhatsapp = kind === 'phone' && verify.whatsapp;
   const first: Step = byWhatsapp ? { at: 'whatsapp', link: null } : { at: 'enter' };
   const [step, setStep] = useState<Step>(first);
@@ -341,7 +344,7 @@ function SheetBody({ kind, open, onClose }: { kind: CodeKind; open: boolean; onC
   return (
     <KeyboardAvoid style={{ flex: 1 }}>
       <Pressable style={s.backdrop} onPress={onClose} accessibilityLabel="Kapat" />
-      <View style={s.sheet}>
+      <View style={[s.sheet, { paddingBottom }]}>
         <View style={s.handle} />
         <View style={s.head}>
           <Text style={s.title}>{title}</Text>
@@ -382,7 +385,7 @@ const useStyles = makeStyles(({ colors, semantic, ink, dark }) => ({
   hint: { color: colors.textDim, fontSize: 13, marginTop: -4, marginLeft: 4 },
   hintStrong: { color: semantic.actionText, fontWeight: '700' },
   status: { minHeight: 22, alignItems: 'center', justifyContent: 'center' },
-  links: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 4 },
+  links: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 12, alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 4 },
   dim: { color: colors.textDim, fontSize: 13, fontWeight: '600' },
   fine: { color: colors.textDim, fontSize: 12, lineHeight: 17 },
   center: { alignItems: 'center' },

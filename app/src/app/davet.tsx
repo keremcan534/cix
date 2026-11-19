@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { ReactNode } from 'react';
 import { Pressable, ScrollView, Share, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { InviteCodeCard, InviteStatsCard } from '@/components/invite-live';
 import { LoadError } from '@/components/load-error';
@@ -69,6 +69,7 @@ function LiveInvite() {
 function InviteBody({ code, coins, steps, note, off = false, children }: { code: string; coins: number; steps: string[]; note: string; off?: boolean; children?: ReactNode }) {
   const { colors, semantic } = useTheme();
   const styles = useStyles();
+  const insets = useSafeAreaInsets();
   const coinsText = `${coins.toLocaleString('tr-TR')} jeton`;
 
   const shareInvite = async () => {
@@ -131,7 +132,8 @@ function InviteBody({ code, coins, steps, note, off = false, children }: { code:
       </ScrollView>
 
       {!off && (
-        <View style={styles.sticky}>
+        // Absolute, so SafeAreaView's padding doesn't reach it: it keeps clear of the navigation bar itself.
+        <View style={[styles.sticky, { paddingBottom: Math.max(24, insets.bottom + 12) }]}>
           <Pressable onPress={shareInvite} style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]} accessibilityRole="button">
             <LinearGradient colors={['#E2475B', semantic.socialFill]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.stickyBtn}>
               <Ionicons name="share-social" size={18} color="#fff" />

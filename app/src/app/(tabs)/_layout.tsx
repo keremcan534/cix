@@ -125,7 +125,8 @@ const useStyles = makeStyles(({ colors }) => ({
     bottom: 0,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    backgroundColor: 'rgba(255,240,247,0.97)',
+    // Opaque: the rooms list scrolls under this bar and must not show through its icons.
+    backgroundColor: glass.fill,
     borderWidth: 1.5,
     borderBottomWidth: 0,
     borderColor: glass.rim,

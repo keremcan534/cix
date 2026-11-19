@@ -1,7 +1,7 @@
 // Phone build: @livekit/react-native's WebRTC globals and audio session, shared by the voice rooms
 // (voice-setup.ts) and 1v1 calls (call-media.ts). registerGlobals patches globals, so it runs once.
 import { AudioSession, registerGlobals } from '@livekit/react-native';
-import { AppState } from 'react-native';
+import { AppRegistry, AppState, Platform } from 'react-native';
 
 import { startRoomService, stopRoomService } from '../../modules/similar-room-service';
 
@@ -34,6 +34,16 @@ export async function releaseAudio(who: 'room' | 'call') {
   service = false;
   await AudioSession.stopAudioSession();
 }
+
+// Android stops the app's timers in the background unless a headless task runs. The room service holds this one for as
+// long as it runs (SimilarRoomServiceModule), so a call keeps beating and a room can reconnect while the app is away.
+if (Platform.OS === 'android') AppRegistry.registerHeadlessTask('SimilarKeepAlive', () => () => new Promise<void>(() => {}));
+
+// Android refuses the service while the app is off screen (left during the join): it starts on the way back.
+AppState.addEventListener('change', (next) => {
+  if (next !== 'active' || service || holders.size === 0) return;
+  service = startRoomService(NOTE_TITLE, holders.has('call') ? NOTE_CALL : NOTE_ROOM);
+});
 
 /** The room keeps playing and the mic keeps sending while the app is in the background (the service runs). */
 export const audioInBackground = () => service;

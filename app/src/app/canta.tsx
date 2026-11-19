@@ -69,6 +69,7 @@ export default function BagScreen() {
                 setTab(k.key);
                 if (k.key === 'gift') void refreshBackpack();
               }}
+              hitSlop={{ top: 4, bottom: 4 }}
               style={[styles.tab, tab === k.key && styles.tabActive]}
               accessibilityRole="tab"
               accessibilityState={{ selected: tab === k.key }}
@@ -119,7 +120,10 @@ export default function BagScreen() {
             const on = equipped[c.kind] === c.id;
             return (
               <Shelf key={c.id} hue={c.color?.[0] ?? hueAt(i)} on={on}>
-                <ItemPreview item={c} avatar={me.avatar} voice={voiceOf(me.gender, me.showGender !== false)} still={settings.reduceMotion} />
+                {/* One height for every kind of preview, so names and durations line up across a row. */}
+                <View style={styles.previewSlot}>
+                  <ItemPreview item={c} avatar={me.avatar} voice={voiceOf(me.gender, me.showGender !== false)} still={settings.reduceMotion} />
+                </View>
                 <Text style={styles.name} numberOfLines={2}>
                   {c.name}
                 </Text>
@@ -146,14 +150,15 @@ export default function BagScreen() {
 }
 
 const useStyles = makeStyles((t) => ({
+  previewSlot: { height: 104, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center' },
   tabTrack: { marginHorizontal: 16, marginBottom: 12, borderRadius: 999, overflow: 'hidden', ...glassChipOf(t) },
-  tab: { paddingHorizontal: 13, paddingVertical: 6, borderRadius: 999 },
+  tab: { paddingHorizontal: 13, paddingVertical: 9, borderRadius: 999 },
   tabActive: { backgroundColor: t.semantic.action, boxShadow: '0 3px 12px rgba(255,95,162,0.4)' },
   tabText: { color: t.colors.textDim, fontFamily: fonts.displayBold, fontSize: 13, lineHeight: 18 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 12, paddingHorizontal: 16, paddingBottom: 30 },
   note: { width: '100%', color: t.colors.textDim, fontSize: 12, textAlign: 'center' },
   name: { color: t.colors.text, fontFamily: fonts.display, fontSize: 16, lineHeight: 21, textAlign: 'center' },
-  meta: { color: t.colors.textDim, fontSize: 12 },
+  meta: { color: t.colors.textDim, fontSize: 12, textAlign: 'center' },
   source: { color: t.colors.primaryText, fontSize: 11, fontWeight: '700' },
   cta: { marginTop: 'auto' },
   giftArt: { height: 104, justifyContent: 'center', alignItems: 'center' },

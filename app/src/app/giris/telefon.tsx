@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -59,71 +59,74 @@ export default function PhoneScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <KeyboardAvoid style={{ flex: 1 }}>
-        {isEmail ? (
-          <AuthHeader step={1} title="E-posta adresin" subtitle="Adresine 6 haneli bir giriş kodu göndereceğiz." />
-        ) : (
-          <AuthHeader step={1} title="Telefon numaran" subtitle="Sana bir doğrulama kodu göndereceğiz." />
-        )}
-        <View style={styles.row}>
-          <View style={styles.prefix}>
+        {/* A long error on a small phone must not push the button behind the keyboard for good. */}
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1 }}>
+          {isEmail ? (
+            <AuthHeader step={1} title="E-posta adresin" subtitle="Adresine 6 haneli bir giriş kodu göndereceğiz." />
+          ) : (
+            <AuthHeader step={1} title="Telefon numaran" subtitle="Sana bir doğrulama kodu göndereceğiz." />
+          )}
+          <View style={styles.row}>
+            <View style={styles.prefix}>
+              {isEmail ? (
+                <Ionicons name="mail-outline" size={20} color={colors.textDim} />
+              ) : (
+                <>
+                  <Text style={{ fontSize: 18 }}>🇹🇷</Text>
+                  <Text style={styles.prefixText}>+90</Text>
+                </>
+              )}
+            </View>
             {isEmail ? (
-              <Ionicons name="mail-outline" size={20} color={colors.textDim} />
+              <TextInput
+                value={address}
+                onChangeText={(t) => {
+                  setAddress(t);
+                  if (error) setError(null);
+                }}
+                placeholder="ornek@gmail.com"
+                placeholderTextColor={colors.textDim}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="email"
+                textContentType="emailAddress"
+                returnKeyType="send"
+                style={[styles.input, styles.emailInput]}
+                autoFocus
+                onSubmitEditing={() => void submit()}
+                accessibilityLabel="E-posta adresi"
+              />
             ) : (
-              <>
-                <Text style={{ fontSize: 18 }}>🇹🇷</Text>
-                <Text style={styles.prefixText}>+90</Text>
-              </>
+              <TextInput
+                value={format(digits)}
+                onChangeText={(t) => {
+                  setDigits(t.replace(/\D/g, '').slice(0, 10));
+                  if (error) setError(null);
+                }}
+                placeholder="5XX XXX XX XX"
+                placeholderTextColor={colors.textDim}
+                keyboardType="phone-pad"
+                style={styles.input}
+                autoFocus
+                onSubmitEditing={() => void submit()}
+              />
             )}
           </View>
-          {isEmail ? (
-            <TextInput
-              value={address}
-              onChangeText={(t) => {
-                setAddress(t);
-                if (error) setError(null);
-              }}
-              placeholder="ornek@gmail.com"
-              placeholderTextColor={colors.textDim}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-              autoComplete="email"
-              textContentType="emailAddress"
-              returnKeyType="send"
-              style={[styles.input, styles.emailInput]}
-              autoFocus
-              onSubmitEditing={() => void submit()}
-              accessibilityLabel="E-posta adresi"
-            />
-          ) : (
-            <TextInput
-              value={format(digits)}
-              onChangeText={(t) => {
-                setDigits(t.replace(/\D/g, '').slice(0, 10));
-                if (error) setError(null);
-              }}
-              placeholder="5XX XXX XX XX"
-              placeholderTextColor={colors.textDim}
-              keyboardType="phone-pad"
-              style={styles.input}
-              autoFocus
-              onSubmitEditing={() => void submit()}
-            />
+          {!isEmail && digits.length === 10 && !digits.startsWith('5') && <Text style={styles.error}>Numara 5 ile başlamalı.</Text>}
+          {!!error && <Text style={styles.error}>{error}</Text>}
+          {!!hint && (
+            <Pressable onPress={() => setAddress(hint)} hitSlop={6} style={styles.hintRow} accessibilityRole="button" accessibilityLabel={`${hint} olarak düzelt`}>
+              <Text style={styles.hint}>
+                Bunu mu demek istedin? <Text style={{ color: semantic.actionText, fontWeight: '700' }}>{hint}</Text>
+              </Text>
+            </Pressable>
           )}
-        </View>
-        {!isEmail && digits.length === 10 && !digits.startsWith('5') && <Text style={styles.error}>Numara 5 ile başlamalı.</Text>}
-        {!!error && <Text style={styles.error}>{error}</Text>}
-        {!!hint && (
-          <Pressable onPress={() => setAddress(hint)} hitSlop={6} style={styles.hintRow} accessibilityRole="button" accessibilityLabel={`${hint} olarak düzelt`}>
-            <Text style={styles.hint}>
-              Bunu mu demek istedin? <Text style={{ color: semantic.actionText, fontWeight: '700' }}>{hint}</Text>
-            </Text>
-          </Pressable>
-        )}
-        <View style={{ flex: 1 }} />
-        <View style={{ padding: 20 }}>
-          <GradientButton title={busy ? 'Gönderiliyor…' : 'Kod gönder'} onPress={() => void submit()} style={{ opacity: valid && !busy ? 1 : 0.4 }} />
-        </View>
+          <View style={{ flex: 1 }} />
+          <View style={{ padding: 20 }}>
+            <GradientButton title={busy ? 'Gönderiliyor…' : 'Kod gönder'} onPress={() => void submit()} style={{ opacity: valid && !busy ? 1 : 0.4 }} />
+          </View>
+        </ScrollView>
       </KeyboardAvoid>
     </SafeAreaView>
   );

@@ -133,7 +133,7 @@ function PayoutCard({ p, onDone }: { p: admin.AgencyPayout; onDone: () => void }
       title={money(p)}
       sub={`${fmtUsd(p.usd)} · ${p.currency === 'TRY' ? 'TL olarak ödenecek' : 'USD olarak ödenecek'}`}
       pill={
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'flex-end' }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'flex-end', maxWidth: '55%' }}>
           {blocked && <StatusPill text="Test jetonu · ödenemez" tone="danger" />}
           <StatusPill text={p.statusLabel} tone={TONE[p.status]} />
         </View>

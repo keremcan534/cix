@@ -11,10 +11,10 @@ import { Text } from '@/components/text';
 import { CasinoLock } from '@/components/games/casino';
 import { GameInfoSheet } from '@/components/games/fx/info-sheet';
 import { ResultTrail, pushTrail, type TrailItem } from '@/components/games/fx/result-trail';
-import { ChoiceChip, SALON, SalonStage, SideButton, StageHeader, StageStatus, WideAction, choiceInk, salonScreen, tabular, useBox, wideInk, type StatusTone } from '@/components/games/fx/salon';
+import { ChoiceChip, SALON, SalonStage, SideButton, StageHeader, StageStatus, WideAction, choiceInk, salonScreen, salonScreenShort, tabular, useBox, wideInk, type StatusTone } from '@/components/games/fx/salon';
 import { salonArt, type SalonArtName } from '@/components/games/fx/salon-art';
 import { useWinFx } from '@/components/games/fx/win-fx';
-import { WalletRow, fmt, sleep } from '@/components/games/slot-kit';
+import { WalletRow, fmt, sleep, useShortGame } from '@/components/games/slot-kit';
 import { BALL_R, CUPS, CUP_DEPTH, FIELD, HEIGHT, LANES, LANE_NAME, PEGS, POCKETS, POCKET_W, POCKET_Y, RAIL_Y, TARGETS, WIDTH, type Lane } from '@/lib/bilye/board';
 import { CHANNEL_X, bilyePath, launchX, type BilyePath } from '@/lib/bilye/path';
 import { FRAME_MS } from '@/lib/bilye/physics';
@@ -95,6 +95,8 @@ export function BilyePlayer({ entry }: { entry: Entry }) {
   const [lane, setLane] = useState<Lane>('orta');
   // The board takes the stage's free height and keeps its shape within it.
   const area = useBox();
+  // A short phone: the last launches go under the controls so the launch button shows without scrolling.
+  const short = useShortGame(entry);
   const [shine, setShine] = useState(0);
   const [path, setPath] = useState<BilyePath | null>(null);
   const [lit, setLit] = useState<number[]>([]);
@@ -233,10 +235,11 @@ export function BilyePlayer({ entry }: { entry: Entry }) {
   const boardW = WIDTH * k;
   const boardH = HEIGHT * k;
   const chances = LANES.map((l) => bilyeChances(l));
+  const trailRow = <ResultTrail items={trail} empty="Son atışlar burada görünür" />;
 
   return (
-    <View style={salonScreen}>
-      <SalonStage colors={['#1E3366', '#111E44', '#081128']} win={shine} minHeight={330}>
+    <View style={short ? salonScreenShort : salonScreen}>
+      <SalonStage colors={['#1E3366', '#111E44', '#081128']} win={shine} minHeight={short ? undefined : 330}>
         <StageHeader title="PACHINKO" kicker="ÇİVİLER · CEPLER · KUPALAR" onInfo={() => setInfo(true)} />
         <View style={s.area} onLayout={area.onLayout}>
         {k > 0 && (
@@ -275,7 +278,7 @@ export function BilyePlayer({ entry }: { entry: Entry }) {
         )}
         </View>
         <StageStatus text={status.text} tone={status.tone} amount={status.amount} label={status.label} />
-        <ResultTrail items={trail} empty="Son atışlar burada görünür" />
+        {!short && trailRow}
         {win.layer}
       </SalonStage>
 
@@ -305,6 +308,7 @@ export function BilyePlayer({ entry }: { entry: Entry }) {
           <Text style={[tabular, s.goText, wideInk()]}>Fırlat · {fmt(bet)}</Text>
         </WideAction>
       </View>
+      {short && trailRow}
 
       <GameInfoSheet visible={info} onClose={() => setInfo(false)} title={game.name} rules={game.rules}>
         <View style={{ gap: 6 }}>

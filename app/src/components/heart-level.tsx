@@ -333,7 +333,7 @@ const useStyles = makeStyles(({ colors, dark, lift }) => ({
   badge: { flexDirection: 'row', alignItems: 'center' },
   badgeText: { color: '#fff', fontWeight: '800' },
   pin: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
-  card: { backgroundColor: colors.card, borderRadius: 16, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, gap: 8, marginTop: 12, ...lift },
+  card: { backgroundColor: colors.card, borderRadius: 16, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, gap: 8, marginTop: 4, ...lift },
   cardHead: { color: colors.textDim, fontSize: 12, fontWeight: '700' },
   cardRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 },
   cardTitle: { color: CHAT_HEART.tint, fontSize: 15, fontWeight: '800', flexShrink: 1 },

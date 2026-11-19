@@ -6,6 +6,7 @@
 // connection.
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
 import { GiftArt } from '@/components/GiftArt';
@@ -23,6 +24,7 @@ export function GiftCombo({
   price,
   count,
   restartKey,
+  right = 14,
   onPress,
   onExpire,
 }: {
@@ -33,9 +35,13 @@ export function GiftCombo({
   count: number;
   /** Changes on every successful send; restarts the line. */
   restartKey: number;
+  /** From the screen's right edge: further in while a lucky bag holds the corner. */
+  right?: number;
   onPress: () => void;
   onExpire: () => void;
 }) {
+  // Just over the room's bottom bar, whichever navigation the phone uses.
+  const { bottom } = useSafeAreaInsets();
   const [p] = useState(() => new Animated.Value(0));
   const [spin] = useState(() => new Animated.Value(0));
   const [pop] = useState(() => new Animated.Value(1));
@@ -63,7 +69,7 @@ export function GiftCombo({
   const wheel = spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
 
   return (
-    <View style={s.wrap} pointerEvents="box-none">
+    <View style={[s.wrap, { bottom: bottom + 68, right }]} pointerEvents="box-none">
       <Pressable onPress={onPress} hitSlop={8} accessibilityRole="button" accessibilityLabel={`${name} tekrar gönder, ${price} jeton. Şu ana kadar ${count} kez gönderildi.`}>
         <Animated.View style={[s.ring, { transform: [{ scale: pop }] }]}>
           <View style={[s.circle, { borderColor: 'rgba(255,255,255,0.18)' }]} />
@@ -90,14 +96,14 @@ export function GiftCombo({
 }
 
 const s = StyleSheet.create({
-  wrap: { position: 'absolute', right: 10, bottom: 92, alignItems: 'center', zIndex: 70 },
+  wrap: { position: 'absolute', alignItems: 'center', zIndex: 70 },
   ring: { width: S, height: S },
   half: { position: 'absolute', top: 0, width: S / 2, height: S, overflow: 'hidden' },
   circle: { position: 'absolute', top: 0, width: S, height: S, borderRadius: S / 2, borderWidth: W, borderColor: 'transparent' },
   disc: { position: 'absolute', top: W + 3, left: W + 3, width: S - 2 * (W + 3), height: S - 2 * (W + 3), borderRadius: S, backgroundColor: '#3A2A08', borderWidth: 2, borderColor: colors.gold, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   spoke: { position: 'absolute', width: 2, height: '100%', backgroundColor: 'rgba(251,191,36,0.22)' },
   emoji: { fontSize: 28 },
-  count: { position: 'absolute', top: -6, right: -10, minWidth: 34, height: 22, borderRadius: 11, paddingHorizontal: 6, backgroundColor: semantic.money, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.bg },
+  count: { position: 'absolute', top: -6, right: -4, minWidth: 34, height: 22, borderRadius: 11, paddingHorizontal: 6, backgroundColor: semantic.money, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.bg },
   countText: { color: semantic.moneyInk, fontWeight: '900', fontSize: 13, fontVariant: ['tabular-nums'] },
   price: { color: colors.textDim, fontSize: 11, fontWeight: '700', marginTop: 2 },
 });

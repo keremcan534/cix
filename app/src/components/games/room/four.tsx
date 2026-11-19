@@ -31,6 +31,8 @@ const FRAME = '#2459A6';
 const PAD = 9;
 /** What the stage draws round the board: the players' plates, the arrows, the stand, the status line, the gaps. */
 const CHROME = 150;
+/** What a hand's end card, or a waiting table's buttons, take under the board beyond the status line. */
+const END_CARD = 100;
 
 /** A disc: a glossy dome with a groove round its middle, lit from above, its lower rim catching the light. */
 export function Disc({ color, size }: { color: number; size: number }) {
@@ -106,7 +108,8 @@ function Arrows({ cell, open, color, still }: { cell: number; open: boolean[]; c
 
 function FourStage({ view, endsAt, busy, onMove, children }: { view: FourView; endsAt: number | null; busy?: boolean; onMove: (m: FourMove) => void; children?: ReactNode }) {
   const { still, fx } = useTableFx();
-  const room = useBoardRoom(CHROME);
+  // A hand's end brings its card and "Tekrar oyna", a waiting table "Başlat": the board makes way so they open in sight.
+  const room = useBoardRoom(view.status === 'playing' ? CHROME : CHROME + END_CARD);
   const [width, setWidth] = useState(0);
   // The state shown before this one: a disc that wasn't there is the one just dropped.
   const [pair, setPair] = useState<{ cur: FourView; before: FourView | null }>({ cur: view, before: null });

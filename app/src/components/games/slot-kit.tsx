@@ -5,7 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, type Href } from 'expo-router';
 import { createContext, useContext, useState } from 'react';
-import { Image, Pressable, StyleSheet, View } from 'react-native';
+import { Image, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 
 import { Icon3D } from '@/components/Icon3D';
 import { RollingNumber } from '@/components/fx/rolling-number';
@@ -13,6 +13,7 @@ import { GameInfoSheet } from '@/components/games/fx/info-sheet';
 import { ActionButton, SALON, SideButton, tabular, type ActionLook } from '@/components/games/fx/salon';
 import { salonArt } from '@/components/games/fx/salon-art';
 import { Text } from '@/components/text';
+import type { Entry } from '@/lib/games';
 import { tapHaptic } from '@/lib/haptics';
 import { useApp } from '@/store';
 import { Photo } from '@/components/photo';
@@ -24,25 +25,31 @@ import { Photo } from '@/components/photo';
 export const GameNav = createContext<(href: Href) => void>((href) => router.push(href));
 export const useGameNav = () => useContext(GameNav);
 
+/** A phone too short for a game's stage and its controls on one screen (in a room the game is a sheet over the seats). */
+export const useShortGame = (entry: Entry) => useWindowDimensions().height < (entry.from === 'room' ? 960 : 700);
+
 export const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 export const fmt = (n: number) => Math.floor(n).toLocaleString('tr-TR');
 /** Balance for tight spots: 99.950, 999K, 1,2M. */
 const compact = (n: number) => (n >= 1_000_000 ? `${(Math.floor(n / 100_000) / 10).toLocaleString('tr-TR')}M` : n >= 100_000 ? `${Math.floor(n / 1_000)}K` : fmt(n));
 /** A pill at least this wide (px) has room for every digit of the balance. */
 const ROOMY = 172;
+/** A pill narrower than this (px) gives its avatar's place to the digits. */
+const NO_AVATAR = 150;
 
 /** Avatar, coins you can play with (wallet + game balance) and a + that opens the wallet. Navy glass, gold digits. */
 export function BalancePill({ shown }: { /** Shown instead of the balance while a round's result is still on its way to the screen (the stake taken, the win not yet seen). */ shown?: number | null }) {
   const { me, coins, gameCoins } = useApp();
   const go = useGameNav();
-  const [roomy, setRoomy] = useState(false);
+  const [pillW, setPillW] = useState(0);
+  const roomy = pillW >= ROOMY;
   const value = shown ?? coins + gameCoins;
   // With room, every digit is shown: at "4,9M" a win of a few hundred would not be seen arriving.
   const format = (n: number) => (roomy && n < 100_000_000 ? fmt(n) : compact(n));
   return (
-    <LinearGradient colors={SALON.glass} style={k.pill} onLayout={(e) => setRoomy(e.nativeEvent.layout.width >= ROOMY)} accessibilityLabel={`Bakiye ${coins + gameCoins} jeton`}>
+    <LinearGradient colors={SALON.glass} style={k.pill} onLayout={(e) => setPillW(e.nativeEvent.layout.width)} accessibilityLabel={`Bakiye ${coins + gameCoins} jeton`}>
       <LinearGradient colors={['rgba(255,255,255,0.14)', 'rgba(255,255,255,0)']} style={k.gloss} pointerEvents="none" />
-      <Photo uri={me.avatar} kind="face" style={k.avatar} />
+      {(pillW === 0 || pillW >= NO_AVATAR) && <Photo uri={me.avatar} kind="face" style={k.avatar} />}
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text style={k.name} numberOfLines={1}>
           {me.name}
@@ -50,7 +57,7 @@ export function BalancePill({ shown }: { /** Shown instead of the balance while 
         <View style={k.coinRow}>
           <Icon3D name="coin" size={14} />
           {/* Rolls to the new balance after a round, so a win is seen arriving. */}
-          <RollingNumber value={value} format={format} duration={900} style={[tabular, k.coins]} numberOfLines={1} />
+          <RollingNumber value={value} format={format} duration={900} style={[tabular, k.coins]} shrink={0.7} />
         </View>
       </View>
       <Pressable onPress={() => go('/cuzdan')} hitSlop={8} accessibilityLabel="Jeton yükle">
@@ -130,6 +137,7 @@ export function SpinControls({
   look,
   art,
   caption,
+  short,
 }: {
   /** The balance with the stake taken while the reels run (BalancePill's `shown`). */
   held: number | null;
@@ -150,6 +158,8 @@ export function SpinControls({
   art?: number;
   /** A quiet line under the buttons (lines × line stake, the most a round pays). */
   caption?: string;
+  /** useShortGame: a smaller action button, so it ends above the fold. */
+  short?: boolean;
 }) {
   // A single spin is on its way; Oto's rounds can still be stopped.
   const waiting = busy && auto === null;
@@ -168,7 +178,7 @@ export function SpinControls({
           label="TURBO"
           a11y={turbo ? 'Turbo kapat' : 'Turbo aç'}
         />
-        <ActionButton onPress={auto !== null ? onAuto : onSpin} disabled={waiting} busy={busy} count={auto} look={look} art={art} label={auto !== null ? 'Otomatik çevirmeyi durdur' : `Çevir, ${bet} jeton`} />
+        <ActionButton onPress={auto !== null ? onAuto : onSpin} disabled={waiting} busy={busy} count={auto} look={look} art={art} size={short ? 68 : undefined} label={auto !== null ? 'Otomatik çevirmeyi durdur' : `Çevir, ${bet} jeton`} />
         <SideButton onPress={onAuto} on={auto !== null} disabled={waiting} icon={auto !== null ? 'stop' : 'repeat'} pic={auto !== null ? AUTO.on : AUTO.off} label={auto !== null ? 'DUR' : 'OTO'} a11y={auto !== null ? 'Otomatik çevirmeyi durdur' : `${autoSpins} kez otomatik çevir`} />
       </View>
       {!!caption && <Text style={k.caption}>{caption}</Text>}
@@ -200,7 +210,7 @@ const k = StyleSheet.create({
   avatar: { width: 32, height: 32, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(246,189,96,0.5)' },
   name: { color: '#fff', fontWeight: '800', fontSize: 12.5, lineHeight: 16 },
   coinRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  coins: { color: SALON.win, fontSize: 14, lineHeight: 18 },
+  coins: { color: SALON.win, fontSize: 14, lineHeight: 18, flexShrink: 1 },
   row: { flexDirection: 'row', alignItems: 'center', gap: SALON.row },
   caption: { color: SALON.dim, fontSize: 12, lineHeight: 16, textAlign: 'center', marginTop: -4, fontVariant: ['tabular-nums'] },
   stepper: { flexDirection: 'row', alignItems: 'center', height: SALON.control, borderRadius: SALON.controlRadius, borderWidth: 1, borderColor: SALON.glassRim, overflow: 'hidden', boxShadow: '0 4px 10px rgba(0,0,0,0.35)' },

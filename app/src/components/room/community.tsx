@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Switch } from '@/components/luxe-switch';
 import { Text, TextInput } from '@/components/text';
@@ -11,6 +12,7 @@ import { Avatar, GradientButton } from '@/components/ui';
 import { userById, type User } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import { CONTACT_TITLE, contactRefusal } from '@/lib/contact-filter';
+import { useKeyboardOpen } from '@/lib/keyboard-open';
 import { denoiseLine, type DenoiseLine } from '@/lib/mic-denoise';
 import { followerInviteLeft, formatWait } from '@/lib/room-invites';
 import { engineInfo } from '@/lib/room-session';
@@ -28,14 +30,17 @@ export type ModLog = { id: string; time: string; actor: string; action: string; 
 /** `foot`: the sheet's main action (a start or send button, a composer), under the list. Over a room the sheet stops
  *  at the Balkon line (lib/sheet-space): the list scrolls, the title and the foot stay in sight. */
 function Sheet({ visible, onClose, title, art, children, foot }: { visible: boolean; onClose: () => void; title: string; art?: number; children: React.ReactNode; foot?: React.ReactNode }) {
-  const paddingBottom = useSheetBottom();
+  const sheetBottom = useSheetBottom();
   const maxHeight = useSheetMax(0.8);
+  const { top } = useSafeAreaInsets();
+  const keyboardOpen = useKeyboardOpen();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      {/* The modal does not shrink for the keyboard (edge to edge): the sheet rises above it as a whole. */}
-      <KeyboardAvoid style={{ flex: 1 }}>
+      {/* The modal does not shrink for the keyboard (edge to edge): the sheet rises above it as a whole, stops under the
+          status bar and shrinks there (its body scrolls). */}
+      <KeyboardAvoid style={{ flex: 1, paddingTop: top }}>
         <Pressable style={roomStyles.scrim} onPress={onClose} />
-        <View style={[roomStyles.sheet, { maxHeight, paddingBottom }]}>
+        <View style={[roomStyles.sheet, { flexShrink: 1, maxHeight, paddingBottom: keyboardOpen ? 16 : sheetBottom }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
             {art && <Image source={art} style={{ width: 30, height: 30, marginRight: 8 }} />}
             <Text style={[roomStyles.sheetTitle, { flex: 1, marginBottom: 0 }]}>{title}</Text>
@@ -231,7 +236,7 @@ export function EventsSheet({
     <Sheet visible={visible} onClose={onClose} title="Oda etkinlikleri" art={ROOM_ICON_ART.activity} foot={canManage && <GradientButton title="Etkinlik oluştur" icon="calendar" onPress={create} />}>
       {events.length === 0 && <Text style={styles.dim}>Planlanmış etkinlik yok.</Text>}
       {events.map((e) => (
-        <View key={e.id} style={[styles.card, e.cancelled && { opacity: 0.5 }]}>
+        <View key={e.id} style={[styles.card, { marginHorizontal: 0, marginTop: 0 }, e.cancelled && { opacity: 0.5 }]}>
           <Text style={{ color: '#fff', fontWeight: '800' }}>
             {e.cancelled ? '❌ İPTAL · ' : ''}
             {e.title}
@@ -335,10 +340,11 @@ type SetFn = <K extends keyof Settings>(k: K, v: Settings[K]) => void;
 
 function Volume({ settings, set, k, label }: { settings: Settings; set: SetFn; k: 'voiceVolume'; label: string }) {
   return (
-    <View style={styles.row}>
+    // 44 tall: Android drops a touch outside the row's bounds, so the buttons' hitSlop only reaches this far.
+    <View style={[styles.row, { minHeight: 44 }]}>
       <Text style={{ color: '#fff', flex: 1 }}>{label}</Text>
       {[0.3, 0.6, 1].map((v) => (
-        <Pressable key={v} onPress={() => set(k, v)} style={[styles.vol, settings[k] === v && { backgroundColor: colors.primary }]} accessibilityLabel={`${label} yüzde ${Math.round(v * 100)}`}>
+        <Pressable key={v} onPress={() => set(k, v)} hitSlop={{ top: 10, bottom: 10, left: 4, right: 4 }} style={[styles.vol, settings[k] === v && { backgroundColor: colors.primary }]} accessibilityLabel={`${label} yüzde ${Math.round(v * 100)}`}>
           <Text style={styles.smallText}>%{Math.round(v * 100)}</Text>
         </Pressable>
       ))}

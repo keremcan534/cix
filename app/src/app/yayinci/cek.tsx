@@ -198,7 +198,7 @@ export default function Withdraw() {
           {locked > 0 && (
             <View style={styles.locked}>
               <Ionicons name="lock-closed" size={12} color={colors.textDim} />
-              <Text style={styles.dim}>Ayrıca {locked.toLocaleString('tr-TR')} elmas kilitli; süresi dolunca buraya eklenir.</Text>
+              <Text style={[styles.dim, { flexShrink: 1 }]}>Ayrıca {locked.toLocaleString('tr-TR')} elmas kilitli; süresi dolunca buraya eklenir.</Text>
             </View>
           )}
         </Card>
@@ -349,7 +349,7 @@ const useStyles = makeStyles(({ colors, lift, dark }) => ({
   chipText: { color: colors.text, fontWeight: '600' },
   chipTextOn: { color: '#FFFFFF' },
   receive: { color: colors.green, fontWeight: '700' },
-  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 4 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 },
   histRow: { gap: 4, paddingVertical: 4 },
   locked: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
   bankRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },

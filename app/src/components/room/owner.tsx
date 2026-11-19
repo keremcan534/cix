@@ -3,7 +3,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, type Href } from 'expo-router';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Image, Modal, Pressable, ScrollView, StyleSheet, View, type HostInstance } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions, type HostInstance } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Switch } from '@/components/luxe-switch';
@@ -354,7 +354,7 @@ export function RoomInfoSheet({
                   <View style={styles.actionIcon}>
                     <Ionicons name={a.icon} size={22} color="#fff" />
                   </View>
-                  <Text style={styles.actionText} numberOfLines={2}>
+                  <Text style={styles.actionText} numberOfLines={3} maxFontSizeMultiplier={1}>
                     {a.label}
                   </Text>
                 </Pressable>
@@ -364,7 +364,7 @@ export function RoomInfoSheet({
 
           <View style={{ flexDirection: 'row', gap: 10 }}>
             <Pressable style={{ flex: 1 }} onPress={() => setSub('level')} accessibilityLabel="Oda seviyesi">
-              <LinearGradient colors={['#0E7490', '#155E75']} style={styles.card}>
+              <LinearGradient colors={['#0E7490', '#155E75']} style={[styles.card, { flexGrow: 1 }]}>
                 <Text style={styles.cardLabel}>Oda seviyesi</Text>
                 <ArtText art={roomLevelArt(level)} size={26} style={styles.cardValue}>
                   Lv.{level}
@@ -373,14 +373,14 @@ export function RoomInfoSheet({
             </Pressable>
             {/* The owner's family: the server's in a live build (their profile), else the demo's. */}
             <Pressable style={{ flex: 1 }} onPress={() => (clan ? (onClose(), router.push(clan.href)) : owner && (onClose(), router.push('/aile')))} accessibilityLabel="Aile">
-              <LinearGradient colors={['#15803D', '#166534']} style={styles.card}>
+              <LinearGradient colors={['#15803D', '#166534']} style={[styles.card, { flexGrow: 1 }]}>
                 <Text style={styles.cardLabel}>Aile</Text>
                 {clan?.art ? (
                   <ArtText art={clan.art} size={26} style={styles.cardValue}>
                     {clan.label}
                   </ArtText>
                 ) : (
-                  <Text style={styles.cardValue} numberOfLines={1}>
+                  <Text style={styles.cardValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                     {clan ? clan.label : owner ? '+ Aile kur / katıl' : 'Yok'}
                   </Text>
                 )}
@@ -532,7 +532,9 @@ function Stat({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.stat}>
       <Text style={styles.statLabel}>{label}</Text>
-      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+        {value}
+      </Text>
     </View>
   );
 }
@@ -991,7 +993,7 @@ export function RoomSettingsScreen({
                 <Text style={styles.dim}>{room.blacklist.includes(id) ? 'Kalıcı · odaya giremez' : `Geçici yasak · ${ban?.until}`}</Text>
               </View>
               {room.blacklist.includes(id) && (
-                <Pressable onPress={() => (live ? live.unban(id) : update({ blacklist: room.blacklist.filter((x) => x !== id) }))} hitSlop={6}>
+                <Pressable onPress={() => (live ? live.unban(id) : update({ blacklist: room.blacklist.filter((x) => x !== id) }))} hitSlop={{ top: 13, bottom: 13, left: 8, right: 8 }}>
                   <Text style={{ color: colors.green, fontWeight: '700' }}>Kaldır</Text>
                 </Pressable>
               )}
@@ -1007,7 +1009,7 @@ export function RoomSettingsScreen({
           <View key={id} style={styles.listRow}>
             <Avatar uri={userById(id).avatar} size={34} />
             <Text style={{ color: '#fff', flex: 1 }}>🛡️ {userById(id).name}</Text>
-            <Pressable onPress={() => update({ adminIds: room.adminIds.filter((x) => x !== id) })}>
+            <Pressable onPress={() => update({ adminIds: room.adminIds.filter((x) => x !== id) })} hitSlop={{ top: 13, bottom: 13, left: 8, right: 8 }}>
               <Text style={{ color: colors.red, fontWeight: '600' }}>Kaldır</Text>
             </Pressable>
           </View>
@@ -1158,7 +1160,9 @@ export function BossSeat({
           {reaction && u && <SeatReaction key={reaction.key} emoji={reaction.emoji} art={reaction.art} pre={reaction.pre} badge={reaction.badge} badgeAt={reaction.badgeAt} ms={reaction.ms} size={mini.size} still={still} />}
         </LinearGradient>
         </View>
-        <Text style={[styles.bossTag, { fontSize: 9 }]}>PATRON</Text>
+        <Text style={[styles.bossTag, { fontSize: 9, paddingHorizontal: 2 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+          PATRON
+        </Text>
       </Pressable>
     );
   }
@@ -1232,7 +1236,10 @@ export function BossSeatSheet({
   onProfile?: (uid: string) => void;
 }) {
   const paddingBottom = useSheetBottom();
-  const maxHeight = useSheetMax(0.8);
+  // The Patron row itself takes stage room: its sheet still gets 400, so the seat and every button fit on a short phone.
+  const sheet = useSheetMax(0.8);
+  const { height: screenH } = useWindowDimensions();
+  const maxHeight = typeof sheet === 'number' ? Math.max(sheet, Math.min(400, Math.round(screenH * 0.8))) : sheet;
   const [rules, setRules] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -1360,7 +1367,7 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 14 },
   action: { width: '25%', alignItems: 'center', gap: 6 },
   actionIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.1)' },
-  actionText: { color: '#fff', fontSize: 12, fontWeight: '600', textAlign: 'center', paddingHorizontal: 2 },
+  actionText: { color: '#fff', fontSize: 11.5, fontWeight: '600', textAlign: 'center' },
   pill: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
   pillText: { color: '#fff', fontWeight: '700', fontSize: 12 },
   bossRing: { width: 70, height: 70, borderRadius: 35, alignItems: 'center', justifyContent: 'center' },

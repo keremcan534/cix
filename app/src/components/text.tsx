@@ -4,7 +4,7 @@
 // explicit fontFamily (theme `fonts`, monospace) is kept as is. Inputs get the same face for what you type and
 // for the placeholder.
 import { createContext, useContext, type ComponentRef, type Ref } from 'react';
-import { StyleSheet, Text as RNText, TextInput as RNTextInput, type TextInputProps, type TextProps } from 'react-native';
+import { Platform, StyleSheet, Text as RNText, TextInput as RNTextInput, type TextInputProps, type TextProps } from 'react-native';
 
 /** Loaded font names by weight (root layout `useFonts`). */
 export const FACE = { 400: 'Jakarta', 500: 'JakartaMedium', 600: 'JakartaSemiBold', 700: 'JakartaBold', 800: 'JakartaExtraBold' } as const;
@@ -22,6 +22,9 @@ export const MAX_FONT_SCALE = 1.15;
 /** The face of the nearest Text above, so nested text inherits instead of resetting to regular. */
 const ParentFace = createContext<string | null>(null);
 
+/** Android's font padding is taller above this font than below it, so words sat low in their box; a style can still ask for it. */
+const NO_PAD = Platform.OS === 'android' ? { includeFontPadding: false } : null;
+
 export function Text({ style, children, ...rest }: TextProps) {
   const parent = useContext(ParentFace);
   const flat = StyleSheet.flatten(style);
@@ -34,7 +37,7 @@ export function Text({ style, children, ...rest }: TextProps) {
     own = { fontFamily: face, fontWeight: 'normal' };
   } else face = parent;
   return (
-    <RNText style={own ? [style, own] : style} maxFontSizeMultiplier={MAX_FONT_SCALE} {...rest}>
+    <RNText style={[NO_PAD, style, own]} maxFontSizeMultiplier={MAX_FONT_SCALE} {...rest}>
       <ParentFace.Provider value={face}>{children}</ParentFace.Provider>
     </RNText>
   );

@@ -130,8 +130,10 @@ export default function SupportScreen() {
                 ['list', `Taleplerim (${tickets.length})`],
               ] as const
             ).map(([k, l]) => (
-              <Pressable key={k} onPress={() => setTab(k)} style={[styles.segBtn, tab === k && styles.segActive]}>
-                <Text style={[styles.segText, tab === k && styles.segTextOn]}>{l}</Text>
+              <Pressable key={k} onPress={() => setTab(k)} style={[styles.segBtn, { flexShrink: 1 }, tab === k && styles.segActive]}>
+                <Text style={[styles.segText, tab === k && styles.segTextOn]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                  {l}
+                </Text>
               </Pressable>
             ))}
           </View>
@@ -323,7 +325,7 @@ function TicketCard({ t, live }: { t: Ticket & Partial<Pick<TicketView, 'photos'
             </View>
           ))}
           <TextInput value={reply} onChangeText={setReply} maxLength={live ? 2000 : undefined} placeholder="Ek bilgi yaz / itiraz et" placeholderTextColor={colors.textDim} style={styles.input} />
-          <View style={{ flexDirection: 'row', gap: 10 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
             {live ? <Button small title={busy ? 'Gönderiliyor…' : 'Gönder'} disabled={busy} onPress={send} /> : <GradientButton small title="Gönder" onPress={send} />}
             {t.status !== 'Çözüldü' && (
               <Pressable style={[styles.secondary, busy && { opacity: 0.5 }]} disabled={busy} onPress={close}>
@@ -338,7 +340,8 @@ function TicketCard({ t, live }: { t: Ticket & Partial<Pick<TicketView, 'photos'
 }
 
 const useStyles = makeStyles(({ colors, lift }) => ({
-  segment: { flexDirection: 'row', alignSelf: 'center', backgroundColor: colors.card, borderRadius: 999, padding: 4, ...lift },
+  // maxWidth, not a margin: a content-sized row only shrinks its tabs when it has a limit of its own (Yoga).
+  segment: { flexDirection: 'row', alignSelf: 'center', maxWidth: '95%', backgroundColor: colors.card, borderRadius: 999, padding: 4, ...lift },
   hero: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 6 },
   heroTitle: { color: colors.text, fontSize: 28, fontWeight: '900' },
   heroSub: { color: colors.textDim, fontSize: 16 },
@@ -353,7 +356,7 @@ const useStyles = makeStyles(({ colors, lift }) => ({
   service: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   serviceIcon: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   serviceTitle: { color: colors.text, fontSize: 17, fontWeight: '800' },
-  segBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999 },
+  segBtn: { paddingHorizontal: 10, paddingVertical: 8, borderRadius: 999 },
   segActive: { backgroundColor: colors.primary },
   segText: { color: colors.text, fontWeight: '700', fontSize: 13 },
   segTextOn: { color: '#fff' },
@@ -362,7 +365,7 @@ const useStyles = makeStyles(({ colors, lift }) => ({
   chip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, backgroundColor: colors.cardAlt, borderWidth: 1.5, borderColor: 'transparent' },
   chipText: { color: colors.text, fontWeight: '600', fontSize: 12 },
   input: { backgroundColor: colors.cardAlt, borderRadius: 14, color: colors.text, fontSize: 15, paddingHorizontal: 14, paddingVertical: 11, textAlignVertical: 'top' },
-  attach: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  attach: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 13 },
   photos: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   photo: { width: 72, height: 72, borderRadius: 10, backgroundColor: colors.cardAlt },
   photoRemove: { position: 'absolute', top: 4, right: 4, width: 20, height: 20, borderRadius: 10, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' },

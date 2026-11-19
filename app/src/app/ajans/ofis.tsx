@@ -532,7 +532,7 @@ function Subs({ c }: { c: Ctx }) {
                       <View style={st.tRow}>
                         <Text style={[st.tHead, st.tFirst]} />
                         {PERIODS.map(([k, label]) => (
-                          <Text key={k} style={st.tHead}>
+                          <Text key={k} style={st.tHead} numberOfLines={1} adjustsFontSizeToFit>
                             {label}
                           </Text>
                         ))}
@@ -540,7 +540,7 @@ function Subs({ c }: { c: Ctx }) {
                       <View style={st.tRow}>
                         <Text style={[st.tLabel, st.tFirst]}>Toplam hediye</Text>
                         {PERIODS.map(([k]) => (
-                          <Text key={k} style={st.tCell}>
+                          <Text key={k} style={st.tCell} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
                             {fmtD(s.gifts[k])}
                           </Text>
                         ))}
@@ -548,7 +548,7 @@ function Subs({ c }: { c: Ctx }) {
                       <View style={st.tRow}>
                         <Text style={[st.tLabel, st.tFirst]}>Sana geçen</Text>
                         {PERIODS.map(([k]) => (
-                          <Text key={k} style={[st.tCell, st.tMoney]}>
+                          <Text key={k} style={[st.tCell, st.tMoney]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
                             {fmtD(s.mine[k])}
                           </Text>
                         ))}
@@ -848,24 +848,26 @@ function Requests({ c }: { c: Ctx }) {
                 <Empty icon="mail-open-outline" text="Bekleyen katılım isteği yok." />
               ) : (
                 <ListGroup label="Katılım istekleri" footer="Bir yayıncı aynı anda tek ajansa bağlıdır; onay sunucuda tekrar kontrol edilir.">
-                  {open.map((r) => (
-                    <ListRow
-                      key={r.id}
-                      leading={<Mono name={r.user.name} />}
-                      title={r.user.name}
-                      subtitle={`${r.kind === 'invite' ? 'Davet edildi' : 'Katılmak istiyor'} · ${METHOD_TEXT[r.method] ?? r.method} · ${fmtDate(r.createdAt)}${r.note ? `\n${r.note}` : ''}`}
-                      right={
-                        r.kind === 'join' && c.acting && c.can('streamers.approve') ? (
-                          <View style={{ flexDirection: 'row', gap: 6 }}>
+                  {open.map((r) => {
+                    const decides = r.kind === 'join' && c.acting && c.can('streamers.approve');
+                    return (
+                      // One keyed view: the group draws one separator, and the buttons leave the whole row to the text.
+                      <View key={r.id}>
+                        <ListRow
+                          leading={<Mono name={r.user.name} />}
+                          title={r.user.name}
+                          subtitle={`${r.kind === 'invite' ? 'Davet edildi' : 'Katılmak istiyor'} · ${METHOD_TEXT[r.method] ?? r.method} · ${fmtDate(r.createdAt)}${r.note ? `\n${r.note}` : ''}`}
+                          right={decides ? undefined : <Pill text="Bekliyor" tone="money" />}
+                        />
+                        {decides && (
+                          <View style={st.rowActions}>
                             <Button title="Reddet" variant="ghost" small onPress={() => reject(r.id)} />
                             <Button title="Onayla" variant="tonal" small onPress={() => runAction(c.demo, () => agencyNet.decideRequest(c.id, r.id, true), `${r.user.name} ajansa katıldı.`, () => (reqs.reload(), c.reload()))} />
                           </View>
-                        ) : (
-                          <Pill text="Bekliyor" tone="money" />
-                        )
-                      }
-                    />
-                  ))}
+                        )}
+                      </View>
+                    );
+                  })}
                 </ListGroup>
               )}
               {done.length > 0 && (
@@ -997,6 +999,7 @@ const st = StyleSheet.create({
   monogram: { width: 60, height: 60, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,95,162,0.14)', borderWidth: 1, borderColor: 'rgba(255,95,162,0.35)' },
   monoText: { color: semantic.action, fontSize: 26, fontFamily: fonts.display },
   pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  rowActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 6, paddingHorizontal: 14, paddingBottom: 10 },
   banner: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md, borderRadius: 14, borderWidth: 1 },
   upcoming: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: space.md, borderRadius: 12, backgroundColor: 'rgba(255,95,162,0.08)' },
   foot: { color: colors.textDim, fontSize: 12, lineHeight: 17 },

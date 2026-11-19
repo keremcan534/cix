@@ -332,6 +332,18 @@ describe('Bağlantı kopması', () => {
     assert.deepEqual([s().status, stats().connects, stats().reconnects, micSending(s())], ['connected', 1, 1, true]);
   });
 
+  test('arka plandayken kopan oda, uygulamaya dönünce kendiliğinden yeniden bağlanır', () => {
+    talking();
+    onAppState('background');
+    setConnection('offline');
+    onNetwork(false);
+    for (const d of RECONNECT_DELAYS) mock.timers.tick(d);
+    assert.equal(s().status, 'disconnected');
+    setConnection('online');
+    onAppState('active');
+    assert.deepEqual([s().status, s().appState, stats().connects], ['connected', 'active', 1]);
+  });
+
   test('uzun kesinti: denemeler bitince "bağlantı kesildi" gösterilir; yeniden dene ile kurulur', () => {
     talking();
     setConnection('offline');

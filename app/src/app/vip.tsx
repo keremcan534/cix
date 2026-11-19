@@ -154,12 +154,13 @@ function Svip() {
                     <Text style={styles.cardText}>
                       {short(svipXp)} / {short(l.xp)}
                     </Text>
-                    <View style={styles.track}>
+                    {/* The right side is the Yükle button's column. */}
+                    <View style={[styles.track, styles.clearLoad]}>
                       <View style={{ height: 6, width: `${Math.min(100, (svipXp / l.xp) * 100)}%`, backgroundColor: GOLD }} />
                     </View>
                   </>
                 ) : locked ? (
-                  <Text style={styles.cardText}>Bu seviyeye {fmt(l.xp - svipXp)} puan kaldı</Text>
+                  <Text style={[styles.cardText, styles.clearLoad]}>Bu seviyeye {fmt(l.xp - svipXp)} puan kaldı</Text>
                 ) : (
                   <Text style={[styles.cardText, { color: GOLD }]}>{decay ? '✓ Açıldı' : '✓ Açıldı · kalıcı'}</Text>
                 )}
@@ -311,7 +312,11 @@ function Vip() {
       <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
         {plans.map((x) => (
           <Pressable key={x.days} onPress={() => setPlan(x.days)} style={[styles.plan, plan === x.days && styles.planOn]} accessibilityLabel={`VIP ${x.label}, ${x.tl} TL`}>
-            {x.save > 0 && <Text style={styles.planTag}>%{x.save} daha uygun</Text>}
+            {x.save > 0 && (
+              <Text style={styles.planTag} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>
+                %{x.save} daha uygun
+              </Text>
+            )}
             <Text style={{ color: colors.textDim, fontSize: 15, marginTop: 10 }}>{x.label}</Text>
             <Text style={{ color: plan === x.days ? colors.text : soft, fontWeight: '900', fontSize: 26 }}>
               <Text style={{ fontSize: 11, fontWeight: '600' }}>TRY</Text>
@@ -335,7 +340,8 @@ function Vip() {
           {pages.map((page, i) => (
             <View key={i} style={{ width: pageW, flexDirection: 'row', flexWrap: 'wrap', rowGap: 18 }}>
               {page.map((r) => (
-                <View key={r.name} style={styles.perk}>
+                // Two columns leave too little room for a word on a small phone: one column there.
+                <View key={r.name} style={[styles.perk, pageW < 300 && { width: '100%' }]}>
                   <View style={styles.perkIcon}>
                     <Ionicons name={r.icon as keyof typeof Ionicons.glyphMap} size={22} color={gold} />
                   </View>
@@ -549,6 +555,7 @@ const useStyles = makeStyles(({ colors, surface, ink, dark }) => {
     cardText: { color: '#fff', fontSize: 14 },
     track: { height: 6, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 3, overflow: 'hidden' },
     loadBtn: { position: 'absolute', right: 16, bottom: 16, backgroundColor: '#FDE7C7', borderRadius: 999, paddingHorizontal: 22, paddingVertical: 8 },
+    clearLoad: { marginRight: 100 },
     rightsTitle: { color: gold, fontWeight: '900', fontSize: 18, textAlign: 'center', marginVertical: 18 },
     rightsTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginVertical: 18 },
     grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 10, rowGap: 12 },

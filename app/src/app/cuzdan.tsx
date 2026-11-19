@@ -142,7 +142,7 @@ export default function WalletScreen() {
                 ['diamond', '💎 Elmas'],
               ] as const
             ).map(([k, l]) => (
-              <Pressable key={k} onPress={() => setFilter(k)} style={[styles.chip, filter === k && { backgroundColor: colors.primary }]}>
+              <Pressable key={k} onPress={() => setFilter(k)} hitSlop={{ top: 7, bottom: 7 }} style={[styles.chip, filter === k && { backgroundColor: colors.primary }]}>
                 <Text style={{ color: filter === k ? '#fff' : colors.text, fontWeight: '700', fontSize: 12 }}>{l}</Text>
               </Pressable>
             ))}
@@ -343,23 +343,36 @@ function PackTile({
         colors={first ? ['rgba(246,189,96,0.30)', dark ? 'rgba(22,37,60,0.96)' : 'rgba(255,255,255,0.96)'] : [colors.cardAlt, colors.card]}
         style={[styles.pack, (first || !!campaign?.extra) && styles.packFirst, busy && { opacity: 0.5 }]}
       >
-        {first ? (
-          <View style={styles.firstTag}>
-            <Text style={styles.firstTagText}>Hoş geldin paketi</Text>
-          </View>
-        ) : campaign?.extra ? (
-          <View style={styles.firstTag}>
-            <Text style={styles.firstTagText}>+%{campaign.percent} kampanya</Text>
-          </View>
-        ) : null}
+        {/* The same slot on every tile, tag or not, so the coins of a row line up. */}
+        <View style={styles.tagSlot}>
+          {first ? (
+            <View style={styles.firstTag}>
+              <Text style={styles.firstTagText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                Hoş geldin paketi
+              </Text>
+            </View>
+          ) : campaign?.extra ? (
+            <View style={styles.firstTag}>
+              <Text style={styles.firstTagText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                +%{campaign.percent} kampanya
+              </Text>
+            </View>
+          ) : null}
+        </View>
         <Icon3D name="coin" size={40} />
-        <Text style={styles.packCoins}>{coins.toLocaleString('tr-TR')}</Text>
+        <Text style={styles.packCoins} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+          {coins.toLocaleString('tr-TR')}
+        </Text>
         {bonus || campaign?.extra ? (
-          <Text style={styles.packBonus}>+{((bonus ?? 0) + (campaign?.extra ?? 0)).toLocaleString('tr-TR')}</Text>
+          <Text style={styles.packBonus} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+            +{((bonus ?? 0) + (campaign?.extra ?? 0)).toLocaleString('tr-TR')}
+          </Text>
         ) : (
           <View style={{ height: 18 }} />
         )}
-        <Text style={[styles.packPrice, first && { color: colors.text }]}>{busy ? 'Bekleniyor…' : price}</Text>
+        <Text style={[styles.packPrice, first && { color: colors.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+          {busy ? 'Bekleniyor…' : price}
+        </Text>
       </LinearGradient>
     </Pressable>
   );
@@ -373,7 +386,7 @@ const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark }) =>
   segActive: { backgroundColor: colors.primary },
   segText: { color: colors.text, fontWeight: '700' },
   chip: { backgroundColor: colors.card, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7, ...lift },
-  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 10 },
   title: { color: colors.text, fontSize: 18, fontWeight: '700' },
   balance: { margin: 16, borderRadius: 20, padding: 20, gap: 6 },
@@ -383,13 +396,14 @@ const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark }) =>
   grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 10 },
   packHead: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, marginTop: 18, marginBottom: 8 },
   shopNotice: { color: colors.text, fontSize: 14, lineHeight: 20, paddingHorizontal: 20, paddingVertical: 18 },
-  pack: { flex: 1, alignItems: 'center', gap: 6, paddingTop: 26, paddingBottom: 16, borderRadius: 16, minHeight: 130, borderWidth: 1, borderColor: surface.rim, ...(dark ? {} : { boxShadow: '0 1px 2px rgba(64,20,40,0.05), 0 6px 16px rgba(64,20,40,0.06)' }) },
-  packFirst: { borderColor: 'rgba(246,189,96,0.75)', paddingTop: 12 },
+  pack: { flex: 1, alignItems: 'center', gap: 6, paddingTop: 12, paddingBottom: 16, paddingHorizontal: 3, borderRadius: 16, minHeight: 130, borderWidth: 1, borderColor: surface.rim, ...(dark ? {} : { boxShadow: '0 1px 2px rgba(64,20,40,0.05), 0 6px 16px rgba(64,20,40,0.06)' }) },
+  packFirst: { borderColor: 'rgba(246,189,96,0.75)' },
+  tagSlot: { height: 20, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center' },
   svipLink: { alignItems: 'center', gap: 2, marginTop: 14, paddingVertical: 8 },
   svipLinkText: { color: colors.gold, fontWeight: '700', fontSize: 14 },
   svipLinkSub: { color: colors.textDim, fontSize: 12 },
   currency: { color: colors.textDim, fontSize: 12, fontWeight: '600' },
-  firstTag: { alignSelf: 'center', backgroundColor: semantic.money, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2 },
+  firstTag: { alignSelf: 'center', backgroundColor: semantic.money, borderRadius: 8, paddingHorizontal: 4, paddingVertical: 2 },
   firstTagText: { color: semantic.moneyInk, fontSize: 10, fontWeight: '800', letterSpacing: 0.2 },
   packBonus: { color: colors.gold, fontWeight: '800', fontSize: 14 },
   campaign: {

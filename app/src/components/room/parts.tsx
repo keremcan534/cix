@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Image, Pressable, StyleSheet, View, useWindowDimensions, type HostInstance } from 'react-native';
+import { Animated, Dimensions, Easing, Image, Pressable, StyleSheet, View, useWindowDimensions, type HostInstance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MAX_FONT_SCALE, Text } from '@/components/text';
@@ -238,7 +238,8 @@ export function Seat({
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
             {host && <Icon3D name="crown" size={mark} />}
             {user && <RoleIcon mark={staff} size={mark} />}
-            <Text style={[styles.seatName, name, !user && { color: colors.textDim, fontWeight: '500' }]} numberOfLines={1}>
+            {/* Not scaled with the phone's text size: the stage is fitted to this line's height (lib/seat-fit nameLine). */}
+            <Text style={[styles.seatName, name, !user && { color: colors.textDim, fontWeight: '500' }]} numberOfLines={1} maxFontSizeMultiplier={1}>
               {user ? user.name : invitee && !locked ? 'Davet' : `${index + 1}`}
             </Text>
             {tick && <VerifiedBadge size={11} />}
@@ -568,8 +569,11 @@ export function ChatLine({
   );
 }
 
-/** Every round button in the room's bottom bar (menu, messages, mic, room sound, gift) is this big. */
-export const BAR_BTN = 44;
+/**
+ * Every round button in the room's bottom bar (menu, messages, mic, room sound, gift) is this big; a little smaller on
+ * the narrowest phones (their touch area stays 44), so the chat's field between them has room for words.
+ */
+export const BAR_BTN = Dimensions.get('window').width < 360 ? 40 : 44;
 
 export function RoundBtn({
   icon,
@@ -595,6 +599,7 @@ export function RoundBtn({
       }}
       onPressIn={press.onPressIn}
       onPressOut={press.onPressOut}
+      hitSlop={2}
       accessibilityLabel={label}
       accessibilityRole="button"
     >
@@ -641,6 +646,7 @@ export function MicBtn({ state, queuePos, caption: captionOverride, hint, onPres
       }}
       onPressIn={press.onPressIn}
       onPressOut={press.onPressOut}
+      hitSlop={2}
       accessibilityRole="button"
       accessibilityLabel={hint ?? look.a11y}
       accessibilityState={{ checked: state === 'on' || state === 'held' }}
@@ -675,7 +681,7 @@ export function RoomSoundBtn({ muted, onPress }: { muted: boolean; onPress: () =
       accessibilityLabel={muted ? 'Oda sesi kapalı, açmak için dokun' : 'Oda sesi açık, kapatmak için dokun'}
       accessibilityState={{ checked: !muted }}
       aria-checked={!muted}
-      hitSlop={6}
+      hitSlop={2}
       style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.9 : 1 }] })}
     >
       <View style={[styles.round, styles.glassRound, muted && styles.soundRoundOff]}>
@@ -780,11 +786,11 @@ const styles = StyleSheet.create({
   botTag: { color: colors.green, fontSize: 11, fontWeight: '900' },
   botText: { color: '#BBF7D0', fontSize: 12, flexShrink: 1 },
   chatLine: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'flex-start', gap: 8, maxWidth: '88%' },
-  chatName: { fontSize: 12, fontWeight: '800', maxWidth: 160 },
-  chatVip: { color: colors.bg, backgroundColor: colors.gold, fontSize: 9, fontWeight: '900', borderRadius: 4, paddingHorizontal: 4, overflow: 'hidden' },
+  chatName: { fontSize: 12, fontWeight: '800', maxWidth: 160, flexShrink: 1, minWidth: 0 },
+  chatVip: { flexShrink: 0, color: colors.bg, backgroundColor: colors.gold, fontSize: 9, fontWeight: '900', borderRadius: 4, paddingHorizontal: 4, overflow: 'hidden' },
   chatBubble: { alignSelf: 'flex-start', borderRadius: 14, borderTopLeftRadius: 4, paddingHorizontal: 11, paddingVertical: 7 },
   chatMention: { alignSelf: 'flex-start', borderRadius: 16, borderTopLeftRadius: 6, borderWidth: 1.5, borderColor: colors.gold, padding: 1, boxShadow: `0 0 12px ${colors.gold}55` },
-  chatMentionTag: { color: '#1B1405', backgroundColor: colors.gold, fontFamily: fonts.displayBold, fontSize: 10, lineHeight: 14, paddingHorizontal: 6, borderRadius: 7, overflow: 'hidden' },
+  chatMentionTag: { flexShrink: 0, color: '#1B1405', backgroundColor: colors.gold, fontFamily: fonts.displayBold, fontSize: 10, lineHeight: 14, paddingHorizontal: 6, borderRadius: 7, overflow: 'hidden' },
   chatText: { color: '#fff', fontSize: 14, lineHeight: 19 },
   compactLine: { color: '#fff', fontSize: 13, lineHeight: 17 },
   compactWho: { fontWeight: '800' },
@@ -796,7 +802,7 @@ const styles = StyleSheet.create({
   soundRoundOff: { backgroundColor: 'rgba(252,165,165,0.14)', borderColor: 'rgba(252,165,165,0.45)' },
   micGlowOn: { boxShadow: '0 4px 16px rgba(255,95,162,0.6)' },
   micGlowHand: { boxShadow: '0 4px 16px rgba(8,122,128,0.7)' },
-  tagWrap: { position: 'absolute', left: -14, right: -14, bottom: -7, alignItems: 'center' },
+  tagWrap: { position: 'absolute', left: -18, right: -18, bottom: -7, alignItems: 'center' },
   tag: { color: '#fff', fontSize: 8, lineHeight: 12, fontWeight: '800', letterSpacing: 0.3, paddingHorizontal: 5, borderRadius: 6, overflow: 'hidden', backgroundColor: 'rgba(12,8,20,0.92)' },
   badge: { position: 'absolute', top: -4, right: -4, backgroundColor: colors.red, borderRadius: 9, minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
   badgeText: { color: '#fff', fontSize: 11, fontWeight: '800' },

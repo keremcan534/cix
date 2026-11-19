@@ -2,6 +2,7 @@
 // seat it acts on. Placed below the seat when there is room, otherwise above, and kept on screen.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
 import { colors } from '@/theme';
@@ -14,13 +15,18 @@ const ROW = 46;
 
 export function SeatMenu({ anchor, title, items, onClose }: { anchor: Rect | null; title?: string; items: SeatMenuItem[]; onClose: () => void }) {
   const screen = useWindowDimensions();
+  const { top: safeTop, bottom: safeBottom } = useSafeAreaInsets();
   if (!anchor) return null;
   const dividers = items.filter((i) => i.dividerBefore).length;
-  const height = Math.min(items.length * ROW + dividers * 9 + (title ? 34 : 0) + 14, screen.height * 0.6);
+  const full = Math.min(items.length * ROW + dividers * 9 + (title ? 34 : 0) + 14, screen.height * 0.6);
   const cx = anchor.x + anchor.w / 2;
   const left = Math.min(Math.max(12, cx - W / 2), screen.width - W - 12);
-  const below = anchor.y + anchor.h + 10 + height < screen.height - 16;
-  const top = below ? anchor.y + anchor.h + 10 : Math.max(16, anchor.y - 10 - height);
+  // Between the system bars, on the side with room for it; where neither side holds it all, the rows scroll.
+  const roomBelow = screen.height - safeBottom - 8 - (anchor.y + anchor.h + 10);
+  const roomAbove = anchor.y - 10 - (safeTop + 8);
+  const below = roomBelow >= full || roomBelow >= roomAbove;
+  const height = Math.min(full, below ? roomBelow : roomAbove);
+  const top = below ? anchor.y + anchor.h + 10 : anchor.y - 10 - height;
   const arrowLeft = Math.min(Math.max(16, cx - left - 7), W - 30);
 
   return (

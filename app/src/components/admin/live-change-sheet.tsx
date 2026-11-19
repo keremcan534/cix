@@ -7,7 +7,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
 import { Button } from '@/components/ui';
@@ -49,7 +48,6 @@ export function LiveChangeSheet({
   const ctx = useAdmin();
   const { colors, semantic } = useTheme();
   const s = useStyles();
-  const insets = useSafeAreaInsets();
   const [preview, setPreview] = useState<Preview | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   // Empty until the admin taps a chip or writes one, so Uygula never records a reason nobody chose.
@@ -132,7 +130,7 @@ export function LiveChangeSheet({
 
   return (
     <Overlay onClose={busy ? () => {} : close} label={job.title}>
-      <ScrollView contentContainerStyle={[s.body, { paddingBottom: space.md + insets.bottom }]} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={[s.body, { paddingBottom: space.md }]} keyboardShouldPersistTaps="handled">
         {step === 'stale' ? (
           <>
             <View style={s.confirmHead}>

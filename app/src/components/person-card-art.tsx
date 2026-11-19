@@ -77,9 +77,9 @@ export function SlicePill({ kind, h, children, style }: { kind: keyof typeof PIL
   return (
     <View style={[{ minHeight: h, minWidth: end * 2, justifyContent: 'center' }, style]}>
       <View style={[StyleSheet.absoluteFill, { flexDirection: 'row' }]} pointerEvents="none">
-        <Image source={left} style={{ width: end, height: '100%' }} resizeMode="stretch" />
+        <Image source={left} style={{ height: '100%', aspectRatio: PILL_END }} resizeMode="stretch" />
         <Image source={mid} style={{ flex: 1, height: '100%', marginHorizontal: -0.5 }} resizeMode="stretch" />
-        <Image source={right} style={{ width: end, height: '100%' }} resizeMode="stretch" />
+        <Image source={right} style={{ height: '100%', aspectRatio: PILL_END }} resizeMode="stretch" />
       </View>
       {children}
     </View>

@@ -95,7 +95,7 @@ Sohbet ettikçe ve hediyeleştikçe sohbet kalbiniz büyür. Bir süre konuşmaz
         <View style={styles.track}>
           <View style={[styles.fill, { width: `${Math.round(heartShare(heart) * 100)}%` }]} />
         </View>
-        <Text style={styles.heartHint} numberOfLines={1}>
+        <Text style={styles.heartHint} numberOfLines={2}>
           {hint} · {grows}
         </Text>
       </View>

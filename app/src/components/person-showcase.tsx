@@ -146,7 +146,7 @@ export function ActionTiles({ tiles }: { tiles: Tile[] }) {
         >
           <Image source={t.on ? TILE_ART.on : TILE_ART.off} style={s.tileArt} resizeMode="stretch" />
           <CardArt name={t.art} h={25} />
-          <Text style={s.tileText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+          <Text style={s.tileText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
             {t.label}
           </Text>
         </Pressable>
@@ -165,7 +165,7 @@ export function ManageRow({ items }: { items: { art: CardArtName; label: string;
           <View key={it.label} style={s.manageCell}>
             <Pressable style={s.manageItem} onPress={it.onPress} hitSlop={6} accessibilityRole="button" accessibilityLabel={it.label}>
               <CardArt name={it.art} h={17} />
-              <Text style={s.manageText} numberOfLines={1}>
+              <Text style={s.manageText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
                 {it.label}
               </Text>
             </Pressable>
@@ -196,7 +196,7 @@ export function WallLinks({ onOpen }: { onOpen: (w: WallKey) => void }) {
           <SlicePill kind="duvar" h={36}>
             <View style={s.link}>
               {/* Two short lines on a narrow phone ("İlişki / Duvarı") rather than a cut word. */}
-              <Text style={s.linkText} numberOfLines={2}>
+              <Text style={s.linkText} numberOfLines={2} maxFontSizeMultiplier={1}>
                 {WALLS[k].label}
               </Text>
               <CardArt name="ok" h={9} />
@@ -371,14 +371,14 @@ const s = StyleSheet.create({
   manageCell: { flex: 1, flexDirection: 'row', alignItems: 'center' },
   manageItem: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 44 },
   manageText: { color: SHOW.dim, fontSize: 13.5, fontWeight: '700', flexShrink: 1 },
-  links: { flexDirection: 'row', gap: 6, paddingLeft: 8 },
+  links: { flexDirection: 'row', gap: 3, paddingLeft: 6 },
   linkAt: { flex: 1, minWidth: 0, justifyContent: 'center' },
-  link: { flexDirection: 'row', alignItems: 'center', gap: 3, minHeight: 44, paddingLeft: 32, paddingRight: 10 },
+  link: { flexDirection: 'row', alignItems: 'center', gap: 2, minHeight: 44, paddingLeft: 32, paddingRight: 4 },
   linkArt: { position: 'absolute', left: -9, top: 0, bottom: 0, width: 44, alignItems: 'center', justifyContent: 'center' },
-  linkText: { flex: 1, color: SHOW.text, fontSize: 11.5, lineHeight: 13.5, fontWeight: '800' },
+  linkText: { flex: 1, color: SHOW.text, fontSize: 10.5, lineHeight: 13.5, fontWeight: '800' },
   banner: { borderRadius: 22, borderWidth: 1.5, borderColor: 'rgba(255,212,117,0.6)', padding: 12, gap: 6, overflow: 'hidden' },
   bannerTitle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  bannerTitleText: { color: SHOW.text, fontSize: 19, fontWeight: '900', fontStyle: 'italic' },
+  bannerTitleText: { color: SHOW.text, fontSize: 19, fontWeight: '900' },
   bannerBody: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 84 },
   bannerArt: { width: 84, alignItems: 'center', justifyContent: 'center' },
   bannerData: { flex: 1, minWidth: 0 },

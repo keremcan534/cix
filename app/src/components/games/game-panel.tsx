@@ -5,8 +5,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Image, ScrollView, StyleSheet, Pressable, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Image, ScrollView, StyleSheet, Pressable, View, useWindowDimensions } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
 import { gameArtOf } from '@/components/GameArt';
@@ -28,6 +28,7 @@ import type { Player } from '@/components/games/room-games';
 import { CardsPractice } from '@/components/games/room/cards';
 import { FourPractice } from '@/components/games/room/four';
 import { LudoPractice } from '@/components/games/room/ludo';
+import { tallSheetHeight } from '@/components/games/room/table-kit';
 import { XoxPractice } from '@/components/games/room/xox';
 import { LiveTable, isTableGame } from '@/components/games/room-tables';
 import type { CasinoGame } from '@/data/games';
@@ -63,7 +64,7 @@ function CasinoScreen({ id, entry }: { id: CasinoGame['id']; entry: Entry }) {
   const Screen = CASINO_SCREENS[id];
   return Screen ? <Screen entry={entry} /> : <CasinoPlayer gameId={id} entry={entry} />;
 }
-/** Games that need most of the screen in a room (Okey, the room games with a table or a board of their own and every casino game with its own screen); the top row of seats stays visible. */
+/** Games that need most of the screen in a room (Okey, the room games with a table or a board of their own and every casino game with its own screen). Their sheet is tallSheetHeight tall: on a short phone it covers the room's top row of seats while it is open. */
 const isTall = (id: string) => id === 'wheel' || id === 'okey' || id === 'ludo' || id === 'cards' || id === 'xox' || id === 'four' || isLineSlot(id) || isBoard(id) || id in CASINO_SCREENS;
 
 const VOLUMES: [number, string][] = [
@@ -106,6 +107,9 @@ export function GamePanel({
   // The other games and the sound level stay behind two buttons in the header: the game has the screen to itself.
   const [tools, setTools] = useState<'games' | 'sound' | null>(null);
   const inRoom = entry.from === 'room';
+  // A room's sheet runs to the screen's bottom edge: its last control has to end above the phone's navigation buttons.
+  const insets = useSafeAreaInsets();
+  const { height } = useWindowDimensions();
   // A server room plays its free games at the server's table (Ludo, Renk Kartları, XOX); Okey stays out of it there.
   const tables = entry.from === 'room' && isLiveRoom(entry.roomId);
   const roomGame = open.kind === 'room' ? roomGames.find((g) => g.id === open.id) : undefined;
@@ -130,7 +134,7 @@ export function GamePanel({
   const titleArt = wheel ? WHEEL_ART : gameArtOf(open.id);
 
   const body = (
-    <View style={[p.panel, inRoom ? p.sheet : p.full, inRoom && isTall(openId) && p.tall, skin && p.skinned, hidden && { display: 'none' }]}>
+    <View style={[p.panel, inRoom ? p.sheet : p.full, inRoom && { paddingBottom: Math.max(14, insets.bottom + 6) }, inRoom && isTall(openId) && { top: height - tallSheetHeight(height) }, skin && p.skinned, hidden && { display: 'none' }]}>
       {skin && <SkinBackdrop skin={skin} />}
       <View style={p.head}>
         {titleArt && <Image source={titleArt} style={{ width: 28, height: 28, marginRight: -6 }} />}
@@ -257,8 +261,6 @@ export function GamePanel({
 const p = StyleSheet.create({
   panel: { backgroundColor: colors.card, padding: 14, gap: 8 },
   sheet: { position: 'absolute', left: 0, right: 0, bottom: 0, top: '34%', borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderColor: colors.border, zIndex: 40 },
-  // Okey and the launch casino games need most of the screen; the top row of seats stays visible.
-  tall: { top: '22%' },
   full: { flex: 1, backgroundColor: colors.bg },
   skinned: { overflow: 'hidden' },
   head: { flexDirection: 'row', alignItems: 'center', gap: 12 },

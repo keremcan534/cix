@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useState, type ReactNode } from 'react';
+import { useCallback, useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import { FlatList, Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -92,6 +92,7 @@ export default function MessagesScreen() {
   );
   const { colors, gradientDeep } = useTheme();
   const styles = useStyles();
+  const tabStrip = useRef<ComponentRef<typeof ScrollView>>(null);
 
   // Conversations (blocked users hidden), then the active chip filter.
   const live = liveMode();
@@ -239,11 +240,20 @@ export default function MessagesScreen() {
       {/* Dimmer than other scenes: this list is mostly small grey text. */}
       <Backdrop scene={SCENES.messages} strength={0.5} />
       <View style={styles.topBar}>
-        <View style={styles.tabs}>
+        {/* The tabs scroll when they don't fit (a narrow phone, large text): the menu always stays on screen. */}
+        <ScrollView
+          ref={tabStrip}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ flex: 1, marginRight: 8 }}
+          contentContainerStyle={styles.tabs}
+          // The chosen tab's word grows: where the strip is too short, it is brought fully into view.
+          onContentSizeChange={() => (tab === 'messages' ? tabStrip.current?.scrollTo({ x: 0 }) : tabStrip.current?.scrollToEnd())}
+        >
           {TABS.map((t) => (
             <TabButton key={t.key} label={t.label} active={tab === t.key} badge={t.key === 'messages' ? totalUnread : 0} onPress={() => setTab(t.key)} />
           ))}
-        </View>
+        </ScrollView>
         <Pressable onPress={() => setMenuOpen(true)} hitSlop={10} accessibilityLabel="Menü">
           <Ionicons name="ellipsis-horizontal" size={24} color={colors.text} />
         </Pressable>
@@ -327,7 +337,8 @@ function TabButton({ label, active, badge, onPress }: { label: string; active: b
 function Chip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
   const styles = useStyles();
   return (
-    <Pressable onPress={onPress} style={[styles.chip, active && styles.chipActive]}>
+    // The slop stays inside the strip's own padding: a horizontal list takes no touch past its bounds.
+    <Pressable onPress={onPress} hitSlop={{ top: 7, bottom: 7 }} style={[styles.chip, active && styles.chipActive]}>
       <Text style={[styles.chipText, active && { color: '#fff' }]}>{label}</Text>
     </Pressable>
   );
@@ -406,7 +417,7 @@ function SystemRow({
         <Text style={styles.name} numberOfLines={1}>
           {title}
         </Text>
-        <Text style={styles.last} numberOfLines={1}>
+        <Text style={styles.last} numberOfLines={2}>
           {subtitle}
         </Text>
       </View>
@@ -509,10 +520,11 @@ function CallRow({ call, onCallBack }: { call: CallRowData; onCallBack: () => vo
         <Text style={[styles.name, call.direction === 'missed' && { color: colors.red }]} numberOfLines={1}>
           {u.name}
         </Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          <Ionicons name={dir.icon} size={12} color={dir.color} />
-          <Ionicons name={video ? 'videocam' : 'call'} size={12} color={colors.textDim} />
-          <Text style={styles.last} numberOfLines={1}>
+        {/* Wraps instead of cutting: what the call cost or earned comes last. The icons stay on the first line. */}
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 4 }}>
+          <Ionicons name={dir.icon} size={12} color={dir.color} style={{ marginTop: 2 }} />
+          <Ionicons name={video ? 'videocam' : 'call'} size={12} color={colors.textDim} style={{ marginTop: 2 }} />
+          <Text style={styles.last} numberOfLines={3}>
             {`${dir.label} ${video ? 'görüntülü' : 'sesli'} arama`}
             {call.duration > 0 ? ` · ${formatDuration(call.duration)}` : ''}
             {/* Live calls only: how an unanswered call ended, and what it cost or earned. */}
@@ -539,11 +551,10 @@ const useStyles = makeStyles(({ colors, lift, dark }) => ({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: 6,
   },
   // Tight enough that three tabs and the menu fit a 360-wide phone without touching.
   tabs: { flexDirection: 'row', gap: 14, alignItems: 'flex-end' },
-  tabBtn: { alignItems: 'center', gap: 5 },
+  tabBtn: { alignItems: 'center', gap: 5, paddingVertical: 6 },
   tabText: { color: colors.textDim, fontSize: 15, fontWeight: '600' },
   tabTextActive: { color: colors.text, fontSize: 20, fontWeight: '800' },
   tabLine: {
@@ -563,14 +574,14 @@ const useStyles = makeStyles(({ colors, lift, dark }) => ({
     justifyContent: 'center',
     paddingHorizontal: 4,
   },
-  hubs: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingTop: 12 },
+  hubs: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 12 },
   // Tall enough for the 56 px picture over a two-line title and a two-line note, so a third of a narrow phone cuts no word.
-  hub: { height: 146, borderRadius: 16, overflow: 'hidden', padding: 12, justifyContent: 'space-between' },
+  hub: { height: 152, borderRadius: 16, overflow: 'hidden', paddingHorizontal: 7, paddingVertical: 10, justifyContent: 'space-between' },
   hubTitle: { color: '#fff', fontSize: 14, lineHeight: 18, fontWeight: '800' },
   hubSub: { color: 'rgba(255,255,255,0.78)', fontSize: 11, lineHeight: 14 },
   hubBadge: { position: 'absolute', top: 8, right: 8 },
-  chipRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingRight: 12, paddingTop: 10, paddingBottom: 6 },
-  chips: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 16, paddingRight: 4 },
+  chipRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingRight: 12, paddingTop: 3 },
+  chips: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 16, paddingRight: 4, paddingVertical: 7 },
   chip: {
     paddingHorizontal: 14,
     paddingVertical: 6,

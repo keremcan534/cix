@@ -61,7 +61,11 @@ export function LeaveSheet() {
     () => (current ? popularRooms(live ? serverRooms : ROOMS, { current, blocked, needsPassword: (r) => (live ? isLockedRoom(r.id) && !roomPassword(r.id) : !!r.password) }) : []),
     [current, live, serverRooms, blocked],
   );
-  const tileW = Math.floor((Math.min(win.width, MAX_W) - space.lg * 2 - GAP) / 2);
+  // Two to a row inside the popular card: its own padding (space.md each side) comes off the width too.
+  const tileW = Math.floor((Math.min(win.width, MAX_W) - space.lg * 2 - space.md * 2 - GAP) / 2);
+  // The sheet does not scroll: on a short phone the two rows get lower, so the card ends over the navigation bar (the
+  // name, the orbs and the card's own rows take 380 of the height).
+  const tileH = Math.max(80, Math.min(Math.round(tileW * 0.74), Math.floor((win.height - insets.top - insets.bottom - 380) / 2)));
 
   const minimize = () => continueLeave();
   const leave = () => {
@@ -105,7 +109,7 @@ export function LeaveSheet() {
             </View>
             <View style={s.grid}>
               {picks.map((r) => (
-                <Tile key={r.id} room={r} width={tileW} still={still} onPress={() => go(r)} />
+                <Tile key={r.id} room={r} width={tileW} height={tileH} still={still} onPress={() => go(r)} />
               ))}
             </View>
             <View style={s.handle} />
@@ -166,11 +170,11 @@ function Choice({ still, label, note, danger, onPress, children }: { still: bool
 }
 
 /** A popular room: its cover, how many are in it, its agency or family, its name. */
-function Tile({ room, width, still, onPress }: { room: Room; width: number; still: boolean; onPress: () => void }) {
+function Tile({ room, width, height, still, onPress }: { room: Room; width: number; height: number; still: boolean; onPress: () => void }) {
   const s = useStyles();
   const badge = roomBadge(room);
   const body = (
-    <View style={[s.tile, { width, height: Math.round(width * 0.74) }]}>
+    <View style={[s.tile, { width, height }]}>
       <Photo uri={room.cover} kind="cover" seed={room.id} style={StyleSheet.absoluteFill} />
       <LinearGradient colors={['rgba(4,10,20,0.35)', 'rgba(4,10,20,0)', 'rgba(4,10,20,0.9)']} locations={[0, 0.35, 1]} style={StyleSheet.absoluteFill} />
       <View style={s.count}>

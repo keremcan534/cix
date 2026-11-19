@@ -23,7 +23,7 @@ import { Reel, type ReelHandle } from '@/components/games/fx/reel';
 import { ContactShadow, FundPlaque, Marquee, SALON, SalonStage, StageHeader, StageStatus, SymbolPlate, plaqueValue, salonScreen, symbolShadow, useBox, type ActionLook, type StatusTone } from '@/components/games/fx/salon';
 import { SKIN_GAP, SKIN_PAD, SKIN_RIM, SkinCabinet, SkinPlate, fitSkin, slotSkinOf, windowRadius } from '@/components/games/fx/slot-skin';
 import { useWinFx } from '@/components/games/fx/win-fx';
-import { SpinControls, fmt, sleep } from '@/components/games/slot-kit';
+import { SpinControls, fmt, sleep, useShortGame } from '@/components/games/slot-kit';
 import type { LineSlotId } from '@/lib/casino-odds';
 import { casinoAccess, useGames, type Entry } from '@/lib/games';
 import { playSfx, warmSfx } from '@/lib/game-sound';
@@ -198,6 +198,7 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
   const beat = useRef<Animated.CompositeAnimation | null>(null);
   const win = useWinFx();
   const show = useJackpotShow(skin);
+  const short = useShortGame(entry);
 
   useEffect(() => {
     balance.current = coins + gameCoins;
@@ -228,7 +229,8 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
   const fit = skin && area.w && area.h ? fitSkin(skin, area.w, area.h, reels, c.rows) : null;
   const gap = skin ? SKIN_GAP : GAP;
   const plainH = fitW && fitH ? Math.max(40, Math.min(Math.round(fitW * shape), fitH)) : 0;
-  const cellH = skin ? (fit ? Math.max(30, fit.cellH) : 0) : plainH;
+  // A skin's cell never outgrows the cabinet's window: a taller one would push the bottom row behind the cabinet.
+  const cellH = skin ? (fit ? Math.max(10, fit.cellH) : 0) : plainH;
   const cellW = fit ? fit.reelW - 2 * SKIN_RIM : cellH ? Math.min(fitW, Math.round(cellH * (reels === 3 ? 1.25 : 1))) : 0;
   const symSize = fit ? fit.symSize : Math.round(Math.min(cellW, cellH) * (reels === 3 ? 0.74 : 0.8));
   // The reels keep the same pace in symbols a second however tall a cell is.
@@ -424,6 +426,7 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
       look={theme.look}
       art={skin?.spin.src}
       caption={`${c.lines.length} çizgi × ${fmt(bet / c.lines.length)}`}
+      short={short}
     />
   );
   // The JACKPOT fund and Kayıp Parşömen's three prizes, over the reels.
@@ -473,7 +476,8 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
   if (skin)
     return (
       <View style={salonScreen}>
-        <View style={s.skinStage}>
+        {/* Kayıp Parşömen's prize row takes the reels' height: its stage stays taller, or its symbols get too small. */}
+        <View style={[s.skinStage, !!prizes && s.skinStagePrizes]}>
           {/* The fund and the prizes leave room on the right for the "?" button. */}
           {(fundPlaque || prizes) && (
             <View style={s.skinHead}>
@@ -553,7 +557,8 @@ const s = StyleSheet.create({
   // A reel being waited for: its frame lights up until it stops.
   reelWait: { borderColor: '#FFE08A', boxShadow: '0 0 14px rgba(255,224,138,0.9)' },
   // A skinned machine: no stage of the shell's, the game panel's picture behind it (fx/slot-skin).
-  skinStage: { flex: 1, minHeight: 330 },
+  skinStage: { flex: 1, minHeight: 300 },
+  skinStagePrizes: { minHeight: 330 },
   skinWindow: { position: 'absolute', flexDirection: 'row', gap: SKIN_GAP },
   skinHead: { gap: 6, paddingRight: 40, paddingTop: 2 },
   skinReel: { borderRadius: 6, borderWidth: SKIN_RIM, borderColor: 'transparent' },

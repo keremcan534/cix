@@ -281,7 +281,7 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
       <View style={styles.labelRow}>
         <Text style={styles.label}>{label}</Text>
         {hint ? (
-          <Text style={styles.hint} numberOfLines={1}>
+          <Text style={styles.hint} numberOfLines={2}>
             {hint}
           </Text>
         ) : null}

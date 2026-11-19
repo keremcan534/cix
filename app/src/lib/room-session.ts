@@ -348,6 +348,8 @@ export function onAppState(next: 'active' | 'background') {
   patchSession({ appState: 'active', audioSuspended: false });
   if (wasSuspended) notify('Uygulama arka plandayken oda sesi durdu.', 'warn');
   if (!isOnline()) lostConnection();
+  // Dropped for good while away: back in the app it tries again without waiting for a tap.
+  else if (s.status === 'disconnected') retryNow();
 }
 
 // --- Network and reconnection ----------------------------------------------------------------------------

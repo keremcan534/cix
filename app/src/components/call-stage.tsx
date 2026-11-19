@@ -213,7 +213,8 @@ export function CallStage({ call, onEnd, extra, banner }: { call: CallView; onEn
         </View>
 
         {!video || !media.remoteVideo ? (
-          <View style={styles.center}>
+          // In a video call the photo centres in the space left of my own small video, which would cover it.
+          <View style={[styles.center, video && { paddingRight: 120 }]}>
             <Photo uri={avatar} kind="face" seed={peer} style={styles.bigAvatar} />
             <Text style={styles.state}>{media.status === 'connecting' ? 'Bağlanıyor…' : media.status === 'reconnecting' ? 'Yeniden bağlanıyor…' : media.status === 'failed' ? (media.error ?? 'Bağlantı kurulamadı') : !media.peerHere ? `${call.other.name} bekleniyor…` : video ? 'Kamerası kapalı' : 'Görüşme sürüyor'}</Text>
           </View>
@@ -323,17 +324,17 @@ const styles = StyleSheet.create({
   meterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginHorizontal: 16, marginBottom: 12 },
   meter: { backgroundColor: 'rgba(0,0,0,0.45)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999 },
   meterText: { color: colors.gold, fontWeight: '700', fontSize: 12 },
-  controls: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 14, paddingBottom: 24 },
+  controls: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, paddingBottom: 24 },
   ctrl: { width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
   tools: { position: 'absolute', right: 16, top: 280, gap: 10 },
   tool: { alignItems: 'center', gap: 3 },
   toolText: { color: '#fff', fontSize: 11, fontWeight: '700', textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 3 },
-  beautyNote: { alignSelf: 'center', marginBottom: 10, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, backgroundColor: 'rgba(0,0,0,0.55)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)' },
-  beautyNoteText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  beautyNote: { alignSelf: 'center', marginHorizontal: 16, marginBottom: 10, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, backgroundColor: 'rgba(0,0,0,0.55)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)' },
+  beautyNoteText: { color: '#fff', fontSize: 13, fontWeight: '700', textAlign: 'center' },
   earnMeter: { flexDirection: 'row', alignItems: 'baseline', gap: 6, backgroundColor: 'rgba(15,23,42,0.6)', borderWidth: 1, borderColor: 'rgba(125,211,252,0.45)' },
   earnText: { color: '#E0F2FE', fontWeight: '900', fontSize: 15 },
   earnSub: { color: 'rgba(224,242,254,0.75)', fontWeight: '700', fontSize: 11 },
-  pop: { alignSelf: 'center', marginBottom: 10, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, backgroundColor: 'rgba(14,116,144,0.85)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)' },
+  pop: { alignSelf: 'center', marginHorizontal: 16, marginBottom: 10, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, backgroundColor: 'rgba(14,116,144,0.85)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)' },
   popBig: { paddingHorizontal: 20, paddingVertical: 11, backgroundColor: 'rgba(219,39,119,0.9)' },
   popText: { color: '#fff', fontSize: 14, fontWeight: '800', textAlign: 'center' },
   popTextBig: { fontSize: 16 },

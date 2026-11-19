@@ -3,14 +3,14 @@
 // replays anything. A reader scrolled up is never pulled down by new events; a pill offers to jump instead.
 // The chat is at least the height the person chose (drag the handle above the tabs, or tap it: lib/room-chat-size)
 // and takes whatever the mics leave too, so there is never an empty band between the mics and the chat; when the
-// stage needs more (banners, boards), it scrolls before the chat gives up any of its chosen height. The tab
-// at the handle's right is the room's Küçült / Büyüt: Küçült turns the mics into a short strip and the chat takes
+// stage needs more (banners, boards), it scrolls before the chat gives up any of its chosen height. The button
+// at the tabs' right is the room's Küçült / Büyüt: Küçült turns the mics into a short strip and the chat takes
 // all the room below it; Büyüt brings the mics back to their size and the chat to the size it had.
 // While typing, the keyboard takes its room from the chat alone (lib/room-split): the last lines stay in sight between
 // the Balkon bar and the field, with no handle and no tabs, and the mics above never move.
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { Animated, FlatList, PanResponder, Pressable, StyleSheet, View, type ListRenderItem } from 'react-native';
+import { Animated, FlatList, PanResponder, Pressable, StyleSheet, View, useWindowDimensions, type ListRenderItem } from 'react-native';
 
 import { Text } from '@/components/text';
 import { filterFeed, type FeedMsg, type FeedTab } from '@/lib/chat-feed';
@@ -98,19 +98,15 @@ export function ChatFeed({
   );
   return (
     <Animated.View onTouchStart={onTouch} style={[{ marginHorizontal: 12 }, fill ? s.typing : large ? s.grow : { flexBasis: height.value, flexGrow: 1, flexShrink: 1, minHeight: 0 }, hidden && { display: 'none' }]}>
+      {!fill && <Handle height={height} />}
       {!fill && (
-        <View>
-          <Handle height={height} />
-          <FoldTab height={height} />
-        </View>
-      )}
-      {!fill && (
-        <View style={[s.tabs, { paddingTop: 0 }]} accessibilityRole="tablist">
+        <View style={s.tabs} accessibilityRole="tablist">
           {TABS.map(([k, l]) => (
-            <Pressable key={k} onPress={() => setTab(k)} hitSlop={{ top: 8, bottom: 8 }} style={[s.tab, tab === k && s.tabOn]} accessibilityRole="tab" aria-selected={tab === k} accessibilityLabel={`${l} mesajları`}>
+            <Pressable key={k} onPress={() => setTab(k)} hitSlop={{ top: 2, bottom: 8 }} style={[s.tab, tab === k && s.tabOn]} accessibilityRole="tab" aria-selected={tab === k} accessibilityLabel={`${l} mesajları`}>
               <Text style={[s.tabText, tab === k && s.tabTextOn]}>{l}</Text>
             </Pressable>
           ))}
+          <FoldTab height={height} />
         </View>
       )}
       {TABS.map(([k]) => (
@@ -189,6 +185,8 @@ function Handle({ height }: { height: ChatHeight }) {
     <View
       {...pan.panHandlers}
       style={s.handle}
+      // Not further up: a touch higher than this belongs to the Balkon bar.
+      hitSlop={{ top: 4, bottom: 0 }}
       accessible
       accessibilityRole="adjustable"
       accessibilityLabel="Sohbet alanının boyu. Yukarı çek: büyüt, aşağı çek: küçült, dokun: büyük ya da normal"
@@ -201,8 +199,10 @@ function Handle({ height }: { height: ChatHeight }) {
   );
 }
 
-/** The tab at the handle's right: Küçült (small mics, the largest chat) or Büyüt (mics and chat as they were). */
+/** The button at the tabs' right: Küçült (small mics, the largest chat) or Büyüt (mics and chat as they were). */
 function FoldTab({ height }: { height: ChatHeight }) {
+  // The narrowest phones keep the three tabs on one line: the icon alone (its label stays for screen readers).
+  const iconOnly = useWindowDimensions().width < 360;
   const [large, setLarge] = useState(() => isLargeChat(height.share));
   useEffect(() => {
     const f = () => setLarge(isLargeChat(height.share));
@@ -218,7 +218,7 @@ function FoldTab({ height }: { height: ChatHeight }) {
       accessibilityLabel={large ? 'Mikrofonları büyüt' : 'Mikrofonları küçült, sohbeti genişlet'}
     >
       <Ionicons name={large ? 'expand-outline' : 'contract-outline'} size={13} color={colors.text} />
-      <Text style={s.foldText}>{large ? 'Büyüt' : 'Küçült'}</Text>
+      {!iconOnly && <Text style={s.foldText}>{large ? 'Büyüt' : 'Küçült'}</Text>}
     </Pressable>
   );
 }
@@ -228,6 +228,9 @@ function FeedList({ data, active, empty, renderItem, tight, sideRoom }: { data: 
   const [away, setAway] = useState(false);
   const [unread, setUnread] = useState(0);
   const [newest, setNewest] = useState(data[0]?.id);
+  // Only the newest lines, which pass the floating button, keep clear of it; the older ones use the whole width. Inside
+  // its cell this margin stays on the right: Android turns both the inverted list and each cell around (scale -1).
+  const drawRow = useCallback<ListRenderItem<FeedMsg>>((p) => <View style={p.index < 3 && sideRoom ? { marginRight: sideRoom } : undefined}>{renderItem(p)}</View>, [renderItem, sideRoom]);
   if (data[0]?.id !== newest) {
     // Derived transition: count what arrived while the reader was scrolled up.
     const before = data.findIndex((m) => m.id === newest);
@@ -244,12 +247,8 @@ function FeedList({ data, active, empty, renderItem, tight, sideRoom }: { data: 
           data={data}
           inverted
           keyExtractor={(m) => m.id}
-          renderItem={renderItem}
-          // The room for the button on the right is the list's own margin, not its content's padding: Android draws an
-          // inverted list turned around (scale -1), so a right padding would end up on the left, with the lines
-          // running under the button.
-          style={sideRoom ? { marginRight: sideRoom } : undefined}
-          contentContainerStyle={tight ? { gap: 2, paddingVertical: 2 } : { gap: 6, paddingVertical: 8 }}
+          renderItem={drawRow}
+          contentContainerStyle={tight ? { gap: 2, paddingVertical: 2 } : { gap: 6, paddingVertical: 4 }}
           initialNumToRender={16}
           windowSize={9}
           scrollEventThrottle={100}
@@ -280,8 +279,8 @@ function FeedList({ data, active, empty, renderItem, tight, sideRoom }: { data: 
 }
 
 const s = StyleSheet.create({
-  tabs: { flexDirection: 'row', gap: 6, paddingTop: 8, paddingBottom: 4 },
-  tab: { borderRadius: 999, paddingHorizontal: 14, paddingVertical: 6, backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', borderTopColor: 'rgba(255,255,255,0.24)' },
+  tabs: { flexDirection: 'row', gap: 6, paddingBottom: 2 },
+  tab: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4, backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', borderTopColor: 'rgba(255,255,255,0.24)' },
   tabOn: { backgroundColor: semantic.action, borderColor: semantic.action, borderTopColor: '#FFC2DC', boxShadow: '0 0 12px rgba(255,95,162,0.5)' },
   tabText: { color: colors.text, fontWeight: '700', fontSize: 13 },
   tabTextOn: { color: semantic.actionInk, fontWeight: '900' },
@@ -290,11 +289,11 @@ const s = StyleSheet.create({
   typing: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minHeight: 0 },
   // Küçült: everything the mic strip leaves.
   grow: { flexGrow: 1, flexShrink: 1, flexBasis: 160, minHeight: 0 },
-  handle: { height: 22, alignItems: 'center', justifyContent: 'center' },
+  handle: { height: 12, alignItems: 'center', justifyContent: 'center' },
   grip: { width: 44, height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.38)' },
-  fold: { position: 'absolute', right: 0, top: 0, height: 22, flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 9, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
+  fold: { marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 9, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
   foldText: { color: colors.text, fontSize: 11, fontWeight: '700' },
-  empty: { color: colors.textDim, fontSize: 13, textAlign: 'center', marginTop: 24 },
+  empty: { color: colors.textDim, fontSize: 13, textAlign: 'center', marginTop: 8 },
   pill: { position: 'absolute', alignSelf: 'center', bottom: 8, backgroundColor: semantic.action, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7 },
   pillText: { color: semantic.actionInk, fontWeight: '900', fontSize: 13 },
 });

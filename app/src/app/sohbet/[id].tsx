@@ -109,22 +109,28 @@ export default function ChatScreen() {
               <Avatar uri={missing ? '' : user.avatar} size={38} online={!missing && user.online} />
               <View style={{ flex: 1 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Text style={styles.name}>{missing ? 'Kullanıcı bulunamadı' : user.name}</Text>
+                  <Text style={styles.name} numberOfLines={1}>
+                    {missing ? 'Kullanıcı bulunamadı' : user.name}
+                  </Text>
                   {!missing && user.verified && <VerifiedBadge />}
                 </View>
-                {!missing && <Text style={styles.status}>{typing ? 'yazıyor...' : user.online ? 'Çevrimiçi' : user.city}</Text>}
+                {!missing && (
+                  <Text style={styles.status} numberOfLines={1}>
+                    {typing ? 'yazıyor...' : user.online ? 'Çevrimiçi' : user.city}
+                  </Text>
+                )}
               </View>
             </Pressable>
             {!callsAvailable() ? (
               liveCalls() && pair && !isBlocked && <CallButtons userId={user.id} pair={pair} />
             ) : (
               <>
-                <Pressable onPress={() => router.push({ pathname: '/arama/[id]', params: { id: user.id, mode: 'sesli' } })} hitSlop={8} accessibilityRole="button" accessibilityLabel="Sesli ara">
+                <Pressable onPress={() => router.push({ pathname: '/arama/[id]', params: { id: user.id, mode: 'sesli' } })} hitSlop={{ top: 11, bottom: 11, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel="Sesli ara">
                   <Ionicons name="call-outline" size={22} color={colors.text} />
                 </Pressable>
                 <Pressable
                   onPress={() => router.push({ pathname: '/arama/[id]', params: { id: user.id, mode: 'goruntulu' } })}
-                  hitSlop={8}
+                  hitSlop={{ top: 11, bottom: 11, left: 8, right: 8 }}
                   style={{ marginLeft: 14 }}
                   accessibilityRole="button"
                   accessibilityLabel="Görüntülü ara"
@@ -133,7 +139,7 @@ export default function ChatScreen() {
                 </Pressable>
               </>
             )}
-            <Pressable onPress={() => setMenuOpen(true)} hitSlop={10} style={{ marginLeft: 6 }} accessibilityRole="button" accessibilityLabel="Sohbet seçenekleri">
+            <Pressable onPress={() => setMenuOpen(true)} hitSlop={{ top: 11, bottom: 11, left: 8, right: 10 }} style={{ marginLeft: 6 }} accessibilityRole="button" accessibilityLabel="Sohbet seçenekleri">
               <Ionicons name="ellipsis-horizontal" size={22} color={colors.text} />
             </Pressable>
           </View>
@@ -155,6 +161,6 @@ const useStyles = makeStyles(({ colors }) => ({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  name: { color: colors.text, fontWeight: '700', fontSize: 16 },
+  name: { color: colors.text, fontWeight: '700', fontSize: 16, flexShrink: 1 },
   status: { color: colors.textDim, fontSize: 12 },
 }));

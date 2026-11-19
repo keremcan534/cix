@@ -177,17 +177,49 @@ export function EmojiPanel({ onPick, hint, onAnimate, onClose, fill }: { onPick:
   };
 
   const list = fill ? styles.fillScroll : styles.stickerScroll;
+  const kindSwitch = (
+    <View style={[styles.kinds, fill && styles.kindsInline]} accessibilityRole="tablist">
+      {(['sabit', 'vip'] as const).map((k) => (
+        <Pressable key={k} onPress={() => switchKind(k)} hitSlop={{ top: 8, bottom: 8 }} style={[styles.kind2, fill && styles.kind2Inline, kind === k && styles.kindOn]} accessibilityRole="tab" accessibilityState={{ selected: kind === k }}>
+          <Text style={[styles.kindText, kind === k && styles.kindTextOn]}>{KIND_NAME[k]}</Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+  const micEffects = (
+    <>
+      {micFxList.length > 0 && <Text style={styles.sub}>🎙️ Mikrofon efektim · konuşurken koltuğunda kendiliğinden oynar</Text>}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, flexShrink: 0 }} contentContainerStyle={{ gap: 6 }}>
+        {micFxList.map((a) => {
+          const owned = ownedAnims.has(a.animation_id);
+          const on = micFx === a.animation_id;
+          return (
+            <Pressable
+              key={a.animation_id}
+              onPress={() => {
+                if (on) return setMicFx(null);
+                const err = buyMicFx(a.animation_id);
+                if (err) showAlert('Alınamadı', err);
+              }}
+              style={[styles.fx, on && styles.fxOn]}
+              accessibilityLabel={`${a.name} mikrofon efekti`}
+            >
+              <AssetView asset={a.preview_asset} size={18} />
+              <Text style={styles.fxText}>{a.name}</Text>
+              <Text style={styles.fxPrice}>{on ? '✓ Açık' : owned || a.is_free ? 'Kullan' : `${a.coin_price}`}</Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+    </>
+  );
   return (
     <View style={[styles.wrap, fill && styles.fillWrap]}>
       {hint && <Text style={styles.hint}>{hint}</Text>}
-      <View style={styles.kinds} accessibilityRole="tablist">
-        {(['sabit', 'vip'] as const).map((k) => (
-          <Pressable key={k} onPress={() => switchKind(k)} style={[styles.kind2, kind === k && styles.kindOn]} accessibilityRole="tab" accessibilityState={{ selected: kind === k }}>
-            <Text style={[styles.kindText, kind === k && styles.kindTextOn]}>{KIND_NAME[k]}</Text>
-          </Pressable>
-        ))}
-      </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, flexShrink: 0 }} contentContainerStyle={{ gap: 6, paddingHorizontal: 8 }}>
+      {/* Over a room's chat every row counts: the switch rides in the tab strip, the mic effects scroll with the list. */}
+      {!fill && kindSwitch}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[{ flexGrow: 0, flexShrink: 0 }, fill && styles.strip]} contentContainerStyle={[{ gap: 6, paddingHorizontal: 8 }, fill && styles.stripIn]}>
+        {fill && kindSwitch}
         {tabs
           .filter((x) => x.kind === kind)
           .map((x) => {
@@ -196,7 +228,8 @@ export function EmojiPanel({ onPick, hint, onAnimate, onClose, fill }: { onPick:
               <Pressable
                 key={x.id}
                 onPress={() => choose(x)}
-                style={[styles.tab, tab.id === x.id && styles.tabActive]}
+                hitSlop={fill ? { top: 8, bottom: 8 } : undefined}
+                style={[styles.tab, fill ? styles.tabInline : styles.tabTall, tab.id === x.id && styles.tabActive]}
                 accessibilityRole="tab"
                 accessibilityState={{ selected: tab.id === x.id }}
                 accessibilityLabel={x.pack ? `${l.name} çıkartmaları` : l.name}
@@ -213,30 +246,9 @@ export function EmojiPanel({ onPick, hint, onAnimate, onClose, fill }: { onPick:
       </ScrollView>
       {(tab.id === 'animated' || tab.id === 'animated-free') && onAnimate ? (
         <View style={[{ paddingHorizontal: 8, gap: 6 }, fill ? { flex: 1 } : { flexShrink: 1 }]}>
-          {micFxList.length > 0 && <Text style={styles.sub}>🎙️ Mikrofon efektim · konuşurken koltuğunda kendiliğinden oynar</Text>}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, flexShrink: 0 }} contentContainerStyle={{ gap: 6 }}>
-            {micFxList.map((a) => {
-              const owned = ownedAnims.has(a.animation_id);
-              const on = micFx === a.animation_id;
-              return (
-                <Pressable
-                  key={a.animation_id}
-                  onPress={() => {
-                    if (on) return setMicFx(null);
-                    const err = buyMicFx(a.animation_id);
-                    if (err) showAlert('Alınamadı', err);
-                  }}
-                  style={[styles.fx, on && styles.fxOn]}
-                  accessibilityLabel={`${a.name} mikrofon efekti`}
-                >
-                  <AssetView asset={a.preview_asset} size={18} />
-                  <Text style={styles.fxText}>{a.name}</Text>
-                  <Text style={styles.fxPrice}>{on ? '✓ Açık' : owned || a.is_free ? 'Kullan' : `${a.coin_price}`}</Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-          <ScrollView style={list} nestedScrollEnabled>
+          {!fill && micEffects}
+          <ScrollView style={list} contentContainerStyle={fill ? { gap: 6 } : undefined} nestedScrollEnabled>
+            {fill && micEffects}
             <View style={styles.grid}>{catalog.filter((a) => sendable(a) && a.is_free === !paidAnim).map(animCell)}</View>
           </ScrollView>
         </View>
@@ -281,13 +293,22 @@ export function EmojiPanel({ onPick, hint, onAnimate, onClose, fill }: { onPick:
 const useStyles = makeStyles(({ colors, semantic, dark }) => ({
   hint: { color: colors.textDim, fontSize: 12, paddingHorizontal: 12, paddingBottom: 6 },
   kinds: { flexDirection: 'row', alignSelf: 'center', gap: 4, padding: 3, marginBottom: 8, borderRadius: 999, backgroundColor: colors.cardAlt },
+  kindsInline: { marginBottom: 0 },
   kind2: { paddingHorizontal: 18, paddingVertical: 5, borderRadius: 999 },
+  kind2Inline: { paddingHorizontal: 9 },
+  // A scroll view takes no touch outside its own box, so the strip reaches up under the panel's top padding: the hitSlop
+  // of the switch and the tabs then works, and nothing moves on screen.
+  strip: { marginTop: -8 },
+  // Tight enough that the last tab (Hareketli) still shows on a 320 wide phone with large text.
+  stripIn: { gap: 4, alignItems: 'center', paddingTop: 8, paddingBottom: 5 },
   kindOn: { backgroundColor: colors.primary },
   kindText: { color: colors.text, fontSize: 12, fontWeight: '700' },
   kindTextOn: { color: '#fff' },
   // Light: a hairline and a soft upward shadow so the white panel lifts off the paper behind it.
   wrap: { flexShrink: 1, backgroundColor: colors.card, borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingTop: 10, paddingBottom: 6, ...(dark ? null : { borderWidth: StyleSheet.hairlineWidth, borderBottomWidth: 0, borderColor: 'rgba(42,21,32,0.08)', boxShadow: '0 -4px 16px rgba(64,20,40,0.06)' }) },
   tab: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999 },
+  tabInline: { paddingHorizontal: 7 },
+  tabTall: { paddingVertical: 9 },
   tabIcon: { width: 18, height: 18 },
   tabActive: { backgroundColor: colors.cardAlt },
   tabText: { color: colors.text, fontSize: 12, fontWeight: '600' },

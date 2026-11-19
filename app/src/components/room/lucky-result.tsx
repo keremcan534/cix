@@ -62,7 +62,7 @@ export function LuckyResult({ records, still, onDone }: { records: LuckyRecord[]
 
 const s = StyleSheet.create({
   center: { alignItems: 'center', justifyContent: 'center', zIndex: 80 },
-  card: { alignItems: 'center', gap: 4, paddingVertical: 18, paddingHorizontal: 28, borderRadius: 24, borderWidth: 2, minWidth: 200 },
+  card: { alignItems: 'center', gap: 4, paddingVertical: 18, paddingHorizontal: 20, borderRadius: 24, borderWidth: 2, minWidth: 200, maxWidth: '86%' },
   cardNone: { backgroundColor: 'rgba(22,37,60,0.94)', borderColor: colors.border, paddingVertical: 12 },
   cardWin: { backgroundColor: 'rgba(6,58,40,0.95)', borderColor: semantic.success },
   cardBig: { backgroundColor: 'rgba(66,40,4,0.96)', borderColor: colors.gold },
@@ -71,5 +71,5 @@ const s = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   reward: { color: semantic.money, fontSize: 24, fontWeight: '900', fontVariant: ['tabular-nums'] },
   none: { color: colors.text, fontSize: 16, fontWeight: '800' },
-  note: { color: colors.textDim, fontSize: 12 },
+  note: { color: colors.textDim, fontSize: 12, textAlign: 'center' },
 });

@@ -152,8 +152,8 @@ const useStyles = makeStyles(({ colors, surface, lift }) => ({
   statusTitle: { color: colors.text, fontSize: 18, fontWeight: '800' },
   statusSub: { color: colors.textDim, fontSize: 13, lineHeight: 18 },
   label: { color: colors.textDim, fontSize: 12, fontWeight: '700', letterSpacing: 0.6, paddingHorizontal: space.xs },
-  tiles: { flexDirection: 'row', gap: space.sm },
-  tile: { flex: 1, minWidth: 0, backgroundColor: colors.card, borderRadius: radius.lg, paddingVertical: space.md, paddingHorizontal: space.md, gap: 4, borderWidth: 1, borderColor: surface.rim, ...lift },
+  tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
+  tile: { flexBasis: '47%', flexGrow: 1, minWidth: 0, backgroundColor: colors.card, borderRadius: radius.lg, paddingVertical: space.md, paddingHorizontal: space.md, gap: 4, borderWidth: 1, borderColor: surface.rim, ...lift },
   tileValue: { color: colors.text, fontSize: 24, fontWeight: '800', fontVariant: ['tabular-nums'] },
   tileLabel: { color: colors.textDim, fontSize: 12, fontWeight: '600' },
 }));

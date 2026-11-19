@@ -29,6 +29,8 @@ const GAP = 8;
 const INSET = 10;
 /** What the stage draws round the board: the players' plates, the status line and the gaps between them. */
 const CHROME = 120;
+/** What a hand's end card, or a waiting table's buttons, take under the board beyond the status line. */
+const END_CARD = 100;
 const LINE = '#FFD166';
 
 /** One stroke of an X: a lit tube that runs in from one end. */
@@ -154,7 +156,8 @@ function WinLine({ line, cell, still, fx }: { line: number[]; cell: number; stil
 
 function XoxStage({ view, endsAt, busy, onMove, children }: { view: XoxView; endsAt: number | null; busy?: boolean; onMove: (m: XoxMove) => void; children?: ReactNode }) {
   const { still, fx } = useTableFx();
-  const room = useBoardRoom(CHROME);
+  // A hand's end brings its card and "Tekrar oyna", a waiting table "Başlat": the board makes way so they open in sight.
+  const room = useBoardRoom(view.status === 'playing' ? CHROME : CHROME + END_CARD);
   const [width, setWidth] = useState(0);
   // The board shown before this one: a mark that wasn't there is the one just placed.
   const [pair, setPair] = useState<{ cur: XoxView; before: XoxView | null }>({ cur: view, before: null });

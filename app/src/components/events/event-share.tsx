@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { Modal, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { Text, TextInput } from '@/components/text';
 import { Avatar } from '@/components/ui';
 import { USERS, isServerId, userById } from '@/data/mock';
@@ -60,43 +61,45 @@ export function EventShareSheet({ e, onClose }: { e: api.EventItem; onClose: () 
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Kapat" />
-      <View style={[styles.sheet, { paddingBottom: insets.bottom + 16 }]}>
-        <View style={styles.head}>
-          <Text style={styles.title}>Paylaş</Text>
-          <Pressable onPress={onClose} hitSlop={10} accessibilityLabel="Kapat">
-            <Ionicons name="close" size={22} color={colors.textDim} />
-          </Pressable>
-        </View>
-        <Pressable onPress={() => shareLink(eventShareText(e), eventPath(e.id))} style={styles.external} accessibilityRole="button">
-          <Ionicons name="share-social-outline" size={20} color={colors.primaryText} />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.name}>Diğer uygulamalarla paylaş</Text>
-            <Text style={styles.dim}>Bağlantı etkinliği uygulamada açar.</Text>
+      <KeyboardAvoid style={{ flex: 1 }}>
+        <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Kapat" />
+        <View style={[styles.sheet, { paddingBottom: insets.bottom + 16, marginTop: insets.top, flexShrink: 1 }]}>
+          <View style={styles.head}>
+            <Text style={styles.title}>Paylaş</Text>
+            <Pressable onPress={onClose} hitSlop={10} accessibilityLabel="Kapat">
+              <Ionicons name="close" size={22} color={colors.textDim} />
+            </Pressable>
           </View>
-          <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
-        </Pressable>
-        <Text style={styles.label}>Arkadaşına gönder</Text>
-        {friends.length > 4 && <TextInput value={query} onChangeText={setQuery} placeholder="Arkadaş ara" placeholderTextColor={colors.textDim} style={styles.input} maxLength={40} />}
-        {friends.length === 0 && <Text style={styles.dim}>Takip ettiğin ya da mesajlaştığın kişiler burada görünür.</Text>}
-        <ScrollView style={{ maxHeight: 320 }} contentContainerStyle={{ gap: 4 }} keyboardShouldPersistTaps="handled">
-          {list.map((u) => (
-            <View key={u.id} style={styles.row}>
-              <Avatar uri={u.avatar || undefined} name={u.name} size={36} />
-              <Text style={[styles.name, { flex: 1 }]} numberOfLines={1}>
-                {u.name}
-              </Text>
-              {sent.has(u.id) ? (
-                <Text style={styles.sent}>Gönderildi</Text>
-              ) : (
-                <Pressable onPress={() => send(u.id)} style={styles.small} accessibilityRole="button" accessibilityLabel={`${u.name} kişisine etkinliği gönder`}>
-                  <Text style={styles.smallText}>Gönder</Text>
-                </Pressable>
-              )}
+          <Pressable onPress={() => shareLink(eventShareText(e), eventPath(e.id))} style={styles.external} accessibilityRole="button">
+            <Ionicons name="share-social-outline" size={20} color={colors.primaryText} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.name}>Diğer uygulamalarla paylaş</Text>
+              <Text style={styles.dim}>Bağlantı etkinliği uygulamada açar.</Text>
             </View>
-          ))}
-        </ScrollView>
-      </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
+          </Pressable>
+          <Text style={styles.label}>Arkadaşına gönder</Text>
+          {friends.length > 4 && <TextInput value={query} onChangeText={setQuery} placeholder="Arkadaş ara" placeholderTextColor={colors.textDim} style={styles.input} maxLength={40} />}
+          {friends.length === 0 && <Text style={styles.dim}>Takip ettiğin ya da mesajlaştığın kişiler burada görünür.</Text>}
+          <ScrollView style={{ maxHeight: 320 }} contentContainerStyle={{ gap: 4 }} keyboardShouldPersistTaps="handled">
+            {list.map((u) => (
+              <View key={u.id} style={styles.row}>
+                <Avatar uri={u.avatar || undefined} name={u.name} size={36} />
+                <Text style={[styles.name, { flex: 1 }]} numberOfLines={1}>
+                  {u.name}
+                </Text>
+                {sent.has(u.id) ? (
+                  <Text style={styles.sent}>Gönderildi</Text>
+                ) : (
+                  <Pressable onPress={() => send(u.id)} style={styles.small} accessibilityRole="button" accessibilityLabel={`${u.name} kişisine etkinliği gönder`}>
+                    <Text style={styles.smallText}>Gönder</Text>
+                  </Pressable>
+                )}
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+      </KeyboardAvoid>
     </Modal>
   );
 }

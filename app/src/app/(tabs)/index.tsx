@@ -2,10 +2,11 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { FlatList, Image, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { FlatList, Image, Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
+import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { ActionSheet } from '@/components/ActionSheet';
 import { Art, artSource, type ArtName } from '@/components/Art';
 import { FloatIcon } from '@/components/fx/float';
@@ -151,6 +152,9 @@ export default function RoomsScreen() {
           ? 'Üye olduğun ya da takip ettiğin oda yok.'
           : 'Takip ettiğin kimse şu an oda açmamış.';
 
+  // Only the narrowest phones need the header's icons this close; the others keep a wider target for each finger.
+  const tightHeader = useWindowDimensions().width < 360;
+  const iconSlop = tightHeader ? HEADER_ICON_SLOP_TIGHT : HEADER_ICON_SLOP;
   const header = (
     <Glass style={[styles.headerBar, { paddingTop: insets.top }]}>
       <View style={styles.header} onLayout={(e) => setHeaderH(e.nativeEvent.layout.height + insets.top)}>
@@ -163,22 +167,24 @@ export default function RoomsScreen() {
             ] as const
           ).map(([key, label]) => (
             <Pressable key={key} onPress={() => setMain(key)} hitSlop={4} style={[styles.segItem, main === key && styles.segItemOn]} accessibilityRole="tab" aria-selected={main === key}>
-              <Text style={[styles.segText, main === key && styles.segTextOn]}>{label}</Text>
+              <Text style={[styles.segText, main === key && styles.segTextOn]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+                {label}
+              </Text>
             </Pressable>
           ))}
         </View>
-        <View style={styles.headerIcons}>
-          <Pressable onPress={() => router.push('/siralama')} hitSlop={6} accessibilityLabel="Sıralama">
+        <View style={[styles.headerIcons, tightHeader && { gap: 8 }]}>
+          <Pressable onPress={() => router.push('/siralama')} hitSlop={iconSlop} accessibilityLabel="Sıralama">
             <Ionicons name="trophy-outline" size={21} color={colors.gold} />
           </Pressable>
           {/* Etkinlik Merkezi (components/events): every approved event, my room's and my places. */}
-          <Pressable onPress={() => openEvents()} hitSlop={6} accessibilityLabel="Etkinlikler">
+          <Pressable onPress={() => openEvents()} hitSlop={iconSlop} accessibilityLabel="Etkinlikler">
             <Ionicons name="calendar-outline" size={21} color={colors.text} />
           </Pressable>
-          <Pressable onPress={() => setSearchOpen(true)} hitSlop={6} accessibilityLabel="Oda ara">
+          <Pressable onPress={() => setSearchOpen(true)} hitSlop={iconSlop} accessibilityLabel="Oda ara">
             <Ionicons name="search" size={22} color={colors.text} />
           </Pressable>
-          <Pressable onPress={() => router.push('/bildirimler')} hitSlop={6} accessibilityLabel="Bildirimler">
+          <Pressable onPress={() => router.push('/bildirimler')} hitSlop={iconSlop} accessibilityLabel="Bildirimler">
             <Ionicons name="notifications" size={22} color={colors.text} />
             {unreadNotices > 0 && <View style={styles.dot} />}
           </Pressable>
@@ -266,7 +272,7 @@ export default function RoomsScreen() {
       <View style={[styles.fab, { bottom: TAB_BAR_HEIGHT + insets.bottom + 18 }]}>
         <PressableScale to={0.9} onPress={() => router.push('/oda/yeni')} accessibilityLabel="Oda oluştur">
           <View style={[styles.fabInner, glow('rgba(255,95,162,0.5)', 14, 4)]}>
-            <Image source={LUXE_ROUND} style={StyleSheet.absoluteFill} resizeMode="contain" accessibilityIgnoresInvertColors />
+            <Image source={LUXE_ROUND} style={[StyleSheet.absoluteFill, { width: '100%', height: '100%' }]} resizeMode="contain" accessibilityIgnoresInvertColors />
             <Ionicons name="add" size={30} color="#fff" />
           </View>
         </PressableScale>
@@ -317,7 +323,7 @@ function ClosestRoomCard({ match }: { match: RoomMatch }) {
             <Avatar uri={host.avatar} name={host.name} size={44} />
           </View>
           <View style={{ flex: 1, gap: 3 }}>
-            <Text style={styles.heroTitle} numberOfLines={1}>
+            <Text style={styles.heroTitle} numberOfLines={2}>
               {room.title}
             </Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
@@ -358,7 +364,7 @@ function QuickStrip({ coins, checkedInToday }: { coins: number; checkedInToday: 
               <FloatIcon source={it.source} size={46} hue={it.hue} bob delay={i * 280} />
               {it.dot && <View style={[styles.dot, { top: 0, right: 0 }]} />}
             </View>
-            <Text style={[styles.shelfText, it.key === 'coins' && { color: colors.gold }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+            <Text style={[styles.shelfText, it.key === 'coins' && { color: colors.gold }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.72}>
               {it.label}
             </Text>
           </PressableScale>
@@ -375,7 +381,7 @@ function CategoryBar({ cat, onCat, countryArt: flag, onCountry }: { cat: RoomTab
     <View style={styles.catBar}>
       {/* The strip ends cleanly at its own edge: no shade over it, which on a bright photo read as a dark box. */}
       <View style={{ flex: 1, overflow: 'hidden' }}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 20, paddingLeft: 16, paddingRight: 16 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 20, paddingLeft: 16, paddingRight: 16, alignItems: 'flex-end' }}>
           {ROOM_TABS.map((c) => (
             <Pressable key={c} onPress={() => onCat(c)} style={{ alignItems: 'center' }}>
               <Text style={[styles.catText, c === cat && styles.catTextActive]}>{c}</Text>
@@ -682,75 +688,82 @@ function RoomSearch({ visible, rooms, onClose }: { visible: boolean; rooms: Room
   };
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
-      <Pressable style={styles.backdrop} onPress={close} />
-      {/* Above the system navigation bar too (edge-to-edge Android draws the sheet under it). */}
-      <View style={[styles.searchSheet, { paddingBottom: Math.max(34, insets.bottom + 8) }]}>
-        <View style={styles.searchBox}>
-          <Ionicons name="search" size={18} color={colors.textDim} />
-          <TextInput
-            value={q}
-            onChangeText={setQ}
-            placeholder="Oda adı veya oda ID"
-            placeholderTextColor={colors.textDim}
-            style={styles.searchInput}
-            autoFocus
-            returnKeyType="search"
-          />
-          {q.length > 0 && (
-            <Pressable onPress={() => setQ('')} hitSlop={6}>
-              <Ionicons name="close-circle" size={18} color={colors.textDim} />
-            </Pressable>
-          )}
-        </View>
-        <Text style={styles.searchHint}>{needle ? `${results.length + (hit ? 1 : 0)} sonuç` : 'Popüler odalar'}</Text>
-        <ScrollView style={{ maxHeight: 380 }} keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: 6 }}>
-          {results.map((r) => (
-            <Pressable
-              key={r.id}
-              style={({ pressed }) => [styles.searchRow, pressed && { backgroundColor: colors.cardAlt }]}
-              onPress={() => {
-                close();
-                router.push(`/oda/${r.id}`);
-              }}
-            >
-              <Photo uri={r.cover} kind="cover" seed={r.id} style={styles.searchCover} />
-              <View style={{ flex: 1, gap: 2 }}>
-                <View style={styles.titleRow}>
-                  {locked(r) && <Ionicons name="lock-closed" size={12} color={colors.gold} accessibilityLabel="Şifreli oda" />}
+      {/* The box focuses itself and an edge-to-edge dialog doesn't shrink for the keyboard: the sheet rises over it,
+          and stops under the status bar when the results shrink it. */}
+      <KeyboardAvoid style={[styles.backdrop, { paddingTop: insets.top }]}>
+        <Pressable style={{ flex: 1 }} onPress={close} />
+        {/* Above the system navigation bar too (edge-to-edge Android draws the sheet under it). */}
+        <View style={[styles.searchSheet, { paddingBottom: Math.max(34, insets.bottom + 8) }]}>
+          <View style={styles.searchBox}>
+            <Ionicons name="search" size={18} color={colors.textDim} />
+            <TextInput
+              value={q}
+              onChangeText={setQ}
+              placeholder="Oda adı veya oda ID"
+              placeholderTextColor={colors.textDim}
+              style={styles.searchInput}
+              autoFocus
+              returnKeyType="search"
+            />
+            {q.length > 0 && (
+              <Pressable onPress={() => setQ('')} hitSlop={13}>
+                <Ionicons name="close-circle" size={18} color={colors.textDim} />
+              </Pressable>
+            )}
+          </View>
+          <Text style={styles.searchHint}>{needle ? `${results.length + (hit ? 1 : 0)} sonuç` : 'Popüler odalar'}</Text>
+          <ScrollView style={{ maxHeight: 380 }} keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: 6 }}>
+            {results.map((r) => (
+              <Pressable
+                key={r.id}
+                style={({ pressed }) => [styles.searchRow, pressed && { backgroundColor: colors.cardAlt }]}
+                onPress={() => {
+                  close();
+                  router.push(`/oda/${r.id}`);
+                }}
+              >
+                <Photo uri={r.cover} kind="cover" seed={r.id} style={styles.searchCover} />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <View style={styles.titleRow}>
+                    {locked(r) && <Ionicons name="lock-closed" size={12} color={colors.gold} accessibilityLabel="Şifreli oda" />}
+                    <Text style={styles.roomTitle} numberOfLines={1}>
+                      {r.title}
+                    </Text>
+                  </View>
+                  <Text style={styles.announce}>ID: {roomIdText(r)}</Text>
+                </View>
+                <View style={styles.listeners}>
+                  <Ionicons name="stats-chart" size={12} color={semantic.actionText} />
+                  <Text style={styles.listenerText}>{r.listeners}</Text>
+                </View>
+              </Pressable>
+            ))}
+            {hit && (
+              <Pressable style={({ pressed }) => [styles.searchRow, pressed && { backgroundColor: colors.cardAlt }]} onPress={() => openHit(hit)}>
+                <Photo uri={hit.user.avatarUrl ?? undefined} kind="face" seed={hit.user.id} style={styles.searchCover} />
+                <View style={{ flex: 1, gap: 2 }}>
                   <Text style={styles.roomTitle} numberOfLines={1}>
-                    {r.title}
+                    {hit.room ? hit.room.title : hit.user.name}
+                  </Text>
+                  <Text style={styles.announce} numberOfLines={1}>
+                    {hit.room ? `ID: ${hit.room.code ?? hit.user.publicNo ?? digits} · ${hit.user.name}` : `ID: ${hit.user.publicNo ?? digits} · odası şu an kapalı, profiline git`}
                   </Text>
                 </View>
-                <Text style={styles.announce}>ID: {roomIdText(r)}</Text>
-              </View>
-              <View style={styles.listeners}>
-                <Ionicons name="stats-chart" size={12} color={semantic.actionText} />
-                <Text style={styles.listenerText}>{r.listeners}</Text>
-              </View>
-            </Pressable>
-          ))}
-          {hit && (
-            <Pressable style={({ pressed }) => [styles.searchRow, pressed && { backgroundColor: colors.cardAlt }]} onPress={() => openHit(hit)}>
-              <Photo uri={hit.user.avatarUrl ?? undefined} kind="face" seed={hit.user.id} style={styles.searchCover} />
-              <View style={{ flex: 1, gap: 2 }}>
-                <Text style={styles.roomTitle} numberOfLines={1}>
-                  {hit.room ? hit.room.title : hit.user.name}
-                </Text>
-                <Text style={styles.announce} numberOfLines={1}>
-                  {hit.room ? `ID: ${hit.room.code ?? hit.user.publicNo ?? digits} · ${hit.user.name}` : `ID: ${hit.user.publicNo ?? digits} · odası şu an kapalı, profiline git`}
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={colors.textDim} />
-            </Pressable>
-          )}
-          {results.length === 0 && !hit && <Text style={styles.empty}>{askServer && hit === undefined ? 'ID aranıyor…' : askServer ? 'Bu ID ile kimse bulunamadı.' : 'Eşleşen oda bulunamadı.'}</Text>}
-        </ScrollView>
-      </View>
+                <Ionicons name="chevron-forward" size={16} color={colors.textDim} />
+              </Pressable>
+            )}
+            {results.length === 0 && !hit && <Text style={styles.empty}>{askServer && hit === undefined ? 'ID aranıyor…' : askServer ? 'Bu ID ile kimse bulunamadı.' : 'Eşleşen oda bulunamadı.'}</Text>}
+          </ScrollView>
+        </View>
+      </KeyboardAvoid>
     </Modal>
   );
 }
 
-const JOIN_HEIGHT = 38;
+const JOIN_HEIGHT = 32;
+/** 44 dp tall inside the header's clipped glass, and apart from each other across the 16 dp gaps (8 dp on the narrowest phones). */
+const HEADER_ICON_SLOP = { top: 11, bottom: 11, left: 8, right: 8 };
+const HEADER_ICON_SLOP_TIGHT = { top: 11, bottom: 11, left: 4, right: 4 };
 
 // Shadow under cards and photo frames: deep and black at night, a soft navy lift on paper.
 const SOFT_SHADOW = '0 1px 2px rgba(64,20,40,0.05), 0 6px 16px rgba(64,20,40,0.06)';
@@ -758,15 +771,15 @@ const SOFT_SHADOW = '0 1px 2px rgba(64,20,40,0.05), 0 6px 16px rgba(64,20,40,0.0
 const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark, edge }) => ({
   headerBar: { position: 'absolute', top: 0, left: 0, right: 0, borderBottomWidth: 1, borderBottomColor: ink(0.06) },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 6, paddingBottom: 8 },
-  // header segment
-  segment: { flexDirection: 'row', backgroundColor: ink(0.06), borderRadius: 999, padding: 3, borderWidth: 1, borderColor: surface.hairline },
-  segItem: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999 },
+  // header segment: gives way on a narrow phone, so the icons beside it stay on screen.
+  segment: { flexDirection: 'row', flexShrink: 1, backgroundColor: ink(0.06), borderRadius: 999, padding: 3, borderWidth: 1, borderColor: surface.hairline },
+  segItem: { flexShrink: 1, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 999 },
   segItemOn: { backgroundColor: semantic.action, boxShadow: '0 0 12px rgba(255,95,162,0.45)' },
-  segText: { color: colors.textDim, fontFamily: fonts.displayBold, fontSize: 14, lineHeight: 18 },
+  segText: { color: colors.textDim, fontFamily: fonts.displayBold, fontSize: 13, lineHeight: 18 },
   segTextOn: { color: semantic.actionInk },
   // Active tab marker: bright turquoise with a soft glow, like a lit LED.
   underlineSm: { width: 14, height: 3, borderRadius: 2, backgroundColor: semantic.action, marginTop: 3, boxShadow: '0 0 6px rgba(255,95,162,0.9)' },
-  headerIcons: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  headerIcons: { flexDirection: 'row', alignItems: 'center', gap: 16, marginLeft: 6, flexShrink: 0 },
   dot: { position: 'absolute', top: -2, right: -2, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.red },
   section: { color: colors.text, fontSize: 18, lineHeight: 24, fontFamily: fonts.display, paddingHorizontal: 16 },
   sectionHint: { color: colors.textDim, fontSize: 12, marginLeft: 'auto' },
@@ -780,10 +793,10 @@ const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark, edge
   heroPct: { color: '#fff', fontFamily: fonts.display, fontSize: 30, lineHeight: 34, letterSpacing: -0.6, textShadowColor: 'rgba(255,95,162,0.55)', textShadowRadius: 14 },
   // On the cover's dark fade: the night palette's dim text in both schemes.
   heroPctCap: { color: '#CDB3C0', fontSize: 11, fontWeight: '700', marginTop: -3 },
-  heroBody: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12 },
-  heroHost: { width: 44, height: 44, margin: 4 },
+  heroBody: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12 },
+  heroHost: { width: 44, height: 44 },
   heroTitle: { color: colors.text, fontFamily: fonts.display, fontSize: 17, lineHeight: 22 },
-  heroJoin: { minHeight: JOIN_HEIGHT, minWidth: luxeMinWidth(JOIN_HEIGHT), paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center' },
+  heroJoin: { minHeight: JOIN_HEIGHT, minWidth: luxeMinWidth(JOIN_HEIGHT), paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },
   heroJoinText: { color: '#fff', fontWeight: '900', fontSize: 14 },
   // similar people
   person: { alignItems: 'center', width: 66, gap: 1 },
@@ -793,7 +806,7 @@ const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark, edge
   // quick strip
   shelf: { flexDirection: 'row', gap: 6, paddingHorizontal: 16 },
   shelfItem: { alignItems: 'center', gap: 5, paddingTop: 9, paddingBottom: 8, borderRadius: 16, borderWidth: 1, overflow: 'hidden' },
-  shelfText: { color: colors.text, fontSize: 11, fontWeight: '700' },
+  shelfText: { color: colors.text, fontSize: 11, fontWeight: '700', paddingHorizontal: 2 },
   // category bar
   catBar: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   catText: { color: colors.textDim, fontSize: 17, lineHeight: 24, fontFamily: fonts.displayBold },
@@ -820,8 +833,8 @@ const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark, edge
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   roomTitle: { color: colors.text, fontWeight: '800', fontSize: 15, flexShrink: 1 },
   announce: { color: colors.textDim, fontSize: 12 },
-  chipRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  badgeChip: { flexDirection: 'row', alignItems: 'center', gap: 3, borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2, maxWidth: 128, overflow: 'hidden' },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 5, rowGap: 3 },
+  badgeChip: { flexDirection: 'row', alignItems: 'center', gap: 3, borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2, maxWidth: 128, flexShrink: 1, overflow: 'hidden' },
   badgeText: { color: '#fff', fontSize: 11, fontWeight: '800', flexShrink: 1 },
   tagChip: { backgroundColor: dark ? 'rgba(255,95,162,0.2)' : 'rgba(208,46,120,0.12)', borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2 },
   tagText: { color: semantic.tonalText, fontSize: 11, fontWeight: '600' },
@@ -846,7 +859,7 @@ const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark, edge
   bannerSub: { color: 'rgba(255,255,255,0.85)', fontSize: 12 },
   // search sheet
   backdrop: { flex: 1, backgroundColor: SCRIM },
-  searchSheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, paddingBottom: 34, gap: 10, ...edge.sheet },
+  searchSheet: { flexShrink: 1, backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, paddingBottom: 34, gap: 10, ...edge.sheet },
   searchBox: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.cardAlt, borderRadius: 12, paddingHorizontal: 12 },
   searchInput: { flex: 1, color: colors.text, paddingVertical: 10, fontSize: 15 },
   searchHint: { color: colors.textDim, fontSize: 12, fontWeight: '600' },

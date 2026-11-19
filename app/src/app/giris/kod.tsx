@@ -1,11 +1,12 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
 import { AuthHeader } from '@/components/AuthHeader';
 import { CodeBoxes, useResendWait } from '@/components/code-boxes';
+import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { TextLink } from '@/components/ui';
 import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
@@ -112,25 +113,30 @@ export default function CodeScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <AuthHeader step={2} title="Doğrulama kodu" subtitle={subtitle} />
 
-      <View style={styles.boxes}>
-        <CodeBoxes value={code} onChange={onChange} error={refused} busy={checking} autoComplete={isEmail ? 'one-time-code' : 'sms-otp'} />
-      </View>
+      {/* A small phone's keyboard leaves too little room: what is under the boxes scrolls into view. */}
+      <KeyboardAvoid style={{ flex: 1 }}>
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 16 }}>
+          <View style={styles.boxes}>
+            <CodeBoxes value={code} onChange={onChange} error={refused} busy={checking} autoComplete={isEmail ? 'one-time-code' : 'sms-otp'} />
+          </View>
 
-      <View style={{ alignItems: 'center', gap: 14, marginTop: 24, paddingHorizontal: 20 }}>
-        {!!error && <Text style={styles.error}>{error}</Text>}
-        {checking ? (
-          <ActivityIndicator color={colors.primaryText} />
-        ) : seconds > 0 ? (
-          <Text style={styles.dim}>{resendLabel(seconds)}</Text>
-        ) : (
-          <Pressable onPress={() => void resend()} disabled={sending} accessibilityRole="button">
-            <Text style={[styles.link, sending && { opacity: 0.5 }]}>{sending ? 'Gönderiliyor…' : 'Kodu tekrar gönder'}</Text>
-          </Pressable>
-        )}
-        {isEmail && <Text style={styles.note}>Gelen kutunda yoksa Spam / Gereksiz klasörüne de bak.</Text>}
-        {live && <TextLink title={isEmail ? 'Adresi değiştir' : 'Numarayı değiştir'} color={colors.textDim} onPress={() => router.back()} center />}
-        {IS_DEMO && !live && <Text style={styles.hint}>Demo: herhangi 6 haneli bir kod gir</Text>}
-      </View>
+          <View style={{ alignItems: 'center', gap: 14, marginTop: 24, paddingHorizontal: 20 }}>
+            {!!error && <Text style={styles.error}>{error}</Text>}
+            {checking ? (
+              <ActivityIndicator color={colors.primaryText} />
+            ) : seconds > 0 ? (
+              <Text style={styles.dim}>{resendLabel(seconds)}</Text>
+            ) : (
+              <Pressable onPress={() => void resend()} disabled={sending} accessibilityRole="button">
+                <Text style={[styles.link, sending && { opacity: 0.5 }]}>{sending ? 'Gönderiliyor…' : 'Kodu tekrar gönder'}</Text>
+              </Pressable>
+            )}
+            {isEmail && <Text style={styles.note}>Gelen kutunda yoksa Spam / Gereksiz klasörüne de bak.</Text>}
+            {live && <TextLink title={isEmail ? 'Adresi değiştir' : 'Numarayı değiştir'} color={colors.textDim} onPress={() => router.back()} center />}
+            {IS_DEMO && !live && <Text style={styles.hint}>Demo: herhangi 6 haneli bir kod gir</Text>}
+          </View>
+        </ScrollView>
+      </KeyboardAvoid>
     </SafeAreaView>
   );
 }

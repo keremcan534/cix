@@ -10,7 +10,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 
 import { Text } from '@/components/text';
 import { HeartBadge } from '@/components/heart-level';
@@ -91,8 +91,12 @@ export function PersonCard({ uid, note, onClose, onGift, onMention, onReport, on
   const frameId = isMe ? equipped.frame : (look?.frame ?? undefined);
   const vip = isMe ? vipLevel : (look?.vipLevel ?? 0);
   const paddingBottom = useSheetBottom(18);
-  // It stops at the room's Balkon line (lib/sheet-space): who they are scrolls, the buttons stay in sight.
-  const maxHeight = useSheetMax(0.9);
+  // It stops at the room's Balkon line (lib/sheet-space): who they are scrolls, the buttons stay in sight. The card
+  // floats over the navigation bar, so that padding comes off; a busy room on a short phone still leaves it 380 to
+  // hold its fixed rows and a part of the list.
+  const sheet = useSheetMax(0.9);
+  const { height } = useWindowDimensions();
+  const maxHeight = typeof sheet === 'number' ? Math.min(Math.round(height * 0.9) - paddingBottom, Math.max(sheet - paddingBottom, 380)) : sheet;
 
   const act = (fn: () => void) => () => {
     onClose();
@@ -136,10 +140,10 @@ export function PersonCard({ uid, note, onClose, onGift, onMention, onReport, on
                 <Text style={s.name} numberOfLines={1}>
                   {u.name}
                 </Text>
-                {charm !== null && <LevelPill level={charm} />}
               </View>
               <View style={[s.row, { flexWrap: 'wrap' }]}>
                 <AgePill user={u} />
+                {charm !== null && <LevelPill level={charm} />}
                 {u.vip && <VipBadge />}
                 {heart && heart.level > 0 && <HeartBadge level={heart.level} />}
               </View>
@@ -170,7 +174,7 @@ export function PersonCard({ uid, note, onClose, onGift, onMention, onReport, on
             tiles={[
               { art: 'hediye', label: 'Hediye', onPress: act(() => onGift(uid)) },
               { art: 'bahset', label: 'Bahset', onPress: act(() => onMention(uid)) },
-              { art: 'takip', label: isFollowing ? 'Takiptesin' : 'Takip et', on: isFollowing, disabled: busy, onPress: () => void follow() },
+              { art: 'takip', label: isFollowing ? 'Takipte' : 'Takip et', on: isFollowing, disabled: busy, onPress: () => void follow() },
               { art: 'sohbet', label: 'Mesaj', onPress: act(() => router.push(`/sohbet/${uid}`)) },
             ]}
           />

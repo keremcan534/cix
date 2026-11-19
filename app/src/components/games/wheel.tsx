@@ -9,6 +9,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { memo, useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RollingNumber } from '@/components/fx/rolling-number';
 import { Text } from '@/components/text';
@@ -82,6 +83,7 @@ export function WheelPlayer({ entry }: { entry: Entry }) {
   const needLevel = casinoLevelOf(useLevels());
   const still = settings.reduceMotion;
   const dims = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const [tier, setTier] = useState<WheelTierId>('kiyi');
   const [view, setView] = useState<WheelView | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -147,7 +149,7 @@ export function WheelPlayer({ entry }: { entry: Entry }) {
   // The wheel takes what the stage's other rows and the controls leave of the phone's height (in a room the panel
   // is a sheet over the lower part), within the stage's width.
   const inner = (width || dims.width - 28) - 20;
-  const room = Math.round(entry.from === 'room' ? dims.height * 0.78 - 112 : dims.height - 140);
+  const room = Math.round(entry.from === 'room' ? dims.height * 0.78 - 112 - insets.bottom : dims.height - 140);
   const size = Math.max(208, Math.min(272, inner - 48, room - 372));
 
   const play = async (count: WheelCount) => {
@@ -233,6 +235,29 @@ export function WheelPlayer({ entry }: { entry: Entry }) {
           {win.layer}
         </SalonStage>
 
+        {/* Right under the stage: on a 640 dp phone the spin buttons are on screen without scrolling. */}
+        <View style={w.counts}>
+          {WHEEL_COUNTS.map((c) => {
+            const cost = wheelCost(tier, c);
+            const on = busy === c;
+            const ink = c === 50 ? '#FFFFFF' : c === 1 ? semantic.actionInk : semantic.moneyInk;
+            return (
+              <Pressable
+                key={c}
+                onPress={() => play(c)}
+                disabled={!!busy}
+                style={({ pressed }) => [w.countWrap, (pressed || on) && { transform: [{ scale: 0.97 }] }, busy && !on && { opacity: 0.5 }]}
+                accessibilityRole="button"
+                accessibilityLabel={`${c} kez çevir, ${n(cost)} jeton`}
+              >
+                <LinearGradient colors={c === 1 ? ['#6FF1F5', '#0FB8BE'] : c === 10 ? ['#FFD98A', '#F2A93B'] : ['#FF8E9A', '#C93C4F']} style={w.count}>
+                  <Text style={[w.countX, { color: ink }]}>{on ? 'Dönüyor…' : `Çevir ×${c}`}</Text>
+                  <Text style={[w.countCost, { color: ink }]}>{n(cost)}</Text>
+                </LinearGradient>
+              </Pressable>
+            );
+          })}
+        </View>
         <View style={w.tiers} accessibilityRole="tablist">
           {WHEEL_TIER_IDS.map((t) => (
             <Pressable
@@ -257,28 +282,6 @@ export function WheelPlayer({ entry }: { entry: Entry }) {
               </View>
             </Pressable>
           ))}
-        </View>
-        <View style={w.counts}>
-          {WHEEL_COUNTS.map((c) => {
-            const cost = wheelCost(tier, c);
-            const on = busy === c;
-            const ink = c === 50 ? '#FFFFFF' : c === 1 ? semantic.actionInk : semantic.moneyInk;
-            return (
-              <Pressable
-                key={c}
-                onPress={() => play(c)}
-                disabled={!!busy}
-                style={({ pressed }) => [w.countWrap, (pressed || on) && { transform: [{ scale: 0.97 }] }, busy && !on && { opacity: 0.5 }]}
-                accessibilityRole="button"
-                accessibilityLabel={`${c} kez çevir, ${n(cost)} jeton`}
-              >
-                <LinearGradient colors={c === 1 ? ['#6FF1F5', '#0FB8BE'] : c === 10 ? ['#FFD98A', '#F2A93B'] : ['#FF8E9A', '#C93C4F']} style={w.count}>
-                  <Text style={[w.countX, { color: ink }]}>{on ? 'Dönüyor…' : `Çevir ×${c}`}</Text>
-                  <Text style={[w.countCost, { color: ink }]}>{n(cost)}</Text>
-                </LinearGradient>
-              </Pressable>
-            );
-          })}
         </View>
         <View style={w.wallet}>
           <BalancePill shown={held} />

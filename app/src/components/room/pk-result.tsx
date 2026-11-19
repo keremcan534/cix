@@ -4,6 +4,7 @@
 // most) and En Çok Atışı Alan (who received the most). Both only render the server's final result (lib/pk).
 import { useEffect, useState } from 'react';
 import { Animated, Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
 import { Icon3D } from '@/components/Icon3D';
@@ -134,6 +135,7 @@ export function PkResultScreen({
   onProfile: (uid: string) => void;
 }) {
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const enter = useEntrance(still);
   const r = pk.result;
   const cancelled = pk.status === 'cancelled';
@@ -154,7 +156,7 @@ export function PkResultScreen({
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onContinue}>
-      <View style={s.backdrop}>
+      <View style={[s.backdrop, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 8 }]}>
         <Animated.View style={[s.cardWrap, { width: cardW }, enter]}>
           <GoldRim radius={26} width={2} inner={{ flexShrink: 1 }} style={{ flexShrink: 1 }}>
             <PkBackdrop style={{ flexShrink: 1 }}>
@@ -183,7 +185,7 @@ export function PkResultScreen({
                         <Icon3D name="crown" size={Math.round(face * 0.62)} />
                         <GoldRim radius={8} width={1.5}>
                           <View style={[s.winRibbon, { backgroundColor: won === 'tie' || won === 'none' || !r ? '#5B2A86' : PK.win[0] }]}>
-                            <Text style={s.winText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                            <Text style={s.winText} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>
                               {banner}
                             </Text>
                           </View>
@@ -307,6 +309,7 @@ function MiniAward({ award, tone, title, onProfile }: { award: PkAward | null; t
  */
 export function CrownScreen({ pk, still, onClose, onProfile }: { pk: PkSession; still: boolean; onClose: () => void; onProfile: (uid: string) => void }) {
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const enter = useEntrance(still);
   const r = pk.result;
   const awards = r ? (r.awards ?? computeAwards(pk)) : null;
@@ -315,7 +318,7 @@ export function CrownScreen({ pk, still, onClose, onProfile }: { pk: PkSession; 
   const none = !awards || (!awards.topSender && !awards.topRecipient);
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <View style={s.backdrop}>
+      <View style={[s.backdrop, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 8 }]}>
         <Animated.View style={[s.cardWrap, { width: cardW }, enter]}>
           <GoldRim radius={26} width={2} inner={{ flexShrink: 1 }} style={{ flexShrink: 1 }}>
             <PkBackdrop style={{ flexShrink: 1 }}>
@@ -390,7 +393,8 @@ function BigAward({ award, tone, title, face, onProfile }: { award: PkAward | nu
 
 const s = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(12,4,20,0.86)', alignItems: 'center', justifyContent: 'center', padding: 12 },
-  cardWrap: { maxHeight: '94%' },
+  // Between the system bars (the backdrop's padding).
+  cardWrap: { maxHeight: '100%' },
   closeAt: { position: 'absolute', right: 10, top: 10, zIndex: 3 },
   body: { padding: 14, paddingTop: 8, gap: 12 },
   head: { alignItems: 'center' },
@@ -401,8 +405,8 @@ const s = StyleSheet.create({
   dimC: { color: PK.dim, fontSize: 12, textAlign: 'center' },
   duel: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
   mid: { flex: 1, minWidth: 0, alignItems: 'center', gap: 4, paddingTop: 18 },
-  winRibbon: { paddingHorizontal: 10, paddingVertical: 4, minWidth: 86, alignItems: 'center' },
-  winText: { color: '#FFE9A8', fontWeight: '800', fontSize: 14, letterSpacing: 0.5 },
+  winRibbon: { paddingHorizontal: 6, paddingVertical: 4, minWidth: 86, alignItems: 'center' },
+  winText: { color: '#FFE9A8', fontWeight: '800', fontSize: 14, letterSpacing: 0.5, textAlign: 'center' },
   winnerName: { color: PK.goldText, fontWeight: '800', fontSize: 13, textAlign: 'center' },
   emptyFace: { color: PK.dim, fontSize: 22, fontWeight: '800' },
   scores: { flexDirection: 'row', alignItems: 'center', gap: 6 },

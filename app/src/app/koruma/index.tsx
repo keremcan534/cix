@@ -7,9 +7,10 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, ScrollView, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { Switch } from '@/components/luxe-switch';
 import { Text, TextInput } from '@/components/text';
 import { Photo } from '@/components/photo';
@@ -31,6 +32,8 @@ export default function MyGuard() {
   const { colors } = useTheme();
   const styles = useStyles();
   const insets = useSafeAreaInsets();
+  // Both faces and the heart keep a 16 dp gutter on the smallest phone (92 elsewhere).
+  const heroFace = Math.min(92, (useWindowDimensions().width - 168) / 2);
   const params = useLocalSearchParams<{ ayar?: string }>();
   const [side, setSide] = useState<Side>('guardians');
   const [data, setData] = useState<GuardMine | 'failed' | null>(null);
@@ -103,14 +106,14 @@ export default function MyGuard() {
         </View>
         {top && (
           <View style={styles.hero}>
-            <Face uri={me.avatar} size={92} />
+            <Face uri={me.avatar} size={heroFace} />
             <View style={styles.heart}>
               <Ionicons name="heart" size={108} color="#FF4FA3" style={styles.heartIcon} />
               <Text style={styles.heartText} numberOfLines={1} adjustsFontSizeToFit>
                 {guardPoints(top.points)}
               </Text>
             </View>
-            <Face uri={top.avatarUrl} size={92} />
+            <Face uri={top.avatarUrl} size={heroFace} />
           </View>
         )}
       </LinearGradient>
@@ -156,7 +159,7 @@ export default function MyGuard() {
                   <Text style={styles.rank}>{i + 1}</Text>
                   <Face uri={p.avatarUrl} size={48} ring="#F7B6D8" />
                   <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
                       <Text style={styles.name} numberOfLines={1}>
                         {p.name}
                       </Text>
@@ -229,42 +232,47 @@ function GuardSettingsSheet({ settings, onClose, onSaved }: { settings: GuardMin
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={{ flex: 1 }} onPress={onClose} accessibilityLabel="Kapat" />
-      <View style={[styles.settings, { paddingBottom: insets.bottom + 16 }]}>
-        <View style={styles.settingsHead}>
-          <Text style={styles.settingsTitle}>Koruma ayarları</Text>
-          <Pressable onPress={onClose} hitSlop={8} accessibilityLabel="Kapat">
-            <Ionicons name="close" size={22} color={colors.textDim} />
-          </Pressable>
-        </View>
-        <View style={styles.settingRow}>
-          <View style={{ flex: 1, gap: 2 }}>
-            <Text style={styles.settingLabel}>Korumayı kapat</Text>
-            <Text style={styles.settingHint}>Kapalıyken kimse yeni koruyucun olamaz; olanlar kalır. Başkalarının korumalarını yine görürsün.</Text>
+      <KeyboardAvoid style={{ flex: 1 }}>
+        <Pressable style={{ flex: 1 }} onPress={onClose} accessibilityLabel="Kapat" />
+        <View style={[styles.settings, { paddingBottom: insets.bottom + 16, marginTop: insets.top, flexShrink: 1 }]}>
+          <View style={styles.settingsHead}>
+            <Text style={styles.settingsTitle}>Koruma ayarları</Text>
+            <Pressable onPress={onClose} hitSlop={8} accessibilityLabel="Kapat">
+              <Ionicons name="close" size={22} color={colors.textDim} />
+            </Pressable>
           </View>
-          <Switch value={off} disabled={busy} onValueChange={(v) => void toggleOff(v)} accessibilityLabel="Korumayı kapat" />
+          {/* Scrolls when the keyboard leaves less room than the sheet needs. */}
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: 18 }}>
+            <View style={styles.settingRow}>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={styles.settingLabel}>Korumayı kapat</Text>
+                <Text style={styles.settingHint}>Kapalıyken kimse yeni koruyucun olamaz; olanlar kalır. Başkalarının korumalarını yine görürsün.</Text>
+              </View>
+              <Switch value={off} disabled={busy} onValueChange={(v) => void toggleOff(v)} accessibilityLabel="Korumayı kapat" />
+            </View>
+            <View style={{ gap: 6 }}>
+              <Text style={styles.settingLabel}>Koruma alanı eşiği</Text>
+              <Text style={styles.settingHint}>
+                Profilinde görünmek için koruyucunun ulaşması gereken puan. En çok {guardPoints(settings.thresholdMax)}; Yankı seviyen yükseldikçe artar.
+              </Text>
+              <TextInput
+                value={text}
+                onChangeText={(t) => setText(t.replace(/\D/g, '').slice(0, 12))}
+                keyboardType="number-pad"
+                editable={!locked && !busy}
+                style={[styles.input, tooHigh && { borderColor: colors.red }]}
+                accessibilityLabel="Koruma alanı eşiği"
+              />
+              {locked ? (
+                <Text style={styles.settingHint}>Eşik haftada bir değişir. Bir sonraki değişiklik: {fmtDate(settings.thresholdNextAt!)}</Text>
+              ) : tooHigh ? (
+                <Text style={[styles.settingHint, { color: colors.red }]}>En çok {guardPoints(settings.thresholdMax)} puan olabilir.</Text>
+              ) : null}
+              <Button title="Eşiği kaydet" disabled={locked || busy || tooHigh || wanted === settings.threshold} onPress={saveThreshold} />
+            </View>
+          </ScrollView>
         </View>
-        <View style={{ gap: 6 }}>
-          <Text style={styles.settingLabel}>Koruma alanı eşiği</Text>
-          <Text style={styles.settingHint}>
-            Profilinde görünmek için koruyucunun ulaşması gereken puan. En çok {guardPoints(settings.thresholdMax)}; Yankı seviyen yükseldikçe artar.
-          </Text>
-          <TextInput
-            value={text}
-            onChangeText={(t) => setText(t.replace(/\D/g, '').slice(0, 12))}
-            keyboardType="number-pad"
-            editable={!locked && !busy}
-            style={[styles.input, tooHigh && { borderColor: colors.red }]}
-            accessibilityLabel="Koruma alanı eşiği"
-          />
-          {locked ? (
-            <Text style={styles.settingHint}>Eşik haftada bir değişir. Bir sonraki değişiklik: {fmtDate(settings.thresholdNextAt!)}</Text>
-          ) : tooHigh ? (
-            <Text style={[styles.settingHint, { color: colors.red }]}>En çok {guardPoints(settings.thresholdMax)} puan olabilir.</Text>
-          ) : null}
-          <Button title="Eşiği kaydet" disabled={locked || busy || tooHigh || wanted === settings.threshold} onPress={saveThreshold} />
-        </View>
-      </View>
+      </KeyboardAvoid>
     </Modal>
   );
 }

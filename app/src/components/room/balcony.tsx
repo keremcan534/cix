@@ -40,7 +40,9 @@ export function BalconyBar({ view, stale, onOpen }: { view: RoomView; stale: boo
             ))}
             {more > 0 && (
               <View style={[s.face, s.more, { marginLeft: -7 }]}>
-                <Text style={s.moreText}>+{more > 999 ? '999' : more}</Text>
+                <Text style={s.moreText} numberOfLines={1}>
+                  +{more > 999 ? '999' : more}
+                </Text>
               </View>
             )}
           </View>
@@ -145,7 +147,7 @@ export function ParticipantsSheet({
               ] as const
             ).map(([k, l, n]) => (
               <Pressable key={k} onPress={() => setTab(k)} style={[s.tab, tab === k && s.tabOn]} accessibilityRole="tab" aria-selected={tab === k}>
-                <Text style={[s.tabText, tab === k && { color: semantic.actionInk }]}>
+                <Text style={[s.tabText, tab === k && { color: semantic.actionInk }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
                   {l} {fmt(n)}
                 </Text>
               </Pressable>
@@ -252,7 +254,7 @@ function Action({ icon, label, onPress, danger, disabled }: { icon: keyof typeof
 }
 
 // --- Invite prompt (the invited person decides) ----------------------------------------------------------
-export function MicInvitePrompt({ invite, onAnswer }: { invite: MicInvite; onAnswer: (accept: boolean) => void }) {
+export function MicInvitePrompt({ invite, top, onAnswer }: { invite: MicInvite; /** From the screen's top (the room keeps it off the mics and the controls). */ top: number; onAnswer: (accept: boolean) => void }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -260,33 +262,37 @@ export function MicInvitePrompt({ invite, onAnswer }: { invite: MicInvite; onAns
   }, []);
   const left = Math.max(0, Math.ceil((invite.expiresAt - now) / 1000));
   return (
-    <View style={s.prompt} accessibilityLiveRegion="polite" accessibilityLabel={`${nameOf(invite.fromId)} seni mikrofona davet ediyor`}>
-      <Icon3D name="userAdd" size={36} />
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={s.name} numberOfLines={2}>
-          {nameOf(invite.fromId)} seni {invite.seat !== undefined ? `${invite.seat + 1}. ` : ''}mikrofona davet ediyor
-        </Text>
-        <Text style={s.dim}>Boş bir mikrofona geçersin · {left} sn</Text>
+    <View style={[s.prompt, { top }]} accessibilityLiveRegion="polite" accessibilityLabel={`${nameOf(invite.fromId)} seni mikrofona davet ediyor`}>
+      <View style={s.promptHead}>
+        <Icon3D name="userAdd" size={36} />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={s.name} numberOfLines={2}>
+            {nameOf(invite.fromId)} seni {invite.seat !== undefined ? `${invite.seat + 1}. ` : ''}mikrofona davet ediyor
+          </Text>
+          <Text style={s.dim}>Boş bir mikrofona geçersin · {left} sn</Text>
+        </View>
       </View>
-      <Pressable style={s.decline} onPress={() => onAnswer(false)} accessibilityLabel="Daveti reddet">
-        <Text style={s.declineText}>Reddet</Text>
-      </Pressable>
-      <Pressable style={s.accept} onPress={() => onAnswer(true)} accessibilityLabel="Daveti kabul et">
-        <Text style={s.acceptText}>Kabul</Text>
-      </Pressable>
+      <View style={s.promptBtns}>
+        <Pressable style={s.decline} onPress={() => onAnswer(false)} accessibilityLabel="Daveti reddet">
+          <Text style={s.declineText}>Reddet</Text>
+        </Pressable>
+        <Pressable style={s.accept} onPress={() => onAnswer(true)} accessibilityLabel="Daveti kabul et">
+          <Text style={s.acceptText}>Kabul</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
 
 // --- Connection banner ----------------------------------------------------------------------------------
 const s = StyleSheet.create({
-  bar: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 12, marginTop: 8 },
+  bar: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 12, marginTop: 4 },
   balcony: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', borderTopColor: 'rgba(255,255,255,0.24)', borderRadius: 999, paddingLeft: 12, paddingRight: 6, minHeight: 40 },
-  balconyTitle: { color: colors.text, fontWeight: '800', fontSize: 13, flexShrink: 0 },
+  balconyTitle: { color: colors.text, fontWeight: '800', fontSize: 13, flexShrink: 1, minWidth: 0 },
   balconyCount: { color: colors.textDim, fontWeight: '700' },
-  faces: { flexDirection: 'row', alignItems: 'center' },
+  faces: { flexDirection: 'row', alignItems: 'center', flexShrink: 0 },
   face: { width: 26, height: 26, borderRadius: 13, borderWidth: 1.5, borderColor: colors.card },
-  more: { backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center', width: 34 },
+  more: { backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center', width: 'auto', minWidth: 34, paddingHorizontal: 3 },
   moreText: { color: colors.text, fontSize: 12, fontWeight: '800' },
   total: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: semantic.action, borderRadius: 999, paddingHorizontal: 12, minHeight: 40, minWidth: 56, justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)', boxShadow: '0 4px 14px rgba(255,95,162,0.45)' },
   totalText: { color: semantic.actionInk, fontWeight: '900', fontSize: 14, fontVariant: ['tabular-nums'] },
@@ -317,9 +323,11 @@ const s = StyleSheet.create({
   action: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 999, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, paddingHorizontal: 10, paddingVertical: 8 },
   actionDanger: { borderColor: 'rgba(217,58,69,0.7)', backgroundColor: 'rgba(217,58,69,0.12)' },
   actionText: { color: colors.text, fontSize: 12, fontWeight: '700' },
-  prompt: { position: 'absolute', left: 12, right: 12, top: 96, zIndex: 40, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.card, borderRadius: 16, padding: 10, borderWidth: 1, borderColor: semantic.action },
-  decline: { borderRadius: 999, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, paddingVertical: 9 },
+  prompt: { position: 'absolute', left: 12, right: 12, zIndex: 40, gap: 8, backgroundColor: colors.card, borderRadius: 16, padding: 10, borderWidth: 1, borderColor: semantic.action },
+  promptHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  promptBtns: { flexDirection: 'row', gap: 8 },
+  decline: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 999, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12 },
   declineText: { color: colors.text, fontWeight: '800', fontSize: 13 },
-  accept: { backgroundColor: semantic.action, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9 },
+  accept: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: semantic.action, borderRadius: 999, paddingHorizontal: 14 },
   acceptText: { color: semantic.actionInk, fontWeight: '900', fontSize: 13 },
 });

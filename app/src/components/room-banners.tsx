@@ -194,7 +194,7 @@ function EventCard({ s, live }: { s: EventSlide; live: boolean }) {
               {s.title}
             </Text>
             {!!s.body && (
-              <Text style={styles.eventSub} numberOfLines={s.image ? 2 : 3}>
+              <Text style={styles.eventSub} numberOfLines={2}>
                 {s.body}
               </Text>
             )}
@@ -224,16 +224,17 @@ function BoardCard({ s }: { s: BoardSlide }) {
     <PressableScale to={0.98} onPress={() => router.push(`/siralama?board=${b.screen}&period=${screen}` as Href)} accessibilityRole="button" accessibilityLabel={`${b.title}, tam sıralama`}>
       <LinearGradient colors={b.tint} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.fill}>
         <Gloss radius={18} strength={0.12} />
+        {/* The title has the whole line; what it counts shares the next one with the period switch, on two lines if it must. */}
         <View style={styles.boardHead}>
-          <Image source={b.art} style={{ width: 30, height: 30 }} resizeMode="contain" accessibilityIgnoresInvertColors />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.boardTitle} numberOfLines={1}>
-              {b.title}
-            </Text>
-            <Text style={styles.boardSub} numberOfLines={1}>
-              {b.sub}
-            </Text>
-          </View>
+          <Image source={b.art} style={{ width: 20, height: 20 }} resizeMode="contain" accessibilityIgnoresInvertColors />
+          <Text style={styles.boardTitle} numberOfLines={1}>
+            {b.title}
+          </Text>
+        </View>
+        <View style={styles.boardLine}>
+          <Text style={styles.boardSub} numberOfLines={2}>
+            {b.sub}
+          </Text>
           <View style={styles.periods} accessibilityRole="tablist">
             {PERIODS.map((p) => (
               <Pressable key={p.key} onPress={() => setPicked(p.key)} hitSlop={4} accessibilityRole="tab" accessibilityState={{ selected: p.key === period }} style={[styles.period, p.key === period && styles.periodOn]}>
@@ -267,7 +268,7 @@ function BoardCard({ s }: { s: BoardSlide }) {
               return (
                 <View key={r.id} style={styles.place} accessible accessibilityLabel={`${rank}. ${r.name}, ${short(r.score)}`}>
                   <View>
-                    <Avatar uri={r.avatar || undefined} name={r.name} size={rank === 1 ? 46 : 38} ring={rank === 1} />
+                    <Avatar uri={r.avatar || undefined} name={r.name} size={rank === 1 ? 42 : 38} ring={rank === 1} />
                     <View style={[styles.rank, rank === 1 && styles.rankFirst]}>
                       <Text style={styles.rankText}>{rank}</Text>
                     </View>
@@ -309,15 +310,16 @@ const useStyles = makeStyles(({ colors }) => ({
   eventSub: { color: 'rgba(255,255,255,0.86)', fontSize: 13, lineHeight: 18 },
 
   boardHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  boardTitle: { color: '#fff', fontSize: 15, fontFamily: fonts.display },
-  boardSub: { color: 'rgba(255,255,255,0.7)', fontSize: 12 },
+  boardTitle: { flex: 1, minWidth: 0, color: '#fff', fontSize: 15, fontFamily: fonts.display },
+  boardLine: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  boardSub: { flex: 1, minWidth: 0, color: 'rgba(255,255,255,0.7)', fontSize: 12, lineHeight: 15 },
   periods: { flexDirection: 'row', padding: 2, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.12)' },
   period: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999 },
   periodOn: { backgroundColor: 'rgba(255,255,255,0.92)' },
   periodText: { color: 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: '700' },
   periodTextOn: { color: '#1A1530' },
 
-  podium: { flex: 1, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-around', paddingTop: 6 },
+  podium: { flex: 1, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-around' },
   place: { flex: 1, alignItems: 'center', gap: 3 },
   rank: {
     position: 'absolute',

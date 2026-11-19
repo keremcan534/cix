@@ -2,8 +2,8 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, Modal, Pressable, RefreshControl, ScrollView, Share, View, type AlertButton } from 'react-native';
+import { useEffect, useRef, useState, type ComponentRef } from 'react';
+import { ActivityIndicator, FlatList, Image, Keyboard, Modal, Pressable, RefreshControl, ScrollView, Share, View, type AlertButton } from 'react-native';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -550,16 +550,27 @@ function FeedHeader({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
   const { colors } = useTheme();
   const styles = useStyles();
   const unread = notifications.filter((n) => !n.read).length;
+  const strip = useRef<ComponentRef<typeof ScrollView>>(null);
   return (
     <View style={styles.header}>
-      {TABS.map((t) => (
-        <Pressable key={t} onPress={() => onTab(t)} style={{ alignItems: 'center' }}>
-          <Text style={[styles.tab, t === tab && styles.tabActive]}>{t}</Text>
-          {t === tab && <View style={styles.underline} />}
-        </Pressable>
-      ))}
-      <View style={{ flex: 1 }} />
-      <Pressable onPress={() => router.push('/bildirimler')} hitSlop={10}>
+      {/* The tabs scroll on a narrow phone, so the bell stays on screen. Every tab keeps its underline's room: the words share a baseline. */}
+      <ScrollView
+        ref={strip}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={{ flex: 1 }}
+        contentContainerStyle={{ gap: 20, alignItems: 'flex-end' }}
+        // The chosen tab's word grows: where the strip is too short, it is brought fully into view.
+        onContentSizeChange={() => (tab === TABS[0] ? strip.current?.scrollTo({ x: 0 }) : strip.current?.scrollToEnd())}
+      >
+        {TABS.map((t) => (
+          <Pressable key={t} onPress={() => onTab(t)} style={styles.tabBtn}>
+            <Text style={[styles.tab, t === tab && styles.tabActive]}>{t}</Text>
+            <View style={[styles.underline, t !== tab && { opacity: 0 }]} />
+          </Pressable>
+        ))}
+      </ScrollView>
+      <Pressable onPress={() => router.push('/bildirimler')} hitSlop={10} style={{ marginTop: 10 }}>
         <Ionicons name="notifications-outline" size={25} color={colors.text} />
         {unread > 0 && (
           <View style={styles.badge}>
@@ -811,6 +822,20 @@ function MomentCard({
 /** `onPost` may answer false (or a promise of it) when the post didn't go through: the draft then stays. */
 type Sent = boolean | void | Promise<boolean | void>;
 
+/** The keyboard is up: a sheet resting on it needs no room for the navigation bar it covers. */
+function useKeyboardOpen() {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const shown = Keyboard.addListener('keyboardDidShow', () => setOpen(true));
+    const hidden = Keyboard.addListener('keyboardDidHide', () => setOpen(false));
+    return () => {
+      shown.remove();
+      hidden.remove();
+    };
+  }, []);
+  return open;
+}
+
 function Composer({ visible, onClose, onPost }: { visible: boolean; onClose: () => void; onPost: (text: string, image: PickedImage | undefined, topicId: string | undefined) => Sent }) {
   const [draft, setDraft] = useState('');
   // Why the text was not shared (contact details, lib/contact-filter); cleared as soon as it changes.
@@ -825,7 +850,8 @@ function Composer({ visible, onClose, onPost }: { visible: boolean; onClose: () 
   const { colors } = useTheme();
   const styles = useStyles();
   // Android modals draw edge to edge: keep the last row above the navigation bar.
-  const paddingBottom = Math.max(34, useSafeAreaInsets().bottom + 8);
+  const insets = useSafeAreaInsets();
+  const paddingBottom = useKeyboardOpen() ? 12 : Math.max(34, insets.bottom + 8);
 
   const pickImage = async () => {
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7 });
@@ -851,30 +877,34 @@ function Composer({ visible, onClose, onPost }: { visible: boolean; onClose: () 
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <KeyboardAvoid style={styles.sheetWrap}>
+      <KeyboardAvoid style={[styles.sheetWrap, { paddingTop: insets.top }]}>
         <Pressable style={{ flex: 1 }} onPress={onClose} />
         <View style={[styles.sheet, { paddingBottom }]}>
           <Text style={styles.sheetTitle}>Yeni an paylaş</Text>
-          <TextInput
-            value={draft}
-            onChangeText={edit}
-            placeholder="Neler oluyor?"
-            placeholderTextColor={colors.textDim}
-            multiline
-            maxLength={1000}
-            style={styles.composeInput}
-            autoFocus
-          />
-          <ContactNote text={refused} style={styles.contactNote} />
-          {image && (
-            <View style={{ alignSelf: 'flex-start' }}>
-              <Image source={{ uri: image.uri }} style={styles.preview} />
-              <Pressable style={styles.removeImage} onPress={() => setImage(undefined)} hitSlop={8}>
-                <Ionicons name="close" size={14} color="#fff" />
-              </Pressable>
-            </View>
-          )}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+          {/* Only the writing area gives way above the keyboard: the topics and Paylaş stay in view. */}
+          <ScrollView style={{ flexGrow: 0, flexShrink: 1 }} contentContainerStyle={{ gap: 12 }} keyboardShouldPersistTaps="handled">
+            <TextInput
+              value={draft}
+              onChangeText={edit}
+              placeholder="Neler oluyor?"
+              placeholderTextColor={colors.textDim}
+              multiline
+              maxLength={1000}
+              style={styles.composeInput}
+              autoFocus
+            />
+            <ContactNote text={refused} style={styles.contactNote} />
+            {image && (
+              <View style={{ alignSelf: 'flex-start' }}>
+                <Image source={{ uri: image.uri }} style={styles.preview} />
+                <Pressable style={styles.removeImage} onPress={() => setImage(undefined)} hitSlop={12}>
+                  <Ionicons name="close" size={14} color="#fff" />
+                </Pressable>
+              </View>
+            )}
+          </ScrollView>
+          {/* The keyboard is up here: the first tap on a topic picks it instead of only closing the keyboard. */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ flexGrow: 0, flexShrink: 0 }} contentContainerStyle={{ gap: 8 }}>
             {MOMENT_TOPICS.map((t) => (
               <Pressable key={t.id} onPress={() => setTopicId((cur) => (cur === t.id ? undefined : t.id))} style={[styles.topicChip, topicId === t.id && styles.topicChipActive]}>
                 <Text style={[styles.topicChipText, topicId === t.id && { color: colors.text }]}># {t.title}</Text>
@@ -887,7 +917,7 @@ function Composer({ visible, onClose, onPost }: { visible: boolean; onClose: () 
               <Text style={{ color: colors.textDim, fontSize: 13 }}>Fotoğraf</Text>
             </Pressable>
             <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
-              <Pressable onPress={onClose}>
+              <Pressable onPress={onClose} hitSlop={{ top: 13, bottom: 13, left: 8, right: 5 }}>
                 <Text style={{ color: colors.textDim }}>Vazgeç</Text>
               </Pressable>
               {busy ? <ActivityIndicator color={colors.primary} style={{ paddingHorizontal: 22 }} /> : <GradientButton small title="Paylaş" onPress={submit} />}
@@ -934,7 +964,8 @@ function CommentsSheet({
   };
   const { colors } = useTheme();
   const styles = useStyles();
-  const paddingBottom = Math.max(34, useSafeAreaInsets().bottom + 8);
+  const insets = useSafeAreaInsets();
+  const paddingBottom = useKeyboardOpen() ? 12 : Math.max(34, insets.bottom + 8);
   const [busy, setBusy] = useState(false);
   const send = async () => {
     const text = draft.trim();
@@ -955,7 +986,7 @@ function CommentsSheet({
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <KeyboardAvoid style={styles.sheetWrap}>
         <Pressable style={{ flex: 1 }} onPress={onClose} />
-        <View style={[styles.sheet, { maxHeight: '70%', paddingBottom }]}>
+        <View style={[styles.sheet, { maxHeight: '88%', paddingBottom }]}>
           <Text style={styles.sheetTitle}>{loading ? 'Yorumlar' : `Yorumlar (${comments.length})`}</Text>
           <ScrollView style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 14, paddingVertical: 4 }}>
             {loading && <ActivityIndicator color={colors.primary} style={{ paddingVertical: 20 }} />}
@@ -1026,7 +1057,9 @@ function CommentsSheet({
 }
 
 const useStyles = makeStyles(({ colors, lift, dark, edge }) => ({
-  header: { flexDirection: 'row', alignItems: 'flex-start', gap: 20, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 6 },
+  header: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingHorizontal: 16 },
+  // The header's vertical padding lives in the tabs, so they are 44 dp tall to the finger inside their strip.
+  tabBtn: { alignItems: 'center', paddingTop: 10, paddingBottom: 6 },
   tab: { color: colors.textDim, fontSize: 17, fontWeight: '600' },
   tabActive: { color: colors.text, fontSize: 20, fontWeight: '800' },
   underline: { height: 3, borderRadius: 2, backgroundColor: colors.primary, marginTop: 4, width: 20 },
@@ -1061,7 +1094,7 @@ const useStyles = makeStyles(({ colors, lift, dark, edge }) => ({
   svipTag: { position: 'absolute', bottom: -6, left: (AVATAR_COL - 40) / 2, right: (AVATAR_COL - 40) / 2, alignItems: 'center', borderRadius: 6, paddingVertical: 1 },
   svipText: { color: '#fff', fontSize: 9, fontWeight: '900' },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  name: { color: colors.text, fontWeight: '800', fontSize: 15, maxWidth: 150 },
+  name: { color: colors.text, fontWeight: '800', fontSize: 15, maxWidth: 150, flexShrink: 1 },
   genderChip: { flexDirection: 'row', alignItems: 'center', gap: 1, borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1 },
   meta: { color: colors.textDim, fontSize: 12 },
   hiBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: 'rgba(255,101,118,0.45)', backgroundColor: 'rgba(255,101,118,0.12)' },
@@ -1071,7 +1104,8 @@ const useStyles = makeStyles(({ colors, lift, dark, edge }) => ({
   body: { paddingLeft: AVATAR_COL + 10, gap: 10 },
   text: { color: colors.text, fontSize: 15, lineHeight: 21 },
   image: { width: '78%', aspectRatio: 0.78, borderRadius: 12, backgroundColor: colors.card },
-  actions: { flexDirection: 'row', alignItems: 'center', gap: 22, paddingTop: 2 },
+  // Starts at the card's own edge (out of the body's indent), so all the actions fit a 320-wide phone.
+  actions: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingTop: 2, marginLeft: -(AVATAR_COL + 10) },
   action: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   actionText: { color: colors.textDim, fontSize: 13, fontWeight: '700' },
   fab: {
@@ -1096,9 +1130,9 @@ const useStyles = makeStyles(({ colors, lift, dark, edge }) => ({
   composeBar: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 16, marginTop: 10, marginBottom: 4, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 16, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
   composeHint: { flex: 1, color: colors.textDim, fontSize: 14 },
   sheetWrap: { flex: 1, backgroundColor: SCRIM },
-  sheet: { backgroundColor: colors.card, padding: 16, borderTopLeftRadius: 24, borderTopRightRadius: 24, gap: 12, paddingBottom: 34, ...edge.sheet },
+  sheet: { flexShrink: 1, backgroundColor: colors.card, padding: 16, borderTopLeftRadius: 24, borderTopRightRadius: 24, gap: 12, paddingBottom: 34, ...edge.sheet },
   sheetTitle: { color: colors.text, fontWeight: '700', fontSize: 16 },
-  composeInput: { color: colors.text, minHeight: 90, fontSize: 16, textAlignVertical: 'top' },
+  composeInput: { color: colors.text, minHeight: 90, maxHeight: 140, fontSize: 16, textAlignVertical: 'top' },
   preview: { width: 110, height: 110, borderRadius: 12, backgroundColor: colors.cardAlt },
   removeImage: { position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 999, padding: 3 },
   topicChip: { backgroundColor: colors.cardAlt, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: 'transparent' },

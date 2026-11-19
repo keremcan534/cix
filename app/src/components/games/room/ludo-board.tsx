@@ -37,6 +37,8 @@ const HOP_MS = 140;
 const BASE_SCALE = 1.24;
 const HOME_SCALE = 0.62;
 const GAP = 1.5;
+/** How wide a movable token's tap area is on the screen, with no other movable token near it (dp). */
+const TAP = 44;
 const keyOf = (color: number, index: number) => `${color}:${index}`;
 const run = (a: Animated.CompositeAnimation) => new Promise<void>((done) => a.start(() => done()));
 const sizeAt = (step: number) => (step <= BASE ? BASE_SCALE : step >= HOME ? HOME_SCALE : 1);
@@ -208,6 +210,18 @@ export function LudoBoard({
   }));
 
   const pickable = movable && onPick ? movable : null;
+  // A movable token's tap area: 44dp on the screen, cut short of the next movable token so a tap can't take the wrong
+  // one. The token's wrapper is scaled with it, so the size is given before that scale.
+  const hitOf = (t: BoardToken) => {
+    const at = rest.get(keyOf(t.color, t.index));
+    if (!at || !pickable) return unit;
+    let room = TAP;
+    for (const index of pickable.indexes) {
+      const other = index === t.index ? undefined : rest.get(keyOf(pickable.color, index));
+      if (other) room = Math.min(room, Math.max(Math.abs(other.x - at.x), Math.abs(other.y - at.y)));
+    }
+    return Math.max(unit, room / at.scale);
+  };
   const felt = roomArt('ludo-tahta-zemin');
   return (
     <View accessibilityLabel="Ludo tahtası">
@@ -221,6 +235,7 @@ export function LudoBoard({
               key={key}
               color={t.color}
               unit={unit}
+              hit={can ? hitOf(t) : unit}
               v={valuesOf(key)}
               top={moving === key}
               pulse={can}
@@ -319,7 +334,7 @@ function Centre({ cell, turns }: { cell: number; turns: number }) {
   );
 }
 
-const Token = memo(function Token({ color, unit, v, top, pulse, still, label, onPress }: { color: number; unit: number; v: Values; top: boolean; pulse: boolean; still: boolean; label: string; onPress?: () => void }) {
+const Token = memo(function Token({ color, unit, hit, v, top, pulse, still, label, onPress }: { color: number; unit: number; /** The side of its tap area, before the token's scale. */ hit: number; v: Values; top: boolean; pulse: boolean; still: boolean; label: string; onPress?: () => void }) {
   const c = LUDO_COLORS[color];
   const art = roomArtSet(LUDO_TOKEN_ART);
   const rise = v.lift.interpolate({ inputRange: [0, 1], outputRange: [0, -unit * 0.55] });
@@ -339,19 +354,17 @@ const Token = memo(function Token({ color, unit, v, top, pulse, still, label, on
     </View>
   );
   return (
-    <Animated.View style={[k.wrap, { width: unit, height: unit, marginLeft: -unit / 2, marginTop: -unit / 2, zIndex: top ? 30 : pulse ? 20 : 10, pointerEvents: onPress ? 'auto' : 'none', transform: [{ translateX: v.xy.x }, { translateY: v.xy.y }, { scale: v.scale }] }]}>
-      {/* The shadow stays on the board while the token is in the air: smaller and fainter the higher it goes. */}
-      <Animated.View style={[k.shadow, { borderRadius: unit, opacity: v.lift.interpolate({ inputRange: [0, 1], outputRange: [0.6, 0.22] }), transform: [{ scale: v.lift.interpolate({ inputRange: [0, 1], outputRange: [1, 0.7] }) }] }]} />
-      <Animated.View style={[k.fill, { transform: [{ translateY: rise }, { scale: swell }] }]}>
-        {pulse && <Ring unit={unit} still={still} />}
-        {onPress ? (
-          <Pressable onPress={onPress} hitSlop={Math.max(4, (40 - unit) / 2)} accessibilityRole="button" accessibilityLabel={label} style={k.fill}>
-            {body}
-          </Pressable>
-        ) : (
-          body
-        )}
-      </Animated.View>
+    <Animated.View style={[k.wrap, { width: hit, height: hit, marginLeft: -hit / 2, marginTop: -hit / 2, zIndex: top ? 30 : pulse ? 20 : 10, pointerEvents: onPress ? 'auto' : 'none', transform: [{ translateX: v.xy.x }, { translateY: v.xy.y }, { scale: v.scale }] }]}>
+      <View style={{ width: unit, height: unit }}>
+        {/* The shadow stays on the board while the token is in the air: smaller and fainter the higher it goes. */}
+        <Animated.View style={[k.shadow, { borderRadius: unit, opacity: v.lift.interpolate({ inputRange: [0, 1], outputRange: [0.6, 0.22] }), transform: [{ scale: v.lift.interpolate({ inputRange: [0, 1], outputRange: [1, 0.7] }) }] }]} />
+        <Animated.View style={[k.fill, { transform: [{ translateY: rise }, { scale: swell }] }]}>
+          {pulse && <Ring unit={unit} still={still} />}
+          {body}
+        </Animated.View>
+      </View>
+      {/* The tap area is the wrapper itself: Android takes no touch outside a parent's bounds, so hitSlop can't widen it. */}
+      {onPress && <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} style={StyleSheet.absoluteFill} />}
     </Animated.View>
   );
 });
@@ -413,7 +426,7 @@ const b = StyleSheet.create({
   hub: { backgroundColor: '#0A1426', borderWidth: 1.5, borderColor: '#F6BD60', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 10px rgba(246,189,96,0.55)' },
 });
 const k = StyleSheet.create({
-  wrap: { position: 'absolute', left: 0, top: 0 },
+  wrap: { position: 'absolute', left: 0, top: 0, alignItems: 'center', justifyContent: 'center' },
   fill: { flex: 1 },
   body: { flex: 1, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.92)', alignItems: 'center', justifyContent: 'center' },
   lit: { boxShadow: '0 0 9px rgba(255,255,255,0.95)' },

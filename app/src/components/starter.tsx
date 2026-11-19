@@ -15,6 +15,8 @@ import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 
 const REWARD = 300;
+/** Tümü and the close button: 44 dp tall, and their touch areas stay apart. */
+const HEAD_SLOP = { top: 13, bottom: 13, left: 4, right: 4 };
 
 type Step = { key: string; icon: Icon3DName; title: string; done: boolean; href: Href };
 
@@ -54,10 +56,10 @@ export function StarterPath({ roomHref }: { roomHref?: Href } = {}) {
           {doneCount}/{steps.length}
         </Text>
         <View style={{ flex: 1 }} />
-        <Pressable onPress={() => setOpen((o) => !o)} hitSlop={8} accessibilityLabel={open ? 'Adımları gizle' : 'Tüm adımları göster'}>
+        <Pressable onPress={() => setOpen((o) => !o)} hitSlop={HEAD_SLOP} accessibilityLabel={open ? 'Adımları gizle' : 'Tüm adımları göster'}>
           <Text style={s.link}>{open ? 'Gizle' : 'Tümü'}</Text>
         </Pressable>
-        <Pressable onPress={hideStarter} hitSlop={8} accessibilityLabel="İlk adımlar kartını kapat">
+        <Pressable onPress={hideStarter} hitSlop={HEAD_SLOP} accessibilityLabel="İlk adımlar kartını kapat">
           <Ionicons name="close" size={18} color={colors.textDim} />
         </Pressable>
       </View>
@@ -116,7 +118,7 @@ const useStyles = makeStyles(({ colors, semantic, dark, ink }) => ({
   link: { color: semantic.tonalText, fontWeight: '700', fontSize: 13, marginRight: 6 },
   track: { height: 6, borderRadius: 3, backgroundColor: dark ? 'rgba(0,0,0,0.3)' : ink(0.08), overflow: 'hidden' },
   fill: { height: 6, borderRadius: 3, backgroundColor: semantic.action, boxShadow: dark ? '0 0 8px rgba(255,95,162,0.8)' : '0 0 6px rgba(255,95,162,0.45)' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 2 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 7 },
   stepText: { color: colors.text, fontWeight: '700', fontSize: 14, flex: 1 },
   stepDone: { color: colors.textDim, textDecorationLine: 'line-through' },
   goPill: { flexDirection: 'row', alignItems: 'center', gap: 1, paddingLeft: 10, paddingRight: 6, paddingVertical: 4, borderRadius: 999, backgroundColor: dark ? 'rgba(255,95,162,0.12)' : 'rgba(208,46,120,0.08)' },
