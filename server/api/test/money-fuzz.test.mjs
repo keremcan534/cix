@@ -1,5 +1,5 @@
 // Many people moving money at once, in random order (docs/PARA_DENETIMI.md): top-ups, purchases, gifts, Çevir,
-// bonds, Şanslı çanta, paid messages waiting for the streamer's answer (answers, quick replies, time running out), the shop, Oyun Salonu (Canlı Yörünge's fuel and escapes too), Jeton Noktası sales and diamond
+// bonds (requests, answers, bond gifts again, ends), Şanslı çanta, paid messages waiting for the streamer's answer (answers, quick replies, time running out), the shop, Oyun Salonu (Canlı Yörünge's fuel and escapes too), Jeton Noktası sales and diamond
 // sales, store refunds, with some
 // requests sent twice at the same moment. Whatever the order, no request may fail with a server error, and the
 // harness's money checks after this file (money-check.mjs) must find every coin and diamond where the ledger says.
@@ -51,6 +51,10 @@ describe('Para: aynı anda rastgele işlemler', () => {
       }
     };
     const bondIds = async () => (await q("SELECT id FROM bonds WHERE status = 'pending'")).map((r) => Number(r.id));
+    // Bond gifts again (bonds.mjs): an ordinary gift between two who have that bond, at the price the shelf shows.
+    const bondPrice = Object.fromEntries((await ok(call('GET', '/api/catalog?gifts=2&family=1'), 'katalog')).gifts.filter((g) => g.id.startsWith('bag-')).map((g) => [g.id, g.price]));
+    const activeBond = async () => (await q("SELECT id, a, b, kind FROM bonds WHERE status = 'active' ORDER BY random() LIMIT 1"))[0];
+    const personOf = (id) => people.find((p) => p.user.id === id);
     const bagIds = async () => (await q("SELECT id FROM lucky_bags WHERE status = 'open'")).map((r) => Number(r.id));
 
     /** One random request: [label, method, path, body, session], built when it runs. */
@@ -71,6 +75,19 @@ describe('Para: aynı anda rastgele işlemler', () => {
       [3, async (u) => {
         const id = pick(await bondIds());
         return id ? ['bağ geri alma', 'POST', '/api/bonds/withdraw', { id }, u.session] : null;
+      }],
+      // Either side of an active bond sends its bond gift again (sometimes the wrong kind, refused); now and then one
+      // ends it, racing the gifts.
+      [5, async () => {
+        const x = await activeBond();
+        if (!x) return null;
+        const [from, to] = random() < 0.5 ? [x.a, x.b] : [x.b, x.a];
+        const giftId = random() < 0.9 ? `bag-${x.kind}` : x.kind === 'kanka' ? 'bag-kardes' : 'bag-kanka';
+        return ['bağ hediyesi', 'POST', '/api/gifts/send', { to, giftId, count: pick([1, 5, 10]), price: bondPrice[giftId], ref: rnd(6) }, personOf(from).session];
+      }],
+      [1, async () => {
+        const x = await activeBond();
+        return x ? ['bağ bitirme', 'POST', '/api/bonds/end', { id: Number(x.id) }, personOf(random() < 0.5 ? x.a : x.b).session] : null;
       }],
       [4, async (u) => ['çanta', 'POST', '/api/lucky-bags', { room, kind: 'coins', amount: 1000, packets: 5, followersOnly: false, delay: 0, ref: rnd(6) }, u.session]],
       [6, async (u) => {

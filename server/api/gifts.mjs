@@ -24,7 +24,7 @@
 // A gift sent in a server room is announced to the room's voice connection from here, after it is paid
 // (LiveKit SendData, so no phone can fake one); the phones draw only these, never a peer's own claim.
 import { recordIncome } from './agency-lib.mjs';
-import { KINDS as BOND_KINDS, addBondCoins, maxOf as bondMax } from './bonds.mjs';
+import { addBondCoins, bondCatalog, bondGiftOf, checkBondGift } from './bonds.mjs';
 import { HttpError, auth, blockedBetween, claimRef, db, env, int, once, readJson, userId } from './core.mjs';
 import { EXCHANGE, GIFT_COUNTS, PACKS, VIP_SUBS } from './catalog.mjs';
 import { docsNow, levelsPayload, levelsRev, svipLevel, vipItemNeed } from './levels.mjs';
@@ -150,7 +150,7 @@ export const giftRoutes = {
       guard: guardRules(s),
       rooms: (({ micMinLevel, bossMinLevel, caps }) => ({ micMinLevel, bossMinLevel, caps }))(roomNumbersOf(s)),
       family: { themes: Object.fromEntries(familyRulesOf(s).themes.map((t) => [t.id, t.minLevel])) },
-      bonds: { answerDays: s.bondAnswerDays, cooldownDays: s.bondCooldownDays, talkDaily: s.bondTalkDaily, max: Object.fromEntries(Object.keys(BOND_KINDS).map((k) => [k, bondMax(k, s)])) },
+      bonds: bondCatalog(s),
       // Grows with every live settings save, every change in Yönetim › Hediyeler and Emojiler, and every Seviye
       // ayarları save (as /api/config's).
       v: s.v + customGiftsRev() + emojiRev() + levelsRev() + shopItemsRev() + rocketVideosRev(),
@@ -163,8 +163,8 @@ export const giftRoutes = {
     const s = live();
     const b = await readJson(req);
     // One of the app's gifts (as changed in the panel) or an admin's on the shelves (custom-gifts.mjs), at this
-    // server's price either way.
-    const gift = giftOf(b.giftId);
+    // server's price either way. A bond gift (bag-<kind>) only to someone I have that bond with (bonds.mjs).
+    const gift = giftOf(b.giftId) ?? bondGiftOf(b.giftId);
     if (!gift) throw new HttpError(400, 'Bu hediye artık yok');
     const count = int(b.count ?? 1, 1, 10_000);
     if (!count || !GIFT_COUNTS.includes(count)) throw new HttpError(400, `Adet ${GIFT_COUNTS.join(', ')} olabilir`);
@@ -193,6 +193,7 @@ export const giftRoutes = {
       if (s.giftsHidden.has(gift.id)) throw new HttpError(400, 'Bu hediye artık yok');
       // The price the phone showed (none from an older app): a gift whose price moved is refused, nothing moves.
       checkShownPrice(gift, b.price);
+      if (gift.bond) await checkBondGift(c, u.id, to, gift.bond);
       // Koruma Kartı (guards.mjs): starts a Koruma before the gift's row, so its coins are the first points.
       if (gift.id === GUARD_CARD) guardNew = await startGuard(c, u.id, to);
       const g = await c.query('INSERT INTO gift_events (sender, recipient, gift_id, count, unit_price, total, room, place, ref) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id', [
