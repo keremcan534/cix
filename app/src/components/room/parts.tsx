@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
 import { Avatar, FramedAvatar, VerifiedBadge } from '@/components/ui';
+import { MarkLayer } from '@/components/profile-mark';
 import { GiftArt, giftArtOf, giftSource } from '@/components/GiftArt';
 import { EmojiText, ReactionArt, StickerArt, isAnimatedSticker, messagePreview, stickersOf } from '@/components/ReactionArt';
 import { cosmeticById } from '@/data/catalog';
@@ -218,10 +219,12 @@ export function Seat({
               The owners' call (güncelleme 5, "dalgalar çerçeveyi kesiyor"): the ring never covers a frame. */}
           {speaking && <VoiceWave wave={wave} size={size} color={voice} level={level} still={still} reach={ringReach(size, room)} />}
           {user && !mini && (vipLevel > 0 || frameId) ? (
-            <FramedAvatar uri={user.avatar} size={size} vipLevel={vipLevel} frameId={frameId} room={room} />
+            <FramedAvatar uri={user.avatar} size={size} vipLevel={vipLevel} frameId={frameId} room={room} markUid={userId ?? undefined} />
           ) : user ? (
             <>
               <Photo uri={user.avatar} kind="face" style={{ width: size, height: size, borderRadius: size / 2 }} />
+              {/* Profil izleri: on the photo, under the host's gold frame (components/profile-mark). */}
+              {!mini && <MarkLayer uid={userId} size={size} />}
               {hostFrame !== undefined && (
                 <Image
                   source={hostFrame}

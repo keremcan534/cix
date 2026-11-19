@@ -27,9 +27,12 @@
 //   - invitesFrom: inviteRefusal / mayInvite, for room and mic invites.
 //   - autoReceive, autoOpener, autoOpenerSeen, autoSend: Otomatik mesaj (auto-chat.mjs). autoOpenerSeen can only be
 //     turned on (the app says it showed what a conversation start in my name is).
+//   - profileMarks off ("Profilime iz bırakılmasın"): a gift that leaves a profile mark is refused before any coin moves,
+//     and the marks I have come off at once (profile-marks.mjs). On at first.
 // A block either way refuses all three. The other person is never told which setting refused them beyond the
 // reason the demo shows ("… yalnızca takip ettiği kişilerden mesaj alıyor").
 import { HttpError, auth, db, limit, readJson } from './core.mjs';
+import { clearMarks } from './profile-marks.mjs';
 
 export const PRIVACY_DEFAULTS = Object.freeze({
   profilePublic: true,
@@ -50,6 +53,8 @@ export const PRIVACY_DEFAULTS = Object.freeze({
   autoOpener: true,
   autoOpenerSeen: false,
   autoSend: true,
+  // Profil izleri (profile-marks.mjs): others may leave a mark on my photo.
+  profileMarks: true,
 });
 const COLUMN = {
   profilePublic: 'profile_public',
@@ -67,6 +72,7 @@ const COLUMN = {
   autoOpener: 'auto_opener',
   autoOpenerSeen: 'auto_opener_seen',
   autoSend: 'auto_send',
+  profileMarks: 'profile_marks',
 };
 const CHOICES = { dmFrom: ['everyone', 'following', 'mutual'], callsFrom: ['everyone', 'following', 'nobody'], invitesFrom: ['everyone', 'following', 'nobody'] };
 /** A session seen this recently is online (as Keşfet has always counted it). */
@@ -248,6 +254,8 @@ export const privacyRoutes = {
     );
     // Back to every default: nothing to keep.
     await db.query(`DELETE FROM privacy_settings WHERE user_id = $1 AND ${ALL_DEFAULT}`, [me.id]);
+    // "Profilime iz bırakılmasın": the marks I have come off now too.
+    if (set.profile_marks === false) await clearMarks(me.id, { how: 'self', by: me.id });
     return { privacy: await privacyOf(db, me.id) };
   },
 

@@ -23,7 +23,7 @@ import { LUCKY_RECIPIENT_SHARE, pct } from '@/data/rules';
 import { bagCounts, bagLabel, bagNeed as needOf, bagShort as shortOf } from '@/lib/backpack';
 import { gamblingLevelOk } from '@/lib/games';
 import { pressHaptic, tapHaptic } from '@/lib/haptics';
-import { bagGifts, roomGiftShelf, useLiveCatalog } from '@/lib/live/catalog-live';
+import { bagGifts, giftMarkOf, roomGiftShelf, useLiveCatalog } from '@/lib/live/catalog-live';
 import { liveMode } from '@/lib/live';
 import { refreshBackpack, useBackpack } from '@/lib/live/backpack';
 import { refreshLucky } from '@/lib/live/lucky';
@@ -34,6 +34,8 @@ import { Icon3D } from '@/components/Icon3D';
 import { GiftArt, MUSIC_BADGE } from '@/components/GiftArt';
 import { RollingNumber } from '@/components/fx/rolling-number';
 import { useRoomSheetSpace, useSheetMax } from '@/lib/sheet-space';
+import { marksShelfNote, refusesMarks } from '@/lib/live/marks-live';
+import { refusalLine, refusingMarks } from '@/lib/profile-marks';
 
 type Shelf = GiftCat | 'lucky' | 'fav' | 'bag';
 type PriceSort = 'default' | 'asc' | 'desc';
@@ -56,7 +58,8 @@ const SHELF_NOTE: Record<Shelf, string> = {
   hot: 'En çok gönderilen hediyeler.',
   // How it is played and where its odds are, nothing about what can be won (the owners, Güncelleme 7).
   lucky: `Her gönderimde bir çekiliş yapılır; olasılıklar aşağıda. Ödül garanti değildir. Alıcıya ve PK puanına hediye değerinin ${pct(LUCKY_RECIPIENT_SHARE)}’si yazılır.`,
-  gameplay: 'Alıcının koltuğuna animasyonla atılır. Fiyat sabit, sürpriz ödül yok.',
+  // While a gift here leaves a profile mark (Kaka), the note says so instead (lib/live/marks-live marksShelfNote).
+  gameplay: 'Atılan hediye alıcının koltuğuna düşer. Fiyat sabit, sürpriz ödül yok.',
   couple: 'Sevdiğine özel hediyeler.',
   family: 'Koruma Kartı seni koruyucu yapar. Bağ hediyesi bağ isteği olarak gider; kabul edilmezse jetonun geri döner.',
   privilege: 'VIP üyelerine özel hediyeler.',
@@ -204,6 +207,7 @@ export function GiftSheet({
   const lg = lucky.config.gifts.find((x) => x.id === luckyId) ?? lucky.config.gifts[0];
   const isLucky = shelf === 'lucky' && !!lg;
   const list = shelfGifts(shown, shelf, sort, favs, bag, inBag);
+  const kutlamaNote = shelf === 'gameplay' ? marksShelfNote() : null;
   // A pick from Çantam may be a gift off the shelf for now (Kalp from the call task).
   const gift = (sel.bag ? inBag : shown).find((g) => g.id === sel.id) ?? shown[0];
   // An empty shelf (bag, favorites, no Lucky packages) keeps the last pick in state; never send it from here.
@@ -213,7 +217,10 @@ export function GiftSheet({
   // A bond gift goes one at a time, to one person: it asks them for a bond.
   const bondGift = !isLucky && !fromBag && isBondGift(gift.id);
   const sendCount = bondGift ? 1 : count;
-  const total = isLucky ? lg.price * count * targets.length : (fromBag ? 0 : gift.price) * sendCount * targets.length;
+  // Profil izleri: a gift that leaves a mark doesn't go to someone who refuses marks (Gizlilik); the others still get it.
+  const refusing = isLucky ? [] : refusingMarks(giftMarkOf(gift.id), targets, refusesMarks);
+  const sendTo = refusing.length ? targets.filter((id) => !refusing.includes(id)) : targets;
+  const total = isLucky ? lg.price * count * targets.length : (fromBag ? 0 : gift.price) * sendCount * sendTo.length;
   const short = fromBag ? 0 : total - coins;
   const bagNeed = needOf(count, targets.length);
   const bagShort = fromBag && shortOf(bag, gift.id, count, targets.length);
@@ -269,7 +276,7 @@ export function GiftSheet({
   const send = () => {
     if (!onShelf) return;
     if (isLucky) return sendLucky();
-    if (!targets.length || locked || bagShort) return;
+    if (!sendTo.length || locked || bagShort) return;
     if (bondGift) {
       if (targets.length !== 1) return;
       if (short > 0) return goWallet();
@@ -279,7 +286,7 @@ export function GiftSheet({
     }
     if (fromBag) {
       // Stock goes down only after the gift really went out (offline sends nothing). Live: the server's answer.
-      if (!onSend({ ...gift, price: 0 }, targets, count, true) || live) return;
+      if (!onSend({ ...gift, price: 0 }, sendTo, count, true) || live) return;
       const next = { ...demoBag, [gift.id]: (demoBag[gift.id] ?? 0) - bagNeed };
       Object.assign(backpackStock, next);
       setBag(next);
@@ -288,7 +295,7 @@ export function GiftSheet({
     if (short > 0) return goWallet();
     if (overLimit) return;
     pressHaptic();
-    onSend(gift, targets, count);
+    onSend(gift, sendTo, count);
   };
 
   // Footer state: exactly one message and one primary action at a time.
@@ -307,6 +314,8 @@ export function GiftSheet({
             { tone: 'info' as const, text: `${count * targets.length > 1 ? `Her hediye için ayrı çekiliş yapılır. ` : ''}Ödül garanti değildir`, odds: true, cta: `Gönder · ${fmt(total)}`, variant: 'money' as const }
     : bondGift && targets.length !== 1
       ? { tone: 'info' as const, text: 'Bağ hediyesi tek kişiye gönderilir: alıcılardan birini seç.', cta: 'Tek kişi seç', disabled: true }
+    : refusing.length === targets.length
+      ? { tone: 'lock' as const, text: refusalLine(gift, refusing, (id) => userById(id).name, targets.length), cta: 'Gönderilemez', disabled: true }
     : locked
       ? { tone: 'lock' as const, text: `VIP ${gift.minSvip} ve üzerine özel (sen VIP ${svipLevel}).`, cta: 'VIP ayrıcalıklarını gör', variant: 'tonal' as const, onPress: goVip }
       : bagShort
@@ -317,6 +326,8 @@ export function GiftSheet({
             ? { tone: 'warn' as const, text: `${fmt(short)} jeton eksik.`, cta: 'Jeton yükle', variant: 'money' as const }
             : overLimit
               ? { tone: 'lock' as const, text: overLimit, cta: 'Günlük limiti aşıyor', disabled: true }
+            : refusing.length
+              ? { tone: 'warn' as const, text: refusalLine(gift, refusing, (id) => userById(id).name, targets.length), cta: `Gönder · ${fmt(total)}`, variant: 'money' as const }
             : { tone: 'info' as const, text: `Kalan: ${fmt(coins - total)} jeton`, cta: `Gönder · ${fmt(total)}`, variant: 'money' as const };
 
   const sortBtn =
@@ -434,7 +445,7 @@ export function GiftSheet({
         {!compact && shelf !== 'lucky' && (
         <View style={g.noteRow}>
           <Text style={[g.dim, { flex: 1 }]} numberOfLines={2}>
-            {shelf === 'family' ? '' : shelf === 'privilege' ? `${SHELF_NOTE.privilege} Senin seviyen: VIP ${svipLevel}.` : shelf === 'bag' && live ? LIVE_BAG_NOTE : SHELF_NOTE[shelf]}
+            {shelf === 'family' || (shelf === 'gameplay' && kutlamaNote) ? '' : shelf === 'privilege' ? `${SHELF_NOTE.privilege} Senin seviyen: VIP ${svipLevel}.` : shelf === 'bag' && live ? LIVE_BAG_NOTE : SHELF_NOTE[shelf]}
           </Text>
           {sortBtn}
         </View>
@@ -445,6 +456,8 @@ export function GiftSheet({
         <ScrollView key={shelf} ref={gridRef} style={compact ? g.gridFill : g.gridScroll} contentContainerStyle={g.grid}>
           {/* Şanslı's disclaimer and the bond gifts' refund rule: always shown in full, at the top of their shelf. */}
           {(shelf === 'lucky' || shelf === 'family') && <Text style={[g.dim, g.shelfNote]}>{SHELF_NOTE[shelf]}</Text>}
+          {/* Kutlama with a gift that leaves a profile mark: what it does, what cleans it, that anyone may refuse it. */}
+          {shelf === 'gameplay' && kutlamaNote && <Text style={[g.dim, g.shelfNote]}>{kutlamaNote}</Text>}
           {isLucky ? (
             <LuckyShelf
               gifts={lucky.config.gifts}
@@ -483,6 +496,7 @@ export function GiftSheet({
                 selected={sel.id === it.id && sel.bag === (shelf === 'bag')}
                 favorite={favs.has(it.id)}
                 locked={shelf !== 'bag' && isLocked(it, svipLevel)}
+                muted={targets.length > 0 && refusingMarks(giftMarkOf(it.id), targets, refusesMarks).length === targets.length}
                 stock={shelf === 'bag' ? bag[it.id] : undefined}
                 onPress={() => {
                   tapHaptic();
@@ -712,6 +726,7 @@ function GiftTile({
   selected,
   favorite,
   locked,
+  muted = false,
   stock,
   onPress,
   onLongPress,
@@ -720,21 +735,24 @@ function GiftTile({
   selected: boolean;
   favorite: boolean;
   locked: boolean;
+  /** Can't go to the people picked (they refuse the profile mark it leaves): drawn faded, without a lock. */
+  muted?: boolean;
   stock?: number;
   onPress: () => void;
   onLongPress: () => void;
 }) {
   // At most one corner badge: a lock beats the effect type, so the important fact is never crowded out.
   const badge = locked ? null : gift.badge === '3D' || gift.badge === 'music' ? gift.badge : null;
-  const a11y = `${gift.name}, ${stock !== undefined ? `ücretsiz, ${stock} adet` : `${fmt(gift.price)} jeton`}${locked ? `, VIP ${gift.minSvip} gerekli` : ''}${favorite ? ', favori' : ''}`;
+  const a11y = `${gift.name}, ${stock !== undefined ? `ücretsiz, ${stock} adet` : `${fmt(gift.price)} jeton`}${locked ? `, VIP ${gift.minSvip} gerekli` : ''}${muted ? ', alıcı iz kabul etmiyor' : ''}${favorite ? ', favori' : ''}`;
+  const faded = locked || muted;
   return (
     <Pressable onPress={onPress} onLongPress={onLongPress} delayLongPress={350} style={g.tileWrap} accessibilityRole="button" accessibilityState={{ selected }} accessibilityLabel={a11y} accessibilityHint="Uzun bas: favorilere ekle veya çıkar">
       <View style={[g.tile, selected && g.tileOn]}>
         <View style={g.tileArtBox}>
-          <GiftArt giftId={gift.id} emoji={gift.emoji} size={44} style={locked && { opacity: 0.4 }} textStyle={[g.tileArt, locked && { opacity: 0.4 }]} />
+          <GiftArt giftId={gift.id} emoji={gift.emoji} size={44} style={faded && { opacity: 0.4 }} textStyle={[g.tileArt, faded && { opacity: 0.4 }]} />
         </View>
         <View style={g.tileNameBox}>
-          <Text style={[g.tileName, locked && { color: colors.textDim }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.85}>
+          <Text style={[g.tileName, faded && { color: colors.textDim }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.85}>
             {gift.name}
           </Text>
         </View>

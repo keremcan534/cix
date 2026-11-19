@@ -17,6 +17,8 @@ import { putLevels } from '@/lib/live/levels';
 import { putDistance } from '@/lib/live/distances';
 import { extrasPatch, showcaseView, type ExtrasDraft, type ShowcaseView } from '@/lib/profile-more';
 import { cardLookOf, medalIds, type CardLook } from '@/lib/person-card';
+import { putMarks } from '@/lib/mark-store';
+import { parseMarks } from '@/lib/profile-marks';
 
 // Someone's agency and family as their profile last answered, by server id (the profile pills and sections).
 const ties = new Map<string, api.ProfileTies>();
@@ -93,7 +95,10 @@ export async function loadMe(localAvatar?: string): Promise<Partial<User>> {
  * also gets their medals and look (and not the received-gift count, which it doesn't show).
  */
 export async function loadPublicProfile(serverId: string, mine = false, visit = false, card = false): Promise<SocialCounts> {
+  const started = Date.now();
   const p = await api.userProfile(serverId, visit && !mine, card);
+  // Profil izleri: the marks on their photo now (lib/mark-store); an older server sends none.
+  if (p.marks !== undefined) putMarks(serverId, parseMarks(p.marks), started);
   putTies(serverId, p);
   putLevels(serverId, p.levels);
   // "Ankara · 350 km" after their city (lib/live/distances).

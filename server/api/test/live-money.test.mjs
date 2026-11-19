@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 
 import { BOND_GIFTS, EXCHANGE, GIFTS, GIFTS_PAUSED, PACKS, exchangeCoins } from '../catalog.mjs';
+import { MARK_GIFTS } from '../profile-mark-rules.mjs';
 import { eventsOf } from '../finance-sync.mjs';
 import { campaignRef } from '../live-registry.mjs';
 import { fakeStores } from './fake-stores.mjs';
@@ -89,7 +90,8 @@ describe('Canlı ayarlar para uçlarında', () => {
     admin = await h.account('Yönetici', 'admin');
     const cat = await catalog();
     // Gifts off the shelf for now aren't listed (catalog.mjs GIFTS_PAUSED), nor bond gifts to an app without their shelf.
-    assert.equal(cat.gifts.length, GIFTS.size - GIFTS_PAUSED.size - BOND_GIFTS.size);
+    // Nor Kaka and Su to an app without Profil izleri (profile-mark-rules.mjs MARK_GIFTS).
+    assert.equal(cat.gifts.length, GIFTS.size - GIFTS_PAUSED.size - BOND_GIFTS.size - MARK_GIFTS.size);
     assert.equal(cat.packs.length, PACKS.length);
     assert.deepEqual(cat.exchange, { usdTry: EXCHANGE.usdTry, minDiamonds: EXCHANGE.minDiamonds });
     assert.equal(cat.campaign, null);
@@ -108,7 +110,7 @@ describe('Canlı ayarlar para uçlarında', () => {
     const cat = await catalog();
     assert.equal(cat.v, saved.v);
     assert.ok(!cat.gifts.some((g) => g.id === 'g6'), 'gizli hediye katalogda yok');
-    assert.equal(cat.gifts.length, GIFTS.size - GIFTS_PAUSED.size - BOND_GIFTS.size - 1);
+    assert.equal(cat.gifts.length, GIFTS.size - GIFTS_PAUSED.size - BOND_GIFTS.size - MARK_GIFTS.size - 1);
 
     const [sb, rb] = [await balance(s.user.id), await balance(r.user.id)];
     const [st, j] = await call('POST', '/api/gifts/send', { to: r.user.id, giftId: 'g6', count: 1, ref: rnd(8) }, s.session);

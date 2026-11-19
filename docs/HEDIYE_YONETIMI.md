@@ -47,7 +47,7 @@ hediyeyi sessizce atlar, videosunu indirmez (adresi `/api/fx/g/…`, onların s�
 | Bağlantıdan dosya | Finans panelinde her dosyanın yanında "ya da bağlantı yapıştır": sunucu dosyayı bir kez indirir, yüklenmiş gibi denetler ve kendisi sunar (aşağıda **Bağlantıdan dosya**) |
 | Raftan kaldırma | Panelde kalır, kataloğda görünmez, gönderilemez; tekrar rafa konabilir |
 
-## Uygulamanın kendi hediyeleri (hazır 65 hediye)
+## Uygulamanın kendi hediyeleri (hazır 75 hediye)
 
 Uygulamayla gelen hediyeler (Gül, Roket, Sevimli Panda, Pırlanta Yüzük…, `server/api/catalog.mjs` `GIFT_ROWS`) de
 panelden değişir; geliştiriciye ya da uygulama güncellemesine gerek yoktur. Finans panelinin **Uygulama › Hediyeler**
@@ -86,6 +86,24 @@ değerleri (`original`), neyin değiştirildiği (`changed`) ve son 30 günde ka
 
 Saklama: `custom_gifts` tablosunda uygulama hediyesinin kimliğiyle bir satır (`builtin`, 069); her boş sütun
 "uygulamadaki gibi" demektir, satır hiç silinmez (katalog sürümü yalnız artar).
+
+## Profil izi (Kaka ve Su)
+
+Her hediyenin bir **Profil izi** ayarı var (101, [`PROFIL_IZLERI.md`](PROFIL_IZLERI.md)): yok, **bırakır** (izin türü ve
+isteğe bağlı süre, 1–168 saat; boşsa Canlı ayarlar › Profil izleri'ndeki süre) ya da **temizler** (izin türü). Gönderirken
+`mark: {role: 'leave'|'clean', kind, hours?}` ya da `mark: null`; listede her hediyenin `mark`'ı gelir, uygulamanın
+hediyesinde `original.mark` ve değiştirildiyse `changed` içinde `mark`; "Orijinale dön" `mark` alanını da geri alır.
+
+- Uygulamanın kendi iki hediyesi: **💩 Kaka** (`k1`, 999 jeton, Kutlama) `kaka` izi bırakır; **💧 Su** (`k2`, 1.999
+  jeton, Kutlama) `kaka` izini temizler. Kaka'nın kuralı kaldırılırsa (`mark: null`) düz hediye olur.
+- **Kural:** bir izi temizleyen hediye, o izi bırakan her hediyeden pahalı olmalı. Kaydı bozan değişiklik (fiyat, kural,
+  geri alma) reddedilir: "Su izi temizlediği için onu bırakan hediyelerden pahalı olmalı: Kaka 999 jeton, bu 999 jeton."
+- Panelde başka bir çift yapılabilir (ör. `camur`: Çamur bırakır, Hortum temizler). Uygulamada resmi olan tür şimdilik
+  yalnız `kaka`; başka bir türde fotoğrafta yalnız hediyenin küçük resmi görünür.
+- Eski APK'da Kaka ve Su hiç görünmez (uygulamanın içinde yoklar); yöneticinin eklediği iz hediyesi eski APK'da düz bir
+  hediye gibi görünür, iz yine sunucuda yazılır.
+- **Panel tarafı (finans paneli deposu, sonra):** hediye formuna "Profil izi" alanı; Kullanıcılar sayfasına kişinin izleri
+  ve "İzi kaldır" (`GET /api/admin/marks`, `POST /api/admin/marks/clear`).
 
 ## Yöneticinin adımları
 

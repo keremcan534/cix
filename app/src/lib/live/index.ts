@@ -23,6 +23,8 @@ import { forgetRoomPasswords } from '@/lib/live/room-password';
 import { forgetRoomFollows, putRoomFollow } from '@/lib/room-follow';
 import { replyOrder, unsureRefs } from '@/lib/live/requests';
 import { setLooksSelf } from '@/lib/live/looks';
+import { applyMarkNews } from '@/lib/mark-store';
+import { parseMarkNews } from '@/lib/profile-marks';
 
 export const liveMode = api.apiEnabled;
 /**
@@ -184,7 +186,12 @@ export async function liveGift(to: string, giftId: string, count: number, room?:
   const id = toServer(to);
   if (!id) throw new Error('Bu kişiye şu an ulaşılamıyor');
   try {
-    return applied(await once(`gift:${id}:${giftId}:${count}:${room ?? place ?? ''}`, (ref) => api.sendGift(id, giftId, count, room, ref, place, price)), 'Hediye gönderildi');
+    const r = applied(await once(`gift:${id}:${giftId}:${count}:${room ?? place ?? ''}`, (ref) => api.sendGift(id, giftId, count, room, ref, place, price)), 'Hediye gönderildi');
+    // Profil izleri: a mark left or cleaned outside a room shows on their photo here at once (in a room, the room's
+    // packet does it for every phone; lib/live/room).
+    const news = room ? null : parseMarkNews((r as { mark?: unknown }).mark);
+    if (news) applyMarkNews(id, news);
+    return r;
   } catch (e) {
     if (e instanceof api.ApiError && e.status === 409 && (e.data.code === 'price_changed' || e.data.code === 'update_required')) void refreshLiveCatalog();
     throw e;

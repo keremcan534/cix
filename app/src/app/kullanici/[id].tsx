@@ -72,6 +72,7 @@ import { Art, type ArtName } from '@/components/Art';
 import { Photo } from '@/components/photo';
 import { useReport } from '@/components/report-sheet';
 import { BondBadge, BondFrame, BondsTab, shownTopBond, useBonds } from '@/components/bonds';
+import { MarkLayer, OwnMarkNote } from '@/components/profile-mark';
 
 const REPORT_REASONS = ['Sahte profil', 'Taciz / hakaret', 'Uygunsuz içerik', 'Dolandırıcılık', 'Reşit değil'];
 
@@ -592,7 +593,7 @@ export default function UserProfile() {
                 <Pressable onPress={() => pickPhoto(false)} accessibilityLabel="Profil fotoğrafını değiştir">
                   {/* A frame from the store wins over the bond frame. */}
                   <BondFrame bond={equipped.frame ? null : topBondShown} size={96}>
-                    <FramedAvatar uri={pendingAvatar ?? user.avatar} size={96} vipLevel={vipLevel} frameId={equipped.frame} artScale={2.2} />
+                    <FramedAvatar uri={pendingAvatar ?? user.avatar} size={96} vipLevel={vipLevel} frameId={equipped.frame} artScale={2.2} markUid="me" />
                   </BondFrame>
                   <View style={styles.cameraBadge}>
                     <Ionicons name="camera" size={14} color="#fff" />
@@ -601,7 +602,11 @@ export default function UserProfile() {
               ) : (
                 <>
                   <BondFrame bond={topBondShown} size={96}>
-                    <Avatar uri={user.avatar} size={96} ring={user.vip && !topBondShown} />
+                    <View>
+                      <Avatar uri={user.avatar} size={96} ring={user.vip && !topBondShown} />
+                      {/* Profil izleri: on the photo, under the bond frame (components/profile-mark). */}
+                      <MarkLayer uid={id} size={96} />
+                    </View>
                   </BondFrame>
                   {heart && <HeartPin level={heart.level} style={styles.heartPin} />}
                 </>
@@ -706,6 +711,9 @@ export default function UserProfile() {
               )}
             </Pressable>
           )}
+
+          {/* Profil izleri: my own mark, who left it, how long it stays and what cleans it. */}
+          {isMe && <OwnMarkNote textColor={glass.deep} />}
 
           <View style={styles.stats}>
             {/* Someone else's numbers open nothing: who follows them and whom they follow is theirs alone. */}

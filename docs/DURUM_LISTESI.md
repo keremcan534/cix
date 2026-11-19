@@ -157,6 +157,16 @@ Ayrıntı: [`OTOMATIK_MESAJ.md`](OTOMATIK_MESAJ.md).
   - Hâlâ görünmeyen biri olursa: o kişinin ID'si ve hangi ekranda olduğu (mikrofon, Balkon, sohbet, Mesajlar). Fotoğrafını eski bir APK'da seçip hiç yeni APK açmamış biri, profilini bir kez açınca fotoğrafı sunucuya gider.
 - **"Şu an odada" (madde 15):** Birinin profilinde bulunduğu oda yine görünüyor: "Şu an odada: <oda> · Git". Şifreli odada "Şifreli oda · girişte şifre sorulur". Kişinin "Bulunduğum odayı göster" ayarına uyar (başta açık); engellenen kişiye, giremeyeceği odada ve bire bir görüşmede görünmez. "Git" ile (profil, ajans sohbeti, aile) gelen için odadaki herkes "Kaan, Artemis'i takip ederek geldi" görür, Artemis hâlâ odadaysa. Eski APK'lar profilde odayı göstermez ve girişte yine "X odaya girdi" yazar. **Telefonda denenmeli:** satır, ses sunucusunun (LiveKit 1.9.1) giriş anahtarındaki katılımcı özelliğine dayanıyor; bilgisayarda değil, gerçek iki telefonla denenmeli.
 
+## Profil izleri: 💩 Kaka ve 💧 Su (yeni APK)
+
+- **Kutlama rafı:** 💩 Kaka (999 jeton) alıcının profil fotoğrafında biraz pislik ve küçük bir 💩 bırakır; 💧 Su (1.999 jeton) temizler, elması temizlenen kişiye gider. İz 24 saat kalır (Canlı ayarlar › Profil izleri), ikinci Kaka süreyi yeniden başlatır. Temiz profile Su düz hediyedir. Ayrıntı: [`PROFIL_IZLERI.md`](PROFIL_IZLERI.md).
+- **Nerede:** profil fotoğrafı, odadaki kişi kartı, mikrofon koltuğu (çerçevenin altında). İz düşerken fotoğrafa çarpar, Su gelince su sıçrar ve leke akıp gider.
+- **Alıcıya:** odada "Ali sana 💩 attı; 24 saat kalır ya da biri 💧 gönderene kadar", oda dışında aynı cümle bildirim olarak; kendi profilinde kimin bıraktığı ve ne zaman gideceği yazar.
+- **İstemeyen:** Ayarlar › Gizlilik › "Profilime iz bırakılmasın". Açınca izi gider, Kaka ona jeton düşmeden reddedilir; hediye panelinde o kişi seçiliyse Kaka soluk görünür.
+- **Eski APK:** Kaka ve Su görünmez, izleri çizmez, Gizlilik'te seçenek yok. Sunucu kuralları (reddetme dahil) her uygulamaya işler.
+- **Panel:** hediye formunda "Profil izi" ve kişinin izlerini kaldırma için sunucu hazır; panel sayfaları henüz yok.
+- **Telefonda denenmeli:** iki telefonla odada Kaka ve Su (koltuk, sohbet satırı, su sıçraması), oda dışından Kaka bildirimi, Gizlilik'te kapatınca Kaka'nın soluklaşması.
+
 ## Depo (R2): kuruldu, az yer kaplıyor
 
 - **Kurulum:** Anahtarlar 9 Kasım'da girildi, sunucuya yazıldı. Fotoğraf ve şarkı yükleme açık.

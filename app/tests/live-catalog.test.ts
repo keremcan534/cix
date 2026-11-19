@@ -46,10 +46,10 @@ describe('Canlı katalog: hediye rafı', () => {
     assert.deepEqual(visibleGifts(GIFTS, extra), [GIFTS.find((g) => g.id === 'g6')]);
   });
 
-  test('boş sunucu tablosu (eski sunucu gibi): şimdilik kapalı 41 dışındaki 32 hediyenin hepsi', () => {
+  test('boş sunucu tablosu (eski sunucu gibi): şimdilik kapalı 41 dışındaki 34 hediyenin hepsi', () => {
     const c = parseLiveCatalog(body());
-    assert.equal(GIFTS.length, 73);
-    assert.equal(visibleGifts(GIFTS, c).length, 32);
+    assert.equal(GIFTS.length, 75);
+    assert.equal(visibleGifts(GIFTS, c).length, 34);
     assert.equal(c.packs.length, 9);
   });
 
@@ -120,7 +120,7 @@ describe('Canlı katalog: çevirme kuru', () => {
     assert.equal(liveRules(parseLiveCatalog({ gifts: [] })), RULES, 'exchange yok (eski sunucu)');
     assert.equal(liveRules(null), RULES);
     // Even a hand-made catalog with a bad rate (not from parseLiveCatalog) falls back.
-    const bad: LiveCatalog = { v: 1, giftIds: null, packs: [], campaign: null, usdTry: 498, fx: null, remote: [], shelf: null, app: {}, emoji: null, levels: null, shop: null, guard: null, bonds: null, familyThemes: null, rooms: null };
+    const bad: LiveCatalog = { v: 1, giftIds: null, packs: [], campaign: null, usdTry: 498, fx: null, remote: [], shelf: null, app: {}, emoji: null, levels: null, shop: null, guard: null, bonds: null, familyThemes: null, rooms: null, marks: null };
     assert.equal(liveRules(bad), RULES);
     assert.equal(validRate(40), true);
     assert.equal(validRate(75.0001), false);
@@ -202,17 +202,17 @@ describe('Canlı katalog: telefondaki kopya', () => {
     const back = parseSavedLiveCatalog(JSON.stringify({ ...c, fetchedAt: NOW }));
     assert.deepEqual(back, { catalog: c, fetchedAt: NOW });
     assert.equal(c.v, 12);
-    assert.equal(c.giftIds?.length, 72);
+    assert.equal(c.giftIds?.length, 74);
   });
 
   test('bozuk kopya hiç kullanılmaz; bozuk alanlar derlenmiş değere döner', () => {
     for (const raw of [null, '', '{', '42', '[]', 'null']) assert.equal(parseSavedLiveCatalog(raw), null, String(raw));
     const back = parseSavedLiveCatalog(JSON.stringify({ v: -3, giftIds: 'g1', packs: [{ productId: 'kötü' }], campaign: { percent: 900 }, usdTry: 498, fetchedAt: 'dün' }));
-    assert.deepEqual(back, { catalog: { v: 0, giftIds: null, packs: [], campaign: null, usdTry: null, fx: null, remote: [], shelf: null, app: {}, emoji: null, levels: null, shop: null, guard: null, bonds: null, familyThemes: null, rooms: null }, fetchedAt: 0 });
+    assert.deepEqual(back, { catalog: { v: 0, giftIds: null, packs: [], campaign: null, usdTry: null, fx: null, remote: [], shelf: null, app: {}, emoji: null, levels: null, shop: null, guard: null, bonds: null, familyThemes: null, rooms: null, marks: null }, fetchedAt: 0 });
   });
 
   test('eski sunucu: v, kampanya ve kur yok; paketler yine okunur', () => {
     const c = parseLiveCatalog({ gifts: [...(server.GIFTS as Map<string, ServerGift>).values()], packs: [{ id: 'p1', productId: 'coins_1000', coins: 1000, firstBonus: 1000 }] });
-    assert.deepEqual(c, { v: 0, giftIds: ids([...(server.GIFTS as Map<string, ServerGift>).values()]), packs: [{ productId: 'coins_1000', coins: 1000, firstBonus: 1000 }], campaign: null, usdTry: null, fx: null, remote: [], shelf: null, app: {}, emoji: null, levels: null, shop: null, guard: null, bonds: null, familyThemes: null, rooms: null });
+    assert.deepEqual(c, { v: 0, giftIds: ids([...(server.GIFTS as Map<string, ServerGift>).values()]), packs: [{ productId: 'coins_1000', coins: 1000, firstBonus: 1000 }], campaign: null, usdTry: null, fx: null, remote: [], shelf: null, app: {}, emoji: null, levels: null, shop: null, guard: null, bonds: null, familyThemes: null, rooms: null, marks: null });
   });
 });

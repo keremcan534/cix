@@ -82,6 +82,8 @@ describe('Gizlilik ayarları', () => {
       autoOpener: true,
       autoOpenerSeen: false,
       autoSend: true,
+      // Profil izleri (profile-marks.mjs): others may leave a mark until I say no.
+      profileMarks: true,
     });
     const p = await setPrivacy(a.session, { showOnline: false, dmFrom: 'mutual' });
     assert.equal(p.showOnline, false);

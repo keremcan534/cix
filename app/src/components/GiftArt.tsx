@@ -52,6 +52,9 @@ const ART: Record<string, Art> = {
   p8: { sm: require('../../assets/gifts/192/hediye-terlik-at.png'), lg: require('../../assets/gifts/512/hediye-terlik-at.png') },
   p9: { sm: require('../../assets/gifts/192/hediye-konfeti-topu.png'), lg: require('../../assets/gifts/512/hediye-konfeti-topu.png') },
   p10: { sm: require('../../assets/gifts/192/hediye-ask-oku.png'), lg: require('../../assets/gifts/512/hediye-ask-oku.png') },
+  // Profil izleri (drawn by scripts/mark-art.py).
+  k1: { sm: require('../../assets/gifts/192/hediye-kaka.png'), lg: require('../../assets/gifts/512/hediye-kaka.png') },
+  k2: { sm: require('../../assets/gifts/192/hediye-su.png'), lg: require('../../assets/gifts/512/hediye-su.png') },
   c1: { sm: require('../../assets/gifts/192/hediye-can-dostum.png'), lg: require('../../assets/gifts/512/hediye-can-dostum.png') },
   c2: { sm: require('../../assets/gifts/192/hediye-dilek-kavanozu.png'), lg: require('../../assets/gifts/512/hediye-dilek-kavanozu.png') },
   c3: { sm: require('../../assets/gifts/192/hediye-masal-kalesi.png'), lg: require('../../assets/gifts/512/hediye-masal-kalesi.png') },

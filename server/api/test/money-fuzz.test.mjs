@@ -41,7 +41,8 @@ describe('Para: aynı anda rastgele işlemler', () => {
     for (const p of people) await ok(call('POST', '/api/wallet/test-topup', { amount: 10000, ref: rnd(6) }, p.session), 'yükleme');
     const room = (await ok(call('POST', '/api/rooms', { title: `Para ${rnd(2)}` }, people[0].session), 'oda')).room.id;
     // The shelf's gifts anyone may send (most are paused or for VIPs): Roket 1.999, and the like.
-    const gifts = (await ok(call('GET', '/api/catalog?gifts=2'), 'katalog')).gifts.filter((g) => !g.minSvip && g.price <= 3000);
+    // Kaka and Su too (marks=1): a profile mark written, ended or cleaned in the gift's transaction (profile-marks.mjs).
+    const gifts = (await ok(call('GET', '/api/catalog?gifts=2&marks=1'), 'katalog')).gifts.filter((g) => !g.minSvip && g.price <= 3000);
     assert.ok(gifts.length >= 1);
     const shop = [['fr-neon', 150], ['en-sparkle', 200], ['fr-silver', 800]];
     const other = (u) => {
@@ -61,6 +62,8 @@ describe('Para: aynı anda rastgele işlemler', () => {
         const g = pick(gifts);
         return ['hediye', 'POST', '/api/gifts/send', { to: other(u).user.id, giftId: g.id, count: 1, price: g.price, place: pick(['profile', 'chat']), ref: rnd(6) }, u.session];
       }],
+      // Profil izleri: refusing marks (a Kaka to them is refused, their marks come off in a transaction of their own).
+      [2, async (u) => ['iz tercihi', 'PATCH', '/api/me/privacy', { profileMarks: random() < 0.5 }, u.session]],
       [6, async (u) => ['test hediyesi', 'POST', '/api/wallet/gift', { to: other(u).user.id, amount: 1 + Math.floor(random() * 500), ref: rnd(6) }, u.session]],
       [8, async (u) => ['çevir', 'POST', '/api/wallet/exchange', { diamonds: pick([100, 500, 1000]), ref: rnd(6) }, u.session]],
       [5, async (u) => ['bağ isteği', 'POST', '/api/bonds/request', { to: other(u).user.id, kind: pick(['kardes', 'kanka']), ref: rnd(6) }, u.session]],
