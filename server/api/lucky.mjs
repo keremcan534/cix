@@ -2,9 +2,15 @@
 //
 //   GET  /api/lucky                                          → { version, gifts, announceFrom, share, counts, needLevel,
 //                                                               allowed, minAge, gameCoins, mine }
-//   POST /api/lucky/send { giftId, to: [ids], count, room?, ref, named? } → { send, user, replay }
-//   GET  /api/admin/lucky                                    → { config, version, updatedAt, stats, recent, winners } (admins)
+//        each gift also { open, since, icon, fx }: since, the version its price and odds are as now from; icon and fx,
+//        its own picture and video from the panel (lucky-art.mjs; null: none)
+//   POST /api/lucky/send { giftId, to: [ids], count, room?, ref, named?, price?, version? } → { send, user, replay }
+//        price / version: what a newer app showed (the package's price, GET /api/lucky's version): a moved value is a
+//        409 price_changed / odds_changed and nothing moves (lucky-rules.mjs checkShownLucky); an older app sends none
+//   GET  /api/admin/lucky                                    → { config, version, updatedAt, stats, recent, winners,
+//                                                               art, artLimits, convert, svga, storage }          (admins)
 //   POST /api/admin/lucky/config { config, version }         → { config, version, updatedAt }                       (admins)
+//   POST /api/admin/lucky/art, /art/remove, /fetch           → a package's icon and video (lucky-art.mjs)          (admins)
 //
 // A send is `count` gifts of one package to each recipient. The sender pays price × count for each (paid coins
 // only, as any gift). Each recipient gets SHARE (20 %) of that as diamonds, a gift like any other: diamond locks,
@@ -15,7 +21,10 @@
 // Open from Cömertlik Lv.2 and 18 years, checked on every send, like Rüzgâr Gülü. A package takes no new sends
 // while the rewards paid today across the platform plus its top reward would pass the daily limit.
 // The odds a send was drawn with are stored on it; an admin's later edit never changes an old result. Every
-// edit is audited (sanction_audit_logs, action lucky_config).
+// edit is audited: audit_events 'lucky.config' with the settings before and after and the panel user (and, as before,
+// sanction_audit_logs action lucky_config with a summary). Adding a package (up to 20, Güncelleme 7 madde 10) or taking
+// one out is a save like any other: the version grows, phones read the packages again when the sheet opens, and a
+// send of a package that is gone is refused (400, code lucky_closed) before anything moves.
 // A win is announced to everyone with the app open (live-line.mjs lineWin, the banner on top of every room) from the
 // live setting lucky_announce_min_coins up (0: every win); with the sender's name only when the send says `named`.
 import crypto from 'node:crypto';
@@ -23,17 +32,20 @@ import crypto from 'node:crypto';
 import { recordIncome } from './agency-lib.mjs';
 import { addBondCoins } from './bonds.mjs';
 import { GIFT_COUNTS } from './catalog.mjs';
-import { HttpError, REF, ageOf, auth, blockedBetween, db, limit, readJson, selfUser, tx, userId } from './core.mjs';
+import { HttpError, REF, ageOf, auth, blockedBetween, clientIp, db, filesOut, limit, readJson, selfUser, tx, userId } from './core.mjs';
 import { ROOM, announceGift, liveKitRoom } from './gifts.mjs';
-import { DEFAULT_CONFIG, MIN_AGE, ODDS_TOTAL, SHARE, checkConfig, drawMult, maxMult } from './lucky-rules.mjs';
+import { DEFAULT_CONFIG, MIN_AGE, ODDS_TOTAL, SHARE, checkConfig, checkShownLucky, drawMult, maxMult, shownOf, sinceOf, withSince } from './lucky-rules.mjs';
+import { luckyArtAdmin, luckyArtOf, luckyArtRoutes, refreshLuckyArt } from './lucky-art.mjs';
 import { announceRoom } from './live.mjs';
 import { lineWin } from './live-line.mjs';
 import { live } from './live-settings.mjs';
+import { panelDetail } from './panel.mjs';
 import { scorePkGift } from './pk.mjs';
 import { roomLevel } from './rooms.mjs';
 import { announceBoss, bossGift } from './boss-seat.mjs';
 import { fuelRocket, launchRockets } from './room-rocket.mjs';
 import { audit } from './sanctions.mjs';
+import { lockSendAccounts } from './send-locks.mjs';
 import { creditCoins, giftCoins, spendCoins } from './wallet.mjs';
 import { casinoNeed, wealthPoints } from './wheel.mjs';
 
@@ -119,7 +131,7 @@ export const luckyRoutes = {
     const { config } = cur;
     return {
       version: cur.version,
-      gifts: config.gifts.filter((g) => g.enabled).map((g) => ({ ...g, open: paid + g.price * maxMult(g) <= config.dailyPayoutLimit })),
+      gifts: config.gifts.filter((g) => g.enabled).map((g) => ({ ...g, since: sinceOf(g, cur.version), open: paid + g.price * maxMult(g) <= config.dailyPayoutLimit, ...luckyArtOf(g.id) })),
       announceFrom: config.announceFrom,
       share: SHARE,
       counts: GIFT_COUNTS,
@@ -145,6 +157,8 @@ export const luckyRoutes = {
     const room = b.room === undefined || b.room === null ? null : String(b.room);
     if (room !== null && !ROOM.test(room)) throw new HttpError(400, 'Geçersiz oda');
     const { ref, count } = b;
+    // What a newer app showed (checked once the send is known not to be a replay).
+    const shown = shownOf(b);
     // The ledger's idempotency key (user, currency, ref) is shared by every wallet feature: these rows carry
     // "lucky:" (a colon no client ref can hold), so a ref used elsewhere neither breaks a send nor looks like one.
     const lref = `lucky:${ref}`;
@@ -167,15 +181,15 @@ export const luckyRoutes = {
     let gift;
     try {
       row = await tx(async (c) => {
-        // Every account this send touches, locked in id order so two people gifting each other can't deadlock.
-        const ids = [me.id, ...to];
-        const locked = await c.query('SELECT id FROM users WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL ORDER BY id FOR UPDATE', [ids]);
-        if (locked.rowCount < ids.length) throw new HttpError(404, 'Alıcı bulunamadı');
+        // Every account this send touches (the room owner's too: room XP below; and what the sender's coin lots point
+        // at, since a lot is written twice here), locked in id order so two sends at once can't deadlock (send-locks.mjs).
+        if (!(await lockSendAccounts(c, [me.id, ...to], liveKitRoom(room)?.slice(4), { rewrites: true }))) throw new HttpError(404, 'Alıcı bulunamadı');
         if ((await c.query('SELECT 1 FROM lucky_sends WHERE user_id = $1 AND ref = $2', [me.id, ref])).rowCount) throw Object.assign(new Error('replay'), { code: '23505' });
         const cur = await current(c);
         announceFrom = cur.config.announceFrom;
         gift = cur.config.gifts.find((g) => g.id === b.giftId);
-        if (!gift || !gift.enabled) throw new HttpError(400, 'Bu Şanslı hediye şu an kapalı');
+        if (!gift || !gift.enabled) throw Object.assign(new HttpError(400, 'Bu Şanslı hediye şu an kapalı'), { extra: { code: 'lucky_closed', giftId: b.giftId } });
+        checkShownLucky(gift, shown, cur.version);
         if ((await paidToday(c)) + gift.price * maxMult(gift) > cur.config.dailyPayoutLimit) throw new HttpError(409, 'Günlük ödül limiti doldu; bu hediye yarın yeniden açılır');
 
         const cost = gift.price * count * to.length;
@@ -238,11 +252,17 @@ export const luckyRoutes = {
     const lkRoom = liveKitRoom(room);
     if (lkRoom) {
       const best = Number(row.best_mult);
+      const icon = luckyArtOf(gift.id).icon;
       announceGift(lkRoom, {
         type: 'lucky',
         giftId: gift.id,
         name: gift.name,
         emoji: gift.emoji,
+        // The package's own icon (lucky-art.mjs; null: the app's picture or the emoji), at the address phones load it
+        // (core.mjs filesOut), and its price: a newer app draws and counts a package it hasn't read yet. An older app
+        // reads neither.
+        icon: icon ? filesOut(icon) : null,
+        price: gift.price,
         count,
         from: me.id,
         to,
@@ -281,19 +301,22 @@ export const luckyRoutes = {
       stats: { today: num(today), total: num(total) },
       recent: recent.rows.map(withName),
       winners: winners.rows.map(withName),
+      // Each package's icon and video (lucky-art.mjs), and what an upload may be.
+      ...(await luckyArtAdmin(cur.config.gifts.map((g) => g.id))),
     };
   },
 
   async 'POST /api/admin/lucky/config'(req) {
     const u = await admin(req);
     const b = await readJson(req);
-    const config = checkConfig(b.config);
-    return tx(async (c) => {
+    const checked = checkConfig(b.config);
+    const out = await tx(async (c) => {
       // One save at a time; a save made on an older copy of the settings is refused instead of undoing the other.
       await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', ['lucky_config']);
       const cur = await current(c);
       if (b.version !== cur.version) throw new HttpError(409, 'Ayarlar bu arada değişti; yenileyip tekrar dene');
       const version = cur.version + 1;
+      const config = { ...checked, gifts: withSince(checked.gifts, cur.config, cur.version, version) };
       const r = await c.query(
         `INSERT INTO lucky_config (id, config, version, updated_by, updated_at) VALUES (1, $1, $2, $3, now())
          ON CONFLICT (id) DO UPDATE SET config = EXCLUDED.config, version = EXCLUDED.version, updated_by = EXCLUDED.updated_by, updated_at = now()
@@ -302,7 +325,17 @@ export const luckyRoutes = {
       );
       const summary = config.gifts.map((g) => ({ id: g.id, price: g.price, enabled: g.enabled, top: maxMult(g) }));
       await audit(c, { actor: u.id, role: u.role, action: 'lucky_config', detail: { version, gifts: summary, dailyPayoutLimit: config.dailyPayoutLimit, announceFrom: config.announceFrom } });
+      await c.query("INSERT INTO audit_events (actor, action, target, detail, ip) VALUES ($1, 'lucky.config', NULL, $2, $3)", [
+        u.id,
+        JSON.stringify({ before: { version: cur.version, ...cur.config }, after: { version, ...config }, ...panelDetail(u) }),
+        clientIp(req),
+      ]);
       return { config, version, updatedAt: r.rows[0].updated_at };
     });
+    // The packages on sale decide which videos the catalog lists (lucky-art.mjs).
+    await refreshLuckyArt().catch((e) => console.error('lucky art refresh', String(e?.message ?? e).slice(0, 200)));
+    return out;
   },
+
+  ...luckyArtRoutes,
 };

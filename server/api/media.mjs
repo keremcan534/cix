@@ -358,7 +358,9 @@ async function deleteKeys(keys) {
     // A gift's icon, video, source or refused video's preview stays while a gift that isn't deleted holds it
     // (custom-gifts.mjs clears it first). concat_ws skips the empty ones: an app's own gift changed by staff may have
     // no icon of its own, and a plain || would make the whole text null.
-    const giftFiles = "SELECT 1 FROM custom_gifts WHERE deleted_at IS NULL AND position($1 in concat_ws(' ', icon_url, video_url, job_source, job_preview)) > 0 LIMIT 1";
+    // A Şanslı package's (lucky-art.mjs) the same way: the panel may give one file to both.
+    const giftFiles = `SELECT 1 FROM custom_gifts WHERE deleted_at IS NULL AND position($1 in concat_ws(' ', icon_url, video_url, job_source, job_preview)) > 0
+                       UNION ALL SELECT 1 FROM lucky_art WHERE position($1 in concat_ws(' ', icon_url, video_url, job_source, job_preview)) > 0 LIMIT 1`;
     if (key.startsWith('gift') && (await db.query(giftFiles, [key])).rowCount) continue;
     const res = await fetch(signed('DELETE', key), { method: 'DELETE', signal: AbortSignal.timeout(10_000) });
     // 404: already gone, which is what was wanted.

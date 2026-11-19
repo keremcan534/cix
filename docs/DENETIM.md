@@ -19,6 +19,14 @@ modunda olması, hata takibi olmaması ve kırık kodun birleşmeden önce yakal
   şans oyunundan gerçek paraya giden bir yol var. Google Play bunu "gerçek paralı kumar" sayar (lisans ve onay ister);
   Türkiye'de de lisans gerekir. Kodda varsayılan olarak **açık** (Cömertlik Lv.2 ve 18 yaş şartıyla). Panelin "Şanslı
   hediye ayarı" sayfasından paket paket kapatılabiliyor.
+- **Şanslı hediye genişledi (19 Kasım 2026, sahip kararı, hukuk riski açık):** Sahipler avukat görüşünü beklemeden
+  panelden **yeni Şanslı paketi** eklenmesini (en çok 20 paket; her birinin adı, emojisi, fiyatı, olasılık tablosu,
+  açık/kapalı) ve her pakete **ikon ve video** verilmesini istedi; yapıldı (Güncelleme 7 madde 10,
+  [`LUCKY_HEDIYE.md`](LUCKY_HEDIYE.md)). Yeni oyun türü yok, kazanç yine normal jeton. Bu, satın alınan jetonla oynanan
+  ve nakde dönebilen şans özelliğini **genişletir**: daha çok paket, daha çekici gösterim. Aşağıdaki öneri ve avukat
+  sorusu aynen geçerli; karar ve risk sahiplerindir. Yayından önce avukat görüşü alınmalı, gerekirse paketler panelden
+  kapatılır. Oyun ekranlarında kasa payı ya da kazanç tutarı yazmaz (Güncelleme 7 madde 6); yalnız nasıl oynanır ve
+  olasılık tablosu.
 - **Oyun Salonu** kazancı ayrı oyun jetonuna gidiyor (`casino.mjs`, `game_coins`), bu daha güvenli. Ama bahis satın
   alınan jetonla da yapılabiliyor. Varsayılan olarak yalnız yöneticilere açık. Kasım 2026'da Yörünge canlı ve çok
   oyunculu oldu (`rocket-live.mjs`, herkes aynı roketi izler): aynı anahtarın arkasında, ama kasa payı canlı ayardan
@@ -172,6 +180,26 @@ Ayrıntı: [`BAGLAR.md`](BAGLAR.md). Bağ hediyesi bağı olana normal hediye ol
 - **Para:** bağ hediyesinin tekrarı her hediye gibi `gifts/send`'den gider (fiyat ekrandaki, istek kimliği, kilit sırası aynı). Yazılırken, aynı anda bağ bitirme ve hediye testinde eski bir kilitlenme bulundu ve düzeltildi: bağı bitirme hesap kilitlerini almadan bağ satırını yazıyordu, hediye ise hesapları kilitleyip bağ satırını bekliyordu (Kasım dersiyle aynı: `ended_by` hesap satırını denetler). Artık bitirme de önce iki hesabı, sonra bağı kilitler. Para karıştırma testine bağ hediyesi ve bitirme eklendi.
 - **Bağ Yüzüğü (Çift) panelden gizlenemez:** rafta değil (katalogda `bag-cift` yok), tekrarı yalnız profildeki düğmeden ve uygulamanın fiyatıyla gider. Gizlemek ya da fiyatını değiştirmek gerekirse önce rafa eklenmeli (iki tarafta derlenmiş katalog değişikliği, yeni APK).
 - **Yük:** gece işi her etkin bağ satırına günde bir kez yazar (500'erli, hesap kilidi yok); oda listesi `among` artık kesilmeden, kişi başına endeksle okur; profil 50'şer sayfalanır. Bağ sayısı yüz binleri geçerse gece işinin süresi `bond drop:` kaydından izlenmeli. Yük testi bu sürümle tekrarlanmadı.
+
+## Şanslı hediye: yeni paket, ikon ve video (19 Kasım 2026, sahip kararı)
+
+Hukuk riski Kritik §1'de. Bu işte ayrıca:
+
+- **Gösterilen fiyat ve olasılık (kapandı, yeni APK):** Şanslı gönderimi önce ekranda görülen fiyatı ve ayar sürümünü
+  taşımıyordu: yönetici sayfa açıkken fiyatı ya da olasılıkları değiştirirse kişi görmediği fiyatla ödüyor, görmediği
+  oranlarla çekiliyordu (Google Play "önceden göster" şartı). Yeni APK ikisini de gönderir; değiştiyse 409 ve jeton
+  düşmez. **Eski APK'lar için açık kalıyor** (iki alanı göndermezler): yeni APK dağıtılınca Canlı ayarlar › Zorunlu sürüm
+  yükseltilmeli; o zamana kadar paketin fiyatını ve olasılıklarını yoğun saatlerde değiştirmemek iyi olur.
+- **Ayar kayıtları denetime (kapandı):** Şanslı ayarı kayıtları artık `audit_events`'te önceki ve sonraki haliyle ve
+  panel kullanıcısının adıyla.
+- **İki kilitlenme (kapandı, para testi buldu):** Şanslı gönderimi rastgele para testine eklenince iki gerçek hata çıktı:
+  odada gönderilen hediye ve Şanslı hediye oda sahibinin hesabını sıra dışı kilitliyordu; Şanslı gönderimi aynı jeton
+  partisine iki kez yazdığı için o partinin satın alımını ve Jeton Noktası'nı da bekliyordu. Kullanıcı "sunucu hatası"
+  görüyordu, para kaymıyordu (işlem geri alınıyordu). Artık bunlar baştan, sırayla kilitleniyor (`server/api/send-locks.mjs`).
+- **Panel sayfası (Claude, sonra):** "Yeni paket" formu, %100'e tamamlanan olasılık düzenleyici ve ikon/video yükleme
+  finans paneli deposunda yapılmadı; uçlar `PANEL_ROUTES`'ta hazır.
+- **Yük:** videolar öteki hediye videoları gibi API sunucusundan iner (CDN yok, "Medya dağıtımı"); yalnız satıştaki
+  paketlerin videosu ve yalnız yeni APK'ya listelenir.
 
 ## Mesaj bildirimi varsayılanı (18 Kasım 2026, sahip kararı)
 

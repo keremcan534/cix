@@ -1007,7 +1007,12 @@ export const wheelSpin = (tier: string, count: number, ref = newRef()) => call<{
 // Şanslı hediyeler (server/api/lucky.mjs): the server draws and pays; rewards are game coins, the recipients get
 // their share as diamonds. `draws`: one multiplier per gift, recipient by recipient (`count` each).
 export type ServerLuckyTier = { mult: number; weight: number };
-export type ServerLuckyGift = { id: string; name: string; emoji: string; price: number; enabled: boolean; tiers: ServerLuckyTier[]; open?: boolean };
+/** `since`: the settings' version its price and odds are as now from; `icon` / `fx`: its own picture and video from the
+ *  panel (server/api/lucky-art.mjs; null: none). The three are newer servers' (lib/lucky-art reads them defensively). */
+export type ServerLuckyGift = {
+  id: string; name: string; emoji: string; price: number; enabled: boolean; tiers: ServerLuckyTier[]; open?: boolean;
+  since?: number; icon?: string | null; fx?: { url: string; bytes: number; ms: number } | null;
+};
 export type ServerLuckySend = {
   id: number; ref: string; giftId: string; room: string | null; count: number; to: string[]; price: number; cost: number; shared: number;
   payout: number; best: number; draws: number[]; configVersion: number; odds: ServerLuckyTier[]; at: string;
@@ -1017,9 +1022,13 @@ export type ServerLucky = {
   minAge: number; gameCoins: number; mine: ServerLuckySend[];
 };
 export const lucky = () => call<ServerLucky>('GET', '/api/lucky');
-/** `named`: a win may carry my name and photo to every room (Ayarlar › "Kazançlarımda adım görünsün"). */
-export const luckySend = (giftId: string, to: string[], count: number, room?: string, ref = newRef(), named = false) =>
-  call<{ send: ServerLuckySend; user: ServerUser; replay: boolean }>('POST', '/api/lucky/send', { giftId, to, count, room, ref, named });
+/**
+ * `named`: a win may carry my name and photo to every room (Ayarlar › "Kazançlarımda adım görünsün"). `shown`: the
+ * package's price this phone showed and the settings' version it read them at: a moved one is a 409 price_changed /
+ * odds_changed and nothing moves (server/api/lucky-rules.mjs checkShownLucky).
+ */
+export const luckySend = (giftId: string, to: string[], count: number, room?: string, ref = newRef(), named = false, shown?: { price: number; version: number }) =>
+  call<{ send: ServerLuckySend; user: ServerUser; replay: boolean }>('POST', '/api/lucky/send', { giftId, to, count, room, ref, named, ...shown });
 export type ServerLuckyConfig = { gifts: ServerLuckyGift[]; dailyPayoutLimit: number; announceFrom: number };
 export type ServerLuckyStats = { sends: number; spent: number; paid: number; shared: number };
 export type ServerLuckyAdminSend = ServerLuckySend & { sender: { id: string; name: string } };

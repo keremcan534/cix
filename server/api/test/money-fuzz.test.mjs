@@ -1,5 +1,5 @@
 // Many people moving money at once, in random order (docs/PARA_DENETIMI.md): top-ups, purchases, gifts, Çevir,
-// bonds (requests, answers, bond gifts again, ends), Şanslı çanta, paid messages waiting for the streamer's answer (answers, quick replies, time running out), the shop, Oyun Salonu (Canlı Yörünge's fuel and escapes too), Jeton Noktası sales and diamond
+// bonds (requests, answers, bond gifts again, ends), Şanslı çanta, Şanslı hediye (a stale sheet's price and version too), paid messages waiting for the streamer's answer (answers, quick replies, time running out), the shop, Oyun Salonu (Canlı Yörünge's fuel and escapes too), Jeton Noktası sales and diamond
 // sales, store refunds, with some
 // requests sent twice at the same moment. Whatever the order, no request may fail with a server error, and the
 // harness's money checks after this file (money-check.mjs) must find every coin and diamond where the ledger says.
@@ -50,6 +50,10 @@ describe('Para: aynı anda rastgele işlemler', () => {
         if (x !== u) return x;
       }
     };
+    // Şanslı hediye is for adults (lucky.mjs); Cömertlik Lv.2 comes with what they spend here.
+    await h.sql.query("UPDATE users SET birth_date = '1990-01-01' WHERE id = ANY($1::uuid[])", [people.map((x) => x.user.id)]);
+    /** What Şanslı sheets showed (GET /api/lucky): its version and the packages' prices; an older one is a sheet left open. */
+    const luckySeen = [];
     const bondIds = async () => (await q("SELECT id FROM bonds WHERE status = 'pending'")).map((r) => Number(r.id));
     // Bond gifts again (bonds.mjs): an ordinary gift between two who have that bond, at the price the shelf shows.
     const bondPrice = Object.fromEntries((await ok(call('GET', '/api/catalog?gifts=2&family=1'), 'katalog')).gifts.filter((g) => g.id.startsWith('bag-')).map((g) => [g.id, g.price]));
@@ -63,7 +67,9 @@ describe('Para: aynı anda rastgele işlemler', () => {
       [6, async (u) => ['satın alma', 'POST', '/api/wallet/purchase', { platform: 'test', productId: pick(['coins_1000', 'coins_5000']), transactionId: rnd(8) }, u.session]],
       [16, async (u) => {
         const g = pick(gifts);
-        return ['hediye', 'POST', '/api/gifts/send', { to: other(u).user.id, giftId: g.id, count: 1, price: g.price, place: pick(['profile', 'chat']), ref: rnd(6) }, u.session];
+        // Half in the room: its owner's room XP is a third account the gift locks (send-locks.mjs).
+        const where = random() < 0.5 ? { room } : { place: pick(['profile', 'chat']) };
+        return ['hediye', 'POST', '/api/gifts/send', { to: other(u).user.id, giftId: g.id, count: 1, price: g.price, ...where, ref: rnd(6) }, u.session];
       }],
       [6, async (u) => ['test hediyesi', 'POST', '/api/wallet/gift', { to: other(u).user.id, amount: 1 + Math.floor(random() * 500), ref: rnd(6) }, u.session]],
       [8, async (u) => ['çevir', 'POST', '/api/wallet/exchange', { diamonds: pick([100, 500, 1000]), ref: rnd(6) }, u.session]],
@@ -108,6 +114,22 @@ describe('Para: aynı anda rastgele işlemler', () => {
         return ['mağaza', 'POST', '/api/shop/buy', { sku, price, ref: rnd(6) }, u.session];
       }],
       [6, async (u) => ['oyun', 'POST', '/api/casino/play', { game: 'jackpot', bet: 250, ref: rnd(8) }, u.session]],
+      // Şanslı hediye at what a sheet showed (price and settings' version), now and then a stale one while the admin
+      // re-prices a package: refused (409) with nothing moved, never a server error (Güncelleme 7 madde 10).
+      [5, async (u) => {
+        const [, cur] = await call('GET', '/api/lucky', null, u.session);
+        if (cur?.version) luckySeen.push({ version: cur.version, price: Object.fromEntries(cur.gifts.map((g) => [g.id, g.price])) });
+        const view = random() < 0.3 ? pick(luckySeen) : luckySeen[luckySeen.length - 1];
+        const giftId = pick(['lk1', 'lk2']);
+        return view ? ['şanslı', 'POST', '/api/lucky/send', { giftId, to: [other(u).user.id], count: pick([1, 10]), room, price: view.price[giftId], version: view.version, ref: rnd(8) }, u.session] : null;
+      }],
+      [1, async () => {
+        const [, cur] = await call('GET', '/api/admin/lucky', null, admin.session);
+        const config = structuredClone(cur.config);
+        const g = config.gifts.find((x) => x.id === 'lk2');
+        g.price = g.price === 100 ? 120 : 100;
+        return ['şanslı ayarı', 'POST', '/api/admin/lucky/config', { config, version: cur.version }, admin.session];
+      }],
       // Canlı Yörünge: fuel into the open round, an escape from the one in the air (the screen's read finds the round).
       [4, async (u) => {
         const round = (await call('GET', '/api/casino/rocket', null, u.session))[1]?.round?.id;

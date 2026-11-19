@@ -138,6 +138,7 @@ import { entranceView, entryPlanOf } from '@/lib/room-entrance';
 import { followLine, followedHere } from '@/lib/follow-room';
 import { getLucky, luckyGift, luckyPkPoints, sendLuckyBatch, type LuckyRecord } from '@/lib/lucky';
 import { liveLuckySend, refreshLucky } from '@/lib/live/lucky';
+import { luckyVideoPending, noteLuckyIcon } from '@/lib/lucky-art';
 import { getPk, joinRoomPk, markPkSeen, modeLabel, pkPointsFor, recordGift, reportMismatch, teamOf, usePk } from '@/lib/pk';
 import {
   KICK_BAN_MIN,
@@ -673,7 +674,18 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     const key = `fx-${msgId()}`;
     setFxStage((s) => stageRocket(s, news, { at, held, key }, (r) => r, (p) => (p.kind === 'rocket' ? p : null)));
   };
-  const [luckyFx, setLuckyFx] = useState<LuckyRecord[] | null>(null);
+  // My Şanslı send's result card; `after`: the package whose video plays first (the card waits for it, lib/lucky-art).
+  const [luckyFx, setLuckyFx] = useState<{ records: LuckyRecord[]; after: string | null } | null>(null);
+  /**
+   * A Şanslı package's own video (Yönetim › Şanslı hediye, the catalog's lucky=1 clips) on the stage, in line with the
+   * gifts; true when there is one on the phone to play. None: the flight and the chat line show the send, as before.
+   */
+  const playLuckyFx = (gift: Gift, from: string, toIds: string[], count: number) => {
+    const media = giftVideoOf(gift.id);
+    if (!media) return false;
+    pushFx({ from, what: gift.id, to: Object.fromEntries(toIds.map((u) => [u, count])), each: count, price: gift.price, ms: media.ms || VIDEO_MS, payload: { kind: 'video', gift, media } });
+    return true;
+  };
   // The repeat wheel (components/room/gift-combo): after a send from the gift sheet, the same gift to the same people
   // with the same count, one tap per repeat (×1, ×2, ×3 …), Şanslı or not.
   const [combo, setCombo] = useState<(ComboSpec & { count: number; key: number }) | null>(null);
@@ -2871,10 +2883,14 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   /** A Lucky send another phone made (the server announced it): the gift lines, the flight and a big win. */
   const showLuckyFrom = (from: string, toIds: string[], s: LuckySignal) => {
     const fromName = userById(from).name;
-    const price = luckyGift(s.giftId)?.price ?? 0;
+    // The packet names the package's icon and price (newer servers): one this phone hasn't read is drawn and counted.
+    noteLuckyIcon(s.giftId, s.icon);
+    const price = luckyGift(s.giftId)?.price ?? s.price ?? 0;
     toIds.forEach((to) => logGift(from, to, { id: s.giftId, name: s.name, emoji: s.emoji, price }, s.count));
     if (price) addContrib(from, price * s.count * toIds.length);
     flyGift(s.emoji, s.count, toIds, { x: 36, y: win.height * 0.72 }, s.giftId);
+    // Its video, as a gift's: only with gift effects on (Efekt ayarları, the room's choice), never minimized.
+    if (showFx(price) && visibleRef.current) playLuckyFx({ id: s.giftId, name: s.name, emoji: s.emoji, price }, from, toIds, s.count);
     const toText = toIds.length > 1 ? `${toIds.length} kişiye` : toIds[0] === 'me' ? 'sana' : `${userById(toIds[0]).name} kişisine`;
     addMsg({
       id: `gift:${s.eventId}`,
@@ -3001,7 +3017,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         kind: 'gift',
         text: settings.luckyAnnounce ? `🎉 ${ME.name} Şanslı hediyeden ×${best.mult.toLocaleString('tr-TR')} kazandı! +${reward.toLocaleString('tr-TR')} jeton` : `🎉 Bir kullanıcı Şanslı hediyeden ×${best.mult.toLocaleString('tr-TR')} kazandı!`,
       });
-    setLuckyFx(records);
+    // The package's video first, when it has one and effects are on; the result card comes once it is over.
+    const video = showFx(first.price) && visibleRef.current && playLuckyFx({ id: first.giftId, name: first.giftName, emoji: first.emoji, price: first.price }, 'me', sentTo, count);
+    setLuckyFx({ records, after: video ? first.giftId : null });
     // Some gifts didn't go (the balance ran out): the wheel stops; else it counts this send.
     if (error) stopCombo(spec);
     else countCombo(spec, viaWheel);
@@ -4579,7 +4597,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           onExpire={() => setCombo(null)}
         />
       )}
-      {luckyFx && <LuckyResult key={luckyFx[0].txId} records={luckyFx} still={settings.effectsOff || settings.reduceMotion} onDone={() => setLuckyFx(null)} />}
+      {luckyFx && !(luckyFx.after && luckyVideoPending(fxStage, luckyFx.after)) && (
+        <LuckyResult key={luckyFx.records[0].txId} records={luckyFx.records} still={settings.effectsOff || settings.reduceMotion} onDone={() => setLuckyFx(null)} />
+      )}
       {/* Platform-wide win announcements (every room shows every win). */}
       {visible && !promptUp && <WinBanner top={typing && bagRain ? insets.top + 176 : noticeTop + (entries.now && !entryMedia ? 66 : 0)} still={settings.reduceMotion} />}
       {entries.now &&

@@ -207,7 +207,7 @@ Ayrıntı: [`OTOMATIK_MESAJ.md`](OTOMATIK_MESAJ.md).
 | 25 | Mikrofon değişikliği herkeste aynı | Telefonda denenmeli | |
 | 26 | Küçük mikrofon, büyüyen sohbet | Çalışıyor | |
 | 27 | Rüzgâr Gülü odada | Seviyeyle açılır | Cömertlik Lv.2'de açılır. Düğmesi örnekteki gibi sağ altta |
-| 28 | Uğurlu hediyeler ve yönetimi | Seviyeyle açılır | Cömertlik Lv.2 ve 18 yaş gerekir. Yeni APK'da rafta kazanç tutarı ve kasa ayrıntısı yazmaz, yalnız nasıl oynanır ve olasılık tablosu (Güncelleme 7). Yönetimi: Yönetim sitesinde Uygulama › Şanslı hediye ayarı; yeni APK'da Ayarlar › Yönetim siteyi açar (eski APK'larda Ayarlar › Yönetim › Uğurlu hediyeler, sadece yönetici hesaplar) |
+| 28 | Uğurlu hediyeler ve yönetimi | Seviyeyle açılır | Cömertlik Lv.2 ve 18 yaş gerekir. Yeni APK'da rafta kazanç tutarı ve kasa ayrıntısı yazmaz, yalnız nasıl oynanır ve olasılık tablosu (Güncelleme 7). Yönetimi: Yönetim sitesinde Uygulama › Şanslı hediye ayarı; yeni APK'da Ayarlar › Yönetim siteyi açar (eski APK'larda Ayarlar › Yönetim › Uğurlu hediyeler, sadece yönetici hesaplar). Güncelleme 7 madde 10 (sahip kararı, hukuk sorusu açık): panelden yeni paket eklenebilir, her pakete ikon ve video verilebilir (sunucu hazır; panel sayfası ayrıca yapılacak). Yeni APK ikonu gösterir, kendi gönderiminde önce videoyu sonra sonucu oynatır, gösterdiği fiyat ya da olasılık değiştiyse gönderim reddedilir ve jeton düşmez; eski APK yeni paketi varsayılan resimle gösterir, videoyu oynatmaz. Videolu Şanslı gönderimi telefonda denenmeli |
 
 ## Belge 2: Güncelleme 2
 

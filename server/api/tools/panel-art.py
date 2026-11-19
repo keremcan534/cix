@@ -45,8 +45,9 @@ def write(kind, art, size):
 
 
 def main():
-    # Gifts: the 192 px picture of each catalog gift (the Lucky packages have their own page and are left out).
-    gifts = sources('GiftArt.tsx', r"\n  ([a-z][0-9]{1,3}): \{ sm: require\('([^']+)'\)")
+    # Gifts: the 192 px picture of each catalog gift, and of the app's four Şanslı packages (lk1–lk4: the panel's
+    # Şanslı hediye page shows each next to the icon given instead, server/api/lucky-art.mjs).
+    gifts = sources('GiftArt.tsx', r"\n  ([a-z][0-9]{1,3}|lk[0-9]): \{ sm: require\('([^']+)'\)")
     # Stickers: one PNG each, and the Penguen pack's still frames.
     stickers = sources('ReactionArt.tsx', r"\n  '([a-z0-9-]+)': require\('([^']+\.png)'\)")
     stickers.update(sources('ReactionArt.tsx', r"\n  '([a-z0-9-]+)': \{ sheet: require\('[^']+'\), still: require\('([^']+)'\)"))
