@@ -561,7 +561,10 @@ export type ServerMe = ServerUser & ServerProfile & { role?: string; genderHidde
 export type CityDistance = { km: number; sameCity: boolean };
 /** `followers` / `following`: totals; `oneWay`: the same without the people who follow each other (friends), as the
  *  profile shows them (lib/follow-ties tieCounts; an older server sends none). */
-export type PublicUser = { id: string; name: string } & ServerProfile & { followers: number; following: number; oneWay?: { followers: number; following: number }; isFollowing: boolean; blockedByMe: boolean } & Partial<ProfileMore> & { distance?: CityDistance | null };
+export type PublicUser = { id: string; name: string } & ServerProfile & { followers: number; following: number; oneWay?: { followers: number; following: number }; isFollowing: boolean; blockedByMe: boolean } & Partial<ProfileMore> & { distance?: CityDistance | null } & {
+  /** Asked with `card` (userProfile): their medal ids; unchecked, lib/person-card medalIds reads them. */
+  medals?: unknown;
+};
 export type UserCard = { id: string; name: string; avatarUrl: string | null; publicNo?: string | null };
 /** `level` / `xp`: the owner's room level, earned on the server from gifts in their room. `micCount` / `layoutId`:
  *  the mics and layout the owner or a room admin chose (null = the default). `lockedSeats`: mics the staff locked;
@@ -677,9 +680,19 @@ export type ProfileTies = { agency: { id: string; name: string } | null; family:
  * call, also 404); a malformed answer: null.
  */
 export const lookup = (no: string) => call<unknown>('GET', `/api/lookup?no=${encodeURIComponent(no)}`).then(parseLookup);
-/** `visit`: opened on the profile screen, so it counts as a visit (Profil ziyaretçileri); a person card doesn't. */
-export const userProfile = (id: string, visit = false) =>
-  call<{ user: PublicUser } & Partial<ProfileTies>>('GET', `/api/user?id=${encodeURIComponent(id)}${visit ? '&visit=1' : ''}`).then((r) => ({ ...r.user, agency: r.agency ?? null, family: r.family ?? null }));
+/**
+ * `visit`: opened on the profile screen, so it counts as a visit (Profil ziyaretçileri); a person card doesn't. `card`:
+ * the room's person card, which asks for their medals (`user.medals`) and not for the received-gift count it doesn't
+ * show (server/api/social.mjs `card=1&medals=1`; an older server ignores both). `looks`: their shop look as the server
+ * sent it (unchecked: lib/person-card cardLookOf reads it).
+ */
+export const userProfile = (id: string, visit = false, card = false) =>
+  call<{ user: PublicUser; looks?: unknown } & Partial<ProfileTies>>('GET', `/api/user?id=${encodeURIComponent(id)}${visit ? '&visit=1' : ''}${card ? '&card=1&medals=1' : ''}`).then((r) => ({
+    ...r.user,
+    agency: r.agency ?? null,
+    family: r.family ?? null,
+    looks: r.looks,
+  }));
 /** Someone who opened my profile in the last 7 days. */
 export type ServerVisitor = { id: string; name: string; avatarUrl: string | null; visits: number; lastAt: string };
 /** A visit without who made it (no VIP): how many times and when, to the minute. */

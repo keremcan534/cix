@@ -15,6 +15,7 @@ import { serverNo } from '@/lib/public-no';
 import { putLevels } from '@/lib/live/levels';
 import { putDistance } from '@/lib/live/distances';
 import { extrasPatch, showcaseView, type ExtrasDraft, type ShowcaseView } from '@/lib/profile-more';
+import { cardLookOf, medalIds, type CardLook } from '@/lib/person-card';
 
 // Someone's agency and family as their profile last answered, by server id (the profile pills and sections).
 const ties = new Map<string, api.ProfileTies>();
@@ -36,7 +37,11 @@ export const useTies = (serverId: string | null) => useSyncExternalStore(subscri
  * `followers` / `following` are totals, `oneWay` the profile's Takipçi and Takip (lib/follow-ties tieCounts). The rest
  * (one-way counts, levels, friends, received gifts, staff role, extras, album) is missing from an older server.
  */
-export type SocialCounts = { followers: number; following: number; oneWay?: { followers: number; following: number }; isFollowing: boolean; blockedByMe: boolean } & Partial<api.ProfileMore>;
+export type SocialCounts = { followers: number; following: number; oneWay?: { followers: number; following: number }; isFollowing: boolean; blockedByMe: boolean } & Partial<api.ProfileMore> & {
+  /** Read for the room's person card (`card`): their medal ids (an older server sends none) and their look. */
+  medals?: string[];
+  look?: CardLook | null;
+};
 
 /** My profile as the server keeps it. Empty fields stay empty, so no demo value (a handle, a city) survives. */
 export function meFromServer(u: api.ServerMe): Partial<User> {
@@ -81,10 +86,11 @@ export async function loadMe(localAvatar?: string): Promise<Partial<User>> {
 /**
  * Someone's public profile with their counts. Another person's age, city and interests also update what this
  * phone knows about them (data/mock); `mine`: my own profile, of which only the counts are used. `visit`: opened
- * on the profile screen, so it counts as a visit (their Profil ziyaretçileri).
+ * on the profile screen, so it counts as a visit (their Profil ziyaretçileri). `card`: the room's person card, which
+ * also gets their medals and look (and not the received-gift count, which it doesn't show).
  */
-export async function loadPublicProfile(serverId: string, mine = false, visit = false): Promise<SocialCounts> {
-  const p = await api.userProfile(serverId, visit && !mine);
+export async function loadPublicProfile(serverId: string, mine = false, visit = false, card = false): Promise<SocialCounts> {
+  const p = await api.userProfile(serverId, visit && !mine, card);
   putTies(serverId, p);
   putLevels(serverId, p.levels);
   // "Ankara · 350 km" after their city (lib/live/distances).
@@ -118,7 +124,14 @@ export async function loadPublicProfile(serverId: string, mine = false, visit = 
     ...(p.extras && { extras: p.extras }),
     ...(p.photos && { photos: p.photos }),
     ...(p.levelsHidden && { levelsHidden: p.levelsHidden }),
+    ...(card && cardPart(p.medals, p.looks)),
   };
+}
+
+/** What the card adds: the medals when the server sent them (an older one doesn't), and the look when it is readable. */
+function cardPart(medals: unknown, looks: unknown): Pick<SocialCounts, 'medals' | 'look'> {
+  const ids = medalIds(medals);
+  return { ...(ids && { medals: ids }), look: cardLookOf(looks) };
 }
 
 /** Their Vitrin (gift wall, rides, entry effects, medals, titles) as the server has it, in the app's names. */

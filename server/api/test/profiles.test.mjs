@@ -303,6 +303,42 @@ describe('Başkasının profili', () => {
     assert.deepEqual((await showcase(viewer, star)).titles, []);
   });
 
+  test('kişi kartı: madalyalar yalnız istenince, card=1 hediye toplamını atlar, gizli seviye gizli kalır', async () => {
+    const viewer = await signUp('Kart bakan');
+    const star = await signUp('Kart yıldızı');
+    const people = await Promise.all(Array.from({ length: 20 }, (_, i) => h.account(`Kart kişi ${i}`)));
+    // The week's biggest receiver, gave to 10 people, 20 friends: all three medals the server gives.
+    await q("INSERT INTO gift_events (sender, recipient, gift_id, count, unit_price, total, ref) VALUES ($1, $2, 'g8', 60, 19999, 1199940, $3)", [people[0].user.id, star.user.id, rnd(6)]);
+    for (const p of people.slice(0, 10)) await q("INSERT INTO gift_events (sender, recipient, gift_id, count, unit_price, total, ref) VALUES ($1, $2, 'g1', 1, 10, 10, $3)", [star.user.id, p.user.id, rnd(6)]);
+    for (const p of people) await q('INSERT INTO follows (follower, followee) VALUES ($1, $2), ($2, $1)', [star.user.id, p.user.id]);
+    const read = async (query) => (await ok(call('GET', `/api/user?id=${star.user.id}${query}`, null, viewer.session), 'kart')).user;
+
+    // An older app asks without the flags: the answer is as before (no medals, the received-gift count there).
+    const old = await read('');
+    assert.equal('medals' in old, false, 'eski uygulamaya madalya gitmez');
+    assert.equal(old.giftsReceived, 60);
+    const card = await read('&card=1&medals=1');
+    assert.deepEqual(card.medals, ['md1', 'md4', 'md6']);
+    assert.equal('giftsReceived' in card, false, 'kart hediye toplamını istemez');
+    assert.equal(card.friends, 20);
+    assert.deepEqual(card.medals, (await showcase(viewer, star)).medals, 'Vitrin ile aynı madalyalar');
+    // Someone with none: an empty list, not a missing field.
+    assert.deepEqual((await ok(call('GET', `/api/user?id=${viewer.user.id}&card=1&medals=1`, null, star.session), 'kart')).user.medals, []);
+
+    // A VIP who hides their Yankı level: the card gets null for it, as the profile does.
+    await q('UPDATE users SET svip_xp = 500000 WHERE id = $1', [star.user.id]);
+    await ok(extras(star, { hideCharm: true }), 'gizle');
+    const hidden = await read('&card=1&medals=1');
+    assert.equal(hidden.levels.charm, null, 'gizli Yankı seviyesi gitmez');
+    assert.equal(typeof hidden.levels.wealth, 'number');
+
+    // Someone who blocked me: no card at all.
+    await ok(call('POST', '/api/block', { to: viewer.user.id, block: true }, star.session), 'engel');
+    assert.equal((await call('GET', `/api/user?id=${star.user.id}&card=1&medals=1`, null, viewer.session))[0], 404);
+    // No session: refused.
+    assert.equal((await call('GET', `/api/user?id=${star.user.id}&card=1&medals=1`))[0], 401);
+  });
+
   test('beni engelleyenin profil parçaları açılmaz', async () => {
     const a = await signUp('Engelleyen');
     const b = await signUp('Engellenen');
