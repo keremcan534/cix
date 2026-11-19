@@ -102,6 +102,10 @@ export const PANEL_ROUTES = new Set([
   'POST /api/admin/rocket/config',
   'POST /api/admin/rocket/video',
   'POST /api/admin/lucky/config',
+  // A Şanslı package's icon and video (lucky-art.mjs), a link fetched for them; uploads as a gift's (gifticon, giftvideo, giftsource).
+  'POST /api/admin/lucky/art',
+  'POST /api/admin/lucky/art/remove',
+  'POST /api/admin/lucky/fetch',
   // Canlı ayarlar (live-settings.mjs).
   'GET /api/admin/live-settings',
   'POST /api/admin/live-settings',

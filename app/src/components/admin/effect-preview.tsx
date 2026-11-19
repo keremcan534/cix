@@ -16,6 +16,7 @@ import { COSMETICS } from '@/data/catalog';
 import { fetchFxNow, useFxState } from '@/lib/fx-videos';
 import { fxFileName, type FxVideo } from '@/lib/fx-videos-core';
 import { giftById } from '@/lib/live/catalog-live';
+import { luckyGift } from '@/lib/lucky';
 import { makeStyles, radius, space, useTheme } from '@/theme';
 
 import { alphaVideoAvailable } from '../../../modules/similar-alpha-video';
@@ -28,9 +29,9 @@ export function EffectPreviewPanel({ visible, onClose }: { visible: boolean; onC
   );
 }
 
-/** The name a clip is shown with: its gift's or its entry effect's. */
+/** The name a clip is shown with: its gift's (a Şanslı package's too) or its entry effect's. */
 const labelOf = (v: FxVideo) =>
-  v.kind === 'gift' ? (giftById(v.id)?.name ?? v.id) : (COSMETICS.find((c) => c.kind === 'entry' && c.fx === v.id)?.name ?? v.id);
+  v.kind === 'gift' ? (giftById(v.id)?.name ?? luckyGift(v.id)?.name ?? v.id) : (COSMETICS.find((c) => c.kind === 'entry' && c.fx === v.id)?.name ?? v.id);
 const keyOf = (v: FxVideo) => `${v.kind}:${v.id}`;
 
 function Body({ onClose }: { onClose: () => void }) {
@@ -81,7 +82,7 @@ function Body({ onClose }: { onClose: () => void }) {
                 accessibilityRole="button"
                 accessibilityLabel={`${labelOf(v)} (${kind}) oynat`}
               >
-                {v.kind === 'gift' ? <GiftArt giftId={v.id} emoji="🎁" size={44} /> : <Text style={{ fontSize: 34 }}>🐉</Text>}
+                {v.kind === 'gift' ? <GiftArt giftId={v.id} emoji={luckyGift(v.id)?.emoji ?? '🎁'} size={44} /> : <Text style={{ fontSize: 34 }}>🐉</Text>}
                 {busy ? <ActivityIndicator size="small" color={colors.text} /> : <Ionicons name={on ? 'play-circle' : 'play-circle-outline'} size={20} color={on ? semantic.action : colors.text} />}
                 <Text style={s.chipName}>{labelOf(v)}</Text>
                 <Text style={s.chipKind}>{kind}</Text>

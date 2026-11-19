@@ -346,7 +346,7 @@ const canFitIcon = () => (pillow ??= run(PYTHON, ['-I', '-c', 'import PIL'], { t
  * (tools/icon-fit.py: an optimised PNG, transparency kept). { url: the icon to keep, upload: the file it replaced,
  * to remove once the gift is saved (null: kept as uploaded) }.
  */
-async function checkIcon(url) {
+export async function checkIcon(url) {
   const key = keyOf(url);
   if (!key?.startsWith('gifticon/')) throw new HttpError(400, 'İkonu önce yükle');
   await verifyUpload(url, 'gifticon');

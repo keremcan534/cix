@@ -3,11 +3,14 @@
 // (GIFTS and the Lucky packages), so an admin renaming a gift or editing its emoji keeps its image.
 // A gift with no image (a new catalog entry) keeps its emoji until one is delivered. An admin's gift (Yönetim ›
 // Hediyeler), and one of the app's whose icon was replaced there, is drawn from the icon address the server's catalog
-// gives (lib/live/catalog-live remoteIconOf), one file for both sizes; the phone keeps it in its image cache.
+// gives (lib/live/catalog-live remoteIconOf), one file for both sizes; the phone keeps it in its image cache. A
+// Şanslı package (ids `lk…`) is drawn from the icon the panel gave it (lib/lucky-art luckyIconOf, Güncelleme 7 madde
+// 10) before the app's own picture (lk1–lk4); a package with neither (one the panel added) shows its emoji.
 import { Image, type ImageSourcePropType, type ImageStyle, type StyleProp, type TextStyle } from 'react-native';
 
 import { Text } from '@/components/text';
 import { remoteIconOf } from '@/lib/live/catalog-live';
+import { luckyIconOf } from '@/lib/lucky-art';
 
 type Art = { sm: ImageSourcePropType; lg: ImageSourcePropType };
 const ART: Record<string, Art> = {
@@ -92,15 +95,14 @@ const ART: Record<string, Art> = {
   lk4: { sm: require('../../assets/gifts/192/lucky-kayan-yildiz.png'), lg: require('../../assets/gifts/512/lucky-kayan-yildiz.png') },
 };
 
-/** Default picture for Lucky packages created in Lucky yönetimi (ids `lk…`) that have no own image. */
-const LUCKY_DEFAULT: Art = { sm: require('../../assets/gifts/192/lucky-yeni-lucky.png'), lg: require('../../assets/gifts/512/lucky-yeni-lucky.png') };
 /** Corner badge on gift tiles whose effect plays music. */
 export const MUSIC_BADGE = require('../../assets/gifts/192/hediye-rozet-muzikli-hediye-rozeti.png');
 
 /** One source object per icon address, so an image isn't handed a new source on every render. */
 const remoteArt = new Map<string, Art>();
 function remoteArtOf(giftId: string): Art | undefined {
-  const uri = remoteIconOf(giftId);
+  // A Şanslı package is never a catalog gift (server/api/lucky-art.mjs): its icon comes with the packages.
+  const uri = giftId.startsWith('lk') ? luckyIconOf(giftId) : remoteIconOf(giftId);
   if (!uri) return undefined;
   let art = remoteArt.get(uri);
   if (!art) {
@@ -111,9 +113,11 @@ function remoteArtOf(giftId: string): Art | undefined {
   return art;
 }
 
-/** The image for a catalog gift: the icon the server gave (an admin's gift, or a replaced one), else the app's own. */
-export const giftArtOf = (giftId?: string): Art | undefined =>
-  giftId ? (remoteArtOf(giftId) ?? ART[giftId] ?? (giftId.startsWith('lk') ? LUCKY_DEFAULT : undefined)) : undefined;
+/**
+ * The image for a gift or a Şanslı package: the icon the server gave (an admin's gift, a replaced one, a package's
+ * from the panel), else the app's own; undefined (the emoji is drawn) for one with neither.
+ */
+export const giftArtOf = (giftId?: string): Art | undefined => (giftId ? (remoteArtOf(giftId) ?? ART[giftId]) : undefined);
 /** Picks the file for the size it is drawn at (192 px covers up to ~64 pt on 3x screens). */
 export const giftSource = (art: Art, size: number) => (size > 64 ? art.lg : art.sm);
 

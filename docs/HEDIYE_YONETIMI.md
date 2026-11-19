@@ -23,6 +23,13 @@ yeniden okur (uygulama açıkken bir iki dakika içinde; açılışta hemen). He
 Fiyatı her zaman sunucu belirler; gönderim, Şanslı çanta, PK puanı, oda seviyesi, bağlar, kalp seviyesi, ajans geliri
 derlenmiş hediyelerdeki gibi işler.
 
+**Şanslı paketleri (Güncelleme 7 madde 10):** Şanslı hediye paketlerinin ikonu ve videosu da aynı yükleme, kontrol ve
+çevirme yolundan geçer (`server/api/lucky-art.mjs`: `checkIcon`, `videoOf`, aynı çevirme sırası, bağlantıdan dosya), ama
+bu listede değildir: ayrı tabloda (`lucky_art`) durur, Hediyeler panelinde ve kataloğun hediyelerinde görünmez ve
+`/api/gifts/send` ile gönderilemez. Paketlerin fiyatı, olasılıkları ve yeni paket eklemek Şanslı hediye ayarı
+sayfasındadır ([`LUCKY_HEDIYE.md`](LUCKY_HEDIYE.md)). Bir dosya hem bir hediyede hem bir pakette kullanılıyorsa
+birinden kaldırılınca öbürü için kalır.
+
 **Eski APK'lar:** katalogda bilmedikleri hediyeyi göstermez (yalnız derlenmiş listeyi süzerler), odada gelen bilinmeyen
 hediyeyi sessizce atlar, videosunu indirmez (adresi `/api/fx/g/…`, onların süzgecinden geçmez). Yeni hediyeleri bu
 özelliği taşıyan APK'dan (bu değişikliğin preview-N'i) itibaren her telefon görür; derlenmiş hediyeler aynen çalışır.
@@ -161,7 +168,8 @@ vardır: dosyayı kendi sitenize (ör. GoDaddy hostingde `/hediyeler/` klasörü
   numpy, Pillow) ile çevrilir, denetlenir, depoya konur, hediye yeni videoya geçer, kaynak silinir. Depo ya da yeniden
   başlatma yüzünden yarıda kalan iş birkaç kez daha denenir; dosyanın kendisinden kaynaklanan hata bir kez söylenir.
   Docker imajı `ffmpeg python3 py3-numpy py3-pillow` kurar. Ayar: `FFMPEG`, `FFPROBE`, `PYTHON` (programların yolu),
-  `CUSTOM_GIFTS_POLL_MS` (başka bir sürecin değişikliğini okuma aralığı, varsayılan 5000).
+  `CUSTOM_GIFTS_POLL_MS` (başka bir sürecin değişikliğini okuma aralığı, varsayılan 5000), `LUCKY_ART_POLL_MS` (aynısı
+  Şanslı paketlerinin ikon ve videoları için; yoksa `CUSTOM_GIFTS_POLL_MS`).
 - Gönderim yolları sunucu fiyatıyla: `POST /api/gifts/send` (oda, profil, sohbet, aile, Anlar), Şanslı çanta
   (`lucky-bags.mjs`). Çantam (ödül hediyeleri) yalnız derlenmiş hediyeleri tutar; mağaza (`economy.mjs`) hediye satmaz.
 

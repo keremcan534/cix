@@ -29,6 +29,7 @@ import { useEffect, useRef, useSyncExternalStore } from 'react';
 
 import { isSeatColorId, type SeatColorId } from '@/data/seat-colors';
 import type { Look } from '@/lib/live/looks';
+import { parseLuckyIcon } from '@/lib/lucky-art';
 import type { BossNews } from '@/lib/patron-seat';
 import { parseMove, type Move } from '@/lib/room-moves';
 
@@ -56,7 +57,8 @@ export type GiftSignal = { t: 'gift'; giftId: string; count: number; to: string[
  * highest multiplier drawn and `bigWin` its reward when the room is told about it (0 otherwise). The name and
  * emoji come along, so a phone that never opened the Şanslı shelf still draws it.
  */
-export type LuckySignal = { t: 'lucky'; giftId: string; name: string; emoji: string; count: number; to: string[]; eventId: number; best: number; bigWin: number };
+/** `icon`: the package's own picture from the panel (null: none; absent from an older server); `price`: its price now. */
+export type LuckySignal = { t: 'lucky'; giftId: string; name: string; emoji: string; count: number; to: string[]; eventId: number; best: number; bigWin: number; icon?: string | null; price?: number };
 export type RoomSignal = PeerSignal | GiftSignal | LuckySignal | FxSignal;
 
 /** `send` is false when the voice connection isn't up and nothing went out. */
@@ -342,7 +344,7 @@ export function parseServerGift(raw: unknown): { from: string; msg: GiftSignal }
   return { from: m.from, msg: { t: 'gift', giftId: m.giftId.slice(0, 32), count: m.count as number, to: [m.to], eventId: m.eventId as number } };
 }
 
-/** The server's Şanslı packet: `{ type: 'lucky', giftId, name, emoji, count, from, to: [ids], eventIds, best, bigWin }`. */
+/** The server's Şanslı packet: `{ type: 'lucky', giftId, name, emoji, count, from, to: [ids], eventIds, best, bigWin, icon?, price? }`. */
 export function parseServerLucky(raw: unknown): { from: string; msg: LuckySignal } | null {
   if (!raw || typeof raw !== 'object') return null;
   const m = raw as Record<string, unknown>;
@@ -355,7 +357,20 @@ export function parseServerLucky(raw: unknown): { from: string; msg: LuckySignal
   const n = (v: unknown) => (Number.isSafeInteger(v) && (v as number) >= 0 ? (v as number) : 0);
   return {
     from: m.from,
-    msg: { t: 'lucky', giftId: m.giftId.slice(0, 32), name: m.name.slice(0, 30), emoji: m.emoji.slice(0, 8), count: m.count as number, to: m.to as string[], eventId: ids[0] as number, best: n(m.best), bigWin: n(m.bigWin) },
+    msg: {
+      t: 'lucky',
+      giftId: m.giftId.slice(0, 32),
+      name: m.name.slice(0, 30),
+      emoji: m.emoji.slice(0, 8),
+      count: m.count as number,
+      to: m.to as string[],
+      eventId: ids[0] as number,
+      best: n(m.best),
+      bigWin: n(m.bigWin),
+      // Newer servers' (lucky-art.mjs): a malformed icon is none; a price only when it is one.
+      ...('icon' in m ? { icon: parseLuckyIcon(m.icon) } : {}),
+      ...(n(m.price) > 0 ? { price: n(m.price) } : {}),
+    },
   };
 }
 

@@ -8,6 +8,8 @@ export const MULTS = [2, 5, 10, 20, 50, 100, 200, 500, 1000];
 /** The recipient's part of the price, as diamonds (app/src/data/rules.ts LUCKY_RECIPIENT_SHARE). */
 export const SHARE = 0.2;
 export const MIN_AGE = 18;
+/** A package's id: the app's four (lk1–lk4) and the panel's own (Güncelleme 7 madde 10). */
+export const LUCKY_ID = /^lk[a-z0-9]{1,20}$/;
 
 /** mult 0 = no reward; it takes whatever the listed multipliers leave, so a table always adds up to 100 %. */
 const tiers = (w) => {
@@ -38,7 +40,7 @@ export const maxMult = (g) => Math.max(0, ...g.tiers.filter((t) => t.weight > 0)
 /** A package from input, checked; a 400 saying what is wrong otherwise. */
 function checkGift(g, i) {
   if (!g || typeof g !== 'object') bad('Geçersiz paket');
-  const id = typeof g.id === 'string' && /^lk[a-z0-9]{1,20}$/.test(g.id) ? g.id : bad(`${i + 1}. paketin kimliği geçersiz`);
+  const id = typeof g.id === 'string' && LUCKY_ID.test(g.id) ? g.id : bad(`${i + 1}. paketin kimliği geçersiz`);
   const name = text(g.name, 1, 30, 'paket adı');
   const emoji = typeof g.emoji === 'string' && g.emoji.trim().length >= 1 && g.emoji.trim().length <= 8 ? g.emoji.trim() : bad(`${name}: simge geçersiz`);
   // At least 5: the recipient's 20 % has to be a whole diamond.
@@ -64,6 +66,10 @@ export function checkConfig(v) {
   if (!v || typeof v !== 'object' || !Array.isArray(v.gifts) || v.gifts.length < 1 || v.gifts.length > 20) bad('Geçersiz ayarlar');
   const gifts = v.gifts.map(checkGift);
   if (new Set(gifts.map((g) => g.id)).size !== gifts.length) bad('Aynı paket iki kez var');
+  // Two packages with one name would read alike on the shelf, in the room and in the history.
+  const names = gifts.map((g) => g.name.toLocaleLowerCase('tr'));
+  const twice = gifts.find((g, k) => names.indexOf(names[k]) !== k);
+  if (twice) bad(`“${twice.name}” adında iki paket var; her paketin adı ayrı olmalı`);
   const dailyPayoutLimit = int(v.dailyPayoutLimit, 1, 1_000_000_000_000) ?? bad('Günlük ödül limiti geçersiz');
   const announceFrom = MULTS.includes(v.announceFrom) ? v.announceFrom : bad('Duyuru çarpanı geçersiz');
   return { gifts, dailyPayoutLimit, announceFrom };
@@ -76,4 +82,53 @@ export function drawMult(list, r) {
     r -= t.weight;
   }
   return 0;
+}
+
+const tiersKey = (list) => JSON.stringify([...list].sort((a, b) => a.mult - b.mult).map((t) => [t.mult, t.weight]));
+/** A package's `since` (withSince), or `version` for one saved before packages had it: as it is now from then on. */
+export const sinceOf = (g, version) => int(g?.since, 1, version) ?? version;
+/**
+ * The packages of a configuration saved as `version` (checkConfig's), each with `since`: the version from which its
+ * price and odds are as now. Kept from the configuration before (`prev`, version `prevVersion`) when neither changed;
+ * this version otherwise (a new package, or one put back after it was taken out, too).
+ */
+export function withSince(gifts, prev, prevVersion, version) {
+  const before = new Map((prev?.gifts ?? []).map((g) => [g.id, g]));
+  return gifts.map((g) => {
+    const p = before.get(g.id);
+    const same = p && p.price === g.price && tiersKey(p.tiers) === tiersKey(g.tiers);
+    return { ...g, since: same ? sinceOf(p, prevVersion) : version };
+  });
+}
+
+/**
+ * What a newer app sends with a send: the package's price it showed and the settings' version it read them at
+ * (GET /api/lucky `version`); undefined each when it sent none (an older app). A 400 when malformed.
+ */
+export function shownOf(b) {
+  const price = b.price === undefined || b.price === null ? undefined : int(b.price, 1, Number.MAX_SAFE_INTEGER);
+  const version = b.version === undefined || b.version === null ? undefined : int(b.version, 1, Number.MAX_SAFE_INTEGER);
+  if (price === null || version === null) throw new HttpError(400, 'Geçersiz istek');
+  return { price, version };
+}
+
+const fmt = (n) => n.toLocaleString('tr-TR');
+/**
+ * The send goes on only at what the phone showed: a package whose price moved is refused (409 price_changed with the
+ * price now), one whose odds or price changed after the version the phone read them at too (409 odds_changed with
+ * the version now); the phone reads the packages again and nothing moves. Called inside the send's transaction, after
+ * its replay check, so a retry of a send that went through gets its first answer. An older app sends neither and is
+ * played at the server's price and odds, as always.
+ */
+export function checkShownLucky(gift, shown, version) {
+  if (shown.price !== undefined && shown.price !== gift.price) {
+    throw Object.assign(new HttpError(409, `${gift.name} Şanslı hediyesinin fiyatı değişti: artık ${fmt(gift.price)} jeton. Yeni fiyatı görüp yeniden gönder.`), {
+      extra: { code: 'price_changed', giftId: gift.id, price: gift.price, version },
+    });
+  }
+  if (shown.version !== undefined && (shown.version > version || shown.version < sinceOf(gift, version))) {
+    throw Object.assign(new HttpError(409, `${gift.name} Şanslı hediyesinin olasılıkları değişti. Yeni olasılık tablosunu görüp yeniden gönder.`), {
+      extra: { code: 'odds_changed', giftId: gift.id, version },
+    });
+  }
 }

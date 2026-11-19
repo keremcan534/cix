@@ -43,6 +43,8 @@ import { roomLevel } from './rooms.mjs';
 import { announceBoss, bossGift } from './boss-seat.mjs';
 import { GUARD_CARD, guardRules, guardStarted, startGuard } from './guards.mjs';
 import { fuelRocket, launchRockets, rocketFx, rocketVideosRev } from './room-rocket.mjs';
+import { luckyArtRev, luckyFx } from './lucky-art.mjs';
+import { lockSendAccounts } from './send-locks.mjs';
 
 export const ROOM = /^[A-Za-z0-9_-]{1,64}$/;
 const BOARDS = { wealth: 'sender', charm: 'recipient' };
@@ -139,7 +141,8 @@ export const giftRoutes = {
       campaign: c && Date.parse(c.startsAt) <= now && now < Date.parse(c.endsAt) ? { percent: c.percent, startsAt: c.startsAt, endsAt: c.endsAt, label: c.label } : null,
       exchange: { usdTry: s.usdTry, minDiamonds: EXCHANGE.minDiamonds },
       // The gift and entry videos the phones download and keep (fx.mjs, and the admins' gifts'); an older app ignores it.
-      fx: [...fxCatalog(s.giftsHidden, replacedClips()), ...giftFx(s.giftsHidden, family), ...shopFx(), ...rocketFx()],
+      // Şanslı packages' videos (lucky-art.mjs) only for an app that plays them (lucky=1).
+      fx: [...fxCatalog(s.giftsHidden, replacedClips()), ...giftFx(s.giftsHidden, family), ...shopFx(), ...rocketFx(), ...(url?.searchParams.get('lucky') === '1' ? luckyFx() : [])],
       // The emoji panel's packs and stickers as they are now (emoji.mjs): only for an app that asks (emoji=1).
       ...(url?.searchParams.get('emoji') === '1' ? { emoji: emojiCatalog() } : {}),
       // Seviye ve VIP ayarları (levels.mjs): only for an app that asks (levels=1).
@@ -153,7 +156,7 @@ export const giftRoutes = {
       bonds: { answerDays: s.bondAnswerDays, cooldownDays: s.bondCooldownDays, talkDaily: s.bondTalkDaily, max: Object.fromEntries(Object.keys(BOND_KINDS).map((k) => [k, bondMax(k, s)])) },
       // Grows with every live settings save, every change in Yönetim › Hediyeler and Emojiler, and every Seviye
       // ayarları save (as /api/config's).
-      v: s.v + customGiftsRev() + emojiRev() + levelsRev() + shopItemsRev() + rocketVideosRev(),
+      v: s.v + customGiftsRev() + emojiRev() + levelsRev() + shopItemsRev() + rocketVideosRev() + luckyArtRev(),
     };
   },
 
@@ -185,9 +188,8 @@ export const giftRoutes = {
     let guardNew = false;
     let rocket = null;
     const out = await once(u.id, 'coin', b.ref, async (c) => {
-      // Lock both rows in id order so two people gifting each other at once can't deadlock.
-      const locked = await c.query('SELECT id FROM users WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL ORDER BY id FOR UPDATE', [[u.id, to]]);
-      if (locked.rowCount < 2) throw new HttpError(404, 'Alıcı bulunamadı');
+      // Both rows and the room owner's (room XP below) in id order, so two gifts at once can't deadlock (send-locks.mjs).
+      if (!(await lockSendAccounts(c, [u.id, to], liveKitRoom(room)?.slice(4)))) throw new HttpError(404, 'Alıcı bulunamadı');
       await claimRef(c, u.id, 'coin', b.ref);
       // After the ref check: a retry of a gift that went through before the hide gets its replay, not a 400.
       if (s.giftsHidden.has(gift.id)) throw new HttpError(400, 'Bu hediye artık yok');

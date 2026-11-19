@@ -68,6 +68,7 @@ import { FX_PATH, sendFx } from './fx.mjs';
 import { jetonRoutes } from './jeton.mjs';
 import { liveRoutes } from './live.mjs';
 import { luckyRoutes } from './lucky.mjs';
+import { refreshLuckyArt, sendLuckyFx, startLuckyArt, stopLuckyArt } from './lucky-art.mjs';
 import { economyRoutes, grantInTx } from './economy.mjs';
 import { levelRewardRoutes } from './level-rewards.mjs';
 import { taskRewardRoutes } from './task-rewards.mjs';
@@ -448,6 +449,7 @@ const server = http.createServer(async (req, res) => {
       if (name.startsWith('g/')) await sendCustomFx(req, res, name.slice(2));
       else if (name.startsWith('s/')) await sendShopFx(req, res, name.slice(2));
       else if (name.startsWith('r/')) await sendRocketFx(req, res, name.slice(2));
+      else if (name.startsWith('l/')) await sendLuckyFx(req, res, name.slice(2));
       else if (name.startsWith('art/')) sendArt(req, res, name.slice(4));
       else sendFx(req, res, name);
     } catch (e) {
@@ -531,6 +533,7 @@ function shutdown(signal) {
   stopLevelDecay();
   stopGuardSweep();
   stopShopItems();
+  stopLuckyArt();
   server.close();
   const started = Date.now();
   const wait = setInterval(async () => {
@@ -549,6 +552,7 @@ await refreshCustomGifts();
 await refreshEmoji();
 await refreshLevels();
 await refreshShopItems();
+await refreshLuckyArt();
 // A live Yörünge round the last process left in the air: its fuel goes back before anyone can play again.
 await recoverRocket();
 server.listen(PORT, '127.0.0.1', () => console.log(`api on 127.0.0.1:${PORT} version ${VERSION}${TEST_TOPUP ? ' (test top-up on)' : ''}`));
@@ -575,4 +579,5 @@ startLevels();
 startLevelDecay();
 startGuardSweep();
 startShopItems();
+startLuckyArt();
 startSeatColorSweep();
