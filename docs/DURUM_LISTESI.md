@@ -144,6 +144,15 @@ Ayrıntı: [`OTOMATIK_MESAJ.md`](OTOMATIK_MESAJ.md).
 - **Telefonda denenmeli:** geri sayım, hazır cevap penceresi, iki telefonla 5 dakika içinde ve sonra cevap.
 - **Panel:** bütün sayılar ve metinler finans paneli › Canlı ayarlar › Otomatik mesaj ve SimilarClub Sistem'de kendiliğinden görünür. Rapor sayfası (yayıncı, ajans, şüpheli ikililer) için sunucu hazır, panel sayfası henüz yok.
 
+## Güncelleme 7: fotoğraflar ve "Şu an odada" (yeni APK)
+
+- **Başkalarının fotoğrafı (madde 1):**
+  - Şanslı kazanç bandındaki fotoğraf artık sunucunun adresiyle gidiyor; bazı internet sağlayıcılarında yüz boş görünüyordu. Sunucu tarafı, eski APK'da da düzelir.
+  - Oda ayarlarındaki yönetici, DJ, atılan ve susturulan listeleri, oda davetleri, Gelir ve jeton geçmişi, davet kodunu veren kişi artık fotoğrafla geliyor.
+  - Yeni APK: görünüm okuması başarısız olursa kendiliğinden yeniden deneniyor (5 ve 15 saniye), hâlâ yüzü gelmeyen kişi 30 saniyede bir yeniden soruluyor; açılamayan fotoğraf 3 ve 20 saniye sonra bir daha deneniyor. Oda oyunlarının oyuncu yüzleri de güncel.
+  - Hâlâ görünmeyen biri olursa: o kişinin ID'si ve hangi ekranda olduğu (mikrofon, Balkon, sohbet, Mesajlar). Fotoğrafını eski bir APK'da seçip hiç yeni APK açmamış biri, profilini bir kez açınca fotoğrafı sunucuya gider.
+- **"Şu an odada" (madde 15):** Birinin profilinde bulunduğu oda yine görünüyor: "Şu an odada: <oda> · Git". Şifreli odada "Şifreli oda · girişte şifre sorulur". Kişinin "Bulunduğum odayı göster" ayarına uyar (başta açık); engellenen kişiye, giremeyeceği odada ve bire bir görüşmede görünmez. "Git" ile (profil, ajans sohbeti, aile) gelen için odadaki herkes "Kaan, Artemis'i takip ederek geldi" görür, Artemis hâlâ odadaysa. Eski APK'lar profilde odayı göstermez ve girişte yine "X odaya girdi" yazar. **Telefonda denenmeli:** satır, ses sunucusunun (LiveKit 1.9.1) giriş anahtarındaki katılımcı özelliğine dayanıyor; bilgisayarda değil, gerçek iki telefonla denenmeli.
+
 ## Depo (R2): kuruldu, az yer kaplıyor
 
 - **Kurulum:** Anahtarlar 9 Kasım'da girildi, sunucuya yazıldı. Fotoğraf ve şarkı yükleme açık.

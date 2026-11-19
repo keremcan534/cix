@@ -18,6 +18,7 @@ import type { RoomBackground } from '@/data/catalog';
 import type { Outcome } from '@/lib/casino-odds';
 import { noteContactStrike, type ContactStrike } from '@/lib/contact-filter';
 import { deviceInfo } from '@/lib/device-info';
+import { parseHereRoom, takeVia } from '@/lib/follow-room';
 import { forgetRoomPassword, roomPassword } from '@/lib/live/room-password';
 import { parseLookup } from '@/lib/public-no';
 import type { CardsMove, CardsSeen } from '@/lib/room-games/cards';
@@ -353,13 +354,19 @@ export const testTopup = (amount: number, ref = newRef()) => call<{ user: Server
 export const gift = (to: string, amount: number, ref = newRef()) => call<{ user: ServerUser; replay: boolean }>('POST', '/api/wallet/gift', { to, amount, ref });
 /**
  * LiveKit token for a room; needs a signed-in user. A password room's token needs the password the person typed
- * (lib/live/room-password, keyed by the room id in `oda-<id>`); a refusal forgets it, so the room asks again.
+ * (lib/live/room-password, keyed by the room id in `oda-<id>`); a refusal forgets it, so the room asks again. The
+ * first connect after following someone there from their profile names them (`via`, lib/follow-room; the server
+ * checks it and an older one ignores it).
  */
 export async function voiceToken(room: string) {
   const id = room.startsWith('oda-') ? room.slice(4) : room;
   const password = roomPassword(id);
+  const via = takeVia(id);
   try {
-    const r = await call<{ token: string }>('GET', `/token?room=${encodeURIComponent(room)}${password ? `&password=${encodeURIComponent(password)}` : ''}`);
+    const r = await call<{ token: string }>(
+      'GET',
+      `/token?room=${encodeURIComponent(room)}${password ? `&password=${encodeURIComponent(password)}` : ''}${via ? `&via=${encodeURIComponent(via)}` : ''}`,
+    );
     return r.token;
   } catch (e) {
     if (password && e instanceof ApiError && e.status === 403) forgetRoomPassword(id);
@@ -679,7 +686,13 @@ export type ProfileTies = { agency: { id: string; name: string } | null; family:
 export const lookup = (no: string) => call<unknown>('GET', `/api/lookup?no=${encodeURIComponent(no)}`).then(parseLookup);
 /** `visit`: opened on the profile screen, so it counts as a visit (Profil ziyaretçileri); a person card doesn't. */
 export const userProfile = (id: string, visit = false) =>
-  call<{ user: PublicUser } & Partial<ProfileTies>>('GET', `/api/user?id=${encodeURIComponent(id)}${visit ? '&visit=1' : ''}`).then((r) => ({ ...r.user, agency: r.agency ?? null, family: r.family ?? null }));
+  call<{ user: PublicUser; room?: unknown } & Partial<ProfileTies>>('GET', `/api/user?id=${encodeURIComponent(id)}${visit ? '&visit=1' : ''}`).then((r) => ({
+    ...r.user,
+    agency: r.agency ?? null,
+    family: r.family ?? null,
+    // The room they are in now ("Şu an odada"); an older server sends none.
+    room: parseHereRoom(r.room),
+  }));
 /** Someone who opened my profile in the last 7 days. */
 export type ServerVisitor = { id: string; name: string; avatarUrl: string | null; visits: number; lastAt: string };
 /** A visit without who made it (no VIP): how many times and when, to the minute. */
@@ -1409,7 +1422,7 @@ export const appealSanction = (sanction: number, text: string, as?: string | nul
 export const roomMute = (room: string, user: string, kind: 'text' | 'voice', minutes: number | null, reason?: string) =>
   call<{ sanction: SanctionView }>('POST', '/api/rooms/mute', { room, user, kind, minutes, ...(reason ? { reason } : {}) });
 export const roomUnmute = (sanction: number) => call<{ lifted: boolean }>('POST', '/api/rooms/unmute', { sanction });
-export const roomMutes = (room: string) => call<{ mutes: (SanctionView & { userId: string; userName: string })[] }>('GET', `/api/rooms/mutes?room=${encodeURIComponent(room)}`).then((r) => r.mutes);
+export const roomMutes = (room: string) => call<{ mutes: (SanctionView & { userId: string; userName: string; userAvatar?: string | null })[] }>('GET', `/api/rooms/mutes?room=${encodeURIComponent(room)}`).then((r) => r.mutes);
 
 // --- Canlı ayarlar (server/api/live-settings.mjs): admin role only (403 otherwise). Every save sends the reason,
 // the version it was based on (baseV) and this app's version; a stale baseV answers 409 stale, a big change

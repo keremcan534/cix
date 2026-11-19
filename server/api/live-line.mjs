@@ -15,7 +15,7 @@
 // Yörünge's round ('rocket', lineRocket) what its screen shows (the climb, the fuel on board with masked names), since
 // both are public by design and a read by every phone after every change would cost far more than the line itself.
 // The lines live in this process's memory (one API process). The polls stay: they cover a line that is down.
-import { auth, limit } from './core.mjs';
+import { auth, filesOut, limit } from './core.mjs';
 
 /** Open lines by user id. A phone that reconnects before its old line is noticed gone has two for a moment. */
 const lines = new Map();
@@ -88,7 +88,9 @@ const whole = (v) => (Number.isSafeInteger(v) && v >= 0 ? v : 0);
  */
 export function lineWin(win, skip = new Set()) {
   if (!lines.size) return;
-  const event = `data: ${JSON.stringify({
+  // The winner's photo as the phones load it (core.mjs filesOut), like every HTTP answer: the storage's own address
+  // can't be reached from some networks, so a banner with it showed a blank face there (Güncelleme 7, item 1).
+  const event = `data: ${filesOut(JSON.stringify({
     type: 'win',
     id: whole(win.id),
     uid: clip(win.uid, 64),
@@ -100,7 +102,7 @@ export function lineWin(win, skip = new Set()) {
     coins: whole(win.coins),
     wins: Math.max(1, whole(win.wins)),
     room: clip(win.room, 80),
-  })}\n\n`;
+  }))}\n\n`;
   for (const [uid, mine] of lines) {
     if (skip.has(uid)) continue;
     for (const res of mine) {

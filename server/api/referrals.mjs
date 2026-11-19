@@ -120,11 +120,11 @@ const enterUntil = (me) => new Date(new Date(me.created_at).getTime() + ENTER_DA
 
 /** The invite I entered (who, its state) and whether I may still enter one. Someone blocked either way has no name. */
 async function mineOf(q, me) {
-  const r = (await q.query('SELECT f.*, u.name FROM referrals f JOIN users u ON u.id = f.inviter_id WHERE f.invitee_id = $1', [me.id])).rows[0];
+  const r = (await q.query('SELECT f.*, u.name, u.avatar_url FROM referrals f JOIN users u ON u.id = f.inviter_id WHERE f.invitee_id = $1', [me.id])).rows[0];
   const until = enterUntil(me);
   const hidden = r ? await blockedBetween(me.id, r.inviter_id, q) : false;
   return {
-    by: r && !hidden ? { id: r.inviter_id, name: r.name } : null,
+    by: r && !hidden ? { id: r.inviter_id, name: r.name, avatarUrl: r.avatar_url ?? null } : null,
     status: r?.status ?? null,
     reason: r?.reason ?? null,
     coins: r ? Number(r.coins) : 0,

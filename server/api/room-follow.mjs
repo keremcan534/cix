@@ -103,7 +103,7 @@ export async function roomOpened(roomId, owner) {
  */
 export async function openNoticesFor(me) {
   const r = await db.query(
-    `SELECT n.id, n.room_id, n.created_at, r.title, o.id AS owner_id, o.name AS owner_name
+    `SELECT n.id, n.room_id, n.created_at, r.title, o.id AS owner_id, o.name AS owner_name, o.avatar_url AS owner_avatar
        FROM room_open_notices n
        JOIN room_follows f ON f.owner_id = n.owner_id AND f.user_id = $1 AND f.created_at <= n.created_at
        JOIN rooms r ON r.id = n.room_id JOIN users o ON o.id = n.owner_id
@@ -114,7 +114,13 @@ export async function openNoticesFor(me) {
       ORDER BY n.id DESC LIMIT 20`,
     [me],
   );
-  return r.rows.map((x) => ({ id: Number(x.id), kind: 'open', room: { id: x.room_id, title: x.title }, host: { id: x.owner_id, name: x.owner_name }, at: x.created_at }));
+  return r.rows.map((x) => ({
+    id: Number(x.id),
+    kind: 'open',
+    room: { id: x.room_id, title: x.title },
+    host: { id: x.owner_id, name: x.owner_name, avatarUrl: x.owner_avatar ?? null },
+    at: x.created_at,
+  }));
 }
 
 export const roomFollowRoutes = {

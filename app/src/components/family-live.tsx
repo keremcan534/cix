@@ -24,7 +24,8 @@ import { GIFTS } from '@/data/mock';
 import { FAMILY_PERKS } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
 import * as api from '@/lib/api';
-import { applyServerUser, message, myServerId, once } from '@/lib/live';
+import { applyServerUser, message, myServerId, once, rememberUser } from '@/lib/live';
+import { followRoute } from '@/data/presence';
 import * as fam from '@/lib/live/family';
 import { liveCatalog } from '@/lib/live/catalog-live';
 import { SCRIM, makeStyles, useTheme } from '@/theme';
@@ -377,7 +378,12 @@ function OnlineRow({ m }: { m: NonNullable<fam.FamilyOverview['online']>[number]
         </Text>
       </View>
       {room && (
-        <Pressable style={[styles.pill, { backgroundColor: colors.primary }]} onPress={() => router.push(`/oda/${room.id}`)} accessibilityRole="button" accessibilityLabel={`${m.name} odasına git`}>
+        <Pressable
+          style={[styles.pill, { backgroundColor: colors.primary }]}
+          // Joining them: the room hears "…, <them>’i takip ederek geldi" while they are still there (lib/follow-room).
+          onPress={() => (rememberUser({ id: m.id, name: m.name, avatarUrl: m.avatarUrl }), router.push(followRoute(room.id, m.id)))}
+          accessibilityRole="button"
+          accessibilityLabel={`${m.name} odasına git`}>
           <Text style={styles.pillText}>Git</Text>
         </Pressable>
       )}

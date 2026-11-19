@@ -132,6 +132,7 @@ import { isTableGame } from '@/components/games/room-tables';
 import { announceWin, roomTitleOf } from '@/lib/broadcast';
 import { emptyEntryLine, pushEntry, shiftEntry, type EntryItem, type EntryLine } from '@/lib/entry-queue';
 import { entranceView, entryPlanOf } from '@/lib/room-entrance';
+import { followLine, followedHere } from '@/lib/follow-room';
 import { getLucky, luckyGift, luckyPkPoints, sendLuckyBatch, type LuckyRecord } from '@/lib/lucky';
 import { liveLuckySend, refreshLucky } from '@/lib/live/lucky';
 import { getPk, joinRoomPk, markPkSeen, modeLabel, pkPointsFor, recordGift, reportMismatch, teamOf, usePk } from '@/lib/pk';
@@ -581,7 +582,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     ...(entryInfo && !invisible ? [{ id: 'vip', system: true, text: entryInfo.text }] : []),
     ...(joinedInCall ? [{ id: 'incall', system: true, text: '📞 Görüşmedesin: odada dinleyicisin.' }] : []),
     // Arrived by following someone from a profile / agency / tribe chat.
-    ...(via && !invisible ? [{ id: 'via', system: true, text: `👣 ${ME.name}, ${userById(via).name} kişisini takip ederek odaya girdi` }] : []),
+    ...(via && !invisible ? [{ id: 'via', system: true, text: `👣 ${followLine(ME.name, userById(via).name)}` }] : []),
     ...(invisible ? [{ id: 'inv', system: true, text: '👻 Gizli girdin; seni yalnız moderasyon görür.' }] : []),
   ]);
   const [draft, setDraft] = useState('');
@@ -1016,7 +1017,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
 
   const gameEntry = { from: 'room' as const, roomId: id, roomTitle: title };
   // Table seats: me, people on the mics, then listeners (the game's own lobby, separate from room seats).
-  const gamePlayers = [{ id: 'me', name: ME.name, avatar: app.me.avatar }, ...[...seatedOthers.map(userById), ...audience].slice(0, 5)];
+  // Each face as known now (a look read after the Balkon list was made brings the photo), not from that list's copy.
+  const gamePlayers = [{ id: 'me', name: ME.name, avatar: app.me.avatar }, ...[...seatedOthers, ...audience.map((u) => u.id)].slice(0, 5).map(userById)];
   // A server room: the owner, its admins and its DJs play (the server checks it); the demo keeps the functions rule.
   const canControlMusic = real ? myRole !== 'member' || djIds.includes('me') : canFunctions;
   // A server room's music, as the room metadata has it, played on this phone at the room's clock.
@@ -1084,8 +1086,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       // for someone back; their own entry effect (their shop look from the server, whatever their or my role in the
       // room) for a new entrance only.
       const v = entranceView(j, { blocked: blocked.has(uid), effectsOn: entryOn });
-      if (v.line) addMsg({ system: true, text: `${name} odaya girdi` });
       const sid = toServer(uid);
+      // Came following someone still here (their voice token's `via`, lib/follow-room): "Kaan, Artemis’i takip ederek geldi".
+      const followed = j.fresh && j.away === null && sid ? followedHere(roomMeta.peers, sid, myServerId()) : null;
+      if (v.line) addMsg({ system: true, text: followed ? `👣 ${followLine(name, userById(toLocal(followed)).name)}` : `${name} odaya girdi` });
       if (!v.effect || !sid) return;
       // Read now, not from a copy of a few minutes ago: what they wear may be new. A read that fails is tried once more.
       const playEntry = () => {

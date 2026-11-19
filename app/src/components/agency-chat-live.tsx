@@ -12,7 +12,8 @@ import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { Text, TextInput } from '@/components/text';
 import { Avatar, GradientButton, Header, StateIcon } from '@/components/ui';
 import { showAlert } from '@/lib/alert';
-import { message, myServerId } from '@/lib/live';
+import { message, myServerId, rememberUser } from '@/lib/live';
+import { followRoute } from '@/data/presence';
 import * as ac from '@/lib/live/agency-chat';
 import { makeStyles, useTheme } from '@/theme';
 
@@ -195,7 +196,7 @@ export function LiveAgencyChat() {
                     </View>
                     </Pressable>
                     {m.room && m.id !== me && (
-                      <Pressable style={[styles.pill, { backgroundColor: colors.primary }]} onPress={() => router.push(`/oda/${m.room!.id}`)} accessibilityRole="button" accessibilityLabel={`${m.name} odasına git`}>
+                      <Pressable style={[styles.pill, { backgroundColor: colors.primary }]} onPress={() => (rememberUser({ id: m.id, name: m.name, avatarUrl: m.avatarUrl }), router.push(followRoute(m.room!.id, m.id)))} accessibilityRole="button" accessibilityLabel={`${m.name} odasına git`}>
                         <Text style={styles.pillText}>Git</Text>
                       </Pressable>
                     )}

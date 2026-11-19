@@ -11,6 +11,7 @@ import { useSyncExternalStore } from 'react';
 
 import * as api from '@/lib/api';
 import { putServerUser, type User } from '@/data/mock';
+import type { HereRoom } from '@/lib/follow-room';
 import { serverNo } from '@/lib/public-no';
 import { putLevels } from '@/lib/live/levels';
 import { putDistance } from '@/lib/live/distances';
@@ -36,7 +37,10 @@ export const useTies = (serverId: string | null) => useSyncExternalStore(subscri
  * `followers` / `following` are totals, `oneWay` the profile's Takipçi and Takip (lib/follow-ties tieCounts). The rest
  * (one-way counts, levels, friends, received gifts, staff role, extras, album) is missing from an older server.
  */
-export type SocialCounts = { followers: number; following: number; oneWay?: { followers: number; following: number }; isFollowing: boolean; blockedByMe: boolean } & Partial<api.ProfileMore>;
+export type SocialCounts = { followers: number; following: number; oneWay?: { followers: number; following: number }; isFollowing: boolean; blockedByMe: boolean } & Partial<api.ProfileMore> & {
+  /** The room they are in now, as the server lets me see it ("Şu an odada"); null: none or not shown. */
+  room?: HereRoom | null;
+};
 
 /** My profile as the server keeps it. Empty fields stay empty, so no demo value (a handle, a city) survives. */
 export function meFromServer(u: api.ServerMe): Partial<User> {
@@ -118,6 +122,8 @@ export async function loadPublicProfile(serverId: string, mine = false, visit = 
     ...(p.extras && { extras: p.extras }),
     ...(p.photos && { photos: p.photos }),
     ...(p.levelsHidden && { levelsHidden: p.levelsHidden }),
+    // "Şu an odada" (lib/follow-room): never on my own profile, where my own open room shows instead.
+    ...(!mine && p.room && { room: p.room }),
   };
 }
 
