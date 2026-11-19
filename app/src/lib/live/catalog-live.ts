@@ -43,6 +43,7 @@ import { mergeShop, parseLiveShop, type LiveShop } from '@/lib/shop-live-core';
 import { BOSS_SEAT_MIN_LEVEL, COSMETICS, MIC_PERMISSION_MIN_LEVEL, memberLimit, setLiveCosmetics } from '@/data/catalog';
 import { setLiveSeatColors } from '@/data/seat-colors';
 import { parseFxList, type FxVideo } from '@/lib/fx-videos-core';
+import { parseGlobalIds } from '@/lib/global-gift-core';
 import { parseCatalog, type CatalogPack } from '@/lib/live/billing-core';
 
 const BASE = process.env.EXPO_PUBLIC_API_URL ?? '';
@@ -94,6 +95,8 @@ export type LiveCatalog = {
   familyThemes: Record<string, number> | null;
   /** Oda seviyeleri as Canlı ayarlar has them; null from an older server: the app's own. */
   rooms: RoomNumbers | null;
+  /** The gifts the server marks global (Global hediye, lib/global-gift-core); absent when none. */
+  global?: string[];
 };
 /** The rooms' numbers (server/api/live-registry.mjs roomNumbersOf): mic and boss seat levels, people per level. */
 export type RoomNumbers = { micMinLevel: number; bossMinLevel: number; caps: number[] };
@@ -261,8 +264,10 @@ export function parseLiveCatalog(raw: unknown): LiveCatalog {
     bonds: parseBondNumbers(r.bonds),
     familyThemes: parseFamilyThemes(r.family),
     rooms: parseRoomNumbers(r.rooms),
+    ...globalOf(parseGlobalIds(r.gifts)),
   };
 }
+const globalOf = (ids: string[]) => (ids.length ? { global: ids } : {});
 
 type Saved = LiveCatalog & { fetchedAt: number };
 /** The copy kept on the phone ({v, giftIds, packs, campaign, usdTry, fetchedAt}); null when broken. */
@@ -297,6 +302,7 @@ export function parseSavedLiveCatalog(raw: string | null): { catalog: LiveCatalo
       bonds: parseBondNumbers(r.bonds),
       familyThemes: parseFamilyThemes({ themes: r.familyThemes }),
       rooms: parseRoomNumbers(r.rooms),
+      ...globalOf(parseGlobalIds(Array.isArray(r.global) ? r.global.map((id) => ({ id, global: true })) : null)),
     },
     // A copy an older app saved counts as old: the next poll reads the catalog again. One from before the videos were
     // listed (no fx), or from before the shelves were (no shelf): that app hid the gifts put back on the shelves
@@ -399,6 +405,9 @@ export function bondKindOf(kind: BondKind, c: LiveCatalog | null = current): Bon
   const max = c?.bonds?.max[kind] ?? k.max;
   return g && Number.isSafeInteger(g.price) && g.price > 0 ? { ...k, gift: g.name, price: g.price, max } : max === k.max ? k : { ...k, max };
 }
+
+/** Whether the server marks this gift global (Global hediye): the gift panel's Global shelf and the tile's badge. */
+export const isGlobalGift = (id: string, c: LiveCatalog | null = current) => !!c?.global?.includes(id);
 
 /** Every gift this phone can draw, the app's own as they are now and the admins' listed (the profile's gift wall). */
 export const everyGift = (c: LiveCatalog | null = current): Gift[] => [...viewsOf(c).byId.values()];

@@ -239,9 +239,10 @@ export async function retrySignIn(): Promise<boolean> {
 /** Any route of the API with this session (the agency panels go through lib/agency-net). */
 export const apiRequest = <T>(method: 'GET' | 'POST', path: string, body?: object) => call<T>(method, path, body);
 
-/** The live line, with the wins announced to everyone (server/api/live-line.mjs lineWin; lib/live/win-news) and Canlı
- *  Yörünge's round while its screen is open (lineRocket; lib/live/rocket-live). */
-const LIVE_LINE = '/api/live?wins=1&rocket=1';
+/** The live line, with the wins announced to everyone (server/api/live-line.mjs lineWin; lib/live/win-news), Canlı
+ *  Yörünge's round while its screen is open (lineRocket; lib/live/rocket-live) and the global gifts of my country
+ *  (lineGlobal; lib/live/global-gift). */
+const LIVE_LINE = '/api/live?wins=1&rocket=1&global=1';
 /**
  * Opens my live line (lib/live/live-line): a request that stays open while the server writes events into it.
  * Null when there is no server or no session yet. Not compressed, so each event comes through as it is written.
@@ -1087,6 +1088,9 @@ export type ServerPrivacy = {
   videoCalls: boolean;
   messagePush: boolean;
   pushCloseOnly: boolean;
+  /** Gizlilik › "Adım genel duyurularda görünmesin": global gifts I send or receive name me "Bir kullanıcı". An older
+   *  server doesn't say. */
+  globalHideName?: boolean;
 };
 /** Otomatik mesaj's choices (server/api/auto-chat.mjs, saved with the privacy settings); lib/live/auto-chat reads them. */
 export type AutoChoices = { autoReceive?: boolean; autoOpener?: boolean; autoOpenerSeen?: boolean; autoSend?: boolean };

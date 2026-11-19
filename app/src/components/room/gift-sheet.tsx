@@ -8,6 +8,9 @@
 // used only for the money action, and a short balance turns the action into "top up" instead of
 // failing after the tap. Product rule: no gift ever asks for a confirmation; one tap sends.
 // Gifts the owner hid in Yönetim › Canlı ayarlar are left off every shelf (lib/live/catalog-live visibleGifts).
+// Global: the gifts the server marks global (Global hediye, announced in every room of the country), gathered from
+// their own shelves (no shelf of their own on the server, so an older app keeps them where the admin put them), each
+// with a Global badge.
 // Çantam: free gifts from rewards. A live build shows the server's backpack (lib/live/backpack), read each time the
 // sheet opens; the server takes the gifts out when it sends them. The demo keeps its sample stock on this phone.
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -23,7 +26,7 @@ import { LUCKY_RECIPIENT_SHARE, pct } from '@/data/rules';
 import { bagCounts, bagLabel, bagNeed as needOf, bagShort as shortOf } from '@/lib/backpack';
 import { gamblingLevelOk } from '@/lib/games';
 import { pressHaptic, tapHaptic } from '@/lib/haptics';
-import { bagGifts, roomGiftShelf, useLiveCatalog } from '@/lib/live/catalog-live';
+import { bagGifts, isGlobalGift, roomGiftShelf, useLiveCatalog, type LiveCatalog } from '@/lib/live/catalog-live';
 import { liveMode } from '@/lib/live';
 import { refreshBackpack, useBackpack } from '@/lib/live/backpack';
 import { refreshLucky } from '@/lib/live/lucky';
@@ -35,11 +38,12 @@ import { GiftArt, MUSIC_BADGE } from '@/components/GiftArt';
 import { RollingNumber } from '@/components/fx/rolling-number';
 import { useRoomSheetSpace, useSheetMax } from '@/lib/sheet-space';
 
-type Shelf = GiftCat | 'lucky' | 'fav' | 'bag';
+type Shelf = GiftCat | 'lucky' | 'fav' | 'bag' | 'global';
 type PriceSort = 'default' | 'asc' | 'desc';
 
 const SHELVES: { key: Shelf; label: string; icon?: keyof typeof Ionicons.glyphMap }[] = [
   { key: 'hot', label: 'Popüler' },
+  { key: 'global', label: 'Global', icon: 'globe' },
   { key: 'lucky', label: 'Şanslı', icon: 'leaf' },
   { key: 'couple', label: 'Çift' },
   { key: 'family', label: 'Aile ve Dost' },
@@ -60,6 +64,7 @@ const SHELF_NOTE: Record<Shelf, string> = {
   couple: 'Sevdiğine özel hediyeler.',
   family: 'Koruma Kartı seni koruyucu yapar. Bağ hediyesi bağ isteği olarak gider; kabul edilmezse jetonun geri döner.',
   privilege: 'VIP üyelerine özel hediyeler.',
+  global: 'Gönderince ülkendeki bütün odalarda adınla duyurulur. Adını Ayarlar › Gizlilik’ten gizleyebilirsin.',
   fav: 'Bir hediyeye uzun basarak favorilere ekle veya çıkar.',
   bag: 'Görev ve giriş ödüllerin. Gönderirken jeton harcanmaz.',
 };
@@ -91,11 +96,11 @@ const levelOf = (spent: number) => LEVEL_XP.filter((x) => spent >= x).length;
 const isLocked = (g: Gift, svip: number) => (g.minSvip ?? 0) > svip;
 
 /** `shown`: the gifts the server still offers (giftShelf); `inBag`: what the backpack may send (bagGifts). */
-function shelfGifts(shown: Gift[], shelf: Shelf, sort: PriceSort, favs: Set<string>, bag: Record<string, number>, inBag: Gift[]) {
+function shelfGifts(shown: Gift[], shelf: Shelf, sort: PriceSort, favs: Set<string>, bag: Record<string, number>, inBag: Gift[], catalog: LiveCatalog | null) {
   if (shelf === 'lucky') return [];
   if (shelf === 'fav') return shown.filter((g) => favs.has(g.id));
   if (shelf === 'bag') return inBag.filter((g) => (bag[g.id] ?? 0) > 0);
-  const list = shown.filter((g) => (g.cat ?? 'hot') === shelf);
+  const list = shown.filter((g) => (shelf === 'global' ? isGlobalGift(g.id, catalog) : (g.cat ?? 'hot') === shelf));
   if (sort !== 'default') list.sort((a, b) => (sort === 'asc' ? a.price - b.price : b.price - a.price));
   return list;
 }
@@ -203,7 +208,7 @@ export function GiftSheet({
   const pickedListeners = roomAll ? [] : targets.filter((id) => !micIds.includes(id));
   const lg = lucky.config.gifts.find((x) => x.id === luckyId) ?? lucky.config.gifts[0];
   const isLucky = shelf === 'lucky' && !!lg;
-  const list = shelfGifts(shown, shelf, sort, favs, bag, inBag);
+  const list = shelfGifts(shown, shelf, sort, favs, bag, inBag, catalog);
   // A pick from Çantam may be a gift off the shelf for now (Kalp from the call task).
   const gift = (sel.bag ? inBag : shown).find((g) => g.id === sel.id) ?? shown[0];
   // An empty shelf (bag, favorites, no Lucky packages) keeps the last pick in state; never send it from here.
@@ -228,7 +233,7 @@ export function GiftSheet({
   const pickShelf = (s: Shelf) => {
     tapHaptic();
     setShelf(s);
-    const l = shelfGifts(shown, s, sort, favs, bag, inBag);
+    const l = shelfGifts(shown, s, sort, favs, bag, inBag, catalog);
     const keep = l.some((g) => g.id === sel.id) && sel.bag === (s === 'bag');
     if (!keep && l[0]) setSel({ id: l[0].id, bag: s === 'bag' });
   };
@@ -403,7 +408,9 @@ export function GiftSheet({
         {/* What: shelves (compact: the price sort at their end, as the shelf notes are left out) */}
         <View style={g.shelfBar}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={g.shelves}>
-          {SHELVES.filter((s) => (s.key === 'lucky' ? luckyShelf : !CATEGORY_SHELVES.has(s.key) || shown.some((g) => (g.cat ?? 'hot') === s.key))).map((s) => {
+          {SHELVES.filter((s) =>
+            s.key === 'lucky' ? luckyShelf : s.key === 'global' ? shown.some((g) => isGlobalGift(g.id, catalog)) : !CATEGORY_SHELVES.has(s.key) || shown.some((g) => (g.cat ?? 'hot') === s.key),
+          ).map((s) => {
             const on = shelf === s.key;
             const n = s.key === 'bag' ? Object.values(bag).filter((x) => x > 0).length : 0;
             // Çantam is the app's 3D bag alone, its count on a badge; the word stays for screen readers.
@@ -430,11 +437,11 @@ export function GiftSheet({
         </ScrollView>
         {compact && sortBtn}
         </View>
-        {/* The notes that carry a rule (Şanslı, Aile ve Dost) open the grid below instead, in full. */}
+        {/* The notes that carry a rule (Şanslı, Aile ve Dost, Global) open the grid below instead, in full. */}
         {!compact && shelf !== 'lucky' && (
         <View style={g.noteRow}>
           <Text style={[g.dim, { flex: 1 }]} numberOfLines={2}>
-            {shelf === 'family' ? '' : shelf === 'privilege' ? `${SHELF_NOTE.privilege} Senin seviyen: VIP ${svipLevel}.` : shelf === 'bag' && live ? LIVE_BAG_NOTE : SHELF_NOTE[shelf]}
+            {shelf === 'family' || shelf === 'global' ? '' : shelf === 'privilege' ? `${SHELF_NOTE.privilege} Senin seviyen: VIP ${svipLevel}.` : shelf === 'bag' && live ? LIVE_BAG_NOTE : SHELF_NOTE[shelf]}
           </Text>
           {sortBtn}
         </View>
@@ -443,8 +450,8 @@ export function GiftSheet({
         {/* What: grid */}
         {/* Keyed by shelf: each shelf opens at its top, not at the previous shelf's scroll offset. */}
         <ScrollView key={shelf} ref={gridRef} style={compact ? g.gridFill : g.gridScroll} contentContainerStyle={g.grid}>
-          {/* Şanslı's disclaimer and the bond gifts' refund rule: always shown in full, at the top of their shelf. */}
-          {(shelf === 'lucky' || shelf === 'family') && <Text style={[g.dim, g.shelfNote]}>{SHELF_NOTE[shelf]}</Text>}
+          {/* Şanslı's disclaimer, the bond gifts' refund rule and Global's announcement: always in full, atop their shelf. */}
+          {(shelf === 'lucky' || shelf === 'family' || shelf === 'global') && <Text style={[g.dim, g.shelfNote]}>{SHELF_NOTE[shelf]}</Text>}
           {isLucky ? (
             <LuckyShelf
               gifts={lucky.config.gifts}
@@ -483,6 +490,7 @@ export function GiftSheet({
                 selected={sel.id === it.id && sel.bag === (shelf === 'bag')}
                 favorite={favs.has(it.id)}
                 locked={shelf !== 'bag' && isLocked(it, svipLevel)}
+                global={isGlobalGift(it.id, catalog)}
                 stock={shelf === 'bag' ? bag[it.id] : undefined}
                 onPress={() => {
                   tapHaptic();
@@ -712,6 +720,7 @@ function GiftTile({
   selected,
   favorite,
   locked,
+  global,
   stock,
   onPress,
   onLongPress,
@@ -720,13 +729,16 @@ function GiftTile({
   selected: boolean;
   favorite: boolean;
   locked: boolean;
+  /** Global hediye: announced in every room of the country; its badge takes the corner. */
+  global?: boolean;
   stock?: number;
   onPress: () => void;
   onLongPress: () => void;
 }) {
-  // At most one corner badge: a lock beats the effect type, so the important fact is never crowded out.
-  const badge = locked ? null : gift.badge === '3D' || gift.badge === 'music' ? gift.badge : null;
-  const a11y = `${gift.name}, ${stock !== undefined ? `ücretsiz, ${stock} adet` : `${fmt(gift.price)} jeton`}${locked ? `, VIP ${gift.minSvip} gerekli` : ''}${favorite ? ', favori' : ''}`;
+  // At most one corner badge: Global (it says the whole country hears of it), else the effect type unless locked, so
+  // the important fact is never crowded out.
+  const badge = global ? 'global' : locked ? null : gift.badge === '3D' || gift.badge === 'music' ? gift.badge : null;
+  const a11y = `${gift.name}, ${stock !== undefined ? `ücretsiz, ${stock} adet` : `${fmt(gift.price)} jeton`}${global ? ', global hediye' : ''}${locked ? `, VIP ${gift.minSvip} gerekli` : ''}${favorite ? ', favori' : ''}`;
   return (
     <Pressable onPress={onPress} onLongPress={onLongPress} delayLongPress={350} style={g.tileWrap} accessibilityRole="button" accessibilityState={{ selected }} accessibilityLabel={a11y} accessibilityHint="Uzun bas: favorilere ekle veya çıkar">
       <View style={[g.tile, selected && g.tileOn]}>
@@ -755,7 +767,12 @@ function GiftTile({
             </Text>
           </View>
         )}
-        {badge === 'music' ? (
+        {badge === 'global' ? (
+          <View style={g.globalBadge}>
+            <Ionicons name="globe" size={9} color="#1A1014" />
+            <Text style={g.globalBadgeText}>Global</Text>
+          </View>
+        ) : badge === 'music' ? (
           <Image source={MUSIC_BADGE} style={g.musicBadge} accessibilityIgnoresInvertColors />
         ) : badge ? (
           <View style={g.badge}>
@@ -851,6 +868,8 @@ const g = StyleSheet.create({
   luckyBadge: { alignSelf: 'center', minWidth: 20, height: 16, borderRadius: 5, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
   badgeText: { color: colors.text, fontSize: 10, fontWeight: '900' },
   musicBadge: { position: 'absolute', top: 2, right: 2, width: 20, height: 20 },
+  globalBadge: { position: 'absolute', top: 2, right: 2, flexDirection: 'row', alignItems: 'center', gap: 1, height: 14, borderRadius: 5, paddingHorizontal: 3, backgroundColor: colors.gold },
+  globalBadgeText: { color: '#1A1014', fontSize: 9, fontWeight: '900' },
   // The left corner, clear of the name: the selection above, the favourite star under it.
   favMark: { position: 'absolute', top: 20, left: 4 },
   check: { position: 'absolute', top: 2, left: 2 },

@@ -82,6 +82,8 @@ describe('Gizlilik ayarları', () => {
       autoOpener: true,
       autoOpenerSeen: false,
       autoSend: true,
+      // Global hediye (global-gifts.mjs): my name shows until I hide it.
+      globalHideName: false,
     });
     const p = await setPrivacy(a.session, { showOnline: false, dmFrom: 'mutual' });
     assert.equal(p.showOnline, false);

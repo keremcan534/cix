@@ -22,7 +22,8 @@
 // shop=1: the shop's frames and entry effects as Yönetim › Mağaza has them (shop-items.mjs shopCatalog); `v` too.
 // A members-only gift needs its own VIP level and at least the one the settings open `vip_gifts` at (vipItemNeed).
 // A gift sent in a server room is announced to the room's voice connection from here, after it is paid
-// (LiveKit SendData, so no phone can fake one); the phones draw only these, never a peer's own claim.
+// (LiveKit SendData, so no phone can fake one); the phones draw only these, never a peer's own claim. A global gift
+// (global-gifts.mjs) is also told, once paid, to every room of the sender's country; the catalog marks it `global`.
 import { recordIncome } from './agency-lib.mjs';
 import { KINDS as BOND_KINDS, addBondCoins, maxOf as bondMax } from './bonds.mjs';
 import { HttpError, auth, blockedBetween, claimRef, db, env, int, once, readJson, userId } from './core.mjs';
@@ -43,6 +44,7 @@ import { roomLevel } from './rooms.mjs';
 import { announceBoss, bossGift } from './boss-seat.mjs';
 import { GUARD_CARD, guardRules, guardStarted, startGuard } from './guards.mjs';
 import { fuelRocket, launchRockets, rocketFx, rocketVideosRev } from './room-rocket.mjs';
+import { announceGlobalGift } from './global-gifts.mjs';
 
 export const ROOM = /^[A-Za-z0-9_-]{1,64}$/;
 const BOARDS = { wealth: 'sender', charm: 'recipient' };
@@ -253,6 +255,8 @@ export const giftRoutes = {
     if (!out.replay && lkRoom && rocket) void launchRockets(lkRoom.slice(4), rocket);
     if (!out.replay && !room) notify([to], { title: 'Hediye geldi', body: `${u.name} sana ${label} gönderdi`, data: { type: 'gift', from: u.id } });
     if (!out.replay && guardNew) guardStarted(u, to);
+    // Global hediye (global-gifts.mjs): every room of the sender's country hears of it, paced (not awaited).
+    if (!out.replay && eventId !== null && gift.global) void announceGlobalGift({ sender: u.id, to, gift, count, eventId, roomId: lkRoom?.slice(4) ?? null });
     if (!out.replay) return { ...out, total };
     // A replay reports what that ref sent, not this body's gift and count (0: the ref was no gift).
     const sent = (await db.query('SELECT total FROM gift_events WHERE sender = $1 AND ref = $2', [u.id, b.ref])).rows[0];

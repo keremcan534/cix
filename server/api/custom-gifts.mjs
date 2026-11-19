@@ -4,12 +4,12 @@
 // will. Both live in the custom_gifts table (066, 069): an admin's gift is a row of its own ('a' and a number); a row
 // with a compiled gift's id (builtin) holds only what was changed about it, every NULL column "as in the app".
 //
-//   GET  /api/admin/gifts[?builtin=1]                      → { gifts, limits, convert, storage }  (builtin=1: the app's own too)
-//   POST /api/admin/gifts        { name, price, cat, minSvip?, emoji?, enabled?, icon, video? } → { gift }
+//   GET  /api/admin/gifts[?builtin=1]                      → { gifts, limits, convert, storage, globalMinPrice }  (builtin=1: the app's own too)
+//   POST /api/admin/gifts        { name, price, cat, minSvip?, emoji?, enabled?, icon, video?, global? } → { gift }
 //   POST /api/admin/gifts/update { id, …any of the above; video: null takes it off }        → { gift }
 //        an app's own gift too: icon: null gives it the app's picture again, video: null stops its video
 //   POST /api/admin/gifts/reset  { id, fields? }           → { gift }   an app's own gift back to the app's values
-//        (fields: any of name, emoji, price, cat — with its VIP level —, enabled, sort, icon, video; none: all)
+//        (fields: any of name, emoji, price, cat — with its VIP level —, enabled, sort, icon, video, global; none: all)
 //   POST /api/admin/gifts/delete { id }                    → { deleted }  (an admin's gift; the app's own can't go)
 //   POST /api/admin/gifts/order  { ids }                   → { gifts }   (each id's place: its index; lower first)
 //   POST /api/admin/gifts/fetch  { slot: 'icon'|'video', url } → { url, link, kind, type, bytes, video, svga }
@@ -22,6 +22,9 @@
 // send (checkShownPrice: a newer app sends the price it showed, 409 price_changed when it moved meanwhile). A replaced
 // video reaches every app since the admins' gifts came (preview with /api/fx/g/); a gift put back on the shelves only
 // the apps that trust the server's list (gifts=2) show, the others keep the compiled pause list (catalog.mjs).
+//
+// global: true marks a Global hediye (global-gifts.mjs, 102: announced in every room of the sender's country), from
+// Canlı ayarlar' minimum price on (GET answers it as globalMinPrice), never a bond gift or Koruma Kartı (globalSave).
 //
 // Admins only; every change is an audit_events row (who, what, before and after, from where). `icon` and `video.url`
 // are files uploaded first (media.mjs kinds gifticon, giftvideo, giftsource). video: { url, kind: 'stacked' } is a
@@ -53,6 +56,7 @@ import { artUrl } from './art.mjs';
 import { BOND_GIFTS, GIFTS, GIFTS_PAUSED } from './catalog.mjs';
 import { HttpError, auth, clientIp, db, env, int, limit, readJson, text, tx } from './core.mjs';
 import { FX_PATH, giftClip, mp4Duration } from './fx.mjs';
+import { globalMinPrice, globalNow, globalSave } from './global-gifts.mjs';
 import { panelDetail } from './panel.mjs';
 import { download, linkOf } from './link-fetch.mjs';
 import { downloadStored, keyOf, kindMax, readStored, removeFiles, sendFile, storageOn, storeFile, storedUrl, verifyUpload, writeStored } from './media.mjs';
@@ -127,6 +131,7 @@ const viewOf = (r) =>
     icon: r.icon_url,
     video: r.video_url ? Object.freeze({ url: r.video_url, bytes: Number(r.video_bytes), ms: Number(r.video_ms ?? 0), v: r.video_v }) : null,
     videoOff: r.video_off === true,
+    global: r.global === true,
     job: r.job_status ?? null,
     updatedAt: r.updated_at ?? null,
   });
@@ -190,6 +195,7 @@ function appGiftOf(base, o) {
     icon: o?.icon ?? null,
     video: o?.video ?? null,
     videoOff: !!o?.videoOff,
+    global: o?.global === true,
   };
 }
 /** One of the app's gifts as it is now (appGiftOf); undefined for an id that isn't one of them. */
@@ -226,9 +232,12 @@ export function giftOf(id) {
   // A bond gift goes as a bond request (bonds.mjs), which holds its coins until the other person answers.
   if (typeof id !== 'string' || BOND_GIFTS.has(id)) return undefined;
   const app = builtinGift(id);
-  if (app) return { id, name: app.name, emoji: app.emoji, price: app.price, cat: app.cat, minSvip: app.minSvip, builtin: true };
+  // A global one says so, with its icon (null: the app's own picture), for its announcement (global-gifts.mjs).
+  if (app) return { id, name: app.name, emoji: app.emoji, price: app.price, cat: app.cat, minSvip: app.minSvip, builtin: true, ...(globalNow(app) ? { global: true, icon: app.icon } : {}) };
   const g = snap.rows.get(id);
-  return g && !g.builtin && g.enabled && !g.deleted ? { id: g.id, name: g.name, emoji: g.emoji, price: g.price, cat: g.cat, minSvip: g.minSvip, custom: true } : undefined;
+  return g && !g.builtin && g.enabled && !g.deleted
+    ? { id: g.id, name: g.name, emoji: g.emoji, price: g.price, cat: g.cat, minSvip: g.minSvip, custom: true, ...(globalNow(g) ? { global: true, icon: g.icon } : {}) }
+    : undefined;
 }
 /** A gift's name now, a taken-down or deleted one's too (history lines, Şanslı çanta); null when nothing has this id. */
 export const giftNameOf = (id) => builtinGift(id)?.name ?? snap.rows.get(id)?.name ?? null;
@@ -260,7 +269,8 @@ export function checkShownPrice(gift, shown) {
  * as changed, and `icon` when it was replaced (an app reading gifts=2 draws these; an older one only takes the id).
  * `app2`: the phone reads it all (?gifts=2); otherwise the app's gifts whose price was changed are left out, since
  * that app would show its own price. `family`: the phone has the Aile ve Dost shelf (?family=1); an older one gets no
- * bond gifts and sees that shelf's other gifts on Çift (İkili before), where Koruma Kartı was.
+ * bond gifts and sees that shelf's other gifts on Çift (İkili before), where Koruma Kartı was. A global gift (global-gifts.mjs
+ * globalNow) also says global: true, which an older app ignores (it shows it on its shelf as any gift).
  */
 export function catalogGifts({ app2 = false, hidden = new Set(), family = false } = {}) {
   const out = [];
@@ -268,8 +278,8 @@ export function catalogGifts({ app2 = false, hidden = new Set(), family = false 
     const cat = family || g.cat !== 'family' ? g.cat : 'couple';
     if (g.builtin) {
       if (hidden.has(g.id) || (!family && BOND_GIFTS.has(g.id)) || (!app2 && g.price !== GIFTS.get(g.id).price)) continue;
-      out.push({ id: g.id, name: g.name, emoji: g.emoji, price: g.price, cat, minSvip: g.minSvip, ...(g.icon ? { icon: g.icon } : {}) });
-    } else out.push({ id: g.id, name: g.name, price: g.price, cat, minSvip: g.minSvip, emoji: g.emoji, icon: g.icon, custom: true });
+      out.push({ id: g.id, name: g.name, emoji: g.emoji, price: g.price, cat, minSvip: g.minSvip, ...(g.icon ? { icon: g.icon } : {}), ...(globalNow(g) ? { global: true } : {}) });
+    } else out.push({ id: g.id, name: g.name, price: g.price, cat, minSvip: g.minSvip, emoji: g.emoji, icon: g.icon, custom: true, ...(globalNow(g) ? { global: true } : {}) });
   }
   return out;
 }
@@ -1061,6 +1071,7 @@ const auditOf = (r) =>
     icon: r.icon_url,
     video: r.video_url ?? null,
     ...(r.video_off ? { videoOff: true } : {}),
+    ...(r.global ? { global: true } : {}),
     job: r.job_status ?? null,
     iconLink: r.icon_link ?? null,
     videoLink: r.video_link ?? null,
@@ -1119,6 +1130,7 @@ const changedOf = (r) =>
         ...(r.enabled !== null ? ['enabled'] : []),
         ...(r.icon_url !== null ? ['icon'] : []),
         ...(r.video_url !== null || r.video_off || r.job_status !== null ? ['video'] : []),
+        ...(r.global ? ['global'] : []),
       ];
 
 /** An admin's gift as the panel shows it. */
@@ -1132,6 +1144,7 @@ const customView = (x, sent) => ({
   minSvip: Number(x.min_svip),
   sort: Number(x.sort),
   enabled: x.enabled,
+  global: x.global === true,
   icon: x.icon_url,
   // Where the icon and the video were fetched from (null: uploaded), for fetching them again.
   iconLink: x.icon_link ?? null,
@@ -1162,6 +1175,7 @@ function appView(id, x, sent) {
     minSvip: g.minSvip,
     sort: g.sort,
     enabled: g.enabled,
+    global: g.global,
     icon: g.icon ?? original.icon,
     iconLink: x?.icon_link ?? null,
     videoLink: x?.video_link ?? null,
@@ -1264,7 +1278,7 @@ const writeLimit = (a) => limit(`gifts-admin:${a.id}`, 60, 'Çok fazla deneme, b
  * What POST /api/admin/gifts/reset can give back to one of the app's gifts; without `fields`, all but its place (an
  * ordered shelf keeps its order). Its place goes back with its shelf when it was moved to another one.
  */
-const RESET = ['name', 'emoji', 'price', 'cat', 'enabled', 'sort', 'icon', 'video'];
+const RESET = ['name', 'emoji', 'price', 'cat', 'enabled', 'sort', 'icon', 'video', 'global'];
 const RESET_ALL = RESET.filter((f) => f !== 'sort');
 
 /**
@@ -1306,6 +1320,9 @@ async function updateApp(req, a, id, b) {
     if (typeof b.enabled !== 'boolean') throw new HttpError(400, 'Açık/kapalı geçersiz');
     next.enabled = b.enabled === !GIFTS_PAUSED.has(id) ? null : b.enabled;
   }
+  // Global hediye (global-gifts.mjs): checked with the price it will have.
+  const global = globalSave(b, { id, price: next.price === undefined ? cur.price : (next.price ?? base.price), was: cur.global });
+  if (global !== undefined) next.global = global;
   // The app's picture as the panel shows it, or null: back to it. Another address: a new icon.
   if (b.icon !== undefined) {
     if (b.icon === null || b.icon === artUrl('gifts', id)) {
@@ -1340,6 +1357,7 @@ async function updateApp(req, a, id, b) {
       if (next.emoji !== undefined) set('emoji', next.emoji);
       if (next.enabled !== undefined) set('enabled', next.enabled);
       if (next.minSvip !== undefined) set('min_svip', next.minSvip);
+      if (next.global !== undefined) set('global', next.global);
       // Moved to another shelf: first there, as an admin's gift is.
       if (next.cat !== undefined) {
         set('cat', next.cat);
@@ -1383,7 +1401,7 @@ export const customGiftRoutes = {
   async 'GET /api/admin/gifts'(req, url) {
     await admin(req);
     const app = url?.searchParams.get('builtin') === '1';
-    return { gifts: await adminGifts(null, { app }), limits: LIMITS, convert: await canConvert(), svga: await canSvga(), storage: storageOn() };
+    return { gifts: await adminGifts(null, { app }), limits: LIMITS, convert: await canConvert(), svga: await canSvga(), storage: storageOn(), globalMinPrice: globalMinPrice() };
   },
 
   /** A new gift, first on its shelf; on the shelves at once unless enabled is false. */
@@ -1397,6 +1415,7 @@ export const customGiftRoutes = {
     const minSvip = svipOf(b.minSvip, cat);
     const emoji = emojiOf(b.emoji);
     if (b.enabled !== undefined && typeof b.enabled !== 'boolean') throw new HttpError(400, 'Açık/kapalı geçersiz');
+    const global = globalSave(b, { price }) ?? null;
     nameFree(name, null);
     if (typeof b.icon !== 'string' || !b.icon) throw new HttpError(400, 'İkonu önce yükle');
     const icon = await checkIcon(b.icon);
@@ -1410,11 +1429,11 @@ export const customGiftRoutes = {
         const first = await firstSort(c, cat);
         const r = await c.query(
           `INSERT INTO custom_gifts (id, name, emoji, price, cat, min_svip, sort, enabled, icon_url, video_url, video_bytes, video_ms, video_v, job_status, job_source, job_fill,
-                                     created_by, updated_by, icon_link, video_link, job_opaque)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $17, $18, $19, $20) RETURNING *`,
+                                     created_by, updated_by, icon_link, video_link, job_opaque, global)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $17, $18, $19, $20, $21) RETURNING *`,
           [id, name, emoji, price, cat, minSvip, first, b.enabled !== false, icon.url, stacked?.url ?? null, stacked?.bytes ?? null, stacked?.ms ?? null, stacked?.v ?? null,
             video?.kind === 'source' ? 'processing' : null, video?.kind === 'source' ? video.url : null, video?.kind === 'source' ? video.fill : null, a.id, iconLink, videoLink,
-            video?.kind === 'source' && video.opaque],
+            video?.kind === 'source' && video.opaque, global],
         );
         await audited(c, a.id, 'gift.create', { gift: id, before: null, after: auditOf(r.rows[0]), ...panelDetail(a) }, clientIp(req));
         return id;
@@ -1455,6 +1474,8 @@ export const customGiftRoutes = {
       if (typeof b.enabled !== 'boolean') throw new HttpError(400, 'Açık/kapalı geçersiz');
       next.enabled = b.enabled;
     }
+    const global = globalSave(b, { id, price: next.price ?? cur.price, was: cur.global });
+    if (global !== undefined) next.global = global;
     let iconUpload = null;
     if (b.icon !== undefined && b.icon !== cur.icon) {
       if (typeof b.icon !== 'string' || !b.icon) throw new HttpError(400, 'İkonu önce yükle');
@@ -1485,6 +1506,7 @@ export const customGiftRoutes = {
         if (next.minSvip !== undefined) set('min_svip', next.minSvip);
         if (next.emoji !== undefined) set('emoji', next.emoji);
         if (next.enabled !== undefined) set('enabled', next.enabled);
+        if (next.global !== undefined) set('global', next.global);
         // A gift moved to another shelf goes first there.
         if (next.cat !== undefined && next.cat !== r.cat) {
           set('cat', next.cat);
@@ -1598,6 +1620,7 @@ export const customGiftRoutes = {
         if (fields.includes('price')) sets.push('price = NULL');
         if (fields.includes('cat')) sets.push('cat = NULL', 'min_svip = NULL');
         if (fields.includes('enabled')) sets.push('enabled = NULL');
+        if (fields.includes('global')) sets.push('global = NULL');
         // Moved to another shelf: its place there means nothing on its own one.
         if (fields.includes('sort') || (fields.includes('cat') && r.cat !== null)) sets.push('sort = NULL');
         if (fields.includes('icon')) {

@@ -27,6 +27,8 @@
 //   - invitesFrom: inviteRefusal / mayInvite, for room and mic invites.
 //   - autoReceive, autoOpener, autoOpenerSeen, autoSend: Otomatik mesaj (auto-chat.mjs). autoOpenerSeen can only be
 //     turned on (the app says it showed what a conversation start in my name is).
+//   - globalHideName on ("Adım genel duyurularda görünmesin", off at first): a global gift I send or receive is
+//     announced without my id, name and photo ("Bir kullanıcı", global-gifts.mjs).
 // A block either way refuses all three. The other person is never told which setting refused them beyond the
 // reason the demo shows ("… yalnızca takip ettiği kişilerden mesaj alıyor").
 import { HttpError, auth, db, limit, readJson } from './core.mjs';
@@ -50,6 +52,7 @@ export const PRIVACY_DEFAULTS = Object.freeze({
   autoOpener: true,
   autoOpenerSeen: false,
   autoSend: true,
+  globalHideName: false,
 });
 const COLUMN = {
   profilePublic: 'profile_public',
@@ -67,6 +70,7 @@ const COLUMN = {
   autoOpener: 'auto_opener',
   autoOpenerSeen: 'auto_opener_seen',
   autoSend: 'auto_send',
+  globalHideName: 'global_hide_name',
 };
 const CHOICES = { dmFrom: ['everyone', 'following', 'mutual'], callsFrom: ['everyone', 'following', 'nobody'], invitesFrom: ['everyone', 'following', 'nobody'] };
 /** A session seen this recently is online (as Keşfet has always counted it). */
