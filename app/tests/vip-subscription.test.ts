@@ -75,8 +75,8 @@ describe('Abonelik planları ve satış yolu', () => {
   test('sözler: başladı, zaten var, bekliyor, saklandı, test aboneliği; vazgeçmek sessiz', () => {
     const until = '2026-12-14T10:00:00.000Z';
     const day = new Date(until).toLocaleDateString('tr-TR');
-    assert.deepEqual(vipOutcomeAlert({ kind: 'done', until, days: 30, replay: false }), { title: 'VIP aktif 🎉', body: `Aboneliğin başladı. Bitiş: ${day}.` });
-    assert.equal(vipOutcomeAlert({ kind: 'done', until, days: 30, replay: true })?.title, 'VIP aktif');
+    assert.deepEqual(vipOutcomeAlert({ kind: 'done', until, days: 30, replay: false }), { title: 'Abonelik aktif 🎉', body: `Aboneliğin başladı. Bitiş: ${day}.` });
+    assert.equal(vipOutcomeAlert({ kind: 'done', until, days: 30, replay: true })?.title, 'Abonelik aktif');
     assert.equal(vipOutcomeAlert({ kind: 'done', until: null, days: 30, replay: true })?.title, 'Abonelik bitmiş');
     assert.equal(vipOutcomeAlert({ kind: 'pending' })?.title, 'Ödeme onay bekliyor');
     assert.equal(vipOutcomeAlert({ kind: 'saved' })?.title, 'Ödemen alındı');
@@ -84,7 +84,7 @@ describe('Abonelik planları ve satış yolu', () => {
     assert.equal(vipOutcomeAlert({ kind: 'failed', message: 'Bu satın alma başka bir hesaba ait' })?.body, 'Bu satın alma başka bir hesaba ait');
     assert.equal(vipOutcomeAlert({ kind: 'cancelled' }), null);
     assert.equal(vipOutcomeAlert({ kind: 'busy' }), null);
-    assert.deepEqual(testAlert({ replay: false, until, days: 7 }), { title: 'VIP aktif 🎉', body: `7 gün eklendi (test sürümü, ödeme alınmadı). Bitiş: ${day}.` });
+    assert.deepEqual(testAlert({ replay: false, until, days: 7 }), { title: 'Abonelik aktif 🎉', body: `7 gün eklendi (test sürümü, ödeme alınmadı). Bitiş: ${day}.` });
     assert.match(testAlert({ replay: true, until, days: 7 }).body, /daha önce eklenmişti/);
   });
 
