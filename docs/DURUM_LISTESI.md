@@ -101,7 +101,7 @@ Son güncelleme: preview-96 sonrası (Küçült, çanta yağmuru, @bahset düzel
 
 - **Kapalı gelir:** finans panelinde Hediye ve mağaza › Oda roketi'nden açılır (şansla dağıtılan, nakde dönebilen ödül; hukuki değerlendirme gerekir).
 - **Açılınca (yeni APK):** odanın adının altında roket düğmesi; odadaki hediyeler roketi doldurur (günde 5 seviye, 00:00'da sıfırlanır), seviye dolunca roket kalkar, ödüller o seviyeye katkı verenler arasında çekilir (normal jeton ya da birkaç günlük mağaza eşyası).
-- **Telefonda denenmeli:** kalkış gösterisi ve roket penceresi gerçek telefonda henüz denenmedi.
+- **Telefonda denenmeli:** kalkış gösterisi ve roket penceresi gerçek telefonda henüz denenmedi. Güncelleme 7 (yeni APK): düğme "Lv.2 · %12,9" yazar; kalkış ekrandaki ve sıradaki hediyeleri bekler, sonraki hediyeler kalkışı bekler. İki telefonla, videolu bir hediyeyle seviye doldurularak denenmeli.
 - **Eski APK'lar:** roketi göstermez; hediyeleri roketi doldurur, kazandıkları hesaplarına geçer. Ayrıntı: [`ODA_ROKETI.md`](ODA_ROKETI.md).
 
 ## Paket 5'te gelenler
@@ -214,7 +214,7 @@ Ayrıntı: [`OTOMATIK_MESAJ.md`](OTOMATIK_MESAJ.md).
 | 37 | Mesajda büyük emoji | Çalışıyor | |
 | 38 | Mikrofon sayısına göre boyut | Çalışıyor | |
 | 39 | Yazarken mikrofonlar kapanmasın | Telefonda denenmeli | |
-| 40 | @bahset | Yarım | Bahsetmeli mesaj iletişim filtresine takılıyordu. Düzeltmesi PR #87'de, sonraki APK'da gelir |
+| 40 | @bahset | Yarım | Bahsetmeli mesaj iletişim filtresine takılıyordu. Düzeltmesi PR #87'de, sonraki APK'da gelir. Güncelleme 7 (yeni APK): görülmeden geçen bahsetme için sohbetin üstünde "Senden bahsedildi" düğmesi, dokununca o mesaja gider; telefonda denenmeli |
 | 41–42 | Kişi kartı | Çalışıyor | |
 | 43–44 | DJ yetkisi | Çalışıyor | |
 | 45 | Telefondan müzik çalma | Telefonda denenmeli | Depo (R2) kuruldu, şarkı yükleme açık |

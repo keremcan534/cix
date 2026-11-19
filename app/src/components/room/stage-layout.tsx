@@ -50,8 +50,11 @@ export function StageLayout({
    * The px free above the first row's faces (lib/stage-rows stageTop: a row's, SEAT_TOP, wherever the stage gives it).
    */
   top?: number;
-  /** `next`: the seat beside it on the same mic row (and the gap between them), for the Lv4 bond line. */
-  renderSeat: (index: number, slot: ArenaSlot, next?: { index: number; gap: number }) => ReactNode;
+  /**
+   * `next` / `prev`: the seats after and before it on the same mic row (and the gap between them), for the Lv4 bond
+   * line (the left seat draws the line, the right one its knot: lib/bond-link).
+   */
+  renderSeat: (index: number, slot: ArenaSlot, next?: { index: number; gap: number }, prev?: { index: number; gap: number }) => ReactNode;
 }) {
   const s = layout.layoutSchema;
   const stage = s.slots.filter((x) => x.area === 'stage');
@@ -122,8 +125,10 @@ export function StageLayout({
           const next = xs[k + 1];
           const linked = paired.has(x.index) && next && s.pairs.some(([a, b]) => a === x.index && b === next.index);
           const beside = x.kind === 'mic' && next?.kind === 'mic' && !x.host && !next.host ? { index: next.index, gap: micGap } : undefined;
+          const prev = xs[k - 1];
+          const behind = x.kind === 'mic' && prev?.kind === 'mic' && !x.host && !prev.host ? { index: prev.index, gap: micGap } : undefined;
           return [
-            <View key={x.index}>{x.kind === 'main' ? mainSeat(x, above) : renderSeat(x.index, { ...(x.host && xs.length === 1 ? sizes.host : micSlot), top: above }, beside)}</View>,
+            <View key={x.index}>{x.kind === 'main' ? mainSeat(x, above) : renderSeat(x.index, { ...(x.host && xs.length === 1 ? sizes.host : micSlot), top: above }, beside, behind)}</View>,
             linked ? heart(x.index, next.index) : null,
           ];
         })}

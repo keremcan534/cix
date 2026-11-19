@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 
 import { jointEntries, type JointState, type RoomBond } from '@/data/bonds';
 import { emptyEntryLine, pushEntry, shiftEntry, type EntryLine } from '@/lib/entry-queue';
-import { RETURN_MS, cameInAfter, entranceView, entryPlanOf, peerChanges } from '@/lib/room-entrance';
+import { RETURN_MS, cameInAfter, entranceView, entryPlanOf, newPeerLog, peerStep } from '@/lib/room-entrance';
 
 type Look = { entry?: string | null; ride?: string | null; noble?: number | null; vipLevel?: number };
 type Person = { id: string; name: string; look?: Look };
@@ -20,16 +20,17 @@ const T = 1_800_000_000_000;
 
 /**
  * One phone in a server room (lib/live/room useLiveRoomSync and the room screen's onJoin, without React). `me` came in
- * at `meJoinedAt`; `sync(people)` is the voice connection's list (everyone else, with when each came in).
+ * at `meJoinedAt`; `sync(people)` is the voice connection's list (everyone else, with when each came in). `stale`: the
+ * room's presence as an earlier visit left it on this phone (lib/room-presence keeps a room between visits).
  */
-function phone(me: Person, meJoinedAt: number, roomBonds: RoomBond[] = []) {
+function phone(me: Person, meJoinedAt: number, roomBonds: RoomBond[] = [], stale: string[] = []) {
   // My own account is 'me' on my phone, in the bonds too (lib/live/bonds loadRoomBonds: toLocal).
   const local = (uid: string) => (uid === me.id ? 'me' : uid);
   const bonds = roomBonds.map((b) => ({ ...b, a: local(b.a), b: local(b.b) }));
   const names = new Map([['me', me.name]]);
-  let members = ['me'];
+  let members = ['me', ...stale];
   let joinedAt = meJoinedAt;
-  const leftAt = new Map<string, number>();
+  let log = newPeerLog();
   const arrivals = new Map<string, number>();
   const mine = entryPlanOf(me.look);
   let line: EntryLine<string> = emptyEntryLine(mine ? { id: 'mine', who: ['me'], show: `${me.name}:${mine.fx}` } : null);
@@ -38,17 +39,18 @@ function phone(me: Person, meJoinedAt: number, roomBonds: RoomBond[] = []) {
   const nameOf = (uid: string) => names.get(uid) ?? uid;
   return {
     chat,
+    members: () => members,
     /** The voice connection's people now; `now` is this phone's clock. */
     sync(people: (Person & { at: number })[], now: number) {
       const here = new Map(people.map((p) => [p.id, { name: p.name, joinedAt: p.at }]));
-      const { leaves, joins } = peerChanges(members, here, joinedAt, leftAt, now);
-      for (const uid of leaves) {
-        members = members.filter((m) => m !== uid);
-        leftAt.set(uid, now);
-        arrivals.delete(uid);
-        chat.push(`${nameOf(uid)} odadan ayrıldı`);
+      const step = peerStep(log, members, here, joinedAt, now);
+      log = step.log;
+      for (const l of step.lines) {
+        arrivals.delete(l.uid);
+        chat.push(`${l.name} odadan ayrıldı`);
       }
-      for (const j of joins) {
+      for (const uid of step.leaves) members = members.filter((m) => m !== uid);
+      for (const j of step.joins) {
         members.push(j.uid);
         names.set(j.uid, j.name);
         arrivals.set(j.uid, j.join.at);
@@ -61,8 +63,13 @@ function phone(me: Person, meJoinedAt: number, roomBonds: RoomBond[] = []) {
       const r = jointEntries(bonds, new Set(members), new Map([...arrivals, ['me', joinedAt]]), joinedAt, joint);
       joint = r.state;
       for (const b of r.show) line = pushEntry(line, { id: `bond:${b.a}|${b.b}`, who: [b.a, b.b], show: `${nameOf(b.a)} & ${nameOf(b.b)}` });
+      return step;
     },
-    /** My connection dropped and came back: LiveKit lists nobody, then everyone again, with my new join time. */
+    /** My connection dropped: LiveKit says I'm not connected (my join time 0) until it is back. */
+    drop() {
+      joinedAt = 0;
+    },
+    /** My connection is back, with my new join time. */
     reconnect(at: number) {
       joinedAt = at;
     },
@@ -131,29 +138,38 @@ describe('(b) yeni gelen, içerideki kişilerin girişlerini tekrar görmez', ()
     assert.deepEqual(p.played(), ['Yönetici:dragon']);
   });
 
-  test('benim bağlantım kopup gelince: herkes yeniden listelenir ama giriş efekti oynamaz', () => {
+  test('benim bağlantım kopup gelince: herkes yeniden listelenir ama ne satır ne giriş efekti (Güncelleme 7, madde 14)', () => {
     const p = phone(newbie, T);
     const people = [{ ...owner, at: T - 900 * S }, { ...admin, at: T + 10 * S }];
+    p.sync(people.slice(0, 1), T + S);
     p.sync(people, T + 11 * S);
+    assert.deepEqual(p.chat, ['Yönetici odaya girdi']);
     p.played();
+    // LiveKit drops everyone while I'm reconnecting, then lists them again with my new join time.
+    p.drop();
     p.sync([], T + 100 * S);
-    p.reconnect(T + 104 * S);
-    p.sync(people, T + 105 * S);
+    p.sync([], T + 100 * S + 2 * RETURN_MS);
+    p.reconnect(T + 104 * S + 2 * RETURN_MS);
+    p.sync(people, T + 105 * S + 2 * RETURN_MS);
     assert.deepEqual(p.played(), []);
-    // The lines go both ways, as the connection did.
-    assert.deepEqual(p.chat.slice(-4), ['Oda Sahibi odadan ayrıldı', 'Yönetici odadan ayrıldı', 'Oda Sahibi odaya girdi', 'Yönetici odaya girdi']);
+    assert.deepEqual(p.chat, ['Yönetici odaya girdi'], 'kimse çıkıp girmiş gibi yazılmaz');
+    assert.deepEqual(p.members(), ['me', 'u-owner', 'u-admin']);
   });
 
-  test('başkasının bağlantısı kopup birkaç saniyede gelince satır var, efekt yok; sonra gelince efekt de var', () => {
+  test('başkasının bağlantısı 15 saniyeden kısa kopunca satır da efekt de yok; sonra gelince ikisi de var', () => {
     const p = phone(newbie, T);
+    p.sync([], T + S);
     p.sync([{ ...kaan, at: T + 5 * S }], T + 6 * S);
     assert.deepEqual(p.played(), ['KaaN:dragon']);
     p.sync([], T + 20 * S);
     p.sync([{ ...kaan, at: T + 24 * S }], T + 25 * S);
+    p.sync([{ ...kaan, at: T + 24 * S }], T + 60 * S);
     assert.deepEqual(p.played(), [], 'kopup gelen');
-    p.sync([], T + 30 * S);
-    p.sync([{ ...kaan, at: T + 30 * S + RETURN_MS }], T + 31 * S + RETURN_MS);
+    assert.deepEqual(p.chat, ['KaaN odaya girdi'], 'ayrıldı / girdi satırı yok');
+    p.sync([], T + 70 * S);
+    p.sync([{ ...kaan, at: T + 70 * S + RETURN_MS }], T + 71 * S + RETURN_MS);
     assert.deepEqual(p.played(), ['KaaN:dragon'], 'çıkıp sonra giren');
+    assert.deepEqual(p.chat.slice(1), ['KaaN odadan ayrıldı', 'KaaN odaya girdi']);
   });
 
   test('ses sunucusunun saatiyle: benden sonra gelen giriştir, önce gelen ya da bilinmeyen değil', () => {
@@ -254,5 +270,81 @@ describe('giriş bandını odadaki herkes görür (müşteri notu, 18 Kasım)', 
     assert.equal(RETURN_MS, 15_000);
     assert.equal(fresh(RETURN_MS), true);
     assert.equal(fresh(RETURN_MS - 1), false);
+    // The line too: a connection back within RETURN_MS writes nothing.
+    assert.equal(entranceView({ fresh: true, at: T, away: RETURN_MS - 1 }).line, false);
+    assert.equal(entranceView({ fresh: false, at: T, away: RETURN_MS }).line, true);
+  });
+});
+
+describe('odaya yeniden girince herkes yeniden gelmiş gibi yazılmaz (Güncelleme 7, madde 14)', () => {
+  const people = [{ ...owner, at: T - 900 * S }, { ...admin, at: T - 120 * S }, { ...artemis, at: T - 30 * S }];
+
+  test('ikinci ziyaret: eski ziyaretten kalanlar sessizce düşer, içeridekiler sessizce gelir; sonra gelen ve çıkan yazılır', () => {
+    // The presence still lists the people of my last visit: KaaN has gone since, ARTEMİS came while I was away.
+    const p = phone(newbie, T, [], ['u-owner', 'u-admin', 'u-kaan']);
+    // The room screen opens before the voice connection is up: an empty list, my join time 0.
+    p.drop();
+    const quiet = p.sync([], T - 2 * S);
+    assert.deepEqual([quiet.leaves, quiet.joins, quiet.lines], [[], [], []], 'bağlanırken hiçbir şey değişmez');
+    assert.deepEqual(p.members(), ['me', 'u-owner', 'u-admin', 'u-kaan']);
+    p.reconnect(T);
+    p.sync(people, T + S);
+    assert.deepEqual(p.chat, []);
+    assert.deepEqual(p.played(), []);
+    assert.deepEqual(p.members(), ['me', 'u-owner', 'u-admin', 'u-artemis']);
+    // Nothing comes later for the ones the baseline settled.
+    p.sync(people, T + S + 2 * RETURN_MS);
+    assert.deepEqual(p.chat, []);
+    // A real newcomer: the line and their effect at once.
+    p.sync([...people, { ...kaan, at: T + 40 * S }], T + 41 * S);
+    assert.deepEqual(p.chat, ['KaaN odaya girdi']);
+    assert.deepEqual(p.played(), ['KaaN:dragon']);
+    // A real leaver: out of the mics and the Balkon at once, the line once they have been out RETURN_MS.
+    const after = people.filter((x) => x.id !== 'u-admin').concat({ ...kaan, at: T + 40 * S });
+    const gone = p.sync(after, T + 50 * S);
+    assert.deepEqual(gone.leaves, ['u-admin']);
+    assert.equal(gone.next, T + 50 * S + RETURN_MS);
+    p.sync(after, T + 50 * S + RETURN_MS - 1);
+    assert.deepEqual(p.chat, ['KaaN odaya girdi']);
+    const due = p.sync(after, T + 50 * S + RETURN_MS);
+    assert.equal(due.next, null);
+    assert.deepEqual(p.chat, ['KaaN odaya girdi', 'Yönetici odadan ayrıldı']);
+  });
+
+  test('odayı ilk açışta da içeridekiler için satır yok', () => {
+    const p = phone(newbie, T);
+    p.drop();
+    p.sync([], T - S);
+    p.reconnect(T);
+    p.sync(people, T + S);
+    assert.deepEqual(p.chat, []);
+    assert.deepEqual(p.played(), []);
+  });
+
+  test('bekleyen "ayrıldı" satırı: bağlantım koparken kişi döndüyse yazılmaz, dönmediyse yazılır', () => {
+    const p = phone(newbie, T);
+    p.sync([], T + S);
+    p.sync([{ ...kaan, at: T + 5 * S }, { ...artemis, at: T + 6 * S }], T + 7 * S);
+    assert.equal(p.sync([], T + 10 * S).next, T + 10 * S + RETURN_MS);
+    p.drop();
+    assert.equal(p.sync([], T + 12 * S).next, null, 'bağlantı yokken saat kurulmaz; ilk liste karar verir');
+    assert.equal(p.sync([], T + 30 * S).lines.length, 0);
+    p.reconnect(T + 40 * S);
+    p.sync([{ ...kaan, at: T + 13 * S }], T + 41 * S);
+    assert.deepEqual(p.chat.slice(2), ['ARTEMİS odadan ayrıldı'], 'dönen KaaN için satır yok');
+    assert.deepEqual(p.members(), ['me', 'u-kaan']);
+  });
+
+  test('saf adım: bağlanmadan bir şey değişmez; ilk liste sessiz; yalnız sonraki değişiklikler yazılır', () => {
+    const here = new Map([['u-a', { name: 'A', joinedAt: T - S }]]);
+    const none = peerStep(newPeerLog(), ['me', 'u-old'], here, 0, T);
+    assert.deepEqual([none.leaves, none.joins, none.lines, none.next], [[], [], [], null]);
+    const first = peerStep(none.log, ['me', 'u-old'], here, T, T);
+    assert.deepEqual(first.leaves, ['u-old']);
+    assert.deepEqual(first.joins, [{ uid: 'u-a', name: 'A', join: { fresh: false, at: T - S, away: null } }]);
+    assert.equal(first.next, null, 'sessiz çıkan için bekleyen satır yok');
+    // A screen opened while the connection was already up: someone who came after my join is no entrance either.
+    const late = peerStep(newPeerLog(), ['me'], new Map([['u-b', { name: 'B', joinedAt: T + 5 * S }]]), T, T + 9 * S);
+    assert.equal(entranceView(late.joins[0].join).line, false);
   });
 });

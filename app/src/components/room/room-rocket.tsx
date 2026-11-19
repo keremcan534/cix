@@ -4,7 +4,7 @@
 // level launches and its prizes are paid. A level the team gave a video (Oda roketi in the panel: an SVGA, one a level)
 // launches with it, once it is on the phone; otherwise the Roket gift's picture rises, in the level's own colour.
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Image, Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 
 import { Halo } from '@/components/fx/float';
@@ -17,7 +17,8 @@ import { Text } from '@/components/text';
 import { Avatar } from '@/components/ui';
 import { toLocal } from '@/lib/live';
 import type { RocketNews } from '@/lib/live/room-bus';
-import { pctText, prizeLabel, rocketPct, shownLevel, type RocketPrize, type RoomRocket } from '@/lib/room-rocket-core';
+import { pctText, pillText, prizeLabel, rocketPct, shownLevel, type RocketPrize, type RoomRocket } from '@/lib/room-rocket-core';
+import { LAUNCH_MS, PAID_MS } from '@/lib/rocket-stage';
 import { useSheetMax } from '@/lib/sheet-space';
 import { SCRIM, colors } from '@/theme';
 
@@ -40,7 +41,9 @@ export function RocketPill({ rocket, onPress }: { rocket: RoomRocket; onPress: (
       accessibilityRole="button"
       accessibilityLabel={done ? 'Oda roketi: bugünün beş seviyesi kalktı' : `Oda roketi, Lv.${l.level}, ${pctText(pct)} dolu`}>
       <Image source={ROCKET_ART} style={s.pillArt} />
-      <Text style={s.pillText}>{done ? 'Lv.5 ✓' : `Lv.${l.level} ${pctText(pct)}`}</Text>
+      <Text style={s.pillText} numberOfLines={1}>
+        {pillText(rocket)}
+      </Text>
     </Pressable>
   );
 }
@@ -179,10 +182,27 @@ export function RocketSheet({ rocket, onClose, onGift }: { rocket: RoomRocket; o
 }
 
 /**
- * A level launching (the rocket rises across the screen) or its prizes paid (who won; mine first). `still`:
- * "hareketi azalt" (no rise, the line alone). Ends itself (onDone) after a few seconds.
+ * A level launching (the rocket rises across the screen) or its prizes paid (who won; mine first), then `then`, the
+ * launch's payout, when it came in time. A cue of the room's stage (lib/rocket-stage): it waits for the gift on screen
+ * and the gifts after it wait for it. `still`: "hareketi azalt" (no rise, the line alone). Ends itself (onDone) after a
+ * few seconds.
  */
-export function RocketShow({ news, still, muted, onDone }: { news: RocketNews; still?: boolean; muted?: boolean; onDone: () => void }) {
+export function RocketShow({ news, then, still, muted, onDone }: { news: RocketNews; then?: RocketNews | null; still?: boolean; muted?: boolean; onDone: () => void }) {
+  // A launch's payout joins its turn on the room's stage (lib/rocket-stage), also while the launch plays: the winners'
+  // line comes right after the rocket, before anything else takes the stage.
+  const after = useRef(then ?? null);
+  useEffect(() => {
+    after.current = then ?? null;
+  });
+  const [phase, setPhase] = useState(news);
+  const next = () => {
+    if (phase === news && after.current) setPhase(after.current);
+    else onDone();
+  };
+  return <RocketPhase key={`${phase.launch}:${phase.event}`} news={phase} still={still} muted={muted} onDone={next} />;
+}
+
+function RocketPhase({ news, still, muted, onDone }: { news: RocketNews; still?: boolean; muted?: boolean; onDone: () => void }) {
   const { height } = useWindowDimensions();
   const [rise] = useState(() => new Animated.Value(0));
   const launch = news.event === 'launch';
@@ -190,7 +210,7 @@ export function RocketShow({ news, still, muted, onDone }: { news: RocketNews; s
   useEffect(() => {
     // The video ends the show itself (VideoFx).
     if (media) return;
-    const ms = launch ? 2600 : 3600;
+    const ms = launch ? LAUNCH_MS : PAID_MS;
     const t = setTimeout(onDone, ms);
     if (launch && !still) Animated.timing(rise, { toValue: 1, duration: 2200, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start();
     return () => clearTimeout(t);

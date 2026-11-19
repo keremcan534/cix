@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 
 import { onServerRocket, parseServerRocket, reportSignal, type RocketNews } from '@/lib/live/room-bus';
-import { parsePrize, parseRocket, pctText, prizeLabel, rocketPct, shownLevel } from '@/lib/room-rocket-core';
+import { parsePrize, parseRocket, pctText, pillText, prizeLabel, rocketPct, shownLevel } from '@/lib/room-rocket-core';
 
 const AVATAR = 'https://130-61-230-94.sslip.io/api/media/f/avatar/00000000-0000-4000-8000-000000000001/a.jpg';
 const user = (id: string, name: string) => ({ id, name, avatarUrl: AVATAR });
@@ -79,11 +79,21 @@ describe('Oda roketi: sunucunun cevabı', () => {
     assert.equal(rocketPct({ filled: 575, goal: 1_000, launched: false }), 57.5);
     assert.equal(rocketPct({ filled: 999, goal: 1_000, launched: false }), 99.9);
     assert.equal(rocketPct({ filled: 3, goal: 1_000, launched: true }), 100);
-    assert.equal(pctText(57.5), '57,5%');
-    assert.equal(pctText(100), '100%');
+    assert.equal(pctText(57.5), '%57,5');
+    assert.equal(pctText(12.9), '%12,9');
+    assert.equal(pctText(100), '%100');
     const r = parseRocket(answer())!;
     assert.equal(shownLevel(r), 2);
     assert.equal(shownLevel({ ...r, current: null }), 5, 'beşi de kalkınca son seviye');
+  });
+
+  test('düğme: seviye ve yüzde ayrı okunur ("Lv.2 · %12,9", Güncelleme 7 madde 5a)', () => {
+    const r = parseRocket(answer())!;
+    assert.equal(pillText(r), 'Lv.2 · %10');
+    r.levels[1].filled = 258;
+    assert.equal(pillText(r), 'Lv.2 · %12,9');
+    assert.doesNotMatch(pillText(r), /Lv\.\d+\s?\d/, 'seviye sayısı yüzdeye bitişmez');
+    assert.equal(pillText({ ...r, current: null }), 'Lv.5 ✓');
   });
 });
 
