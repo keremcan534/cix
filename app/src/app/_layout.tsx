@@ -11,7 +11,7 @@ import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
 
 import { RootCrashScreen, ScreenCrashScreen } from '@/components/crash-screen';
-import { Intro } from '@/components/fx/intro';
+import { Intro, introReady, preloadIntro, splashGone } from '@/components/fx/intro';
 import { ThemeFade } from '@/components/fx/theme-fade';
 import { ScreenEnter } from '@/components/fx/screen-enter';
 import { GamesBridge } from '@/components/games/bridge';
@@ -27,6 +27,7 @@ import { prepareAudioMode } from '@/lib/audio-mode';
 import { IS_DEMO } from '@/lib/build';
 import { installCrashGuard, markStarted } from '@/lib/crash-guard';
 import { initReporting } from '@/lib/reporting';
+import { SPLASH_FADE, SPLASH_WAIT } from '@/lib/splash';
 import { setupVoice } from '@/lib/voice-setup';
 import { liveMode } from '@/lib/live';
 import { LiveSync } from '@/lib/live/sync';
@@ -45,11 +46,22 @@ initReporting();
 // A stray error in a timer or a button handler no longer closes the app once it is up (lib/crash-guard).
 installCrashGuard();
 
-// Keep the splash up until the saved state is loaded, so the app doesn't flash the login screen first.
+// Keep the splash up until the saved state is loaded, so the app doesn't flash the login screen first. It then fades
+// out in SPLASH_FADE (Android's default is 400 ms, iOS cuts; the web has no native splash) over the opening's first
+// frame, which is the same picture and holds still meanwhile (components/fx/intro).
+SplashScreen.setOptions({ duration: SPLASH_FADE, fade: true });
 SplashScreen.preventAutoHideAsync().catch(() => {});
+// The opening's first frame starts loading now, while the fonts and the saved state do.
+preloadIntro();
+const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 const hideSplash = () => {
-  SplashScreen.hideAsync().catch(() => {});
   markStarted();
+  // The opening's layers have drawn (usually within a frame), or it won't play; never longer than SPLASH_WAIT. The
+  // splash shows the same picture, so waiting for them is invisible; hiding it first would show bare navy.
+  void Promise.race([introReady, delay(SPLASH_WAIT)]).then(() => {
+    SplashScreen.hideAsync().catch(() => {});
+    splashGone();
+  });
 };
 
 // An error anywhere above the screens (store, saved state, room layer) shows a way out instead of a closed app.
