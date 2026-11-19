@@ -1,5 +1,5 @@
 // Aile in a live build, the rest (lib/live/family → server/api/family-more.mjs): Görevler (the daily tasks as the
-// server counted them, the check-in, the weekly chests) and Uyum Köşesi (the family's pairs, İkili gifts to a
+// server counted them, the check-in, the weekly chests) and Uyum Köşesi (the family's pairs, Çift gifts to a
 // member), plus the gift sheet the family chat uses. Everything shown is the server's answer: a task is done
 // when the server saw it happen, a chest pays reward coins once per person and week, and the weekly bonus is an
 // estimate (paying it is a management decision).
@@ -13,6 +13,7 @@ import { ActionSheet } from '@/components/ActionSheet';
 import { SCENES } from '@/components/fx/scenes';
 import { Backdrop } from '@/components/fx/surface';
 import { ProfileGiftSheet } from '@/components/profile-gift-sheet';
+import { useGiftStage } from '@/components/fx/gift-stage';
 import { Text } from '@/components/text';
 import { Avatar, Card, GradientButton, Header, StateIcon } from '@/components/ui';
 import { BOND_KINDS, isBondKind } from '@/data/bonds';
@@ -91,10 +92,12 @@ function NoFamily({ title, state, onRetry }: { title: string; state: 'loading' |
 
 /**
  * A gift to someone of my family, from the family chat (place 'family': the chat shows it) or Uyum Köşesi. No
- * confirmation, as every gift: the server takes the coins at its price.
+ * confirmation, as every gift: the server takes the coins at its price. Its animation plays over the screen once it
+ * went (components/fx/gift-stage; `sheet` draws it too).
  */
 export function useFamilyGift(list: Gift[], place: GiftPlace | undefined, onSent: () => void) {
-  const { coins, svipLevel, spendBlock, recordGift, bump } = useApp();
+  const { coins, svipLevel, spendBlock, recordGift, bump, me } = useApp();
+  const stage = useGiftStage();
   const gifts = visibleGifts(list, useLiveCatalog());
   const [to, setTo] = useState<{ id: string; name: string } | null>(null);
   const send = async (g: Gift): Promise<boolean> => {
@@ -120,9 +123,15 @@ export function useFamilyGift(list: Gift[], place: GiftPlace | undefined, onSent
     recordGift(to.id, g.id, 1);
     bump('giftsSent', 1);
     onSent();
+    stage.play(g, me.name, to.name, 1);
     return true;
   };
-  const sheet = to ? <ProfileGiftSheet visible name={to.name} gifts={gifts} coins={coins} svipLevel={svipLevel} onClose={() => setTo(null)} onSend={send} /> : null;
+  const sheet = (
+    <>
+      {to ? <ProfileGiftSheet visible name={to.name} gifts={gifts} coins={coins} svipLevel={svipLevel} onClose={() => setTo(null)} onSend={send} /> : null}
+      {stage.node}
+    </>
+  );
   return { giftTo: (p: { id: string; name: string }) => setTo(p), sheet };
 }
 
@@ -311,7 +320,7 @@ export function LiveFamilyTasks() {
 
 const CP_GIFTS = CP_GIFT_IDS.map((id) => GIFTS.find((g) => g.id === id)).filter((g): g is Gift => !!g);
 
-/** Uyum Köşesi: the family's bonds between members, and İkili gifts to one of them. */
+/** Uyum Köşesi: the family's bonds between members, and Çift gifts to one of them. */
 export function LiveFamilyPairs() {
   const { colors } = useTheme();
   const styles = useStyles();
@@ -362,8 +371,8 @@ export function LiveFamilyPairs() {
           )}
         </Card>
         <Card style={{ gap: 10 }}>
-          <Text style={styles.title}>İkili hediyesi</Text>
-          <Text style={styles.dim}>Aileden birine İkili hediyesi gönder: günlük “İkili hediyesi” görevine sayılır (her 350 jetona 2 puan).</Text>
+          <Text style={styles.title}>Çift hediyesi</Text>
+          <Text style={styles.dim}>Aileden birine Çift hediyesi gönder: günlük “Çift hediyesi” görevine sayılır (her 350 jetona 2 puan).</Text>
           <GradientButton title="Üye seç ve gönder" icon="gift" onPress={() => setPicking(true)} />
         </Card>
       </ScrollView>

@@ -125,6 +125,68 @@ describe('Birebir mesaj', () => {
     assert.equal(spent, Number(price), 'yalnız hediyenin fiyatı');
     assert.ok((await pair(man.session, star.user.id)).heart.points >= Number(price));
   });
+
+  test('sohbet hediyesinin satırı hediyeyi taşır (yeni uygulama oynatır), eski uygulama yazısını görür', async () => {
+    const a = await person('Arda', 'Erkek');
+    const b = await person('Bade', 'Kadın');
+    await topUp(a.session, 5000);
+    const ref = rnd(6);
+    await ok(call('POST', '/api/gifts/send', { to: b.user.id, giftId: 'g4', count: 5, place: 'chat', ref }, a.session), 'hediye');
+    await ok(dm(b.session, a.user.id, 'Teşekkürler'), 'cevap');
+    for (const s of [a.session, b.session]) {
+      const { messages } = await ok(call('GET', `/api/messages?with=${s === a.session ? b.user.id : a.user.id}`, null, s), 'mesajlar');
+      const line = messages.find((m) => m.from === a.user.id);
+      assert.deepEqual(line.gift, { id: 'g4', count: 5 });
+      assert.match(line.text, /^Hediye gönderdi: .+ ×5$/, 'eski uygulama yazıyı okur');
+      assert.equal(messages.find((m) => m.from === b.user.id).gift, undefined, 'yazılan mesajda hediye yok');
+    }
+    // The line's ref is the server's: a phone can't send one with ':'.
+    assert.equal((await q('SELECT ref FROM messages WHERE sender = $1', [a.user.id])).rows[0].ref, `gift:${ref}`);
+    const [st] = await dm(a.session, b.user.id, 'Merhaba', `gift:${rnd(6)}`);
+    assert.equal(st, 400);
+    // The conversation list carries it on the last line too.
+    await ok(call('POST', '/api/gifts/send', { to: b.user.id, giftId: 'g4', count: 1, place: 'chat', ref: rnd(6) }, a.session), 'ikinci hediye');
+    const { conversations } = await ok(call('GET', '/api/conversations', null, b.session), 'sohbetler');
+    assert.deepEqual(conversations.find((c) => c.user.id === a.user.id).last.gift, { id: 'g4', count: 1 });
+  });
+
+  test('yazıyla hediye satırı taklidi reddedilir; önceden alınan ref hediye sayılmaz', async () => {
+    const a = await person('Cem', 'Erkek');
+    const b = await person('Dila', 'Kadın');
+    const count = async () => Number((await q('SELECT count(*) FROM messages WHERE sender = $1', [a.user.id])).rows[0].count);
+    for (const text of ['Hediye gönderdi: Aslan ×100', '🎁 HEDİYE  gönderdi : Roket', 'hediye gonderdi - Taç', 'Hedi​ye gönderdi: Aslan']) {
+      const [st, j] = await dm(a.session, b.user.id, text);
+      assert.equal(st, 400, text);
+      assert.equal(j.code, 'fake_gift');
+      assert.match(j.error, /gerçek bir hediye/);
+    }
+    assert.equal(await count(), 0, 'hiçbiri yazılmadı');
+    // Ordinary words about gifts still go.
+    for (const text of ['Hediye gönderdin mi?', 'Bana hediye gönderdi: Aslan', 'Hediye gönderdi']) await ok(dm(a.session, b.user.id, text), text);
+    // A phone took the old line ref (gift-<ref>) before the gift: its message stays a plain message, the gift
+    // writes its own line with the gift.
+    await topUp(a.session, 1000);
+    const ref = rnd(6);
+    await ok(dm(a.session, b.user.id, 'Bu bir hediye değil', `gift-${ref}`), 'önceden alınan ref');
+    await ok(call('POST', '/api/gifts/send', { to: b.user.id, giftId: 'g4', count: 1, place: 'chat', ref }, a.session), 'hediye');
+    const { messages } = await ok(call('GET', `/api/messages?with=${a.user.id}`, null, b.session), 'mesajlar');
+    assert.equal(messages.find((m) => m.text === 'Bu bir hediye değil').gift, undefined);
+    assert.deepEqual(messages.filter((m) => m.gift).map((m) => m.gift), [{ id: 'g4', count: 1 }]);
+    // A line written before Nov 2026 (ref gift-<ref>, in the gift's transaction) still carries its gift; one whose
+    // gift came later (a ref taken first) doesn't.
+    const old = rnd(6);
+    await q(
+      `WITH g AS (INSERT INTO gift_events (sender, recipient, gift_id, count, unit_price, total, place, ref) VALUES ($1, $2, 'g4', 10, 10, 100, 'chat', $3) RETURNING id)
+       INSERT INTO messages (sender, recipient, body, ref) SELECT $1, $2, 'Hediye gönderdi: Kahve ×10', 'gift-' || $3 FROM g`,
+      [a.user.id, b.user.id, old],
+    );
+    const early = rnd(6);
+    await q("INSERT INTO messages (sender, recipient, body, ref) VALUES ($1, $2, 'Erken', 'gift-' || $3)", [a.user.id, b.user.id, early]);
+    await q("INSERT INTO gift_events (sender, recipient, gift_id, count, unit_price, total, place, ref) VALUES ($1, $2, 'g4', 1, 10, 10, 'chat', $3)", [a.user.id, b.user.id, early]);
+    const after = (await ok(call('GET', `/api/messages?with=${b.user.id}`, null, a.session), 'mesajlar')).messages;
+    assert.deepEqual(after.find((m) => m.text === 'Hediye gönderdi: Kahve ×10').gift, { id: 'g4', count: 10 });
+    assert.equal(after.find((m) => m.text === 'Erken').gift, undefined);
+  });
 });
 
 describe('Birebir arama', () => {

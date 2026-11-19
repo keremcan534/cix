@@ -7,6 +7,10 @@
 // Otomatik mesaj (lib/live/auto-chat): under a paid message a streamer received, the diamonds she earns by answering
 // in 5 minutes and the time left; under my own paid message what became of its coins; a label on automatic messages and
 // quick replies; and a woman streamer's quick-reply button once the other person wrote to her.
+// Gifts (lib/dm-gift-fx): a gift's line (the server's `gift`) is drawn as the gift; its animation plays on my screen
+// as soon as my gift went, and the other person's on mine once: the newest one when the chat opens, each new one
+// while it is open. A tap on the line plays it again. `stage`: where they play (the room's messages sheet passes its
+// Modal's own, so the video isn't cut by the sheet); otherwise over this thread's screen.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
@@ -24,6 +28,11 @@ import { MessageText } from '@/components/ReactionArt';
 import { stickerIdOf } from '@/lib/stickers';
 import { Avatar } from '@/components/ui';
 import { Icon3D } from '@/components/Icon3D';
+import { GiftArt } from '@/components/GiftArt';
+import { useGiftStage, type GiftStage } from '@/components/fx/gift-stage';
+import { GIFT_FX_OPENING_MS, giftFxToPlay, giftNameOfText, type DmGift } from '@/lib/dm-gift-fx';
+import { giftById } from '@/lib/live/catalog-live';
+import { giftFxPlayedOf, giftFxSeen, noteGiftFxPlayed } from '@/lib/live/gift-fx-seen';
 import { BOT_LINES, DM_PRICE, FOLLOWS_ME, type Conversation, type EventShareCard, type RoomInviteCard, type User } from '@/data/mock';
 import { openEvents } from '@/components/events/open';
 import { whenText } from '@/lib/events';
@@ -61,6 +70,7 @@ export function ChatThread({
   last,
   onMore,
   avoidKeyboard = true,
+  stage: stageProp,
 }: {
   user: User;
   /** Rendered above the thread; gets the "typing…" state and, with a real person, the 1v1 pair (null until read). */
@@ -72,6 +82,8 @@ export function ChatThread({
   onMore?: () => void;
   /** Off when the screen around it already keeps the composer above the keyboard (a bottom sheet rises as a whole). */
   avoidKeyboard?: boolean;
+  /** Where gift animations play (components/fx/gift-stage), drawn by the caller; none: over this thread. */
+  stage?: GiftStage;
 }) {
   const { conversations, sendMessage, setMessageFailed, markMessageSent, importDms, deleteMessage, markRead, following, toggleFollow, blocked, toggleBlock, spendCoins, createTicket, logSafety, me, coins } = useApp();
   const { colors, gradientDeep } = useTheme();
@@ -94,7 +106,17 @@ export function ChatThread({
   const heart = missing ? null : heartOf(user.id, pair);
   const price = real ? (pair?.dmPrice ?? 0) : DM_PRICE;
   const mutual = real ? price === 0 : following.has(user.id) && FOLLOWS_ME.has(user.id);
-  const gift = useChatGift(user, reload);
+  const ownStage = useGiftStage();
+  const stage = stageProp ?? ownStage;
+  // My gift went: its line comes from the server, read at once (the heart moved too).
+  const gift = useChatGift(
+    user,
+    () => {
+      reload();
+      if (real) void syncThread(user.id, { importDms }).catch(() => {});
+    },
+    stage,
+  );
   const isBlocked = blocked.has(user.id);
   const report = useReport();
   const [emojiOpen, setEmojiOpen] = useState(false);
@@ -126,6 +148,37 @@ export function ChatThread({
     markRead(user.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user.id, messages.length]);
+
+  // The other person's gifts play once on this phone (lib/dm-gift-fx): on opening only the newest one not played yet,
+  // then each new one. Only the server's `gift` on a line counts, never its text.
+  const openedAt = useRef(0);
+  useEffect(() => {
+    openedAt.current = Date.now();
+  }, [user.id]);
+  const peer = real ? toServer(user.id) : null;
+  useEffect(() => {
+    if (!peer || !messages.length) return;
+    let alive = true;
+    void giftFxSeen().then(() => {
+      if (!alive) return;
+      const now = Date.now();
+      const r = giftFxToPlay(messages, giftFxPlayedOf(peer), now - openedAt.current < GIFT_FX_OPENING_MS, now);
+      noteGiftFxPlayed(peer, r.played);
+      for (const { gift: gl } of r.play) {
+        const g = gl ? giftById(gl.id) : undefined;
+        if (g && gl) stage.play(g, user.name, me.name, gl.count);
+      }
+    });
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [peer, messages]);
+  /** A tap on a gift's line: its animation again. */
+  const replayGift = (m: ChatMessage, gl: DmGift) => {
+    const g = giftById(gl.id);
+    if (g) stage.play(g, m.fromMe ? me.name : user.name, m.fromMe ? user.name : me.name, gl.count);
+  };
 
   useEffect(
     () => () => {
@@ -330,7 +383,11 @@ export function ChatThread({
                 {!!sourceLabel(item.source ?? extras(item.sid)?.source, true) && <Text style={[styles.autoLabel, { alignSelf: 'flex-end' }]}>{sourceLabel(item.source ?? extras(item.sid)?.source, true)}</Text>}
                 <LinearGradient colors={gradientDeep} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.bubble, styles.mineBubble]}>
                   {!!item.image && <Image source={{ uri: item.image }} style={styles.photo} resizeMode="cover" accessibilityLabel="Fotoğraf" />}
-                  {!(item.image && item.text === 'Fotoğraf') && <MessageText text={item.text} style={styles.bubbleText} />}
+                  {item.gift ? (
+                    <GiftLine gift={item.gift} text={item.text} onPlay={() => replayGift(item, item.gift!)} onLongPress={() => setPicked(item)} />
+                  ) : (
+                    !(item.image && item.text === 'Fotoğraf') && <MessageText text={item.text} style={styles.bubbleText} />
+                  )}
                   {item.room && <RoomCard room={item.room} />}
                   {item.event && <EventCard event={item.event} />}
                   <Text style={styles.time}>
@@ -361,7 +418,11 @@ export function ChatThread({
                 {!!sourceLabel(item.source ?? extras(item.sid)?.source, false) && <Text style={styles.autoLabel}>{sourceLabel(item.source ?? extras(item.sid)?.source, false)}</Text>}
                 <Pressable onLongPress={() => setPicked(item)} delayLongPress={350} style={[styles.bubble, styles.theirs]} accessibilityHint="Seçenekler için basılı tut">
                   {!!item.image && <Image source={{ uri: item.image }} style={styles.photo} resizeMode="cover" accessibilityLabel="Fotoğraf" />}
-                  {!(item.image && item.text === 'Fotoğraf') && <MessageText text={item.text} style={[styles.bubbleText, styles.theirsText]} />}
+                  {item.gift ? (
+                    <GiftLine gift={item.gift} text={item.text} theirs onPlay={() => replayGift(item, item.gift!)} onLongPress={() => setPicked(item)} />
+                  ) : (
+                    !(item.image && item.text === 'Fotoğraf') && <MessageText text={item.text} style={[styles.bubbleText, styles.theirsText]} />
+                  )}
                   {item.room && <RoomCard room={item.room} theirs />}
                   {item.event && <EventCard event={item.event} theirs />}
                   <Text style={[styles.time, styles.theirsTime]}>{messageTime(item)}</Text>
@@ -498,7 +559,35 @@ export function ChatThread({
         options={MESSAGE_REPORT_REASONS.map((r) => ({ label: r, onPress: () => reporting && void sendReport(reporting, r) }))}
         onClose={() => setReporting(null)}
       />
+      {!stageProp && ownStage.node}
     </>
+  );
+}
+
+/** A gift's line (the server's `gift`): its picture, who sent it, its name and count; a tap plays it again. */
+function GiftLine({ gift, text, theirs, onPlay, onLongPress }: { gift: DmGift; text: string; theirs?: boolean; onPlay: () => void; onLongPress: () => void }) {
+  const styles = useStyles();
+  const known = giftById(gift.id);
+  const name = `${known?.name ?? giftNameOfText(text)}${gift.count > 1 ? ` ×${gift.count}` : ''}`;
+  const kind = theirs ? 'Hediye gönderdi' : 'Hediye gönderdin';
+  return (
+    <Pressable
+      onPress={known ? onPlay : undefined}
+      onLongPress={onLongPress}
+      delayLongPress={350}
+      style={styles.giftLine}
+      accessibilityRole="button"
+      accessibilityLabel={`${kind}: ${name}`}
+      accessibilityHint={known ? 'Animasyonu yeniden oynatır' : undefined}
+    >
+      <GiftArt giftId={gift.id} emoji={known?.emoji ?? '🎁'} size={44} textStyle={styles.giftLineEmoji} />
+      <View style={{ flexShrink: 1 }}>
+        <Text style={[styles.giftLineKind, theirs && styles.giftLineKindTheirs]}>🎁 {kind}</Text>
+        <Text style={[styles.giftLineName, theirs && styles.theirsText]} numberOfLines={2}>
+          {name}
+        </Text>
+      </View>
+    </Pressable>
   );
 }
 
@@ -600,6 +689,11 @@ const useStyles = makeStyles(({ colors, lift, ink, dark }) => ({
   refusedText: { color: '#FECACA', fontWeight: '700', alignSelf: 'stretch', textAlign: 'right', lineHeight: 15 },
   theirsTime: { color: ink(0.6) },
   roomCard: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6, padding: 8, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.25)', minWidth: 190 },
+  giftLine: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 2, minWidth: 150 },
+  giftLineEmoji: { fontSize: 34, lineHeight: 44 },
+  giftLineKind: { color: 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: '700' },
+  giftLineKindTheirs: { color: ink(0.7) },
+  giftLineName: { color: '#fff', fontSize: 15, fontWeight: '800' },
   roomCardTheirs: { backgroundColor: dark ? 'rgba(0,0,0,0.25)' : colors.cardAlt },
   roomCover: { width: 44, height: 44, borderRadius: 10 },
   eventIcon: { width: 44, height: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#7C3AED' },

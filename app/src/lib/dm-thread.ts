@@ -6,6 +6,7 @@
 // shown and then deleted here. Ids at or below it are never added again, which is what keeps a deleted message or
 // chat deleted. `hidden` holds the ids above `after` that were deleted before the next sync settled them.
 import type { Conversation } from '@/data/mock';
+import { parseDmGift } from '@/lib/dm-gift-fx';
 
 export type ChatMessage = Conversation['messages'][number];
 /** A message as GET /api/messages returns it (lib/api DirectMessage). */
@@ -21,6 +22,8 @@ export type ServerDm = {
   readAt?: string | null;
   /** An automatic message or a quick reply (newer servers, server/api/auto-chat.mjs); the bubble labels it. */
   source?: string;
+  /** The line of a gift sent from the chat (newer servers): which gift and how many (lib/dm-gift-fx parseDmGift). */
+  gift?: unknown;
 };
 /** The card of a server message's event, or undefined. */
 const eventCard = (d: ServerDm) => (d.event && Number.isSafeInteger(d.event.id) ? { event: { id: d.event.id, title: d.event.title ?? 'Etkinlik', startsAt: d.event.startsAt ?? null } } : null);
@@ -28,6 +31,11 @@ export type ThreadSync = { peer: string; after: number; hidden?: readonly number
 const SOURCES = ['auto_streamer', 'auto_opener', 'quick_reply'];
 /** The source of an automatic message or a quick reply, or nothing (a message typed by its writer, an older server). */
 const sourceOf = (d: ServerDm) => (typeof d.source === 'string' && SOURCES.includes(d.source) ? { source: d.source as 'auto_streamer' | 'auto_opener' | 'quick_reply' } : null);
+/** A gift's line: its gift, or nothing (a typed message, an older server, a malformed field). */
+const giftOf = (d: ServerDm) => {
+  const gift = parseDmGift(d.gift);
+  return gift ? { gift } : null;
+};
 
 const pad = (n: number) => String(n).padStart(2, '0');
 /** 'HH:MM' of an ISO time on this phone's clock, or '' when it can't be read. */
@@ -69,7 +77,8 @@ export function mergeThread(local: readonly ChatMessage[], server: readonly Serv
     // stored it); the oldest first, as the server numbers messages in the order they arrive. A message the server
     // refused (noRetry) was never stored, so it never takes the id.
     let pending = -1;
-    if (mine) {
+    // A gift's line is the server's (never sent ahead from this phone), so it matches no local message either.
+    if (mine && !giftOf(d)) {
       // A photo is never sent ahead on this phone (it comes in from the server), so it matches no local message.
       const unconfirmed = (m: ChatMessage) => !d.image && m.fromMe && m.sid === undefined && !m.noRetry && m.text === d.text;
       pending = out.findIndex((m) => unconfirmed(m) && !m.failed);
@@ -79,7 +88,7 @@ export function mergeThread(local: readonly ChatMessage[], server: readonly Serv
       out[pending] = { ...withoutFailure(out[pending]), sid: d.id, at: d.createdAt, ...seen };
       known.set(d.id, pending);
     } else {
-      out.push({ id: `s${d.id}`, fromMe: mine, text: d.text, time: clockOf(d.createdAt), at: d.createdAt, sid: d.id, ...(d.image && { image: d.image }), ...eventCard(d), ...sourceOf(d), ...seen });
+      out.push({ id: `s${d.id}`, fromMe: mine, text: d.text, time: clockOf(d.createdAt), at: d.createdAt, sid: d.id, ...(d.image && { image: d.image }), ...eventCard(d), ...sourceOf(d), ...giftOf(d), ...seen });
       known.set(d.id, out.length - 1);
       if (!mine) incoming++;
     }
