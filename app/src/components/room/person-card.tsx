@@ -196,14 +196,15 @@ export function PersonCard({ uid, note, onClose, onGift, onMention, onReport, on
                 </Text>
                 {charm !== null && <LevelPill level={charm} />}
               </View>
-              <View style={[s.row, { flexWrap: 'wrap' }]}>
+              {/* Room between wrapped lines: the badges' crowns and sparkles stand above them. */}
+              <View style={[s.row, s.wrap]}>
                 <AgePill user={u} />
                 {wealth !== null && <WealthBadge level={wealth} />}
                 {vip > 0 ? <VipTitle level={vip} /> : u.vip && <VipBadge />}
                 {heart && heart.level > 0 && <HeartBadge level={heart.level} />}
               </View>
               {(!!shownId.id || !!country) && (
-                <View style={[s.row, { flexWrap: 'wrap' }]}>
+                <View style={[s.row, s.wrap]}>
                   {!!shownId.id && (
                     <Pressable style={s.idPill} onPress={copyId} hitSlop={6} accessibilityRole="button" accessibilityLabel={`ID ${shownId.id}, kopyala`}>
                       <Text style={[s.idText, shownId.special && s.idSpecial]} numberOfLines={1}>
@@ -224,7 +225,7 @@ export function PersonCard({ uid, note, onClose, onGift, onMention, onReport, on
               {!!note && (
                 <View style={s.row}>
                   <CardArt name="defne-sol" h={20} />
-                  <Text style={s.note} numberOfLines={2}>
+                  <Text style={s.note} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                     {note}
                   </Text>
                   <CardArt name="defne-sag" h={20} />
@@ -304,10 +305,11 @@ const s = StyleSheet.create({
   avatar: { width: 104, height: 104, alignItems: 'center', justifyContent: 'center' },
   who: { flex: 1, minWidth: 0, gap: 7, paddingTop: 8 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  wrap: { flexWrap: 'wrap', rowGap: 10 },
   name: { color: SHOW.text, fontSize: 21, fontWeight: '900', flexShrink: 1 },
   age: { width: AGE_H * 3, height: AGE_H, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3 },
   ageText: { color: '#fff', fontSize: 13, lineHeight: 16, fontWeight: '800' },
-  note: { color: SHOW.dim, fontSize: 13, flexShrink: 1 },
+  note: { color: SHOW.dim, fontSize: 12.5, flexShrink: 1 },
   close: { position: 'absolute', right: 4, top: 4, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   dim: { color: SHOW.dim, fontSize: 14 },
   strong: { color: SHOW.text, fontWeight: '800' },

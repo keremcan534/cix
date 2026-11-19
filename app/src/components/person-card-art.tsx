@@ -1,7 +1,7 @@
 // The person card's pictures (app/assets/person-card, the designer's set): each drawn at its own shape. What changes
 // size is built from slices, so round corners and glowing ends keep their shape on every phone and with every name.
-import type { ReactNode } from 'react';
-import { Image, StyleSheet, View, type ImageSourcePropType, type StyleProp, type ViewStyle } from 'react-native';
+import { useState, type ReactNode } from 'react';
+import { Image, StyleSheet, View, type ImageSourcePropType, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
 
 const ART = {
   iliski: [require('../../assets/person-card/iliski.png'), 1.737],
@@ -70,16 +70,26 @@ const PILLS = {
 /** A pill end's width over its height. */
 const PILL_END = 0.788;
 
-/** A pill as wide as what is in it: both ends keep their shape, the strip between them stretches. */
+/**
+ * A pill as wide as what is in it: both ends keep their shape, the strip between them stretches. Each end gets an
+ * explicit width from the pill's real height: an Image given only `height` and `aspectRatio` takes its picture's own
+ * width on Android (104 px ends became 104-point ovals, the client's broken card in Güncelleme 7), and Yoga lets the
+ * ratio win over the height. The slices are clipped to the pill, so nothing ever paints outside it.
+ */
 export function SlicePill({ kind, h, children, style }: { kind: keyof typeof PILLS; h: number; children: ReactNode; style?: StyleProp<ViewStyle> }) {
   const [left, mid, right] = PILLS[kind];
-  const end = h * PILL_END;
+  const [tall, setTall] = useState(h);
+  const end = Math.round(Math.max(h, tall) * PILL_END);
+  const onLayout = (e: LayoutChangeEvent) => {
+    const next = Math.round(e.nativeEvent.layout.height);
+    if (next > 0 && next !== tall) setTall(next);
+  };
   return (
-    <View style={[{ minHeight: h, minWidth: end * 2, justifyContent: 'center' }, style]}>
-      <View style={[StyleSheet.absoluteFill, { flexDirection: 'row' }]} pointerEvents="none">
-        <Image source={left} style={{ height: '100%', aspectRatio: PILL_END }} resizeMode="stretch" />
-        <Image source={mid} style={{ flex: 1, height: '100%', marginHorizontal: -0.5 }} resizeMode="stretch" />
-        <Image source={right} style={{ height: '100%', aspectRatio: PILL_END }} resizeMode="stretch" />
+    <View style={[{ minHeight: h, minWidth: end * 2, justifyContent: 'center' }, style]} onLayout={onLayout}>
+      <View style={[StyleSheet.absoluteFill, { flexDirection: 'row', overflow: 'hidden' }]} pointerEvents="none">
+        <Image source={left} style={{ width: end, height: '100%' }} resizeMode="stretch" />
+        <Image source={mid} style={{ flex: 1, width: undefined, height: '100%', marginHorizontal: -0.5 }} resizeMode="stretch" />
+        <Image source={right} style={{ width: end, height: '100%' }} resizeMode="stretch" />
       </View>
       {children}
     </View>
