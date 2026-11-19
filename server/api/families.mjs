@@ -26,7 +26,7 @@ import { HttpError, auth, blockedBetween, db, int, limit, once, publicText, read
 import { notify } from './push.mjs';
 import { assertMay } from './sanctions.mjs';
 import { spendCoins } from './wallet.mjs';
-import { FAMILY_THEMES } from './family-rules.mjs';
+import { familyRulesOf } from './live-registry.mjs';
 import { live } from './live-settings.mjs';
 import { isStreamer } from './streamer-rule.mjs';
 
@@ -444,7 +444,7 @@ export const familyRoutes = {
     if (tag && !/^[\p{L}\p{N}]+$/u.test(tag)) throw new HttpError(400, 'Aile etiketi yalnızca harf ve rakam olabilir');
     let theme;
     if (b.theme !== undefined) {
-      const t = FAMILY_THEMES.find((x) => x.id === b.theme);
+      const t = familyRulesOf(live()).themes.find((x) => x.id === b.theme);
       if (!t) throw new HttpError(400, 'Geçersiz tema');
       const level = (await familyView(id)).level;
       if (level < t.minLevel) throw new HttpError(403, `Bu tema Lv.${t.minLevel} ailede açılır`);

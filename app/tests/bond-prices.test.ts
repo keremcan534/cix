@@ -53,3 +53,12 @@ describe('Bağlar ve Koruma sayıları panelden (Canlı ayarlar)', () => {
     assert.equal(parseLiveCatalog({ gifts: [], guard: { dropFrom: 1, dropShare: 2, dropFlat: 1, thresholdEveryDays: 7 } }).guard, null);
   });
 });
+
+describe('Aile temaları panelden', () => {
+  test('tema seviyeleri katalogdan; bozuk olan atlanır', async () => {
+    const { parseFamilyThemes } = await import('@/lib/live/catalog-live');
+    assert.deepEqual(parseLiveCatalog({ gifts: [], family: { themes: { gece: 5, ates: 0, 'x y': 3 } } }).familyThemes, { gece: 5 });
+    assert.equal(parseLiveCatalog({ gifts: [] }).familyThemes, null);
+    assert.equal(parseFamilyThemes(null), null);
+  });
+});

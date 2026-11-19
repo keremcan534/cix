@@ -33,6 +33,7 @@ import { catalogGifts, checkShownPrice, customGiftsRev, giftFx, giftOf, replaced
 import { emojiCatalog, emojiRev } from './emoji.mjs';
 import { fxCatalog } from './fx.mjs';
 import { live } from './live-settings.mjs';
+import { familyRulesOf } from './live-registry.mjs';
 import { scorePkGift } from './pk.mjs';
 import { notify } from './push.mjs';
 import { purchaseOptions } from './purchases.mjs';
@@ -147,6 +148,7 @@ export const giftRoutes = {
       ...(url?.searchParams.get('shop') === '1' ? { shop: shopCatalog() } : {}),
       // Koruma's and Bağlar's numbers as Canlı ayarlar has them, for the screens that say them (an older app says its own).
       guard: guardRules(s),
+      family: { themes: Object.fromEntries(familyRulesOf(s).themes.map((t) => [t.id, t.minLevel])) },
       bonds: { answerDays: s.bondAnswerDays, cooldownDays: s.bondCooldownDays, talkDaily: s.bondTalkDaily, max: Object.fromEntries(Object.keys(BOND_KINDS).map((k) => [k, bondMax(k, s)])) },
       // Grows with every live settings save, every change in Yönetim › Hediyeler and Emojiler, and every Seviye
       // ayarları save (as /api/config's).

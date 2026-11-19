@@ -44,7 +44,27 @@ bekleme süresi.
   Bağlar ve Koruma yazılarındaki sayıları (3 gün, %10…) eski APK kendi içinden yazar; yeni APK katalogdan
   (`/api/catalog` `guard`, `bonds`) okur.
 
-## Sıradaki adımlar
+## 2. adım (19 Kasım): Aile
 
-2. Aile: günlük görevlerin puanları, haftalık sandıkların hedefi ve jetonu, temaların seviyesi.
+| Grup | Ayar | Varsayılan |
+| --- | --- | --- |
+| Aile görevleri | Her görevin puanı (sohbete mesaj, odada kalma, yeni üyeye hediye, yoklama, odada hediye, İkili hediyesi, sohbette hediye) | 1, 1, 3, 1, 2, 2, 2 |
+| Aile görevleri | Aile odasında kalma: hedef | 15 dakika |
+| Aile görevleri | Hediye görevleri: kaç jetonda bir puan (odada, İkili, sohbette) | 500, 350, 400 |
+| Aile sandıkları | Her sandığın haftalık hedefi (Ahşap, Yeşil, Mavi, Kırmızı) | 10.000, 25.000, 50.000, 80.000 |
+| Aile sandıkları | Her sandığın ödül jetonu | 20, 50, 50, 100 |
+| Aile sandıkları | Sandık için en az katkı | 1 |
+| Aile | Her temanın aile seviyesi (Gece Moru, Kızıl Ay, Zümrüt Orman, Gece Mavisi, Altın Saray, Galaksi) | 1, 1, 4, 7, 10, 13 |
+
+- **Sandık ödülü** ödül jetonudur (yalnız Çarşı'da harcanır, çekilmez); sandık başına en çok 1.000. İki katından fazla
+  artış ya da yarıya düşüş ikinci onay ister.
+- **Görev değişikliği** o günün ilerlemesine de uygulanır: sunucu puanları her açılışta yeniden sayar.
+- **Eski APK'lar:** sandık hedefi ve jetonu, görev hedefi ve ilerlemesi sunucudan gelir, doğru görünür. Görev puanı
+  (+1 puan) ve tema kilidi eski APK'da kendi değeriyle görünür; sunucu yeni kuralı uygular (tema reddedilirse nedeni
+  yazılır). Yeni APK ikisini de sunucudan alır.
+- **Panelde değişmeyenler:** aile kurma ücreti (500 jeton: eski APK'lar kendi fiyatını gösterir, ayrı bir iş ister) ve
+  aile seviyesine göre haftalık bonus oranı (yalnız tahmin olarak gösteriliyor, ödemesi sizin kararınız).
+
+## Sıradaki adım
+
 3. Oda ve profil kuralları: oda kişi sınırları, mikrofon seviyesi, profil listeleri, seviye eğrisi.

@@ -15,6 +15,7 @@
 import { EXCHANGE, GIFTS, PACKS, SHOP, WITHDRAW, exchangeCoins } from './catalog.mjs';
 import { DAILY_ROUNDS as CASINO_DAILY_ROUNDS, GAMES as CASINO_GAMES, STAKES as CASINO_STAKES } from './casino-rules.mjs';
 import { REMINDER_KINDS, REMINDER_LABEL } from './event-rules.mjs';
+import { CHEST_MIN_CONTRIBUTION, FAMILY_CHESTS, FAMILY_TASKS, FAMILY_THEMES } from './family-rules.mjs';
 import { HOUSE_PCT as ROCKET_HOUSE_PCT } from './rocket-live-rules.mjs';
 import { AUTO_CHAT, AUTO_PARTS, AUTO_PART_LABEL, AUTO_PART_OFF, AUTO_TEXTS, NOTICE_CATEGORIES, NOTICE_LABEL, linesOf } from './auto-chat-rules.mjs';
 
@@ -118,6 +119,8 @@ export function defaultsOf(e = process.env) {
     // Odalar: a room without its staff closes after 5 minutes (room-autoclose.mjs); Patron koltuğu 25.000 jeton, 10
     // dakika (boss-seat.mjs). The owner's numbers (Güncelleme 4).
     ...Object.fromEntries(Object.entries(ROOM_AMOUNTS).map(([k, x]) => [k, x.default])),
+    // Aile's game (FAMILY_AMOUNTS): family-rules.mjs's numbers.
+    ...Object.fromEntries(Object.entries(FAMILY_AMOUNTS).map(([k, x]) => [k, x.default])),
     // Etkinlik Merkezi (events.mjs): every room owner may apply; 30 minutes ahead at least, 3 hours, 500 places.
     ...Object.fromEntries(Object.entries(EVENT_RULES).map(([k, x]) => [k, x.default])),
     // Every reminder on: 1 hour and 15 minutes before, and at the start.
@@ -379,10 +382,63 @@ const ROOM_AMOUNTS = {
   guard_threshold_per_level: { group: 'Koruma', field: 'guardThresholdPerLevel', label: 'Eşik: Yankı seviyesi başına en fazla', default: 50_000, bounds: { min: 0, max: 10_000_000, step: 1000 }, unit: ' puan', help: 'Kişinin koyabileceği en yüksek eşik: bu sayı × (Yankı seviyesi + 1). Konmuş eşikler değişmez.', text: (a, b) => `Yankı seviyesi başına eşik ${a} → ${b} puan.` },
   guard_threshold_days: { group: 'Koruma', field: 'guardThresholdDays', label: 'Eşik değiştirme aralığı (gün)', default: 7, bounds: { min: 1, max: 30, step: 1 }, unit: ' gün', help: 'Kişi eşiğini en çok bu kadar günde bir değiştirebilir.', text: (a, b) => `Eşik ${a} → ${b} günde bir değişir.` },
 };
+/**
+ * Aile's game (family-more.mjs, family-rules.mjs): each daily task's points (and the room task's minutes, the coin
+ * tasks' coins per step), each weekly chest's goal and reward coins (ödül jetonu, spent in Çarşı), the least a member
+ * must give to open one, and the family level each theme opens at. Built from family-rules.mjs, so the defaults stay
+ * today's. A change counts from the next read: today's progress is counted again with it.
+ */
+const FAMILY_TASK_NAME = {
+  'k-chat': 'Aile sohbetine mesaj',
+  'k-room': 'Aile odasında kalma',
+  'k-newbie': 'Yeni üyeye hediye',
+  'k-checkin': 'Aile yoklaması',
+  'k-roomgift': 'Aile odasında hediye',
+  'k-cp': 'İkili hediyesi',
+  'k-chatgift': 'Aile sohbetinde hediye',
+};
+const FAMILY_THEME_NAME = { gece: 'Gece Moru', ates: 'Kızıl Ay', orman: 'Zümrüt Orman', okyanus: 'Gece Mavisi', altin: 'Altın Saray', galaksi: 'Galaksi' };
+const keyOfTask = (id) => id.slice(2).replace('-', '_');
+const FAMILY_AMOUNTS = {
+  ...Object.fromEntries(
+    FAMILY_TASKS.flatMap((t) => {
+      const name = FAMILY_TASK_NAME[t.id] ?? t.id;
+      const k = keyOfTask(t.id);
+      const out = [[`family_task_${k}_power`, { group: 'Aile görevleri', field: `familyTask_${k}_power`, task: t.id, part: 'power', label: `${name}: puan`, default: t.power, bounds: { min: 0, max: 100, step: 1 }, unit: ' puan', help: t.kind === 'count' ? `“${name}” görevi bitince verilen puan. 0: puan vermez.` : `“${name}” görevinde her adımda verilen puan. 0: puan vermez.`, text: (a, b) => `${name}: ${a} → ${b} puan.` }]];
+      if (t.kind === 'rate') out.push([`family_task_${k}_per`, { group: 'Aile görevleri', field: `familyTask_${k}_per`, task: t.id, part: 'per', label: `${name}: kaç jetonda bir`, default: t.per, bounds: { min: 10, max: 1_000_000, step: 10 }, unit: ' jeton', help: `“${name}” görevinde her bu kadar jeton bir adım sayılır.`, text: (a, b) => `${name}: her ${a} → ${b} jetonda bir puan.` }]);
+      else if (t.goal > 1) out.push([`family_task_${k}_goal`, { group: 'Aile görevleri', field: `familyTask_${k}_goal`, task: t.id, part: 'goal', label: `${name}: hedef (dakika)`, default: t.goal, bounds: { min: 1, max: 600, step: 1 }, unit: ' dakika', help: `“${name}” görevi bu kadar dakikada biter.`, text: (a, b) => `${name}: ${a} → ${b} dakika.` }]);
+      return out;
+    }),
+  ),
+  ...Object.fromEntries(
+    FAMILY_CHESTS.flatMap((c) => [
+      [`family_chest_${c.id}_need`, { group: 'Aile sandıkları', field: `familyChest_${c.id}_need`, chest: c.id, part: 'need', label: `${c.name}: haftalık hedef`, default: c.need, bounds: { min: 1_000, max: 100_000_000, step: 1_000 }, unit: ' güç', help: `Ailenin haftalık gücü bu kadar olunca ${c.name} açılır.`, text: (a, b) => `${c.name} ${a} → ${b} güçte açılır.` }],
+      [`family_chest_${c.id}_coins`, { group: 'Aile sandıkları', field: `familyChest_${c.id}_coins`, chest: c.id, part: 'coins', label: `${c.name}: ödül jetonu`, default: c.coins, bounds: { min: 1, max: 1_000, step: 1, money: true }, unit: ' ödül jetonu', help: `${c.name}'nı açan her üyeye verilen ödül jetonu (Çarşı'da harcanır, çekilemez). Haftada bir kez.`, text: (a, b) => `${c.name}: üye başına ${a} → ${b} ödül jetonu.` }],
+    ]),
+  ),
+  family_chest_min_contribution: { group: 'Aile sandıkları', field: 'familyChestMin', label: 'Sandık için en az katkı', default: CHEST_MIN_CONTRIBUTION, bounds: { min: 0, max: 1_000_000, step: 1 }, unit: '', help: 'Bir üyenin sandık açabilmesi için o hafta aileye verdiği en az katkı (hediye jetonu + görev puanı). 0: katkısız da açar.', text: (a, b) => `Sandık için en az katkı ${a} → ${b}.` },
+  ...Object.fromEntries(
+    FAMILY_THEMES.map((t) => [`family_theme_${t.id}_level`, { group: 'Aile', field: `familyTheme_${t.id}`, theme: t.id, label: `${FAMILY_THEME_NAME[t.id] ?? t.id} teması: aile seviyesi`, default: t.minLevel, bounds: { min: 1, max: 15, step: 1 }, unit: '', help: `${FAMILY_THEME_NAME[t.id] ?? t.id} teması bu aile seviyesinden itibaren seçilir. Seçilmiş tema kalır.`, text: (a, b) => `${FAMILY_THEME_NAME[t.id] ?? t.id} teması Lv.${a} → Lv.${b} ailede açılır.` }]),
+  ),
+};
+/** Aile's tasks, chests and themes as Canlı ayarlar has them (snapshot `s`), in family-rules.mjs's shapes. */
+export function familyRulesOf(s) {
+  const v = (field, d) => (Number.isSafeInteger(s?.[field]) ? s[field] : d);
+  return {
+    tasks: FAMILY_TASKS.map((t) => {
+      const k = keyOfTask(t.id);
+      return { ...t, power: v(`familyTask_${k}_power`, t.power), per: t.kind === 'rate' ? v(`familyTask_${k}_per`, t.per) : t.per, goal: t.kind === 'count' ? v(`familyTask_${k}_goal`, t.goal) : t.goal };
+    }),
+    chests: FAMILY_CHESTS.map((c) => ({ ...c, need: v(`familyChest_${c.id}_need`, c.need), coins: v(`familyChest_${c.id}_coins`, c.coins) })),
+    chestMin: v('familyChestMin', CHEST_MIN_CONTRIBUTION),
+    themes: FAMILY_THEMES.map((t) => ({ ...t, minLevel: v(`familyTheme_${t.id}`, t.minLevel) })),
+  };
+}
+
 /** The room keys as registry entries; a coin amount that more than doubles or halves, or a close sooner than 3 minutes, asks twice. */
-const roomEntries = () =>
+const roomEntries = (table = ROOM_AMOUNTS) =>
   Object.fromEntries(
-    Object.entries(ROOM_AMOUNTS).map(([k, x]) => [
+    Object.entries(table).map(([k, x]) => [
       k,
       {
         field: x.field,
@@ -970,6 +1026,7 @@ export const REGISTRY = {
   },
   ...decorEntries(),
   ...roomEntries(),
+  ...roomEntries(FAMILY_AMOUNTS),
   ...eventEntries(),
   ...winEntries(),
   ...bagEntries(),
@@ -1108,6 +1165,7 @@ export function snapshotOf(rows = [], e = process.env, { v = 0 } = {}) {
     roomDecorOff: readOnlySet(val('room_decor_off')),
     ...Object.fromEntries(Object.entries(DECOR_AMOUNTS).map(([k, x]) => [x.field, val(k)])),
     ...Object.fromEntries(Object.entries(ROOM_AMOUNTS).map(([k, x]) => [x.field, val(k)])),
+    ...Object.fromEntries(Object.entries(FAMILY_AMOUNTS).map(([k, x]) => [x.field, val(k)])),
     ...Object.fromEntries(Object.entries(EVENT_RULES).map(([k, x]) => [x.field, val(k)])),
     eventRemindersOff: readOnlySet(val('event_reminders_off')),
     luckyAnnounceMinCoins: val('lucky_announce_min_coins'),

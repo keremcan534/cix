@@ -90,6 +90,8 @@ export type LiveCatalog = {
   guard: GuardNumbers | null;
   /** Bağlar's limits and days as Canlı ayarlar has them; null from an older server: the app's own. */
   bonds: BondNumbers | null;
+  /** Aile's themes: id → the family level it opens at, as Canlı ayarlar has them; null from an older server. */
+  familyThemes: Record<string, number> | null;
 };
 /** Koruma's numbers (server/api/guards.mjs guardRules) that the rules page says. */
 export type GuardNumbers = { dropFrom: number; dropShare: number; dropFlat: number; thresholdEveryDays: number };
@@ -206,6 +208,16 @@ export function parseBondNumbers(x: unknown): BondNumbers | null {
   return { answerDays, cooldownDays, talkDaily, max };
 }
 
+/** The catalog's `family.themes`; the sound entries only, null when none. */
+export function parseFamilyThemes(x: unknown): Record<string, number> | null {
+  const out: Record<string, number> = {};
+  for (const [id, v] of Object.entries(obj(obj(x).themes))) {
+    const n = whole(v, 1, 100);
+    if (n !== null && /^[a-z0-9_-]{1,32}$/.test(id)) out[id] = n;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
 /** GET /api/catalog as the live catalog; anything malformed is left out (the compiled value is used), never thrown. */
 export function parseLiveCatalog(raw: unknown): LiveCatalog {
   const r = obj(raw);
@@ -228,6 +240,7 @@ export function parseLiveCatalog(raw: unknown): LiveCatalog {
     shop: parseLiveShop(r.shop),
     guard: parseGuardNumbers(r.guard),
     bonds: parseBondNumbers(r.bonds),
+    familyThemes: parseFamilyThemes(r.family),
   };
 }
 
@@ -262,6 +275,7 @@ export function parseSavedLiveCatalog(raw: string | null): { catalog: LiveCatalo
       shop: parseLiveShop(r.shop),
       guard: parseGuardNumbers(r.guard),
       bonds: parseBondNumbers(r.bonds),
+      familyThemes: parseFamilyThemes({ themes: r.familyThemes }),
     },
     // A copy an older app saved counts as old: the next poll reads the catalog again. One from before the videos were
     // listed (no fx), or from before the shelves were (no shelf): that app hid the gifts put back on the shelves
@@ -485,7 +499,7 @@ export const liveCatalogStale = (now = Date.now()) => !current || now - fetchedA
 /** The server named its current Çevir rate (409 rate_changed): the screens show it before the catalog is read again. */
 export function noteLiveRate(usdTry: unknown) {
   if (!validRate(usdTry)) return;
-  publish({ ...(current ?? { v: 0, giftIds: null, packs: [], campaign: null, fx: null, remote: [], shelf: null, app: {}, emoji: null, levels: null, shop: null, guard: null, bonds: null }), usdTry });
+  publish({ ...(current ?? { v: 0, giftIds: null, packs: [], campaign: null, fx: null, remote: [], shelf: null, app: {}, emoji: null, levels: null, shop: null, guard: null, bonds: null, familyThemes: null }), usdTry });
 }
 
 const subscribe = (l: () => void) => {

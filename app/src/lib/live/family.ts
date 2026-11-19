@@ -56,7 +56,9 @@ export const setRole = (userId: string, role: FamilyRole) => api.apiRequest<{ me
 export const settings = (s: { announcement?: string; joinMode?: 'open' | 'approve'; tag?: string; theme?: string }) => api.apiRequest<{ family: LiveFamily }>('POST', '/api/family/settings', s);
 
 /** A daily task as the server counted it today (Turkey's day) from what I really did. */
-export type FamilyTask = { id: string; progress: number; goal: number; per: number; kind: 'count' | 'rate'; done: boolean; points: number; doneBy: number };
+export type FamilyTask = { id: string; progress: number; goal: number; per: number; kind: 'count' | 'rate'; done: boolean; points: number; doneBy: number; power?: number };
+/** The points a task gives: the server's (Canlı ayarlar may change them), else the app's own; an older server says none. */
+export const taskPower = (t: Pick<FamilyTask, 'power'>, own = 1) => (typeof t.power === 'number' && Number.isSafeInteger(t.power) && t.power >= 0 ? t.power : own);
 export type FamilyChest = { id: string; need: number; coins: number; reached: boolean; claimed: boolean };
 type Short = { id: string; name: string; avatarUrl: string | null };
 /** GET /api/family/overview: my family's day and week. */

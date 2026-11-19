@@ -14,7 +14,9 @@
 // estimate (family level rate × the week): paying it is a management decision, nothing here pays it.
 import { bonusNotice } from './system-notices.mjs';
 import { HttpError, auth, claimRef, db, limit, once, readJson } from './core.mjs';
-import { CHEST_MIN_CONTRIBUTION, CP_GIFT_IDS, FAMILY_CHESTS, FAMILY_RATES, FAMILY_TASKS, taskPoints } from './family-rules.mjs';
+import { CP_GIFT_IDS, FAMILY_RATES, taskPoints } from './family-rules.mjs';
+import { familyRulesOf } from './live-registry.mjs';
+import { live } from './live-settings.mjs';
 import { WEEK, familyView, membersOf, myMembership, statsOf } from './families.mjs';
 import { privacyMap } from './privacy.mjs';
 import { creditCoins } from './wallet.mjs';
@@ -79,12 +81,13 @@ async function weekProgress(familyId, members, room) {
   return out;
 }
 
-/** Points of one person's day of progress. */
-const dayPoints = (day) => FAMILY_TASKS.reduce((s, t) => s + taskPoints(t, day?.[t.id] ?? 0), 0);
+/** Points of one person's day of progress, by the tasks as Canlı ayarlar has them. */
+const dayPoints = (tasks, day) => tasks.reduce((s, t) => s + taskPoints(t, day?.[t.id] ?? 0), 0);
 
 async function overviewOf(uid) {
   const mine = await myMembership(uid);
   if (!mine) throw new HttpError(403, 'Bir ailede değilsin');
+  const rules = familyRulesOf(live());
   const id = Number(mine.family_id);
   const family = await familyView(id);
   const members = await membersOf(id);
@@ -92,13 +95,14 @@ async function overviewOf(uid) {
   const progress = await weekProgress(id, members, room);
   const today = (await db.query(`SELECT ${TODAY} AS d`)).rows[0].d;
   const todayKey = today instanceof Date ? today.toISOString().slice(0, 10) : String(today);
-  const weekPoints = (u) => Object.values(progress[u] ?? {}).reduce((s, day) => s + dayPoints(day), 0);
+  const weekPoints = (u) => Object.values(progress[u] ?? {}).reduce((s, day) => s + dayPoints(rules.tasks, day), 0);
 
   const myDay = progress[uid]?.[todayKey] ?? {};
-  const tasks = FAMILY_TASKS.map((t) => {
+  const tasks = rules.tasks.map((t) => {
     const n = myDay[t.id] ?? 0;
     const doneBy = members.filter((m) => taskPoints(t, progress[m.id]?.[todayKey]?.[t.id] ?? 0) > 0).length;
-    return { id: t.id, progress: n, goal: t.goal, per: t.per, kind: t.kind, done: taskPoints(t, n) > 0, points: taskPoints(t, n), doneBy };
+    // power: the points it gives (a newer app shows it; an older one its own).
+    return { id: t.id, progress: n, goal: t.goal, per: t.per, kind: t.kind, power: t.power, done: taskPoints(t, n) > 0, points: taskPoints(t, n), doneBy };
   });
   const contribution = (m) => m.weekly + weekPoints(m.id);
   const me = members.find((m) => m.id === uid);
@@ -107,7 +111,7 @@ async function overviewOf(uid) {
   const week = (await db.query(`SELECT ${DAY(WEEK)} AS w`)).rows[0].w;
   const weekKey = week instanceof Date ? week.toISOString().slice(0, 10) : String(week);
   const claimed = new Set((await db.query('SELECT chest FROM family_chest_claims WHERE user_id = $1 AND week = $2', [uid, weekKey])).rows.map((x) => x.chest));
-  const chests = FAMILY_CHESTS.map((c) => ({ id: c.id, need: c.need, coins: c.coins, reached: family.weekly >= c.need, claimed: claimed.has(c.id) }));
+  const chests = rules.chests.map((c) => ({ id: c.id, need: c.need, coins: c.coins, reached: family.weekly >= c.need, claimed: claimed.has(c.id) }));
 
   // The week's rank among open families, by their week (the same as GET /api/families).
   const all = await db.query('SELECT id FROM families WHERE closed_at IS NULL');
@@ -145,6 +149,7 @@ async function overviewOf(uid) {
   return {
     tasks,
     me: myWeek,
+    chestMin: rules.chestMin,
     chests,
     week: { power: family.weekly, start: weekKey },
     bonus: { rate: FAMILY_RATES[family.level - 1], pool: Math.round(family.weekly * FAMILY_RATES[family.level - 1]) },
@@ -181,12 +186,13 @@ export const familyMoreRoutes = {
   async 'POST /api/family/chest'(req) {
     const me = await auth(req);
     const b = await readJson(req);
-    const chest = FAMILY_CHESTS.find((c) => c.id === b.chest);
+    const rules = familyRulesOf(live());
+    const chest = rules.chests.find((c) => c.id === b.chest);
     if (!chest) throw new HttpError(400, 'Geçersiz sandık');
     limit(`family-chest:${me.id}`, 20);
     const o = await overviewOf(me.id);
     if (o.week.power < chest.need) throw new HttpError(409, `Bu sandık ailenin haftası ${chest.need.toLocaleString('tr-TR')} olunca açılır`);
-    if (o.me.gifts + o.me.points < CHEST_MIN_CONTRIBUTION) throw new HttpError(409, 'Sandığı açmak için bu hafta ailene katkı vermelisin (görev ya da hediye)');
+    if (o.me.gifts + o.me.points < rules.chestMin) throw new HttpError(409, 'Sandığı açmak için bu hafta ailene katkı vermelisin (görev ya da hediye)');
     const mine = await myMembership(me.id);
     const out = await once(me.id, 'coin', b.ref, async (c) => {
       await c.query('SELECT 1 FROM users WHERE id = $1 FOR UPDATE', [me.id]);

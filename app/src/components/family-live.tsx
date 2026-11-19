@@ -26,6 +26,7 @@ import { showAlert } from '@/lib/alert';
 import * as api from '@/lib/api';
 import { applyServerUser, message, myServerId, once } from '@/lib/live';
 import * as fam from '@/lib/live/family';
+import { liveCatalog } from '@/lib/live/catalog-live';
 import { SCRIM, makeStyles, useTheme } from '@/theme';
 
 const fmt = (n: number) => n.toLocaleString('tr-TR');
@@ -546,8 +547,10 @@ function MyFamily({ detail, onChange, reload, onRanking }: { detail: fam.FamilyD
       showAlert(what, message(e));
     }
   };
+  // The level a theme opens at: the server's (Canlı ayarlar), else the app's own.
+  const themeLevel = (t: (typeof KABILE_THEMES)[number]) => liveCatalog()?.familyThemes?.[t.id] ?? t.minLevel;
   const pickTheme = (t: (typeof KABILE_THEMES)[number]) =>
-    f.level < t.minLevel ? showAlert(t.name, `Bu tema Lv.${t.minLevel} ailede açılır.`) : void saveLook({ theme: t.id }, 'Tema değiştirilemedi');
+    f.level < themeLevel(t) ? showAlert(t.name, `Bu tema Lv.${themeLevel(t)} ailede açılır.`) : void saveLook({ theme: t.id }, 'Tema değiştirilemedi');
   const openRoom = () =>
     ov?.room
       ? router.push(`/oda/${ov.room.id}`)
@@ -692,7 +695,7 @@ function MyFamily({ detail, onChange, reload, onRanking }: { detail: fam.FamilyD
               <Text style={styles.label}>Tema</Text>
               <View style={styles.themes}>
                 {KABILE_THEMES.map((t) => {
-                  const locked = f.level < t.minLevel;
+                  const locked = f.level < themeLevel(t);
                   return (
                     <Pressable
                       key={t.id}
@@ -700,7 +703,7 @@ function MyFamily({ detail, onChange, reload, onRanking }: { detail: fam.FamilyD
                       style={[styles.theme, f.theme === t.id && { borderColor: colors.primary }]}
                       accessibilityRole="button"
                       accessibilityState={{ selected: f.theme === t.id, disabled: locked }}
-                      accessibilityLabel={`${t.name}${locked ? `, Lv.${t.minLevel} ailede açılır` : ''}`}>
+                      accessibilityLabel={`${t.name}${locked ? `, Lv.${themeLevel(t)} ailede açılır` : ''}`}>
                       <LinearGradient colors={t.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.swatch}>
                         {locked && <Ionicons name="lock-closed" size={14} color="#fff" />}
                       </LinearGradient>

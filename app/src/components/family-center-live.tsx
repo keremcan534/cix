@@ -259,7 +259,9 @@ export function LiveFamilyTasks() {
           <Text style={styles.dim}>Her gün 00:00&apos;da yenilenir (Türkiye saati). Görevler katkı puanı verir, jeton vermez.</Text>
           {ov.tasks.map((t) => {
             const info = KABILE_TASKS.find((x) => x.id === t.id);
-            const title = info?.title ?? t.id;
+            // The room task's minutes are the server's goal (Canlı ayarlar may change it).
+            const title = t.id === 'k-room' && t.goal > 0 ? `Aile odasında ${t.goal} dakika kal` : (info?.title ?? t.id);
+            const power = fam.taskPower(t, info?.power ?? 1);
             const label = t.id === 'k-checkin' ? (t.done ? 'Tamam' : 'Yoklama ver') : t.kind === 'count' && t.done ? 'Tamam' : 'Git';
             return (
               <View key={t.id} style={styles.task}>
@@ -271,12 +273,12 @@ export function LiveFamilyTasks() {
                     <Text style={styles.taskTitle}>{title}</Text>
                     {t.kind === 'count' ? (
                       <Text style={styles.reward}>
-                        +{info?.power ?? 1} puan
+                        +{power} puan
                         {t.id !== 'k-checkin' && <Text style={styles.dim}>{`  ${fmt(Math.min(t.progress, t.goal))}/${t.goal}${t.id === 'k-room' ? ' dk' : ''}`}</Text>}
                       </Text>
                     ) : (
                       <Text style={styles.rateText}>
-                        Her {fmt(t.per)} jeton için +{info?.power ?? 1} puan · bugün {fmt(t.progress)} jeton, {fmt(t.points)} puan
+                        Her {fmt(t.per)} jeton için +{power} puan · bugün {fmt(t.progress)} jeton, {fmt(t.points)} puan
                       </Text>
                     )}
                   </View>

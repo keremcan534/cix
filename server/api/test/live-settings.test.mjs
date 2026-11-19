@@ -112,6 +112,7 @@ describe('nothing saved', () => {
         ...['room_staff_away_minutes', 'boss_seat_coins', 'boss_seat_minutes', 'family_cashout_members', 'family_rejoin_days'],
         ...['bond_max_cift', 'bond_max_kin', 'bond_max_kanka', 'bond_pending_max', 'bond_answer_days', 'bond_cooldown_days', 'bond_talk_daily'],
         ...['guard_drop_from', 'guard_drop_pct', 'guard_drop_flat', 'guard_list_max', 'guard_threshold_per_level', 'guard_threshold_days'],
+        ...['family_task_chat_power', 'family_task_room_power', 'family_task_room_goal', 'family_task_newbie_power', 'family_task_checkin_power', 'family_task_roomgift_power', 'family_task_roomgift_per', 'family_task_cp_power', 'family_task_cp_per', 'family_task_chatgift_power', 'family_task_chatgift_per', 'family_chest_c1_need', 'family_chest_c1_coins', 'family_chest_c2_need', 'family_chest_c2_coins', 'family_chest_c3_need', 'family_chest_c3_coins', 'family_chest_c4_need', 'family_chest_c4_coins', 'family_chest_min_contribution', 'family_theme_gece_level', 'family_theme_ates_level', 'family_theme_orman_level', 'family_theme_okyanus_level', 'family_theme_altin_level', 'family_theme_galaksi_level'],
         ...['event_min_room_level', 'event_min_lead_minutes', 'event_max_minutes', 'event_max_capacity', 'event_grace_minutes', 'event_strike_limit', 'event_block_days', 'event_reminders_off'],
         'lucky_announce_min_coins',
         ...['lucky_bag_coins', 'lucky_bag_coin_packets', 'lucky_bag_gift_counts', 'lucky_bag_gift_packets', 'lucky_bag_delays', 'lucky_bag_seconds'],
