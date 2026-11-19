@@ -81,6 +81,8 @@ export type Settings = {
   pushCloseOnly: boolean;
   /** Profil izleri: others may leave a mark on my photo (Gizlilik's "Profilime iz bırakılmasın" is its opposite). */
   profileMarks: boolean;
+  /** Gizlilik › "Adım genel duyurularda görünmesin" (Global hediye; kept on the server in a live build). */
+  globalHideName: boolean;
   profilePublic: boolean;
   notifySocial: boolean;
   notifyFinance: boolean;
@@ -526,6 +528,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       messagePush: true,
       pushCloseOnly: true,
       profileMarks: true,
+      globalHideName: false,
       profilePublic: true,
       notifySocial: true,
       notifyFinance: true,

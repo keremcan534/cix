@@ -111,3 +111,18 @@ temizlediği Hediyeler sayfasında, hediyenin kendi ayarıdır. Ayrıntı: [`PRO
 Aday ajans / aktif ajans kuralının sayıları (20 yayıncı, 10 × 10 USD kazanan, 20 altında adaya düşme, aylık 5 yeni
 yayıncı, şart tutmazsa 5 puan düşüş, 90 gün pasif yayıncı) Canlı ayarlar › **Ajans statüsü**'nde. Ayrıntı:
 [`AJANS_STATUSU.md`](AJANS_STATUSU.md).
+
+## Global hediye (19 Kasım, Güncelleme 7 madde 12)
+
+| Grup | Ayar | Varsayılan |
+| --- | --- | --- |
+| Global hediye | Global hediye: en düşük fiyat | 300.000 jeton |
+| Global hediye | Global hediye: iki duyuru arası (saniye) | 10 |
+
+- **En düşük fiyat:** Hediyeler'de "Global" kutusu yalnız bu fiyattan itibaren işaretlenir. Yükseltirseniz altında kalan
+  global hediyeler duyurulmaz (işaretleri durur, fiyat sınıra çıkınca yine duyurulur). İki katından fazla artış ya da
+  yarıya düşüş ikinci onay ister.
+- **Aralık:** bütün odalara en çok bu kadar saniyede bir duyuru gider; beklerken aynı kişinin aynı kişiye aynı hediyesi
+  tek duyuruda toplanır (×3). 0: beklemeden.
+- **Eski APK'lar:** duyuruyu hiç almaz; yalnız yeni APK gösterir. Ayrıntı: [`HEDIYE_YONETIMI.md`](HEDIYE_YONETIMI.md) ›
+  Global hediye.

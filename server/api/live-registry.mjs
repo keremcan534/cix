@@ -21,6 +21,7 @@ import { MARK_HOURS } from './profile-mark-rules.mjs';
 import { HOUSE_PCT as ROCKET_HOUSE_PCT } from './rocket-live-rules.mjs';
 import { LEVELS as BOND_LEVELS, levelsOf as bondLevelsOf } from './bond-rules.mjs';
 import { AUTO_CHAT, AUTO_PARTS, AUTO_PART_LABEL, AUTO_PART_OFF, AUTO_TEXTS, NOTICE_CATEGORIES, NOTICE_LABEL, linesOf } from './auto-chat-rules.mjs';
+import { GLOBAL_GIFT_AMOUNTS } from './global-gift-rules.mjs';
 
 /** Every feature that can be switched off (features.mjs ROUTES). `games` is mostly in the app; Rüzgâr Gülü is on the server. */
 export const FEATURES = ['gifts', 'purchases', 'topup', 'exchange', 'jeton', 'games', 'dm', 'rooms', 'withdraw', 'shop'];
@@ -137,6 +138,8 @@ export function defaultsOf(e = process.env) {
     event_reminders_off: [],
     // Every Şanslı win is announced in every room (the owner's wish, Güncelleme 5).
     lucky_announce_min_coins: 0,
+    // Global hediye (global-gifts.mjs): from 300.000 coins, one announcement every 10 seconds (the owners, Güncelleme 7).
+    ...Object.fromEntries(Object.entries(GLOBAL_GIFT_AMOUNTS).map(([k, x]) => [k, x.default])),
     // Şanslı çanta's choices as lucky-bag-rules.mjs had them (BAG_LISTS), the way the panel writes them.
     ...Object.fromEntries(Object.entries(BAG_LISTS).map(([k, x]) => [k, x.default.join(', ')])),
     lucky_bag_seconds: 30,
@@ -1127,6 +1130,7 @@ export const REGISTRY = {
   ...roomEntries(BADGE_AMOUNTS),
   ...eventEntries(),
   ...winEntries(),
+  ...roomEntries(GLOBAL_GIFT_AMOUNTS),
   ...bagEntries(),
   lucky_bag_seconds: {
     field: 'luckyBagSeconds',
@@ -1217,7 +1221,7 @@ const readOnlySet = (xs) => {
  *     heartVideo, heartMsg, heartMsgDaily, heartGrace, heartHalf, backpackCallTask, rewardsOff: Set, welcomeCoins, inviteCoins, inviteDailyCap, casinoOff: Set, casinoOpen: Set, casinoMaxBet,
  *     casinoDailyRounds, rocketHousePct, roomDecorOff: Set, roomBgCustomPrice, roomBgCustomDays, roomStaffAwayMinutes, bossSeatCoins,
  *     bossSeatMinutes, eventMinRoomLevel, eventMinLead, eventMaxMinutes, eventMaxCapacity, eventGrace, eventStrikeLimit,
- *     eventBlockDays, eventRemindersOff: Set, luckyAnnounceMinCoins, invalid }
+ *     eventBlockDays, eventRemindersOff: Set, luckyAnnounceMinCoins, globalGiftMinPrice, globalGiftGapSeconds, invalid }
  */
 export function snapshotOf(rows = [], e = process.env, { v = 0 } = {}) {
   const d = defaultsOf(e);
@@ -1272,6 +1276,7 @@ export function snapshotOf(rows = [], e = process.env, { v = 0 } = {}) {
     ...Object.fromEntries(Object.entries(EVENT_RULES).map(([k, x]) => [x.field, val(k)])),
     eventRemindersOff: readOnlySet(val('event_reminders_off')),
     luckyAnnounceMinCoins: val('lucky_announce_min_coins'),
+    ...Object.fromEntries(Object.entries(GLOBAL_GIFT_AMOUNTS).map(([k, x]) => [x.field, val(k)])),
     // As written ("1000, 5000"), so the panel shows it so; lucky-bags.mjs reads it with bagList.
     ...Object.fromEntries(Object.entries(BAG_LISTS).map(([k, x]) => [x.field, val(k)])),
     luckyBagSeconds: val('lucky_bag_seconds'),

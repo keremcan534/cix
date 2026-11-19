@@ -5,7 +5,7 @@ import type { ServerPrivacy } from '@/lib/api';
 
 export type PrivacyKey = keyof ServerPrivacy;
 /** The choices the server keeps and enforces (server/api/privacy.mjs). */
-export const PRIVACY_KEYS: readonly PrivacyKey[] = ['profilePublic', 'showOnline', 'showLastSeen', 'showCurrentRoom', 'dmFrom', 'callsFrom', 'invitesFrom', 'voiceCalls', 'videoCalls', 'messagePush', 'pushCloseOnly', 'profileMarks'];
+export const PRIVACY_KEYS: readonly PrivacyKey[] = ['profilePublic', 'showOnline', 'showLastSeen', 'showCurrentRoom', 'dmFrom', 'callsFrom', 'invitesFrom', 'voiceCalls', 'videoCalls', 'messagePush', 'pushCloseOnly', 'profileMarks', 'globalHideName'];
 
 export function privacySync() {
   let confirmed: Partial<ServerPrivacy> = {};

@@ -1,9 +1,11 @@
 // Platform-wide win announcements. Every win in any room or game goes out to every room; rooms show them one at a
 // time as a banner near the top. In a live build the other people's Şanslı wins come from the server on the live line
-// (lib/live/win-news); the offline demo makes up other rooms' wins so it shows what they would see.
+// (lib/live/win-news); the offline demo makes up other rooms' wins so it shows what they would see. A global gift
+// (Global hediye, lib/live/global-gift) waits in the same line and shows as a banner of its own.
 import { useSyncExternalStore } from 'react';
 
 import { ROOMS, USERS, roomById } from '@/data/mock';
+import type { GlobalGift } from '@/lib/global-gift-core';
 import { liveBuild } from '@/lib/live-flag';
 
 export type WinNews = {
@@ -25,6 +27,8 @@ export type WinNews = {
   at: number;
   /** An Oyun Salonu win: only shown to people who can see Oyun Salonu (Cömertlik Lv.2+). */
   casino?: boolean;
+  /** A global gift, not a win (components/fx/global-gift-banner): who sent what to whom, and in which room. */
+  global?: GlobalGift;
 };
 export const NEWS_TTL_MS = 30_000;
 
@@ -74,6 +78,11 @@ export function announceWin(news: Omit<WinNews, 'id' | 'at'>, opts?: { mine?: bo
     // Keep the newest few; a long backlog would be old news by the time it shows.
     queue = [...queue, n].slice(-MAX_QUEUE);
   }
+  emit();
+}
+/** A global gift (lib/live/global-gift) in the banner line, after the ones waiting. */
+export function announceGlobal(g: GlobalGift) {
+  queue = [...queue, { id: rid(), at: Date.now(), userName: g.from.name, source: 'Global hediye', amount: 0, global: g }].slice(-MAX_QUEUE);
   emit();
 }
 /** An Oyun Salonu win. The source prefix counts too, so an announcement without the flag is still caught. */

@@ -1,6 +1,7 @@
 // Win announcement banner: every win on the platform (lib/broadcast) shows here in every room, one at a
 // time, near the top centre: a slim gold pill with a light sweep, one line, gone in under three seconds.
-// Visual only (pointerEvents none): it never covers controls for long and never touches the mic or seats.
+// Visual only (pointerEvents none): it never covers controls for long and never touches the mic or seats. A global
+// gift (Global hediye) in the same line has a banner of its own, which can be tapped (components/fx/global-gift-banner).
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
@@ -12,6 +13,8 @@ import { useApp } from '@/store';
 import { colors, semantic } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
 import { Photo } from '@/components/photo';
+import { GlobalGiftBanner } from '@/components/fx/global-gift-banner';
+import { globalGiftBlocked } from '@/lib/global-gift-core';
 
 const fmt = (n: number) => n.toLocaleString('tr-TR');
 const HOLD_MS = 2600;
@@ -22,11 +25,12 @@ export function WinBanner({ top = 96, still }: { top?: number; /** reduce motion
   const news = queue[0];
   // Oyun Salonu wins are not news for someone who cannot see Oyun Salonu, nor anyone's win for someone who blocked
   // them: skipped, never shown.
-  const hidden = !!news && (winNewsHidden(news, wealthLevel, paidGames) || (!!news.uid && blocked.has(news.uid)));
+  const hidden = !!news && (winNewsHidden(news, wealthLevel, paidGames) || (!!news.uid && blocked.has(news.uid)) || (!!news.global && globalGiftBlocked(news.global, blocked)));
   useEffect(() => {
     if (news && hidden) shiftWinNews(news.id);
   }, [news, hidden]);
   if (!news || hidden) return null;
+  if (news.global) return <GlobalGiftBanner key={news.id} news={news} gift={news.global} top={top} still={still} />;
   return <Banner key={news.id} news={news} top={top} still={still} />;
 }
 

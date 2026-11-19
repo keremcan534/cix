@@ -7,13 +7,15 @@
 //                               every LIVE_BEAT_MS (20 s) so idle connections stay open and dead ones are found.
 //   GET /api/live?wins=1      the same, and the wins announced to everyone (lineWin): an app that shows them asks.
 //   GET /api/live?rocket=1    the same, and Canlı Yörünge's round while its screen is open (lineRocket, rocket-live.mjs).
+//   GET /api/live?global=1    the same, and the global gifts of my country (lineGlobal, global-gifts.mjs).
 //
 // Server-Sent Events: plain HTTP, no extra package, and Caddy passes the stream through as it is written. An event
 // says only what changed (its type and ids, never a message's text or a name): the phone reads the thing itself
 // through the usual routes, with their usual checks, so a line can't show anyone anything they couldn't read.
-// Two kinds are different: a win announced to everyone ('win', lineWin) carries what its banner shows, and Canlı
-// Yörünge's round ('rocket', lineRocket) what its screen shows (the climb, the fuel on board with masked names), since
-// both are public by design and a read by every phone after every change would cost far more than the line itself.
+// Three kinds are different: a win announced to everyone ('win', lineWin) carries what its banner shows, Canlı
+// Yörünge's round ('rocket', lineRocket) what its screen shows (the climb, the fuel on board with masked names), and a
+// global gift ('global_gift', lineGlobal) its banner's names, gift and room, since all three are public by design and a
+// read by every phone after every change would cost far more than the line itself.
 // The lines live in this process's memory (one API process). The polls stay: they cover a line that is down.
 import { auth, filesOut, limit } from './core.mjs';
 
@@ -23,6 +25,8 @@ const lines = new Map();
 const winLines = new WeakSet();
 /** The lines of an app that shows Canlı Yörünge (an older one would take its events for "read everything again"). */
 const rocketLines = new WeakSet();
+/** The lines of an app that shows the global gifts (global-gifts.mjs; an older one: "read everything again"). */
+const globalLines = new WeakSet();
 const MAX_PER_USER = 3;
 const BEAT_MS = Number(process.env.LIVE_BEAT_MS) >= 50 ? Number(process.env.LIVE_BEAT_MS) : 20_000;
 
@@ -33,6 +37,7 @@ export async function openLine(req, res) {
   const ask = new URL(req.url ?? '/', 'http://line').searchParams;
   if (ask.get('wins') === '1') winLines.add(res);
   if (ask.get('rocket') === '1') rocketLines.add(res);
+  if (ask.get('global') === '1') globalLines.add(res);
   // no-transform: nothing on the way (Caddy's compression) may hold the events back to pack them.
   res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-store, no-transform', 'X-Accel-Buffering': 'no' });
   res.write('retry: 3000\n: ok\n\n');
@@ -126,6 +131,28 @@ export function lineRocket(userIds, round) {
   for (const uid of new Set([...userIds].map(String))) {
     for (const res of lines.get(uid) ?? []) {
       if (!rocketLines.has(res)) continue;
+      try {
+        res.write(event);
+      } catch {
+        // A line that just broke: its 'close' removes it.
+      }
+    }
+  }
+}
+
+/** Who has a line open that asked for the global gifts (global-gifts.mjs picks who of them hears one). */
+export function globalListeners() {
+  const out = [];
+  for (const [uid, mine] of lines) if ([...mine].some((res) => globalLines.has(res))) out.push(uid);
+  return out;
+}
+/** A global gift (global-gifts.mjs) to these people's lines that asked for it: `json` is the event as it goes. Never throws. */
+export function lineGlobal(userIds, json) {
+  if (!lines.size || typeof json !== 'string') return;
+  const event = `data: ${json}\n\n`;
+  for (const uid of new Set([...userIds].map(String))) {
+    for (const res of lines.get(uid) ?? []) {
+      if (!globalLines.has(res)) continue;
       try {
         res.write(event);
       } catch {

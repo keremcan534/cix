@@ -315,6 +315,8 @@ export default function SettingsScreen() {
             title="Profilime iz bırakılmasın"
             subtitle="Açıkken kimse sana 💩 gibi iz bırakan hediye gönderemez; profilindeki iz de hemen gider."
           />
+          {/* Global hediye (server/api/global-gifts.mjs): a gift I send or get is announced in every room of the country. */}
+          <PrivacyToggle k="globalHideName" icon="earth-outline" title="Adım genel duyurularda görünmesin" subtitle="Global hediyelerde adın ve fotoğrafın yerine “Bir kullanıcı” yazar." />
           {!live && (
             <>
               <Toggle k="luckyAnnounce" icon="megaphone-outline" title="Kazançlarımda adım görünsün" subtitle="Kapalıyken “Bir kullanıcı kazandı” yazar." />

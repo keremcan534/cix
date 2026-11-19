@@ -19,6 +19,7 @@ import { checkRoomInvites } from '@/lib/live/room-social';
 import { lineOpen, onLine, startLiveLine } from '@/lib/live/live-line';
 import { visitLineNotice } from '@/lib/live/visitors';
 import { takeWinEvent } from '@/lib/live/win-news';
+import { takeGlobalGiftEvent } from '@/lib/live/global-gift';
 import { pollMessages } from '@/lib/live/messages';
 import { loadPrivacy } from '@/lib/live/privacy';
 import { refreshSpendLimit } from '@/lib/live/spend-limit';
@@ -148,6 +149,8 @@ export function LiveSync() {
     const offLine = onLine((e) => {
       // Another person's win (lib/live/win-news): a banner in every room, nothing of mine to read again.
       if (takeWinEvent(e)) return;
+      // A global gift of my country (lib/live/global-gift): a banner and a chat line, nothing to read again.
+      if (takeGlobalGiftEvent(e)) return;
       // Canlı Yörünge's round (lib/live/rocket-live): its screen reads it, nothing else changed for me.
       if (e.type === 'call' || e.type === 'message_read' || e.type === 'rocket') return;
       // Someone opened my profile (the server tells at most once a day per visitor): the counts and a notice.

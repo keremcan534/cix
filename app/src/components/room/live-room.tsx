@@ -133,6 +133,7 @@ import { refreshCasino } from '@/lib/live/casino';
 import { useTableNews } from '@/lib/live/room-table';
 import { isTableGame } from '@/components/games/room-tables';
 import { announceWin, roomTitleOf } from '@/lib/broadcast';
+import { useGlobalGiftLines } from '@/lib/live/global-gift';
 import { emptyEntryLine, pushEntry, shiftEntry, type EntryItem, type EntryLine } from '@/lib/entry-queue';
 import { entranceView, entryPlanOf } from '@/lib/room-entrance';
 import { followLine, followedHere } from '@/lib/follow-room';
@@ -1103,6 +1104,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   useMarkLines(id, (text, key) => addMsg({ id: key, system: true, text }));
   // A room note after a server call went through (so online), straight into the feed.
   const sysNote = (text: string) => setMessages((list) => mergeFeed(list, [{ system: true, text, id: msgId(), at: stamp() }]));
+  // Global hediye (lib/live/global-gift): a global gift sent in another room of my country gets a line here.
+  useGlobalGiftLines(id, blocked, addMsg);
   // A server room: when the staff open a game table (server/api/room-games.mjs), the room hears of it (not from
   // someone I block).
   useTableNews(id, real && unlocked, (t) => {

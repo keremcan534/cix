@@ -117,6 +117,8 @@ describe('nothing saved', () => {
         ...['room_mic_min_level', 'room_boss_min_level', 'room_words_max', 'room_cap_lv1', 'room_cap_lv2', 'room_cap_lv3', 'room_cap_lv4', 'room_cap_lv5', 'room_cap_lv6', 'room_cap_lv7', 'room_cap_lv8', 'room_cap_lv9', 'room_cap_lv10', 'room_cap_lv11', 'room_cap_lv12', 'room_cap_lv13', 'room_cap_lv14', 'room_cap_lv15', 'medal_week_top', 'medal_generous_people', 'medal_friends', 'title_room_level', 'title_rising_charm', 'title_rising_days'],
         ...['event_min_room_level', 'event_min_lead_minutes', 'event_max_minutes', 'event_max_capacity', 'event_grace_minutes', 'event_strike_limit', 'event_block_days', 'event_reminders_off'],
         'lucky_announce_min_coins',
+        'global_gift_min_price',
+        'global_gift_gap_seconds',
         ...['lucky_bag_coins', 'lucky_bag_coin_packets', 'lucky_bag_gift_counts', 'lucky_bag_gift_packets', 'lucky_bag_delays', 'lucky_bag_seconds'],
         ...['auto_chat_off', 'auto_daily', 'quick_daily', 'opener_daily', 'auto_gap_minutes', 'auto_man_daily', 'auto_man_gap_minutes', 'auto_quiet_cut', 'auto_new_days', 'auto_new_weight', 'auto_reply_weight'],
         ...['auto_online_weight', 'auto_streamer_coef', 'auto_busy_pending', 'auto_active_minutes', 'auto_online_minutes', 'template_max_chars', 'template_min_chars', 'reply_minutes', 'reply_grace_seconds'],

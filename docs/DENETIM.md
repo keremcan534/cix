@@ -232,3 +232,24 @@ Mesajlar'daki "Yalnızca samimi kişilerden bildirim al" seçeneği herkeste aç
 - **Panel sayfası (Claude, sonra):** Canlı ayarlar kendiliğinden görünüyor. Rapor (yayıncı ve ajans performansı, hazır cevap kullanımı, şüpheli ikililer, bildirim kayıtları) için sunucu uçları `PANEL_ROUTES`'ta hazır; panel deposunda sayfası ve `APP_ROUTES` izni yapılmadı.
 - **Yük:** eşleştirme dakikada bir, en çok 100 yayıncı ve 500 aday erkekle çalışır; ücretli mesaj başına bir satır daha yazılır. Yük testi bu sürümle tekrarlanmadı; canlı kullanıcı artınca `server/infra/loadtest/` ile denenmeli.
 
+
+## Global hediye (19 Kasım 2026, Güncelleme 7 madde 12)
+
+Yöneticinin "Global" işaretlediği pahalı hediye (en az 300.000 jeton) gönderilince gönderenin ülkesindeki bütün odalarda
+adlarıyla duyurulur ([`HEDIYE_YONETIMI.md`](HEDIYE_YONETIMI.md) › Global hediye).
+
+- **Moderasyon (siz: bilin):** gönderenin ve alıcının adı bütün platformda görünür; alıcı buna onay vermedi. Biri bunu
+  birini herkesin önünde rahatsız etmek için kullanabilir (alıcının adı herkese gider). Önlemler: adlar zaten iletişim
+  filtresinden geçmiş; herkes Gizlilik › "Adım genel duyurularda görünmesin" ile kendi adını gizleyebilir (gönderen de
+  alıcı da, ayrı ayrı); engelleşen kişiler birbirinin duyurusunu görmez. Kötüye kullanılırsa hediyenin işareti panelden
+  kaldırılır.
+- **Hukuk:** Şanslı paketleri hiçbir zaman global olamaz (şans oyunu tanıtılmaz; Şanslı gönderimi bu yoldan geçmez).
+  Bu sınır gevşetilirse Kritik 1'deki soruya dahil edin.
+- **Yük:** her duyuru açık her hatta bir kısa yazı (ucuz); 10 saniyede en çok bir duyuru. Hediyenin videosu başka
+  odalarda **oynamaz ve indirilmez** (1 çekirdekli sunucu, CDN yok: binlerce telefon aynı videoyu çekmesin).
+- **Tek süreç (sonra):** duyuru sırası ve canlı hatlar tek API sürecinin belleğinde. Birden fazla API sürecine
+  geçilirken ortak kanal (Postgres LISTEN/NOTIFY ya da Redis) ve tek sıra kurulmalı; yoksa her süreç yalnız kendi
+  hatlarına duyurur ve aralık süreç başına sayılır.
+- **Eski APK'lar:** duyuruyu görmez; gönderildiği odada normal hediye görür.
+- **Panel (Claude, sonra):** Hediyeler formundaki "Global" kutusu panel deposunda yapılmadı; sunucu ucu hazır
+  (`global` alanı, `globalMinPrice`).

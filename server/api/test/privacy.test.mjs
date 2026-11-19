@@ -84,6 +84,8 @@ describe('Gizlilik ayarları', () => {
       autoSend: true,
       // Profil izleri (profile-marks.mjs): others may leave a mark until I say no.
       profileMarks: true,
+      // Global hediye (global-gifts.mjs): my name shows until I hide it.
+      globalHideName: false,
     });
     const p = await setPrivacy(a.session, { showOnline: false, dmFrom: 'mutual' });
     assert.equal(p.showOnline, false);
