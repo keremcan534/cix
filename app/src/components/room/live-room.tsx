@@ -86,7 +86,7 @@ import { LayoutPickerSheet } from '@/components/room/layout-picker';
 import { RoomScreen } from '@/components/room/room-screen';
 import { StageBackdrop } from '@/components/room/stage-backdrop';
 import { useRoomLook } from '@/components/room/decor';
-import { StageLayout } from '@/components/room/stage-layout';
+import { LAYOUT_PAD_TOP, StageLayout } from '@/components/room/stage-layout';
 import { FitStage } from '@/components/room/fit-stage';
 import { useRoomBonds } from '@/components/room/room-bonds';
 import { BOND_KINDS, bondTint, bubbleBondOf, jointEntries, micLinkOf, roomBondKey, type BondKind, type JointState, type RoomBond } from '@/data/bonds';
@@ -182,7 +182,8 @@ import { errorHaptic, micHaptic, successHaptic, tapHaptic } from '@/lib/haptics'
 import { stickerIdOf, stickerToken } from '@/lib/stickers';
 import { useApp, type MyRoom } from '@/store';
 import { similarity } from '@/lib/similarity';
-import { fitGrid, fitLayout, layoutPlan, type FitOpts, type Fitted } from '@/lib/seat-fit';
+import { PK_LINE, fitGrid, fitLayout, layoutPlan, type FitOpts, type Fitted } from '@/lib/seat-fit';
+import { SEAT_TOP } from '@/lib/seat-cell';
 import { BOSS_SEAT_DEFAULTS, bossLine, bossStep, patronOnSeat, type BossSitting } from '@/lib/patron-seat';
 import { RPS, isMovePick, moveArt, moveLine, moveOfPick, moveShuffle, needsMic, sideTarget, type Move, type Rect as MicRect } from '@/lib/room-moves';
 import { colors, fonts, gradient, semantic } from '@/theme';
@@ -214,6 +215,13 @@ const WHEEL_ROOM = 62;
 const CORNER_ROOM = 92;
 /** The header's small buttons: 44 px tall to the finger, without reaching their neighbours across the 8 px gaps. */
 const HEAD_SLOP = { top: 12, bottom: 12, left: 4, right: 4 };
+/** The classic grid's padding over its first row (styles.seatGrid; lib/seat-fit gridAt counts it). */
+const GRID_PAD_TOP = 8;
+/**
+ * components/room/fit-stage HEADROOM: the stage's scroller reaches this far over its first row, into the header's
+ * padding, and cuts what passes its edge (tests/seat-cell keeps the two equal).
+ */
+const STAGE_HEADROOM = 8;
 /** What a stage cue (lib/fx-queue) draws: a gift's video, a big gift's show, the other gifts' pop, a full-screen Hareketli. */
 type StagePlay =
   | { kind: 'video'; gift: Gift; media: NonNullable<ReturnType<typeof giftVideoOf>> }
@@ -612,6 +620,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const [balkonLine, setBalkonLine] = useState(0);
   // The notes over the controls (a mute, a refused line, @ names): what floats over the chat's corner stays above them.
   const [notesH, setNotesH] = useState(0);
+  // A board or banner over the mics (music, a poll, the shared screen…): the first row's frames keep off it.
+  const [boardsOver, setBoardsOver] = useState(false);
   const sheetRoom = sheetSpace(roomH, insets.bottom, headerH, balkonLine);
   // Seat emoji reactions currently playing, by user id.
   const [reactions, setReactions] = useState<Record<string, SeatReactionData>>({});
@@ -3527,7 +3537,13 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const stripSlot: ArenaSlot = { width: stripW, size: Math.max(24, Math.min(34, stripW - 8)) };
   // Empty / locked / invite pending / mic on / mic off / muted by the room, per numbered mic.
   const slots = useMemo(() => slotStates(live, (uid) => uid === 'me' && !sending), [live, sending]);
-  const renderSeat = (i: number, extra?: { host?: boolean; compact?: boolean; slot?: ArenaSlot; grid?: ArenaSlot; next?: { index: number; gap: number }; mini?: boolean }) => {
+  // The px free above the stage's first row of faces, where a frame's crown may rise (lib/seat-cell): under the Patron
+  // seat its points line and the gap (the classic grid's row gap, a layout's top padding); under a board the stage's
+  // top padding; else that and the stage's headroom over it (components/room/fit-stage HEADROOM), which cuts
+  // what passes its edge.
+  const padTop = layout ? LAYOUT_PAD_TOP : GRID_PAD_TOP;
+  const stageTop = bossOn ? (layout ? padTop + PK_LINE : SEAT_TOP) : boardsOver || pk?.kind === 'cross' ? padTop : STAGE_HEADROOM + padTop;
+  const renderSeat = (i: number, extra?: { host?: boolean; compact?: boolean; slot?: ArenaSlot; grid?: ArenaSlot; next?: { index: number; gap: number }; mini?: boolean; layer?: number }) => {
     const uid = allSeats[i];
     const link = extra?.next ? micLinkOf(roomBonds, uid, allSeats[extra.next.index]) : null;
     const host = extra?.slot ? false : (extra?.host ?? i === 0);
@@ -3558,6 +3574,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         pkPoints={pkPointsOf(uid)}
         avatarSize={extra?.slot?.size ?? extra?.grid?.size}
         slotWidth={extra?.slot?.width ?? extra?.grid?.width}
+        roomTop={extra?.slot?.top ?? extra?.grid?.top}
+        layer={extra?.layer}
         bondLink={link && extra?.next ? { bond: link, gap: extra.next.gap } : null}
         mini={extra?.mini}
         seatColor={seatColor}
@@ -3598,7 +3616,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} reaction={bossReaction} still={settings.reduceMotion} anchor={bossAnchor} pkPoints={pkPointsOf(bossId)} />
           </View>
         )}
-        <StageLayout layout={layout} width={win.width} face={f.face} seats={allSeats} pkRoom={theme === 'pk'} cameraOf={(uid) => (uid === 'me' ? camOn : !!camOf(uid))} videoOf={camOf} renderSeat={(i, slot, next) => renderSeat(i, { slot, next })} />
+        <StageLayout layout={layout} width={win.width} face={f.face} seats={allSeats} pkRoom={theme === 'pk'} cameraOf={(uid) => (uid === 'me' ? camOn : !!camOf(uid))} videoOf={camOf} top={stageTop} renderSeat={(i, slot, next) => renderSeat(i, { slot, next })} />
       </>
     ) : (
       <View style={styles.seatGrid}>
@@ -3609,9 +3627,16 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           </View>
         )}
         {/* Every mic, the host's first, `f.cols` to a row (equal widths, no gap): full rows, the same seats for every
-            mic count (lib/seat-fit gridCols), so the stage is symmetric and a new count only adds or takes rows. */}
+            mic count (lib/seat-fit gridCols), so the stage is symmetric and a new count only adds or takes rows. A
+            row higher on the screen is drawn over the rows under it (its names and points pills over a crown's tip). */}
         <View style={[styles.guestGrid, { width: f.cols * f.slot }]}>
-          {allSeats.map((_, i) => renderSeat(i, { grid: { width: f.slot, size: f.face }, next: i + 1 < allSeats.length && i % f.cols !== f.cols - 1 ? { index: i + 1, gap: 0 } : undefined }))}
+          {allSeats.map((_, i) =>
+            renderSeat(i, {
+              grid: { width: f.slot, size: f.face, top: i < f.cols ? stageTop : undefined },
+              layer: Math.ceil(allSeats.length / f.cols) - Math.floor(i / f.cols),
+              next: i + 1 < allSeats.length && i % f.cols !== f.cols - 1 ? { index: i + 1, gap: 0 } : undefined,
+            }),
+          )}
         </View>
       </View>
     );
@@ -3777,7 +3802,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             guess={Math.round(win.height * 0.34)}
             onTouchStart={emojiOpen ? () => setEmojiOpen(false) : undefined}
             top={
-              <>
+              <View onLayout={(e) => setBoardsOver(e.nativeEvent.layout.height > 0)}>
                 {musicEnabled && <MusicBar music={shownMusic} canControl={canControlMusic} onOpen={() => setPanel('music')} onToggle={music$.toggle} onClose={music$.close} />}
                 {session && <SessionBanner session={session} />}
                 {callActive && (
@@ -3833,7 +3858,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                     soundOff={soundOff}
                   />
                 )}
-              </>
+              </View>
             }
             seats={stageSeats}
             balcony={
@@ -4581,9 +4606,10 @@ const styles = StyleSheet.create({
   callBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 12, marginTop: 6, backgroundColor: semantic.success, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
   callBannerText: { color: semantic.successInk, fontWeight: '800', flex: 1, fontSize: 13 },
   callBannerGo: { color: semantic.successInk, fontWeight: '900' },
-  topRow: { width: '100%', flexDirection: 'row', justifyContent: 'center', alignItems: 'flex-start', gap: 28 },
+  // Over the mics under it: its points line covers a crown's tip that rises into it.
+  topRow: { width: '100%', flexDirection: 'row', justifyContent: 'center', alignItems: 'flex-start', gap: 28, zIndex: 1 },
   topAvatar: { borderWidth: 2, borderRadius: 14 },
-  seatGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', paddingHorizontal: 8, paddingTop: 8, rowGap: 10 },
+  seatGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', paddingHorizontal: 8, paddingTop: GRID_PAD_TOP, rowGap: 10 },
   // Full rows for every mic count (lib/seat-fit gridCols); a count no row length fills keeps its short last row in the
   // middle, so the stage stays symmetric.
   guestGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', rowGap: 10 },

@@ -278,12 +278,18 @@ function Amount({ unit, n, small }: { unit: 'coin' | 'diamond'; n: number; small
 }
 
 /**
+ * How far a shop frame's picture may spread round a face here (ArtFrame maxScale; 1.8 elsewhere): the list's rows sit
+ * close, and a wider picture ran into the next row's.
+ */
+const FRAME_SPREAD = 1.4;
+
+/**
  * Their photo in their own shop frame when they wear one; otherwise in `wreath` (a podium place's laurel), in `ring`
  * (the place's metal, when there is no laurel) or plain.
  */
 function Face({ who, size, ring, wreath }: { who: Person; size: number; ring?: readonly [string, string, string]; wreath?: number }) {
   const s = useStyles();
-  if (who.frame || who.vip > 0) return <FramedAvatar uri={who.avatar} size={size} frameId={who.frame} vipLevel={who.vip} />;
+  if (who.frame || who.vip > 0) return <FramedAvatar uri={who.avatar} size={size} frameId={who.frame} vipLevel={who.vip} artScale={FRAME_SPREAD} />;
   if (wreath !== undefined) {
     const w = Math.round(size * CONTRIB_WREATH_SCALE);
     return (

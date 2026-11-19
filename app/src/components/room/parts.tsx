@@ -64,6 +64,8 @@ export function Seat({
   pkPoints,
   avatarSize,
   slotWidth,
+  roomTop,
+  layer,
   modMuted,
   invitee,
   similarity,
@@ -105,6 +107,16 @@ export function Seat({
   /** Layout overrides (team PK arena). */
   avatarSize?: number;
   slotWidth?: number;
+  /**
+   * The px free above the face, where its frame's crown may go (lib/seat-cell seatRoom); none: a row of seats'
+   * (SEAT_TOP). A container with less room above (a team PK's halves, a video tile) says how much.
+   */
+  roomTop?: number;
+  /**
+   * The seat's place in its container's stacking (zIndex): a row higher on the screen is drawn over the rows under it,
+   * so its name and points pill cover a lower row's crown tip, never the reverse. Seats of one row share it.
+   */
+  layer?: number;
   /** The mic was switched off by the room's management (red badge), not by its owner (grey badge). */
   modMuted?: boolean;
   /** Empty seat held for a pending mic invite (name of the invited person). */
@@ -145,9 +157,10 @@ export function Seat({
   const g = gender !== undefined ? gender : user?.showGender === false ? null : user?.gender;
   const voice = g ? VOICE_RING[g] : VOICE_RING.none;
   const size = avatarSize ?? (host ? 60 : 48);
-  // The frame's picture and the speaking ring keep to this seat's cell (lib/seat-cell): off the name, the next seats
-  // and the row above, the same for every frame and wave. One object per size, so the framed photo isn't redrawn.
-  const room = useMemo(() => seatRoom(size, slotWidth), [size, slotWidth]);
+  // The frame's picture and the speaking ring keep to this seat's cell (lib/seat-cell): off the next seats and the row
+  // above, a frame's hanging gems behind its own name (drawn over them), the speaking ring off the name's letters; the
+  // same for every frame and wave. One object per size, so the framed photo isn't redrawn.
+  const room = useMemo(() => seatRoom(size, slotWidth, roomTop), [size, slotWidth, roomTop]);
   // Small faces: a smaller icon and no badge by the name. The name grows a little with the face (lib/seat-fit, which
   // sizes the stage by the same numbers) and may be as wide as the seat's slot.
   const small = size < 46;
@@ -161,6 +174,10 @@ export function Seat({
   // An empty or locked seat is the pouf in the room's seat color (a pending invite keeps the gold bubble); the host's
   // own photo sits in the gold host frame unless they wear a VIP or shop frame.
   const pouf = !user && (locked || !invitee);
+  // A framed face's speaking ring is drawn over its frame's picture (a wide frame would hide it); a plain face's behind
+  // the photo, round it.
+  const framed = !!user && !mini && (vipLevel > 0 || !!frameId);
+  const ring = speaking ? <VoiceWave wave={wave} size={size} color={voice} level={level} still={still} reach={ringReach(size, room)} /> : null;
   const hostFrame = host && !mini ? SEAT_ART.hostFrame : undefined;
   const frameSize = Math.round(size * HOST_FRAME_SCALE);
   const muteText = modMuted ? ', yönetim tarafından susturuldu' : muted ? ', mikrofonu kapalı' : '';
@@ -175,7 +192,7 @@ export function Seat({
       onPressOut={press.onPressOut}
       accessibilityRole="button"
       accessibilityLabel={label}
-      style={[styles.seat, slotWidth ? { width: slotWidth } : host ? (compact ? { width: 96 } : styles.hostSeat) : { width: '20%' }]}
+      style={[styles.seat, slotWidth ? { width: slotWidth } : host ? (compact ? { width: 96 } : styles.hostSeat) : { width: '20%' }, layer !== undefined && { zIndex: layer }]}
     >
       <Animated.View
         style={[
@@ -184,9 +201,9 @@ export function Seat({
         ]}
       >
         <Animated.View ref={anchorRef} collapsable={false} style={{ width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center', transform: [{ scale: press.scale }] }}>
-          {/* Behind the photo and its frame, round the face: the same ring for every speaker (components/room/voice-wave). */}
-          {speaking && <VoiceWave wave={wave} size={size} color={voice} level={level} still={still} reach={ringReach(size, room)} />}
-          {user && !mini && (vipLevel > 0 || frameId) ? (
+          {/* Round the face, the same ring for every speaker (components/room/voice-wave): behind a plain photo. */}
+          {!framed && ring}
+          {framed && user ? (
             <FramedAvatar uri={user.avatar} size={size} vipLevel={vipLevel} frameId={frameId} room={room} />
           ) : user ? (
             <>
@@ -218,6 +235,8 @@ export function Seat({
               <Ionicons name={locked ? 'lock-closed' : invitee ? 'hourglass-outline' : 'add'} size={mini ? 13 : Math.round(Math.max(15, Math.min(28, size * 0.32)))} color={invitee && !locked ? colors.gold : 'rgba(255,255,255,0.42)'} />
             </LinearGradient>
           )}
+          {/* Over a frame's picture, so a framed speaker's ring is seen. */}
+          {framed && ring}
           {teamColor && user && <View pointerEvents="none" style={[styles.teamRing, { width: size + 8, height: size + 8, borderRadius: (size + 8) / 2, borderColor: teamColor }]} />}
           {camera && user && (
             <View style={styles.camBadge} accessibilityLabel="Kamerası açık">
@@ -771,7 +790,8 @@ const styles = StyleSheet.create({
   giftText: { color: '#FDE7C2', fontSize: 13, flexShrink: 1 },
   giftName: { color: '#fff', fontWeight: '800' },
   failed: { color: '#FF9AA1', fontSize: 12, fontWeight: '700' },
-  seatName: { color: '#fff', fontSize: 12, fontWeight: '600', maxWidth: 64 },
+  // A soft dark shadow, so the name reads over a frame's hanging gems drawn behind it.
+  seatName: { color: '#fff', fontSize: 12, fontWeight: '600', maxWidth: 64, textShadowColor: 'rgba(0,0,0,0.75)', textShadowRadius: 3 },
   miniLabel: { height: 14, alignItems: 'center', justifyContent: 'center' },
   miniNum: { color: 'rgba(255,255,255,0.72)', fontSize: 11, fontWeight: '700' },
   // Room events stay in the background of the conversation: no box shouting over people's messages.

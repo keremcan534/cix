@@ -9,7 +9,10 @@
 //   - a frame: its picture, a transparent PNG or WebP (media.mjs shopframe), square, its empty centre's radius as a
 //     share of its width (`hole`) so the photo sits inside it, where that centre is when it isn't the picture's middle
 //     (`hole_x`, `hole_y`, 079: a ring under a crown is higher), and a moving version if it has one (`motion_*`, 079):
-//     an animated WebP of the same picture the new app plays (the still one stays for older apps);
+//     an animated WebP of the same picture the new app plays (the still one stays for older apps); and the part of the
+//     pictures that is drawn (`art_box_*`, 098: the box round every pixel more than a little opaque, over the still
+//     picture and every frame of the moving one, measured by tools/frame-reach.py when either is saved, and once at
+//     start for the frames saved before; none where Python with Pillow isn't installed: phones draw as before);
 //   - an entry effect: its video, a ready stacked MP4 or a transparent source (WebM, ProRes .mov, SVGA) the server
 //     turns into one, as a gift's (custom-gifts.mjs videoOf and its job), its name plate (`plate`): where the
 //     entering person's name is written over it, as shares of the 540 × 960 frame (x, y: the centre; w: the widest
@@ -38,16 +41,22 @@
 //
 // What the phones get: GET /api/catalog?shop=1 → `shop: { items }` (shopCatalog): every frame, entry effect, chat bubble
 // and voice wave as it is now, in order; one taken off the shelf has `off: true` (whoever has it still wears it and
-// others still see it); an admin's frame its `art` ({ url, hole, at?: { x, y }, motion?: { url } }: where the hole's
-// centre is when it isn't the middle, and the moving version the new app plays; an older one centres the photo and
-// draws the still `url`), an admin's entry effect `video: true`, its
+// others still see it); an admin's frame its `art` ({ url, hole, at?: { x, y }, motion?: { url }, reach?: { x, top,
+// bottom } }: where the hole's centre is when it isn't the middle, the moving version the new app plays, and how far
+// the drawn part reaches from the hole's centre once measured (reachOf), so the frame is drawn as big as it can be
+// and isn't cut; an older one centres the photo, draws the still `url` and never reads `reach`: every app's parser
+// builds the art from the fields it knows), an admin's entry effect `video: true`, its
 // `plate` and its `icon` ({ url }) if it has one, its clip listed in the catalog's `fx` as entry <id> (served at
 // /api/fx/s/<id>.mp4), an admin's bubble or wave its `look`. An older app reads the plate's place, size, colour and
 // boldness only (it writes the name even when `show` is false) and shows no icon. The app that first read this list (frames and entry effects) skips the other kinds. The catalog's and /api/config's `v` add
 // shopItemsRev(). The shop sells at the price, days and VIP level set here (economy.mjs sellable). An older app never
 // asks: it shows its compiled shop and buys by the app's names and prices, refused (update_required, nothing taken)
 // when an item's price or days moved; it draws nothing for an admin's item someone wears.
+import { execFile } from 'node:child_process';
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 import { HttpError, auth, clientIp, db, env, int, limit, readJson, text, tx } from './core.mjs';
 import { SEAT_COLORS, SEAT_DEFAULT, SHOP, SHOP_PAUSED } from './catalog.mjs';
@@ -61,6 +70,9 @@ const positive = (v, d) => {
   return Number.isSafeInteger(n) && n > 0 ? n : d;
 };
 const POLL_MS = positive(env.SHOP_ITEMS_POLL_MS, 5000);
+/** Python with Pillow (the Dockerfile installs it), for tools/frame-reach.py; custom-gifts.mjs reads the same setting. */
+const PYTHON = env.PYTHON || 'python3';
+const REACH_TOOL = path.join(import.meta.dirname, 'tools', 'frame-reach.py');
 
 /**
  * `seat`: a room's seat color (room-seat-color.mjs). A room's owner buys it for the room, not a person for themselves:
@@ -185,6 +197,38 @@ const bad = (message) => new HttpError(400, message);
 
 // --- The table in memory -------------------------------------------------------------------------------------
 let snap = { rev: 0, rows: new Map() };
+/** The pictures a frame's box was measured from, as art_box_of keeps them: the still one's address, a space, the moving one's. */
+const boxKey = (art, motion) => `${art} ${motion ?? ''}`;
+/**
+ * How far a frame's drawn part (`box`, shares of the picture's sides) reaches from the hole's centre (`at`, the middle
+ * when none), as shares of the picture's side: across (the further of left and right), up and down. Never less than
+ * the photo's own radius (`hole`), never past the picture's edge on that side; to 0.001. Null without a box.
+ */
+export function reachOf(box, hole, at) {
+  if (!box) return null;
+  const c = at ?? { x: 0.5, y: 0.5 };
+  const fit = (n, edge) => Math.round(Math.min(Math.max(n, hole), edge) * 1000) / 1000;
+  return Object.freeze({ x: fit(Math.max(c.x - box.l, box.r - c.x), Math.max(c.x, 1 - c.x)), top: fit(c.y - box.t, c.y), bottom: fit(box.b - c.y, 1 - c.y) });
+}
+/** An admin's frame's pictures as a row has them; its box only while it was measured from these very pictures. */
+function artOf(r) {
+  const hole = Number(r.hole);
+  const at = r.hole_x === null || r.hole_x === undefined ? null : Object.freeze({ x: Number(r.hole_x), y: Number(r.hole_y) });
+  const measured = r.art_box_of !== null && r.art_box_of !== undefined && r.art_box_of === boxKey(r.art_url, r.motion_url);
+  const box =
+    measured && r.art_box_l !== null && r.art_box_l !== undefined
+      ? Object.freeze({ l: Number(r.art_box_l), t: Number(r.art_box_t), r: Number(r.art_box_r), b: Number(r.art_box_b) })
+      : null;
+  return Object.freeze({
+    url: r.art_url,
+    px: num(r.art_px),
+    hole,
+    at,
+    motion: r.motion_url ? Object.freeze({ url: r.motion_url, px: num(r.motion_px), bytes: num(r.motion_bytes) }) : null,
+    box,
+    reach: reachOf(box, hole, at),
+  });
+}
 const rowOf = (r) =>
   Object.freeze({
     id: r.id,
@@ -196,15 +240,7 @@ const rowOf = (r) =>
     minVip: num(r.min_vip),
     enabled: r.enabled,
     sort: num(r.sort),
-    art: r.art_url
-      ? Object.freeze({
-          url: r.art_url,
-          px: num(r.art_px),
-          hole: Number(r.hole),
-          at: r.hole_x === null || r.hole_x === undefined ? null : Object.freeze({ x: Number(r.hole_x), y: Number(r.hole_y) }),
-          motion: r.motion_url ? Object.freeze({ url: r.motion_url, px: num(r.motion_px), bytes: num(r.motion_bytes) }) : null,
-        })
-      : null,
+    art: r.art_url ? artOf(r) : null,
     video: r.video_url ? Object.freeze({ url: r.video_url, bytes: num(r.video_bytes), ms: num(r.video_ms), v: r.video_v }) : null,
     plate: r.plate ?? null,
     look: r.look ?? null,
@@ -223,7 +259,7 @@ export async function refreshShopItems(q = db) {
   return snap;
 }
 let timer = null;
-/** Picks up another process's changes. */
+/** Picks up another process's changes, and measures the frames saved before their pictures were (kickMeasure). */
 export function startShopItems() {
   if (timer) return;
   let busy = false;
@@ -240,6 +276,7 @@ export function startShopItems() {
     }
   }, POLL_MS);
   timer.unref();
+  kickMeasure();
 }
 export function stopShopItems() {
   clearInterval(timer);
@@ -346,7 +383,16 @@ export function shopCatalog() {
       ...(x.builtin ? { builtin: true } : {}),
       ...(x.enabled ? {} : { off: true }),
       ...(x.kind === 'frame' && x.art
-        ? { art: { url: x.art.url, hole: x.art.hole, ...(x.art.at && (x.art.at.x !== 0.5 || x.art.at.y !== 0.5) ? { at: x.art.at } : {}), ...(x.art.motion ? { motion: { url: x.art.motion.url } } : {}) } }
+        ? {
+            art: {
+              url: x.art.url,
+              hole: x.art.hole,
+              ...(x.art.at && (x.art.at.x !== 0.5 || x.art.at.y !== 0.5) ? { at: x.art.at } : {}),
+              ...(x.art.motion ? { motion: { url: x.art.motion.url } } : {}),
+              // How far its drawn part reaches from the hole's centre, once measured (an older app never reads it).
+              ...(x.art.reach ? { reach: x.art.reach } : {}),
+            },
+          }
         : {}),
       ...(x.kind === 'entry' && x.video ? { video: true, plate: x.plate, ...(x.icon ? { icon: { url: x.icon.url } } : {}) } : {}),
       ...(!x.builtin && x.look && (x.kind === 'bubble' || x.kind === 'wave') ? { look: lookOut(x) } : {}),
@@ -510,14 +556,17 @@ async function served(url, info, maxPx, maxBytes, what) {
   const px = imageInfo(await readStored(keyOf(small), maxBytes))?.width ?? Math.min(info.width, maxPx);
   return { url: small, px };
 }
-/** A frame's picture: a transparent PNG or WebP, square or nearly, 128–1024 px, still (the moving one goes apart). */
+/**
+ * A frame's picture: a transparent PNG or WebP, square or nearly, 128–1024 px, still (the moving one goes apart).
+ * `buf`: the file, for measuring its drawn part (measureFrame).
+ */
 async function frameArt(url) {
   const info = await pictureOf(url, 'Çerçeve resmini', SHOP_LIMITS.frameBytes);
   if (info.animated) throw bad('Bu resim hareketli: onu "Hareketli hali"ne yükleyin; çerçeve resmi durağan bir PNG ya da WebP olmalı (eski telefonlar onu gösterir)');
   if (!info.alpha) throw bad('Çerçeve resminde saydamlık yok: ortası (fotoğrafın yeri) ve çevresi saydam olmalı');
   if (Math.abs(info.width - info.height) > Math.max(2, info.width * 0.02)) throw bad(`Çerçeve resmi kare olmalı (bu ${info.width} × ${info.height})`);
   if (info.width < SHOP_LIMITS.framePxMin || info.width > SHOP_LIMITS.framePxMax) throw bad(`Çerçeve resmi ${SHOP_LIMITS.framePxMin}–${SHOP_LIMITS.framePxMax} piksel olmalı (bu ${info.width})`);
-  return { url, px: info.width };
+  return { url, px: info.width, buf: info.buf };
 }
 /** A bubble's picture: a PNG or WebP, 64–1024 px each way, up to 1 MB; its width and height go into its slice. */
 async function bubbleArt(url) {
@@ -538,7 +587,134 @@ async function motionArt(url) {
   if (Math.abs(info.width - info.height) > Math.max(2, info.width * 0.02)) throw bad(`Hareketli çerçeve kare olmalı (bu ${info.width} × ${info.height})`);
   const { motionPxMin: lo, motionPxMax: hi } = SHOP_LIMITS;
   if (info.width < lo || info.width > hi) throw bad(`Hareketli çerçeve ${lo}–${hi} piksel olmalı (bu ${info.width}); telefon onu küçük çizer, büyüğü boşuna yer kaplar`);
-  return { url, px: info.width, bytes: info.bytes };
+  return { url, px: info.width, bytes: info.bytes, buf: info.buf };
+}
+
+// --- How much of a frame's picture is drawn (tools/frame-reach.py, 098) ----------------------------------------
+/** Runs Python, never through a shell: { code, out, err }; code -1 when it couldn't start or took too long. */
+function python(args, timeout) {
+  return new Promise((resolve) => {
+    let child;
+    try {
+      child = execFile(PYTHON, args, { timeout, killSignal: 'SIGKILL', maxBuffer: 64 * 1024, windowsHide: true }, (e, out, err) =>
+        resolve({ code: !e ? 0 : typeof e.code === 'number' && !e.killed ? e.code : -1, out: String(out ?? ''), err: String(err || e?.message || '') }),
+      );
+    } catch (e) {
+      return resolve({ code: -1, out: '', err: String(e?.message ?? e) });
+    }
+    // Measuring gives way to the API's own work.
+    if (child.pid) {
+      try {
+        os.setPriority(child.pid, 10);
+      } catch {}
+    }
+  });
+}
+let pillow = null;
+/** Whether frames can be measured here: Python with Pillow, and the tool (asked once). */
+const canMeasure = () => (pillow ??= python(['-I', '-c', 'import PIL'], 20_000).then((r) => r.code === 0 && fs.existsSync(REACH_TOOL)));
+/** The tool's box, its edges moved out to 0.0001 (never smaller than measured); throws when it isn't one. */
+function boxIn(j) {
+  const v = ['l', 't', 'r', 'b'].map((k) => (j && typeof j[k] === 'number' ? j[k] : NaN));
+  if (!v.every(Number.isFinite)) throw new Error(`not a box: ${JSON.stringify(j)?.slice(0, 100)}`);
+  const [l, t] = v.slice(0, 2).map((n) => Math.max(0, Math.floor(n * 1e4) / 1e4));
+  const [r, b] = v.slice(2).map((n) => Math.min(1, Math.ceil(n * 1e4) / 1e4));
+  if (!(l < r && t < b)) throw new Error(`not a box: ${JSON.stringify(j)?.slice(0, 100)}`);
+  return { l, t, r, b };
+}
+/**
+ * The drawn part of a frame's still picture and its moving version (`bufs`: their files, null for none), over every
+ * frame of the moving one: { box: { l, t, r, b } } as shares of the pictures' sides; { box: null } when they can't be
+ * read or nothing in them is drawn (known: not measured again); null when it couldn't run here (no Python or Pillow,
+ * too slow, the tool failed): nothing is known, and it is tried again later (kickMeasure). Never refuses a save.
+ */
+async function measureFrame(bufs) {
+  if (!(await canMeasure())) return null;
+  let dir = null;
+  try {
+    dir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'shop-frame-'));
+    const files = [];
+    for (const [i, buf] of bufs.entries()) {
+      if (!buf) continue;
+      files.push(path.join(dir, `picture-${i}`));
+      await fs.promises.writeFile(files.at(-1), buf);
+    }
+    const r = await python(['-I', REACH_TOOL, ...files], 60_000);
+    if (r.code === 3) return { box: null };
+    if (r.code !== 0) throw new Error(`${r.code} ${r.err.slice(-300)}`);
+    return { box: boxIn(JSON.parse(r.out)) };
+  } catch (e) {
+    console.error('shop frame measure', String(e?.message ?? e).slice(0, 300));
+    return null;
+  } finally {
+    if (dir) fs.promises.rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+/** A stored picture's file, or null when the storage can't give it now. */
+const storedPicture = (url, max) => {
+  const key = keyOf(url);
+  return key ? readStored(key, max).catch(() => null) : Promise.resolve(null);
+};
+/** A frame's box columns for a measurement (measureFrame) of the pictures `art` and `motion`; all null when it couldn't run. */
+const boxCols = (m, art, motion) => ({
+  art_box_l: m?.box?.l ?? null,
+  art_box_t: m?.box?.t ?? null,
+  art_box_r: m?.box?.r ?? null,
+  art_box_b: m?.box?.b ?? null,
+  art_box_of: m ? boxKey(art, motion) : null,
+});
+
+let measuring = false;
+let measureAgain = false;
+/**
+ * Measures, one after another in the background, the admins' frames whose pictures aren't measured: saved before 098
+ * (once, at start), or when it couldn't run on save. Each is stored with a new rev, so phones read the catalog again.
+ * One that can't be measured now (no Python here, the storage) is left for the next start; one whose pictures
+ * changed meanwhile is left to its save.
+ */
+export function kickMeasure() {
+  if (measuring) {
+    measureAgain = true;
+    return;
+  }
+  measuring = true;
+  void (async () => {
+    try {
+      do {
+        measureAgain = false;
+        const seen = [];
+        for (;;) {
+          const r = await db.query(
+            `SELECT id, art_url, motion_url FROM shop_items
+              WHERE kind = 'frame' AND NOT builtin AND deleted_at IS NULL AND art_url IS NOT NULL
+                AND art_box_of IS DISTINCT FROM art_url || ' ' || coalesce(motion_url, '') AND NOT (id = ANY($1::text[]))
+              ORDER BY id LIMIT 1`,
+            [seen],
+          );
+          if (!r.rowCount || !(await canMeasure())) break;
+          const row = r.rows[0];
+          seen.push(row.id);
+          const still = await storedPicture(row.art_url, SHOP_LIMITS.frameBytes);
+          const motion = row.motion_url ? await storedPicture(row.motion_url, SHOP_LIMITS.motionBytes) : null;
+          const m = still && (!row.motion_url || motion) ? await measureFrame([still, motion]) : null;
+          if (!m) continue;
+          const c = boxCols(m, row.art_url, row.motion_url);
+          const u = await db.query(
+            `UPDATE shop_items SET art_box_l = $4, art_box_t = $5, art_box_r = $6, art_box_b = $7, art_box_of = $8, rev = nextval('shop_item_rev')
+              WHERE id = $1 AND art_url = $2 AND motion_url IS NOT DISTINCT FROM $3 AND deleted_at IS NULL`,
+            [row.id, row.art_url, row.motion_url, c.art_box_l, c.art_box_t, c.art_box_r, c.art_box_b, c.art_box_of],
+          );
+          if (!u.rowCount) continue;
+          await refreshShopItems();
+          console.log(`shop frame measured: ${row.id}${m.box ? ` ${m.box.l}–${m.box.r} × ${m.box.t}–${m.box.b}` : ', nothing to measure'}`);
+        }
+      } while (measureAgain);
+    } catch (e) {
+      console.error('shop frame measuring', String(e?.message ?? e).slice(0, 200));
+    } finally {
+      measuring = false;
+    }
+  })();
 }
 /** An entry effect's icon in the shop: a PNG or WebP, 64–4096 px each way; phones get at most 512 px and 512 KB. */
 async function iconArt(url) {
@@ -689,7 +865,17 @@ function itemView(x, owned) {
     sort: x.sort,
     owners: owned.get(x.sku) ?? 0,
     art: x.art
-      ? { url: x.art.url, px: x.art.px, hole: x.art.hole, at: x.art.at ?? { x: 0.5, y: 0.5 }, motion: x.art.motion ? { url: x.art.motion.url, px: x.art.motion.px, bytes: x.art.motion.bytes } : null }
+      ? {
+          url: x.art.url,
+          px: x.art.px,
+          hole: x.art.hole,
+          at: x.art.at ?? { x: 0.5, y: 0.5 },
+          motion: x.art.motion ? { url: x.art.motion.url, px: x.art.motion.px, bytes: x.art.motion.bytes } : null,
+          // The drawn part of its pictures (shares of their sides) and how far it reaches from the hole's centre, as
+          // phones get it; null: not measured (yet), or nothing to measure.
+          box: x.art.box,
+          reach: x.art.reach,
+        }
       : null,
     video: x.video ? { url: fxUrl(x.sku, x.video.v), bytes: x.video.bytes, ms: x.video.ms } : null,
     plate: x.plate,
@@ -775,6 +961,7 @@ export const shopRoutes = {
     let icon = null;
     let motion = null;
     let at = null;
+    let box = boxCols(null, null, null);
     if (kind !== 'bubble' && kind !== 'wave' && kind !== 'seat' && b.look !== undefined) throw bad(`${KIND_NAME[kind]} için renk ve stil buradan değil, resmiyle ya da videosuyla gelir`);
     if (kind !== 'entry' && b.icon !== undefined && b.icon !== null) throw bad(`${KIND_NAME[kind]} mağazada kendi görünüşüyle durur; ikon yalnız giriş efektine eklenir`);
     if (kind !== 'frame' && b.motion !== undefined && b.motion !== null) throw bad('Hareketli hali yalnız çerçevede olur');
@@ -784,6 +971,7 @@ export const shopRoutes = {
       hole = holeOf(b.hole ?? SHOP_LIMITS.holeDefault);
       at = holeAtOf(b.holeX, b.holeY, hole) ?? null;
       if (b.motion !== undefined && b.motion !== null) motion = await motionArt(b.motion);
+      box = boxCols(await measureFrame([art.buf, motion?.buf ?? null]), art.url, motion?.url ?? null);
     } else if (kind === 'entry') {
       if (b.art !== undefined || b.hole !== undefined || b.holeX !== undefined || b.holeY !== undefined) throw bad('Giriş efektinin çerçeve resmi olmaz');
       video = await videoOf(b.video ?? null);
@@ -805,11 +993,14 @@ export const shopRoutes = {
         const id = `${PREFIX[kind]}${(await c.query("SELECT nextval('shop_item_no') AS n")).rows[0].n}`;
         const r = await c.query(
           `INSERT INTO shop_items (id, kind, name, price, days, min_vip, enabled, sort, art_url, art_px, hole, video_url, video_bytes, video_ms, video_v, plate,
-                                   job_status, job_source, job_fill, job_opaque, look, icon_url, icon_px, motion_url, motion_px, motion_bytes, hole_x, hole_y, created_by, updated_by)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $29) RETURNING *`,
+                                   job_status, job_source, job_fill, job_opaque, look, icon_url, icon_px, motion_url, motion_px, motion_bytes, hole_x, hole_y,
+                                   art_box_l, art_box_t, art_box_r, art_box_b, art_box_of, created_by, updated_by)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28,
+                   $29, $30, $31, $32, $33, $34, $34) RETURNING *`,
           [id, kind, name, price, days, minVip, enabled, firstSort(kind), art?.url ?? null, art?.px ?? null, hole, stacked?.url ?? null, stacked?.bytes ?? null, stacked?.ms ?? null,
             stacked?.v ?? null, plate ? JSON.stringify(plate) : null, source ? 'processing' : null, source?.url ?? null, source?.fill ?? null, source?.opaque === true,
-            look ? JSON.stringify(look) : null, icon?.url ?? null, icon?.px ?? null, motion?.url ?? null, motion?.px ?? null, motion?.bytes ?? null, at?.x ?? null, at?.y ?? null, a.id],
+            look ? JSON.stringify(look) : null, icon?.url ?? null, icon?.px ?? null, motion?.url ?? null, motion?.px ?? null, motion?.bytes ?? null, at?.x ?? null, at?.y ?? null,
+            box.art_box_l, box.art_box_t, box.art_box_r, box.art_box_b, box.art_box_of, a.id],
         );
         await audited(c, a, 'shop.create', { item: id, before: null, after: auditOf(r.rows[0]) }, req);
         return id;
@@ -817,6 +1008,8 @@ export const shopRoutes = {
     );
     await refreshShopItems();
     if (source) kickJobs();
+    // A frame whose measuring couldn't run now: once more in the background (and at the next start).
+    if (kind === 'frame' && box.art_box_of === null) kickMeasure();
     return { item: await oneItem(id) };
   },
 
@@ -869,9 +1062,10 @@ export const shopRoutes = {
       }
     } else if (cur.kind === 'frame') {
       if (b.video !== undefined || b.plate !== undefined) throw bad('Çerçevenin videosu ya da isim plakası olmaz');
+      let still = null;
       if (b.art !== undefined && b.art !== cur.art?.url) {
-        const art = await frameArt(b.art);
-        Object.assign(cols, { art_url: art.url, art_px: art.px });
+        still = await frameArt(b.art);
+        Object.assign(cols, { art_url: still.url, art_px: still.px });
         if (cur.art) drop.push(cur.art.url);
       }
       if (b.hole !== undefined) cols.hole = holeOf(b.hole);
@@ -880,10 +1074,20 @@ export const shopRoutes = {
       const at = b.holeX !== undefined || b.holeY !== undefined ? holeAtOf(b.holeX, b.holeY, hole) : cols.hole !== undefined && cur.art?.at ? holeAtOf(cur.art.at.x, cur.art.at.y, hole) : undefined;
       if (at !== undefined) Object.assign(cols, { hole_x: at?.x ?? null, hole_y: at?.y ?? null });
       // A new moving version replaces the old file; null takes it away (the still picture alone).
+      let moving = null;
       if (b.motion !== undefined && b.motion !== (cur.art?.motion?.url ?? null)) {
-        const motion = b.motion === null ? null : await motionArt(b.motion);
-        Object.assign(cols, { motion_url: motion?.url ?? null, motion_px: motion?.px ?? null, motion_bytes: motion?.bytes ?? null });
+        moving = b.motion === null ? null : await motionArt(b.motion);
+        Object.assign(cols, { motion_url: moving?.url ?? null, motion_px: moving?.px ?? null, motion_bytes: moving?.bytes ?? null });
         if (cur.art?.motion) drop.push(cur.art.motion.url);
+      }
+      // New pictures: their drawn part measured again, over both (the one that stays read back from the storage).
+      if (cols.art_url !== undefined || cols.motion_url !== undefined) {
+        const artUrl = cols.art_url ?? cur.art?.url ?? null;
+        const motionUrl = cols.motion_url !== undefined ? cols.motion_url : (cur.art?.motion?.url ?? null);
+        const stillBuf = still ? still.buf : artUrl ? await storedPicture(artUrl, SHOP_LIMITS.frameBytes) : null;
+        const motionBuf = moving ? moving.buf : motionUrl ? await storedPicture(motionUrl, SHOP_LIMITS.motionBytes) : null;
+        const m = stillBuf && (!motionUrl || motionBuf) ? await measureFrame([stillBuf, motionBuf]) : null;
+        Object.assign(cols, boxCols(m, artUrl, motionUrl));
       }
     } else {
       if (b.art !== undefined || b.hole !== undefined || b.holeX !== undefined || b.holeY !== undefined) throw bad('Giriş efektinin çerçeve resmi olmaz');
@@ -922,6 +1126,7 @@ export const shopRoutes = {
     removeFiles(drop.filter(Boolean));
     await refreshShopItems();
     if (cols.job_status === 'processing') kickJobs();
+    if (cols.art_box_of === null) kickMeasure();
     return { item: await oneItem(id) };
   },
 

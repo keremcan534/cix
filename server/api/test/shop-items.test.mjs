@@ -11,6 +11,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import zlib from 'node:zlib';
 
 import { SEAT_COLORS, SHOP } from '../catalog.mjs';
 import { convertArgs } from '../custom-gifts.mjs';
@@ -36,6 +37,11 @@ const refused = async (p, code, re) => {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const rnd = () => Math.random().toString(36).slice(2, 12);
 
+const PYTHON = process.env.PYTHON || 'python3';
+// The server measures a frame's drawn part with Python and Pillow (tools/frame-reach.py); without them it saves the
+// frame unmeasured.
+const pillowOk = spawnSync(PYTHON, ['-I', '-c', 'import PIL']).status === 0;
+const NO_PILLOW = pillowOk ? false : 'Python ile Pillow yok';
 const FFMPEG = process.env.FFMPEG || 'ffmpeg';
 const ffmpegOk = spawnSync(FFMPEG, ['-version']).status === 0 && spawnSync(process.env.FFPROBE || 'ffprobe', ['-version']).status === 0;
 const NO_FFMPEG = ffmpegOk ? false : 'ffmpeg yok';
@@ -100,6 +106,62 @@ function animatedWebp(w, h, { alpha = true, frames = 3 } = {}) {
   return Buffer.concat([riff, body]);
 }
 const motionArt = (w = 256, h = w, o) => upload(admin, 'shopframe', animatedWebp(w, h, o), 'image/webp');
+/**
+ * A square RGBA PNG of `side` px drawn where `drawn(x, y)` says (opaque red), transparent elsewhere; `broken`: its
+ * header is right but its pixels can't be read (the shop checks the header, Pillow the pixels).
+ */
+function framePng(side, drawn, { broken = false } = {}) {
+  const row = side * 4 + 1;
+  const raw = Buffer.alloc(row * side);
+  for (let y = 0; y < side; y++) for (let x = 0; x < side; x++) if (drawn(x, y)) raw.set([230, 40, 60, 255], y * row + 1 + x * 4);
+  const chunk = (type, data) => {
+    const len = Buffer.alloc(4);
+    len.writeUInt32BE(data.length);
+    const body = Buffer.concat([Buffer.from(type, 'latin1'), data]);
+    const crc = Buffer.alloc(4);
+    crc.writeUInt32BE(zlib.crc32(body) >>> 0);
+    return Buffer.concat([len, body, crc]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(side, 0);
+  ihdr.writeUInt32BE(side, 4);
+  ihdr[8] = 8;
+  ihdr[9] = 6;
+  const pixels = broken ? Buffer.from('not deflated pixels at all') : zlib.deflateSync(raw);
+  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', ihdr), chunk('IDAT', pixels), chunk('IEND', Buffer.alloc(0))]);
+}
+/**
+ * An animated WebP made by Pillow (lossless, transparent): `side` px, one frame per box [x0, y0, x1, y1) drawn opaque,
+ * the rest transparent.
+ */
+function pillowWebp(side, boxes) {
+  const out = path.join(dir, `hareketli-${rnd()}.webp`);
+  const code = [
+    'import json, sys',
+    'from PIL import Image, ImageDraw',
+    'side, boxes, out = int(sys.argv[1]), json.loads(sys.argv[2]), sys.argv[3]',
+    'frames = []',
+    'for x0, y0, x1, y1 in boxes:',
+    '    f = Image.new("RGBA", (side, side), (0, 0, 0, 0))',
+    '    ImageDraw.Draw(f).rectangle([x0, y0, x1 - 1, y1 - 1], fill=(40, 200, 90, 255))',
+    '    frames.append(f)',
+    'frames[0].save(out, save_all=True, append_images=frames[1:], duration=120, loop=0, lossless=True)',
+  ].join('\n');
+  const r = spawnSync(PYTHON, ['-I', '-c', code, String(side), JSON.stringify(boxes), out]);
+  assert.equal(r.status, 0, String(r.stderr));
+  return fs.readFileSync(out);
+}
+/** The frame's measured columns as stored; `of`: what they were measured from (its pictures now, nothing, or others). */
+const boxRow = async (id) =>
+  (
+    await h.sql.query(
+      `SELECT art_box_l, art_box_t, art_box_r, art_box_b,
+              CASE WHEN art_box_of IS NULL THEN 'none' WHEN art_box_of = art_url || ' ' || coalesce(motion_url, '') THEN
+                CASE WHEN motion_url IS NULL THEN 'still' ELSE 'still+motion' END ELSE 'other' END AS of
+         FROM shop_items WHERE id = $1`,
+      [id],
+    )
+  ).rows[0];
 /** Waits until the item's conversion is over and the catalog lists its video; its panel view. */
 async function settled(id, ms = 60_000) {
   const end = Date.now() + ms;
@@ -240,7 +302,8 @@ describe('Yönetim › Mağaza', () => {
     const f = (await ok(add({ art: still, hole: 0.27, holeX: 0.5, holeY: 0.42, motion: moving }), 'hareketli çerçeve')).item;
     assert.deepEqual([f.art.url, f.art.hole, f.art.at, f.art.motion.url, f.art.motion.px], [still, 0.27, { x: 0.5, y: 0.42 }, moving, 256]);
     assert.ok(f.art.motion.bytes > 0);
-    // Phones: the hole's place and the moving version beside the still picture an older app draws (centred).
+    // Phones: the hole's place and the moving version beside the still picture an older app draws (centred). This
+    // stand-in WebP's frames can't be decoded, so its drawn part isn't known: no reach, drawn as before.
     assert.deepEqual((await inCatalog(f.id)).art, { url: still, hole: 0.27, at: { x: 0.5, y: 0.42 }, motion: { url: moving } });
     // A bigger hole must still fit where it is; the middle is no place at all for the phones.
     await refused(post('/update', { id: f.id, hole: 0.45 }), 400, /taşıyor/);
@@ -251,7 +314,9 @@ describe('Yönetim › Mağaza', () => {
     assert.equal((await ok(post('/update', { id: f.id, motion: moving2 }), 'yeni hareketli')).item.art.motion.px, 320);
     const bare = (await ok(post('/update', { id: f.id, motion: null }), 'hareketsiz')).item;
     assert.deepEqual([bare.art.url, bare.art.motion], [still, null]);
-    assert.deepEqual((await inCatalog(f.id)).art, { url: still, hole: 0.27 });
+    // The still picture alone is measured again (where Pillow is): the stand-in disc reaches a third of the picture
+    // round its middle, 43–214 of its 256 px.
+    assert.deepEqual((await inCatalog(f.id)).art, { url: still, hole: 0.27, ...(pillowOk ? { reach: { x: 0.336, top: 0.332, bottom: 0.336 } } : {}) });
     await refused(post('/update', { id: 'fr-neon', motion: moving }), 400, /görseli buradan değişmez/);
     await refused(post('/update', { id: 'fr-neon', holeX: 0.5, holeY: 0.4 }), 400, /görseli buradan değişmez/);
 
@@ -449,5 +514,82 @@ describe('Yönetim › Mağaza', () => {
     const waves = (await panel()).filter((x) => x.kind === 'wave').map((x) => x.id);
     await ok(post('/order', { kind: 'wave', ids: [...waves].reverse() }), 'sıra');
     assert.deepEqual((await catalog()).shop.items.filter((x) => x.kind === 'wave').map((x) => x.sku), [...waves].reverse());
+  });
+
+  test('çerçevenin çizili kısmı ölçülür: telefonlar ne kadar uzandığını alır (hareketli hali dahil); okunamayan resim yine kaydedilir', { skip: NO_PILLOW }, async () => {
+    await freshAdmin();
+    // 200 px: drawn from 40 to 160 across and from 20 to 170 down, a hole of radius 40 round (100, 110).
+    const drawn = (x, y) => x >= 40 && x < 160 && y >= 20 && y < 170 && (x + 0.5 - 100) ** 2 + (y + 0.5 - 110) ** 2 > 40 ** 2;
+    const still = await upload(admin, 'shopframe', framePng(200, drawn), 'image/png');
+    const [, c0] = await call('GET', '/api/catalog');
+    const f = (await ok(post('', { kind: 'frame', name: 'Ölçülü Taç', price: 700, days: 30, art: still, hole: 0.2, holeX: 0.5, holeY: 0.55 }), 'çerçeve')).item;
+    assert.deepEqual(f.art.box, { l: 0.2, t: 0.1, r: 0.8, b: 0.85 });
+    assert.deepEqual(await boxRow(f.id), { art_box_l: '0.2000', art_box_t: '0.1000', art_box_r: '0.8000', art_box_b: '0.8500', of: 'still' });
+    // From the hole's centre (0.5, 0.55): 0.3 either way across, 0.45 up, 0.3 down. Only `reach` is new for phones;
+    // every app's parser builds the art from the fields it knows, so an older one draws it as before.
+    const reach = { x: 0.3, top: 0.45, bottom: 0.3 };
+    assert.deepEqual(f.art.reach, reach);
+    assert.deepEqual((await inCatalog(f.id)).art, { url: still, hole: 0.2, at: { x: 0.5, y: 0.55 }, reach });
+    assert.ok((await catalog('')).v > c0.v);
+
+    // Never less than the photo itself: a bigger hole reaches past the drawn part below and across.
+    await ok(post('/update', { id: f.id, hole: 0.35 }), 'büyük alan');
+    assert.deepEqual((await inCatalog(f.id)).art.reach, { x: 0.35, top: 0.45, bottom: 0.35 });
+
+    // A moving version that reaches further in one of its frames: the box holds every frame of it and the still one.
+    const moving = await upload(admin, 'shopframe', pillowWebp(128, [[26, 13, 102, 109], [6, 13, 122, 109]]), 'image/webp');
+    const m = (await ok(post('/update', { id: f.id, motion: moving }), 'hareketli')).item;
+    // 6 / 128 and 122 / 128 across, the still picture's 0.1 at the top, 109 / 128 at the bottom (outward to 0.0001).
+    assert.deepEqual(m.art.box, { l: 0.0468, t: 0.1, r: 0.9532, b: 0.8516 });
+    assert.deepEqual((await inCatalog(f.id)).art, { url: still, hole: 0.35, at: { x: 0.5, y: 0.55 }, motion: { url: moving }, reach: { x: 0.453, top: 0.45, bottom: 0.35 } });
+    assert.equal((await boxRow(f.id)).of, 'still+motion');
+    // The moving version taken away: the still picture alone again.
+    await ok(post('/update', { id: f.id, motion: null, hole: 0.2 }), 'hareketsiz');
+    assert.deepEqual((await inCatalog(f.id)).art.reach, reach);
+
+    // A picture whose header is right but whose pixels can't be read: saved all the same, with nothing to reach
+    // (drawn as before), and known as measured so it isn't tried again at every start.
+    const broken = await upload(admin, 'shopframe', framePng(200, drawn, { broken: true }), 'image/png');
+    const b = (await ok(post('/update', { id: f.id, art: broken }), 'okunamayan resim')).item;
+    assert.deepEqual([b.art.url, b.art.box, b.art.reach], [broken, null, null]);
+    assert.deepEqual(await boxRow(f.id), { art_box_l: null, art_box_t: null, art_box_r: null, art_box_b: null, of: 'still' });
+    assert.deepEqual((await inCatalog(f.id)).art, { url: broken, hole: 0.2, at: { x: 0.5, y: 0.55 } });
+    const n = (await ok(post('', { kind: 'frame', name: 'Bozuk Resim', price: 700, days: 30, art: await upload(admin, 'shopframe', framePng(200, drawn, { broken: true }), 'image/png') }), 'yeni okunamayan')).item;
+    assert.equal(n.art.reach, null);
+    assert.equal((await inCatalog(n.id)).art.reach, undefined);
+  });
+
+  // Restarts the API: last.
+  test('Python yokken çerçeve yine kaydedilir, ölçüsüz çizilir; sunucu Pillow ile açılınca eskiler ölçülür ve telefonlar yeniden okur', async () => {
+    const python = h.env.PYTHON;
+    h.env.PYTHON = path.join(dir, 'python-yok');
+    await h.restart();
+    await freshAdmin();
+    const drawn = (x, y) => x >= 20 && x < 180 && y >= 30 && y < 170 && (x + 0.5 - 100) ** 2 + (y + 0.5 - 100) ** 2 > 50 ** 2;
+    const still = await upload(admin, 'shopframe', framePng(200, drawn), 'image/png');
+    const f = (await ok(post('', { kind: 'frame', name: 'Pythonsuz Çerçeve', price: 400, days: 7, art: still, hole: 0.25 }), 'Python yokken')).item;
+    assert.deepEqual([f.art.url, f.art.box, f.art.reach], [still, null, null]);
+    assert.equal((await boxRow(f.id)).of, 'none', 'ölçülmedi: sonra denenir');
+    assert.deepEqual((await inCatalog(f.id)).art, { url: still, hole: 0.25 });
+    await ok(post('/update', { id: f.id, hole: 0.3 }), 'Python yokken değişir');
+    if (!pillowOk) return;
+
+    const [, before] = await call('GET', '/api/catalog');
+    if (python === undefined) delete h.env.PYTHON;
+    else h.env.PYTHON = python;
+    const from = h.logs.length;
+    await h.restart();
+    let listed;
+    for (let i = 0; i < 150 && !listed?.art.reach; i++) {
+      await sleep(100);
+      listed = await inCatalog(f.id);
+    }
+    // 20–180 across and 30–170 down, round the middle.
+    assert.deepEqual(listed.art, { url: still, hole: 0.3, reach: { x: 0.4, top: 0.35, bottom: 0.35 } });
+    assert.ok((await catalog('')).v > before.v, 'telefonlar kataloğu yeniden okur');
+    assert.deepEqual(await boxRow(f.id), { art_box_l: '0.1000', art_box_t: '0.1500', art_box_r: '0.9000', art_box_b: '0.8500', of: 'still' });
+    // The frames measured before (and the one whose picture can't be read) aren't measured again.
+    const measured = h.logs.slice(from).filter((l) => l.startsWith('shop frame measured'));
+    assert.deepEqual(measured, [`shop frame measured: ${f.id} 0.1–0.9 × 0.15–0.85`]);
   });
 });
