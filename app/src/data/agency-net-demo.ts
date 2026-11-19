@@ -143,6 +143,16 @@ export function demoOverview(id: string): Overview {
         : [],
     tiers: DEMO_TIERS,
     poolCap: POOL,
+    // Aday ajans / aktif ajans (lib/agency-activity): the owners' rule with this demo agency's numbers.
+    activity: {
+      status: a.streamers >= 20 ? 'active' : 'candidate',
+      off: false,
+      hosts: a.streamers,
+      earners: Math.min(a.active, 6),
+      newThisMonth: 2,
+      penalty: 0,
+      need: { hosts: 20, earners: 10, earnUsd: 10, demoteBelow: 20, monthlyNew: 5, penaltyPct: 5 },
+    },
   };
 }
 

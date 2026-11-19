@@ -31,6 +31,8 @@ export type AgencyCard = {
   region: string | null;
   createdAt: string;
   approvedAt: string | null;
+  /** Aday ajans / aktif ajans as last worked out (an older server sends none). */
+  activity?: 'candidate' | 'active';
 };
 export type MyAgency = AgencyCard & { viewer: Viewer | null; perms: string[] };
 
@@ -85,6 +87,8 @@ export type Notice = { id: number; kind: string; title: string; body: string; cr
 
 export type Overview = {
   agency: AgencyCard;
+  /** Aday ajans / aktif ajans with its progress; raw, read with lib/agency-activity parseAgencyActivity. */
+  activity?: unknown;
   owner: Named | null;
   viewer: Viewer;
   perms: string[];
@@ -277,6 +281,8 @@ export type TreeNode = {
   owner: string | null;
   tier: string | null;
   tierName: string | null;
+  /** Aday ajans / aktif ajans (an older server sends none). */
+  activity?: 'candidate' | 'active';
   streamers: number;
   volume30: number;
   orgVolume30: number;

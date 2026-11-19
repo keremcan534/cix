@@ -42,6 +42,7 @@ import {
   usdOf,
   validateSetting,
 } from './agency-lib.mjs';
+import { activityJobs } from './agency-activity.mjs';
 import {
   approveAgency,
   approveTransfer,
@@ -151,6 +152,8 @@ export async function runJobs(now = new Date()) {
   }
   out.expired = (await db.query("UPDATE agency_transfers SET status = 'cancelled', decided_at = now(), decision_note = 'Süresi doldu' WHERE status = 'pending' AND created_at < now() - make_interval(days => greatest(30, $1::int + 1))", [s.transfer_policy.decision_days])).rowCount;
   Object.assign(out, await streamerPolicyJobs(s));
+  // Aday ajans / aktif ajans, the 90-day rule and the month's rule (agency-activity.mjs).
+  Object.assign(out, await tx((c) => activityJobs(c, now)));
   return out;
 }
 
@@ -233,6 +236,8 @@ export const agencyAdminRoutes = {
         owner: a.owner_name,
         tier: a.tier,
         tierName: tierName(x.s, a.tier),
+        // Aday ajans / aktif ajans as the agency job last worked it out (agency-activity.mjs).
+        activity: a.activity,
         streamers: a.streamers,
         volume30: n(a.volume30),
         orgVolume30: n(a.org_volume30),
@@ -302,6 +307,7 @@ export const agencyAdminRoutes = {
         description: a.description,
         tier: a.tier,
         tierName: tierName(x.s, a.tier),
+        activity: a.activity,
         createdAt: a.created_at,
       })),
     };

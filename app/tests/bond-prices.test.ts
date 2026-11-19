@@ -74,3 +74,17 @@ describe('Oda seviyeleri panelden', () => {
     assert.deepEqual([liveMicMinLevel(null), liveMemberLimit(3, null)], [MIC_PERMISSION_MIN_LEVEL, memberLimit(3)]);
   });
 });
+
+describe('Ajans statüsü', () => {
+  test('sunucunun cevabı okunur; bozuk olan gösterilmez; yazı kurala göre', async () => {
+    const { activityText, parseAgencyActivity } = await import('@/lib/agency-activity');
+    const need = { hosts: 20, earners: 10, earnUsd: 10, demoteBelow: 20, monthlyNew: 5, penaltyPct: 5 };
+    const a = parseAgencyActivity({ status: 'candidate', off: false, hosts: 12, earners: 3, newThisMonth: 2, penalty: 0, need });
+    assert.deepEqual(a, { status: 'candidate', off: false, hosts: 12, earners: 3, newThisMonth: 2, penalty: 0, need });
+    assert.match(activityText(a!), /Aday ajanssın\. Aktif olmak için 20 yayıncı ve bunlardan 10 tanesinin bu ajansta en az 10 USD kazanması gerekir/);
+    const b = parseAgencyActivity({ status: 'active', hosts: 25, earners: 12, newThisMonth: 1, penalty: 0.05, need });
+    assert.match(activityText(b!), /20'nin altına inerse yeniden aday.*5 yeni yayıncı.*5 puan/);
+    assert.equal(b!.penalty, 0.05);
+    for (const bad of [null, 'x', {}, { status: 'aday', hosts: 1, earners: 1, newThisMonth: 1, need }, { status: 'active', hosts: -1, earners: 1, newThisMonth: 1, need }, { status: 'active', hosts: 1, earners: 1, newThisMonth: 1 }]) assert.equal(parseAgencyActivity(bad), null, JSON.stringify(bad));
+  });
+});

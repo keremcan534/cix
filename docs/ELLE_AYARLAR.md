@@ -87,3 +87,9 @@ bekleme süresi.
 - **Zaten panelde:** Cömertlik ve Yankı seviye eşikleri (Seviye ayarları).
 - **Panelde değişmeyenler:** profil listeleri (burç, etiket, dil, ülke) ve profil formunun sınırları: uygulama
   bunları kendi içinden gösterir, yeni seçenek eski APK'da seçilemez; ayrı bir iş ister.
+
+## Ajans statüsü (19 Kasım)
+
+Aday ajans / aktif ajans kuralının sayıları (20 yayıncı, 10 × 10 USD kazanan, 20 altında adaya düşme, aylık 5 yeni
+yayıncı, şart tutmazsa 5 puan düşüş, 90 gün pasif yayıncı) Canlı ayarlar › **Ajans statüsü**'nde. Ayrıntı:
+[`AJANS_STATUSU.md`](AJANS_STATUSU.md).

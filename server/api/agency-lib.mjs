@@ -8,6 +8,7 @@ import crypto from 'node:crypto';
 
 import { HttpError, db, move } from './core.mjs';
 import { LOCK_HOURS, diamondState } from './wallet.mjs';
+import { penaltyAt } from './agency-activity.mjs';
 
 export const DIAMONDS_PER_USD = 5000;
 /** The first release runs two agency levels (top, sub). The data model allows more; settings can't exceed this. */
@@ -505,6 +506,14 @@ export async function calcEvent(c, eventId) {
   const shares = [{ agency: chain[0], kind: 'direct', rate: eff[0], amount: base * eff[0] }];
   for (let j = 1; j < n; j++) shares.push({ agency: chain[j], kind: 'difference', rate: eff[j] - eff[j - 1], amount: base * (eff[j] - eff[j - 1]) });
 
+  // The month's rule (agency-activity.mjs): an active agency that brought too few new streamers last month gets
+  // fewer points of its own share this month. Only its own share: the parent's difference stays, the platform keeps it.
+  const penalty = Math.min(e4(await penaltyAt(c, chain[0], t)), shares[0].rate);
+  if (penalty > 0) {
+    shares[0].rate -= penalty;
+    shares[0].amount -= base * penalty;
+  }
+
   // Transition commission: a former parent keeps a share of an independent agency's own streamers for a set time.
   let transition = null;
   if (n === 1) {
@@ -515,7 +524,7 @@ export async function calcEvent(c, eventId) {
       [chain[0], t, link.rows[0].joined_at, ev.source_type],
     );
     if (tr.rowCount) {
-      const r = Math.min(e4(tr.rows[0].rate), eff[0]);
+      const r = Math.min(e4(tr.rows[0].rate), shares[0].rate);
       if (r > 0) {
         transition = { row: tr.rows[0], rate: r };
         shares[0].amount -= base * r;
@@ -535,15 +544,15 @@ export async function calcEvent(c, eventId) {
     if (amount !== 0) split = { ...a, basis: shares[0].amount, amount, rate: Math.round((shares[0].rate * a.pct) / 100) };
   }
 
-  const total = base * eff[n - 1];
+  const total = base * (eff[n - 1] - penalty);
   let period = periodOf(t, s.commission_period);
   if (await isClosed(c, period)) period = periodOf(new Date(), s.commission_period);
   const version = `cap#${ids.pool_cap ?? 0}|r#${rows.map((r) => r?.id ?? 0).join(',')}${transition ? `|t#${transition.row.id}` : ''}`;
   const parentAmount = shares.filter((x) => x.kind === 'difference').reduce((a, x) => a + x.amount, 0);
   const ins = await c.query(
     `INSERT INTO agency_commissions (income_event_id, txn, streamer_id, agency_id, parent_agency_id, top_agency_id, chain, base_diamonds, income_type,
-       pool_cap, total_rate, agency_rate, parent_rate, transition_rate, agency_amount, parent_amount, transition_amount, usd, period, rule_version, occurred_at, assistant_amount)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18::numeric / ${DIAMONDS_PER_USD}, $19, $20, $21, $22)
+       pool_cap, total_rate, agency_rate, parent_rate, transition_rate, agency_amount, parent_amount, transition_amount, usd, period, rule_version, occurred_at, assistant_amount, penalty_rate)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18::numeric / ${DIAMONDS_PER_USD}, $19, $20, $21, $22, $23)
      ON CONFLICT (income_event_id) DO NOTHING RETURNING *`,
     [
       ev.id,
@@ -556,7 +565,7 @@ export async function calcEvent(c, eventId) {
       base,
       ev.source_type,
       fmt4(cap),
-      fmt4(eff[n - 1]),
+      fmt4(eff[n - 1] - penalty),
       fmt4(shares[0].rate),
       fmt4(eff[n - 1] - eff[0]),
       fmt4(transition?.rate ?? 0),
@@ -568,6 +577,7 @@ export async function calcEvent(c, eventId) {
       version,
       t,
       fmt4(split?.amount ?? 0),
+      fmt4(penalty),
     ],
   );
   if (!ins.rowCount) return (await done('done'), null);

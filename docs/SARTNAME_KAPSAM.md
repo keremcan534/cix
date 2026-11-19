@@ -109,7 +109,7 @@ Bu bir **tıklanabilir prototip**: backend yok, veriler sahte. "Sunucu tarafınd
 | Aile: profil (seviye kartı, duyuru, etiket, haftalık sıralama, Oda/Görev/Çift/Durum/Tema), aile sohbeti, Görevler (sabit ödüllü sandıklar), Aile Kasası, Uyum Köşesi | ✅ |
 | Hangi odada olduğu: profil, ajans sohbeti ve aile sohbetinde görünür, dokununca o odaya gidilir (kilitliyse şifre), odada "A, B kişisini takip ederek odaya katıldı" mesajı | ✅ |
 | Jeton Noktası: cüzdan, yayıncı/ajans/BD defterleri, blokajlı para çekme, otomatik onay / manuel inceleme durumu | ✅ `docs/COINS_BANK.md` (ödeme simüle; kurallar, onay ve mutabakat ayrı Finance Control platformunda) |
-| Yayıncı/ajans yaşam döngüsü: ajanssız yayıncı 3 gün → yönetim hesabı, 90 gün pasif → ajanstan düşer, ajans aktivasyonu 20 yayıncı / 10×10 USD, aylık 5 yeni yayıncı, komisyon düşüşü, aday statüsüne düşme; süreler panelden | ✅ |
+| Yayıncı/ajans yaşam döngüsü: ajanssız yayıncı 3 gün → yönetim hesabı, 90 gün pasif → ajanstan düşer, ajans aktivasyonu 20 yayıncı / 10×10 USD, aylık 5 yeni yayıncı, komisyon düşüşü, aday statüsüne düşme; süreler panelden | ✅ (19 Kasım'a kadar aday/aktif ajans ve 90 gün kuralı yalnız demo ekranındaydı; artık sunucuda: [`AJANS_STATUSU.md`](AJANS_STATUSU.md)) |
 | Jackpot / şans çarpanlı hediye ve rastgele ödüllü kutular | ⛔ bilinçli olarak eklenmedi (kumar niteliği; lisans/hukuk gerekir) |
 
 ## Prototip dışı (backend / yönetim paneli gerektirir) ⛔

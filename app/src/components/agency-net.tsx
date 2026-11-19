@@ -15,6 +15,7 @@ import { DepthCard } from '@/components/fx/surface';
 import { Text, TextInput } from '@/components/text';
 import { Button } from '@/components/ui';
 import { contactRefusal } from '@/lib/contact-filter';
+import { activityText, type AgencyActivity } from '@/lib/agency-activity';
 import { fmtD, fmtPct, fmtScore, fmtUsd, usdOf, type Loaded, type Tier } from '@/lib/agency-net';
 import { SCRIM, colors, edge, fonts, radius, semantic, space } from '@/theme';
 
@@ -178,6 +179,43 @@ export function TierLadder({ tiers, current, score, poolCap, floor = 0.01 }: { t
       })}
       {score !== null && <Text style={s.foot}>Güncel puan {fmtScore(score)} / 100. Seviye değişiklikleri gelecek dönemden geçerlidir; geçmiş kazançlar değişmez.</Text>}
     </View>
+  );
+}
+
+/** One goal's progress: label, value / target and a bar (green once reached). */
+function GoalBar({ label, value, target }: { label: string; value: number; target: number }) {
+  const done = value >= target;
+  return (
+    <View style={{ gap: 4 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <Text style={[s.legendText, { flex: 1 }]}>{label}</Text>
+        <Text style={[s.legendValue, { color: done ? semantic.success : colors.gold }]}>
+          {fmtD(value)} / {fmtD(target)}
+          {done ? ' ✓' : ''}
+        </Text>
+      </View>
+      <View style={s.scoreTrack}>
+        <View style={[s.scoreFill, { width: `${Math.min(100, (value / Math.max(1, target)) * 100)}%`, backgroundColor: done ? semantic.success : colors.gold }]} />
+      </View>
+    </View>
+  );
+}
+
+/** Aday ajans / aktif ajans: the status, the goals against the rule and this month's line (lib/agency-activity). */
+export function AgencyStatusCard({ a }: { a: AgencyActivity }) {
+  const active = a.status === 'active';
+  return (
+    <Panel>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <Ionicons name={active ? 'checkmark-circle' : 'hourglass-outline'} size={20} color={active ? semantic.success : colors.gold} />
+        <Text style={[s.legendValue, { flex: 1, fontSize: 16 }]}>Statü: {active ? 'Aktif ajans' : 'Aday ajans'}</Text>
+      </View>
+      <GoalBar label={active ? 'Yayıncı (aktif kalmak için)' : 'Getirilen yayıncı'} value={a.hosts} target={active ? a.need.demoteBelow : a.need.hosts} />
+      {!active && a.need.earners > 0 && <GoalBar label={`En az ${a.need.earnUsd} USD kazanan yayıncı`} value={a.earners} target={a.need.earners} />}
+      {active && a.need.monthlyNew > 0 && <GoalBar label="Bu ay yeni yayıncı" value={a.newThisMonth} target={a.need.monthlyNew} />}
+      {a.penalty > 0 && <Text style={[s.legendText, { color: semantic.danger }]}>{`Geçen ay yeni yayıncı şartı tutmadığı için bu ay komisyonun ${Math.round(a.penalty * 100)} puan düşük.`}</Text>}
+      <Text style={s.legendText}>{activityText(a)}</Text>
+    </Panel>
   );
 }
 

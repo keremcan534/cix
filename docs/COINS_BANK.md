@@ -42,6 +42,9 @@ Finans yönetimi (kurallar, ödeme onayı/reddi, mutabakat) mobil uygulamada yer
 - Örnek: yayıncı 100.000 💎 = 20 USD, ajans 40.000 💎 = 8 USD, BD ayrı → platform yükümlülüğü 28 USD + BD.
 
 ## Yayıncı ve ajans kuralları (süreler panelden ayarlanır)
+
+Sunucudaki karşılığı ve güncel değerler (geri düşme sınırı 20): [`AJANS_STATUSU.md`](AJANS_STATUSU.md). Aşağıdaki alan adları uygulamanın örnek modundaki adlardır.
+
 | Kural | Varsayılan | Alan |
 | --- | --- | --- |
 | Ajanssız yayıncı N gün içinde ajansa katılmazsa yönetim hesabına geçer; kazancı ve çekimi normal devam eder, ajans kazancı oluşmaz | 3 gün | `hostAgencyJoinDays` |
