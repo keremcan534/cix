@@ -10,7 +10,8 @@
 // without it a report's ban takes the report's category, otherwise 'other'. Every step is audited there.
 //
 // Kullanıcılar (admins only): every account, newest first, and deleting one the way DELETE /api/me does.
-//   GET  /api/admin/users?q=&offset=   → { users, total, tests }  (50 a page; tests: the smoke-test accounts)
+//   GET  /api/admin/users?q=&offset=   → { users, total, tests }  (50 a page; tests: the smoke-test accounts;
+//        each user's `streamer`: agency | management | agency_owner | family_owner | null)
 //   POST /api/admin/users/delete { id } | { tests: true } → { deleted }
 //   POST /api/admin/users/room-level { id, level }  (1–15)  → { level, xp }   sets the owner's room level
 // The search also takes a number (public-no.mjs whoIs): someone's own (their profile's ID and their room's), a special
@@ -19,6 +20,7 @@
 // named "Test A" or "Test B", development sign-in only (no Google or e-mail), role user.
 import { HttpError, LIVE_SANCTION, SANCTION_SELECT, auth, db, int, publicNoOf, readJson, tx, userId } from './core.mjs';
 import { whoIs } from './public-no.mjs';
+import { streamerKindSql } from './streamer-rule.mjs';
 import { applySanction, audit, liftSanction, mayLift, permsOf } from './sanctions.mjs';
 import { eraseAccount } from './social.mjs';
 import { removeUserFiles } from './media.mjs';
@@ -125,7 +127,7 @@ export const adminRoutes = {
         `SELECT u.id, u.name, u.username, u.role, u.created_at, u.room_xp, u.public_no,
                 coalesce((SELECT array_agg(i.provider ORDER BY i.provider) FROM auth_identities i WHERE i.user_id = u.id), '{}') AS sign_in,
                 (SELECT r.id FROM rooms r WHERE r.owner = u.id ORDER BY (r.closed_at IS NULL) DESC, r.created_at DESC LIMIT 1) AS room_id,
-                (${TEST_ACCOUNT}) AS test
+                (${TEST_ACCOUNT}) AS test, ${streamerKindSql('u.id')} AS streamer
            FROM users u WHERE ${where} ORDER BY u.created_at DESC LIMIT ${PAGE} OFFSET $4`,
         [q, like, owners, offset],
       ),
@@ -141,6 +143,9 @@ export const adminRoutes = {
         createdAt: x.created_at,
         signIn: x.sign_in,
         test: x.test,
+        // Streamer kind (streamer-rule.mjs): 'management' is the yönetim yayıncısı, held by the centre (no agency
+        // picked in the first days, or left one); she moves into an agency only by a transfer the centre approves.
+        streamer: x.streamer,
         // Their room (the open one, else the latest), its ID (the owner's own number) and its level, the owner's.
         room: x.room_id ? { id: x.room_id, code: publicNoOf(x) ?? roomCode(x.room_id) } : null,
         roomLevel: roomLevel(x.room_xp),

@@ -178,10 +178,10 @@ function Dashboard() {
           <Text style={{ color: colors.textDim, fontSize: 12, lineHeight: 17 }}>
             {agency
               ? `${RULES.agencyHostInactiveDays} gün çevrimiçi olmaz ve çekim yapmazsan ajanstan düşer, yönetim hesabına aktarılırsın. Kazancın etkilenmez.`
-              : `Kayıttan itibaren ${RULES.hostAgencyJoinDays} gün içinde bir ajansa katılmazsan yönetim hesabına (platform) bağlanırsın: kazancını almaya ve para çekmeye sorunsuz devam edersin, sadece senin üzerinden ajans komisyonu oluşmaz. ${joinDaysLeft > 0 ? `Kalan süre: ${joinDaysLeft} gün.` : 'Bu süre doldu, şu an yönetim hesabına bağlısın; istediğin zaman bir ajansa katılabilirsin.'}`}
+              : `Kayıttan itibaren ${RULES.hostAgencyJoinDays} gün içinde bir ajansa katılmazsan yönetim hesabına (platform) bağlanırsın: kazancını almaya ve para çekmeye sorunsuz devam edersin, sadece senin üzerinden ajans komisyonu oluşmaz. ${joinDaysLeft > 0 ? `Kalan süre: ${joinDaysLeft} gün.` : 'Bu süre doldu: yönetim yayıncısısın. Bir ajansa artık kodla katılamazsın, yalnız ajansın ve merkezin onayladığı transfer talebiyle geçebilirsin.'}`}
           </Text>
           {!agency && (
-            <TextLink title="Ajansa katıl" color={colors.gold} onPress={() => router.push('/ajans')} />
+            <TextLink title={joinDaysLeft > 0 ? 'Ajansa katıl' : 'Transfer talebi oluştur'} color={colors.gold} onPress={() => router.push('/ajans')} />
           )}
         </View>
 

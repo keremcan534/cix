@@ -79,6 +79,10 @@ describe('Yayıncı kuralları', () => {
     const late = await account('Geç Kalan');
     await q("UPDATE users SET created_at = now() - interval '4 days' WHERE id = $1", [late.id]);
     assert.equal(ok(await late.get('/api/agency/me')).streamer.held, true);
+    // Staff see her as the yönetim yayıncısı (Yönetim › Kullanıcılar), found by her profile number too.
+    const [{ public_no: no }] = await q('SELECT public_no FROM users WHERE id = $1', [late.id]);
+    const kindOf = async (search, id) => ok(await admin.get(`/api/admin/users?q=${encodeURIComponent(search)}`)).users.find((u) => u.id === id)?.streamer;
+    assert.equal(await kindOf(String(no ?? 'Geç Kalan'), late.id), 'management');
     assert.match(refused(await late.post('/api/agency/join', { code: await codeOf(X) }), 409).error, /transfer talebi/);
     refused(await late.post('/api/agency/join', { code: await codeOf(X), method: 'application' }), 409, 'başvuru da olmaz');
     refused(await X.owner.post('/api/agency/invite', { id: X.id, user: late.id }), 409, 'davet de olmaz');
@@ -90,6 +94,10 @@ describe('Yayıncı kuralları', () => {
     assert.equal(ok(await admin.post('/api/admin/agency/transfers/decide', { transferId: t.id, approve: true, note: 'Uygun' })).transfer.status, 'completed');
     const m = ok(await late.get('/api/agency/me')).membership;
     assert.equal(m.agency.id, X.id);
+    assert.equal(await kindOf('Geç Kalan', late.id), 'agency', 'transferden sonra ajans yayıncısı');
+    assert.equal(await kindOf('X Sahip', X.owner.id), 'agency_owner');
+    const man = (await q("SELECT id FROM users WHERE name = 'Erkek Hesap'"))[0].id;
+    assert.equal(await kindOf('Erkek Hesap', man), null, 'erkek hesap yayıncı değil');
     assert.equal(m.method, 'transfer');
     // Someone who was in an agency before is held too (not only after the first days).
     const fresh = await account('Eski Üye');

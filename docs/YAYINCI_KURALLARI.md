@@ -9,6 +9,8 @@ Müşterinin notları ve sahibin kararları (18 Kasım 2026). Kod: `server/api/s
 - Bir ajansa kayıtlı ve sözleşmesi onaylı kadın hesap.
 - İlk 3 gün ajans seçmeyen ya da ajanstan çıkmış kadın hesap: yönetimde kalır ve yayıncı sayılır.
 
+**Yönetim yayıncısı:** ilk 3 gün ajans seçmeyen (ya da ajanstan çıkmış) kadın hesap. Ajans kodu, bağlantı, başvuru ve ajans daveti reddedilir; bir ajansa yalnız ajansın ve merkezin onayladığı transfer talebiyle geçer. Kazancı ve para çekme hakkı sürer, üzerinden ajans komisyonu oluşmaz. Yönetim › Kullanıcılar aramasında (12 haneli ID ile de) `streamer: management` olarak görünür. Erkek hesap ve cinsiyetini seçmemiş hesap yönetim yayıncısı sayılmaz (erkekler hiç ajansa katılamaz). Süre: ajans ayarları › `streamer_policy.pick_days`.
+
 Yayıncı olmak birebir mesaj ve aramada kimin ödeyip kimin kazandığını belirler.
 
 **Ücretli mesajda 5 dakika kuralı (18 Kasım 2026):** yayıncı ücretli mesajın elmasını ancak 5 dakika içinde cevap verirse alır; cevap gelmezse jeton gönderene iade edilir. Otomatik mesaj, hazır cevap ve şablonlar yalnız kadın yayıncılarda. Ayrıntı: [`OTOMATIK_MESAJ.md`](OTOMATIK_MESAJ.md).

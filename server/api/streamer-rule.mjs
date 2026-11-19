@@ -22,7 +22,7 @@ export const familyOwnerSql = (x, members = live().familyCashoutMembers) =>
             WHERE o.user_id = ${x} AND o.role = 'owner' AND (SELECT count(*) FROM family_members m WHERE m.family_id = o.family_id) >= ${Number(members)})`;
 
 /** Whether account `x` is a woman the centre holds: in no agency, and past her days to pick one or out of one. */
-const heldWomanSql = (x) =>
+export const heldWomanSql = (x) =>
   `EXISTS (SELECT 1 FROM users w WHERE w.id = ${x} AND w.gender = 'Kadın' AND w.deleted_at IS NULL
               AND NOT EXISTS (SELECT 1 FROM agency_streamers l WHERE l.streamer_id = w.id AND l.ended_at IS NULL)
               AND (EXISTS (SELECT 1 FROM agency_streamers l WHERE l.streamer_id = w.id)
@@ -32,6 +32,17 @@ const heldWomanSql = (x) =>
 export const streamerSql = (x) =>
   `(EXISTS (SELECT 1 FROM agency_streamers s WHERE s.streamer_id = ${x} AND s.ended_at IS NULL AND s.contract = 'approved')
     OR ${agencyOwnerSql(x)} OR ${familyOwnerSql(x)} OR ${heldWomanSql(x)})`;
+
+/**
+ * What kind of streamer account `x` is, for staff (Yönetim › Kullanıcılar): 'agency' (a woman in an agency, contract
+ * approved), 'management' (a woman the centre holds: the yönetim yayıncısı), 'agency_owner', 'family_owner'; null
+ * when not a streamer. An agency owner who is also held counts as an owner.
+ */
+export const streamerKindSql = (x) =>
+  `(CASE WHEN ${agencyOwnerSql(x)} THEN 'agency_owner'
+         WHEN EXISTS (SELECT 1 FROM agency_streamers s WHERE s.streamer_id = ${x} AND s.ended_at IS NULL AND s.contract = 'approved') THEN 'agency'
+         WHEN ${heldWomanSql(x)} THEN 'management'
+         WHEN ${familyOwnerSql(x)} THEN 'family_owner' END)`;
 
 /** Whether `uid` is a streamer now. */
 export const isStreamer = async (q, uid) => (await q.query(`SELECT ${streamerSql('$1::uuid')} AS yes`, [uid])).rows[0].yes;
