@@ -2770,7 +2770,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       addMsg({ system: true, text: `🤝 ${userById(to).name} kabul edince ${BOND_KINDS[kind].label} bağınız kurulur; kabul etmezse jetonun geri döner.` });
     };
     if (real)
-      return void liveRequestBond(to, kind, id).then(sent, (e) => {
+      return void liveRequestBond(to, kind, id, gift.price).then(sent, (e) => {
         errorHaptic();
         showAlert('Bağ isteği gönderilemedi', errorText(e));
       });

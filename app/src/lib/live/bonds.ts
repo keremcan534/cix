@@ -2,7 +2,8 @@
 // holds the bond gift's coins; the answer that moves them (accept, refuse, withdraw) re-reads the balance.
 import * as api from '@/lib/api';
 import { applyServerUser, liveMode, once, refreshWallet, rememberUser, toLocal, toServer } from '@/lib/live';
-import { BOND_KINDS, isBondKind, type Bond, type BondKind, type RoomBond } from '@/data/bonds';
+import { BOND_KINDS, isBondKind, type Bond, type BondKind, type BondKindInfo, type RoomBond } from '@/data/bonds';
+import { bondKindOf, refreshLiveCatalog } from '@/lib/live/catalog-live';
 import { isServerId } from '@/data/mock';
 
 /** Whose bonds come from the server: me (signed in) and real people. Demo people (u1…) keep demo data. */
@@ -42,12 +43,24 @@ export async function loadBondRequests() {
   return { incoming: r.incoming.map(toBond), outgoing: r.outgoing.map(toBond) };
 }
 
-/** Sends the bond gift with the request; the coins are held until the other person answers. `room`: sent in that room, which sees the gift. */
-export async function liveRequestBond(to: string, kind: BondKind, room?: string) {
+/** A bond kind as it is now: in live mode as the server's catalog says (catalog-live bondKindOf), else the app's own. */
+export const bondKindNow = (kind: BondKind): BondKindInfo => (liveMode() ? bondKindOf(kind) : BOND_KINDS[kind]);
+
+/**
+ * Sends the bond gift with the request; the coins are held until the other person answers. `room`: sent in that room,
+ * which sees the gift. `price`: what the screen showed (bondKindNow); a moved price is a 409 price_changed, nothing is
+ * taken and the catalog is read again, so the screen shows the new one.
+ */
+export async function liveRequestBond(to: string, kind: BondKind, room?: string, price = bondKindNow(kind).price) {
   const id = serverId(to);
-  const r = await once(`bond:${id}:${kind}`, (ref) => api.requestBond(id, kind, ref, room));
-  applyServerUser(r, `Bağ isteği: ${BOND_KINDS[kind].label} (${BOND_KINDS[kind].gift})`);
-  return toBond(r.bond);
+  try {
+    const r = await once(`bond:${id}:${kind}`, (ref) => api.requestBond(id, kind, ref, room, price));
+    applyServerUser(r, `Bağ isteği: ${BOND_KINDS[kind].label} (${bondKindNow(kind).gift})`);
+    return toBond(r.bond);
+  } catch (e) {
+    if (e instanceof api.ApiError && e.status === 409 && (e.data.code === 'price_changed' || e.data.code === 'update_required')) void refreshLiveCatalog();
+    throw e;
+  }
 }
 
 /** Accept (the bond gift becomes my diamonds) or refuse (the coins go back to the sender). */

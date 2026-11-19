@@ -4,13 +4,17 @@
 //   GET  /api/bonds?user=                        → { hidden, bonds }                    (someone's active bonds; mine without user;
 //                                                                                        hidden: only the viewer's own bond with them)
 //   GET  /api/bonds/requests                     → { incoming, outgoing }               (my pending requests)
-//   POST /api/bonds/request  { to, kind, ref, room? } → { bond, user, replay }   (room: sent from a room's gift panel, the room sees the gift)
+//   POST /api/bonds/request  { to, kind, ref, room?, price? } → { bond, user, replay }   (room: sent from a room's gift panel, the room sees the gift;
+//                                                                                   price: the bond gift's price the phone showed)
 //   POST /api/bonds/respond  { id, accept }      → { bond }
 //   POST /api/bonds/withdraw { id }              → { bond }                             (the requester takes it back)
 //   POST /api/bonds/end      { id }              → { bond }                             (either side, any time)
 //   POST /api/bonds/privacy  { hidden }          → { hidden }
 //   POST /api/bonds/among    { ids }             → { bonds: [{ a, b, kind, level }] }   (room effects; hidden ones left out)
 //
+// Price: the bond gift's (bag-<kind>) as Yönetim › Hediyeler set it (custom-gifts.mjs builtinGift; bond-rules.mjs KINDS
+// is the app's own). A newer app sends the price it showed: another one now is a 409 price_changed and nothing moves.
+// An older app sends none and shows the compiled price: while the panel's price differs it gets 409 update_required.
 // Money: a request takes the bond gift's price from the requester at once (spendCoins, the lots it used kept on
 // the bond). Accepted: those coins become the other person's diamonds like any gift (giftDiamonds, gift_events,
 // agency income), so the finance panel sees a gift. Refused, withdrawn or unanswered for 3 days: the coins go
@@ -22,6 +26,7 @@ import { HttpError, auth, blockedBetween, claimRef, db, env, int, limit, move, o
 import { roomPacket } from './live.mjs';
 import { notify } from './push.mjs';
 import { giftDiamonds, spendCoins } from './wallet.mjs';
+import { builtinGift, checkShownPrice } from './custom-gifts.mjs';
 import { KINDS, LEVELS, REWARDS, levelOf } from './bond-rules.mjs';
 
 export { KINDS, LEVELS, REWARDS, levelOf };
@@ -34,6 +39,12 @@ const AMONG_MAX = 80;
 /** A room's announcement of a bond gift has an id of its own, far from any gift_events row's (the phones drop repeats by it). */
 const ROOM_EVENT_BASE = 9_000_000_000_000;
 const voiceRoom = (room) => /^(?:oda-)?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/.exec(typeof room === 'string' ? room : '')?.[1] ?? null;
+
+/** The bond gift of `kind` as it is now: { id, name, price } (the panel's name and price, else the app's). */
+export function bondGift(kind) {
+  const g = builtinGift(`bag-${kind}`);
+  return { id: `bag-${kind}`, name: g?.name ?? KINDS[kind].gift, price: g?.price ?? KINDS[kind].price };
+}
 
 export const scoreOf = (b) => Math.floor(Number(b.gift_coins) / 100) + Number(b.talk_points);
 
@@ -193,7 +204,7 @@ export function stopBondSweep() {
 
 export const bondRoutes = {
   async 'GET /api/bonds/info'() {
-    return { kinds: Object.entries(KINDS).map(([id, k]) => ({ id, ...k })), levels: LEVELS, rewards: REWARDS };
+    return { kinds: Object.entries(KINDS).map(([id, k]) => ({ id, ...k, gift: bondGift(id).name, price: bondGift(id).price })), levels: LEVELS, rewards: REWARDS };
   },
 
   async 'GET /api/bonds'(req, url) {
@@ -232,11 +243,17 @@ export const bondRoutes = {
     const k = KINDS[kind];
     const to = userId(b.to, 'kişi');
     if (to === me.id) throw new HttpError(400, 'Kendinle bağ kuramazsın');
+    const shown = b.price ?? null;
+    if (shown !== null && !(Number.isSafeInteger(shown) && shown > 0)) throw new HttpError(400, 'Geçersiz fiyat');
+    let gift = bondGift(kind);
     if (await blockedBetween(me.id, to)) throw new HttpError(403, 'Bu kişiyle bağ kuramazsın');
     const res = await once(me.id, 'coin', b.ref, async (c) => {
       const locked = await c.query('SELECT id, name FROM users WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL ORDER BY id FOR UPDATE', [[me.id, to]]);
       if (locked.rowCount < 2) throw new HttpError(404, 'Kullanıcı bulunamadı');
       await claimRef(c, me.id, 'coin', b.ref);
+      // After the ref claim: a retry of a request that went through gets its replay even if the price moved since.
+      gift = bondGift(kind);
+      checkShownPrice(gift, shown);
       const open = await c.query(`SELECT status FROM bonds WHERE pair_lo = LEAST($1::uuid, $2::uuid) AND pair_hi = GREATEST($1::uuid, $2::uuid) AND status IN ('pending', 'active')`, [me.id, to]);
       if (open.rowCount) throw new HttpError(409, open.rows[0].status === 'active' ? 'Bu kişiyle zaten bir bağın var' : 'Bu kişiyle bekleyen bir bağ isteği var');
       const recent = await c.query(
@@ -248,10 +265,10 @@ export const bondRoutes = {
       if (Number(pending.rows[0].n) >= PENDING_MAX) throw new HttpError(409, `Aynı anda en fazla ${PENDING_MAX} bekleyen isteğin olabilir`);
       if ((await countKind(c, me.id, kind, true)) >= k.max) throw new HttpError(409, k.max === 1 ? `Zaten bir ${k.label} bağın var` : `En fazla ${k.max} ${k.label} bağın olabilir`);
       if ((await countKind(c, to, kind, false)) >= k.max) throw new HttpError(409, `Bu kişinin ${k.label} bağları dolu`);
-      const parts = await spendCoins(c, me.id, k.price, `Bağ isteği: ${k.label} (${k.gift})`, b.ref, to, { detail: { bondKind: kind } });
+      const parts = await spendCoins(c, me.id, gift.price, `Bağ isteği: ${k.label} (${gift.name})`, b.ref, to, { detail: { bondKind: kind } });
       await c.query(
         `INSERT INTO bonds (a, b, pair_lo, pair_hi, kind, held_coins, held_lots, ref) VALUES ($1, $2, LEAST($1::uuid, $2::uuid), GREATEST($1::uuid, $2::uuid), $3, $4, $5, $6)`,
-        [me.id, to, kind, k.price, JSON.stringify(parts), b.ref],
+        [me.id, to, kind, gift.price, JSON.stringify(parts), b.ref],
       );
     });
     const row = await db.query('SELECT id FROM bonds WHERE a = $1 AND ref = $2', [me.id, b.ref]);

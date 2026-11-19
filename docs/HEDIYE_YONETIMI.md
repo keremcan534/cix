@@ -73,6 +73,9 @@ değerleri (`original`), neyin değiştirildiği (`changed`) ve son 30 günde ka
   görünür, gönderim sorunsuz işler. Bu değişikliği taşıyan APK'dan itibaren telefon her şeyi sunucudan alır
   (`/api/catalog?gifts=2`), raftakini yalnız sunucunun listesine bakarak gösterir ve gönderirken ekranda gördüğü fiyatı
   da yollar: arada fiyat değiştiyse sunucu reddeder (409 `price_changed`, yeni fiyatla), telefon kataloğu yeniden okur.
+- **Bağ hediyeleri (Aile ve Dost rafı):** fiyatı da panelden değişir (19 Kasım 2026); raftan başka rafa geçmez. Bağ
+  isteği o fiyatı keser. Fiyat uygulamanınkinden farklıyken eski APK'lar bağ isteği gönderemez ("uygulamayı güncelle"),
+  bekleyen istek gönderildiği fiyatı tutar. Ayrıntı: [`BAGLAR.md`](BAGLAR.md).
 - **Çantam (görev ödülü):** çantadaki hediye ödül olarak verildiği değerle, uygulamadaki fiyatıyla gönderilir; panelden
   fiyat değişikliği ödülü değerli kılmaz. Adı panelde verilen addır.
 - **Ad çakışması:** iki hediye aynı adı taşıyamaz (uygulamanınkiler şimdiki adlarıyla). Bir uygulama hediyesinin adı

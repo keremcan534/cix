@@ -953,7 +953,9 @@ export type ServerBond = {
 };
 export const bonds = (user?: string) => call<{ hidden: boolean; bonds: ServerBond[] }>('GET', user ? `/api/bonds?user=${encodeURIComponent(user)}` : '/api/bonds');
 export const bondRequests = () => call<{ incoming: ServerBond[]; outgoing: ServerBond[] }>('GET', '/api/bonds/requests');
-export const requestBond = (to: string, kind: string, ref = newRef(), room?: string) => call<{ user: ServerUser; replay: boolean; bond: ServerBond }>('POST', '/api/bonds/request', { to, kind, ref, ...(room ? { room } : {}) });
+/** `price`: the bond gift's price this phone showed; another one now is a 409 price_changed and nothing is taken. */
+export const requestBond = (to: string, kind: string, ref = newRef(), room?: string, price?: number) =>
+  call<{ user: ServerUser; replay: boolean; bond: ServerBond }>('POST', '/api/bonds/request', { to, kind, ref, ...(room ? { room } : {}), ...(price !== undefined ? { price } : {}) });
 export const respondBond = (id: number, accept: boolean) => call<{ bond: ServerBond }>('POST', '/api/bonds/respond', { id, accept }).then((r) => r.bond);
 export const withdrawBond = (id: number) => call<{ bond: ServerBond }>('POST', '/api/bonds/withdraw', { id }).then((r) => r.bond);
 export const endBond = (id: number) => call<{ bond: ServerBond }>('POST', '/api/bonds/end', { id }).then((r) => r.bond);

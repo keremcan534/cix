@@ -32,6 +32,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSyncExternalStore } from 'react';
 
+import { BOND_KINDS, type BondKind, type BondKindInfo } from '@/data/bonds';
 import { GIFTS_PAUSED } from '@/data/gifts-paused';
 import { GIFTS, isBondGift, type Gift, type GiftCat } from '@/data/mock';
 import { RULES, type Rules } from '@/data/rules';
@@ -314,6 +315,16 @@ export function roomGiftShelf(c: LiveCatalog | null = current): Gift[] {
 export function giftById(id: string | null | undefined, c: LiveCatalog | null = current): Gift | undefined {
   if (!id) return undefined;
   return viewsOf(c).byId.get(id);
+}
+
+/**
+ * A bond kind with its bond gift's name and price as the catalog says now (bag-<kind>: Yönetim › Hediyeler can change
+ * them, server/api/bonds.mjs charges that price). The app's own (data/bonds) without a catalog or for a bad price.
+ */
+export function bondKindOf(kind: BondKind, c: LiveCatalog | null = current): BondKindInfo {
+  const k = BOND_KINDS[kind];
+  const g = giftById(`bag-${kind}`, c);
+  return g && Number.isSafeInteger(g.price) && g.price > 0 ? { ...k, gift: g.name, price: g.price } : k;
 }
 
 /** Every gift this phone can draw, the app's own as they are now and the admins' listed (the profile's gift wall). */

@@ -1435,8 +1435,8 @@ export const customGiftRoutes = {
     writeLimit(a);
     const b = await readJson(req, 8192);
     const id = idOf(b.id, { app: true });
-    // A bond gift's price is the bond's (bond-rules.mjs) and it stays on its shelf; its name, picture and video may change.
-    if (BOND_GIFTS.has(id) && b.price !== undefined && b.price !== GIFTS.get(id).price) throw new HttpError(400, 'Bağ hediyesinin fiyatı Bağlar kuralından gelir, buradan değişmez');
+    // A bond gift stays on its shelf. Its price may change: bonds.mjs charges it (an older app, which shows the app's
+    // price, is asked to update while it differs); a pending request keeps the coins it holds.
     if (BOND_GIFTS.has(id) && b.cat !== undefined && b.cat !== 'family') throw new HttpError(400, 'Bağ hediyesi Aile ve Dost rafında kalır');
     if (GIFTS.has(id)) return updateApp(req, a, id, b);
     const cur = snap.rows.get(id);

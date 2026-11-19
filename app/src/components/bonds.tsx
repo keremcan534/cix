@@ -16,7 +16,8 @@ import { userById, type User } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import { ApiError } from '@/lib/api';
 import { message } from '@/lib/live';
-import { liveBondsFor, liveEndBond, liveRequestBond, liveRespondBond, liveSetBondsHidden, liveWithdrawBond, loadBondRequests, loadBonds } from '@/lib/live/bonds';
+import { useLiveCatalog } from '@/lib/live/catalog-live';
+import { bondKindNow, liveBondsFor, liveEndBond, liveRequestBond, liveRespondBond, liveSetBondsHidden, liveWithdrawBond, loadBondRequests, loadBonds } from '@/lib/live/bonds';
 import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 
@@ -148,6 +149,8 @@ export function BondFrame({ bond, size, children }: { bond: Bond | null; size: n
 type Seg = 'cift' | 'diger';
 
 export function BondsTab({ user, isMe, state, isBlocked, onMeetInvite }: { user: User; isMe: boolean; state: BondsState; isBlocked: boolean; onMeetInvite: () => void }) {
+  // Bond prices may be changed in the panel: shown and sent as the catalog says now (bondKindNow).
+  useLiveCatalog();
   const { colors, semantic, dark } = useTheme();
   const styles = useStyles();
   const { me, spendCoins, addCoins } = useApp();
@@ -186,9 +189,9 @@ export function BondsTab({ user, isMe, state, isBlocked, onMeetInvite }: { user:
     ]);
 
   const request = (kind: BondKind) => {
-    const k = BOND_KINDS[kind];
+    const k = bondKindNow(kind);
     if (isBlocked) return showAlert('Engelli kullanıcı', 'Engellediğin biriyle bağ kuramazsın.');
-    if (live) return act(() => liveRequestBond(user.id, kind), `${k.label} isteği gönderildi. ${user.name} kabul edince ${k.gift} ona geçer; 3 gün içinde yanıt gelmezse jetonların geri gelir.`);
+    if (live) return act(() => liveRequestBond(user.id, kind, undefined, k.price), `${k.label} isteği gönderildi. ${user.name} kabul edince ${k.gift} ona geçer; 3 gün içinde yanıt gelmezse jetonların geri gelir.`);
     // Demo: the same limits the server checks, coins from this phone.
     if (ours || myRequest) return showAlert('Zaten var', `${user.name} ile zaten bir bağın ya da bekleyen isteğin var.`);
     const mine = [...demoBondsOf('me', now), ...state.requests.outgoing].filter((b) => !demo.ended.has(b.id) && b.kind === kind).length;
@@ -230,7 +233,7 @@ export function BondsTab({ user, isMe, state, isBlocked, onMeetInvite }: { user:
   // A kind picked from the shelf: its price said once before the bond gift goes (the sheet's "Bağ kur" sends at once).
   const canAsk = !isMe && !ours && !myRequest && !theirRequest;
   const ask = (kind: BondKind) => {
-    const k = BOND_KINDS[kind];
+    const k = bondKindNow(kind);
     showAlert(`${k.label} bağı kur`, `${user.name} ile ${k.label} bağı için ${k.gift} gider: ${k.price.toLocaleString('tr-TR')} jeton. Kabul etmezse jetonların geri gelir.`, [
       { text: 'Vazgeç', style: 'cancel' },
       { text: 'İstek gönder', onPress: () => void request(kind) },
@@ -327,7 +330,7 @@ export function BondsTab({ user, isMe, state, isBlocked, onMeetInvite }: { user:
         title={`${user.name} ile bağ kur`}
         onClose={() => setKindSheet(false)}
         options={BOND_ORDER.map((kind) => {
-          const k = BOND_KINDS[kind];
+          const k = bondKindNow(kind);
           return { label: `${k.label} · ${k.gift} · ${k.price.toLocaleString('tr-TR')} jeton`, icon: k.icon, onPress: () => void request(kind) };
         })}
       />
@@ -421,12 +424,13 @@ function RequestRow({ bond, now, mine, children }: { bond: Bond; now: number; mi
  * shows what can be formed; on someone else's profile a kind can be picked from here (`onPick`).
  */
 function KindShelf({ onPick }: { onPick?: (kind: BondKind) => void }) {
+  useLiveCatalog();
   const { colors } = useTheme();
   const styles = useStyles();
   return (
     <View style={styles.shelf}>
       {BOND_ORDER.filter((kind) => kind !== 'cift').map((kind) => {
-        const k = BOND_KINDS[kind];
+        const k = bondKindNow(kind);
         const art = BOND_ART[kind];
         return (
           <Pressable

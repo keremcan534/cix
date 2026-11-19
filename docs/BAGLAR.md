@@ -4,7 +4,7 @@
 
 Sekmede iki bölüm var: **Çift** ve **Aile ve Dost** (diğer yedi tür). Aile ve Dost boşken yedi tür resmi ve fiyatıyla görünür; başkasının profilinde birine dokununca fiyat bir kez sorulur ve istek gider. Doluyken bağların üstünde türlerin adları yazar. Sohbetteki **kalp** başka bir şeydir: iki kişinin yakınlığı, hediye ve sohbetle dolar, sessiz kalınca düşer (`one-on-one.mjs`, [`SUNUCU.md`](SUNUCU.md)).
 
-Odadaki hediye panelinde **Aile ve Dost** rafı var: Koruma Kartı ve yedi bağ hediyesi. Bu raftan gönderilen bağ hediyesi bağ isteğidir: jeton bekletilir, kabul edilince bağ kurulur, reddedilirse geri döner. Tek kişiye, birer birer gider. Panelde Hediyeler › Aile ve Dost rafından adı, ikonu ve videosu değişir; fiyatı bu sayfadaki kuraldan gelir. Eski APK'lar bu rafı görmez; Koruma Kartı onlarda İkili rafında kalır.
+Odadaki hediye panelinde **Aile ve Dost** rafı var: Koruma Kartı ve yedi bağ hediyesi. Bu raftan gönderilen bağ hediyesi bağ isteğidir: jeton bekletilir, kabul edilince bağ kurulur, reddedilirse geri döner. Tek kişiye, birer birer gider. Panelde Hediyeler › Aile ve Dost rafından adı, ikonu, videosu ve fiyatı değişir (aşağıda **Fiyat panelden**). Eski APK'lar bu rafı görmez; Koruma Kartı onlarda İkili rafında kalır.
 
 ## Kurallar
 
@@ -18,6 +18,13 @@ Odadaki hediye panelinde **Aile ve Dost** rafı var: Koruma Kartı ve yedi bağ 
 | Yenge | Yenge Çiçeği | 1.000 jeton | 3 |
 | Enişte | Enişte Kravatı | 1.000 jeton | 3 |
 | Kanka | Kanka Rozeti | 500 jeton | 5 |
+
+Tablodaki fiyatlar uygulamanın kendi fiyatlarıdır; panelden değiştirilebilir.
+
+**Fiyat panelden (19 Kasım 2026):** Hediyeler › Aile ve Dost'ta bağ hediyesinin fiyatı değişir; **Orijinale dön** uygulamanın fiyatına geri alır.
+- Yeni uygulama Bağlar sekmesinde ve odadaki rafta panelin fiyatını gösterir ve gösterdiği fiyatı istekle gönderir. Arada fiyat değiştiyse jeton düşmez, yeni fiyat söylenir.
+- **Eski APK** (bu sürümden önceki her APK, bugünkü dahil) kendi fiyatını gösterir. Panelde fiyat uygulamanınkinden farklıyken eski APK'dan bağ isteği gitmez, "uygulamayı güncelle" denir. Fiyat orijinaline dönünce eski APK yine gönderir.
+- Bekleyen istek, gönderildiği fiyatı tutar: reddedilir ya da süresi dolarsa o kadar jeton döner, kabul edilirse o kadar elmas olur.
 
 - **İstek:** birinin profilinde Bağlar → "Bağ kur" → tür seçilir. Bağ hediyesinin jetonu hemen düşer ve bekletilir. Onay sorulmaz (hediye kuralı).
 - **Kabul:** jetonlar karşı tarafa elmas olarak geçer, normal bir hediye gibi (Gelir kilidi, ajans geliri, finans panelinde hediye olayı `bag-<tür>`).
