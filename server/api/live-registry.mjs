@@ -124,6 +124,9 @@ export function defaultsOf(e = process.env) {
     event_reminders_off: [],
     // Every Şanslı win is announced in every room (the owner's wish, Güncelleme 5).
     lucky_announce_min_coins: 0,
+    // Şanslı çanta's choices as lucky-bag-rules.mjs had them (BAG_LISTS), the way the panel writes them.
+    ...Object.fromEntries(Object.entries(BAG_LISTS).map(([k, x]) => [k, x.default.join(', ')])),
+    lucky_bag_seconds: 30,
     // Otomatik mesaj (auto-chat-rules.mjs): the spec's numbers and texts, every part on, every SimilarClub Sistem notice on.
     auto_chat_off: [],
     ...Object.fromEntries(Object.entries(AUTO_CHAT).map(([k, x]) => [k, x.default])),
@@ -360,6 +363,21 @@ const ROOM_AMOUNTS = {
   // Aile (streamer-rule.mjs, families.mjs): the owners' numbers, 18 Nov.
   family_cashout_members: { group: 'Aile', field: 'familyCashoutMembers', label: 'Aile sahibinin çekim hakkı: en az üye', default: 10, bounds: { min: 0, max: 500, step: 1 }, unit: ' üye', help: 'Erkek hesaplar para çekemez; ajans sahipleri ile en az bu kadar üyeli ailenin sahibi hariç. Bu aile sahipleri yayıncı da sayılır. Aile kurmak ucuz olduğu için düşük tutma.', text: (a, b) => `Aile sahibinin çekim hakkı için gereken üye ${a} → ${b}.` },
   family_rejoin_days: { group: 'Aile', field: 'familyRejoinDays', label: 'Aileden ayrılan yayıncının bekleme süresi', default: 90, bounds: { min: 0, max: 365, step: 1 }, unit: ' gün', help: 'Kendi isteğiyle aileden ayrılan yayıncı bu kadar gün başka bir aileye katılamaz ve aile kuramaz. Ayrıldığı aileye dönebilir. Aileden çıkarılan kişi beklemez.', text: (a, b) => `Aileden ayrılan yayıncının bekleme süresi ${a} → ${b} gün.` },
+  // Bağlar (bonds.mjs, docs/BAGLAR.md): how many bonds of a kind one person may have, the requests and their days.
+  bond_max_cift: { group: 'Bağlar', field: 'bondMaxCift', label: 'Çift bağı: kişi başına en fazla', default: 1, bounds: { min: 1, max: 5, step: 1 }, unit: ' bağ', help: 'Bir kişinin aynı anda kaç Çift bağı olabilir. Kurulmuş bağlar sınır düşse de sürer; yalnız yenisi kurulamaz.', text: (a, b) => `Kişi başına Çift bağı ${a} → ${b}.` },
+  bond_max_kin: { group: 'Bağlar', field: 'bondMaxKin', label: 'Aile bağları: türü başına en fazla', default: 3, bounds: { min: 1, max: 20, step: 1 }, unit: ' bağ', help: 'Kardeş, Bacı, Ağabey, Abla, Yenge ve Enişte bağlarının her birinden bir kişinin aynı anda kaç tane olabilir. Kurulmuş bağlar sürer.', text: (a, b) => `Kardeş, Bacı, Ağabey, Abla, Yenge, Enişte: türü başına ${a} → ${b} bağ.` },
+  bond_max_kanka: { group: 'Bağlar', field: 'bondMaxKanka', label: 'Kanka bağı: kişi başına en fazla', default: 5, bounds: { min: 1, max: 50, step: 1 }, unit: ' bağ', help: 'Bir kişinin aynı anda kaç Kanka bağı olabilir. Kurulmuş bağlar sürer.', text: (a, b) => `Kişi başına Kanka bağı ${a} → ${b}.` },
+  bond_pending_max: { group: 'Bağlar', field: 'bondPendingMax', label: 'Bekleyen istek: en fazla', default: 10, bounds: { min: 1, max: 50, step: 1 }, unit: ' istek', help: 'Bir kişinin cevap bekleyen bağ isteği en çok bu kadar olabilir (her istek jetonunu bekletir).', text: (a, b) => `Aynı anda bekleyen bağ isteği ${a} → ${b}.` },
+  bond_answer_days: { group: 'Bağlar', field: 'bondAnswerDays', label: 'İsteğe cevap süresi (gün)', default: 3, bounds: { min: 1, max: 14, step: 1 }, unit: ' gün', help: 'Bu süre içinde cevaplanmayan bağ isteğinin jetonu gönderene döner. Bekleyen isteklerin süresi değişmez.', text: (a, b) => `Yeni bağ isteklerine cevap süresi ${a} → ${b} gün.` },
+  bond_cooldown_days: { group: 'Bağlar', field: 'bondCooldownDays', label: 'Bağ bitince bekleme (gün)', default: 7, bounds: { min: 0, max: 90, step: 1 }, unit: ' gün', help: 'Bağı biten iki kişi bu kadar gün yeniden bağ kuramaz. 0: hemen kurabilir.', text: (a, b) => `Bağ bitince yeniden kurmak için ${a} → ${b} gün beklenir.` },
+  bond_talk_daily: { group: 'Bağlar', field: 'bondTalkDaily', label: 'Sohbetten günlük bağ puanı: en fazla', default: 10, bounds: { min: 0, max: 100, step: 1 }, unit: ' puan', help: 'Bağlı iki kişinin birbirine cevap verdiği her mesaj 1 bağ puanı getirir, günde en çok bu kadar. 0: sohbet puan getirmez.', text: (a, b) => `Sohbetten günde en çok ${a} → ${b} bağ puanı.` },
+  // Koruma (guards.mjs, docs/KORUMA.md): the midnight drop, the list's length and the profile's threshold.
+  guard_drop_from: { group: 'Koruma', field: 'guardDropFrom', label: 'Yüzde düşüş: bu puandan itibaren', default: 5000, bounds: { min: 0, max: 10_000_000, step: 100 }, unit: ' puan', help: 'Önceki gün hediye göndermeyen koruyucunun puanı gece düşer: bu puan ve üstündeyse yüzdeyle, altındaysa sabit miktarla.', text: (a, b) => `Gece yüzdeyle düşüş ${a} → ${b} puandan itibaren.` },
+  guard_drop_pct: { group: 'Koruma', field: 'guardDropPct', label: 'Yüzde düşüş (%)', default: 10, bounds: { min: 0, max: 50, step: 1 }, unit: ' %', help: 'Hediye göndermeyen koruyucunun puanından gece düşen yüzde. 0: düşmez.', text: (a, b) => `Gece düşen yüzde %${a} → %${b}.` },
+  guard_drop_flat: { group: 'Koruma', field: 'guardDropFlat', label: 'Sabit düşüş', default: 1000, bounds: { min: 0, max: 1_000_000, step: 10 }, unit: ' puan', help: 'Yüzde düşüş eşiğinin altındaki koruyucunun puanından gece düşen miktar. 0: düşmez.', text: (a, b) => `Eşiğin altında gece ${a} → ${b} puan düşer.` },
+  guard_list_max: { group: 'Koruma', field: 'guardListMax', label: 'Koruma listesi: en fazla kişi', default: 50, bounds: { min: 10, max: 200, step: 1 }, unit: ' kişi', help: 'Benim Koruma listelerinde en çok bu kadar kişi görünür.', text: (a, b) => `Koruma listesinde ${a} → ${b} kişi.` },
+  guard_threshold_per_level: { group: 'Koruma', field: 'guardThresholdPerLevel', label: 'Eşik: Yankı seviyesi başına en fazla', default: 50_000, bounds: { min: 0, max: 10_000_000, step: 1000 }, unit: ' puan', help: 'Kişinin koyabileceği en yüksek eşik: bu sayı × (Yankı seviyesi + 1). Konmuş eşikler değişmez.', text: (a, b) => `Yankı seviyesi başına eşik ${a} → ${b} puan.` },
+  guard_threshold_days: { group: 'Koruma', field: 'guardThresholdDays', label: 'Eşik değiştirme aralığı (gün)', default: 7, bounds: { min: 1, max: 30, step: 1 }, unit: ' gün', help: 'Kişi eşiğini en çok bu kadar günde bir değiştirebilir.', text: (a, b) => `Eşik ${a} → ${b} günde bir değişir.` },
 };
 /** The room keys as registry entries; a coin amount that more than doubles or halves, or a close sooner than 3 minutes, asks twice. */
 const roomEntries = () =>
@@ -403,6 +421,48 @@ const winEntries = () => {
     },
   };
 };
+
+/**
+ * Şanslı çanta (lucky-bags.mjs, lucky-bag-rules.mjs BAG_RULES): the choices a bag offers, as a list the panel writes
+ * as "1000, 5000, 10000". Every phone reads them from the server (GET /api/lucky-bags), older apps too. The coins stay
+ * within today's largest (50.000): bags are given away by chance, a bigger one is the owners' decision.
+ */
+const BAGS = 'Şanslı çanta';
+const BAG_LISTS = {
+  lucky_bag_coins: { field: 'luckyBagCoins', label: 'Jeton çantası: jeton seçenekleri', default: [1_000, 5_000, 10_000, 50_000], bounds: { min: 100, max: 50_000, step: 100, items: 6 }, unit: ' jeton', help: 'Jeton çantasına konabilecek miktarlar, virgülle: 1000, 5000, 10000, 50000. En çok 6 seçenek, her biri 100 ile 50.000 arasında ve 100’ün katı.' },
+  lucky_bag_coin_packets: { field: 'luckyBagCoinPackets', label: 'Jeton çantası: pay seçenekleri', default: [5, 10, 20, 30], bounds: { min: 1, max: 100, step: 1, items: 6 }, unit: ' pay', help: 'Jeton çantasının kaç paya bölüneceği, virgülle: 5, 10, 20, 30. En küçük jeton seçeneğinden fazla olamaz.' },
+  lucky_bag_gift_counts: { field: 'luckyBagGiftCounts', label: 'Hediye çantası: adet seçenekleri', default: [10, 30, 99], bounds: { min: 1, max: 999, step: 1, items: 6 }, unit: ' adet', help: 'Hediye çantasına konabilecek hediye adetleri, virgülle: 10, 30, 99.' },
+  lucky_bag_gift_packets: { field: 'luckyBagGiftPackets', label: 'Hediye çantası: pay seçenekleri', default: [5, 10, 15], bounds: { min: 1, max: 100, step: 1, items: 6 }, unit: ' pay', help: 'Hediye çantasının kaç paya bölüneceği, virgülle: 5, 10, 15. En küçük adet seçeneğinden fazla olamaz.' },
+  lucky_bag_delays: { field: 'luckyBagDelays', label: 'Açılma zamanı seçenekleri (saniye)', default: [0, 120, 300], bounds: { min: 0, max: 3_600, step: 1, items: 6 }, unit: ' saniye', help: 'Çantanın atıldıktan kaç saniye sonra açılacağı, virgülle: 0, 120, 300. 0: hemen.' },
+};
+/** "1000, 5.000 ,10000" (or a list of numbers) → [1000, 5000, 10000], sorted, each checked; refuses anything else. */
+function intListOf(v, { min, max, step, items }, what, unit) {
+  const parts = Array.isArray(v) ? v : typeof v === 'string' ? v.split(',').map((x) => x.trim()).filter(Boolean).map((x) => (/^\d{1,3}(\.\d{3})*$|^\d+$/.test(x) ? Number(x.replaceAll('.', '')) : NaN)) : null;
+  if (!parts || !parts.length) bad(`${what}: en az bir sayı yaz, virgülle ayır`);
+  if (parts.length > items) bad(`${what}: en çok ${items} seçenek olabilir`);
+  const out = [...new Set(parts.map((x) => wholeOf(x, { min, max, step }, what, unit)))].sort((a, b) => a - b);
+  return out;
+}
+const listText = (xs) => xs.map(fmt).join(', ');
+const bagEntries = () =>
+  Object.fromEntries(
+    Object.entries(BAG_LISTS).map(([k, x]) => [
+      k,
+      {
+        field: x.field,
+        group: BAGS,
+        label: x.label,
+        help: x.help,
+        type: 'text',
+        bounds: { max: 80 },
+        parse: (v) => listText(intListOf(v, x.bounds, x.label, x.unit)).replaceAll('.', ''),
+        big: () => false,
+        impact: (before, after) => `${x.label}: ${listText(bagList(before))} → ${listText(bagList(after))}.`,
+      },
+    ]),
+  );
+/** A stored list setting ("1000, 5000") as numbers; the default list for anything unreadable. */
+export const bagList = (v) => (Array.isArray(v) ? v : String(v ?? '').split(',').map((x) => Number(x.trim())).filter((n) => Number.isSafeInteger(n)));
 
 const freezeDeep = (o) => (o && typeof o === 'object' ? Object.freeze(Object.values(o).forEach(freezeDeep) ?? o) : o);
 export const DEFAULTS = freezeDeep(defaultsOf());
@@ -912,6 +972,18 @@ export const REGISTRY = {
   ...roomEntries(),
   ...eventEntries(),
   ...winEntries(),
+  ...bagEntries(),
+  lucky_bag_seconds: {
+    field: 'luckyBagSeconds',
+    group: BAGS,
+    label: 'Çantanın açık kaldığı süre (saniye)',
+    help: 'Çanta açılınca bu kadar saniye düşer; o sırada dokunan herkes katılır ve çekiliş bitince yapılır. Atılmış çantalar kendi süresiyle biter.',
+    type: 'int',
+    bounds: { min: 10, max: 300, step: 5 },
+    parse: (v) => wholeOf(v, { min: 10, max: 300, step: 5 }, 'Çantanın açık kaldığı süre', ' saniye'),
+    big: () => false,
+    impact: (before, after) => `Yeni çantalar açılınca ${fmt(before)} → ${fmt(after)} saniye açık kalır.`,
+  },
   ...autoEntries(),
   admin_site: {
     field: 'adminSite',
@@ -1039,6 +1111,9 @@ export function snapshotOf(rows = [], e = process.env, { v = 0 } = {}) {
     ...Object.fromEntries(Object.entries(EVENT_RULES).map(([k, x]) => [x.field, val(k)])),
     eventRemindersOff: readOnlySet(val('event_reminders_off')),
     luckyAnnounceMinCoins: val('lucky_announce_min_coins'),
+    // As written ("1000, 5000"), so the panel shows it so; lucky-bags.mjs reads it with bagList.
+    ...Object.fromEntries(Object.entries(BAG_LISTS).map(([k, x]) => [x.field, val(k)])),
+    luckyBagSeconds: val('lucky_bag_seconds'),
     autoChatOff: readOnlySet(val('auto_chat_off')),
     ...Object.fromEntries(Object.entries(AUTO_CHAT).map(([k, x]) => [x.field, val(k)])),
     ...Object.fromEntries(Object.entries(AUTO_TEXTS).map(([k, x]) => [x.field, val(k)])),

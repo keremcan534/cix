@@ -22,6 +22,8 @@ kişi kartında Koruma alanı (`components/person-showcase.tsx`).
 | Liste | Benim Koruma'da iki yön ayrı ayrı, puana göre ilk 50. |
 | Engel | Engelli kişiler arasında kart gitmez (hediye kuralı). |
 
+Gece düşüşü, eşik ve liste sayıları Canlı ayarlar › **Koruma**'dan değişir ([`ELLE_AYARLAR.md`](ELLE_AYARLAR.md)); tablodakiler varsayılandır.
+
 ## Sahiplerin kararı
 
 - **Kartın fiyatı 999 jeton** (varsayılan). Yönetim › Hediyeler'den değiştirilebilir.

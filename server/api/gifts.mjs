@@ -24,7 +24,7 @@
 // A gift sent in a server room is announced to the room's voice connection from here, after it is paid
 // (LiveKit SendData, so no phone can fake one); the phones draw only these, never a peer's own claim.
 import { recordIncome } from './agency-lib.mjs';
-import { addBondCoins } from './bonds.mjs';
+import { KINDS as BOND_KINDS, addBondCoins, maxOf as bondMax } from './bonds.mjs';
 import { HttpError, auth, blockedBetween, claimRef, db, env, int, once, readJson, userId } from './core.mjs';
 import { EXCHANGE, GIFT_COUNTS, PACKS, VIP_SUBS } from './catalog.mjs';
 import { docsNow, levelsPayload, levelsRev, svipLevel, vipItemNeed } from './levels.mjs';
@@ -40,7 +40,7 @@ import { giftCoins } from './wallet.mjs';
 import { announceRoom, roomService } from './live.mjs';
 import { roomLevel } from './rooms.mjs';
 import { announceBoss, bossGift } from './boss-seat.mjs';
-import { GUARD_CARD, guardStarted, startGuard } from './guards.mjs';
+import { GUARD_CARD, guardRules, guardStarted, startGuard } from './guards.mjs';
 import { fuelRocket, launchRockets, rocketFx, rocketVideosRev } from './room-rocket.mjs';
 
 export const ROOM = /^[A-Za-z0-9_-]{1,64}$/;
@@ -145,6 +145,9 @@ export const giftRoutes = {
       ...(url?.searchParams.get('levels') === '1' ? { levels: levelsPayload() } : {}),
       // Yönetim › Mağaza (shop-items.mjs): only for an app that asks (shop=1).
       ...(url?.searchParams.get('shop') === '1' ? { shop: shopCatalog() } : {}),
+      // Koruma's and Bağlar's numbers as Canlı ayarlar has them, for the screens that say them (an older app says its own).
+      guard: guardRules(s),
+      bonds: { answerDays: s.bondAnswerDays, cooldownDays: s.bondCooldownDays, talkDaily: s.bondTalkDaily, max: Object.fromEntries(Object.keys(BOND_KINDS).map((k) => [k, bondMax(k, s)])) },
       // Grows with every live settings save, every change in Yönetim › Hediyeler and Emojiler, and every Seviye
       // ayarları save (as /api/config's).
       v: s.v + customGiftsRev() + emojiRev() + levelsRev() + shopItemsRev() + rocketVideosRev(),

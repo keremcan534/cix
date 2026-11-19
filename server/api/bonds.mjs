@@ -24,6 +24,7 @@
 import { recordIncome } from './agency-lib.mjs';
 import { HttpError, auth, blockedBetween, claimRef, db, env, int, limit, move, once, readJson, tx, userId } from './core.mjs';
 import { roomPacket } from './live.mjs';
+import { live } from './live-settings.mjs';
 import { notify } from './push.mjs';
 import { giftDiamonds, spendCoins } from './wallet.mjs';
 import { builtinGift, checkShownPrice } from './custom-gifts.mjs';
@@ -31,9 +32,11 @@ import { KINDS, LEVELS, REWARDS, levelOf } from './bond-rules.mjs';
 
 export { KINDS, LEVELS, REWARDS, levelOf };
 
-const TALK_DAILY = 10;
-const PENDING_MAX = 10;
-const COOLDOWN_DAYS = 7;
+// Limits and days (Canlı ayarlar › Bağlar, live-registry.mjs; defaults 1 Çift, 3 of each family kind, 5 Kanka, 10
+// pending requests, 3 days to answer, 7 days apart after an end, 10 talk points a day).
+const FAMILY_KINDS = new Set(['kardes', 'baci', 'agabey', 'abla', 'yenge', 'enishte']);
+/** How many bonds of `kind` one person may have now. */
+export const maxOf = (kind, s = live()) => (kind === 'cift' ? s.bondMaxCift : kind === 'kanka' ? s.bondMaxKanka : FAMILY_KINDS.has(kind) ? s.bondMaxKin : KINDS[kind].max);
 /** People asked about at once by /api/bonds/among (a room's mics and Balkon). */
 const AMONG_MAX = 80;
 /** A room's announcement of a bond gift has an id of its own, far from any gift_events row's (the phones drop repeats by it). */
@@ -154,17 +157,19 @@ export async function bondTalk(sender, recipient, messageId) {
     [sender, recipient, messageId],
   );
   if (prev.rows[0]?.sender !== recipient) return;
+  const daily = live().bondTalkDaily;
+  if (!(daily > 0)) return;
   await db.query(
     `UPDATE bonds SET talk_points = talk_points + 1,
             talk_today = CASE WHEN talk_day = (now() AT TIME ZONE 'Europe/Istanbul')::date THEN talk_today + 1 ELSE 1 END,
             talk_day = (now() AT TIME ZONE 'Europe/Istanbul')::date
       WHERE id = $1 AND (talk_day IS DISTINCT FROM (now() AT TIME ZONE 'Europe/Istanbul')::date OR talk_today < $2)`,
-    [bond.rows[0].id, TALK_DAILY],
+    [bond.rows[0].id, daily],
   );
 }
 
 /**
- * Requests nobody answered in 3 days (or whose recipient deleted the account) go back to the requester; bonds
+ * Requests nobody answered in time (Canlı ayarlar bond_answer_days, fixed on each when sent) (or whose recipient deleted the account) go back to the requester; bonds
  * with a deleted account end. Returns how many changed.
  */
 export async function sweepBonds() {
@@ -204,7 +209,7 @@ export function stopBondSweep() {
 
 export const bondRoutes = {
   async 'GET /api/bonds/info'() {
-    return { kinds: Object.entries(KINDS).map(([id, k]) => ({ id, ...k, gift: bondGift(id).name, price: bondGift(id).price })), levels: LEVELS, rewards: REWARDS };
+    return { kinds: Object.entries(KINDS).map(([id, k]) => ({ id, ...k, gift: bondGift(id).name, price: bondGift(id).price, max: maxOf(id) })), levels: LEVELS, rewards: REWARDS };
   },
 
   async 'GET /api/bonds'(req, url) {
@@ -254,21 +259,24 @@ export const bondRoutes = {
       // After the ref claim: a retry of a request that went through gets its replay even if the price moved since.
       gift = bondGift(kind);
       checkShownPrice(gift, shown);
+      const set = live();
       const open = await c.query(`SELECT status FROM bonds WHERE pair_lo = LEAST($1::uuid, $2::uuid) AND pair_hi = GREATEST($1::uuid, $2::uuid) AND status IN ('pending', 'active')`, [me.id, to]);
       if (open.rowCount) throw new HttpError(409, open.rows[0].status === 'active' ? 'Bu kişiyle zaten bir bağın var' : 'Bu kişiyle bekleyen bir bağ isteği var');
       const recent = await c.query(
-        `SELECT 1 FROM bonds WHERE pair_lo = LEAST($1::uuid, $2::uuid) AND pair_hi = GREATEST($1::uuid, $2::uuid) AND status = 'ended' AND ended_at > now() - make_interval(days => $3)`,
-        [me.id, to, COOLDOWN_DAYS],
+        `SELECT 1 FROM bonds WHERE pair_lo = LEAST($1::uuid, $2::uuid) AND pair_hi = GREATEST($1::uuid, $2::uuid) AND status = 'ended' AND ended_at > now() - make_interval(days => $3::int)`,
+        [me.id, to, set.bondCooldownDays],
       );
-      if (recent.rowCount) throw new HttpError(409, `Bu kişiyle bağın yakın zamanda bitti; ${COOLDOWN_DAYS} gün sonra yeniden kurabilirsin`);
+      if (recent.rowCount) throw new HttpError(409, `Bu kişiyle bağın yakın zamanda bitti; ${set.bondCooldownDays} gün sonra yeniden kurabilirsin`);
       const pending = await c.query(`SELECT count(*) AS n FROM bonds WHERE a = $1 AND status = 'pending'`, [me.id]);
-      if (Number(pending.rows[0].n) >= PENDING_MAX) throw new HttpError(409, `Aynı anda en fazla ${PENDING_MAX} bekleyen isteğin olabilir`);
-      if ((await countKind(c, me.id, kind, true)) >= k.max) throw new HttpError(409, k.max === 1 ? `Zaten bir ${k.label} bağın var` : `En fazla ${k.max} ${k.label} bağın olabilir`);
-      if ((await countKind(c, to, kind, false)) >= k.max) throw new HttpError(409, `Bu kişinin ${k.label} bağları dolu`);
+      if (Number(pending.rows[0].n) >= set.bondPendingMax) throw new HttpError(409, `Aynı anda en fazla ${set.bondPendingMax} bekleyen isteğin olabilir`);
+      const max = maxOf(kind, set);
+      if ((await countKind(c, me.id, kind, true)) >= max) throw new HttpError(409, max === 1 ? `Zaten bir ${k.label} bağın var` : `En fazla ${max} ${k.label} bağın olabilir`);
+      if ((await countKind(c, to, kind, false)) >= max) throw new HttpError(409, `Bu kişinin ${k.label} bağları dolu`);
       const parts = await spendCoins(c, me.id, gift.price, `Bağ isteği: ${k.label} (${gift.name})`, b.ref, to, { detail: { bondKind: kind } });
       await c.query(
-        `INSERT INTO bonds (a, b, pair_lo, pair_hi, kind, held_coins, held_lots, ref) VALUES ($1, $2, LEAST($1::uuid, $2::uuid), GREATEST($1::uuid, $2::uuid), $3, $4, $5, $6)`,
-        [me.id, to, kind, gift.price, JSON.stringify(parts), b.ref],
+        `INSERT INTO bonds (a, b, pair_lo, pair_hi, kind, held_coins, held_lots, ref, expires_at)
+         VALUES ($1, $2, LEAST($1::uuid, $2::uuid), GREATEST($1::uuid, $2::uuid), $3, $4, $5, $6, now() + make_interval(days => $7::int))`,
+        [me.id, to, kind, gift.price, JSON.stringify(parts), b.ref, set.bondAnswerDays],
       );
     });
     const row = await db.query('SELECT id FROM bonds WHERE a = $1 AND ref = $2', [me.id, b.ref]);
@@ -306,8 +314,9 @@ export const bondRoutes = {
       const alive = await c.query('SELECT count(*) AS n FROM users WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL', [[b.a, b.b]]);
       if (Number(alive.rows[0].n) < 2) throw new HttpError(404, 'Kullanıcı bulunamadı');
       // Room may have filled since the request: mine, or theirs from another bond accepted meanwhile.
-      if ((await countKind(c, me.id, b.kind, false)) >= k.max) throw new HttpError(409, `${k.label} bağların dolu; önce birini bitir`);
-      if ((await countKind(c, b.a, b.kind, false)) >= k.max) throw new HttpError(409, `İsteği gönderenin ${k.label} bağları dolu`);
+      const max = maxOf(b.kind);
+      if ((await countKind(c, me.id, b.kind, false)) >= max) throw new HttpError(409, `${k.label} bağların dolu; önce birini bitir`);
+      if ((await countKind(c, b.a, b.kind, false)) >= max) throw new HttpError(409, `İsteği gönderenin ${k.label} bağları dolu`);
       const total = Number(b.held_coins);
       const ref = `bond:${b.id}`;
       const g = await c.query(`INSERT INTO gift_events (sender, recipient, gift_id, count, unit_price, total, room, ref) VALUES ($1, $2, $3, 1, $4, $4, NULL, $5) RETURNING id`, [

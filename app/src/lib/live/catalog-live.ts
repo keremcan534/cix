@@ -86,7 +86,15 @@ export type LiveCatalog = {
   levels: LiveLevels | null;
   /** The shop's frames and entry effects (shop=1, Yönetim › Mağaza); null from an older server: the compiled shop. */
   shop: LiveShop | null;
+  /** Koruma's numbers as Canlı ayarlar has them; null from an older server: the app's own. */
+  guard: GuardNumbers | null;
+  /** Bağlar's limits and days as Canlı ayarlar has them; null from an older server: the app's own. */
+  bonds: BondNumbers | null;
 };
+/** Koruma's numbers (server/api/guards.mjs guardRules) that the rules page says. */
+export type GuardNumbers = { dropFrom: number; dropShare: number; dropFlat: number; thresholdEveryDays: number };
+/** Bağlar's numbers (server/api/gifts.mjs catalog `bonds`): days to answer, days apart, talk points, per-kind limits. */
+export type BondNumbers = { answerDays: number; cooldownDays: number; talkDaily: number; max: Partial<Record<BondKind, number>> };
 
 // --- Reading the server's answer, without trusting it ----------------------------------------------------
 const obj = (x: unknown): Record<string, unknown> => (x && typeof x === 'object' && !Array.isArray(x) ? (x as Record<string, unknown>) : {});
@@ -173,6 +181,31 @@ function shelfOf(list: unknown, app: Record<string, AppGiftEdit>, remote: Remote
   return [...new Set(ids)];
 }
 
+const whole = (v: unknown, min: number, max: number): number | null => (typeof v === 'number' && Number.isSafeInteger(v) && v >= min && v <= max ? v : null);
+/** The catalog's `guard`; null unless every number is sound. */
+export function parseGuardNumbers(x: unknown): GuardNumbers | null {
+  const g = obj(x);
+  const dropFrom = whole(g.dropFrom, 0, 1e9);
+  const dropFlat = whole(g.dropFlat, 0, 1e9);
+  const days = whole(g.thresholdEveryDays, 1, 365);
+  const share = typeof g.dropShare === 'number' && Number.isFinite(g.dropShare) && g.dropShare >= 0 && g.dropShare <= 1 ? g.dropShare : null;
+  return dropFrom === null || dropFlat === null || days === null || share === null ? null : { dropFrom, dropShare: share, dropFlat, thresholdEveryDays: days };
+}
+/** The catalog's `bonds`; null unless the days are sound (a bad per-kind limit is left out: the app's own). */
+export function parseBondNumbers(x: unknown): BondNumbers | null {
+  const b = obj(x);
+  const answerDays = whole(b.answerDays, 1, 365);
+  const cooldownDays = whole(b.cooldownDays, 0, 365);
+  const talkDaily = whole(b.talkDaily, 0, 1000);
+  if (answerDays === null || cooldownDays === null || talkDaily === null) return null;
+  const max: Partial<Record<BondKind, number>> = {};
+  for (const [k, v] of Object.entries(obj(b.max))) {
+    const n = whole(v, 1, 1000);
+    if (n !== null && Object.hasOwn(BOND_KINDS, k)) max[k as BondKind] = n;
+  }
+  return { answerDays, cooldownDays, talkDaily, max };
+}
+
 /** GET /api/catalog as the live catalog; anything malformed is left out (the compiled value is used), never thrown. */
 export function parseLiveCatalog(raw: unknown): LiveCatalog {
   const r = obj(raw);
@@ -193,6 +226,8 @@ export function parseLiveCatalog(raw: unknown): LiveCatalog {
     emoji: parseLiveEmoji(r.emoji),
     levels: parseLiveLevels(r.levels),
     shop: parseLiveShop(r.shop),
+    guard: parseGuardNumbers(r.guard),
+    bonds: parseBondNumbers(r.bonds),
   };
 }
 
@@ -225,6 +260,8 @@ export function parseSavedLiveCatalog(raw: string | null): { catalog: LiveCatalo
       emoji: parseLiveEmoji(r.emoji),
       levels: parseLiveLevels(r.levels),
       shop: parseLiveShop(r.shop),
+      guard: parseGuardNumbers(r.guard),
+      bonds: parseBondNumbers(r.bonds),
     },
     // A copy an older app saved counts as old: the next poll reads the catalog again. One from before the videos were
     // listed (no fx), or from before the shelves were (no shelf): that app hid the gifts put back on the shelves
@@ -324,7 +361,8 @@ export function giftById(id: string | null | undefined, c: LiveCatalog | null = 
 export function bondKindOf(kind: BondKind, c: LiveCatalog | null = current): BondKindInfo {
   const k = BOND_KINDS[kind];
   const g = giftById(`bag-${kind}`, c);
-  return g && Number.isSafeInteger(g.price) && g.price > 0 ? { ...k, gift: g.name, price: g.price } : k;
+  const max = c?.bonds?.max[kind] ?? k.max;
+  return g && Number.isSafeInteger(g.price) && g.price > 0 ? { ...k, gift: g.name, price: g.price, max } : max === k.max ? k : { ...k, max };
 }
 
 /** Every gift this phone can draw, the app's own as they are now and the admins' listed (the profile's gift wall). */
@@ -447,7 +485,7 @@ export const liveCatalogStale = (now = Date.now()) => !current || now - fetchedA
 /** The server named its current Çevir rate (409 rate_changed): the screens show it before the catalog is read again. */
 export function noteLiveRate(usdTry: unknown) {
   if (!validRate(usdTry)) return;
-  publish({ ...(current ?? { v: 0, giftIds: null, packs: [], campaign: null, fx: null, remote: [], shelf: null, app: {}, emoji: null, levels: null, shop: null }), usdTry });
+  publish({ ...(current ?? { v: 0, giftIds: null, packs: [], campaign: null, fx: null, remote: [], shelf: null, app: {}, emoji: null, levels: null, shop: null, guard: null, bonds: null }), usdTry });
 }
 
 const subscribe = (l: () => void) => {

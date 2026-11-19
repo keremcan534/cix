@@ -11,12 +11,12 @@ import { Image, Pressable, View } from 'react-native';
 import { ActionSheet } from '@/components/ActionSheet';
 import { Text } from '@/components/text';
 import { Avatar } from '@/components/ui';
-import { BOND_KINDS, BOND_LEVELS, BOND_ORDER, BOND_REWARDS, BOND_RULES, bondDays, demoBondsOf, hasReward, sortBonds, topBond, type Bond, type BondKind } from '@/data/bonds';
+import { BOND_KINDS, BOND_LEVELS, BOND_ORDER, BOND_REWARDS, bondDays, bondRulesText, demoBondsOf, hasReward, sortBonds, topBond, type Bond, type BondKind } from '@/data/bonds';
 import { userById, type User } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import { ApiError } from '@/lib/api';
 import { message } from '@/lib/live';
-import { useLiveCatalog } from '@/lib/live/catalog-live';
+import { liveCatalog, useLiveCatalog } from '@/lib/live/catalog-live';
 import { bondKindNow, liveBondsFor, liveEndBond, liveRequestBond, liveRespondBond, liveSetBondsHidden, liveWithdrawBond, loadBondRequests, loadBonds } from '@/lib/live/bonds';
 import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
@@ -191,7 +191,7 @@ export function BondsTab({ user, isMe, state, isBlocked, onMeetInvite }: { user:
   const request = (kind: BondKind) => {
     const k = bondKindNow(kind);
     if (isBlocked) return showAlert('Engelli kullanıcı', 'Engellediğin biriyle bağ kuramazsın.');
-    if (live) return act(() => liveRequestBond(user.id, kind, undefined, k.price), `${k.label} isteği gönderildi. ${user.name} kabul edince ${k.gift} ona geçer; 3 gün içinde yanıt gelmezse jetonların geri gelir.`);
+    if (live) return act(() => liveRequestBond(user.id, kind, undefined, k.price), `${k.label} isteği gönderildi. ${user.name} kabul edince ${k.gift} ona geçer; ${liveCatalog()?.bonds?.answerDays ?? 3} gün içinde yanıt gelmezse jetonların geri gelir.`);
     // Demo: the same limits the server checks, coins from this phone.
     if (ours || myRequest) return showAlert('Zaten var', `${user.name} ile zaten bir bağın ya da bekleyen isteğin var.`);
     const mine = [...demoBondsOf('me', now), ...state.requests.outgoing].filter((b) => !demo.ended.has(b.id) && b.kind === kind).length;
@@ -240,7 +240,7 @@ export function BondsTab({ user, isMe, state, isBlocked, onMeetInvite }: { user:
     ]);
   };
 
-  const rules = () => showAlert('Bağlar nasıl işler?', [...BOND_RULES, '', 'Ödüller: ' + BOND_REWARDS.map((r) => `Lv.${r.level} ${r.label}`).join(' · ')].join('\n'));
+  const rules = () => showAlert('Bağlar nasıl işler?', [...bondRulesText((live && liveCatalog()?.bonds) || undefined), '', 'Ödüller: ' + BOND_REWARDS.map((r) => `Lv.${r.level} ${r.label}`).join(' · ')].join('\n'));
 
   return (
     <View style={{ padding: 16, gap: 14 }}>

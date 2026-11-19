@@ -24,10 +24,27 @@ import { checkShownPrice, giftNameOf, giftOf } from './custom-gifts.mjs';
 import { HttpError, auth, blockedBetween, claimRef, db, env, int, limit, once, readJson, tx } from './core.mjs';
 import { announceGift, liveKitRoom, ROOM } from './gifts.mjs';
 import { live } from './live-settings.mjs';
-import { BAG_RULES, deal, split, takeParts } from './lucky-bag-rules.mjs';
+import { BAG_RULES as BAG_DEFAULTS, deal, split, takeParts } from './lucky-bag-rules.mjs';
+import { bagList } from './live-registry.mjs';
 import { notify } from './push.mjs';
 import { presenceTracked, roomService } from './live.mjs';
 import { creditCoins, giftDiamonds, spendCoins } from './wallet.mjs';
+
+/** The choices a bag offers now: Canlı ayarlar › Şanslı çanta (live-registry.mjs), else lucky-bag-rules.mjs BAG_RULES. */
+export function bagRules(s = live()) {
+  const list = (v, d) => {
+    const xs = bagList(v);
+    return xs.length ? xs : d;
+  };
+  return {
+    coins: list(s.luckyBagCoins, BAG_DEFAULTS.coins),
+    coinPackets: list(s.luckyBagCoinPackets, BAG_DEFAULTS.coinPackets),
+    giftCounts: list(s.luckyBagGiftCounts, BAG_DEFAULTS.giftCounts),
+    giftPackets: list(s.luckyBagGiftPackets, BAG_DEFAULTS.giftPackets),
+    delays: list(s.luckyBagDelays, BAG_DEFAULTS.delays),
+    windowSeconds: Number.isSafeInteger(s.luckyBagSeconds) ? s.luckyBagSeconds : BAG_DEFAULTS.windowSeconds,
+  };
+}
 
 const fmt = (n) => n.toLocaleString('tr-TR');
 
@@ -196,7 +213,7 @@ export const luckyBagRoutes = {
         WHERE b.room = $1 AND b.status = 'open' AND b.closes_at > now() ORDER BY b.opens_at, b.id LIMIT 20`,
       [room, u.id],
     );
-    return { bags: r.rows.map((b) => bagView(b, u.id, b.my_units)), rules: BAG_RULES, serverNow: new Date().toISOString() };
+    return { bags: r.rows.map((b) => bagView(b, u.id, b.my_units)), rules: bagRules(), serverNow: new Date().toISOString() };
   },
 
   async 'GET /api/lucky-bags/one'(req, url) {
@@ -211,6 +228,7 @@ export const luckyBagRoutes = {
 
   async 'POST /api/lucky-bags'(req) {
     const u = await auth(req);
+    const BAG_RULES = bagRules();
     const b = await readJson(req);
     const raw = b.room === undefined || b.room === null ? '' : String(b.room);
     const room = ROOM.test(raw) ? liveKitRoom(raw) : null;

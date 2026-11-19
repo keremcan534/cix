@@ -39,14 +39,17 @@ export const BOND_REWARDS: BondReward[] = [
 ];
 export const hasReward = (level: number, id: BondReward['id']) => level >= (BOND_REWARDS.find((r) => r.id === id)?.level ?? Infinity);
 
-export const BOND_RULES = [
-  'Bağ isteği bir bağ hediyesiyle gider; karşı taraf kabul edince hediye ona geçer.',
-  'Reddedilirse, geri çekilirse ya da 3 gün içinde yanıtlanmazsa jetonların geri gelir.',
-  'Birbirinize gönderdiğiniz her 100 jeton 1 puan; karşılıklı mesajlaşma günde en fazla 10 puan.',
-  'Puan düşmez. Bağı iki taraf da istediği zaman bitirebilir: seviye ve ödüller sıfırlanır, jeton iadesi olmaz.',
-  'Biten bir bağ aynı kişiyle 7 gün sonra yeniden kurulabilir.',
-];
-
+/** Bağlar's rules as sentences, with the server's days and points when the catalog has them (Canlı ayarlar). */
+export function bondRulesText(n: { answerDays: number; talkDaily: number; cooldownDays: number } = { answerDays: 3, talkDaily: 10, cooldownDays: 7 }): string[] {
+  return [
+    'Bağ isteği bir bağ hediyesiyle gider; karşı taraf kabul edince hediye ona geçer.',
+    `Reddedilirse, geri çekilirse ya da ${n.answerDays} gün içinde yanıtlanmazsa jetonların geri gelir.`,
+    n.talkDaily > 0 ? `Birbirinize gönderdiğiniz her 100 jeton 1 puan; karşılıklı mesajlaşma günde en fazla ${n.talkDaily} puan.` : 'Birbirinize gönderdiğiniz her 100 jeton 1 puan.',
+    'Puan düşmez. Bağı iki taraf da istediği zaman bitirebilir: seviye ve ödüller sıfırlanır, jeton iadesi olmaz.',
+    n.cooldownDays > 0 ? `Biten bir bağ aynı kişiyle ${n.cooldownDays} gün sonra yeniden kurulabilir.` : 'Biten bir bağ aynı kişiyle hemen yeniden kurulabilir.',
+  ];
+}
+export const BOND_RULES = bondRulesText();
 export type BondStatus = 'pending' | 'active' | 'refused' | 'expired' | 'withdrawn' | 'ended';
 /** A bond as one side sees it: `partnerId` is the other person (a local id: 'me', u1… or a server id). */
 export type Bond = {

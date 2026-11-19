@@ -19,7 +19,7 @@ Odadaki hediye panelinde **Aile ve Dost** rafı var: Koruma Kartı ve yedi bağ 
 | Enişte | Enişte Kravatı | 1.000 jeton | 3 |
 | Kanka | Kanka Rozeti | 500 jeton | 5 |
 
-Tablodaki fiyatlar uygulamanın kendi fiyatlarıdır; panelden değiştirilebilir.
+Tablodaki fiyatlar ve sınırlar uygulamanın kendi değerleridir. Fiyat Hediyeler'den; sınırlar, cevap süresi, bekleme ve sohbet puanı Canlı ayarlar › **Bağlar**'dan değişir ([`ELLE_AYARLAR.md`](ELLE_AYARLAR.md)).
 
 **Fiyat panelden (19 Kasım 2026):** Hediyeler › Aile ve Dost'ta bağ hediyesinin fiyatı değişir; **Orijinale dön** uygulamanın fiyatına geri alır.
 - Yeni uygulama Bağlar sekmesinde ve odadaki rafta panelin fiyatını gösterir ve gösterdiği fiyatı istekle gönderir. Arada fiyat değiştiyse jeton düşmez, yeni fiyat söylenir.

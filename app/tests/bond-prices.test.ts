@@ -29,3 +29,27 @@ describe('Bağ fiyatı panelden', () => {
     assert.equal(bondKindOf('kanka', bad).price, 500);
   });
 });
+
+describe('Bağlar ve Koruma sayıları panelden (Canlı ayarlar)', () => {
+  test('bağ sınırı, cevap süresi ve kurallar yazısı katalogdan; bozuk değer uygulamanın', async () => {
+    const { bondRulesText } = await import('@/data/bonds');
+    const c = parseLiveCatalog({ gifts: [], bonds: { answerDays: 5, cooldownDays: 0, talkDaily: 0, max: { kanka: 2, kardes: 'çok', xyz: 4 } } });
+    assert.deepEqual(c.bonds, { answerDays: 5, cooldownDays: 0, talkDaily: 0, max: { kanka: 2 } });
+    assert.equal(bondKindOf('kanka', c).max, 2);
+    assert.equal(bondKindOf('kardes', c).max, 3);
+    const text = bondRulesText(c.bonds!).join(' ');
+    assert.match(text, /5 gün içinde/);
+    assert.match(text, /hemen yeniden/);
+    assert.doesNotMatch(text, /mesajlaşma/);
+    assert.equal(parseLiveCatalog({ gifts: [], bonds: { answerDays: 0, cooldownDays: 1, talkDaily: 1 } }).bonds, null);
+  });
+
+  test('Koruma kuralları sayfası sunucunun sayılarını söyler', async () => {
+    const { guardRulesText } = await import('@/lib/guard-core');
+    const c = parseLiveCatalog({ gifts: [], guard: { dropFrom: 10_000, dropShare: 0.25, dropFlat: 300, listMax: 50, thresholdPerLevel: 1000, thresholdEveryDays: 2 } });
+    const text = guardRulesText(c.guard!).flatMap((s) => s.lines).join(' ');
+    assert.match(text, /10\.000 puan ve üstünde puanın %25’u düşer; 10\.000’in altında 300 puan düşer/);
+    assert.match(text, /Eşik 2 günde bir değişir/);
+    assert.equal(parseLiveCatalog({ gifts: [], guard: { dropFrom: 1, dropShare: 2, dropFlat: 1, thresholdEveryDays: 7 } }).guard, null);
+  });
+});

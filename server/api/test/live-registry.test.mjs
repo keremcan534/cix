@@ -83,6 +83,19 @@ describe('defaults are today', () => {
       boss_seat_minutes: 10,
       family_cashout_members: 10,
       family_rejoin_days: 90,
+      bond_max_cift: 1,
+      bond_max_kin: 3,
+      bond_max_kanka: 5,
+      bond_pending_max: 10,
+      bond_answer_days: 3,
+      bond_cooldown_days: 7,
+      bond_talk_daily: 10,
+      guard_drop_from: 5000,
+      guard_drop_pct: 10,
+      guard_drop_flat: 1000,
+      guard_list_max: 50,
+      guard_threshold_per_level: 50_000,
+      guard_threshold_days: 7,
       event_min_room_level: 1,
       event_min_lead_minutes: 30,
       event_max_minutes: 180,
@@ -92,6 +105,12 @@ describe('defaults are today', () => {
       event_block_days: 14,
       event_reminders_off: [],
       lucky_announce_min_coins: 0,
+      lucky_bag_coins: '1000, 5000, 10000, 50000',
+      lucky_bag_coin_packets: '5, 10, 20, 30',
+      lucky_bag_gift_counts: '10, 30, 99',
+      lucky_bag_gift_packets: '5, 10, 15',
+      lucky_bag_delays: '0, 120, 300',
+      lucky_bag_seconds: 30,
       // Otomatik mesaj and SimilarClub Sistem (auto-chat-rules.mjs): the spec's numbers (V2.0, 18 Nov 2026).
       auto_chat_off: [],
       auto_daily: 10,
@@ -184,6 +203,19 @@ describe('defaults are today', () => {
       'boss_seat_minutes',
       'family_cashout_members',
       'family_rejoin_days',
+      'bond_max_cift',
+      'bond_max_kin',
+      'bond_max_kanka',
+      'bond_pending_max',
+      'bond_answer_days',
+      'bond_cooldown_days',
+      'bond_talk_daily',
+      'guard_drop_from',
+      'guard_drop_pct',
+      'guard_drop_flat',
+      'guard_list_max',
+      'guard_threshold_per_level',
+      'guard_threshold_days',
       'event_min_room_level',
       'event_min_lead_minutes',
       'event_max_minutes',
@@ -193,6 +225,12 @@ describe('defaults are today', () => {
       'event_block_days',
       'event_reminders_off',
       'lucky_announce_min_coins',
+      'lucky_bag_coins',
+      'lucky_bag_coin_packets',
+      'lucky_bag_gift_counts',
+      'lucky_bag_gift_packets',
+      'lucky_bag_delays',
+      'lucky_bag_seconds',
       'auto_chat_off',
       'auto_daily',
       'quick_daily',
@@ -456,6 +494,20 @@ describe('Kazanç duyurusu', () => {
     assert.equal(impactOf('lucky_announce_min_coins', 500, 0), 'Şanslı hediyede her kazanç bütün odalarda duyurulur.');
     assert.equal(snapshotOf([]).luckyAnnounceMinCoins, 0);
     assert.equal(snapshotOf([{ key: 'lucky_announce_min_coins', value: 2_000 }]).luckyAnnounceMinCoins, 2_000);
+  });
+});
+
+describe('Bağlar, Koruma, Şanslı çanta', () => {
+  test('sınırlar tam sayı ve aralıkta; çanta listeleri virgülle, sıralı, en çok 6, büyük çanta yok', () => {
+    assert.equal(validate('bond_max_kin', 5), 5);
+    refused(() => validate('bond_max_cift', 0), /Çift bağı/);
+    refused(() => validate('guard_drop_pct', 60), /Yüzde düşüş/);
+    assert.equal(snapshotOf([{ key: 'guard_drop_pct', value: 20 }]).guardDropPct, 20);
+    assert.equal(validate('lucky_bag_coins', '5.000, 1000,1000 , 2000'), '1000, 2000, 5000');
+    assert.equal(validate('lucky_bag_delays', [300, 0]), '0, 300');
+    for (const v of ['', 'bin', '1000, 60000', '1000, 150', '1,2,3,4,5,6,7', 12]) refused(() => validate('lucky_bag_coins', v));
+    assert.equal(snapshotOf([{ key: 'lucky_bag_coins', value: '500, 2000' }]).luckyBagCoins, '500, 2000');
+    assert.equal(impactOf('lucky_bag_coins', '1000, 5000', '500'), 'Jeton çantası: jeton seçenekleri: 1.000, 5.000 → 500.');
   });
 });
 
