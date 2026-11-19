@@ -223,7 +223,7 @@ describe('Oyun Salonu sunucuda', () => {
     const coins = (await me(a.session)).coins;
     const [st, why] = await play(a.session, { game: 'rocket', bet: 25_000, pick: '1000' });
     assert.equal(st, 409, 'havuz 25 milyonu karşılamaz');
-    assert.match(why.error, /Ödül havuzu/);
+    assert.match(why.error, /Bu bahis şu an alınamıyor/);
     assert.equal((await me(a.session)).coins, coins);
     await h.sql.query('UPDATE casino_bank SET pool = 1000');
     assert.equal((await play(a.session, { game: 'goldtree', bet: 250 }))[0], 409, '250 × 188 > 1000');

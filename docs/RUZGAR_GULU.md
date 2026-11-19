@@ -22,7 +22,7 @@ Oyun Salonu'nun özgün çark oyunu. Adı, dilimleri, alanları ve ekranı bize 
 
 ## Dilimler ve şanslar
 
-Çarkta 12 dilim var ve her dilim bir şey öder. Dilimler aynı boyda çizilir ama şansları farklıdır; kurallar bölümündeki tablo bunu açıkça yazar.
+Çarkta 12 dilim var. Dilimler aynı boyda çizilir ama şansları farklıdır; kurallar bölümündeki tablo her dilimin ödediği katı ve şansını açıkça yazar.
 
 | Dilim | Kazanç (tur ücretinin katı) | Şans |
 |---|---|---|
@@ -41,6 +41,7 @@ Oyun Salonu'nun özgün çark oyunu. Adı, dilimleri, alanları ve ekranı bize 
 
 - **JACKPOT fonu:** Her turun %1,5'i o alanın fonuna eklenir. JACKPOT'a gelen fonun tamamını alır. Fon kazanılınca 20 turluk ücretle yeniden başlar.
 - **Geri dönüş:** Oynanan her 100 jetonun ortalama 40'ı kazanç olarak döner (sabit dilimlerden %38, fondan yaklaşık %2). Bu oran diğer jeton oyunlarıyla aynı ev kuralıdır. Hesaplarda küsurat evin lehine aşağı yuvarlanır.
+- **Oyuncuya ne yazar (Güncelleme 7, sahip kararı):** fon payı (%1,5) ve geri dönüş (ortalama 40) personel bilgisidir, oyunda yazmaz. Oyunun bilgi sayfasında nasıl oynanır, olasılık tablosu (dilim, kat, şans), JACKPOT kuralı ("JACKPOT dilimine gelen, o alanın JACKPOT fonunun tamamını alır") ve sınırlar kalır. Oyunlar ekranındaki kartta "her dilim kazandırır" yerine "12 dilimli çark" yazar (en sık gelen dilim tur ücretinin yalnız 0,1 katını öder). Eski APK'lar eski yazıları güncellenene kadar gösterir.
 
 ## Sonuç sunucuda belirlenir
 

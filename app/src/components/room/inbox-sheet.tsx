@@ -1,6 +1,7 @@
 // Messages inside the room: the conversation list and a reply thread in a sheet, so a user can answer
 // a DM without leaving the room (the room keeps playing behind it). Same rules as the Mesajlar tab:
-// blocked people are hidden and every reply goes through ChatThread.
+// blocked people are hidden and every reply goes through ChatThread. A gift's animation in a chat here plays over the
+// whole Modal (components/fx/gift-stage), not inside the sheet, which would cut the video.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -9,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
 import { ChatThread } from '@/components/chat-thread';
+import { useGiftStage } from '@/components/fx/gift-stage';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { messagePreview } from '@/components/ReactionArt';
 import { Avatar, VerifiedBadge } from '@/components/ui';
@@ -31,6 +33,7 @@ export function useInboxUnread() {
 export function InboxSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const { conversations, blocked } = useApp();
   const [openId, setOpenId] = useState<string | null>(null);
+  const stage = useGiftStage();
   const convs = conversations.filter((c) => !blocked.has(c.userId));
   const close = () => {
     setOpenId(null);
@@ -77,6 +80,7 @@ export function InboxSheet({ visible, onClose }: { visible: boolean; onClose: ()
                 router.push({ pathname: '/sohbet/[id]', params: { id: user.id } });
               }}
               avoidKeyboard={false}
+              stage={stage}
               header={(typing, pair) => (
                 <View style={s.head}>
                   <Pressable onPress={() => setOpenId(null)} hitSlop={10} accessibilityRole="button" accessibilityLabel="Mesajlara dön">
@@ -167,6 +171,7 @@ export function InboxSheet({ visible, onClose }: { visible: boolean; onClose: ()
           )}
         </View>
       </KeyboardAvoid>
+      {stage.node}
     </Modal>
   );
 }

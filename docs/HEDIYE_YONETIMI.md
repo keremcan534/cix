@@ -33,7 +33,7 @@ hediyeyi sessizce atlar, videosunu indirmez (adresi `/api/fx/g/…`, onların s�
 | --- | --- |
 | Kim yapar | Yalnız yönetici hesabı (`role = admin`); her işlem `audit_events`'e yazılır (kim, ne, önce/sonra, IP) |
 | Fiyat | 1 – 1.000.000 jeton, tam sayı; değişiklik yeni gönderimlerden itibaren geçer, geçmiş gönderim kendi fiyatıyla kalır |
-| Raf | Popüler, İkili, Kutlama, Özel (Özel'de en düşük VIP 1–10) |
+| Raf | Popüler, Çift, Kutlama, Özel (Özel'de en düşük VIP 1–10). Çift rafının adı Kasım 2026'ya kadar İkili'ydi; eski APK'lar hâlâ "İkili" yazar |
 | Sıra | Yöneticinin hediyeleri kendi rafının başında, paneldeki sırayla; yeni eklenen en başa |
 | Ad | 2–24 karakter; aynı adda iki hediye olmaz (derlenmişlerle de) |
 | İkon | PNG ya da WebP, saydam, kare (en çok 1:1,25), 128–4096 px (önerilen 512 × 512), en çok 10 MB. Telefonlar hediye panelinin bütün ikonlarını indirir: 1024 px'ten ya da 1 MB'tan büyük ikonu sunucu kaydederken küçültür (en çok 1024 px ve 1 MB, saydam PNG, `tools/icon-fit.py`); yüklenen büyük dosya silinir |

@@ -161,6 +161,8 @@ export type Conversation = {
     read?: boolean;
     /** Live mode: an automatic message or a quick reply (server/api/auto-chat.mjs); the bubble labels it. */
     source?: 'auto_streamer' | 'auto_opener' | 'quick_reply';
+    /** Live mode: the line of a gift sent from the chat (the server's, lib/dm-gift-fx): drawn as the gift, played once. */
+    gift?: { id: string; count: number };
   }[];
   unread: number;
 };

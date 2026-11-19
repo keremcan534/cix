@@ -24,7 +24,12 @@ Kullanıcı Uğurlu kategorisinden bir hediye gönderir. Sunucu yayımlanmış o
 - **Varsayılan oranlar:** Beklenen geri dönüş yaklaşık ×0,65. Bunlar örnek değerlerdir; gerçek oranlar ekonomi ve hukuk incelemesinden sonra belirlenmeli.
   - Belgedeki test tablosu (her gönderim en az 2x kazanır) yönetim panelinde **Belgedeki test tablosu** düğmesiyle uygulanabilir.
 - **Gönderim akışı:**
-  1. Panelde fiyat, her çarpanın olasılığı ve ödülü gösterilir.
+  1. Panelde fiyat, her çarpanın olasılığı ve ödülü gösterilir (olasılık tablosu; Google Play ve Apple satın almadan
+     önce olasılıkların gösterilmesini ister). Rafın notu yalnız nasıl oynandığını söyler: "Her gönderimde bir çekiliş
+     yapılır; olasılıklar aşağıda. Ödül garanti değildir. Alıcıya ve PK puanına hediye değerinin %20'si yazılır."
+     Gönder düğmesinin üstünde en yüksek ödül ve tutarı yazmaz (Güncelleme 7, sahip kararı: kazanç tutarını anlatan
+     yazı yok); yerine "Ödül garanti değildir · Olasılıklar" yazar, dokununca seçili paketin olasılık tablosu açılır.
+     Eski APK'lar eski yazıyı güncellenene kadar gösterir.
   2. **Onay yok:** Hiçbir hediye onay sormaz; tek dokunuşla gönderilir.
   3. Gönderimden sonra sağ altta o hediyeye ait çark çıkar. Çevresindeki çizgi 5 saniyede tamamlanır; bu sürede çarka basmak aynı hediyeyi aynı kişilere tekrar gönderir ve sayaç ×1, ×2, ×3 diye ilerler. Her basış çizgiyi baştan başlatır, çizgi kapanınca çark kaybolur.
      - Aynı çark Şanslı olmayan hediyelerde de çıkar (Çantam'dan gönderilenler hariç). Her tekrar normal gönderim gibi sunucuya gider, fiyatı sunucu belirler.

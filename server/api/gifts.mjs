@@ -207,8 +207,10 @@ export const giftRoutes = {
         b.ref,
       ]);
       eventId = Number(g.rows[0].id);
-      // A gift from a chat shows in that chat, for both of them (a line of its own; no message price).
-      if (place === 'chat') await c.query('INSERT INTO messages (sender, recipient, body, ref) VALUES ($1,$2,$3,$4) ON CONFLICT (sender, ref) DO NOTHING', [u.id, to, `Hediye gönderdi: ${label}`, `gift-${b.ref}`]);
+      // A gift from a chat shows in that chat, for both of them (a line of its own; no message price). Its ref is a
+      // server ref (':'), so no phone can take it first and hide the line or put its own words in it; the chat reads
+      // the gift back from it (messages.mjs GIFT_LINE: this ref and this transaction's moment).
+      if (place === 'chat') await c.query('INSERT INTO messages (sender, recipient, body, ref) VALUES ($1,$2,$3,$4) ON CONFLICT (sender, ref) DO NOTHING', [u.id, to, `Hediye gönderdi: ${label}`, `gift:${b.ref}`]);
       // A gift from the family chat: only to someone of my family, and the family chat shows it (family-more.mjs task).
       if (place === 'family') {
         const fam = await c.query(

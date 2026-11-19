@@ -48,9 +48,9 @@ bekleme süresi.
 
 | Grup | Ayar | Varsayılan |
 | --- | --- | --- |
-| Aile görevleri | Her görevin puanı (sohbete mesaj, odada kalma, yeni üyeye hediye, yoklama, odada hediye, İkili hediyesi, sohbette hediye) | 1, 1, 3, 1, 2, 2, 2 |
+| Aile görevleri | Her görevin puanı (sohbete mesaj, odada kalma, yeni üyeye hediye, yoklama, odada hediye, Çift hediyesi, sohbette hediye) | 1, 1, 3, 1, 2, 2, 2 |
 | Aile görevleri | Aile odasında kalma: hedef | 15 dakika |
-| Aile görevleri | Hediye görevleri: kaç jetonda bir puan (odada, İkili, sohbette) | 500, 350, 400 |
+| Aile görevleri | Hediye görevleri: kaç jetonda bir puan (odada, Çift, sohbette) | 500, 350, 400 |
 | Aile sandıkları | Her sandığın haftalık hedefi (Ahşap, Yeşil, Mavi, Kırmızı) | 10.000, 25.000, 50.000, 80.000 |
 | Aile sandıkları | Her sandığın ödül jetonu | 20, 50, 50, 100 |
 | Aile sandıkları | Sandık için en az katkı | 1 |

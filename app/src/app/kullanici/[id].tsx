@@ -63,6 +63,7 @@ import { similarity } from '@/lib/similarity';
 import { SimilarityCard } from '@/components/similarity';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { ProfileGiftSheet } from '@/components/profile-gift-sheet';
+import { useGiftStage } from '@/components/fx/gift-stage';
 import { AffiliationPills, FEMALE_FILL, GenderChip, MALE_FILL, useAffiliations, useStaffBadge, type Affiliation } from '@/components/profile-badges';
 import { Icon3D } from '@/components/Icon3D';
 import { useApp, type FanClub } from '@/store';
@@ -402,6 +403,8 @@ export default function UserProfile() {
 
   // Live mode: only a real person (a server id) can get a gift; a sample person has no Hediye button.
   const giftable = !live || !!serverId;
+  // My gift's animation plays here once it went (components/fx/gift-stage).
+  const giftStage = useGiftStage();
   /** One gift, no confirmation; true once it went. */
   const deliverGift = async (g: Gift): Promise<boolean> => {
     // Same VIP (SVIP) lock as the room's gift sheet.
@@ -444,6 +447,7 @@ export default function UserProfile() {
     bump('giftsSent', 1);
     addFanPoints(user.id, Math.ceil(g.price / 10), `Hediye gönderdin (${g.price} jeton)`);
     successHaptic();
+    giftStage.play(g, me.name, user.name, 1);
     return true;
   };
   const sendGift = (g: Gift) => {
@@ -1128,7 +1132,7 @@ export default function UserProfile() {
           onSave={saveEdit}
         />
       )}
-
+      {giftStage.node}
     </View>
   );
 }

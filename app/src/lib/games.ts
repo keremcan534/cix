@@ -157,7 +157,7 @@ function refundStake(d: GameDeps, split: { fromGame: number; fromWallet: number 
   if (split.fromWallet > 0) d.credit(split.fromWallet, reason);
   if (split.fromGame > 0) d.creditGame(split.fromGame, reason);
 }
-const POOL_LOW = 'Ödül havuzu şu an bu bahsin en yüksek ödülünü karşılayamıyor. Daha küçük bir bahisle dene; jetonun düşülmedi.';
+const POOL_LOW = 'Bu bahis şu an alınamıyor. Daha küçük bir bahisle dene; jetonun düşülmedi.';
 
 /**
  * One casino round. Order mirrors the server: idempotency → access (VIP re-read now, not from the UI)

@@ -50,7 +50,7 @@ Son güncelleme: preview-96 sonrası (Küçült, çanta yağmuru, @bahset düzel
   - aile odası (liderin açık odası)
   - seviye ayrıcalıkları, aile kuralları
   - liderin seçtiği etiket ve tema
-- **Uyum Köşesi:** Ailedeki gerçek ikililer ve İkili hediyesi.
+- **Uyum Köşesi:** Ailedeki gerçek ikililer ve Çift hediyesi.
 - **Diğer:** Keşfet'teki Aile kısayolu açıldı. Oda kartında oda sahibinin ailesi görünüyor.
 - **PR #87 ile eklenenler:**
   - üye davet (lider ve yardımcı; davet edilen bildirim alır, Aile ekranında Katıl/Reddet)
@@ -122,7 +122,10 @@ Son güncelleme: preview-96 sonrası (Küçült, çanta yağmuru, @bahset düzel
   - Sayıların hepsi Canlı ayarlar › Birebir ve eşleşme'den değişir.
 - **Arama öncesi:** ücretli aramada bir kez sakin bir not: "Bu arama ücretlidir; dakika başına … jeton ücret kesilir."
 - **Arama sırasında:** ödeyen taraf dakika ücretini ve harcadığını görmez; arama bitince yalnız süreyi görür (harcama cüzdan geçmişinde ve Aramalar listesinde). Kazanan taraf her dakika kazandığı elması ve büyüyen toplamı görür, 5 dakikada bir daha büyük bir teşvik notu çıkar; bitişte kazandığı elması görür.
-- **Aramada hediye:** arama ekranındaki hediye düğmesiyle gönderilir; alan "🎁 … gönderdi" notunu görür. Telefonda denenmeli.
+- **Aramada hediye:** arama ekranındaki hediye düğmesiyle gönderilir; alan "🎁 … gönderdi" notunu görür. Yeni APK'da iki tarafta da hediyenin animasyonu sessiz oynar. Telefonda denenmeli.
+- **Mesajda hediye animasyonu (Güncelleme 7, yeni APK):** Mesajlar'dan (odadaki Mesajlar penceresi dahil) gönderilen hediyenin animasyonu gönderenin ekranında hemen oynar; alanın ekranında sohbeti açınca bir kez oynar (açılışta en yeni oynatılmamış hediye, sohbet açıkken gelen her yeni hediye). Hediye satırı hediyenin resmi ve adıyla kart olarak görünür, karta dokununca animasyon yeniden oynar. Profilden, Anlar'dan, aramadan ve aile sohbetinden gönderilen hediyenin animasyonu da gönderenin ekranında oynar. Oda gibi Efekt ayarlarına uyar (efektler kapalıysa, "yalnız büyük hediyeler" ya da "hareketi azalt" açıksa oynamaz). Eski APK'lar hediye satırını yazı olarak görür, animasyon yok. Video bir pencere (Modal) içinde ilk kez burada oynuyor: telefonda denenmeli.
+- **Sahte hediye satırı (sunucu, eski APK dahil):** "Hediye gönderdi: …" diye başlayan yazılı mesaj reddedilir ("Hediye satırını yalnızca gerçek bir hediye yazar…"); bu satırı yalnız sunucu, gerçek hediyeyle yazar. Dolandırıcının sahte hediye göstermesini önler.
+- **Hediye paneli rafları (Güncelleme 7, yeni APK):** İkili rafının adı **Çift** (altındaki yanlış "%2 yakınlık" yazısı kalktı; aile görevindeki "Çift hediyesi" de bu adla); **Çantam** rafı yazı yerine 3B çanta simgesi, üstünde kaç çeşit hediye olduğunu gösteren rozet. Odalar listesindeki "İkili" sekmesi ve "En Uyumlu İkili" sıralaması aynı kaldı. Eski APK'lar eski adları gösterir.
 - **Bağlar:** "Aile ve Dost" boşken Kardeş, Bacı, Ağabey, Abla, Yenge, Enişte ve Kanka resimleri ve fiyatlarıyla görünür. Başkasının profilinde birine dokununca fiyat bir kez sorulur, sonra istek gider.
 - **Maske (görüntülü arama ve eşleşme, kadınlar, Android):** kendi küçük görüntüsünün altındaki **Maske** düğmesi sırayla Kapalı → Göz maskesi → Mozaik yüz → Emoji yüz yapar. Güzellik düğmesi de oraya taşındı. Seçim telefonda kalır, bir sonraki aramada da açık başlar.
   - Yüzü telefon bulur (saniyede 5 kez). Yüz bulunamazsa (yüz çevrik, karanlık, ekrandan çıkmış) görüntünün tamamı iri karelere bölünür; bir hata olursa siyah gider. Yüz hiçbir zaman maskesiz gitmez.
@@ -195,7 +198,7 @@ Ayrıntı: [`OTOMATIK_MESAJ.md`](OTOMATIK_MESAJ.md).
 | 25 | Mikrofon değişikliği herkeste aynı | Telefonda denenmeli | |
 | 26 | Küçük mikrofon, büyüyen sohbet | Çalışıyor | |
 | 27 | Rüzgâr Gülü odada | Seviyeyle açılır | Cömertlik Lv.2'de açılır. Düğmesi örnekteki gibi sağ altta |
-| 28 | Uğurlu hediyeler ve yönetimi | Seviyeyle açılır | Cömertlik Lv.2 ve 18 yaş gerekir. Yönetimi: Yönetim sitesinde Uygulama › Şanslı hediye ayarı; yeni APK'da Ayarlar › Yönetim siteyi açar (eski APK'larda Ayarlar › Yönetim › Uğurlu hediyeler, sadece yönetici hesaplar) |
+| 28 | Uğurlu hediyeler ve yönetimi | Seviyeyle açılır | Cömertlik Lv.2 ve 18 yaş gerekir. Yeni APK'da rafta kazanç tutarı ve kasa ayrıntısı yazmaz, yalnız nasıl oynanır ve olasılık tablosu (Güncelleme 7). Yönetimi: Yönetim sitesinde Uygulama › Şanslı hediye ayarı; yeni APK'da Ayarlar › Yönetim siteyi açar (eski APK'larda Ayarlar › Yönetim › Uğurlu hediyeler, sadece yönetici hesaplar) |
 
 ## Belge 2: Güncelleme 2
 
@@ -213,7 +216,7 @@ Ayrıntı: [`OTOMATIK_MESAJ.md`](OTOMATIK_MESAJ.md).
 | 13 | Birebir: mesaj, sesli/görüntülü arama | Kurulum bekliyor | Uygulama kapalıyken arama çalması Firebase dosyaları girilince açılır |
 | 14, 16–18 | Ücretler, karşılıklı takipte mesaj ücretsiz | Çalışıyor | Ücretler sadece onaylı ajans yayıncısıyla konuşunca görünür. Yönetim panelinden değişir |
 | 15 | Kalp seviyesiyle arama açılması | Telefonda denenmeli | Arama kilitleri çalışıyor. Mesajda fotoğraf (yayıncıyla kalp Lv.3) depo kurulunca açıldı |
-| 19 | Mesajda hediye | Çalışıyor | |
+| 19 | Mesajda hediye | Çalışıyor | Yeni APK'da animasyonu iki tarafta da oynar (Güncelleme 7); telefonda denenmeli |
 | 20 | Ayarlar'da sürüm ve güncelleme | Çalışıyor | |
 | 21 | Oda sesi kapat düğmesi | Çalışıyor | |
 | 22–33 | ⋯ menüsü düzenlemesi | Çalışıyor | Çıkanlar odanın adına/resmine dokununca açılan oda kartında |

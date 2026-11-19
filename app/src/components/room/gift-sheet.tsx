@@ -12,7 +12,7 @@
 // sheet opens; the server takes the gifts out when it sends them. The demo keeps its sample stock on this phone.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type ComponentRef } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -41,21 +41,23 @@ type PriceSort = 'default' | 'asc' | 'desc';
 const SHELVES: { key: Shelf; label: string; icon?: keyof typeof Ionicons.glyphMap }[] = [
   { key: 'hot', label: 'Popüler' },
   { key: 'lucky', label: 'Şanslı', icon: 'leaf' },
-  { key: 'couple', label: 'İkili' },
+  { key: 'couple', label: 'Çift' },
   { key: 'family', label: 'Aile ve Dost' },
   { key: 'gameplay', label: 'Kutlama' },
   { key: 'privilege', label: 'Özel' },
   { key: 'fav', label: 'Favoriler', icon: 'star' },
-  { key: 'bag', label: 'Çantam', icon: 'bag-handle' },
+  // Drawn as the 3D bag with its count (the label is for screen readers).
+  { key: 'bag', label: 'Çantam' },
 ];
 /** The shelves that are a gift category: one with no gift left on it (all off the shelf for now) isn't shown. */
 const CATEGORY_SHELVES = new Set<Shelf>(['hot', 'couple', 'family', 'gameplay', 'privilege']);
 /** One neutral line that explains the shelf; no countdowns, no "spend more" nudges. */
 const SHELF_NOTE: Record<Shelf, string> = {
   hot: 'En çok gönderilen hediyeler.',
-  lucky: `Ödül garanti değildir: gönderdiğin hediyenin katları kadar jeton kazanma ihtimalin var, olasılıklar aşağıda. Kazandığın jeton bakiyene eklenir. Alıcıya ve PK puanına hediye değerinin ${pct(LUCKY_RECIPIENT_SHARE)}’si yazılır.`,
+  // How it is played and where its odds are, nothing about what can be won (the owners, Güncelleme 7).
+  lucky: `Her gönderimde bir çekiliş yapılır; olasılıklar aşağıda. Ödül garanti değildir. Alıcıya ve PK puanına hediye değerinin ${pct(LUCKY_RECIPIENT_SHARE)}’si yazılır.`,
   gameplay: 'Alıcının koltuğuna animasyonla atılır. Fiyat sabit, sürpriz ödül yok.',
-  couple: 'İkili hediyeler yakınlık puanını ekstra %2 artırır.',
+  couple: 'Sevdiğine özel hediyeler.',
   family: 'Koruma Kartı seni koruyucu yapar. Bağ hediyesi bağ isteği olarak gider; kabul edilmezse jetonun geri döner.',
   privilege: 'VIP üyelerine özel hediyeler.',
   fav: 'Bir hediyeye uzun basarak favorilere ekle veya çıkar.',
@@ -155,6 +157,21 @@ export function GiftSheet({
   }, [visible, luckyShelf]);
   const [luckyId, setLuckyId] = useState(lucky.config.gifts[0]?.id ?? '');
   const [luckyView, setLuckyView] = useState<'odds' | 'history'>('odds');
+  // The "Olasılıklar" link under the button: the odds table of the gift picked, scrolled into sight (store rules want the
+  // odds close to the purchase). `want`: the table is still to be laid out (it was the history).
+  const gridRef = useRef<ComponentRef<typeof ScrollView>>(null);
+  const oddsAt = useRef({ shelf: 0, table: 0, want: false });
+  const scrollToOdds = () => {
+    const a = oddsAt.current;
+    a.want = false;
+    gridRef.current?.scrollTo({ y: Math.max(0, a.shelf + a.table - 8), animated: true });
+  };
+  const showOdds = () => {
+    tapHaptic();
+    if (luckyView === 'odds') return scrollToOdds();
+    oddsAt.current.want = true;
+    setLuckyView('odds');
+  };
   const [pickedShelf, setShelf] = useState<Shelf>('hot');
   const shelf: Shelf = pickedShelf === 'lucky' && !luckyShelf ? 'hot' : pickedShelf;
   const [sort, setSort] = useState<PriceSort>('default');
@@ -274,8 +291,6 @@ export function GiftSheet({
     onSend(gift, targets, count);
   };
 
-  const top = isLucky ? maxMult(lg) : 0;
-  const topOdds = isLucky ? (lg.tiers.find((t) => t.mult === top)?.weight ?? 0) : 0;
   // Footer state: exactly one message and one primary action at a time.
   const footer = !targets.length
     ? { tone: 'info' as const, text: roomIds.length ? 'Yukarıdan alıcı seç.' : 'Odada hediye gönderebileceğin kimse yok.', cta: 'Önce alıcı seç', disabled: true }
@@ -288,7 +303,8 @@ export function GiftSheet({
           ? { tone: 'warn' as const, text: `${fmt(total - coins)} jeton eksik.`, cta: 'Jeton yükle', variant: 'money' as const }
           : overLimit
             ? { tone: 'lock' as const, text: overLimit, cta: 'Günlük limiti aşıyor', disabled: true }
-          : { tone: 'info' as const, text: `${count * targets.length > 1 ? `Her hediye için ayrı çekiliş yapılır. ` : ''}En yüksek ödül ×${fmt(top)} = ${fmt(lg.price * top)} jeton (olasılık ${oddsLabel(topOdds)}). Ödül garanti değildir.`, cta: `Gönder · ${fmt(total)}`, variant: 'money' as const }
+          : // The odds a tap away, next to the purchase (store rules); no prize amount here.
+            { tone: 'info' as const, text: `${count * targets.length > 1 ? `Her hediye için ayrı çekiliş yapılır. ` : ''}Ödül garanti değildir`, odds: true, cta: `Gönder · ${fmt(total)}`, variant: 'money' as const }
     : bondGift && targets.length !== 1
       ? { tone: 'info' as const, text: 'Bağ hediyesi tek kişiye gönderilir: alıcılardan birini seç.', cta: 'Tek kişi seç', disabled: true }
     : locked
@@ -390,13 +406,24 @@ export function GiftSheet({
           {SHELVES.filter((s) => (s.key === 'lucky' ? luckyShelf : !CATEGORY_SHELVES.has(s.key) || shown.some((g) => (g.cat ?? 'hot') === s.key))).map((s) => {
             const on = shelf === s.key;
             const n = s.key === 'bag' ? Object.values(bag).filter((x) => x > 0).length : 0;
+            // Çantam is the app's 3D bag alone, its count on a badge; the word stays for screen readers.
+            if (s.key === 'bag')
+              return (
+                <Pressable key={s.key} onPress={() => pickShelf(s.key)} hitSlop={{ top: 4, bottom: 4 }} style={[g.shelf, g.shelfIcon, on && g.shelfOn]} accessibilityRole="tab" accessibilityState={{ selected: on }} accessibilityLabel={n ? `${s.label}, ${n} çeşit hediye` : s.label}>
+                  <Icon3D name="bag" size={24} />
+                  {n > 0 && (
+                    <View style={g.shelfBadge}>
+                      <Text style={g.shelfBadgeText} numberOfLines={1}>
+                        {n > 99 ? '99+' : n}
+                      </Text>
+                    </View>
+                  )}
+                </Pressable>
+              );
             return (
               <Pressable key={s.key} onPress={() => pickShelf(s.key)} hitSlop={{ top: 4, bottom: 4 }} style={[g.shelf, on && g.shelfOn]} accessibilityRole="tab" accessibilityState={{ selected: on }}>
                 {s.icon && <Ionicons name={s.icon} size={14} color={on ? '#fff' : colors.textDim} />}
-                <Text style={[g.shelfText, on && { color: '#fff' }]}>
-                  {s.label}
-                  {n ? ` ${n}` : ''}
-                </Text>
+                <Text style={[g.shelfText, on && { color: '#fff' }]}>{s.label}</Text>
               </Pressable>
             );
           })}
@@ -415,7 +442,7 @@ export function GiftSheet({
 
         {/* What: grid */}
         {/* Keyed by shelf: each shelf opens at its top, not at the previous shelf's scroll offset. */}
-        <ScrollView key={shelf} style={compact ? g.gridFill : g.gridScroll} contentContainerStyle={g.grid}>
+        <ScrollView key={shelf} ref={gridRef} style={compact ? g.gridFill : g.gridScroll} contentContainerStyle={g.grid}>
           {/* Şanslı's disclaimer and the bond gifts' refund rule: always shown in full, at the top of their shelf. */}
           {(shelf === 'lucky' || shelf === 'family') && <Text style={[g.dim, g.shelfNote]}>{SHELF_NOTE[shelf]}</Text>}
           {isLucky ? (
@@ -426,6 +453,11 @@ export function GiftSheet({
               onToggleView={() => setLuckyView((v) => (v === 'odds' ? 'history' : 'odds'))}
               history={lucky.records.filter((r) => r.userId === 'me')}
               version={lucky.config.version}
+              onShelfAt={(y) => (oddsAt.current.shelf = y)}
+              onTableAt={(y) => {
+                oddsAt.current.table = y;
+                if (oddsAt.current.want) scrollToOdds();
+              }}
               onPick={(id) => {
                 tapHaptic();
                 setLuckyId(id);
@@ -486,12 +518,20 @@ export function GiftSheet({
           </View>
           )}
 
-          {noticeShown && (
+          {noticeShown && 'odds' in footer ? (
+          // Şanslı: a tap shows the odds table of the gift picked.
+          <Pressable onPress={showOdds} hitSlop={{ top: 6, bottom: 6 }} style={g.notice} accessibilityRole="link" accessibilityLabel={`${footer.text}. Olasılık tablosunu göster`}>
+            <Ionicons name="information-circle" size={16} color={colors.textDim} />
+            <Text style={[g.dim, { flex: 1 }]}>
+              {footer.text} · <Text style={g.noticeLink}>Olasılıklar</Text>
+            </Text>
+          </Pressable>
+          ) : noticeShown ? (
           <View style={[g.notice, footer.tone === 'warn' && g.noticeWarn, footer.tone === 'lock' && g.noticeLock]}>
             <Ionicons name={footer.tone === 'warn' ? 'alert-circle' : footer.tone === 'lock' ? 'lock-closed' : 'information-circle'} size={16} color={footer.tone === 'info' ? colors.textDim : colors.gold} />
             <Text style={[g.dim, { flex: 1 }, footer.tone !== 'info' && { color: '#FDE68A' }]}>{footer.text}</Text>
           </View>
-          )}
+          ) : null}
 
           <View style={g.actions}>
             <Pressable onPress={() => setCountOpen((o) => !o)} style={[g.countBtn, compact && { height: 48 }]} accessibilityRole="button" accessibilityLabel={`Adet ${count}, değiştir`}>
@@ -564,10 +604,31 @@ function GroupPick({ icon, on, label, onPress }: { icon: 'home' | 'mic'; on: boo
 }
 
 /** Lucky packages, then either the full odds table of the selected one or the user's own Lucky history. */
-function LuckyShelf({ gifts, selected, view, onToggleView, history, version, onPick }: { gifts: LuckyGift[]; selected: LuckyGift; view: 'odds' | 'history'; onToggleView: () => void; history: LuckyRecord[]; version: number; onPick: (id: string) => void }) {
+function LuckyShelf({
+  gifts,
+  selected,
+  view,
+  onToggleView,
+  history,
+  version,
+  onShelfAt,
+  onTableAt,
+  onPick,
+}: {
+  gifts: LuckyGift[];
+  selected: LuckyGift;
+  view: 'odds' | 'history';
+  onToggleView: () => void;
+  history: LuckyRecord[];
+  version: number;
+  /** Where this shelf and its odds table sit in the grid (the "Olasılıklar" link under the button scrolls there). */
+  onShelfAt: (y: number) => void;
+  onTableAt: (y: number) => void;
+  onPick: (id: string) => void;
+}) {
   const top = maxMult(selected);
   return (
-    <View style={{ width: '100%' }}>
+    <View style={{ width: '100%' }} onLayout={(e) => onShelfAt(e.nativeEvent.layout.y)}>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
         {gifts.map((it) => {
           const on = it.id === selected.id;
@@ -605,7 +666,7 @@ function LuckyShelf({ gifts, selected, view, onToggleView, history, version, onP
         </Pressable>
       </View>
       {view === 'odds' ? (
-        <View style={g.odds} accessibilityLabel={`${selected.name} olasılık tablosu`}>
+        <View style={g.odds} accessibilityLabel={`${selected.name} olasılık tablosu`} onLayout={(e) => onTableAt(e.nativeEvent.layout.y)}>
           <View style={g.oddsHead}>
             <Text style={[g.oddsCell, g.oddsHeadText]}>Çarpan</Text>
             <Text style={[g.oddsCell, g.oddsHeadText, { textAlign: 'center' }]}>Olasılık</Text>
@@ -619,7 +680,7 @@ function LuckyShelf({ gifts, selected, view, onToggleView, history, version, onP
             </View>
           ))}
           <Text style={[g.dim, { marginTop: 6 }]}>
-            Bu oranlar sunucudaki gerçek ayarlardır (sürüm {version}). Ödül garanti değildir. Ödül jeton olarak bakiyene eklenir; ödülle yaptığın harcama Cömertlik puanına sayılmaz. Hediyeyi alan kişiye fiyatın {pct(LUCKY_RECIPIENT_SHARE)}’si elmas olarak yazılır.
+            Bu oranlar sunucudaki gerçek ayarlardır (sürüm {version}). Ödül garanti değildir. Ödül jeton olarak bakiyene eklenir; ödülle yaptığın harcama Cömertlik puanına sayılmaz.
           </Text>
         </View>
       ) : history.length === 0 ? (
@@ -754,6 +815,10 @@ const g = StyleSheet.create({
   shelves: { gap: space.sm, paddingHorizontal: space.lg, paddingVertical: space.xs, alignItems: 'center' },
   shelf: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 36, paddingHorizontal: space.md, borderRadius: radius.pill, backgroundColor: colors.cardAlt },
   shelfOn: { backgroundColor: colors.primary },
+  // Çantam: the bag icon alone, the pill as wide as it is tall; the count on its corner.
+  shelfIcon: { width: 44, paddingHorizontal: 0, justifyContent: 'center' },
+  shelfBadge: { position: 'absolute', top: -3, right: -3, minWidth: 17, height: 17, borderRadius: 9, paddingHorizontal: 4, backgroundColor: colors.gold, borderWidth: 1.5, borderColor: colors.card, alignItems: 'center', justifyContent: 'center' },
+  shelfBadgeText: { color: '#1A1014', fontSize: 10, fontWeight: '900', fontVariant: ['tabular-nums'] },
   shelfText: { color: colors.textDim, fontSize: type.body, fontWeight: '700' },
   noteRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingHorizontal: space.lg, minHeight: 32 },
   sortBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 32, paddingHorizontal: space.sm },
@@ -796,6 +861,7 @@ const g = StyleSheet.create({
   totalLabel: { color: colors.textDim, fontSize: type.caption },
   total: { color: colors.text, fontSize: type.title, fontWeight: '900', fontVariant: ['tabular-nums'] },
   notice: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, paddingVertical: 2 },
+  noticeLink: { color: colors.primaryText, fontWeight: '700', textDecorationLine: 'underline' },
   noticeWarn: { backgroundColor: 'rgba(251,191,36,0.1)', borderRadius: radius.sm, padding: space.sm },
   noticeLock: { backgroundColor: 'rgba(251,191,36,0.08)', borderRadius: radius.sm, padding: space.sm },
   actions: { flexDirection: 'row', alignItems: 'center', gap: space.sm },

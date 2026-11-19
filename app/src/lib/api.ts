@@ -667,7 +667,8 @@ export type RoomMember = UserCard & { since: string | null };
  */
 export type RoomMembers = { members: RoomMember[]; total: number; joined?: number; cap: number; mine: 'owner' | 'admin' | 'member' | 'pending' | null; joinMode: RoomRules['joinMode']; canManage: boolean; pending: RoomMember[] };
 /** `image`: a photo in the chat (its storage address), null for text only. */
-export type DirectMessage = { id: number; from: string; to: string; text: string; image?: string | null; event?: SharedEvent; createdAt: string; readAt: string | null };
+/** `gift`: the line a gift sent from a chat writes (newer servers; lib/dm-gift-fx parses it). */
+export type DirectMessage = { id: number; from: string; to: string; text: string; image?: string | null; event?: SharedEvent; gift?: unknown; createdAt: string; readAt: string | null };
 /** An event sent in a message (Etkinlik Merkezi "Arkadaşına gönder"); older servers never send it. */
 export type SharedEvent = { id: number; title: string | null; startsAt: string | null };
 export type ServerConversation = { user: UserCard; last: DirectMessage; unread: number };

@@ -307,7 +307,7 @@ export function DiceModal({ visible, onClose, onPlay }: { visible: boolean; onCl
       art={ROOM_ICON_ART.diceDuel}
       foot={<GradientButton title={`At · 🪙 ${bet}`} icon="dice" onPress={() => setResult(onPlay(bet))} />}
     >
-      <Text style={styles.dim}>Odadaki rastgele biriyle zar at; rakibinden en az 3 fazla atarsan bahsinin 2,4 katı oyun bakiyene yazılır (yalnızca oyunlarda kullanılır). Oyunlarda oynanan jetonun %60&apos;ı kasaya kalır, %40&apos;ı kazananlara dağılır. 18+ · Sonuç sunucuda belirlenir.</Text>
+      <Text style={styles.dim}>Odadaki rastgele biriyle zar at; rakibinden en az 3 fazla atarsan bahsinin 2,4 katı oyun bakiyene yazılır (yalnızca oyunlarda kullanılır). 18+ · Sonuç sunucuda belirlenir.</Text>
       <View style={{ flexDirection: 'row', gap: 8, marginVertical: 12 }}>
         {[10, 50, 100].map((n) => (
           <Pressable key={n} onPress={() => setBet(n)} style={[styles.chip, bet === n && { borderColor: colors.primaryText }]}>

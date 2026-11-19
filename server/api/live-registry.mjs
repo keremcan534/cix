@@ -400,7 +400,7 @@ const FAMILY_TASK_NAME = {
   'k-newbie': 'Yeni üyeye hediye',
   'k-checkin': 'Aile yoklaması',
   'k-roomgift': 'Aile odasında hediye',
-  'k-cp': 'İkili hediyesi',
+  'k-cp': 'Çift hediyesi',
   'k-chatgift': 'Aile sohbetinde hediye',
 };
 const FAMILY_THEME_NAME = { gece: 'Gece Moru', ates: 'Kızıl Ay', orman: 'Zümrüt Orman', okyanus: 'Gece Mavisi', altin: 'Altın Saray', galaksi: 'Galaksi' };

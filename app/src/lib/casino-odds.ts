@@ -165,12 +165,12 @@ export function evaluate(game: Exclude<CasinoId, EngineId>, pick: string, d: num
     const b = d[1] + 1;
     const sum = a + b;
     const side = sum >= 10 ? 'big' : sum <= 4 ? 'small' : 'house';
-    return { display: [String(a), String(b)], multiplier: side === pick ? DICE_MULT : 0, detail: `${a}+${b}=${sum} · ${side === 'house' ? 'kasa' : side === 'big' ? 'Büyük' : 'Küçük'}` };
+    return { display: [String(a), String(b)], multiplier: side === pick ? DICE_MULT : 0, detail: `${a}+${b}=${sum} · ${side === 'house' ? 'kazanan yok' : side === 'big' ? 'Büyük' : 'Küçük'}` };
   }
   const [dr, tg] = d;
   const winner = dr - tg >= DT_GAP ? 'dragon' : tg - dr >= DT_GAP ? 'tiger' : dr === tg ? 'tie' : 'house';
   const m = pick !== winner ? 0 : winner === 'tie' ? DT_TIE : DT_MULT;
-  const label = { dragon: 'Ejder', tiger: 'Kaplan', tie: 'Beraberlik', house: 'fark 4’ten az, kasa' }[winner];
+  const label = { dragon: 'Ejder', tiger: 'Kaplan', tie: 'Beraberlik', house: 'fark 4’ten az, kazanan yok' }[winner];
   return { display: [CARD[dr], CARD[tg]], multiplier: m, detail: `Ejder ${CARD[dr]} · Kaplan ${CARD[tg]} · ${label}` };
 }
 /**
