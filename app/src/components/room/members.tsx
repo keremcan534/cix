@@ -13,7 +13,7 @@ import { ArtText, ROOM_ICON_ART } from '@/components/RoomArt';
 import { RoleMark as StaffBadge } from '@/components/room/role-mark';
 import { Text } from '@/components/text';
 import { Avatar } from '@/components/ui';
-import { memberLimit } from '@/data/catalog';
+import { liveMemberLimit } from '@/lib/live/catalog-live';
 import { userById } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import { errorHaptic, pressHaptic } from '@/lib/haptics';
@@ -136,7 +136,7 @@ export function RoomMembersSection(p: RoomMembersProps) {
   const [open, setOpen] = useState(false);
   // Read when the list opens, so "son giriş" is counted from then.
   const [now, setNow] = useState(() => Date.now());
-  const cap = memberLimit(p.level);
+  const cap = liveMemberLimit(p.level);
   // The row: the room's staff first, then its members, each once; the bubble after it counts the people it left out.
   const { row: strip, more: extra } = memberStrip(p.staffIds, p.members, p.memberTotal, STRIP);
   const join = joinButton(p.joinMode, p.memberJoined, cap);

@@ -16,6 +16,7 @@ import { EXCHANGE, GIFTS, PACKS, SHOP, WITHDRAW, exchangeCoins } from './catalog
 import { DAILY_ROUNDS as CASINO_DAILY_ROUNDS, GAMES as CASINO_GAMES, STAKES as CASINO_STAKES } from './casino-rules.mjs';
 import { REMINDER_KINDS, REMINDER_LABEL } from './event-rules.mjs';
 import { CHEST_MIN_CONTRIBUTION, FAMILY_CHESTS, FAMILY_TASKS, FAMILY_THEMES } from './family-rules.mjs';
+import { MEDAL_RULES, TITLE_RULES } from './profile-rules.mjs';
 import { HOUSE_PCT as ROCKET_HOUSE_PCT } from './rocket-live-rules.mjs';
 import { AUTO_CHAT, AUTO_PARTS, AUTO_PART_LABEL, AUTO_PART_OFF, AUTO_TEXTS, NOTICE_CATEGORIES, NOTICE_LABEL, linesOf } from './auto-chat-rules.mjs';
 
@@ -121,6 +122,9 @@ export function defaultsOf(e = process.env) {
     ...Object.fromEntries(Object.entries(ROOM_AMOUNTS).map(([k, x]) => [k, x.default])),
     // Aile's game (FAMILY_AMOUNTS): family-rules.mjs's numbers.
     ...Object.fromEntries(Object.entries(FAMILY_AMOUNTS).map(([k, x]) => [k, x.default])),
+    // Oda seviyeleri and Vitrin (ROOM_LEVEL_AMOUNTS, BADGE_AMOUNTS): room-rules.mjs's and profile-rules.mjs's numbers.
+    ...Object.fromEntries(Object.entries(ROOM_LEVEL_AMOUNTS).map(([k, x]) => [k, x.default])),
+    ...Object.fromEntries(Object.entries(BADGE_AMOUNTS).map(([k, x]) => [k, x.default])),
     // Etkinlik Merkezi (events.mjs): every room owner may apply; 30 minutes ahead at least, 3 hours, 500 places.
     ...Object.fromEntries(Object.entries(EVENT_RULES).map(([k, x]) => [k, x.default])),
     // Every reminder on: 1 hour and 15 minutes before, and at the start.
@@ -434,6 +438,45 @@ export function familyRulesOf(s) {
     themes: FAMILY_THEMES.map((t) => ({ ...t, minLevel: v(`familyTheme_${t.id}`, t.minLevel) })),
   };
 }
+
+/**
+ * Oda seviyeleri (room-rules.mjs, rooms.mjs): the level Mikrofon izni and Patron koltuğu open at, the room's own
+ * forbidden words, and how many people a room of each level may hold. One busy 200-person room fills one core
+ * (docs/YUK_TESTI.md): the caps stay within today's largest (5.000).
+ */
+const ROOM_CAPS_DEFAULT = [50, 100, 200, 300, 500, 600, 800, 1_200, 1_350, 1_500, 1_750, 2_000, 2_500, 3_000, 5_000];
+const LEVELS_GROUP = 'Oda seviyeleri';
+const ROOM_LEVEL_AMOUNTS = {
+  room_mic_min_level: { group: LEVELS_GROUP, field: 'roomMicMinLevel', label: 'Mikrofon izni: oda seviyesi', default: 4, bounds: { min: 1, max: 15, step: 1 }, unit: '', help: 'Oda sahibi "Mikrofonu yalnız üyeler alsın" ayarını bu oda seviyesinden itibaren açabilir. Açılmış ayar kalır.', text: (a, b) => `Mikrofon izni Lv.${a} → Lv.${b} odada açılır.` },
+  room_boss_min_level: { group: LEVELS_GROUP, field: 'roomBossMinLevel', label: 'Patron koltuğu: oda seviyesi', default: 3, bounds: { min: 1, max: 15, step: 1 }, unit: '', help: 'Patron koltuğu bu oda seviyesinden itibaren açılır ve çalışır.', text: (a, b) => `Patron koltuğu Lv.${a} → Lv.${b} odada açılır.` },
+  room_words_max: { group: LEVELS_GROUP, field: 'roomWordsMax', label: 'Odanın yasaklı kelimeleri: en fazla', default: 30, bounds: { min: 5, max: 100, step: 1 }, unit: ' kelime', help: 'Bir odanın kendi yasaklı kelime listesine eklenebilecek en çok kelime.', text: (a, b) => `Oda başına yasaklı kelime ${a} → ${b}.` },
+  ...Object.fromEntries(
+    ROOM_CAPS_DEFAULT.map((n, i) => [
+      `room_cap_lv${i + 1}`,
+      { group: LEVELS_GROUP, field: `roomCapLv${i + 1}`, label: `Lv.${i + 1} oda: en fazla kişi`, default: n, bounds: { min: 10, max: 5_000, step: 10 }, unit: ' kişi', help: `Lv.${i + 1} bir odaya aynı anda girebilecek ve üye olabilecek en çok kişi. Tek sunucu yoğun bir 200 kişilik odayı taşır; yüksek sayılar sunucuyu büyütmeyi gerektirir.`, text: (a, b) => `Lv.${i + 1} oda ${a} → ${b} kişi alır.` },
+    ]),
+  ),
+};
+/** The rooms' numbers as Canlı ayarlar has them (snapshot `s`). */
+export function roomNumbersOf(s) {
+  const v = (field, d) => (Number.isSafeInteger(s?.[field]) ? s[field] : d);
+  return {
+    micMinLevel: v('roomMicMinLevel', 4),
+    bossMinLevel: v('roomBossMinLevel', 3),
+    wordsMax: v('roomWordsMax', 30),
+    caps: ROOM_CAPS_DEFAULT.map((n, i) => v(`roomCapLv${i + 1}`, n)),
+  };
+}
+/** Vitrin (profiles.mjs): what earns a medal or a title. Earned ones come and go with the rule. */
+const BADGES = 'Profil rozetleri';
+const BADGE_AMOUNTS = {
+  medal_week_top: { group: BADGES, field: 'medalWeekTop', label: 'Haftanın Yıldızı: haftanın ilk kaçı', default: MEDAL_RULES.weekTop, bounds: { min: 1, max: 50, step: 1 }, unit: ' kişi', help: 'Bu haftanın Yankı sıralamasında ilk bu kadar kişi Haftanın Yıldızı madalyası alır.', text: (a, b) => `Haftanın Yıldızı: ilk ${a} → ${b} kişi.` },
+  medal_generous_people: { group: BADGES, field: 'medalGenerousPeople', label: 'Cömert Kalp: farklı kişiye hediye', default: MEDAL_RULES.generousPeople, bounds: { min: 1, max: 1_000, step: 1 }, unit: ' kişi', help: 'Bu kadar farklı kişiye hediye gönderen Cömert Kalp madalyası alır.', text: (a, b) => `Cömert Kalp: ${a} → ${b} farklı kişi.` },
+  medal_friends: { group: BADGES, field: 'medalFriends', label: 'Sosyal Kelebek: arkadaş sayısı', default: MEDAL_RULES.friends, bounds: { min: 1, max: 10_000, step: 1 }, unit: ' arkadaş', help: 'Karşılıklı takipleştiği bu kadar kişisi olan Sosyal Kelebek madalyası alır.', text: (a, b) => `Sosyal Kelebek: ${a} → ${b} arkadaş.` },
+  title_room_level: { group: BADGES, field: 'titleRoomLevel', label: 'Oda Efsanesi: oda seviyesi', default: TITLE_RULES.roomLevel, bounds: { min: 1, max: 15, step: 1 }, unit: '', help: 'Odası bu seviyeye ulaşan Oda Efsanesi unvanını alır.', text: (a, b) => `Oda Efsanesi: Lv.${a} → Lv.${b} oda.` },
+  title_rising_charm: { group: BADGES, field: 'titleRisingCharm', label: 'Yükselen Yıldız: Yankı seviyesi', default: TITLE_RULES.risingCharm, bounds: { min: 1, max: 50, step: 1 }, unit: '', help: 'Katıldıktan sonraki günlerde bu Yankı seviyesine ulaşan Yükselen Yıldız unvanını alır.', text: (a, b) => `Yükselen Yıldız: Yankı Lv.${a} → Lv.${b}.` },
+  title_rising_days: { group: BADGES, field: 'titleRisingDays', label: 'Yükselen Yıldız: katıldıktan sonra gün', default: TITLE_RULES.risingDays, bounds: { min: 1, max: 365, step: 1 }, unit: ' gün', help: 'Yükselen Yıldız unvanı katıldıktan sonra bu kadar gün içinde kazanılır.', text: (a, b) => `Yükselen Yıldız: ilk ${a} → ${b} gün.` },
+};
 
 /** The room keys as registry entries; a coin amount that more than doubles or halves, or a close sooner than 3 minutes, asks twice. */
 const roomEntries = (table = ROOM_AMOUNTS) =>
@@ -1027,6 +1070,8 @@ export const REGISTRY = {
   ...decorEntries(),
   ...roomEntries(),
   ...roomEntries(FAMILY_AMOUNTS),
+  ...roomEntries(ROOM_LEVEL_AMOUNTS),
+  ...roomEntries(BADGE_AMOUNTS),
   ...eventEntries(),
   ...winEntries(),
   ...bagEntries(),
@@ -1166,6 +1211,8 @@ export function snapshotOf(rows = [], e = process.env, { v = 0 } = {}) {
     ...Object.fromEntries(Object.entries(DECOR_AMOUNTS).map(([k, x]) => [x.field, val(k)])),
     ...Object.fromEntries(Object.entries(ROOM_AMOUNTS).map(([k, x]) => [x.field, val(k)])),
     ...Object.fromEntries(Object.entries(FAMILY_AMOUNTS).map(([k, x]) => [x.field, val(k)])),
+    ...Object.fromEntries(Object.entries(ROOM_LEVEL_AMOUNTS).map(([k, x]) => [x.field, val(k)])),
+    ...Object.fromEntries(Object.entries(BADGE_AMOUNTS).map(([k, x]) => [x.field, val(k)])),
     ...Object.fromEntries(Object.entries(EVENT_RULES).map(([k, x]) => [x.field, val(k)])),
     eventRemindersOff: readOnlySet(val('event_reminders_off')),
     luckyAnnounceMinCoins: val('lucky_announce_min_coins'),

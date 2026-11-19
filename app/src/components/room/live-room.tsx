@@ -93,7 +93,7 @@ import { BOND_KINDS, bondTint, bubbleBondOf, jointEntries, micLinkOf, roomBondKe
 import { liveRequestBond } from '@/lib/live/bonds';
 import { Avatar } from '@/components/ui';
 import { AGENCIES } from '@/data/agency';
-import { BOSS_SEAT_MIN_LEVEL, COSMETICS, MUSIC_CATALOG, STANDARD_EMOJI, adminCapacity, cosmeticById, djCapacity, memberLimit, micCapacity, roomIdText, roomLevel, roomTypeInfo, ROOM_LEVEL_REWARDS, type RoomTheme, type Track } from '@/data/catalog';
+import { COSMETICS, MUSIC_CATALOG, STANDARD_EMOJI, adminCapacity, cosmeticById, djCapacity, micCapacity, roomIdText, roomLevel, roomTypeInfo, ROOM_LEVEL_REWARDS, type RoomTheme, type Track } from '@/data/catalog';
 import { FAMILIES, INCOMING_GIFT_POOL, vipTier } from '@/data/economy';
 import { GATES, nobleInfo } from '@/data/status';
 import { LUCKY_RECIPIENT_SHARE, RULES, luckyHostDiamonds, pct } from '@/data/rules';
@@ -101,7 +101,7 @@ import { BOT_LINES, GIFTS, ME, USERS, isServerId, roomById, serverRoomCode, user
 import * as api from '@/lib/api';
 import { isLiveRoom, isLockedRoom, liveGift, liveMode, liveRoomAnimation, message as errorText, myServerId, putRoomAnswer, refreshServerRoom, rememberUser, toLocal, toServer, updateServerRoom } from '@/lib/live';
 import { liveBackpackGift } from '@/lib/live/backpack';
-import { giftById, refreshLiveCatalog } from '@/lib/live/catalog-live';
+import { giftById, liveBossMinLevel, liveMemberLimit, refreshLiveCatalog } from '@/lib/live/catalog-live';
 import { liveSticker } from '@/lib/live/emoji-live';
 import { useLiveRoomSync } from '@/lib/live/room';
 import { useRoomTop } from '@/lib/live/room-contrib';
@@ -348,7 +348,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const agencyRoom = isOwn ? !!agencyId : !!base!.agency;
   const maxMics = micCapacity(agencyRoom, level);
   const theme = isOwn ? myRoom.theme : (base!.theme ?? 'chat');
-  const bossOn = isOwn ? myRoom.bossSeat && level >= BOSS_SEAT_MIN_LEVEL : !!base!.bossSeat;
+  const bossOn = isOwn ? myRoom.bossSeat && level >= liveBossMinLevel() : !!base!.bossSeat;
   // Patron koltuğu's mode and numbers: a server room's as the server reads them (server/api/boss-seat.mjs), the
   // demo's own (lib/patron-seat).
   const bossMode = isOwn ? myRoom.bossMode : real ? (base!.bossInfo?.mode ?? base!.rules?.bossMode ?? 'auto') : 'auto';
@@ -3312,7 +3312,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     ? roomPeopleCount([hostId, ...superIds, ...adminIds], roomMembers)
     : real
       ? (serverMembers?.total ?? 0)
-      : Math.min(memberLimit(level), Math.round(base!.listeners * 1.8)) + (membership === 'member' ? 1 : 0);
+      : Math.min(liveMemberLimit(level), Math.round(base!.listeners * 1.8)) + (membership === 'member' ? 1 : 0);
   // The members the cap counts: the owner and staff take no member's place (server/api/rooms.mjs memberCount).
   const memberJoined = isOwn ? myRoom.memberIds.filter((m) => m !== hostId && !superIds.includes(m) && !adminIds.includes(m)).length : real ? (serverMembers?.joined ?? 0) : memberTotal;
   const ownFamily = FAMILIES.find((f) => f.id === familyId);
@@ -4080,7 +4080,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         onLeave={leaveMembers}
         onApprove={(uid) => {
           if (real) return memberCall('Onaylanamadı', () => api.answerRoomMember(id, toServer(uid) ?? '', true), `🏠 ${userById(uid).name} oda üyesi oldu`);
-          if (memberJoined >= memberLimit(level)) return showAlert('Üye kapasitesi dolu', `Lv.${level} oda en fazla ${memberLimit(level)} üye alabilir.`);
+          if (memberJoined >= liveMemberLimit(level)) return showAlert('Üye kapasitesi dolu', `Lv.${level} oda en fazla ${liveMemberLimit(level)} üye alabilir.`);
           setMemberApps((l) => l.filter((x) => x !== uid));
           updateMyRoom({ memberIds: [...myRoom.memberIds, uid] });
           addMsg({ system: true, text: `🏠 ${userById(uid).name} oda üyesi oldu` });
@@ -4129,7 +4129,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                   manageMembers: liveRules?.manageMembers ?? 'admins',
                   manageFunctions: functionsBy,
                   autoRemoveDays: liveRules?.autoRemoveDays ?? 0,
-                  limit: liveRules?.limit ?? memberLimit(level),
+                  limit: liveRules?.limit ?? liveMemberLimit(level),
                   profileVisible: liveRules?.profileVisible ?? true,
                   videoPrivacy: !!liveRules?.videoPrivacy,
                   blacklist: (staff.bans ?? []).filter((b) => b.until === null).map((b) => b.uid),

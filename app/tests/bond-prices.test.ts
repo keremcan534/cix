@@ -62,3 +62,15 @@ describe('Aile temaları panelden', () => {
     assert.equal(parseFamilyThemes(null), null);
   });
 });
+
+describe('Oda seviyeleri panelden', () => {
+  test('mikrofon ve patron seviyesi, kişi sınırı katalogdan; yoksa uygulamanın', async () => {
+    const { liveBossMinLevel, liveMemberLimit, liveMicMinLevel } = await import('@/lib/live/catalog-live');
+    const { memberLimit, MIC_PERMISSION_MIN_LEVEL } = await import('@/data/catalog');
+    const caps = Array.from({ length: 15 }, (_, i) => (i + 1) * 100);
+    const c = parseLiveCatalog({ gifts: [], rooms: { micMinLevel: 2, bossMinLevel: 5, caps } });
+    assert.deepEqual([liveMicMinLevel(c), liveBossMinLevel(c), liveMemberLimit(2, c), liveMemberLimit(99, c)], [2, 5, 200, 1500]);
+    assert.equal(parseLiveCatalog({ gifts: [], rooms: { micMinLevel: 2, bossMinLevel: 5, caps: caps.slice(1) } }).rooms, null);
+    assert.deepEqual([liveMicMinLevel(null), liveMemberLimit(3, null)], [MIC_PERMISSION_MIN_LEVEL, memberLimit(3)]);
+  });
+});

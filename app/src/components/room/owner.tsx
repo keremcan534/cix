@@ -18,17 +18,14 @@ import { PkPoints, SeatReaction, type SeatReactionData } from '@/components/room
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { Avatar } from '@/components/ui';
 import {
-  BOSS_SEAT_MIN_LEVEL,
   LOCK_MIN_LEVEL,
   MIC_COUNT_OPTIONS,
-  MIC_PERMISSION_MIN_LEVEL,
   ROOM_LEVEL_REWARDS,
   ROOM_LIMITS,
   ROOM_THEMES,
   ROOM_TYPES,
   ROOM_XP_THRESHOLDS,
   adminCapacity,
-  memberLimit,
   roomIdText,
   roomThemeInfo,
   type RoomTheme,
@@ -36,6 +33,7 @@ import {
 import { serverRoomCode, userById } from '@/data/mock';
 import { RULES, pct } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
+import { liveBossMinLevel, liveMemberLimit, liveMicMinLevel } from '@/lib/live/catalog-live';
 import { CONTACT_TITLE, contactRefusal } from '@/lib/contact-filter';
 import type { ServerOwnerStats } from '@/lib/api';
 import type { JoinMode, Membership } from '@/lib/room-follow';
@@ -736,8 +734,11 @@ export function RoomSettingsScreen({
   const [picker, setPicker] = useState<Picker>(null);
   const close = () => setPicker(null);
   const lockOpen = level >= LOCK_MIN_LEVEL || vipLevel >= 1;
-  const micPermOpen = level >= MIC_PERMISSION_MIN_LEVEL;
-  const bossOpen = level >= BOSS_SEAT_MIN_LEVEL;
+  // The levels as the server's catalog says (Canlı ayarlar › Oda seviyeleri), else the app's own.
+  const micMin = liveMicMinLevel();
+  const bossMin = liveBossMinLevel();
+  const micPermOpen = level >= micMin;
+  const bossOpen = level >= bossMin;
   const typeInfo = ROOM_TYPES.find((t) => t.id === room.roomType)!;
   const blacklist = [...new Set([...room.blacklist, ...bans.map((b) => b.userId)])];
   const who = { owner: 'Sadece oda sahibi', admins: 'Oda sahibi ve yöneticiler' } as const;
@@ -816,16 +817,16 @@ export function RoomSettingsScreen({
           />
           <Row
             label="Mikrofon izni"
-            hint={micPermOpen ? undefined : `Lv.${MIC_PERMISSION_MIN_LEVEL}'te açılır`}
+            hint={micPermOpen ? undefined : `Lv.${micMin}'te açılır`}
             value={room.micPermission === 'members' ? 'Oda üyeleri' : 'Herkes'}
             onPress={() => setPicker('micPerm')}
-            locked={ownerLock ?? (micPermOpen ? undefined : `Mikrofon izni Lv.${MIC_PERMISSION_MIN_LEVEL} odada açılır.`)}
+            locked={ownerLock ?? (micPermOpen ? undefined : `Mikrofon izni Lv.${micMin} odada açılır.`)}
           />
           <Row
             label="Patron Koltuğu"
-            hint={bossOpen ? (room.bossMode === 'invite' ? 'Oda sahibi oturtur' : `${bossCfg.coins.toLocaleString('tr-TR')} jetonla oturulur`) : `Lv.${BOSS_SEAT_MIN_LEVEL}'te açılır`}
+            hint={bossOpen ? (room.bossMode === 'invite' ? 'Oda sahibi oturtur' : `${bossCfg.coins.toLocaleString('tr-TR')} jetonla oturulur`) : `Lv.${bossMin}'te açılır`}
             toggle={{ value: room.bossSeat && bossOpen, onChange: (v) => update({ bossSeat: v }) }}
-            locked={ownerLock ?? (bossOpen ? undefined : `Patron koltuğu Lv.${BOSS_SEAT_MIN_LEVEL} odada açılır.`)}
+            locked={ownerLock ?? (bossOpen ? undefined : `Patron koltuğu Lv.${bossMin} odada açılır.`)}
           />
           {room.bossSeat && bossOpen && (
             <Row label="Koltuk modu" value={room.bossMode === 'invite' ? 'Davet' : 'Otomatik'} onPress={() => setPicker('bossMode')} locked={ownerLock} />
@@ -971,8 +972,8 @@ export function RoomSettingsScreen({
       />
       <ChoiceSheet
         visible={picker === 'limit'}
-        title={`Katılımcı limiti (Lv.${level} sınırı: ${memberLimit(level).toLocaleString('tr-TR')})`}
-        options={[50, 100, 200, 300, 500, 1_200, 2_000, 5_000].map((n) => ({ value: n, label: `${n.toLocaleString('tr-TR')} kişi`, disabled: n > memberLimit(level), sub: n > memberLimit(level) ? 'Daha yüksek oda seviyesi gerekir' : undefined }))}
+        title={`Katılımcı limiti (Lv.${level} sınırı: ${liveMemberLimit(level).toLocaleString('tr-TR')})`}
+        options={[50, 100, 200, 300, 500, 1_200, 2_000, 5_000].map((n) => ({ value: n, label: `${n.toLocaleString('tr-TR')} kişi`, disabled: n > liveMemberLimit(level), sub: n > liveMemberLimit(level) ? 'Daha yüksek oda seviyesi gerekir' : undefined }))}
         value={room.limit}
         onPick={(v) => update({ limit: v })}
         onClose={close}

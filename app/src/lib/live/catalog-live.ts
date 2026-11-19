@@ -40,7 +40,7 @@ import { selfExchangeRate } from '@/lib/coins-bank';
 import { parseLiveEmoji, type LiveEmoji } from '@/lib/emoji-live-core';
 import { parseLiveLevels, type LiveLevels } from '@/lib/levels-live-core';
 import { mergeShop, parseLiveShop, type LiveShop } from '@/lib/shop-live-core';
-import { COSMETICS, setLiveCosmetics } from '@/data/catalog';
+import { BOSS_SEAT_MIN_LEVEL, COSMETICS, MIC_PERMISSION_MIN_LEVEL, memberLimit, setLiveCosmetics } from '@/data/catalog';
 import { setLiveSeatColors } from '@/data/seat-colors';
 import { parseFxList, type FxVideo } from '@/lib/fx-videos-core';
 import { parseCatalog, type CatalogPack } from '@/lib/live/billing-core';
@@ -92,7 +92,11 @@ export type LiveCatalog = {
   bonds: BondNumbers | null;
   /** Aile's themes: id → the family level it opens at, as Canlı ayarlar has them; null from an older server. */
   familyThemes: Record<string, number> | null;
+  /** Oda seviyeleri as Canlı ayarlar has them; null from an older server: the app's own. */
+  rooms: RoomNumbers | null;
 };
+/** The rooms' numbers (server/api/live-registry.mjs roomNumbersOf): mic and boss seat levels, people per level. */
+export type RoomNumbers = { micMinLevel: number; bossMinLevel: number; caps: number[] };
 /** Koruma's numbers (server/api/guards.mjs guardRules) that the rules page says. */
 export type GuardNumbers = { dropFrom: number; dropShare: number; dropFlat: number; thresholdEveryDays: number };
 /** Bağlar's numbers (server/api/gifts.mjs catalog `bonds`): days to answer, days apart, talk points, per-kind limits. */
@@ -218,6 +222,21 @@ export function parseFamilyThemes(x: unknown): Record<string, number> | null {
   return Object.keys(out).length ? out : null;
 }
 
+/** The catalog's `rooms`; null unless the levels are sound and there are 15 caps. */
+export function parseRoomNumbers(x: unknown): RoomNumbers | null {
+  const r = obj(x);
+  const mic = whole(r.micMinLevel, 1, 15);
+  const boss = whole(r.bossMinLevel, 1, 15);
+  const caps = Array.isArray(r.caps) && r.caps.length === 15 ? r.caps.map((n) => whole(n, 1, 100_000)) : null;
+  return mic === null || boss === null || !caps || caps.some((n) => n === null) ? null : { micMinLevel: mic, bossMinLevel: boss, caps: caps as number[] };
+}
+/** The room level Mikrofon izni opens at: the server's, else the app's own. */
+export const liveMicMinLevel = (c: LiveCatalog | null = current) => c?.rooms?.micMinLevel ?? MIC_PERMISSION_MIN_LEVEL;
+/** The room level Patron koltuğu opens at: the server's, else the app's own. */
+export const liveBossMinLevel = (c: LiveCatalog | null = current) => c?.rooms?.bossMinLevel ?? BOSS_SEAT_MIN_LEVEL;
+/** How many people a room of `level` holds: the server's, else the app's own. */
+export const liveMemberLimit = (level: number, c: LiveCatalog | null = current) => c?.rooms?.caps[Math.min(Math.max(level, 1), 15) - 1] ?? memberLimit(level);
+
 /** GET /api/catalog as the live catalog; anything malformed is left out (the compiled value is used), never thrown. */
 export function parseLiveCatalog(raw: unknown): LiveCatalog {
   const r = obj(raw);
@@ -241,6 +260,7 @@ export function parseLiveCatalog(raw: unknown): LiveCatalog {
     guard: parseGuardNumbers(r.guard),
     bonds: parseBondNumbers(r.bonds),
     familyThemes: parseFamilyThemes(r.family),
+    rooms: parseRoomNumbers(r.rooms),
   };
 }
 
@@ -276,6 +296,7 @@ export function parseSavedLiveCatalog(raw: string | null): { catalog: LiveCatalo
       guard: parseGuardNumbers(r.guard),
       bonds: parseBondNumbers(r.bonds),
       familyThemes: parseFamilyThemes({ themes: r.familyThemes }),
+      rooms: parseRoomNumbers(r.rooms),
     },
     // A copy an older app saved counts as old: the next poll reads the catalog again. One from before the videos were
     // listed (no fx), or from before the shelves were (no shelf): that app hid the gifts put back on the shelves
@@ -499,7 +520,7 @@ export const liveCatalogStale = (now = Date.now()) => !current || now - fetchedA
 /** The server named its current Çevir rate (409 rate_changed): the screens show it before the catalog is read again. */
 export function noteLiveRate(usdTry: unknown) {
   if (!validRate(usdTry)) return;
-  publish({ ...(current ?? { v: 0, giftIds: null, packs: [], campaign: null, fx: null, remote: [], shelf: null, app: {}, emoji: null, levels: null, shop: null, guard: null, bonds: null, familyThemes: null }), usdTry });
+  publish({ ...(current ?? { v: 0, giftIds: null, packs: [], campaign: null, fx: null, remote: [], shelf: null, app: {}, emoji: null, levels: null, shop: null, guard: null, bonds: null, familyThemes: null, rooms: null }), usdTry });
 }
 
 const subscribe = (l: () => void) => {

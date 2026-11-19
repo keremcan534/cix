@@ -65,6 +65,25 @@ bekleme süresi.
 - **Panelde değişmeyenler:** aile kurma ücreti (500 jeton: eski APK'lar kendi fiyatını gösterir, ayrı bir iş ister) ve
   aile seviyesine göre haftalık bonus oranı (yalnız tahmin olarak gösteriliyor, ödemesi sizin kararınız).
 
-## Sıradaki adım
+## 3. adım (19 Kasım): Oda seviyeleri ve profil rozetleri
 
-3. Oda ve profil kuralları: oda kişi sınırları, mikrofon seviyesi, profil listeleri, seviye eğrisi.
+| Grup | Ayar | Varsayılan |
+| --- | --- | --- |
+| Oda seviyeleri | Mikrofon izni: oda seviyesi | Lv.4 |
+| Oda seviyeleri | Patron koltuğu: oda seviyesi | Lv.3 |
+| Oda seviyeleri | Odanın yasaklı kelimeleri: en fazla | 30 |
+| Oda seviyeleri | Lv.1 … Lv.15 oda: en fazla kişi | 50, 100, 200, 300, 500, 600, 800, 1.200, 1.350, 1.500, 1.750, 2.000, 2.500, 3.000, 5.000 |
+| Profil rozetleri | Haftanın Yıldızı: haftanın ilk kaçı | 3 |
+| Profil rozetleri | Cömert Kalp: farklı kişiye hediye | 10 |
+| Profil rozetleri | Sosyal Kelebek: arkadaş sayısı | 20 |
+| Profil rozetleri | Oda Efsanesi: oda seviyesi | Lv.10 |
+| Profil rozetleri | Yükselen Yıldız: Yankı seviyesi / ilk kaç gün | Lv.5 / 30 gün |
+
+- **Kişi sınırı en çok 5.000:** tek sunucu yoğun bir 200 kişilik odayı taşır ([`YUK_TESTI.md`](YUK_TESTI.md)).
+  Sınırları yükseltmek sunucuyu büyütmeyi gerektirebilir.
+- **Eski APK'lar:** sunucu yeni seviyeleri ve sınırları uygular. Oda ayarlarındaki kilitler ve "Lv.X sınırı" yazısı
+  eski APK'da kendi değeriyle görünür; yeni APK katalogdan (`rooms`) okur. Rozetleri sunucu verir, her APK doğru
+  gösterir.
+- **Zaten panelde:** Cömertlik ve Yankı seviye eşikleri (Seviye ayarları).
+- **Panelde değişmeyenler:** profil listeleri (burç, etiket, dil, ülke) ve profil formunun sınırları: uygulama
+  bunları kendi içinden gösterir, yeni seçenek eski APK'da seçilemez; ayrı bir iş ister.

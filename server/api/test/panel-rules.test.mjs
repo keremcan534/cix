@@ -128,3 +128,22 @@ describe('Canlı ayarlar › Şanslı çanta', () => {
     assert.equal(Math.round(Number(secs)), 60);
   });
 });
+
+describe('Canlı ayarlar › Profil rozetleri', () => {
+  after(() => setLive({ medal_generous_people: null, title_room_level: null }));
+
+  test('Cömert Kalp ve Oda Efsanesi eşikleri panelden', async () => {
+    const star = await person('Rozetli', 5_000);
+    const [x, y] = await Promise.all([person('Alan Bir'), person('Alan İki')]);
+    for (const to of [x, y]) await ok(call('POST', '/api/gifts/send', { to: to.user.id, giftId: 'g5', count: 1, ref: rnd(8), price: GIFTS.get('g5').price, place: 'profile' }, star.session), 'hediye');
+    await q('UPDATE users SET room_xp = 300 WHERE id = $1', [star.user.id]); // Lv.3 room
+    const showcase = async () => ok(call('GET', `/api/user/showcase?id=${star.user.id}`, null, x.session), 'vitrin');
+    let v = await showcase();
+    assert.equal(v.medals.includes('md4'), false);
+    assert.equal(v.titles.includes('t2'), false);
+    await setLive({ medal_generous_people: 2, title_room_level: 3 });
+    v = await showcase();
+    assert.equal(v.medals.includes('md4'), true, 'iki kişiye hediye yeter');
+    assert.equal(v.titles.includes('t2'), true, 'Lv.3 oda yeter');
+  });
+});

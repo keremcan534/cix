@@ -31,7 +31,8 @@ import { customGiftIds } from './custom-gifts.mjs';
 import { LIVE, announceLook, statusOf } from './economy.mjs';
 import { topBoard } from './gifts.mjs';
 import { removeFiles, verifyUpload } from './media.mjs';
-import { ALBUM_MAX, COUNTRIES, EDUCATION, EXTRA_LIMITS as L, LANGUAGES, MEDAL_RULES, RELATIONSHIP, TAGS, TITLE_RULES, ZODIACS } from './profile-rules.mjs';
+import { live } from './live-settings.mjs';
+import { ALBUM_MAX, COUNTRIES, EDUCATION, EXTRA_LIMITS as L, LANGUAGES, MEDAL_RULES as MEDAL_DEFAULTS, RELATIONSHIP, TAGS, TITLE_RULES as TITLE_DEFAULTS, ZODIACS } from './profile-rules.mjs';
 import { roomLevel } from './rooms.mjs';
 import { charmPointsOf } from './wallet.mjs';
 import { wealthPointsOf } from './wheel.mjs';
@@ -195,10 +196,19 @@ async function readable(me, id) {
 }
 
 // --- Vitrin ----------------------------------------------------------------------------------------------------------
+/** What earns a medal or a title now: Canlı ayarlar › Profil rozetleri, profile-rules.mjs's values until saved. */
+function badgeRules(s = live()) {
+  const v = (x, d) => (Number.isSafeInteger(x) ? x : d);
+  return {
+    medal: { weekTop: v(s.medalWeekTop, MEDAL_DEFAULTS.weekTop), generousPeople: v(s.medalGenerousPeople, MEDAL_DEFAULTS.generousPeople), friends: v(s.medalFriends, MEDAL_DEFAULTS.friends) },
+    title: { roomLevel: v(s.titleRoomLevel, TITLE_DEFAULTS.roomLevel), risingCharm: v(s.titleRisingCharm, TITLE_DEFAULTS.risingCharm), risingDays: v(s.titleRisingDays, TITLE_DEFAULTS.risingDays) },
+  };
+}
 /** This week's top receivers (Haftanın Yıldızı), read again at most once a minute (LEVELS_CACHE_MS). */
-let weekTop = { at: 0, rows: [] };
+let weekTop = { at: 0, n: 0, rows: [] };
 async function weekStars() {
-  if (Date.now() - weekTop.at >= CACHE_MS) weekTop = { at: Date.now(), rows: await topBoard('charm', 'week', MEDAL_RULES.weekTop) };
+  const n = badgeRules().medal.weekTop;
+  if (Date.now() - weekTop.at >= CACHE_MS || weekTop.n !== n) weekTop = { at: Date.now(), n, rows: await topBoard('charm', 'week', n) };
   return weekTop.rows;
 }
 
@@ -211,6 +221,7 @@ async function honoursOf(u, friends) {
   // A Yankı level its owner hides earns nothing that would show it.
   const charm = (await shownLevels([u.id], { fresh: true }))[u.id].charm ?? 0;
   const days = (Date.now() - new Date(u.created_at).getTime()) / 86_400_000;
+  const { medal: MEDAL_RULES, title: TITLE_RULES } = badgeRules();
   const medals = [
     week.some((x) => x.user.id === u.id) && 'md1',
     Number(given.rows[0].n) >= MEDAL_RULES.generousPeople && 'md4',

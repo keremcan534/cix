@@ -24,7 +24,7 @@ import { BOSS_HOLD_MS, bossStep } from './boss-rules.mjs';
 import { HttpError, auth, blockedBetween, db, env, limit, readJson, userId } from './core.mjs';
 import { live } from './live-settings.mjs';
 import { announceRoom, roomPacket } from './live.mjs';
-import { BOSS_SEAT_MIN_LEVEL, rulesOf } from './room-rules.mjs';
+import { roomNumbers, rulesOf } from './room-rules.mjs';
 // rooms.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
 import { liveKitName, roomLevel, roomOut, roomRow, withVoiceCounts } from './rooms.mjs';
 
@@ -75,7 +75,7 @@ export async function bossGift(c, { roomId, sender, coins }) {
   ).rows[0];
   if (!r) return [];
   const rules = rulesOf(r.rules);
-  if (!rules.bossSeat || rules.bossMode !== 'auto' || roomLevel(r.room_xp ?? 0) < BOSS_SEAT_MIN_LEVEL) return [];
+  if (!rules.bossSeat || rules.bossMode !== 'auto' || roomLevel(r.room_xp ?? 0) < roomNumbers().bossMinLevel) return [];
   if ((await c.query('SELECT 1 FROM room_bans WHERE room_id = $1 AND user_id = $2 AND (until IS NULL OR until > now())', [roomId, sender])).rowCount) return [];
   const seat = r.boss_id ? { holder: r.boss_id, since: ms(r.boss_since) ?? 0, until: ms(r.boss_until), spent: Number(r.boss_spent) } : null;
   const s = live();
