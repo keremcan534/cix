@@ -13,6 +13,8 @@
 //    equal ones), so a pile of small gifts never holds a big one back;
 //  - a small cue (a standard gift's pop) shows only if it gets the stage within SMALL_FRESH_MS; later it is old
 //    news, its flight and chat line already showed it.
+// A cue that must play however long the line (`keep`: the Oda roketi's launch, Güncelleme 7 madde 5b) is never the one
+// dropped: it waits behind the gift on screen and the ones already waiting, and the gifts after it wait for it.
 // Pure: the room keeps a Stage in its state and passes the time in.
 
 export const MAX_WAITING = 6;
@@ -38,6 +40,8 @@ export type Cue<P = unknown> = {
   ms: number;
   /** A standard gift's pop: shown only while fresh. */
   small?: boolean;
+  /** Never dropped to keep the line short (the rocket's launch): it plays in its turn whatever waits. */
+  keep?: boolean;
   /** When its latest piece came (ms). */
   last: number;
   payload: P;
@@ -60,13 +64,17 @@ function merged<P>(a: Cue<P>, b: Cue<P>): Cue<P> {
   return { ...a, to, last: Math.max(a.last, b.last) };
 }
 
-/** Drops the lowest-value waiting cues (the oldest of equal ones) while too many or too long a wait is queued. */
+/**
+ * Drops the lowest-value waiting cues (the oldest of equal ones) while too many or too long a wait is queued. A kept
+ * cue is never dropped (nor counted against the bound, so it never pushes the gifts out).
+ */
 function bound<P>(next: Cue<P>[]): Cue<P>[] {
   let list = next;
-  const waitMs = () => list.reduce((n, c) => n + c.ms, 0);
-  while (list.length > MAX_WAITING || (list.length > 1 && waitMs() > WAIT_MS)) {
-    let low = 0;
-    for (let i = 1; i < list.length; i++) if (cueValue(list[i]) < cueValue(list[low])) low = i;
+  const loose = () => list.filter((c) => !c.keep);
+  const waitMs = () => loose().reduce((n, c) => n + c.ms, 0);
+  while (loose().length > MAX_WAITING || (loose().length > 1 && waitMs() > WAIT_MS)) {
+    let low = -1;
+    for (let i = 0; i < list.length; i++) if (!list[i].keep && (low < 0 || cueValue(list[i]) < cueValue(list[low]))) low = i;
     list = list.filter((_, i) => i !== low);
   }
   return list;
@@ -100,3 +108,14 @@ export function endCue<P>(s: Stage<P>, key: string, t: number, held = false): St
 
 /** Whatever held the stage let go of it: the next cue starts if the stage is free. */
 export const resumeCue = <P>(s: Stage<P>, t: number): Stage<P> => start(s, t, false);
+
+/**
+ * The playing or waiting cue `match` picks, changed by `fn` (it keeps its key and its place: a playing one isn't started
+ * again); null when no cue matches. The rocket's payout joins its launch's cue this way, so the winners follow it.
+ */
+export function updateCue<P>(s: Stage<P>, match: (c: Cue<P>) => boolean, fn: (c: Cue<P>) => Cue<P>): Stage<P> | null {
+  if (s.now && match(s.now)) return { ...s, now: { ...fn(s.now), key: s.now.key } };
+  const i = s.next.findIndex(match);
+  if (i < 0) return null;
+  return { ...s, next: s.next.map((c, j) => (j === i ? { ...fn(c), key: c.key } : c)) };
+}

@@ -29,6 +29,7 @@ import {
   roomIdText,
   roomThemeInfo,
   type RoomTheme,
+  type RoomType,
 } from '@/data/catalog';
 import { serverRoomCode, userById } from '@/data/mock';
 import { RULES, pct } from '@/data/rules';
@@ -222,6 +223,7 @@ export function RoomInfoSheet({
   title,
   cover,
   theme,
+  roomType,
   level,
   xp,
   owner,
@@ -262,6 +264,8 @@ export function RoomInfoSheet({
   title: string;
   cover: string;
   theme: RoomTheme;
+  /** The room's type ("Serbest sohbet", "Soru-cevap" …), on the info line under the name (no longer in the header). */
+  roomType?: RoomType;
   level: number;
   xp: number | null;
   owner: boolean;
@@ -310,6 +314,7 @@ export function RoomInfoSheet({
   const [sub, setSub] = useState<null | 'level' | 'traffic' | 'gifts' | 'decor' | 'cover' | 'title' | 'bulletin'>(null);
   const [draft, setDraft] = useState('');
   const th = roomThemeInfo(theme);
+  const type = ROOM_TYPES.find((t) => t.id === roomType);
   const textEditor = owner || canEditText;
   const lookEditor = !!look?.available && look.canEdit;
   const paddingBottom = useSheetBottom();
@@ -337,7 +342,7 @@ export function RoomInfoSheet({
                 {textEditor && <Ionicons name="create-outline" size={18} color={colors.textDim} />}
               </Pressable>
               <Text style={styles.dim}>
-                🇹🇷 │ {th.emoji} {th.name} │ ID {roomIdText({ id: roomId, code: serverRoomCode(roomId) })}
+                🇹🇷 │ {th.emoji} {th.name} │ {type ? `${type.emoji} ${type.name} │ ` : ''}ID {roomIdText({ id: roomId, code: serverRoomCode(roomId) })}
               </Text>
             </View>
             <Pressable onPress={onSettings} hitSlop={8} accessibilityLabel="Oda ayarlarını aç">

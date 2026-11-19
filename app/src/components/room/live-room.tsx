@@ -10,7 +10,7 @@ import { sheetSpace, steadyBox, steadyNext } from '@/lib/room-split';
 import { RoomSheetSpace } from '@/lib/sheet-space';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Text, TextInput } from '@/components/text';
+import { MAX_FONT_SCALE, Text, TextInput } from '@/components/text';
 import { ActionSheet, type SheetOption } from '@/components/ActionSheet';
 import { useReport } from '@/components/report-sheet';
 import { useRoomMute } from '@/components/room/room-mute';
@@ -55,6 +55,7 @@ import { LuckyBagCard, LuckyBagFloat, LuckyBagRain, LuckyBagSheet, bagWhat, type
 import { SeatMenu, type Rect, type SeatMenuItem } from '@/components/room/seat-menu';
 import { PersonCard } from '@/components/room/person-card';
 import { insertMention, mentionPicks, mentionQuery, mentions, stripMentions } from '@/lib/room-mention';
+import { addMention, mentionsIn, seenMentions, type MentionMark } from '@/lib/mention-chip';
 import { EntryEffect, type EntryFx, type EntryShow } from '@/components/fx/entry';
 import { storeArtOf } from '@/components/StoreArt';
 import { ROOM_ICON_ART } from '@/components/RoomArt';
@@ -69,6 +70,8 @@ import { GiftVideoFx, PlateName, VideoFx, entryClipOf, entryVideoOf, giftVideoOf
 import { giftShowOf, type GiftShow } from '@/data/gift-shows';
 import type { Animation } from '@/data/animations';
 import { ROOM, addCue, cueCount, cueTo, emptyStage, endCue, resumeCue, type Cue, type Stage } from '@/lib/fx-queue';
+import { stageRocket, type RocketPlay } from '@/lib/rocket-stage';
+import { bondParts, type Beside } from '@/lib/bond-link';
 import { SalonArt, salonArt } from '@/components/games/fx/salon-art';
 import { GamePanel, type OpenGame } from '@/components/games/game-panel';
 import type { CasinoGame } from '@/data/games';
@@ -89,11 +92,11 @@ import { useRoomLook } from '@/components/room/decor';
 import { StageLayout } from '@/components/room/stage-layout';
 import { FitStage } from '@/components/room/fit-stage';
 import { useRoomBonds } from '@/components/room/room-bonds';
-import { BOND_KINDS, bondTint, bubbleBondOf, jointEntries, micLinkOf, roomBondKey, type BondKind, type JointState, type RoomBond } from '@/data/bonds';
+import { BOND_KINDS, bondTint, bubbleBondOf, jointEntries, roomBondKey, type BondKind, type JointState, type RoomBond } from '@/data/bonds';
 import { liveRequestBond } from '@/lib/live/bonds';
 import { Avatar } from '@/components/ui';
 import { AGENCIES } from '@/data/agency';
-import { COSMETICS, MUSIC_CATALOG, STANDARD_EMOJI, adminCapacity, cosmeticById, djCapacity, micCapacity, roomIdText, roomLevel, roomTypeInfo, ROOM_LEVEL_REWARDS, type RoomTheme, type Track } from '@/data/catalog';
+import { COSMETICS, MUSIC_CATALOG, STANDARD_EMOJI, adminCapacity, cosmeticById, djCapacity, micCapacity, roomIdText, roomLevel, ROOM_LEVEL_REWARDS, type RoomTheme, type Track } from '@/data/catalog';
 import { FAMILIES, INCOMING_GIFT_POOL, vipTier } from '@/data/economy';
 import { GATES, nobleInfo } from '@/data/status';
 import { LUCKY_RECIPIENT_SHARE, RULES, luckyHostDiamonds, pct } from '@/data/rules';
@@ -106,7 +109,7 @@ import { liveSticker } from '@/lib/live/emoji-live';
 import { useLiveRoomSync } from '@/lib/live/room';
 import { useRoomTop } from '@/lib/live/room-contrib';
 import { useRoomRocket } from '@/lib/live/room-rocket';
-import { onServerLook, onServerRoom, sendSignal, useBossNews, useLivePeers, type LuckySignal, type RoomSignal } from '@/lib/live/room-bus';
+import { onServerLook, onServerRoom, sendSignal, useBossNews, useLivePeers, type LuckySignal, type RocketNews, type RoomSignal } from '@/lib/live/room-bus';
 import { answerLiveCrossPk, refreshRoomPkSoon, useIncomingCrossPk, useRoomPkJoin, useRoomPkSync } from '@/lib/live/pk';
 import { useOwnerStats } from '@/lib/live/owner-stats';
 import { bagResult, grabCode, joinBag, useRoomBags, type Bag } from '@/lib/live/lucky-bags';
@@ -215,12 +218,19 @@ const WHEEL_ROOM = 62;
 const CORNER_ROOM = 92;
 /** The header's small buttons: 44 px tall to the finger, without reaching their neighbours across the 8 px gaps. */
 const HEAD_SLOP = { top: 12, bottom: 12, left: 4, right: 4 };
-/** What a stage cue (lib/fx-queue) draws: a gift's video, a big gift's show, the other gifts' pop, a full-screen Hareketli. */
+/** The header's name line and the PK / rocket pill line under it (the rocket pill is 20 px tall). */
+const TITLE_LINE = 20;
+const PILL_LINE = 20;
+/**
+ * What a stage cue (lib/fx-queue) draws: a gift's video, a big gift's show, the other gifts' pop, a full-screen Hareketli,
+ * the Oda roketi's launch and winners (lib/rocket-stage).
+ */
 type StagePlay =
   | { kind: 'video'; gift: Gift; media: NonNullable<ReturnType<typeof giftVideoOf>> }
   | { kind: 'show'; gift: Gift; show: GiftShow }
   | { kind: 'pop'; gift: Gift }
-  | { kind: 'anim'; anim: Animation; origin: Point | null };
+  | { kind: 'anim'; anim: Animation; origin: Point | null }
+  | RocketPlay;
 /** How long they play, for the stage's backlog bound: the gift clips are 5 s; the pop is parts' GiftAnimation. */
 const VIDEO_MS = 5_000;
 const POP_MS = 2_500;
@@ -394,7 +404,6 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // be false there (güncelleme 6; the Rütbe page no longer lists it).
   const invisible = !real && settings.invisibleEntry && GATES.invisibleEntry(nobleTier);
   const roomType = isOwn ? myRoom.roomType : (base!.roomType ?? 'free');
-  const typeInfo = roomTypeInfo(roomType);
   // Seat locks: saved for my own room; in a server room the server keeps them; in other rooms I moderate they
   // last for this session.
   const [localLocks, setLocalLocks] = useState<number[]>([]);
@@ -651,6 +660,17 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   /** A full-screen Hareketli (fx/anim-layer) waits in the same line as the gifts (not one due after the room went away). */
   const playAnimFx = ({ anim, origin, from }: FullscreenAnim) => {
     if (visibleRef.current) pushFx({ from, what: anim.animation_id, to: { [ROOM]: 1 }, each: 1, price: anim.coin_price, ms: anim.duration_ms, payload: { kind: 'anim', anim, origin } });
+  };
+  /**
+   * The Oda roketi's launch and winners (lib/rocket-stage, Güncelleme 7 madde 5b): in the same line, after the gift on
+   * screen and the ones waiting; the gifts after it wait for it. Not while the room is minimized, nor with effects off.
+   */
+  const playRocketFx = (news: RocketNews) => {
+    if (!visibleRef.current || settings.effectsOff) return;
+    const at = nowMs();
+    const held = entryVideoOn.current;
+    const key = `fx-${msgId()}`;
+    setFxStage((s) => stageRocket(s, news, { at, held, key }, (r) => r, (p) => (p.kind === 'rocket' ? p : null)));
   };
   const [luckyFx, setLuckyFx] = useState<LuckyRecord[] | null>(null);
   // The repeat wheel (components/room/gift-combo): after a send from the gift sheet, the same gift to the same people
@@ -1047,6 +1067,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const roomNames = useMemo(() => roomNamesKey.split('\n'), [roomNamesKey]);
   // Someone wrote my name (@bahset): a short buzz and a note over the chat, so I don't miss it.
   const [mentionNote, setMentionNote] = useState<{ name: string; n: number } | null>(null);
+  // The lines naming me not seen yet (lib/mention-chip): the chat's "Senden bahsedildi" chip goes to them. Kept here, so
+  // they outlive minimizing the room (its chat list goes away then).
+  const [unseenMentions, setUnseenMentions] = useState<MentionMark[]>([]);
   useEffect(() => {
     if (!mentionNote) return;
     const t = setTimeout(() => setMentionNote(null), 4_000);
@@ -1114,11 +1137,13 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           if (nowMs() - (lastLineFrom.current.get(from) ?? 0) < SLOW_MS - 1_500) return;
           lastLineFrom.current.set(from, nowMs());
         }
+        const line = msgId();
         if (mentions(msg.text, app.me.name)) {
           successHaptic();
           setMentionNote((n) => ({ name: userById(from).name, n: (n?.n ?? 0) + 1 }));
+          setUnseenMentions((l) => addMention(l, { id: line, from }));
         }
-        return addMsg({ userId: from, text: mask(msg.text) });
+        return addMsg({ id: line, userId: from, text: mask(msg.text) });
       }
       // An emoji over their seat: only one from this phone's own emoji and sticker lists (never free text).
       if (msg.t === 'react') return seatEmojiOk(msg.emoji) ? react(from, msg.emoji) : undefined;
@@ -3056,7 +3081,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     }
     const { me, them, payout } = r;
     const opponent = pick(seatedOthers.length ? seatedOthers : USERS.map((u) => u.id));
-    addMsg({ system: true, text: `🎲 ${ME.name} (${me}) vs ${userById(opponent).name} (${them}) → ${payout > 0 ? `${ME.name} kazandı! +${payout} (oyun bakiyesine)` : 'kasa kazandı'}` });
+    addMsg({ system: true, text: `🎲 ${ME.name} (${me}) vs ${userById(opponent).name} (${them}) → ${payout > 0 ? `${ME.name} kazandı! +${payout} (oyun bakiyesine)` : 'kaybettin'}` });
     return { me, them, opponent };
   };
 
@@ -3339,7 +3364,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // the same on every phone whenever it came in; the demo's from this visit's gifts.
   const serverTop = useRoomTop(id, real && unlocked, giftLog[0]?.id);
   // Oda roketi (lib/live/room-rocket): a server room's rocket today; read again after gifts and when it launches.
-  const roomRocket = useRoomRocket(real && unlocked ? id : null, { open: panel === 'rocket', bump: giftLog[0]?.id });
+  const roomRocket = useRoomRocket(real && unlocked ? id : null, { open: panel === 'rocket', bump: giftLog[0]?.id, onNews: playRocketFx });
   const top3 = real ? serverTop : ranking.slice(0, 3).map(([uid]) => uid);
 
   // Mic invites I sent: announce each answer once (accepted, declined, no answer, no free mic left).
@@ -3419,6 +3444,11 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     (m: FeedMsg) => (msgFilter.bot || !m.bot) && (msgFilter.joins || !(m.system && m.text.includes('odaya girdi'))) && (msgFilter.gifts || kindOf(m) !== 'gift'),
     [msgFilter],
   );
+  // @bahset chip (lib/mention-chip): only the unseen lines still in the feed (a line buffered offline joins it later).
+  const chipMentions = useMemo(() => (unseenMentions.length ? mentionsIn(unseenMentions, new Set(messages.map((m) => m.id))) : unseenMentions), [unseenMentions, messages]);
+  const mentionsSeen = useCallback((ids: string[]) => setUnseenMentions((l) => seenMentions(l, ids)), []);
+  // A line on screen counts as seen only while the chat can be read: the room in front, no sheet or game over it.
+  const chatAttended = full && !panel && !giftOpen && !peopleOpen && !inboxOpen && !person && !sheet && !seatMenu && !(game && !gameMin);
 
   const peopleActions: ParticipantActions = {
     invite: (uid) => {
@@ -3528,9 +3558,11 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const stripSlot: ArenaSlot = { width: stripW, size: Math.max(24, Math.min(34, stripW - 8)) };
   // Empty / locked / invite pending / mic on / mic off / muted by the room, per numbered mic.
   const slots = useMemo(() => slotStates(live, (uid) => uid === 'me' && !sending), [live, sending]);
-  const renderSeat = (i: number, extra?: { host?: boolean; compact?: boolean; slot?: ArenaSlot; grid?: ArenaSlot; next?: { index: number; gap: number }; mini?: boolean; layer?: number }) => {
+  const renderSeat = (i: number, extra?: { host?: boolean; compact?: boolean; slot?: ArenaSlot; grid?: ArenaSlot; next?: Beside; prev?: Beside; mini?: boolean; layer?: number }) => {
     const uid = allSeats[i];
-    const link = extra?.next ? micLinkOf(roomBonds, uid, allSeats[extra.next.index]) : null;
+    // Lv4 bond line: this seat draws the line to the next one behind both frames, the knot of the one from the seat
+    // before over them (lib/bond-link).
+    const link = bondParts(roomBonds, allSeats, i, extra?.next, extra?.prev);
     const host = extra?.slot ? false : (extra?.host ?? i === 0);
     return (
       <Seat
@@ -3561,7 +3593,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         slotWidth={extra?.slot?.width ?? extra?.grid?.width}
         roomTop={extra?.slot?.top ?? extra?.grid?.top}
         layer={extra?.layer}
-        bondLink={link && extra?.next ? { bond: link, gap: extra.next.gap } : null}
+        bondLink={link.line}
+        bondKnot={link.knot}
         mini={extra?.mini}
         seatColor={seatColor}
         enterDelay={Math.min(i, 24) * 22}
@@ -3614,7 +3647,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           cameraOf={(uid) => (uid === 'me' ? camOn : !!camOf(uid))}
           videoOf={camOf}
           top={stageTop({ boss: bossOn, boards, layout: true })}
-          renderSeat={(i, slot, next) => renderSeat(i, { slot, next })}
+          renderSeat={(i, slot, next, prev) => renderSeat(i, { slot, next, prev })}
         />
       </>
     ) : (
@@ -3635,6 +3668,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
               grid: { width: f.slot, size: f.face, top: at.top },
               layer: at.layer,
               next: i + 1 < allSeats.length && i % f.cols !== f.cols - 1 ? { index: i + 1, gap: 0 } : undefined,
+              prev: i > 0 && i % f.cols !== 0 ? { index: i - 1, gap: 0 } : undefined,
             });
           })}
         </View>
@@ -3666,6 +3700,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     const p = cueNow.payload;
     const done = () => endFx(cueNow.key);
     if (p.kind === 'anim') return <AnimPlay key={cueNow.key} anim={p.anim} origin={p.origin} screen={win} lite={settings.lowData} onDone={done} />;
+    if (p.kind === 'rocket') return <RocketShow key={cueNow.key} news={p.news} then={p.paid} still={settings.reduceMotion} muted={fxMuted} onDone={done} />;
     const to = cueTo(cueNow);
     const play = {
       key: cueNow.key,
@@ -3720,12 +3755,21 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           <View style={styles.header} onLayout={(e) => setHeaderH(Math.round(e.nativeEvent.layout.height))}>
             <Pressable onPress={() => setPanel('info')} accessibilityLabel={`Oda kartı, Lv.${level}`} hitSlop={4}>
               <Avatar uri={userById(hostId).avatar} size={36} />
-              {/* On the photo's lower edge, so the room's name keeps the line's width. */}
-              <View style={styles.levelBadge} pointerEvents="none">
-                <Text style={styles.levelText}>Lv.{level}</Text>
+              {/* On the photo's lower edge, so the room's name keeps the line's width; on one line, wider than the photo
+                  when it has to be ("Lv.15" wrapped to "Lv.1 / 5" inside the 36 px photo: Güncelleme 7, madde 9). */}
+              <View style={styles.levelWrap} pointerEvents="none">
+                <View style={styles.levelBadge}>
+                  <Text style={styles.levelText} numberOfLines={1} maxFontSizeMultiplier={1}>
+                    Lv.{level}
+                  </Text>
+                </View>
               </View>
             </Pressable>
-            <View style={{ flex: 1 }}>
+            {/* The name, and under it the PK and rocket pills. The "N kişi · N mikrofon · oda türü" line is gone
+                (Güncelleme 7, madde 9): the people are on the Balkon button, the room type in the Oda kartı. Without a
+                pill the name stands in the middle; the block keeps the height of both, so the header never grows (and
+                the mics never shrink) when a PK starts or the rocket arrives. */}
+            <View style={[styles.headText, { minHeight: Math.ceil(TITLE_LINE * Math.min(win.fontScale || 1, MAX_FONT_SCALE)) + PILL_LINE }]}>
               <Pressable onPress={() => setPanel('info')} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                 {!!password && <Ionicons name="lock-closed" size={13} color={colors.textDim} />}
                 <Text style={styles.title} numberOfLines={1}>
@@ -3733,25 +3777,13 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                 </Text>
                 {hostId !== 'me' && <RoomFollowHeart roomId={id} title={title} />}
               </Pressable>
-              <View style={styles.subLine}>
-                {/* Normal PK: its timer pill leads the line; on a narrow phone the line's end gives way, not the pill. */}
-                {soloPk && <SoloPkPill pk={soloPk} canManage={canManage && !offline} />}
-                {roomRocket.rocket?.on && <RocketPill rocket={roomRocket.rocket} onPress={() => setPanel('rocket')} />}
-                <Pressable onPress={() => setPeopleOpen(true)} style={[styles.subRow, styles.subShrink]} accessibilityLabel={`${listeners} kişi, ${capacity} mikrofon. Odadaki kullanıcıları aç`}>
-                  <Ionicons name="people" size={11} color={colors.textDim} />
-                  <Text style={styles.sub}>{listeners}</Text>
-                  <Ionicons name="mic" size={11} color={colors.textDim} style={{ marginLeft: 4 }} />
-                  <Text style={styles.sub}>{capacity}</Text>
-                  {invisible && <Ionicons name="eye-off" size={11} color={colors.textDim} style={{ marginLeft: 4 }} accessibilityLabel="Gizli giriş" />}
-                  <Text style={[styles.sub, { flexShrink: 1, marginLeft: 2 }]} numberOfLines={1}>
-                    {' · '}
-                    {typeInfo.name}
-                    {layout ? ` · ${modeById(layout.modeId).name}` : ''}
-                    {agencyRoom ? ' · Ajans odası' : ''}
-                    {myRank === 3 ? ' · Sahibi' : myRank > 0 ? ` · ${rankLabel('me')}` : ''}
-                  </Text>
-                </Pressable>
-              </View>
+              {(soloPk || roomRocket.rocket?.on) && (
+                <View style={styles.subLine}>
+                  {/* Normal PK: its timer pill leads the line; on a narrow phone the line's end gives way, not the pill. */}
+                  {soloPk && <SoloPkPill pk={soloPk} canManage={canManage && !offline} />}
+                  {roomRocket.rocket?.on && <RocketPill rocket={roomRocket.rocket} onPress={() => setPanel('rocket')} />}
+                </View>
+              )}
             </View>
             {canManage && (micQueue || queue.length > 0) && (
               <Pressable onPress={() => setPanel('requests')} accessibilityLabel={`Konuşma istekleri, ${queue.length} kişi`} hitSlop={HEAD_SLOP}>
@@ -3872,7 +3904,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
               />
             }
             chat={(onBasis) => (
-              <ChatFeed messages={messages} visible={visibleInAll} renderItem={renderChat} renderTyping={renderTyping} screenHeight={win.height} fill={typing} onLarge={setSeatsSmall} onBasis={onBasis} hidden={emojiOpen && !typing} onTouch={emojiOpen ? () => setEmojiOpen(false) : undefined} sideRoom={wheelShown || (bagsUp && !typing) ? WHEEL_ROOM : 0} />
+              <ChatFeed messages={messages} visible={visibleInAll} renderItem={renderChat} renderTyping={renderTyping} screenHeight={win.height} fill={typing} onLarge={setSeatsSmall} onBasis={onBasis} hidden={emojiOpen && !typing} onTouch={emojiOpen ? () => setEmojiOpen(false) : undefined} sideRoom={wheelShown || (bagsUp && !typing) ? WHEEL_ROOM : 0} mentions={chipMentions} onMentionsSeen={mentionsSeen} attended={chatAttended} />
             )}
             overlay={
               emojiOpen && (
@@ -4083,6 +4115,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         title={title}
         cover={cover}
         theme={theme}
+        roomType={roomType}
         level={level}
         xp={isOwn ? myRoom.xp : real ? (ownerStats?.xp ?? base!.xp ?? null) : null}
         // A server room's owner too (the server knows them: the room's owner id is mine).
@@ -4258,7 +4291,6 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       {panel === 'rocket' && roomRocket.rocket && (
         <RocketSheet rocket={roomRocket.rocket} onClose={closePanel} onGift={() => (setPanel(null), setGiftTo(null), setGiftOpen(true))} />
       )}
-      {roomRocket.show && !settings.effectsOff && <RocketShow key={`${roomRocket.show.launch}:${roomRocket.show.event}`} news={roomRocket.show} still={settings.reduceMotion} muted={fxMuted} onDone={roomRocket.next} />}
       {real && panel === 'bag' && (
         <LuckyBagSheet
           visible
@@ -4567,12 +4599,12 @@ function RoomRoot({ sheetSpace: space, children }: { sheetSpace: number | null; 
 const styles = StyleSheet.create({
   // Over the stage's headroom (components/room/fit-stage), so its buttons keep their whole touch area.
   header: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingTop: 4, paddingBottom: 8, zIndex: 1 },
-  title: { color: '#fff', fontSize: 15, fontWeight: '700', flexShrink: 1 },
-  sub: { color: colors.textDim, fontSize: 12 },
-  subRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  subLine: { flexDirection: 'row', alignItems: 'center', gap: 6, overflow: 'hidden' },
-  subShrink: { flexShrink: 1, minWidth: 0, overflow: 'hidden' },
-  levelBadge: { position: 'absolute', bottom: -4, alignSelf: 'center', backgroundColor: colors.primary, borderRadius: 6, paddingHorizontal: 4, borderWidth: 1, borderColor: 'rgba(165,243,245,0.35)', boxShadow: '0 0 8px rgba(255,95,162,0.35)' },
+  headText: { flex: 1, justifyContent: 'center' },
+  title: { color: '#fff', fontSize: 15, lineHeight: TITLE_LINE, fontWeight: '700', flexShrink: 1 },
+  subLine: { flexDirection: 'row', alignItems: 'center', gap: 6, height: PILL_LINE, overflow: 'hidden' },
+  // The badge may be wider than the photo (centred under it): a two-digit level stays on one line.
+  levelWrap: { position: 'absolute', bottom: -4, left: -10, right: -10, alignItems: 'center' },
+  levelBadge: { backgroundColor: colors.primary, borderRadius: 6, paddingHorizontal: 4, borderWidth: 1, borderColor: 'rgba(165,243,245,0.35)', boxShadow: '0 0 8px rgba(255,95,162,0.35)' },
   levelText: { color: '#fff', fontSize: 10, lineHeight: 13, fontWeight: '800' },
   reqBadge: { position: 'absolute', top: -4, right: -6, backgroundColor: colors.red, borderRadius: 8, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center' },
   reqBadgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },

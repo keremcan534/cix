@@ -116,8 +116,16 @@ export function rocketPct(l: Pick<RocketLevel, 'filled' | 'goal' | 'launched'>):
   if (l.launched || l.filled >= l.goal) return 100;
   return Math.min(99.9, Math.floor((l.filled / l.goal) * 1000) / 10);
 }
-/** "57,5%" (Turkish decimals; a whole number without them). */
-export const pctText = (pct: number) => `${pct.toLocaleString('tr-TR', { maximumFractionDigits: 1 })}%`;
+/** "%57,5": the Turkish way, the sign first, one decimal (a whole number without it). */
+export const pctText = (pct: number) => `%${pct.toLocaleString('tr-TR', { maximumFractionDigits: 1 })}`;
+/**
+ * The pill under the room's name: "Lv.2 · %12,9", the level and how full it is apart (Güncelleme 7, madde 5a: "Lv.2
+ * 12,9%" read as "Lv.212,9%"); "Lv.5 ✓" once all five launched today.
+ */
+export const pillText = (r: RoomRocket) => {
+  const l = r.levels[shownLevel(r) - 1];
+  return r.current === null ? `Lv.${ROCKET_LEVELS} ✓` : `Lv.${l.level} · ${pctText(rocketPct(l))}`;
+};
 /** The level the pill and the sheet show first: the one filling now, else the last. */
 export const shownLevel = (r: RoomRocket) => r.current ?? ROCKET_LEVELS;
 /** A prize in a few words: "750 jeton", "Neon Halka · 3 gün". */

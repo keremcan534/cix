@@ -9,6 +9,7 @@ import { StyleSheet, View } from 'react-native';
 import { Text } from '@/components/text';
 import { BOND_KINDS, bondTint, demoRoomBonds, type RoomBond } from '@/data/bonds';
 import { liveMode } from '@/lib/live';
+import { KNOT, knotBox, lineBox } from '@/lib/bond-link';
 import { loadRoomBonds } from '@/lib/live/bonds';
 
 /** Wait after the last join or leave before asking the server again (people come in waves). */
@@ -41,21 +42,27 @@ export function useRoomBonds(members: readonly string[], real: boolean): RoomBon
 
 /**
  * Lv4 line from this seat's avatar to the next seat's avatar in the row. Drawn inside the seat (absolute, past its
- * right edge by half a seat plus the row gap), so the mic layout never moves or wraps because of it.
+ * right edge by half a seat plus the row gap), so the mic layout never moves or wraps because of it. The seat draws it
+ * before its own face, so it passes behind both frames (lib/bond-link); the knot is the next seat's (BondKnot).
  */
-export function BondLink({ bond, size, gap }: { bond: RoomBond; size: number; gap: number }) {
+export function BondLine({ bond, size, gap }: { bond: RoomBond; size: number; gap: number }) {
   const [c1, c2] = bondTint(bond.kind);
   return (
-    <View
-      pointerEvents="none"
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
-      style={[st.link, { top: size / 2 - 1.5, marginLeft: size / 2 - 1, marginRight: size / 2 - 1 - gap }]}
-    >
+    <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[st.link, lineBox(size, gap)]}>
       <LinearGradient colors={[c1, c2, c1]} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={st.line} />
-      <View style={[st.knot, { backgroundColor: c2 }]}>
-        <Ionicons name={BOND_KINDS[bond.kind].icon} size={9} color="#fff" />
-      </View>
+    </View>
+  );
+}
+
+/**
+ * The Lv4 line's knot (the bond kind's icon), drawn by the RIGHT seat of the pair after its own face, in the middle of
+ * the gap: over both frames (lib/bond-link).
+ */
+export function BondKnot({ bond, size, gap }: { bond: RoomBond; size: number; gap: number }) {
+  const [, c2] = bondTint(bond.kind);
+  return (
+    <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[st.knot, knotBox(size, gap), { backgroundColor: c2 }]}>
+      <Ionicons name={BOND_KINDS[bond.kind].icon} size={9} color="#fff" />
     </View>
   );
 }
@@ -84,9 +91,9 @@ export function BondChip({ bond }: { bond: RoomBond }) {
 }
 
 const st = StyleSheet.create({
-  link: { position: 'absolute', left: '50%', right: '-50%', height: 3, alignItems: 'center', justifyContent: 'center' },
+  link: { position: 'absolute' },
   line: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, borderRadius: 2, boxShadow: '0 0 6px rgba(255,140,170,0.8)' },
-  knot: { width: 16, height: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.9)', boxShadow: '0 0 8px rgba(255,255,255,0.35)' },
+  knot: { position: 'absolute', borderRadius: KNOT / 2, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.9)', boxShadow: '0 0 8px rgba(255,255,255,0.35)' },
   bubble: { borderRadius: 14, borderTopLeftRadius: 4, paddingHorizontal: 10, paddingVertical: 6, alignSelf: 'flex-start', borderWidth: 1, borderColor: 'rgba(255,255,255,0.45)' },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 2, borderRadius: 999, paddingHorizontal: 5, paddingVertical: 1 },
   chipText: { color: '#fff', fontSize: 9, fontWeight: '900' },
