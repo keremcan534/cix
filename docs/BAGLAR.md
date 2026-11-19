@@ -4,22 +4,52 @@
 
 Sekmede iki bölüm var: **Çift** ve **Aile ve Dost** (diğer yedi tür). Aile ve Dost boşken yedi tür resmi ve fiyatıyla görünür; başkasının profilinde birine dokununca fiyat bir kez sorulur ve istek gider. Doluyken bağların üstünde türlerin adları yazar. Sohbetteki **kalp** başka bir şeydir: iki kişinin yakınlığı, hediye ve sohbetle dolar, sessiz kalınca düşer (`one-on-one.mjs`, [`SUNUCU.md`](SUNUCU.md)).
 
-Odadaki hediye panelinde **Aile ve Dost** rafı var: Koruma Kartı ve yedi bağ hediyesi. Bu raftan gönderilen bağ hediyesi bağ isteğidir: jeton bekletilir, kabul edilince bağ kurulur, reddedilirse geri döner. Tek kişiye, birer birer gider. Panelde Hediyeler › Aile ve Dost rafından adı, ikonu, videosu ve fiyatı değişir (aşağıda **Fiyat panelden**). Eski APK'lar bu rafı görmez; Koruma Kartı onlarda İkili rafında kalır.
+Odadaki hediye panelinde **Aile ve Dost** rafı var: Koruma Kartı ve yedi bağ hediyesi. Bu raftan gönderilen bağ hediyesi, aranızda bağ yoksa bağ isteğidir: jeton bekletilir, kabul edilince bağ kurulur, reddedilirse geri döner; tek kişiye, birer birer gider. Aranızda **o türde bir bağ varsa** normal hediye olarak gider (aşağıda **Bağ hediyesi yeniden**). Panelde Hediyeler › Aile ve Dost rafından adı, ikonu, videosu ve fiyatı değişir (aşağıda **Fiyat panelden**). Eski APK'lar bu rafı görmez; Koruma Kartı onlarda İkili rafında kalır.
+
+## Güncelleme 7 (19 Kasım 2026): bağ hediyesi yeniden, seviye düşüşü, Lv20, işaretler, Sistem bildirimleri
+
+Müşterinin isteği: "Bağları olan kişilere aynı hediyeler tekrardan atılmıyor; seviyeler artmalı ve atış olmazsa düşmeli, hiç atış olmazsa bağ düşmeli; seviyeye göre değişen işaretler; sınırsız bağ; her bağ bildirimi SimilarClub Sistem'e; bağ iptal edilebilmeli." Sahiplerin kararları (hepsi önerilen):
+
+- **Bağ hediyesi yeniden:** aranızda **aynı türde** etkin bir bağ varsa bağ hediyesi `POST /api/gifts/send` ile **normal ücretli hediye** olarak gider: jeton hemen karşı tarafa elmas olur (Gelir kilidi, ajans geliri, PK, oda roketi, oda puanı, Koruma, hepsi her hediye gibi), istediğin kadar (×1, ×5, ×10 …), iki taraf da gönderebilir ve her 100 jeton 1 bağ puanı getirir. Fiyat ekranda görünen fiyattır; arada değişmişse 409 `price_changed`, hiçbir şey düşmez.
+  - Aranızda bağ yoksa: 409 `bond_needed` ("Aranızda Kanka bağı yok: bu hediye önce bağ isteği olarak gider"); yeni uygulama bunu bağ isteği olarak göndermeyi önerir.
+  - Aranızda **başka türde** bağ varsa: 409 `bond_kind` "Aranızda Kanka bağı var". İki kişi arasında yine tek bağ olur.
+  - Bağın etkin olduğu, hediyenin istek kimliği (ref) kaydedildikten sonra, iki hesap kilitliyken bağ satırı `FOR SHARE` ile denetlenir: aynı anda gelen bitirme hediyeyi bekler, hediyenin puanı gerçekten var olan bağa yazılır; aynı isteğin tekrarı yine tekrar cevabını alır.
+  - Uygulamada: odanın Aile ve Dost rafında bağın olan kişiyi seçince adet seçilebilir ve altta "+5 bağ puanı" yazar. Başka türde bağın olan kişiye "Aranızda Kanka bağı var" yazar, gönderilemez. Profilin Bağlar sekmesinde her bağın altında **Bağ hediyesi gönder** düğmesi var (adet seçilir: ×1 … ×100, puanıyla). Bağ Yüzüğü (Çift) rafta yok; Çift bağına yeniden yalnız bu düğmeyle gönderilir.
+  - **Eski APK:** bağ hediyesini her zaman istek olarak gönderir. Bağı olan kişiye gönderirse 409 "Aranızda Kanka bağı var. Bağ hediyesini yeniden göndermek için uygulamayı güncelle" görür, jeton düşmez. Bağı olan iki kişinin normal hediyeleri eski APK'da da puan getirir.
+- **Sınırsız bağ:** Aile türleri (Kardeş, Bacı, Ağabey, Abla, Yenge, Enişte) ve Kanka için kişi başına en fazla **1000** (pratikte sınırsız, panelden düşürülebilir). Çift yine **1** (panelden 5'e kadar). Bekleyen istek yine en fazla **10**: her istek jetonunu bekletir.
+  - Profilde bağlar 50'şer gelir, altta "+N bağ daha" (`GET /api/bonds?offset=`). Eski APK ilk 50'yi görür.
+  - Odada `POST /api/bonds/among` artık ikisi de odadaki kişiler arasındaki bütün bağları ve her kişinin sohbet balonu için en iyi Lv10+ bağını (eşi odada olmasa da) verir; eskisi gibi 500 satırda kesilmez, çok bağı olan birinin yanındaki bağ kaybolmaz.
+- **Puan düşüşü:** Türkiye saatiyle her gece, o gün iki taraftan hiçbiri diğerine hediye göndermediyse bağ puanının **%10'u, en az 10 puan** düşer (0'ın altına inmez). İki taraftan birinin o gün gönderdiği herhangi bir hediye (bağ hediyesi, odadaki, sohbetteki, Şanslı hediyenin payı) o günün düşüşünü durdurur. Mesajlaşma puan getirmeye devam eder ama düşüşü durdurmaz. **Kabulden sonraki ilk gece düşmez.** Puan düşünce seviye de düşebilir.
+  - **Kendiliğinden bitiş:** **30 gün** boyunca iki taraftan hiç hediye gitmezse bağ kendiliğinden biter: jeton iadesi yok, yeniden kurmak için **bekleme yok**. Bitmeden **3 gün önce** iki tarafa SimilarClub Sistem'den bir kez uyarı gider.
+  - Güncellemeden önce kurulmuş bağların sayacı güncellemenin yapıldığı gün başlar (eski kural "puan düşmez" diyordu).
+  - Hepsi Canlı ayarlar › Bağlar'dan değişir (`bond_drop_pct`, `bond_drop_flat`, `bond_idle_end_days` (0: hiç bitmez), `bond_idle_warn_days`).
+  - Koruma olduğu gibi kaldı ([`KORUMA.md`](KORUMA.md)).
+- **Seviyeler Lv20'ye kadar:** basamaklar Canlı ayarlar › Bağlar › **Seviye basamakları**'ndan değişir (20 sayı, ilki 0). Puan = (birbirinize gönderilen jeton / 100) + sohbet puanı − gecelerin aldığı (0'ın altına inmez).
+- **İşaretler:** iki kişinin arasında bağ türünün resmi, seviyeye göre büyüyen bir halkanın içinde ve altında "Lv" etiketi. Halka her beş seviyede değişir: Lv1–5 ince (Çift pembe, diğerleri mavi), Lv6–10 türün renginde parlayan, Lv11–15 altın, Lv16–20 parlak elmas halka ve yıldız.
+  - Profilin Bağlar satırında iki fotoğrafın arasında, isim yanındaki rozette küçük haliyle, odada yan yana oturan iki kişinin arasında.
+  - **Odada işaret Lv1'den görünür** (eskiden Lv4'ten, 16 px düğüm). Mikrofonların arasındaki çizgi iki çerçevenin arkasından geçer, işaret ikisinin de önünde durur; boyu yüze göre 24–34 px, etiket en az 9 px (telefonun yazı büyütmesinden etkilenmez).
+  - Yeni çizim gerekmedi: var olan 8 bağ resmi ve 4 halka. Eski APK'lar eski çizimi (Lv4 düğüm) gösterir.
+- **Sistem bildirimleri (3a):** her bağ değişikliği Mesajlar › SimilarClub Sistem'e bir kez yazılır (tür `bond`, panelde "Bağ bildirimleri"; Canlı ayarlar › SimilarClub Sistem'den kapatılabilir). Bildirime dokununca kendi Bağlar sekmem açılır (istekler orada cevaplanır).
+  - İstek → alana · kabul → ikisine · ret, süre dolması, satın alma iadesiyle iptal → isteyene (iade edilen jetonla) · geri çekme → alana · bitirme → diğer tarafa · seviye değişince (yükselme ya da düşme) → ikisine · bitiş uyarısı ve kendiliğinden bitiş → ikisine. Her gece düşen puan için bildirim gitmez, yalnız seviye değişince.
+  - Bildirimler değişiklik kaydolduktan sonra yazılır, hediye işleminin içinde asla. Telefona bildirim (push) bugünkü gibi yalnız istek, kabul, ret ve bitirmede gider; Sistem kayıtları ayrıca push göndermez.
+  - Bağ push'una dokunmak eskiden boş Bildirimler ekranını açıyordu; yeni APK'da Bağlar sekmesini açar. Eski APK'larda push yine Bildirimler'i açar ama aynı bildirim Similar Ekibi'nde "Duyuru" kartı olarak durur ve dokununca Bağlar sekmesine gider.
+- **Bağı bitirme (3b):** her bağ satırında görünür **Bağı bitir** düğmesi (eskiden yazısız "…"); onay sorulur. Onaydaki bekleme süresi panelin değeridir (eskiden hep "7 gün" yazıyordu). Kurallar sayfası ("?") puan düşüşünü ve kendiliğinden bitişi anlatır; "Puan düşmez" cümlesi kalktı.
+  - **Eski APK'lar** kendi içindeki eski kural yazısını ("Puan düşmez") göstermeye devam eder. Kullanıcılara bir duyuruyla (Canlı ayarlar › Duyuru ya da Similar Ekibi) söylenmeli: "Bağ puanları artık hediyesiz gecelerde düşüyor; 30 gün hediye gitmeyen bağ bitiyor. Bağ hediyesini tekrar göndermek için uygulamayı güncelleyin."
 
 ## Kurallar
 
 | Tür | Bağ hediyesi | Fiyat | Bir kişide en fazla |
 |---|---|---|---|
 | Çift | Bağ Yüzüğü | 5.000 jeton | 1 |
-| Kardeş | Kardeş Bilekliği | 1.000 jeton | 3 |
-| Bacı | Bacı Kolyesi | 1.000 jeton | 3 |
-| Ağabey | Ağabey Saati | 1.000 jeton | 3 |
-| Abla | Abla Broşu | 1.000 jeton | 3 |
-| Yenge | Yenge Çiçeği | 1.000 jeton | 3 |
-| Enişte | Enişte Kravatı | 1.000 jeton | 3 |
-| Kanka | Kanka Rozeti | 500 jeton | 5 |
+| Kardeş | Kardeş Bilekliği | 1.000 jeton | 1000 |
+| Bacı | Bacı Kolyesi | 1.000 jeton | 1000 |
+| Ağabey | Ağabey Saati | 1.000 jeton | 1000 |
+| Abla | Abla Broşu | 1.000 jeton | 1000 |
+| Yenge | Yenge Çiçeği | 1.000 jeton | 1000 |
+| Enişte | Enişte Kravatı | 1.000 jeton | 1000 |
+| Kanka | Kanka Rozeti | 500 jeton | 1000 |
 
-Tablodaki fiyatlar ve sınırlar uygulamanın kendi değerleridir. Fiyat Hediyeler'den; sınırlar, cevap süresi, bekleme ve sohbet puanı Canlı ayarlar › **Bağlar**'dan değişir ([`ELLE_AYARLAR.md`](ELLE_AYARLAR.md)).
+Tablodaki fiyatlar ve sınırlar uygulamanın kendi değerleridir (1000: pratikte sınırsız; Güncelleme 7'den önce 3 ve 5). Fiyat Hediyeler'den; sınırlar, cevap süresi, bekleme, sohbet puanı, gece düşüşü, kendiliğinden bitiş ve seviye basamakları Canlı ayarlar › **Bağlar**'dan değişir ([`ELLE_AYARLAR.md`](ELLE_AYARLAR.md)).
 
 **Fiyat panelden (19 Kasım 2026):** Hediyeler › Aile ve Dost'ta bağ hediyesinin fiyatı değişir; **Orijinale dön** uygulamanın fiyatına geri alır.
 - Yeni uygulama Bağlar sekmesinde ve odadaki rafta panelin fiyatını gösterir ve gösterdiği fiyatı istekle gönderir. Arada fiyat değiştiyse jeton düşmez, yeni fiyat söylenir.
@@ -30,24 +60,25 @@ Tablodaki fiyatlar ve sınırlar uygulamanın kendi değerleridir. Fiyat Hediyel
 - **Kabul:** jetonlar karşı tarafa elmas olarak geçer, normal bir hediye gibi (Gelir kilidi, ajans geliri, finans panelinde hediye olayı `bag-<tür>`).
 - **Ret, geri çekme, 3 gün yanıtsız kalma:** jetonlar gönderenin aynı jeton kaynağına geri döner. Finans paneline olay gitmez.
 - Aynı iki kişi arasında aynı anda tek bağ (ya da tek bekleyen istek) olur. Bir kişinin aynı anda en fazla 10 bekleyen isteği olur.
-- **Puan:** bağ sürerken birbirinize gönderdiğiniz her 100 jeton 1 puan (bağ hediyesi dahil); karşılıklı mesajlaşmada karşı tarafın mesajına verilen her yanıt 1 puan, günde en fazla 10 (İstanbul günü). Puan düşmez.
-- **Seviye:** Lv1 0 · Lv2 10 · Lv3 30 · Lv4 60 · Lv5 100 · Lv6 200 · Lv7 400 · Lv8 700 · Lv9 1.200 · Lv10 2.000 puan.
-- **Ödüller:** Lv2 profilde bağ rozeti · Lv4 mikrofonda yan yana oturunca bağ çizgisi · Lv6 profil çerçevesi · Lv8 odaya birlikte giriş efekti · Lv10 özel sohbet balonu.
-- **Bitirme:** iki taraf da istediği zaman bitirebilir. Seviye ve ödüller sıfırlanır, jeton iadesi yok. Aynı kişiyle 7 gün yeniden bağ kurulamaz.
+- **Puan:** bağ sürerken birbirinize gönderdiğiniz her 100 jeton 1 puan (bağ hediyesi dahil); karşılıklı mesajlaşmada karşı tarafın mesajına verilen her yanıt 1 puan, günde en fazla 10 (İstanbul günü). Hediyesiz gecelerde düşer (yukarıda **Puan düşüşü**).
+- **Seviye:** Lv1 0 · Lv2 10 · Lv3 30 · Lv4 60 · Lv5 100 · Lv6 200 · Lv7 400 · Lv8 700 · Lv9 1.200 · Lv10 2.000 · Lv11 3.000 · Lv12 4.500 · Lv13 6.500 · Lv14 9.000 · Lv15 12.000 · Lv16 16.000 · Lv17 21.000 · Lv18 27.000 · Lv19 35.000 · Lv20 45.000 puan (Lv20 = 4,5 milyon jeton).
+- **Ödüller:** Lv1 mikrofonda yan yana oturunca bağ işareti · Lv2 profilde bağ rozeti · Lv6 profil çerçevesi · Lv8 odaya birlikte giriş efekti · Lv10 özel sohbet balonu. (Eski APK'larda mikrofon çizgisi Lv4'ten.)
+- **Bitirme:** iki taraf da istediği zaman bitirebilir ("Bağı bitir"). Seviye ve ödüller sıfırlanır, jeton iadesi yok. Aynı kişiyle 7 gün yeniden bağ kurulamaz (Canlı ayarlar); kendiliğinden biten bağda bekleme yok.
 - **Gizlilik:** kendi Bağlar sekmendeki göz simgesi bağlarını başkalarından gizler (rozet ve çerçeve de görünmez). Sen her zaman görürsün.
 - Engellenen biriyle bağ kurulamaz; silinen hesabın bağları kendiliğinden biter, bekleyen isteklerin jetonu iade edilir.
 
 ## Odada
 
-- **Lv4 bağ çizgisi:** bağlı iki kişi mikrofonda yan yana (aynı sırada, biri ev sahibi değil) oturunca avatarları arasında bağ renginde parlayan çizgi ve ortasında bağ simgesi. Çift pembe, diğerleri mavi. Çizgi iki kişinin çerçevesinin de arkasından geçer, simge ikisinin de önünde durur (Güncelleme 7, madde 13: eskiden soldaki çerçevenin üstünden, sağdakinin altından geçiyordu). Soldaki koltuk çizgiyi kendi yüzünden önce, sağdaki koltuk simgeyi en son çizer (`src/lib/bond-link.ts`, `tests/bond-link.test.ts`). Eski APK'larda eski çizim kalır.
+- **Bağ işareti (Lv1'den):** bağlı iki kişi mikrofonda yan yana (aynı sırada, biri ev sahibi değil) oturunca avatarları arasında bağ renginde parlayan çizgi ve ortasında bağın işareti (türün resmi, seviyenin halkası, "Lv" etiketi; yukarıda **İşaretler**). Çizgi iki kişinin çerçevesinin de arkasından geçer, işaret ikisinin de önünde durur (Güncelleme 7, madde 13: eskiden soldaki çerçevenin üstünden, sağdakinin altından geçiyordu). Soldaki koltuk çizgiyi kendi yüzünden önce, sağdaki koltuk işareti en son çizer (`src/lib/bond-link.ts`, `src/components/bond-mark.tsx`, `tests/bond-link.test.ts`). Eski APK'larda eski çizim (Lv4, 16 px düğüm) kalır.
 - **Lv8 birlikte giriş:** yalnız ikisi odaya aynı anda girdiğinde (aralarında en çok 20 saniye, `JOINT_WINDOW_MS`) "A & B · Çift Lv8 · birlikte odaya girdi" giriş efekti, iki fotoğrafla; ikisinin kendi giriş efektlerinden sonra, onların yerine değil. Biri, bir süredir odada olan eşinin yanına girerse yalnız kendi girişi gösterilir (çift bildirimi yok). Her ikili bir ziyarette bir kez: ilk birlikte girişte; aynı ziyarette çıkıp yine birlikte girince tekrar gösterilmez. Odaya sonradan giren, içeridekilerin girişlerini ve birlikte girişini görmez. Giriş zamanları sunucu odasında ses sunucusunun saatinden (LiveKit), demo odasında telefonun saatinden. Giriş efektleri sırayla oynar (en fazla 3 bekler); efektleri kapatan ya da görünmez giren görmez, engellenen kişiler gösterilmez.
 - **Lv10 sohbet balonu:** kişinin mesajı bağ renginde balonla ve adının yanında "Çift Lv10" etiketiyle görünür. Takılı özel balon varsa o önce gelir. Birden çok Lv10 bağı varsa Çift önce, sonra en yüksek seviye.
-- Sunucu odalarında bağlar `POST /api/bonds/among { ids }` ile gelir (odadakilerin etkin bağları, eşi odada olmasa da; en fazla 80 kişi). Gizleyen birinin bağı başkasına gelmez, kendisine gelir. Katılma ve ayrılmalardan 1,2 saniye sonra yeniden sorulur.
+- Sunucu odalarında bağlar `POST /api/bonds/among { ids }` ile gelir (en fazla 80 kişi): ikisi de odadakiler arasındaki etkin bağlar ve her kişinin en iyi Lv10+ bağı (balon için, eşi odada olmasa da). Gizleyen birinin bağı başkasına gelmez, kendisine gelir. Katılma ve ayrılmalardan 1,2 saniye sonra, bir bağ hediyesi bağ yüzünden reddedilince de hemen yeniden sorulur.
 
 ## Nerede
 
-- Sunucu: `server/api/bonds.mjs` (uçlar), `server/api/bond-rules.mjs` (türler, fiyatlar, seviyeler), tablo `migrations/012_bonds.sql`, testler `test/bonds.test.mjs`.
-- Uygulama: `src/components/bonds.tsx` (sekme, rozet, çerçeve), `src/data/bonds.ts` (aynı kurallar ve çevrimdışı örnek), `src/lib/live/bonds.ts` (sunucu çağrıları). `tests/bonds.test.ts` iki tarafın fiyat ve seviyelerinin aynı kaldığını denetler.
+- Sunucu: `server/api/bonds.mjs` (uçlar, bağ hediyesi denetimi), `server/api/bond-life.mjs` (gece düşüşü, kendiliğinden bitiş, Sistem bildirimleri), `server/api/bond-rules.mjs` (türler, fiyatlar, seviyeler, halka basamakları), tablo `migrations/012_bonds.sql` ve `099_bond_decay.sql` (`points_lost`, `gift_day`, `decayed_on`, `level`, `level_said`, `told_status`, `end_reason`), testler `test/bonds.test.mjs`.
+- Uygulama: `src/components/bonds.tsx` (sekme, rozet, çerçeve), `src/components/bond-mark.tsx` (işaret), `src/data/bonds.ts` (aynı kurallar, halkaların görünüşü, kurallar yazısı ve çevrimdışı örnek), `src/lib/live/bonds.ts` (sunucu çağrıları). `tests/bonds.test.ts` ve `tests/bond-marks.test.ts` iki tarafın fiyat, seviye ve basamaklarının aynı kaldığını denetler.
+- Bir gece işi bütün etkin bağ satırlarına günde bir kez yazar (500'erli, hesap satırına dokunmadan); bağ sayısı çok büyürse süresi `bond drop:` kaydından izlenir.
 - Çevrimdışı demoda örnek bağlar gösterilir; gönderilen istekler telefonda tutulur ve geri çekilebilir.
 
 ## Görsel listesi (ChatGPT)

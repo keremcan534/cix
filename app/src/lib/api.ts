@@ -973,8 +973,14 @@ export const adminEventReport = (days: number) => call<{ report: EventReport }>(
 export type ServerBond = {
   id: number; kind: string; label: string; status: 'pending' | 'active' | 'refused' | 'expired' | 'withdrawn' | 'ended'; requester: boolean;
   partner: UserCard; price: number; score: number; level: number; nextLevelAt: number | null; createdAt: string; expiresAt: string; since: string | null;
+  /** Güncelleme 7 (an older server sends none): days since the last gift either way, days before a quiet bond ends. */
+  quietDays?: number | null; endsInDays?: number | null;
 };
-export const bonds = (user?: string) => call<{ hidden: boolean; bonds: ServerBond[] }>('GET', user ? `/api/bonds?user=${encodeURIComponent(user)}` : '/api/bonds');
+/** 50 a page from `offset`; `next`: the next page's offset (null at the end; an older server sends none). */
+export const bonds = (user?: string, offset = 0) => {
+  const q = [user ? `user=${encodeURIComponent(user)}` : '', offset > 0 ? `offset=${offset}` : ''].filter(Boolean).join('&');
+  return call<{ hidden: boolean; bonds: ServerBond[]; total?: number; next?: number | null }>('GET', `/api/bonds${q ? `?${q}` : ''}`);
+};
 export const bondRequests = () => call<{ incoming: ServerBond[]; outgoing: ServerBond[] }>('GET', '/api/bonds/requests');
 /** `price`: the bond gift's price this phone showed; another one now is a 409 price_changed and nothing is taken. */
 export const requestBond = (to: string, kind: string, ref = newRef(), room?: string, price?: number) =>

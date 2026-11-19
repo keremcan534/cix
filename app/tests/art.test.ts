@@ -27,7 +27,7 @@ const ART_FILES = [
   'components/events/event-art.ts',
   'components/room-banners.tsx',
   'app/(tabs)/mesajlar.tsx',
-  'components/bonds.tsx',
+  'components/bond-mark.tsx',
   'components/heart-level.tsx',
 ];
 

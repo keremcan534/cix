@@ -46,7 +46,9 @@ describe('Canlı ayarlar › Bağlar', () => {
     const ask = (to, kind = 'kanka') => call('POST', '/api/bonds/request', { to: to.user.id, kind, ref: rnd(8) }, a.session);
     await setLive({ bond_max_kanka: 1, bond_answer_days: 5, bond_cooldown_days: 0, bond_pending_max: 2 });
     const cat = await catalog();
-    assert.deepEqual([cat.bonds.max.kanka, cat.bonds.max.kardes, cat.bonds.answerDays, cat.bonds.cooldownDays], [1, 3, 5, 0]);
+    assert.deepEqual([cat.bonds.max.kanka, cat.bonds.max.kardes, cat.bonds.answerDays, cat.bonds.cooldownDays], [1, 1000, 5, 0]);
+    // Güncelleme 7's numbers ride along (an older app reads only the four above).
+    assert.deepEqual([cat.bonds.levels.length, cat.bonds.levels[9], cat.bonds.dropPct, cat.bonds.dropFlat, cat.bonds.idleEndDays, cat.bonds.idleWarnDays], [20, 2000, 10, 10, 30, 3]);
     assert.equal((await ok(call('GET', '/api/bonds/info'))).kinds.find((k) => k.id === 'kanka').max, 1);
     // One Kanka at a time (the pending one counts for the asker).
     const first = await ok(ask(b), 'ilk kanka');

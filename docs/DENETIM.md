@@ -163,6 +163,16 @@ modunda olması, hata takibi olmaması ve kırık kodun birleşmeden önce yakal
 3. **Uçtan uca testler ve gece kontrolü** (Sonra).
 4. Sizden gelecek hesaplar geldikçe: Sentry, analitik, push, görsel moderasyon bağlantıları.
 
+## Bağlar, Güncelleme 7 (19 Kasım 2026, sahiplerin kararları)
+
+Ayrıntı: [`BAGLAR.md`](BAGLAR.md). Bağ hediyesi bağı olana normal hediye olarak tekrar gider, puan hediyesiz gecelerde düşer, 30 gün hediyesiz bağ biter, Aile ve Kanka bağları pratikte sınırsız (1000), her bağ değişikliği SimilarClub Sistem'e yazılır.
+
+- **Eski APK'lara duyuru (siz: bir metin):** eski APK'nın Bağlar kuralları yazısı uygulamanın içinde ve hâlâ "Puan düşmez" diyor; sunucu ise artık puan düşürüyor ve bağı bitirebiliyor. Bir duyuru (Canlı ayarlar › Duyuru ya da Similar Ekibi) önerilir: "Bağ puanları artık hediyesiz gecelerde düşüyor; 30 gün hediye gitmeyen bağ kendiliğinden bitiyor. Bağ hediyesini tekrar göndermek için uygulamayı güncelleyin." Kurulu bağların sayacı güncellemenin yapıldığı gün başlar: ilk bitiş en erken 30 gün sonra.
+- **Taciz kanalı (moderasyon):** sınırsız bağ, çok kişiye istek atmayı kolaylaştırır. Sınırlayanlar: her istek jetonu bekletir, aynı anda en çok 10 bekleyen istek, dakikada 10 istek, engel. Şikâyet gelirse Canlı ayarlar › Bağlar'dan sınır düşürülür.
+- **Para:** bağ hediyesinin tekrarı her hediye gibi `gifts/send`'den gider (fiyat ekrandaki, istek kimliği, kilit sırası aynı). Yazılırken, aynı anda bağ bitirme ve hediye testinde eski bir kilitlenme bulundu ve düzeltildi: bağı bitirme hesap kilitlerini almadan bağ satırını yazıyordu, hediye ise hesapları kilitleyip bağ satırını bekliyordu (Kasım dersiyle aynı: `ended_by` hesap satırını denetler). Artık bitirme de önce iki hesabı, sonra bağı kilitler. Para karıştırma testine bağ hediyesi ve bitirme eklendi.
+- **Bağ Yüzüğü (Çift) panelden gizlenemez:** rafta değil (katalogda `bag-cift` yok), tekrarı yalnız profildeki düğmeden ve uygulamanın fiyatıyla gider. Gizlemek ya da fiyatını değiştirmek gerekirse önce rafa eklenmeli (iki tarafta derlenmiş katalog değişikliği, yeni APK).
+- **Yük:** gece işi her etkin bağ satırına günde bir kez yazar (500'erli, hesap kilidi yok); oda listesi `among` artık kesilmeden, kişi başına endeksle okur; profil 50'şer sayfalanır. Bağ sayısı yüz binleri geçerse gece işinin süresi `bond drop:` kaydından izlenmeli. Yük testi bu sürümle tekrarlanmadı.
+
 ## Mesaj bildirimi varsayılanı (18 Kasım 2026, sahip kararı)
 
 Mesajlar'daki "Yalnızca samimi kişilerden bildirim al" seçeneği herkeste açık başlar. Bu yüzden karşılıklı takipleşmeyen ve aralarında kalp seviyesi olmayan birinin mesajı telefona bildirim düşürmez. Yayıncılar, ilk kez yazıp ücret ödeyen kişinin mesajını uygulamayı açınca görür; yayıncı geliri düşerse ilk bakılacak yer burasıdır. Eski APK bu seçeneği göstermediği için eski APK kullanan kişi kapatamaz. Varsayılan `server/api/privacy.mjs` ve `migrations/095_contact_prefs.sql` içindedir.

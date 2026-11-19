@@ -1,6 +1,7 @@
 // Bağlar: two people tied as Çift, Kardeş, Ağabey, Kanka… The server (server/api/bonds.mjs) is the source of
 // truth in live mode; these are the same kinds, prices and level steps for the screens and the offline demo.
-// Points: every 100 coins the two spend on each other is 1 point, talking back and forth up to 10 a day.
+// Points: every 100 coins the two spend on each other is 1 point, talking back and forth up to 10 a day; a night after
+// a day with no gift takes some back, and a bond nobody gifts for long ends by itself (server/api/bond-life.mjs).
 import type Ionicons from '@expo/vector-icons/Ionicons';
 
 import { USERS } from '@/data/mock';
@@ -10,49 +11,101 @@ export type BondKind = 'cift' | 'kardes' | 'baci' | 'agabey' | 'abla' | 'yenge' 
 type IconName = keyof typeof Ionicons.glyphMap;
 export type BondKindInfo = { label: string; gift: string; price: number; max: number; icon: IconName };
 
-/** Same as KINDS in server/api/bonds.mjs. */
+/** Same as KINDS in server/api/bond-rules.mjs (Aile kinds and Kanka practically unlimited: 1000). */
 export const BOND_KINDS: Record<BondKind, BondKindInfo> = {
   cift: { label: 'Çift', gift: 'Bağ Yüzüğü', price: 5000, max: 1, icon: 'heart' },
-  kardes: { label: 'Kardeş', gift: 'Kardeş Bilekliği', price: 1000, max: 3, icon: 'people' },
-  baci: { label: 'Bacı', gift: 'Bacı Kolyesi', price: 1000, max: 3, icon: 'flower' },
-  agabey: { label: 'Ağabey', gift: 'Ağabey Saati', price: 1000, max: 3, icon: 'shield' },
-  abla: { label: 'Abla', gift: 'Abla Broşu', price: 1000, max: 3, icon: 'sparkles' },
-  yenge: { label: 'Yenge', gift: 'Yenge Çiçeği', price: 1000, max: 3, icon: 'rose' },
-  enishte: { label: 'Enişte', gift: 'Enişte Kravatı', price: 1000, max: 3, icon: 'ribbon' },
-  kanka: { label: 'Kanka', gift: 'Kanka Rozeti', price: 500, max: 5, icon: 'hand-left' },
+  kardes: { label: 'Kardeş', gift: 'Kardeş Bilekliği', price: 1000, max: 1000, icon: 'people' },
+  baci: { label: 'Bacı', gift: 'Bacı Kolyesi', price: 1000, max: 1000, icon: 'flower' },
+  agabey: { label: 'Ağabey', gift: 'Ağabey Saati', price: 1000, max: 1000, icon: 'shield' },
+  abla: { label: 'Abla', gift: 'Abla Broşu', price: 1000, max: 1000, icon: 'sparkles' },
+  yenge: { label: 'Yenge', gift: 'Yenge Çiçeği', price: 1000, max: 1000, icon: 'rose' },
+  enishte: { label: 'Enişte', gift: 'Enişte Kravatı', price: 1000, max: 1000, icon: 'ribbon' },
+  kanka: { label: 'Kanka', gift: 'Kanka Rozeti', price: 500, max: 1000, icon: 'hand-left' },
 };
 export const BOND_ORDER = Object.keys(BOND_KINDS) as BondKind[];
 export const isBondKind = (k: string): k is BondKind => Object.hasOwn(BOND_KINDS, k);
 
-/** Points needed for Lv1…Lv10 (server LEVELS). */
-export const BOND_LEVELS = [0, 10, 30, 60, 100, 200, 400, 700, 1200, 2000];
-export const bondLevel = (score: number) => BOND_LEVELS.reduce((lv, need, i) => (score >= need ? i + 1 : lv), 1);
-export const nextLevelAt = (level: number): number | null => BOND_LEVELS[level] ?? null;
+/** Points needed for Lv1…Lv20 (server LEVELS; Canlı ayarlar may set others: the catalog's `bonds.levels`). */
+export const BOND_LEVELS = [0, 10, 30, 60, 100, 200, 400, 700, 1200, 2000, 3000, 4500, 6500, 9000, 12000, 16000, 21000, 27000, 35000, 45000];
+export const MAX_BOND_LEVEL = BOND_LEVELS.length;
+export const bondLevel = (score: number, levels: readonly number[] = BOND_LEVELS) => levels.reduce((lv, need, i) => (score >= need ? i + 1 : lv), 1);
+export const nextLevelAt = (level: number, levels: readonly number[] = BOND_LEVELS): number | null => levels[level] ?? null;
+/** The points a level starts at (the bar under a bond fills from here). */
+export const levelFloor = (level: number, levels: readonly number[] = BOND_LEVELS) => levels[Math.max(0, Math.min(levels.length, level) - 1)] ?? 0;
+/** A bond gift's coins as bond points (every 100 coins 1 point). */
+export const bondPointsOf = (coins: number) => Math.max(0, Math.floor(coins / 100));
 
+/** In the server's order (server REWARDS). The mic mark shows from Lv1 (Güncelleme 7). */
 export type BondReward = { level: number; id: 'rozet' | 'mikrofon' | 'cerceve' | 'giris' | 'balon'; label: string };
 export const BOND_REWARDS: BondReward[] = [
+  { level: 1, id: 'mikrofon', label: 'Yan yana mikrofonda bağ işareti' },
   { level: 2, id: 'rozet', label: 'Profil rozeti' },
-  { level: 4, id: 'mikrofon', label: 'Yan yana mikrofonda bağ çizgisi' },
   { level: 6, id: 'cerceve', label: 'Profil çerçevesi' },
   { level: 8, id: 'giris', label: 'Odaya birlikte giriş efekti' },
   { level: 10, id: 'balon', label: 'Özel sohbet balonu' },
 ];
 export const hasReward = (level: number, id: BondReward['id']) => level >= (BOND_REWARDS.find((r) => r.id === id)?.level ?? Infinity);
 
+// --- The mark between two bonded people --------------------------------------------------------------------
+/** The mark's ring grows every five levels (server TIER_SIZE): tier 1 Lv1–5 … tier 4 Lv16–20. */
+export const BOND_TIER_SIZE = 5;
+export type BondTier = 1 | 2 | 3 | 4;
+export const bondTier = (level: number): BondTier => Math.min(4, Math.max(1, Math.ceil((Number.isFinite(level) ? level : 1) / BOND_TIER_SIZE))) as BondTier;
+/**
+ * Each tier's ring round the kind's picture: its colours (a gradient), how thick it is (a share of the mark's size) and
+ * its glow. Rose for Çift and blue for the others in the first two tiers; gold, then a bright diamond ring above.
+ */
+export type TierLook = { ring: readonly [string, string, string]; width: number; glow: number; glowColor: string; sparkle: boolean };
+export function tierLook(kind: BondKind, tier: BondTier): TierLook {
+  const cift = kind === 'cift';
+  switch (tier) {
+    case 1:
+      return { ring: cift ? ['#FFD3DF', '#FF8AA6', '#E35480'] : ['#CFF4FB', '#7FD3EA', '#4C7FD9'], width: 0.07, glow: 0, glowColor: 'transparent', sparkle: false };
+    case 2:
+      return { ring: cift ? ['#FFB3C8', '#FF4F7B', '#B0174E'] : ['#A5ECFF', '#3BA7FF', '#3B3FD8'], width: 0.09, glow: 6, glowColor: cift ? 'rgba(255,79,123,0.55)' : 'rgba(59,167,255,0.55)', sparkle: false };
+    case 3:
+      return { ring: ['#FFF4C2', '#F6C343', '#C27C0E'], width: 0.11, glow: 9, glowColor: 'rgba(246,195,67,0.7)', sparkle: false };
+    default:
+      return { ring: ['#FFFFFF', cift ? '#FF9EC4' : '#9EE7FF', '#B98CFF'], width: 0.13, glow: 13, glowColor: cift ? 'rgba(255,140,200,0.85)' : 'rgba(150,200,255,0.85)', sparkle: true };
+  }
+}
+
+/** The numbers the rules sentences say (Canlı ayarlar › Bağlar, the catalog's `bonds`; the app's own without it). */
+export type BondRulesNumbers = { answerDays: number; talkDaily: number; cooldownDays: number; dropPct?: number; dropFlat?: number; idleEndDays?: number; idleWarnDays?: number };
+export const BOND_DECAY = { dropPct: 10, dropFlat: 10, idleEndDays: 30, idleWarnDays: 3 };
+
 /** Bağlar's rules as sentences, with the server's days and points when the catalog has them (Canlı ayarlar). */
-export function bondRulesText(n: { answerDays: number; talkDaily: number; cooldownDays: number } = { answerDays: 3, talkDaily: 10, cooldownDays: 7 }): string[] {
+export function bondRulesText(n: BondRulesNumbers = { answerDays: 3, talkDaily: 10, cooldownDays: 7 }): string[] {
+  const d = { dropPct: n.dropPct ?? BOND_DECAY.dropPct, dropFlat: n.dropFlat ?? BOND_DECAY.dropFlat, idleEndDays: n.idleEndDays ?? BOND_DECAY.idleEndDays, idleWarnDays: n.idleWarnDays ?? BOND_DECAY.idleWarnDays };
+  const drop =
+    d.dropPct > 0 || d.dropFlat > 0
+      ? `İkinizden hiçbirinin hediye göndermediği her gece bağ puanı düşer (${[d.dropPct > 0 ? `%${d.dropPct}` : '', d.dropFlat > 0 ? `en az ${d.dropFlat} puan` : ''].filter(Boolean).join(', ')}). O gün giden bir hediye düşüşü durdurur${n.talkDaily > 0 ? '; mesajlaşma puan getirir ama durdurmaz' : ''}. Kabulden sonraki ilk gece düşmez.`
+      : 'Puan düşmez.';
+  const idle = d.idleEndDays > 0 ? `${d.idleEndDays} gün boyunca ikinizden hiç hediye gitmezse bağ kendiliğinden biter${d.idleWarnDays > 0 ? `; ${d.idleWarnDays} gün önce SimilarClub Sistem’den uyarı gelir` : ''}. Böyle biten bağ beklemeden yeniden kurulabilir.` : null;
   return [
     'Bağ isteği bir bağ hediyesiyle gider; karşı taraf kabul edince hediye ona geçer.',
     `Reddedilirse, geri çekilirse ya da ${n.answerDays} gün içinde yanıtlanmazsa jetonların geri gelir.`,
+    'Bağ kurulduktan sonra aynı bağ hediyesi istediğin kadar gönderilebilir: normal hediye gibi karşı tarafa geçer ve bağ puanı getirir.',
     n.talkDaily > 0 ? `Birbirinize gönderdiğiniz her 100 jeton 1 puan; karşılıklı mesajlaşma günde en fazla ${n.talkDaily} puan.` : 'Birbirinize gönderdiğiniz her 100 jeton 1 puan.',
-    'Puan düşmez. Bağı iki taraf da istediği zaman bitirebilir: seviye ve ödüller sıfırlanır, jeton iadesi olmaz.',
-    n.cooldownDays > 0 ? `Biten bir bağ aynı kişiyle ${n.cooldownDays} gün sonra yeniden kurulabilir.` : 'Biten bir bağ aynı kişiyle hemen yeniden kurulabilir.',
+    drop,
+    ...(idle ? [idle] : []),
+    'Bağı iki taraf da istediği zaman bitirebilir: seviye ve ödüller sıfırlanır, jeton iadesi olmaz.',
+    n.cooldownDays > 0 ? `Birinin bitirdiği bağ aynı kişiyle ${n.cooldownDays} gün sonra yeniden kurulabilir.` : 'Biten bir bağ aynı kişiyle hemen yeniden kurulabilir.',
   ];
 }
 export const BOND_RULES = bondRulesText();
+
+/** What ending a bond means, for its confirmation (the server's cooldown and the quiet end when the catalog has them). */
+export function bondEndText(partner: string, kind: BondKind, n: BondRulesNumbers = { answerDays: 3, talkDaily: 10, cooldownDays: 7 }): string {
+  const wait = n.cooldownDays > 0 ? `Aynı kişiyle ${n.cooldownDays} gün yeniden bağ kurulamaz.` : 'Aynı kişiyle hemen yeniden bağ kurulabilir.';
+  return `${partner} ile ${BOND_KINDS[kind].label} bağın biter. Seviye ve ödüller sıfırlanır, jeton iadesi olmaz. ${wait}`;
+}
 export type BondStatus = 'pending' | 'active' | 'refused' | 'expired' | 'withdrawn' | 'ended';
 /** A bond as one side sees it: `partnerId` is the other person (a local id: 'me', u1… or a server id). */
 export type Bond = {
+  /** Days since either sent the other a gift, and the days left before a quiet bond ends (null: unknown or never). */
+  quietDays?: number | null;
+  endsInDays?: number | null;
   id: string;
   kind: BondKind;
   status: BondStatus;
@@ -88,11 +141,31 @@ export const roomBondKey = (r: RoomBond) => pairKey(r.a, r.b);
 export const bondBetween = (list: RoomBond[], x: string | null | undefined, y: string | null | undefined) =>
   x && y && x !== y ? (list.find((r) => (r.a === x && r.b === y) || (r.a === y && r.b === x)) ?? null) : null;
 
-/** Lv4: the line between two people sitting side by side on the mics. */
+/** The mic mark between two people sitting side by side (Lv1 on: every bond). */
 export const micLinkOf = (list: RoomBond[], x: string | null | undefined, y: string | null | undefined) => {
   const r = bondBetween(list, x, y);
   return r && hasReward(r.level, 'mikrofon') ? r : null;
 };
+
+// --- Sending a bond gift --------------------------------------------------------------------------------
+/** The kind of a bond gift id (bag-<kind>), or null. */
+export const bondKindOfGift = (giftId: string | null | undefined): BondKind | null => {
+  const k = typeof giftId === 'string' && giftId.startsWith('bag-') ? giftId.slice(4) : '';
+  return isBondKind(k) ? k : null;
+};
+/**
+ * What a bond gift to `to` does now, from the room's bonds: 'again' when the two of us have that bond (an ordinary
+ * gift, any count, that adds bond points), 'other' when we have a bond of another kind (one bond per pair: refused,
+ * `bond` says which), 'ask' when we have none (a bond request, one gift). Null for a gift that isn't a bond gift or
+ * not exactly one person.
+ */
+export function bondGiftMode(list: readonly RoomBond[], me: string, to: readonly string[], giftId: string): { mode: 'again' | 'other' | 'ask'; bond: RoomBond | null } | null {
+  const kind = bondKindOfGift(giftId);
+  if (!kind || to.length !== 1) return null;
+  const bond = bondBetween([...list], me, to[0]);
+  if (!bond) return { mode: 'ask', bond: null };
+  return { mode: bond.kind === kind ? 'again' : 'other', bond };
+}
 
 /** Lv10: someone's highest bond with the special chat bubble (Çift first), partner anywhere. */
 export function bubbleBondOf(list: RoomBond[], uid: string | undefined) {

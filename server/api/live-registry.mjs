@@ -18,6 +18,7 @@ import { REMINDER_KINDS, REMINDER_LABEL } from './event-rules.mjs';
 import { CHEST_MIN_CONTRIBUTION, FAMILY_CHESTS, FAMILY_TASKS, FAMILY_THEMES } from './family-rules.mjs';
 import { MEDAL_RULES, TITLE_RULES } from './profile-rules.mjs';
 import { HOUSE_PCT as ROCKET_HOUSE_PCT } from './rocket-live-rules.mjs';
+import { LEVELS as BOND_LEVELS, levelsOf as bondLevelsOf } from './bond-rules.mjs';
 import { AUTO_CHAT, AUTO_PARTS, AUTO_PART_LABEL, AUTO_PART_OFF, AUTO_TEXTS, NOTICE_CATEGORIES, NOTICE_LABEL, linesOf } from './auto-chat-rules.mjs';
 
 /** Every feature that can be switched off (features.mjs ROUTES). `games` is mostly in the app; Rüzgâr Gülü is on the server. */
@@ -120,6 +121,8 @@ export function defaultsOf(e = process.env) {
     // Odalar: a room without its staff closes after 5 minutes (room-autoclose.mjs); Patron koltuğu 25.000 jeton, 10
     // dakika (boss-seat.mjs). The owner's numbers (Güncelleme 4).
     ...Object.fromEntries(Object.entries(ROOM_AMOUNTS).map(([k, x]) => [k, x.default])),
+    // Bağlar's level steps (bond-rules.mjs LEVELS), as the panel writes them.
+    bond_levels: BOND_LEVELS.join(', '),
     // Aile's game (FAMILY_AMOUNTS): family-rules.mjs's numbers.
     ...Object.fromEntries(Object.entries(FAMILY_AMOUNTS).map(([k, x]) => [k, x.default])),
     // Ajans statüsü (AGENCY_AMOUNTS): the owners' numbers.
@@ -374,12 +377,17 @@ const ROOM_AMOUNTS = {
   family_rejoin_days: { group: 'Aile', field: 'familyRejoinDays', label: 'Aileden ayrılan yayıncının bekleme süresi', default: 90, bounds: { min: 0, max: 365, step: 1 }, unit: ' gün', help: 'Kendi isteğiyle aileden ayrılan yayıncı bu kadar gün başka bir aileye katılamaz ve aile kuramaz. Ayrıldığı aileye dönebilir. Aileden çıkarılan kişi beklemez.', text: (a, b) => `Aileden ayrılan yayıncının bekleme süresi ${a} → ${b} gün.` },
   // Bağlar (bonds.mjs, docs/BAGLAR.md): how many bonds of a kind one person may have, the requests and their days.
   bond_max_cift: { group: 'Bağlar', field: 'bondMaxCift', label: 'Çift bağı: kişi başına en fazla', default: 1, bounds: { min: 1, max: 5, step: 1 }, unit: ' bağ', help: 'Bir kişinin aynı anda kaç Çift bağı olabilir. Kurulmuş bağlar sınır düşse de sürer; yalnız yenisi kurulamaz.', text: (a, b) => `Kişi başına Çift bağı ${a} → ${b}.` },
-  bond_max_kin: { group: 'Bağlar', field: 'bondMaxKin', label: 'Aile bağları: türü başına en fazla', default: 3, bounds: { min: 1, max: 20, step: 1 }, unit: ' bağ', help: 'Kardeş, Bacı, Ağabey, Abla, Yenge ve Enişte bağlarının her birinden bir kişinin aynı anda kaç tane olabilir. Kurulmuş bağlar sürer.', text: (a, b) => `Kardeş, Bacı, Ağabey, Abla, Yenge, Enişte: türü başına ${a} → ${b} bağ.` },
-  bond_max_kanka: { group: 'Bağlar', field: 'bondMaxKanka', label: 'Kanka bağı: kişi başına en fazla', default: 5, bounds: { min: 1, max: 50, step: 1 }, unit: ' bağ', help: 'Bir kişinin aynı anda kaç Kanka bağı olabilir. Kurulmuş bağlar sürer.', text: (a, b) => `Kişi başına Kanka bağı ${a} → ${b}.` },
+  bond_max_kin: { group: 'Bağlar', field: 'bondMaxKin', label: 'Aile bağları: türü başına en fazla', default: 1000, bounds: { min: 1, max: 1000, step: 1 }, unit: ' bağ', help: 'Kardeş, Bacı, Ağabey, Abla, Yenge ve Enişte bağlarının her birinden bir kişinin aynı anda kaç tane olabilir. 1000: pratikte sınırsız (sahiplerin kararı, Güncelleme 7). Kurulmuş bağlar sürer.', text: (a, b) => `Kardeş, Bacı, Ağabey, Abla, Yenge, Enişte: türü başına ${a} → ${b} bağ.` },
+  bond_max_kanka: { group: 'Bağlar', field: 'bondMaxKanka', label: 'Kanka bağı: kişi başına en fazla', default: 1000, bounds: { min: 1, max: 1000, step: 1 }, unit: ' bağ', help: 'Bir kişinin aynı anda kaç Kanka bağı olabilir. 1000: pratikte sınırsız. Kurulmuş bağlar sürer.', text: (a, b) => `Kişi başına Kanka bağı ${a} → ${b}.` },
   bond_pending_max: { group: 'Bağlar', field: 'bondPendingMax', label: 'Bekleyen istek: en fazla', default: 10, bounds: { min: 1, max: 50, step: 1 }, unit: ' istek', help: 'Bir kişinin cevap bekleyen bağ isteği en çok bu kadar olabilir (her istek jetonunu bekletir).', text: (a, b) => `Aynı anda bekleyen bağ isteği ${a} → ${b}.` },
   bond_answer_days: { group: 'Bağlar', field: 'bondAnswerDays', label: 'İsteğe cevap süresi (gün)', default: 3, bounds: { min: 1, max: 14, step: 1 }, unit: ' gün', help: 'Bu süre içinde cevaplanmayan bağ isteğinin jetonu gönderene döner. Bekleyen isteklerin süresi değişmez.', text: (a, b) => `Yeni bağ isteklerine cevap süresi ${a} → ${b} gün.` },
   bond_cooldown_days: { group: 'Bağlar', field: 'bondCooldownDays', label: 'Bağ bitince bekleme (gün)', default: 7, bounds: { min: 0, max: 90, step: 1 }, unit: ' gün', help: 'Bağı biten iki kişi bu kadar gün yeniden bağ kuramaz. 0: hemen kurabilir.', text: (a, b) => `Bağ bitince yeniden kurmak için ${a} → ${b} gün beklenir.` },
   bond_talk_daily: { group: 'Bağlar', field: 'bondTalkDaily', label: 'Sohbetten günlük bağ puanı: en fazla', default: 10, bounds: { min: 0, max: 100, step: 1 }, unit: ' puan', help: 'Bağlı iki kişinin birbirine cevap verdiği her mesaj 1 bağ puanı getirir, günde en çok bu kadar. 0: sohbet puan getirmez.', text: (a, b) => `Sohbetten günde en çok ${a} → ${b} bağ puanı.` },
+  // The nightly drop and the end of a bond with no gift (bond-life.mjs, bond-rules.mjs DECAY; the owners' numbers).
+  bond_drop_pct: { group: 'Bağlar', field: 'bondDropPct', label: 'Hediyesiz gece düşen puan (%)', default: 10, bounds: { min: 0, max: 50, step: 1 }, unit: ' %', help: 'İki taraftan biri o gün hediye göndermediyse bağın puanından gece bu kadar yüzde düşer (en az aşağıdaki kadar). Kabulden sonraki ilk gece düşmez. Mesajlaşma puan getirir ama düşüşü durdurmaz. 0: yüzde düşmez.', text: (a, b) => `Hediyesiz gece düşen bağ puanı %${a} → %${b}.` },
+  bond_drop_flat: { group: 'Bağlar', field: 'bondDropFlat', label: 'Hediyesiz gece en az düşen puan', default: 10, bounds: { min: 0, max: 100_000, step: 1 }, unit: ' puan', help: 'Hediyesiz bir gecede bağdan en az bu kadar puan düşer (puan 0’ın altına inmez). 0: yalnız yüzde düşer.', text: (a, b) => `Hediyesiz gece en az ${a} → ${b} bağ puanı düşer.` },
+  bond_idle_end_days: { group: 'Bağlar', field: 'bondIdleEndDays', label: 'Hediyesiz kalan bağ biter (gün)', default: 30, bounds: { min: 0, max: 365, step: 1 }, unit: ' gün', help: 'Bu kadar gün iki taraftan hiç hediye gitmezse bağ kendiliğinden biter: jeton iadesi yok, yeniden kurmak için bekleme yok. 0: hiç bitmez.', text: (a, b) => `Hediyesiz bağ ${a} → ${b} gün sonra biter.` },
+  bond_idle_warn_days: { group: 'Bağlar', field: 'bondIdleWarnDays', label: 'Bitmeden önce uyarı (gün)', default: 3, bounds: { min: 0, max: 30, step: 1 }, unit: ' gün', help: 'Hediyesiz bağ bitmeden bu kadar gün önce iki tarafa SimilarClub Sistem’den bir kez uyarı gider. 0: uyarı yok.', text: (a, b) => `Bağ bitmeden ${a} → ${b} gün önce uyarı.` },
   // Koruma (guards.mjs, docs/KORUMA.md): the midnight drop, the list's length and the profile's threshold.
   guard_drop_from: { group: 'Koruma', field: 'guardDropFrom', label: 'Yüzde düşüş: bu puandan itibaren', default: 5000, bounds: { min: 0, max: 10_000_000, step: 100 }, unit: ' puan', help: 'Önceki gün hediye göndermeyen koruyucunun puanı gece düşer: bu puan ve üstündeyse yüzdeyle, altındaysa sabit miktarla.', text: (a, b) => `Gece yüzdeyle düşüş ${a} → ${b} puandan itibaren.` },
   guard_drop_pct: { group: 'Koruma', field: 'guardDropPct', label: 'Yüzde düşüş (%)', default: 10, bounds: { min: 0, max: 50, step: 1 }, unit: ' %', help: 'Hediye göndermeyen koruyucunun puanından gece düşen yüzde. 0: düşmez.', text: (a, b) => `Gece düşen yüzde %${a} → %${b}.` },
@@ -1094,6 +1102,22 @@ export const REGISTRY = {
   },
   ...decorEntries(),
   ...roomEntries(),
+  // Bağlar's level steps (bond-rules.mjs LEVELS), written as the panel shows them: "0, 10, 30, …".
+  bond_levels: {
+    field: 'bondLevels',
+    group: 'Bağlar',
+    label: 'Seviye basamakları (puan)',
+    help: 'Lv1 … Lv20 için gereken bağ puanı, virgülle ve küçükten büyüğe: 20 sayı, ilki 0. Her 100 jeton 1 puan. Değişince herkesin seviyesi yeni basamaklarla hesaplanır; seviyesi değişene ilk hediyede bildirim gider.',
+    type: 'text',
+    bounds: { max: 300 },
+    parse(v) {
+      const xs = bondLevelsOf(v);
+      if (!xs) bad('Seviye basamakları: 20 tam sayı yaz, virgülle; ilki 0 ve her biri öncekinden büyük olmalı');
+      return xs.join(', ');
+    },
+    big: () => true,
+    impact: (before, after) => `Lv2 ${fmt(bondLevelsOf(before)?.[1] ?? 0)} → ${fmt(bondLevelsOf(after)?.[1] ?? 0)}, Lv10 ${fmt(bondLevelsOf(before)?.[9] ?? 0)} → ${fmt(bondLevelsOf(after)?.[9] ?? 0)}, Lv20 ${fmt(bondLevelsOf(before)?.[19] ?? 0)} → ${fmt(bondLevelsOf(after)?.[19] ?? 0)} puan.`,
+  },
   ...roomEntries(FAMILY_AMOUNTS),
   ...roomEntries(AGENCY_AMOUNTS),
   ...roomEntries(ROOM_LEVEL_AMOUNTS),
@@ -1236,6 +1260,8 @@ export function snapshotOf(rows = [], e = process.env, { v = 0 } = {}) {
     roomDecorOff: readOnlySet(val('room_decor_off')),
     ...Object.fromEntries(Object.entries(DECOR_AMOUNTS).map(([k, x]) => [x.field, val(k)])),
     ...Object.fromEntries(Object.entries(ROOM_AMOUNTS).map(([k, x]) => [x.field, val(k)])),
+    // As written ("0, 10, 30"); bonds.mjs reads it with bond-rules.mjs levelsOf.
+    bondLevels: val('bond_levels'),
     ...Object.fromEntries(Object.entries(FAMILY_AMOUNTS).map(([k, x]) => [x.field, val(k)])),
     ...Object.fromEntries(Object.entries(AGENCY_AMOUNTS).map(([k, x]) => [x.field, val(k)])),
     ...Object.fromEntries(Object.entries(ROOM_LEVEL_AMOUNTS).map(([k, x]) => [x.field, val(k)])),

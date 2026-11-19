@@ -84,18 +84,23 @@ describe('defaults are today', () => {
       family_cashout_members: 10,
       family_rejoin_days: 90,
       bond_max_cift: 1,
-      bond_max_kin: 3,
-      bond_max_kanka: 5,
+      bond_max_kin: 1000,
+      bond_max_kanka: 1000,
       bond_pending_max: 10,
       bond_answer_days: 3,
       bond_cooldown_days: 7,
       bond_talk_daily: 10,
+      bond_drop_pct: 10,
+      bond_drop_flat: 10,
+      bond_idle_end_days: 30,
+      bond_idle_warn_days: 3,
       guard_drop_from: 5000,
       guard_drop_pct: 10,
       guard_drop_flat: 1000,
       guard_list_max: 50,
       guard_threshold_per_level: 50_000,
       guard_threshold_days: 7,
+      bond_levels: '0, 10, 30, 60, 100, 200, 400, 700, 1200, 2000, 3000, 4500, 6500, 9000, 12000, 16000, 21000, 27000, 35000, 45000',
       family_task_chat_power: 1,
       family_task_room_power: 1,
       family_task_room_goal: 15,
@@ -267,12 +272,17 @@ describe('defaults are today', () => {
       'bond_answer_days',
       'bond_cooldown_days',
       'bond_talk_daily',
+      'bond_drop_pct',
+      'bond_drop_flat',
+      'bond_idle_end_days',
+      'bond_idle_warn_days',
       'guard_drop_from',
       'guard_drop_pct',
       'guard_drop_flat',
       'guard_list_max',
       'guard_threshold_per_level',
       'guard_threshold_days',
+      'bond_levels',
       'family_task_chat_power',
       'family_task_room_power',
       'family_task_room_goal',
@@ -614,7 +624,18 @@ describe('Kazanç duyurusu', () => {
 describe('Bağlar, Koruma, Şanslı çanta', () => {
   test('sınırlar tam sayı ve aralıkta; çanta listeleri virgülle, sıralı, en çok 6, büyük çanta yok', () => {
     assert.equal(validate('bond_max_kin', 5), 5);
+    assert.equal(validate('bond_max_kanka', 1000), 1000, 'pratikte sınırsız');
+    refused(() => validate('bond_max_kin', 1001), /Aile bağları/);
     refused(() => validate('bond_max_cift', 0), /Çift bağı/);
+    assert.equal(validate('bond_idle_end_days', 0), 0, '0: hiç bitmez');
+    refused(() => validate('bond_drop_pct', 51), /Hediyesiz gece düşen puan/);
+    // Lv1 … Lv20: 20 rising numbers from 0, as the panel writes them.
+    const steps = '0, 10, 30, 60, 100, 200, 400, 700, 1.200, 2000, 3000, 4500, 6500, 9000, 12000, 16000, 21000, 27000, 35000, 50000';
+    assert.equal(validate('bond_levels', steps), steps.replace('1.200', '1200'));
+    for (const v of ['0, 10', '5, 10, 30, 60, 100, 200, 400, 700, 1200, 2000, 3000, 4500, 6500, 9000, 12000, 16000, 21000, 27000, 35000, 45000', '0, 10, 10, 60, 100, 200, 400, 700, 1200, 2000, 3000, 4500, 6500, 9000, 12000, 16000, 21000, 27000, 35000, 45000', 12, 'bin']) refused(() => validate('bond_levels', v), /Seviye basamakları/);
+    assert.equal(snapshotOf([]).bondLevels, '0, 10, 30, 60, 100, 200, 400, 700, 1200, 2000, 3000, 4500, 6500, 9000, 12000, 16000, 21000, 27000, 35000, 45000');
+    assert.equal(isBig('bond_levels', snapshotOf([]).bondLevels, steps), true, 'herkesin seviyesi değişir: iki kez sorulur');
+    assert.match(impactOf('bond_levels', snapshotOf([]).bondLevels, steps.replace('1.200', '1200')), /Lv20 45\.000 → 50\.000 puan/);
     refused(() => validate('guard_drop_pct', 60), /Yüzde düşüş/);
     assert.equal(snapshotOf([{ key: 'guard_drop_pct', value: 20 }]).guardDropPct, 20);
     assert.equal(validate('lucky_bag_coins', '5.000, 1000,1000 , 2000'), '1000, 2000, 5000');

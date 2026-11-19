@@ -91,7 +91,7 @@ import { StageBackdrop } from '@/components/room/stage-backdrop';
 import { useRoomLook } from '@/components/room/decor';
 import { StageLayout } from '@/components/room/stage-layout';
 import { FitStage } from '@/components/room/fit-stage';
-import { useRoomBonds } from '@/components/room/room-bonds';
+import { bondGiftRefused, useRoomBonds } from '@/components/room/room-bonds';
 import { BOND_KINDS, bondTint, bubbleBondOf, jointEntries, roomBondKey, type BondKind, type JointState, type RoomBond } from '@/data/bonds';
 import { liveRequestBond } from '@/lib/live/bonds';
 import { Avatar } from '@/components/ui';
@@ -1260,7 +1260,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       joiningBags.current.delete(b.id);
     }
   };
-  // Bağlar in the room: Lv4 mic line, Lv8 joint entrance, Lv10 chat bubble (components/room/room-bonds).
+  // Bağlar in the room: the mic mark from Lv1, Lv8 joint entrance, Lv10 chat bubble (components/room/room-bonds).
   const roomBondsNow = useRoomBonds(live.members, real);
   const roomBonds = roomBondsNow ?? NO_BONDS;
   const [joint, setJoint] = useState<{ list: RoomBond[] | null; state: JointState | null }>({ list: null, state: null });
@@ -2802,6 +2802,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     if (real)
       return void liveRequestBond(to, kind, id, gift.price).then(sent, (e) => {
         errorHaptic();
+        // Already bonded (the room's bonds were behind): they are read again, so the next tap sends it as a gift.
+        bondGiftRefused(e, gift, to, userById(to).name, sendBondGift);
         showAlert('Bağ isteği gönderilemedi', errorText(e));
       });
     if (liveMode()) return showAlert('Hediye gönderilemedi', 'Bu örnek odada hediye gönderilemez. Hediyeleri gerçek odalarda gönderebilirsin.');
@@ -2843,6 +2845,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         else await liveGift(uid, gift.id, count, id, undefined, gift.price);
         sent.push(uid);
       } catch (e) {
+        // A bond gift sent again whose bond is gone meanwhile: offered as a bond request (room-bonds).
+        if (!sent.length && bondGiftRefused(e, gift, uid, userById(uid).name, sendBondGift)) return 0;
         error = errorText(e);
         break;
       }
@@ -4089,6 +4093,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         onSend={sendGift}
         onSendLucky={sendLuckyGift}
         onSendBond={sendBondGift}
+        bonds={roomBonds}
       />
       <ActionSheet visible={!!sheet} title={sheet?.title} options={sheet?.options ?? []} onClose={() => (setSheet(null), backToMenu())} />
       {reporting.sheet}

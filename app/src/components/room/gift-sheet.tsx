@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
 import { Avatar, Button } from '@/components/ui';
+import { BOND_KINDS, bondGiftMode, bondPointsOf, type RoomBond } from '@/data/bonds';
 import { GIFTS, isBondGift, userById, type Gift, type GiftCat } from '@/data/mock';
 import { LUCKY_RECIPIENT_SHARE, pct } from '@/data/rules';
 import { bagCounts, bagLabel, bagNeed as needOf, bagShort as shortOf } from '@/lib/backpack';
@@ -58,7 +59,7 @@ const SHELF_NOTE: Record<Shelf, string> = {
   lucky: `Her gönderimde bir çekiliş yapılır; olasılıklar aşağıda. Ödül garanti değildir. Alıcıya ve PK puanına hediye değerinin ${pct(LUCKY_RECIPIENT_SHARE)}’si yazılır.`,
   gameplay: 'Alıcının koltuğuna animasyonla atılır. Fiyat sabit, sürpriz ödül yok.',
   couple: 'Sevdiğine özel hediyeler.',
-  family: 'Koruma Kartı seni koruyucu yapar. Bağ hediyesi bağ isteği olarak gider; kabul edilmezse jetonun geri döner.',
+  family: 'Koruma Kartı koruyucu yapar. Bağ hediyesi istek olur, kabul edilmezse jeton döner; bağın varsa puan getirir.',
   privilege: 'VIP üyelerine özel hediyeler.',
   fav: 'Bir hediyeye uzun basarak favorilere ekle veya çıkar.',
   bag: 'Görev ve giriş ödüllerin. Gönderirken jeton harcanmaz.',
@@ -110,6 +111,7 @@ export function GiftSheet({
   onSend,
   onSendLucky,
   onSendBond,
+  bonds,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -128,6 +130,8 @@ export function GiftSheet({
   onSendLucky: (giftId: string, toIds: string[], count: number) => void;
   /** A bond gift of the Aile ve Dost shelf: one, to one person, as a bond request. */
   onSendBond: (g: Gift, to: string) => void;
+  /** The room's bonds (room-bonds useRoomBonds): a bond gift to someone I have that bond with goes as a gift (onSend). */
+  bonds?: readonly RoomBond[];
 }) {
   const { svipLevel, spentTotal, me, spendBlock, wealthLevel } = useApp();
   // Android modals draw edge to edge: the Gönder row must sit above the navigation bar.
@@ -210,8 +214,12 @@ export function GiftSheet({
   const onShelf = shelf === 'lucky' ? !!lg : list.some((it) => it.id === sel.id && sel.bag === (shelf === 'bag'));
   const fromBag = sel.bag;
   const locked = !fromBag && isLocked(gift, svipLevel);
-  // A bond gift goes one at a time, to one person: it asks them for a bond.
-  const bondGift = !isLucky && !fromBag && isBondGift(gift.id);
+  // A bond gift to someone I have that bond with goes as an ordinary gift, any count, and adds bond points; to someone
+  // with a bond of another kind it can't go (one bond per pair); else it goes one at a time, to one person, and asks
+  // them for a bond (data/bonds bondGiftMode).
+  const bondMode = !isLucky && !fromBag ? bondGiftMode(bonds ?? [], 'me', targets, gift.id) : null;
+  const bondAgain = bondMode?.mode === 'again';
+  const bondGift = !isLucky && !fromBag && isBondGift(gift.id) && !bondAgain;
   const sendCount = bondGift ? 1 : count;
   const total = isLucky ? lg.price * count * targets.length : (fromBag ? 0 : gift.price) * sendCount * targets.length;
   const short = fromBag ? 0 : total - coins;
@@ -307,6 +315,8 @@ export function GiftSheet({
             { tone: 'info' as const, text: `${count * targets.length > 1 ? `Her hediye için ayrı çekiliş yapılır. ` : ''}Ödül garanti değildir`, odds: true, cta: `Gönder · ${fmt(total)}`, variant: 'money' as const }
     : bondGift && targets.length !== 1
       ? { tone: 'info' as const, text: 'Bağ hediyesi tek kişiye gönderilir: alıcılardan birini seç.', cta: 'Tek kişi seç', disabled: true }
+    : bondMode?.mode === 'other' && bondMode.bond
+      ? { tone: 'lock' as const, text: `Aranızda ${BOND_KINDS[bondMode.bond.kind].label} bağı var; bir kişiyle tek bağ kurulur.`, cta: 'Gönderilemez', disabled: true }
     : locked
       ? { tone: 'lock' as const, text: `VIP ${gift.minSvip} ve üzerine özel (sen VIP ${svipLevel}).`, cta: 'VIP ayrıcalıklarını gör', variant: 'tonal' as const, onPress: goVip }
       : bagShort
@@ -317,6 +327,8 @@ export function GiftSheet({
             ? { tone: 'warn' as const, text: `${fmt(short)} jeton eksik.`, cta: 'Jeton yükle', variant: 'money' as const }
             : overLimit
               ? { tone: 'lock' as const, text: overLimit, cta: 'Günlük limiti aşıyor', disabled: true }
+            : bondAgain
+              ? { tone: 'bond' as const, text: `+${fmt(bondPointsOf(total))} bağ puanı · Kalan: ${fmt(coins - total)} jeton`, cta: `Gönder · ${fmt(total)}`, variant: 'money' as const }
             : { tone: 'info' as const, text: `Kalan: ${fmt(coins - total)} jeton`, cta: `Gönder · ${fmt(total)}`, variant: 'money' as const };
 
   const sortBtn =
@@ -337,6 +349,7 @@ export function GiftSheet({
     ) : null;
   // Compact: the total is in the button; a notice only for Şanslı (its odds) or when something is wrong.
   const noticeShown = !compact || isLucky || footer.tone !== 'info';
+  const toneIcon = footer.tone === 'warn' ? 'alert-circle' : footer.tone === 'lock' ? 'lock-closed' : footer.tone === 'bond' ? 'link' : 'information-circle';
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -528,8 +541,8 @@ export function GiftSheet({
           </Pressable>
           ) : noticeShown ? (
           <View style={[g.notice, footer.tone === 'warn' && g.noticeWarn, footer.tone === 'lock' && g.noticeLock]}>
-            <Ionicons name={footer.tone === 'warn' ? 'alert-circle' : footer.tone === 'lock' ? 'lock-closed' : 'information-circle'} size={16} color={footer.tone === 'info' ? colors.textDim : colors.gold} />
-            <Text style={[g.dim, { flex: 1 }, footer.tone !== 'info' && { color: '#FDE68A' }]}>{footer.text}</Text>
+            <Ionicons name={toneIcon} size={16} color={footer.tone === 'info' ? colors.textDim : footer.tone === 'bond' ? '#FF8AA6' : colors.gold} />
+            <Text style={[g.dim, { flex: 1 }, footer.tone !== 'info' && { color: footer.tone === 'bond' ? '#FFD3DF' : '#FDE68A' }]}>{footer.text}</Text>
           </View>
           ) : null}
 

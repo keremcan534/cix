@@ -19,9 +19,11 @@ describe('Bağlar uygulamada sunucuyla aynı', () => {
       BOND_REWARDS.map((r) => [r.level, r.id]),
       (server.REWARDS as { level: number; key: string }[]).map((r) => [r.level, r.key]),
     );
-    for (const score of [0, 9, 10, 29, 30, 50, 1999, 2000, 99999]) assert.equal(bondLevel(score), server.levelOf(score), `puan ${score}`);
+    for (const score of [0, 9, 10, 29, 30, 50, 1999, 2000, 2999, 3000, 44999, 45000, 99999]) assert.equal(bondLevel(score), server.levelOf(score), `puan ${score}`);
     assert.equal(nextLevelAt(3), 60);
-    assert.equal(nextLevelAt(10), null);
+    assert.equal(nextLevelAt(10), 3000, 'Lv20’ye kadar');
+    assert.equal(nextLevelAt(20), null);
+    assert.equal(BOND_LEVELS.length, 20);
   });
 });
 
@@ -48,9 +50,11 @@ describe('Bağlar odada', () => {
     { a: 'u4', b: 'u5', kind: 'kardes', level: 10 },
     { a: 'u4', b: 'u9', kind: 'cift', level: 10 },
   ];
-  test('mikrofon çizgisi Lv4 ve üstü, iki yönde', () => {
+  test('mikrofon işareti Lv1’den, iki yönde', () => {
     assert.equal(micLinkOf(list, 'u1', 'me')?.kind, 'cift');
-    assert.equal(micLinkOf(list, 'u2', 'u3'), null, 'Lv3 çizgi yok');
+    assert.equal(micLinkOf(list, 'u2', 'u3')?.level, 3, 'Lv3 de çizilir (Güncelleme 7)');
+    assert.equal(micLinkOf([{ a: 'x', b: 'y', kind: 'kanka', level: 1 }], 'y', 'x')?.level, 1);
+    assert.equal(micLinkOf(list, 'u2', 'u9'), null, 'bağ yoksa yok');
     assert.equal(micLinkOf(list, 'me', null), null);
     assert.equal(micLinkOf(list, 'me', 'me'), null);
   });
