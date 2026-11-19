@@ -40,6 +40,12 @@ Hangi hediyenin iz bıraktığı ya da temizlediği hediyenin kendi ayarıdır (
   jeton, bu 2.500 jeton."
 - Kaka ve Su uygulamanın kendi hediyeleridir (`k1`, `k2`): adı, fiyatı, rafı ve kuralı panelden değiştirilir,
   "Orijinale dön" ile geri alınır. Kaka'nın kuralı kaldırılırsa düz hediye olur.
+- **Öteki özelliklerle (Güncelleme 7):** iz bırakan ya da temizleyen hediye **Global** olamaz: Kaka'nın bütün
+  odalarda duyurulması alıcıyı herkesin önünde küçük düşürür, Su'yunki herkese iz yediğini söyler. Global bir hediyeye
+  iz kuralı da verilemez; ikisi birden kaydedilmek istenirse 400 ("Profil izi bırakan ya da temizleyen hediye global
+  olamaz; Global seçimini ya da iz kuralını kaldırın"). Satırlarda ikisi birden yazılı olsa bile hediye duyurulmaz.
+  **Bağ hediyeleri ve Koruma Kartı** iz bırakamaz, temizleyemez (400): bağ isteği, bağ puanı ve Koruma başlatır, iz
+  yazmazlar.
 
 ## Canlı ayar
 

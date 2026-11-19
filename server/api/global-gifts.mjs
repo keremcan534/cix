@@ -4,10 +4,12 @@
 // gönderdi"). Its video plays only in the room it was sent in, as any gift's: no phone elsewhere fetches it.
 //
 // Which gift may be global: one of at least Canlı ayarlar › Global hediye › "en düşük fiyat" (global_gift_min_price,
-// 300.000 coins); never a bond gift (bonds.mjs: a request that may be refused, not a gift yet), Koruma Kartı
-// (guards.mjs) nor a Şanslı package (lucky.mjs: a game of chance is never promoted; its packages aren't Hediyeler's
-// gifts and its sends never come here). A save that would break this is refused (globalSave); a gift left under a
-// minimum raised later stays marked but isn't global (globalNow): no banner, no `global` in the catalog.
+// 300.000 coins); never a bond gift (bonds.mjs: a request that may be refused, or bond points between two who have
+// the bond), Koruma Kartı (guards.mjs), a gift that leaves or cleans a profile mark (profile-marks.mjs: Kaka would
+// shame its receiver in every room) nor a Şanslı package (lucky.mjs: a game of chance is never promoted; its packages
+// aren't Hediyeler's gifts and its sends never come here). A save that would break this is refused (globalSave;
+// custom-gifts.mjs checkMarkPrices for the marks); a gift left under a minimum raised later stays marked but isn't
+// global (globalNow): no banner, no `global` in the catalog.
 //
 // Who hears it: the live lines opened with ?global=1 (live-line.mjs lineGlobal; an older app's line never asks, since
 // it would take an unknown event for "read everything again") whose owner's profile country (profile_extras.country,
@@ -33,10 +35,15 @@ const PENDING_MAX = 20;
 const STALE_MS = 3 * 60_000;
 const fmt = (n) => Number(n).toLocaleString('tr-TR');
 
-/** Why `gift` ({ id, price }) can't be global now (Turkish, for the panel), or null when it can. */
-export function globalRefusal({ id = null, price }, s = live()) {
-  if (id && BOND_GIFTS.has(id)) return 'Bağ hediyesi global olamaz: bağ isteği olarak gider';
+/**
+ * Why `gift` ({ id, price, mark? }) can't be global now (Turkish, for the panel), or null when it can. A gift that
+ * leaves or cleans a profile mark (profile-marks.mjs: Kaka, Su) never is: a save that would make one is refused
+ * (custom-gifts.mjs checkMarkPrices), and this keeps it unannounced whatever the rows say.
+ */
+export function globalRefusal({ id = null, price, mark = null }, s = live()) {
+  if (id && BOND_GIFTS.has(id)) return 'Bağ hediyesi global olamaz: bağ isteği ya da bağ puanı olarak gider';
   if (id === GUARD_CARD) return 'Koruma Kartı global olamaz';
+  if (mark?.role === 'leave' || mark?.role === 'clean') return 'Profil izi bırakan ya da temizleyen hediye global olamaz';
   const min = s.globalGiftMinPrice;
   if (!(Number(price) >= min)) return `Global hediye en az ${fmt(min)} jeton olmalı (bu ${fmt(price)} jeton)`;
   return null;

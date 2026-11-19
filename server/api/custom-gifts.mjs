@@ -59,6 +59,7 @@ import { BOND_GIFTS, GIFTS, GIFTS_PAUSED } from './catalog.mjs';
 import { HttpError, auth, clientIp, db, env, int, limit, readJson, text, tx } from './core.mjs';
 import { FX_PATH, giftClip, mp4Duration } from './fx.mjs';
 import { globalMinPrice, globalNow, globalSave } from './global-gifts.mjs';
+import { GUARD_CARD } from './guard-rules.mjs';
 import { panelDetail } from './panel.mjs';
 import { appMarkOf, markInput, markPriceProblem, storedMark } from './profile-mark-rules.mjs';
 import { download, linkOf } from './link-fetch.mjs';
@@ -1072,11 +1073,19 @@ function markCols(v) {
   return m.cols;
 }
 /**
- * Profil izleri: refuses a save after which a gift that cleans a mark wouldn't cost more than a gift that leaves it
- * (profile-mark-rules.mjs markPriceProblem). `row`: the gift's row as the save's transaction just wrote it.
+ * Refuses a save that leaves the gift breaking a rule between Profil izleri and the other features. `row`: the gift's
+ * row as the save's transaction just wrote it (the transaction rolls back on a refusal).
+ * - A gift that cleans a mark must cost more than a gift that leaves it (profile-mark-rules.mjs markPriceProblem).
+ * - A bond gift or Koruma Kartı leaves or cleans no mark: they start or feed a bond or a Koruma, and bonds.mjs
+ *   bondGiftOf never applies one, so the catalog would promise what the send doesn't do.
+ * - A gift that leaves or cleans a mark is never global (global-gifts.mjs): a Kaka told to every room of the country
+ *   would shame its receiver in front of everyone, and a Su would tell everyone they had been marked.
  */
 function checkMarkPrices(row) {
   const after = row.builtin ? appGiftOf(GIFTS.get(row.id), viewOf(row)) : customGift(viewOf(row));
+  const marks = after.mark?.role === 'leave' || after.mark?.role === 'clean';
+  if (marks && (BOND_GIFTS.has(row.id) || row.id === GUARD_CARD)) throw new HttpError(400, 'Bağ hediyesi ve Koruma Kartı profil izi bırakamaz ya da temizleyemez; iz kuralını boş bırakın');
+  if (marks && row.global === true) throw new HttpError(400, 'Profil izi bırakan ya da temizleyen hediye global olamaz; Global seçimini ya da iz kuralını kaldırın');
   const problem = markPriceProblem([...allGifts().filter((g) => g.id !== row.id), after], row.id);
   if (problem) throw new HttpError(400, problem);
 }
