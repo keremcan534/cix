@@ -799,6 +799,19 @@ export function pkPillBox(slot: number, scale = 1): PkPillBox {
 /** The score as the pill shows it: 940, 61.99k (or 61.9k, 61k where fewer characters fit), 1.25m. */
 export const pkPointsText = (value: number, chars: number) => compactFit(Math.max(0, value), chars);
 
+/** `#rrggbb` of `tint` at `alpha` laid over the solid `base`: a see-through colour made solid. */
+export function tintOver(base: string, tint: string, alpha: number): string {
+  const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  const [a, b] = [rgb(base), rgb(tint)];
+  return `#${a.map((c, i) => Math.round(c + (b[i] - c) * alpha).toString(16).padStart(2, '0')).join('').toUpperCase()}`;
+}
+/** The dark the points pill's gold tint is laid over: the pill is opaque, so a lower row's crown under it is covered. */
+export const PILL_BASE = '#1A1024';
+/** The pill's gold (colors.gold). */
+const PILL_GOLD = '#F6BD60';
+/** The points pill's fill: its gold tint (18%; 30% after a big gift) over PILL_BASE, solid. */
+export const pkPillFill = (big = false) => tintOver(PILL_BASE, PILL_GOLD, big ? 0.3 : 0.18);
+
 /** Test support. */
 export function resetPk() {
   timers.forEach((list) => list.forEach(clearTimeout));

@@ -10,9 +10,10 @@
 //     share of its width (`hole`) so the photo sits inside it, where that centre is when it isn't the picture's middle
 //     (`hole_x`, `hole_y`, 079: a ring under a crown is higher), and a moving version if it has one (`motion_*`, 079):
 //     an animated WebP of the same picture the new app plays (the still one stays for older apps); and the part of the
-//     pictures that is drawn (`art_box_*`, 098: the box round every pixel more than a little opaque, over the still
-//     picture and every frame of the moving one, measured by tools/frame-reach.py when either is saved, and once at
-//     start for the frames saved before; none where Python with Pillow isn't installed: phones draw as before);
+//     pictures that is drawn (`art_box_*`, 098: the box round every pixel even faintly visible, soft glows included,
+//     over the still picture and every frame of the moving one, measured by tools/frame-reach.py when either is saved,
+//     and once at start for the frames saved before; none where Python with Pillow isn't installed, or for a WebP
+//     picture where Pillow reads no WebP: phones draw as before);
 //   - an entry effect: its video, a ready stacked MP4 or a transparent source (WebM, ProRes .mov, SVGA) the server
 //     turns into one, as a gift's (custom-gifts.mjs videoOf and its job), its name plate (`plate`): where the
 //     entering person's name is written over it, as shares of the 540 × 960 frame (x, y: the centre; w: the widest
@@ -202,12 +203,15 @@ const boxKey = (art, motion) => `${art} ${motion ?? ''}`;
 /**
  * How far a frame's drawn part (`box`, shares of the picture's sides) reaches from the hole's centre (`at`, the middle
  * when none), as shares of the picture's side: across (the further of left and right), up and down. Never less than
- * the photo's own radius (`hole`), never past the picture's edge on that side; to 0.001. Null without a box.
+ * the photo's own radius (`hole`), never past the picture's edge on that side; to 0.001, rounded out (never less than
+ * measured: a frame drawn by it is never cut). Null without a box.
  */
 export function reachOf(box, hole, at) {
   if (!box) return null;
   const c = at ?? { x: 0.5, y: 0.5 };
-  const fit = (n, edge) => Math.round(Math.min(Math.max(n, hole), edge) * 1000) / 1000;
+  // The hole and its place are kept to 0.001 (holeOf, holeAtOf), so are the edges; the 1e-9 forgives float noise.
+  const out = (n) => Math.ceil(n * 1000 - 1e-9) / 1000;
+  const fit = (n, edge) => Math.min(out(Math.max(n, hole)), Math.round(edge * 1000) / 1000);
   return Object.freeze({ x: fit(Math.max(c.x - box.l, box.r - c.x), Math.max(c.x, 1 - c.x)), top: fit(c.y - box.t, c.y), bottom: fit(box.b - c.y, 1 - c.y) });
 }
 /** An admin's frame's pictures as a row has them; its box only while it was measured from these very pictures. */
@@ -591,12 +595,17 @@ async function motionArt(url) {
 }
 
 // --- How much of a frame's picture is drawn (tools/frame-reach.py, 098) ----------------------------------------
+/**
+ * The environment the tool runs in: where programs are and UTF-8, nothing of the API's own (its database password,
+ * keys and the rest never reach a program that reads files the admins uploaded).
+ */
+const PYTHON_ENV = Object.freeze({ PATH: env.PATH || '/usr/local/bin:/usr/bin:/bin', LANG: 'C.UTF-8', PYTHONIOENCODING: 'utf-8' });
 /** Runs Python, never through a shell: { code, out, err }; code -1 when it couldn't start or took too long. */
 function python(args, timeout) {
   return new Promise((resolve) => {
     let child;
     try {
-      child = execFile(PYTHON, args, { timeout, killSignal: 'SIGKILL', maxBuffer: 64 * 1024, windowsHide: true }, (e, out, err) =>
+      child = execFile(PYTHON, args, { env: PYTHON_ENV, timeout, killSignal: 'SIGKILL', maxBuffer: 64 * 1024, windowsHide: true }, (e, out, err) =>
         resolve({ code: !e ? 0 : typeof e.code === 'number' && !e.killed ? e.code : -1, out: String(out ?? ''), err: String(err || e?.message || '') }),
       );
     } catch (e) {
@@ -611,8 +620,23 @@ function python(args, timeout) {
   });
 }
 let pillow = null;
-/** Whether frames can be measured here: Python with Pillow, and the tool (asked once). */
-const canMeasure = () => (pillow ??= python(['-I', '-c', 'import PIL'], 20_000).then((r) => r.code === 0 && fs.existsSync(REACH_TOOL)));
+/**
+ * What can be measured here (the tool asked once): null where nothing can (no Python with Pillow, no tool), else
+ * `{ webp }`: whether this Pillow reads WebP too; without it a frame with a WebP picture (a moving version always is)
+ * is left unmeasured, for a machine that reads it.
+ */
+const canMeasure = () =>
+  (pillow ??= python(['-I', REACH_TOOL, '--check'], 20_000).then((r) => {
+    let webp = null;
+    try {
+      webp = r.code === 0 ? JSON.parse(r.out).webp : null;
+    } catch {}
+    if (typeof webp !== 'boolean') return null;
+    if (!webp) console.error('shop frame measure: this Pillow reads no WebP; frames with a WebP picture stay unmeasured');
+    return { webp };
+  }));
+/** Whether a file is a WebP (RIFF … WEBP). */
+const isWebp = (buf) => buf.length >= 12 && buf.toString('latin1', 0, 4) === 'RIFF' && buf.toString('latin1', 8, 12) === 'WEBP';
 /** The tool's box, its edges moved out to 0.0001 (never smaller than measured); throws when it isn't one. */
 function boxIn(j) {
   const v = ['l', 't', 'r', 'b'].map((k) => (j && typeof j[k] === 'number' ? j[k] : NaN));
@@ -625,11 +649,13 @@ function boxIn(j) {
 /**
  * The drawn part of a frame's still picture and its moving version (`bufs`: their files, null for none), over every
  * frame of the moving one: { box: { l, t, r, b } } as shares of the pictures' sides; { box: null } when they can't be
- * read or nothing in them is drawn (known: not measured again); null when it couldn't run here (no Python or Pillow,
- * too slow, the tool failed): nothing is known, and it is tried again later (kickMeasure). Never refuses a save.
+ * read or nothing in them is drawn (known: not measured again; the tool's exit 3, only for the files' own faults);
+ * null when it couldn't run here (no Python or Pillow, a Pillow without WebP for a WebP picture, too slow, out of
+ * memory, any other failure): nothing is known, and it is tried again later (kickMeasure). Never refuses a save.
  */
 async function measureFrame(bufs) {
-  if (!(await canMeasure())) return null;
+  const can = await canMeasure();
+  if (!can || (!can.webp && bufs.some((b) => b && isWebp(b)))) return null;
   let dir = null;
   try {
     dir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'shop-frame-'));
@@ -668,9 +694,10 @@ let measuring = false;
 let measureAgain = false;
 /**
  * Measures, one after another in the background, the admins' frames whose pictures aren't measured: saved before 098
- * (once, at start), or when it couldn't run on save. Each is stored with a new rev, so phones read the catalog again.
- * One that can't be measured now (no Python here, the storage) is left for the next start; one whose pictures
- * changed meanwhile is left to its save.
+ * (once, at start), or when it couldn't run on save or two saves at once measured each other's old pictures. Each is
+ * stored with a new rev, so phones read the catalog again (only when the box is new to it). One that can't be
+ * measured now (no Python here, the storage) is left for the next start; one whose pictures changed meanwhile is
+ * left to its save (which kicks this again when it couldn't measure them itself).
  */
 export function kickMeasure() {
   if (measuring) {
@@ -701,7 +728,7 @@ export function kickMeasure() {
           const c = boxCols(m, row.art_url, row.motion_url);
           const u = await db.query(
             `UPDATE shop_items SET art_box_l = $4, art_box_t = $5, art_box_r = $6, art_box_b = $7, art_box_of = $8, rev = nextval('shop_item_rev')
-              WHERE id = $1 AND art_url = $2 AND motion_url IS NOT DISTINCT FROM $3 AND deleted_at IS NULL`,
+              WHERE id = $1 AND art_url = $2 AND motion_url IS NOT DISTINCT FROM $3 AND deleted_at IS NULL AND art_box_of IS DISTINCT FROM $8`,
             [row.id, row.art_url, row.motion_url, c.art_box_l, c.art_box_t, c.art_box_r, c.art_box_b, c.art_box_of],
           );
           if (!u.rowCount) continue;
@@ -1114,19 +1141,23 @@ export const shopRoutes = {
       }
     }
     if (!Object.keys(cols).length) throw bad('Değişecek bir şey yok');
-    await saving(() =>
+    const saved = await saving(() =>
       tx(async (c) => {
         if (cur.builtin) await appRow(c, id, a.id);
         const before = (await c.query('SELECT * FROM shop_items WHERE id = $1 FOR UPDATE', [id])).rows[0];
         if (before.job_source && cols.job_source !== undefined && before.job_source !== cols.job_source) drop.push(before.job_source);
         const r = await setRow(c, id, cols, a.id);
         await audited(c, a, 'shop.update', { item: id, before: auditOf(before), after: auditOf(r) }, req);
+        return r;
       }),
     );
     removeFiles(drop.filter(Boolean));
     await refreshShopItems();
     if (cols.job_status === 'processing') kickJobs();
-    if (cols.art_box_of === null) kickMeasure();
+    // A frame whose pictures as stored now aren't the ones its box was measured from: measuring couldn't run, or two
+    // saves ran at once (one a new picture, the other a new moving version, each measured with the other's old file).
+    // The row lock orders them, so the later one sees both: once more in the background (and at the next start).
+    if (saved.kind === 'frame' && !saved.builtin && saved.art_url && saved.art_box_of !== boxKey(saved.art_url, saved.motion_url)) kickMeasure();
     return { item: await oneItem(id) };
   },
 

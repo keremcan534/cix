@@ -7,7 +7,7 @@ import { Animated, Easing, View, type ImageSourcePropType } from 'react-native';
 
 import { cosmeticById } from '@/data/catalog';
 import { FRAME_ART_SIZES, type FrameArtSize } from '@/data/frame-art';
-import { ART_BREATHE, artFit, seatArt, type SeatRoom } from '@/lib/seat-cell';
+import { ART_BREATHE, artFit, seatArt, seatPhotoDisc, type SeatRoom } from '@/lib/seat-cell';
 import { useSettings } from '@/store';
 
 /**
@@ -76,8 +76,12 @@ export function ArtFrame({ art, size, still, maxScale = 1.8, room, children }: {
   // avatar radius = hole radius (+4% tucked under the ring).
   const seat = room ? seatArt(art, size, room) : null;
   const { frame, avatar } = seat ?? artFit(art, size, maxScale);
-  // A cut picture stands still: breathing (or a moving frame's sparkles) under a fixed cut would slide its edge.
-  const calm = !!still || !!seat?.clip;
+  // On a seat the photo shows only inside the picture's hole (lib/seat-cell seatPhotoDisc): a thin ring drawn over a
+  // bigger photo would let it show round the ring. Elsewhere the photo is the hole's size already.
+  const disc = seat ? seatPhotoDisc(art, frame, avatar) : avatar;
+  // A picture that fits only standing still, or is cut, stands still: breathing (or a moving frame's sparkles) would
+  // pass the seat's cell or slide the cut edge.
+  const calm = !!still || !!seat?.still || !!seat?.clip;
   // A moving frame plays its own animation instead of breathing; "hareketi azalt", "Düşük veri modu" (its file isn't
   // fetched) and a small photo draw the still picture, as an older app does.
   const { lowData } = useSettings();
@@ -110,22 +114,31 @@ export function ArtFrame({ art, size, still, maxScale = 1.8, room, children }: {
       }}
     />
   );
+  const glow = disc * 1.16;
+  const shown = (size - disc) / 2;
   return (
     <View style={{ width: size, height: size }}>
       <Animated.View
         pointerEvents="none"
         style={{
           position: 'absolute',
-          left: inset - avatar * 0.08,
-          top: inset - avatar * 0.08,
-          width: avatar * 1.16,
-          height: avatar * 1.16,
+          left: (size - glow) / 2,
+          top: (size - glow) / 2,
+          width: glow,
+          height: glow,
           borderRadius: size,
           backgroundColor: art.glow,
           opacity: calm ? 0.25 : t.interpolate({ inputRange: [0, 1], outputRange: [0.12, 0.4] }),
         }}
       />
-      <View style={{ position: 'absolute', left: inset, top: inset, width: avatar, height: avatar, borderRadius: avatar / 2, overflow: 'hidden' }}>{children}</View>
+      {seat ? (
+        // The photo at its size, only its middle (the hole's) showing.
+        <View style={{ position: 'absolute', left: shown, top: shown, width: disc, height: disc, borderRadius: disc / 2, overflow: 'hidden' }}>
+          <View style={{ position: 'absolute', left: -(avatar - disc) / 2, top: -(avatar - disc) / 2, width: avatar, height: avatar }}>{children}</View>
+        </View>
+      ) : (
+        <View style={{ position: 'absolute', left: inset, top: inset, width: avatar, height: avatar, borderRadius: avatar / 2, overflow: 'hidden' }}>{children}</View>
+      )}
       {seat?.clip ? (
         <View pointerEvents="none" style={{ position: 'absolute', ...seat.box, overflow: 'hidden' }}>
           {picture}

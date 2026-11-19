@@ -541,7 +541,8 @@ export type ArenaSlot = { width: number; size: number; top?: number };
 const HALF_GAP = 3;
 /**
  * The line of a half's name and head count. It is drawn over the seats under it, like a row's points pill: a frame's
- * crown in the first row may rise behind it (3 px of gap alone would cut nearly every frame there).
+ * crown in the first row may rise behind it (3 px of gap alone would cut nearly every frame there), so it has a dark,
+ * nearly opaque backing (st.halfHead) and its text a shadow: the crown's tip is covered and the name reads.
  */
 const HEAD_LINE = 16;
 /** The PK's other mics: room above their faces, inside the row's scroller (which cuts what passes its edge). */
@@ -943,7 +944,7 @@ const st = StyleSheet.create({
   arenaRim: { marginHorizontal: 8, marginTop: 4 },
   arena: { backgroundColor: 'rgba(30,8,48,0.86)', borderRadius: 16.5, padding: 5, gap: 4 },
   half: { flex: 1, minWidth: 0, borderRadius: 12, borderWidth: 1, paddingVertical: 3, paddingHorizontal: 2, gap: HALF_GAP },
-  halfHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 4, gap: 4 },
+  halfHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 4, gap: 4, borderRadius: 8, backgroundColor: 'rgba(20,10,32,0.9)' },
   halfName: { fontWeight: '800', fontSize: 12, lineHeight: HEAD_LINE, flexShrink: 1, textShadowColor: 'rgba(0,0,0,0.75)', textShadowRadius: 3 },
   halfCount: { color: PK.dim, fontSize: 11, lineHeight: HEAD_LINE, fontWeight: '700', textShadowColor: 'rgba(0,0,0,0.75)', textShadowRadius: 3 },
   halfSeats: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', rowGap: HALF_GAP },

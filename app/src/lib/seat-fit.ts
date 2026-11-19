@@ -36,6 +36,32 @@ const BOSS_H = 98;
 export const PK_LINE = 15;
 /** The Patron seat with its points line (its holder is on a mic for a PK too). */
 const bossHeight = () => BOSS_H + PK_LINE;
+/**
+ * Between two seats' cells (lib/seat-cell), beside and above or below: a seat's frame picture keeps this far from its
+ * neighbour's, so an upper seat's hanging gems and a lower seat's crown never meet.
+ */
+export const CELL_GAP = 2;
+/**
+ * The room above a face in a row of seats, where its frame's crown may rise (lib/seat-cell): the gap between the rows
+ * and the row above's points line (empty outside a PK; in a PK the row above is drawn over this row, its pill over a
+ * crown's tip), less CELL_GAP. The stage gives its first row the same (STAGE_PAD_TOP), so a frame is as big there.
+ */
+export const SEAT_TOP = ROW_GAP + PK_LINE - CELL_GAP;
+/**
+ * components/room/fit-stage: the stage's scroller reaches this far up over its first row, into the header's lower
+ * padding (it cuts what passes its edge). With no board over the mics it is part of the first row's room.
+ */
+export const STAGE_HEADROOM = 8;
+/**
+ * The padding over the stage's first row of seats (the classic grid and every layout; counted in their heights): with
+ * the headroom over it, the first row's faces have SEAT_TOP above them, as every other row has.
+ */
+export const STAGE_PAD_TOP = SEAT_TOP - STAGE_HEADROOM;
+/**
+ * Under the boards and banners over the mics (music, a poll, a cross-room PK's board…; components/room/fit-stage): it
+ * stands in for the headroom they cover, so the first row's frames are as big under a board and never reach it.
+ */
+export const BOARD_GAP = STAGE_HEADROOM;
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 
@@ -79,7 +105,7 @@ function gridAt(seats: number, w: number, cols: number, face: number, o: FitOpts
   const rows = Math.ceil(seats / cols);
   // The Patron seat has the row above the mics to itself; the host's mic is the grid's first, as big as the rest.
   const top = o.boss ? bossHeight() + ROW_GAP : 0;
-  return { cols, slot: gridSlot(w, cols), face, host: face, height: 8 + top + rows * seatHeight(face) + Math.max(0, rows - 1) * ROW_GAP };
+  return { cols, slot: gridSlot(w, cols), face, host: face, height: STAGE_PAD_TOP + top + rows * seatHeight(face) + Math.max(0, rows - 1) * ROW_GAP };
 }
 
 /**
@@ -185,9 +211,32 @@ export function layoutHeight(s: LayoutSchema, plan: LayoutPlan, face: number, o:
     const bigH = Math.round(clamp((plan.inner - 60 * sideCols - 8) * 0.95, 150, 320));
     const sideRows = Math.ceil(side.length / sideCols);
     const block = Math.max(bigH, sideRows * seatHeight(38) + (sideRows - 1) * 6);
-    return boss + 8 + block + rowsHeight(s, plan, face, 1);
+    return boss + STAGE_PAD_TOP + block + rowsHeight(s, plan, face, 1);
   }
-  return boss + 8 + rowsHeight(s, plan, face, 0);
+  return boss + STAGE_PAD_TOP + rowsHeight(s, plan, face, 0);
+}
+
+/** A layout's stage rows that hold seats, top to bottom (an empty row isn't drawn). */
+export const drawnRows = (s: LayoutSchema) => [...Array(s.rows).keys()].filter((r) => s.slots.some((x) => x.area === 'stage' && x.row === r));
+/** A row of video tiles only (the seats in them keep to their tiles). */
+export const isVideoRow = (s: LayoutSchema, r: number) => {
+  const xs = s.slots.filter((x) => x.area === 'stage' && x.row === r);
+  return xs.length > 0 && xs.every((x) => x.kind === 'video');
+};
+
+/**
+ * The gap over a layout's row `r` (components/room/stage-layout draws it): none over the first row drawn, else the row
+ * gap; a row of seats under a row of video tiles (or under a side layout's big video and its column) also gets a points
+ * line's height, which a tile doesn't have under it, so its frames have the same room above (SEAT_TOP) as under a row
+ * of seats.
+ */
+export function rowGapOver(s: LayoutSchema, r: number): number {
+  const drawn = drawnRows(s);
+  const k = drawn.indexOf(r);
+  if (k <= 0) return 0;
+  const prev = drawn[k - 1];
+  const underVideo = (prev === 0 && s.slots.some((x) => x.area === 'side')) || isVideoRow(s, prev);
+  return ROW_GAP + (underVideo && !isVideoRow(s, r) ? PK_LINE : 0);
 }
 
 function rowsHeight(s: LayoutSchema, plan: LayoutPlan, face: number, from: number) {
@@ -196,7 +245,7 @@ function rowsHeight(s: LayoutSchema, plan: LayoutPlan, face: number, from: numbe
   for (let r = from; r < s.rows; r++) {
     const xs = s.slots.filter((x) => x.area === 'stage' && x.row === r);
     if (!xs.length) continue;
-    h += ROW_GAP * (r > 0 ? 1 : 0) + rowHeight(xs, plan, sizes);
+    h += rowGapOver(s, r) + rowHeight(xs, plan, sizes);
   }
   return h;
 }

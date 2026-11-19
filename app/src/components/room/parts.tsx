@@ -23,11 +23,12 @@ import { Gloss, Shine, useSpringPress } from '@/components/fx/surface';
 import { Photo } from '@/components/photo';
 import { RoleIcon, type StaffMark } from '@/components/room/role-mark';
 import { VOICE_RING, VoiceWave } from '@/components/room/voice-wave';
+import { frameArtOf } from '@/components/fx/frame-art';
 import { BondBubble, BondChip, BondLink } from '@/components/room/room-bonds';
 import type { RoomBond } from '@/data/bonds';
 import { PK_LINE, nameLine, nameSize } from '@/lib/seat-fit';
 import { ringReach, seatRoom } from '@/lib/seat-cell';
-import { PILL_GAP, pkPillBox, pkPointsText } from '@/lib/pk';
+import { PILL_GAP, pkPillBox, pkPillFill, pkPointsText } from '@/lib/pk';
 import { compact } from '@/lib/compact';
 import { levelsLive, voiceLevel } from '@/lib/live/voice-level';
 import { RollingNumber } from '@/components/fx/rolling-number';
@@ -158,8 +159,8 @@ export function Seat({
   const voice = g ? VOICE_RING[g] : VOICE_RING.none;
   const size = avatarSize ?? (host ? 60 : 48);
   // The frame's picture and the speaking ring keep to this seat's cell (lib/seat-cell): off the next seats and the row
-  // above, a frame's hanging gems behind its own name (drawn over them), the speaking ring off the name's letters; the
-  // same for every frame and wave. One object per size, so the framed photo isn't redrawn.
+  // above, a frame's hanging gems behind its own name (drawn over them, in a dark capsule), the speaking ring off the
+  // name's letters; the same for every frame and wave. One object per size, so the framed photo isn't redrawn.
   const room = useMemo(() => seatRoom(size, slotWidth, roomTop), [size, slotWidth, roomTop]);
   // Small faces: a smaller icon and no badge by the name. The name grows a little with the face (lib/seat-fit, which
   // sizes the stage by the same numbers) and may be as wide as the seat's slot.
@@ -170,14 +171,18 @@ export function Seat({
   const mark = nameSize(size) + 2;
   const tick = !!user?.verified && !small && (!slotWidth || slotWidth >= 84);
   const marks = (host ? mark + 3 : 0) + (user && staff ? mark + 3 : 0) + (tick ? 14 : 0);
-  const name = { fontSize: nameSize(size), lineHeight: nameLine(size), maxWidth: Math.max(24, (slotWidth ? slotWidth - 6 : 64) - marks) };
+  // A shop frame's picture (its gems hang behind the name): the name line sits in a soft dark capsule, so the gems read
+  // as behind a label, not on its letters. The line keeps its height (lib/seat-fit nameLine); its width the slot's.
+  const capsule = !!user && !mini && !!frameArtOf(frameId);
+  const name = {
+    fontSize: nameSize(size),
+    lineHeight: nameLine(size),
+    // A capsule may use the slot's edge air (1 px each side instead of 3), so a framed name is cut only 2 px sooner than a plain one.
+    maxWidth: Math.max(24, (slotWidth ? slotWidth - (capsule ? 2 + 2 * CAPSULE_PAD : 6) : 64) - marks),
+  };
   // An empty or locked seat is the pouf in the room's seat color (a pending invite keeps the gold bubble); the host's
   // own photo sits in the gold host frame unless they wear a VIP or shop frame.
   const pouf = !user && (locked || !invitee);
-  // A framed face's speaking ring is drawn over its frame's picture (a wide frame would hide it); a plain face's behind
-  // the photo, round it.
-  const framed = !!user && !mini && (vipLevel > 0 || !!frameId);
-  const ring = speaking ? <VoiceWave wave={wave} size={size} color={voice} level={level} still={still} reach={ringReach(size, room)} /> : null;
   const hostFrame = host && !mini ? SEAT_ART.hostFrame : undefined;
   const frameSize = Math.round(size * HOST_FRAME_SCALE);
   const muteText = modMuted ? ', yönetim tarafından susturuldu' : muted ? ', mikrofonu kapalı' : '';
@@ -201,9 +206,10 @@ export function Seat({
         ]}
       >
         <Animated.View ref={anchorRef} collapsable={false} style={{ width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center', transform: [{ scale: press.scale }] }}>
-          {/* Round the face, the same ring for every speaker (components/room/voice-wave): behind a plain photo. */}
-          {!framed && ring}
-          {framed && user ? (
+          {/* Behind the photo and its frame, round the face: the same ring for every speaker (components/room/voice-wave).
+              The owners' call (güncelleme 5, "dalgalar çerçeveyi kesiyor"): the ring never covers a frame. */}
+          {speaking && <VoiceWave wave={wave} size={size} color={voice} level={level} still={still} reach={ringReach(size, room)} />}
+          {user && !mini && (vipLevel > 0 || frameId) ? (
             <FramedAvatar uri={user.avatar} size={size} vipLevel={vipLevel} frameId={frameId} room={room} />
           ) : user ? (
             <>
@@ -235,8 +241,6 @@ export function Seat({
               <Ionicons name={locked ? 'lock-closed' : invitee ? 'hourglass-outline' : 'add'} size={mini ? 13 : Math.round(Math.max(15, Math.min(28, size * 0.32)))} color={invitee && !locked ? colors.gold : 'rgba(255,255,255,0.42)'} />
             </LinearGradient>
           )}
-          {/* Over a frame's picture, so a framed speaker's ring is seen. */}
-          {framed && ring}
           {teamColor && user && <View pointerEvents="none" style={[styles.teamRing, { width: size + 8, height: size + 8, borderRadius: (size + 8) / 2, borderColor: teamColor }]} />}
           {camera && user && (
             <View style={styles.camBadge} accessibilityLabel="Kamerası açık">
@@ -254,7 +258,7 @@ export function Seat({
           // Küçült: only the mic's number (the host's crown, a staff member's mark), so the strip stays one short line per row.
           <View style={styles.miniLabel}>{host ? <Icon3D name="crown" size={11} /> : user && staff ? <RoleIcon mark={staff} size={11} /> : <Text style={styles.miniNum}>{index + 1}</Text>}</View>
         ) : (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+          <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 3 }, capsule && styles.nameCapsule]}>
             {host && <Icon3D name="crown" size={mark} />}
             {user && <RoleIcon mark={staff} size={mark} />}
             {/* Not scaled with the phone's text size: the stage is fitted to this line's height (lib/seat-fit nameLine). */}
@@ -274,6 +278,8 @@ export function Seat({
 
 /** Big gifts get a stronger (still short) bump. */
 const BIG_PK_GIFT = 1_000;
+/** The side padding of the dark capsule a framed face's name sits in (Seat). */
+const CAPSULE_PAD = 3;
 /**
  * PK points under a seat (lib/pk pkPillBox): a pill of one fixed width for the seat, with the score always in its short
  * form (61.99k, 1.25m; fewer decimals where the seat is narrow), the gift icon where there is room for it. However big
@@ -782,8 +788,10 @@ const styles = StyleSheet.create({
   // The line under the name the PK pill goes on: the same height in every room, PK or not (lib/seat-fit PK_LINE).
   pkLine: { height: PK_LINE, marginTop: -4, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'flex-start' },
   pkWrap: { alignItems: 'center' },
-  pkPill: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: PILL_GAP, backgroundColor: 'rgba(246,189,96,0.18)', borderColor: 'rgba(246,189,96,0.55)', borderWidth: 1, borderRadius: 999 },
-  pkPillBig: { backgroundColor: 'rgba(246,189,96,0.3)' },
+  // Opaque (lib/pk pkPillFill: the gold tint over a dark base, as one solid colour): a lower row's crown tip that rises
+  // under the pill (lib/seat-cell SEAT_TOP) is really covered and the score reads.
+  pkPill: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: PILL_GAP, backgroundColor: pkPillFill(), borderColor: 'rgba(246,189,96,0.55)', borderWidth: 1, borderRadius: 999 },
+  pkPillBig: { backgroundColor: pkPillFill(true) },
   pkText: { color: colors.gold, fontSize: 12, fontWeight: '800', fontVariant: ['tabular-nums'] },
   pkDelta: { position: 'absolute', top: -14, color: '#FDE7C2', fontWeight: '900', fontSize: 12 },
   giftMsg: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(246,189,96,0.16)', borderColor: 'rgba(246,189,96,0.35)', borderWidth: 1, borderRadius: 12, paddingHorizontal: 8, paddingVertical: 5, maxWidth: '90%' },
@@ -792,6 +800,9 @@ const styles = StyleSheet.create({
   failed: { color: '#FF9AA1', fontSize: 12, fontWeight: '700' },
   // A soft dark shadow, so the name reads over a frame's hanging gems drawn behind it.
   seatName: { color: '#fff', fontSize: 12, fontWeight: '600', maxWidth: 64, textShadowColor: 'rgba(0,0,0,0.75)', textShadowRadius: 3 },
+  // The name line of a face in a shop frame's picture: a label the hanging gems go behind (no vertical padding: the
+  // line keeps its height).
+  nameCapsule: { backgroundColor: 'rgba(10,6,20,0.55)', borderRadius: 8, paddingHorizontal: CAPSULE_PAD },
   miniLabel: { height: 14, alignItems: 'center', justifyContent: 'center' },
   miniNum: { color: 'rgba(255,255,255,0.72)', fontSize: 11, fontWeight: '700' },
   // Room events stay in the background of the conversation: no box shouting over people's messages.
