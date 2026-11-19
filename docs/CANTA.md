@@ -24,8 +24,8 @@ Yapılış sırası: 1) Çantam, Çarşı ve ortak ödül yolu, 2) seviye ve VIP
     "Görev ödülü";
   - **Kullan** / **Çıkar**: Çarşı'dakiyle aynı yere takılır.
 
-  Hediyeler sekmesi görev ve ödüllerden gelen ücretsiz hediyelerdir; bir odada hediye panelinin Çantam rafından
-  gönderilir. Boş sekmede "Çarşı'ya git" düğmesi çıkar.
+  Hediyeler sekmesi görev ve ödüllerden gelen ücretsiz hediyelerdir; bir odada hediye panelindeki çanta simgesinden
+  (3B çanta, üstünde kaç çeşit hediye olduğu yazar) gönderilir. Eski APK'larda bu raf hâlâ "Çantam" yazısıyla görünür. Boş sekmede "Çarşı'ya git" düğmesi çıkar.
 - Çantam sunucudan okunur: girişte ve Çantam her açıldığında. Önceden uygulama sahip olunan eşyaları yalnız kendi
   telefonunda tutuyordu; başka telefonda alınan ya da yetkilinin verdiği eşya görünmüyordu. Artık sunucudaki her eşya
   telefonun listesine de eklenir; Çarşı ve odalar onları tanır.

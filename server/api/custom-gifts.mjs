@@ -260,7 +260,7 @@ export function checkShownPrice(gift, shown) {
  * as changed, and `icon` when it was replaced (an app reading gifts=2 draws these; an older one only takes the id).
  * `app2`: the phone reads it all (?gifts=2); otherwise the app's gifts whose price was changed are left out, since
  * that app would show its own price. `family`: the phone has the Aile ve Dost shelf (?family=1); an older one gets no
- * bond gifts and sees that shelf's other gifts on İkili, where Koruma Kartı was.
+ * bond gifts and sees that shelf's other gifts on Çift (İkili before), where Koruma Kartı was.
  */
 export function catalogGifts({ app2 = false, hidden = new Set(), family = false } = {}) {
   const out = [];
@@ -998,7 +998,7 @@ const priceOf = (v) => {
   return n;
 };
 const catOf = (v) => {
-  if (!CATS.includes(v)) throw new HttpError(400, 'Raf Popüler, İkili, Aile ve Dost, Kutlama ya da Özel olmalı');
+  if (!CATS.includes(v)) throw new HttpError(400, 'Raf Popüler, Çift, Aile ve Dost, Kutlama ya da Özel olmalı');
   return v;
 };
 /** The VIP level a gift needs: only on the Özel shelf (1–10); 0 elsewhere. */

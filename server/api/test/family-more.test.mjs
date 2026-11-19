@@ -73,7 +73,7 @@ describe('Aile görevleri ve sandıklar', () => {
     assert.ok(chat.messages.some((m) => m.author.id === member.user.id && m.text.includes('Kalp ×10')), 'sohbette görünür');
     const o = await overview(member.session);
     assert.deepEqual([task(o, 'k-chatgift').progress, task(o, 'k-chatgift').points], [500, 2], '400 jetonda 2 puan');
-    assert.deepEqual([task(o, 'k-cp').progress, task(o, 'k-cp').points], [777, 4], 'İkili hediyesi 350 jetonda 2 puan');
+    assert.deepEqual([task(o, 'k-cp').progress, task(o, 'k-cp').points], [777, 4], 'Çift hediyesi 350 jetonda 2 puan');
     assert.equal(task(o, 'k-newbie').progress, 2, 'yeni üyeye hediye');
     assert.equal(o.me.gifts, 1277);
     assert.equal(o.highlights[0].id, member.user.id);

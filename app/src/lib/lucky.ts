@@ -146,7 +146,7 @@ export function unavailable(g: LuckyGift): string | null {
   // Live: the server keeps the reward limit and says per package; it checks again on every send.
   if (state.server) return state.server.open[g.id] === false ? 'Günlük ödül limiti doldu; bu hediye yarın yeniden açılır.' : null;
   const top = g.price * maxMult(g);
-  if (state.pool < top) return 'Ödül rezervi bu hediyenin en yüksek ödülünü karşılayamıyor; gönderime geçici olarak kapalı.';
+  if (state.pool < top) return 'Bu Şanslı hediye şu an gönderilemiyor; biraz sonra yeniden dene.';
   if (paidToday() + top > state.config.dailyPayoutLimit) return 'Günlük ödül limiti doldu; bu hediye yarın yeniden açılır.';
   return null;
 }
