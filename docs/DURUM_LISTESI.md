@@ -79,6 +79,7 @@ Son güncelleme: preview-96 sonrası (Küçült, çanta yağmuru, @bahset düzel
 ## Çarşı ve Çantam (yeni APK)
 
 - **Çarşı:** Mağaza'nın yeni adı. Binek sekmesi kalktı; binekler Giriş efektleri sekmesinde (bir giriş efekti ve bir binek birlikte takılır).
+- **Çerçeve önizlemesi (Güncelleme 7):** Çerçeveler sekmesinde "Önizle" (ya da çerçevenin resmine dokunmak) çerçeveyi kişinin kendi fotoğrafıyla gösterir: büyük, odada mikrofonda (odanın kendi koltuk ölçüsüyle, yanında boş koltuklar) ve profilde. Panelden eklenen çerçeveler de aynı yoldan çizilir. Altındaki düğme Çarşı'nınki: fiyat (onay sorulur), Kullan / Çıkar ya da VIP kilidi. Önizleme hiçbir şey satın almaz, takmaz, sunucuya gitmez.
 - **Çantam (Profil › Çantam):** kişinin bütün eşyaları sekmelerle (Hediyeler, Çerçeveler, Giriş efektleri, Sohbet balonları, Ses dalgaları); her birinde kalan gün, nereden geldiği ve Kullan.
   - Eşyalar artık sunucudan okunur: başka telefonda alınan ya da yetkilinin verdiği eşya da görünür.
 - **Seviye ödülleri:** panelde bir VIP, Cömertlik ya da Yankı seviyesine eşya bağlanır (Seviye ve VIP › Seviye ve görev ödülleri); o seviyeye gelen Çantam'ında bulur.
@@ -227,7 +228,7 @@ Ayrıntı: [`OTOMATIK_MESAJ.md`](OTOMATIK_MESAJ.md).
 | 38 | Mikrofon sayısına göre boyut | Çalışıyor | |
 | 39 | Yazarken mikrofonlar kapanmasın | Telefonda denenmeli | |
 | 40 | @bahset | Yarım | Bahsetmeli mesaj iletişim filtresine takılıyordu. Düzeltmesi PR #87'de, sonraki APK'da gelir. Güncelleme 7 (yeni APK): görülmeden geçen bahsetme için sohbetin üstünde "Senden bahsedildi" düğmesi, dokununca o mesaja gider; telefonda denenmeli |
-| 41–42 | Kişi kartı | Çalışıyor | |
+| 41–42 | Kişi kartı | Çalışıyor | Güncelleme 7 (yeni APK): tasarımdaki gibi; profil ID'si (dokununca kopyalanır) ve ülkesi, Cömertlik ve Yankı seviyesi (VIP'nin gizlediği gizli kalır), VIP seviyesi, madalyaları (dokununca profilin Onur sekmesi). Eski APK eski kartı gösterir |
 | 43–44 | DJ yetkisi | Çalışıyor | |
 | 45 | Telefondan müzik çalma | Telefonda denenmeli | Depo (R2) kuruldu, şarkı yükleme açık |
 | 46 | "Benzer" yerine "Ana Sayfa" | Çalışıyor | Alt menüde de "Ana Sayfa" |

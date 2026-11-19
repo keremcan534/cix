@@ -4,7 +4,9 @@
 //   DELETE /api/me                                        → { deleted: true }
 //   GET    /api/user?id=&visit=1                          → { user }  (public profile + counts (oneWay: Takipçi / Takip without friends) + relation; visit=1 from the profile screen records a visit;
 //                                                                       levels, friends, gifts, staff, extras and album: profiles.mjs;
-//                                                                       room: the room they are in now or null, presence-room.mjs)
+//                                                                       room: the room they are in now or null, presence-room.mjs;
+//                                                                       &medals=1 adds user.medals, &card=1 leaves out giftsReceived:
+//                                                                       the room's person card)
 //   GET    /api/me/visitors                               → { count, visitors, hidden }  (last 7 days; who only with the
 //                                                                       Abonelik, without it `hidden`: when, never who)
 //   POST   /api/follow  { to, follow }                    → { following }
@@ -24,7 +26,7 @@ import { familyOf, leaveFamily } from './families.mjs';
 import { dropFromQueues } from './music.mjs';
 import { removeFiles, removeUserFiles, verifyUpload } from './media.mjs';
 import { shownToViewer } from './privacy.mjs';
-import { cardsMore, privateMore, profileMore } from './profiles.mjs';
+import { cardsMore, medalsOf, privateMore, profileMore } from './profiles.mjs';
 import { cityDistance } from './city-coords.mjs';
 import { eraseDecor } from './room-decor.mjs';
 import { shownRoomOf } from './presence-room.mjs';
@@ -327,7 +329,10 @@ export const socialRoutes = {
     );
     // "Profilim herkese açık" off: someone they don't follow gets no age, city, bio or interests (privacy.mjs).
     const [shown] = await shownToViewer(db, me.id, [{ id: u.id, name: u.name, ...profileOf(u) }]);
-    const more = await profileMore(u, id === me.id);
+    // The room's person card (card=1) doesn't show the received-gift count, a sum over all their gifts: left out; its
+    // levels may be a minute old (profiles.mjs levelsOf), as Keşfet's cards are.
+    const card = url.searchParams.get('card') === '1';
+    const more = await profileMore(u, id === me.id, { gifts: !card, fresh: !card });
     return {
       user: {
         ...shown,
@@ -344,6 +349,8 @@ export const socialRoutes = {
         distance: id === me.id ? null : cityDistance(me.city, shown.city),
         // A private profile keeps its personal extras and album from people it doesn't follow, like age and city.
         ...(shown.private ? privateMore(more) : more),
+        // Their medals (Vitrin's Madalyalar, the same rules) for the person card, only when asked: older apps don't.
+        ...(url.searchParams.get('medals') === '1' && { medals: await medalsOf(u, more.friends) }),
       },
       looks: (await looksOf([u.id]))[u.id] ?? null,
       agency: ag.rowCount ? { id: String(ag.rows[0].id), name: ag.rows[0].name } : null,
