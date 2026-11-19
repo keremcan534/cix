@@ -579,7 +579,7 @@ export const roomSocialRoutes = {
   async 'GET /api/me/room-invites'(req) {
     const me = await auth(req);
     const r = await db.query(
-      `SELECT i.id, i.room_id, i.created_at, r.title, o.id AS owner_id, o.name AS owner_name
+      `SELECT i.id, i.room_id, i.created_at, r.title, o.id AS owner_id, o.name AS owner_name, o.avatar_url AS owner_avatar
          FROM room_follower_invites i
          JOIN follows f ON f.followee = i.owner_id AND f.follower = $1 AND f.created_at <= i.created_at
          JOIN rooms r ON r.id = i.room_id JOIN users o ON o.id = i.owner_id
@@ -589,7 +589,13 @@ export const roomSocialRoutes = {
         ORDER BY i.id DESC LIMIT 20`,
       [me.id],
     );
-    const invites = r.rows.map((x) => ({ id: Number(x.id), room: { id: x.room_id, title: x.title }, host: { id: x.owner_id, name: x.owner_name }, at: x.created_at }));
+    // host.avatarUrl (Güncelleme 7, item 1): an added field, the invite shows the host's face.
+    const invites = r.rows.map((x) => ({
+      id: Number(x.id),
+      room: { id: x.room_id, title: x.title },
+      host: { id: x.owner_id, name: x.owner_name, avatarUrl: x.owner_avatar ?? null },
+      at: x.created_at,
+    }));
     // With them, the rooms I follow that opened (room-follow.mjs; `kind: 'open'`): the phone tells both the same way.
     const opened = await openNoticesFor(me.id);
     return { invites: [...invites, ...opened].sort((a, b) => new Date(b.at) - new Date(a.at)).slice(0, 20) };

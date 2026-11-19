@@ -95,7 +95,7 @@ describe('Oda yönetimi', () => {
     const [st, mine] = await call('GET', `/api/rooms/staff?room=${room}`, null, owner.session);
     assert.equal(st, 200, mine.error);
     assert.equal(mine.owner, owner.user.id);
-    assert.deepEqual(mine.admins, [{ id: admin.user.id, name: 'Oda Yöneticisi', super: false }]);
+    assert.deepEqual(mine.admins, [{ id: admin.user.id, name: 'Oda Yöneticisi', avatarUrl: null, super: false }]);
     assert.deepEqual(
       mine.bans.map((b) => [b.userId, b.name, !!b.until]),
       [[kicked.user.id, 'Atılan', true]],

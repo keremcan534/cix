@@ -264,7 +264,9 @@ export function liveSpend(n: number, reason: string) {
 /** Someone from a server list (room owner, message, LiveKit participant), known by name until their profile loads. */
 export function rememberUser(c: { id: string; name: string; avatarUrl?: string | null; publicNo?: string | null }) {
   if (c.id === myId) return;
-  putServerUser({ id: c.id, name: c.name, ...(c.avatarUrl ? { avatar: c.avatarUrl } : {}), ...(serverNo(c.publicNo) ? { publicNo: serverNo(c.publicNo)! } : {}) });
+  // Only a real address is a face: a malformed one from a list keeps the face we knew.
+  const avatar = typeof c.avatarUrl === 'string' && /^https?:\/\//.test(c.avatarUrl) ? c.avatarUrl : null;
+  putServerUser({ id: c.id, name: c.name, ...(avatar ? { avatar } : {}), ...(serverNo(c.publicNo) ? { publicNo: serverNo(c.publicNo)! } : {}) });
 }
 
 /** A full profile (age, city, interests, follow state) from the server. */

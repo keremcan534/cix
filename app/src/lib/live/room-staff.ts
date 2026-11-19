@@ -15,9 +15,9 @@ import { onServerRoom } from '@/lib/live/room-bus';
 
 type StaffAnswer = {
   owner: string;
-  admins: { id: string; name: string; super?: boolean }[];
-  djs?: { id: string; name: string }[];
-  bans?: { userId: string; name: string; until: string | null }[];
+  admins: { id: string; name: string; avatarUrl?: string | null; super?: boolean }[];
+  djs?: { id: string; name: string; avatarUrl?: string | null }[];
+  bans?: { userId: string; name: string; avatarUrl?: string | null; until: string | null }[];
 };
 /** Someone kept out of the room: `until` in ms, null = the room's blacklist. */
 export type StaffBan = { uid: string; name: string; until: number | null };
@@ -80,10 +80,11 @@ export function useRoomStaff(roomId: string, enabled: boolean) {
         const s = await roomStaff(roomId);
         s.admins.forEach((a) => rememberUser(a));
         s.djs?.forEach((d) => rememberUser(d));
-        s.bans?.forEach((b) => rememberUser({ id: b.userId, name: b.name }));
+        // The face comes along (Güncelleme 7, item 1): an older server sends none, and rememberUser keeps what we knew.
+        s.bans?.forEach((b) => rememberUser({ id: b.userId, name: b.name, avatarUrl: b.avatarUrl }));
         // Mutes are for staff only, like the bans.
         const mutes = s.bans ? await roomMutes(roomId).catch(() => []) : [];
-        mutes.forEach((m) => rememberUser({ id: m.userId, name: m.userName }));
+        mutes.forEach((m) => rememberUser({ id: m.userId, name: m.userName, avatarUrl: m.userAvatar }));
         if (on) setStaff(staffFrom(s, mutes));
       } catch {
         // Offline or the room closed: keep what we last knew; the next read tries again.

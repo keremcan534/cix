@@ -3,7 +3,8 @@
 //   PATCH  /api/me      { name?, username?, gender?, birthDate?, city?, bio?, interests?, avatarUrl? } → { user }
 //   DELETE /api/me                                        → { deleted: true }
 //   GET    /api/user?id=&visit=1                          → { user }  (public profile + counts (oneWay: Takipçi / Takip without friends) + relation; visit=1 from the profile screen records a visit;
-//                                                                       levels, friends, gifts, staff, extras and album: profiles.mjs)
+//                                                                       levels, friends, gifts, staff, extras and album: profiles.mjs;
+//                                                                       room: the room they are in now or null, presence-room.mjs)
 //   GET    /api/me/visitors                               → { count, visitors, hidden }  (last 7 days; who only with the
 //                                                                       Abonelik, without it `hidden`: when, never who)
 //   POST   /api/follow  { to, follow }                    → { following }
@@ -26,6 +27,7 @@ import { shownToViewer } from './privacy.mjs';
 import { cardsMore, privateMore, profileMore } from './profiles.mjs';
 import { cityDistance } from './city-coords.mjs';
 import { eraseDecor } from './room-decor.mjs';
+import { shownRoomOf } from './presence-room.mjs';
 
 /** The interests the app offers (app/src/data/mock.ts INTERESTS). */
 export const INTERESTS = ['🎤 Karaoke', '🎮 Oyun', '💬 Sohbet', '⚽ Spor', '✈️ Seyahat', '🎬 Film', '💃 Dans', '📚 Kitap', '🎧 Müzik', '☕ Kahve'];
@@ -346,6 +348,9 @@ export const socialRoutes = {
       looks: (await looksOf([u.id]))[u.id] ?? null,
       agency: ag.rowCount ? { id: String(ag.rows[0].id), name: ag.rows[0].name } : null,
       family: await familyOf(id),
+      // "Şu an odada" (presence-room.mjs): the room they are in now, as I may see it; null for none, for my own
+      // profile and for someone I blocked. An added field: an older app reads none.
+      room: x.blocked_by_me ? null : await shownRoomOf(id, me.id),
     };
   },
 

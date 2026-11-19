@@ -12,7 +12,7 @@ process.env.EXPO_PUBLIC_API_URL = 'http://api.test';
 
 const store = ((globalThis as { __asyncStore?: Map<string, string> }).__asyncStore ??= new Map<string, string>());
 const { putServerUser, userById } = await import('@/data/mock');
-const { loadLooks, lookOf, putLook } = await import('@/lib/live/looks');
+const { LOOK_RETRY_MS, loadLooks, lookOf, putLook } = await import('@/lib/live/looks');
 
 const A = 'aaaaaaaa-0000-4000-8000-0000000000a1';
 const B = 'aaaaaaaa-0000-4000-8000-0000000000b2';
@@ -62,6 +62,47 @@ describe('Odadaki görünümler', () => {
     assert.deepEqual(asked, [B], 'iki dakika içinde tekrar sorulmaz');
     await loadLooks([B], Date.now());
     assert.deepEqual(asked, [B, B], 'odaya yeni giren tekrar okunur');
+  });
+
+  test('okuma başarısızsa kendiliğinden iki kez daha denenir; yüz gelir (Güncelleme 7, madde 1)', async () => {
+    const C = 'aaaaaaaa-0000-4000-8000-0000000000c3';
+    const D = 'aaaaaaaa-0000-4000-8000-0000000000d4';
+    putServerUser({ id: C, name: 'Cem' });
+    putServerUser({ id: D, name: 'Duru' });
+    // The real waits are 5 s and 15 s; here a few milliseconds.
+    const real = [...LOOK_RETRY_MS];
+    LOOK_RETRY_MS.splice(0, LOOK_RETRY_MS.length, 10, 20);
+    const until = async (ok: () => boolean) => {
+      for (let i = 0; i < 100 && !ok(); i++) await new Promise((r) => setTimeout(r, 5));
+    };
+    try {
+      // Busy twice (429), then the answer: the third read brings the face.
+      let busy = 2;
+      const fetch429 = globalThis.fetch;
+      globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+        if (busy-- > 0) {
+          asked.push(...(new URL(String(input)).searchParams.get('ids') ?? '').split(','));
+          return new Response(JSON.stringify({ error: 'Çok fazla istek' }), { status: 429 });
+        }
+        return fetch429(input, init);
+      }) as typeof fetch;
+      answer = async (ids) => Object.fromEntries(ids.map((id) => [id, look('fr-silver', `https://depo.test/${id.slice(-2)}.jpg`)]));
+      await loadLooks([C]);
+      assert.equal(lookOf(C), undefined, 'ilk okuma başarısız');
+      await until(() => !!lookOf(C));
+      assert.deepEqual(asked, [C, C, C], 'iki kez daha soruldu');
+      assert.equal(userById(C).avatar, 'https://depo.test/c3.jpg');
+
+      // Always down: two retries, then no more on its own (the next look on screen asks again).
+      asked = [];
+      busy = 1_000;
+      await loadLooks([D]);
+      await new Promise((r) => setTimeout(r, 120));
+      assert.deepEqual(asked, [D, D, D], 'üç deneme, sonra durur');
+      assert.equal(lookOf(D), undefined);
+    } finally {
+      LOOK_RETRY_MS.splice(0, LOOK_RETRY_MS.length, ...real);
+    }
   });
 
   test('okunurken gelen yeni görünümü eski cevap ezmez', async () => {

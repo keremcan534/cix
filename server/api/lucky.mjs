@@ -269,11 +269,11 @@ export const luckyRoutes = {
     const [today, total, recent, winners] = await Promise.all([
       stat(`WHERE created_at >= ${DAY_START}`),
       stat(''),
-      db.query('SELECT s.*, u.name FROM lucky_sends s JOIN users u ON u.id = s.user_id ORDER BY s.id DESC LIMIT 50'),
-      db.query('SELECT s.*, u.name FROM lucky_sends s JOIN users u ON u.id = s.user_id WHERE s.best_mult >= $1 ORDER BY s.id DESC LIMIT 30', [cur.config.announceFrom]),
+      db.query('SELECT s.*, u.name, u.avatar_url FROM lucky_sends s JOIN users u ON u.id = s.user_id ORDER BY s.id DESC LIMIT 50'),
+      db.query('SELECT s.*, u.name, u.avatar_url FROM lucky_sends s JOIN users u ON u.id = s.user_id WHERE s.best_mult >= $1 ORDER BY s.id DESC LIMIT 30', [cur.config.announceFrom]),
     ]);
     const num = (r) => Object.fromEntries(Object.entries(r.rows[0]).map(([k, v]) => [k, Number(v)]));
-    const withName = (s) => ({ ...sendOut(s), sender: { id: s.user_id, name: s.name } });
+    const withName = (s) => ({ ...sendOut(s), sender: { id: s.user_id, name: s.name, avatarUrl: s.avatar_url ?? null } });
     return {
       config: cur.config,
       version: cur.version,

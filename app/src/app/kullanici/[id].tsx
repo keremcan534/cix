@@ -38,7 +38,7 @@ import {
   vehiclesOf,
   wealthCharmOf,
 } from '@/data/profile';
-import { followRoute, presenceOf } from '@/data/presence';
+import { followRoute, presenceOf, type Presence } from '@/data/presence';
 import { showAlert } from '@/lib/alert';
 import { callsAvailable, liveCalls, liveGift, liveMode, loadRooms, message, toServer } from '@/lib/live';
 import { callLabel, callPair, heartOf, usePair } from '@/components/one-on-one-bar';
@@ -566,7 +566,10 @@ export default function UserProfile() {
   const showsGender = !!user.gender && (isMe || user.showGender !== false);
   const hasBasics = !live || publicId !== null || !!user.username || showsGender || !!country || (isMe && !!birthday) || !!user.joinedAt || !!extras.relationship || !!extras.education;
 
-  const presence = priv.showCurrentRoom ? presenceOf(user.id) : null;
+  // Live mode: the room the server says they are in now (their "Bulunduğum odayı göster", blocks and the room's door
+  // already applied; one-to-one calls never shown); the demo: its sample rooms and calls.
+  const here = live ? counts?.room : null;
+  const presence: Presence = live ? (here ? { kind: 'room', roomId: here.id, title: here.title, locked: here.locked } : null) : priv.showCurrentRoom ? presenceOf(user.id) : null;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>

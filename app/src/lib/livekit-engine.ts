@@ -11,6 +11,7 @@ import type { AudioEngine, EngineStats } from '@/lib/audio-engine';
 import type { TrackRef } from '@/lib/call-media';
 import { bindLink, decodeSignal, encodeSignal, parseSeat, parseServerClosed, reportPeers, reportRoomMeta, reportServerSeat, reportSignal, type PeerSignal } from '@/lib/live/room-bus';
 import { reportCams } from '@/lib/live/room-cams';
+import { parseVia } from '@/lib/follow-room';
 import { reportLevel } from '@/lib/live/voice-level';
 import type { EngineEvent } from '@/lib/room-session';
 import { setAiDenoise, setPhoneNoiseSuppressor } from '../../modules/similar-denoise';
@@ -180,7 +181,15 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
   /** Everyone else in the room for the room screen (lib/live/room-bus). */
   const snapshot = (r: Room) => {
     if (room !== r || !s.roomId) return;
-    const peers = [...r.remoteParticipants.values()].map((p) => ({ identity: p.identity, name: p.name || 'Üye', seat: parseSeat(p.attributes?.seat), speaking: p.isSpeaking, micOn: p.isMicrophoneEnabled, joinedAt: joinedMs(p.joinedAt) }));
+    const peers = [...r.remoteParticipants.values()].map((p) => ({
+      identity: p.identity,
+      name: p.name || 'Üye',
+      seat: parseSeat(p.attributes?.seat),
+      speaking: p.isSpeaking,
+      micOn: p.isMicrophoneEnabled,
+      joinedAt: joinedMs(p.joinedAt),
+      via: parseVia(p.attributes?.via),
+    }));
     // My own join time is the voice server's once connected; before that LiveKit would make one up from this phone's clock.
     reportPeers(s.roomId, peers, r.localParticipant.isSpeaking, r.state === ConnectionState.Connected ? joinedMs(r.localParticipant.joinedAt) : 0);
   };

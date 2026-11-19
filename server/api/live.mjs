@@ -1,6 +1,7 @@
 // LiveKit (voice): the join token, and who is in which room from LiveKit's webhooks.
 //
-//   GET  /token?room=&password=   → { token, ttl }          (rooms.mjs voiceAccess decides who may join)
+//   GET  /token?room=&password=&via=  → { token, ttl, via }  (rooms.mjs voiceAccess decides who may join; via:
+//                                                              followed from their profile, followedVia)
 //   POST /api/livekit/webhook     LiveKit → us, signed       (participant joined / left, room started / finished,
 //                                                              track published / unpublished: a voice room's mic)
 //   GET  /api/rooms/live          → { rooms: [{ room, listeners }] }   (every voice room with people in it)
@@ -19,7 +20,8 @@
 // (RoomService over Twirp, LIVEKIT_API_URL), so nobody stays in with a token they already had.
 import crypto from 'node:crypto';
 
-import { HttpError, UUID, auth, db, env, filesOut, readRaw } from './core.mjs';
+import { HttpError, UUID, auth, blockedBetween, db, env, filesOut, readRaw } from './core.mjs';
+import { privacyOf } from './privacy.mjs';
 import { roomEntered } from './referrals.mjs';
 import { eventJoined, eventRoomFinished } from './events.mjs';
 import { connectionEnded, roomEnded, sessionsEnded, trackPublished, trackUnpublished } from './media-minutes.mjs';
@@ -300,6 +302,29 @@ if (env.LIVEKIT_API_URL) {
   setInterval(run, ms).unref();
 }
 
+/**
+ * Came following someone (Güncelleme 7, item 15: "Kaan, Artemis'i takip ederek geldi"): `via`, the person whose
+ * profile showed this room (presence-room.mjs), when they are in the room now, there is no block between us and they
+ * show their room ("Bulunduğum odayı göster"). Then it goes in the token as the participant's `via` attribute, so
+ * every phone in the room sees it as I come in; an older app reads no such attribute. Anything else is no `via`:
+ * never a reason to refuse the token. TOKEN_VIA=0 (.env) leaves the attribute out of every token: the way back if a
+ * LiveKit version ever refused a token that carries one (LiveKit reads the claim since 1.7; the tests run without a
+ * real LiveKit).
+ */
+async function followedVia(room, me, via) {
+  if (env.TOKEN_VIA === '0' || !via || !UUID.test(via) || via === me.id) return null;
+  try {
+    let here = (await db.query('SELECT 1 FROM room_presence WHERE room = $1 AND identity = $2', [room, via])).rowCount > 0;
+    // No webhook seen yet (presenceTracked): LiveKit itself says whether they are there.
+    if (!here && !webhooksSeen) here = await roomService('GetParticipant', { room, identity: via }, { roomAdmin: true, room }).catch(() => false);
+    if (!here || (await blockedBetween(me.id, via))) return null;
+    return (await privacyOf(db, via)).showCurrentRoom === false ? null : via;
+  } catch (e) {
+    console.error('token via', String(e?.message ?? e).slice(0, 200));
+    return null;
+  }
+}
+
 export const liveRoutes = {
   /** Voice token for an open server room: kicks, blacklist, blocks and the password (rooms.mjs voiceAccess). */
   async 'GET /token'(req, url) {
@@ -314,8 +339,9 @@ export const liveRoutes = {
     // A mute (sanctions.mjs) takes the mic (voice) or room chat (text) away; seat and role stay as they are.
     const g = await voiceGrant(u.id, room);
     const video = { room, roomJoin: true, canPublish: g.canPublish, canPublishSources: ['microphone', 'camera'], canSubscribe: true, canPublishData: g.canPublishData, canUpdateOwnMetadata: true };
-    const token = liveKitJwt({ sub: u.id, name: u.name, video }, TOKEN_TTL);
-    return { token, ttl: TOKEN_TTL, canPublish: g.canPublish, canChat: g.canPublishData };
+    const via = await followedVia(room, u, url.searchParams.get('via'));
+    const token = liveKitJwt({ sub: u.id, name: u.name, video, ...(via && { attributes: { via } }) }, TOKEN_TTL);
+    return { token, ttl: TOKEN_TTL, canPublish: g.canPublish, canChat: g.canPublishData, via };
   },
 
   async 'POST /api/livekit/webhook'(req) {

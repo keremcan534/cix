@@ -20,17 +20,18 @@ import { useSettings } from '@/store';
 import { fonts, makeStyles, useTheme } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
 import { Art } from '@/components/Art';
-import { FadeImage } from '@/components/photo';
+import { FadeImage, useImageRetry } from '@/components/photo';
 import { RollingNumber } from '@/components/fx/rolling-number';
 
 export function Avatar({ uri, size = 44, online, ring, name }: { uri?: string; size?: number; online?: boolean; ring?: boolean; name?: string }) {
   const { colors, semantic, gradient } = useTheme();
-  // A photo that can't be loaded counts as none (no blank disc); a new address is tried again.
-  const [failed, setFailed] = useState<string>();
+  // A photo that can't be loaded counts as none (no blank disc) while it waits to be tried again (components/photo
+  // useImageRetry), and for good after the last try; a new address starts over.
+  const img = useImageRetry(uri);
   // No photo (sample people carry none): a tinted disc with the name's initial, or a person glyph.
   const face = (style: object) =>
-    uri && uri !== failed ? (
-      <FadeImage source={{ uri }} style={style} onError={() => setFailed(uri)} />
+    uri && img.show ? (
+      <FadeImage key={img.key} source={{ uri }} style={style} onError={img.onError} />
     ) : (
       <View style={[style, { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.cardAlt }]}>
         {name?.trim() ? (
@@ -272,9 +273,9 @@ export function Header({ title, right, onBack }: { title: string; right?: ReactN
 /** The photo, or the person glyph Avatar shows when there is none (new users have no photo yet). */
 function FaceImage({ uri, size, style }: { uri?: string; size: number; style: object }) {
   const { colors, semantic } = useTheme();
-  // A photo that can't be loaded counts as none, as in Avatar.
-  const [failed, setFailed] = useState<string>();
-  if (uri && uri !== failed) return <FadeImage source={{ uri }} style={style} onError={() => setFailed(uri)} />;
+  // A photo that can't be loaded counts as none while it waits to be tried again, as in Avatar.
+  const img = useImageRetry(uri);
+  if (uri && img.show) return <FadeImage key={img.key} source={{ uri }} style={style} onError={img.onError} />;
   return (
     <View style={[style, { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.cardAlt }]}>
       <Ionicons name="person" size={Math.round(size * 0.5)} color={semantic.actionText} />
