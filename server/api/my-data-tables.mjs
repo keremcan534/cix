@@ -16,7 +16,7 @@ export const EXPORTED = [
   'backpack_items', 'backpack_moves', 'referral_codes', 'referrals', 'casino_rounds', 'room_decor',
   'events', 'event_reservations', 'event_participants', 'event_reminders_sent', 'event_reminder_optout',
   'agency_assistants', 'agency_assistant_ledger', 'level_drops', 'level_offsets', 'guards', 'guard_settings',
-  'message_holds', 'auto_templates', 'auto_quota', 'auto_sends',
+  'message_holds', 'auto_templates', 'auto_quota', 'auto_sends', 'profile_marks',
 ];
 
 /** Tables that point at an account but are not that person's to receive, with the reason. */

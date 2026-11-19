@@ -122,6 +122,9 @@ export const PANEL_ROUTES = new Set([
   'GET /api/admin/lookup',
   'POST /api/admin/users/delete',
   'POST /api/admin/users/room-level',
+  // Profil izleri (profile-marks.mjs): a person's marks, and taking the ones showing off (an offensive one, a complaint).
+  'GET /api/admin/marks',
+  'POST /api/admin/marks/clear',
   'POST /api/admin/ban',
   'POST /api/admin/referrals/revoke',
   // Şikâyetler (admin.mjs) and a reported room's own pictures (room-decor.mjs).

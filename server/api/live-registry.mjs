@@ -17,6 +17,7 @@ import { DAILY_ROUNDS as CASINO_DAILY_ROUNDS, GAMES as CASINO_GAMES, STAKES as C
 import { REMINDER_KINDS, REMINDER_LABEL } from './event-rules.mjs';
 import { CHEST_MIN_CONTRIBUTION, FAMILY_CHESTS, FAMILY_TASKS, FAMILY_THEMES } from './family-rules.mjs';
 import { MEDAL_RULES, TITLE_RULES } from './profile-rules.mjs';
+import { MARK_HOURS } from './profile-mark-rules.mjs';
 import { HOUSE_PCT as ROCKET_HOUSE_PCT } from './rocket-live-rules.mjs';
 import { LEVELS as BOND_LEVELS, levelsOf as bondLevelsOf } from './bond-rules.mjs';
 import { AUTO_CHAT, AUTO_PARTS, AUTO_PART_LABEL, AUTO_PART_OFF, AUTO_TEXTS, NOTICE_CATEGORIES, NOTICE_LABEL, linesOf } from './auto-chat-rules.mjs';
@@ -395,6 +396,8 @@ const ROOM_AMOUNTS = {
   guard_list_max: { group: 'Koruma', field: 'guardListMax', label: 'Koruma listesi: en fazla kişi', default: 50, bounds: { min: 10, max: 200, step: 1 }, unit: ' kişi', help: 'Benim Koruma listelerinde en çok bu kadar kişi görünür.', text: (a, b) => `Koruma listesinde ${a} → ${b} kişi.` },
   guard_threshold_per_level: { group: 'Koruma', field: 'guardThresholdPerLevel', label: 'Eşik: Yankı seviyesi başına en fazla', default: 50_000, bounds: { min: 0, max: 10_000_000, step: 1000 }, unit: ' puan', help: 'Kişinin koyabileceği en yüksek eşik: bu sayı × (Yankı seviyesi + 1). Konmuş eşikler değişmez.', text: (a, b) => `Yankı seviyesi başına eşik ${a} → ${b} puan.` },
   guard_threshold_days: { group: 'Koruma', field: 'guardThresholdDays', label: 'Eşik değiştirme aralığı (gün)', default: 7, bounds: { min: 1, max: 30, step: 1 }, unit: ' gün', help: 'Kişi eşiğini en çok bu kadar günde bir değiştirebilir.', text: (a, b) => `Eşik ${a} → ${b} günde bir değişir.` },
+  // Profil izleri (profile-marks.mjs, docs/PROFIL_IZLERI.md): how long a mark stays with no cleaning gift; 0 turns it off.
+  mark_hours: { group: 'Profil izleri', field: 'markHours', label: 'Profil izi süresi (saat)', default: MARK_HOURS, bounds: { min: 0, max: 168, step: 1 }, unit: ' saat', help: 'Kaka gibi iz bırakan bir hediyenin izi alıcının profil fotoğrafında bu kadar saat kalır (izi temizleyen hediye gelirse daha önce gider). Hediyenin kendi süresi varsa o geçer. Konmuş izlerin bitişi değişmez. 0: profil izleri kapalı; bu hediyeler düz hediye olur ve hiçbir iz görünmez.', text: (a, b) => (b === '0' ? 'Profil izleri kapanır: hediyeler düz hediye olur, izler görünmez.' : `Yeni izler ${a} → ${b} saat kalır.`) },
 };
 /**
  * Aile's game (family-more.mjs, family-rules.mjs): each daily task's points (and the room task's minutes, the coin

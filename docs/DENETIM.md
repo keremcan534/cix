@@ -201,6 +201,22 @@ Hukuk riski Kritik §1'de. Bu işte ayrıca:
 - **Yük:** videolar öteki hediye videoları gibi API sunucusundan iner (CDN yok, "Medya dağıtımı"); yalnız satıştaki
   paketlerin videosu ve yalnız yeni APK'ya listelenir.
 
+## Profil izleri: taciz riski (19 Kasım 2026)
+
+Kutlama rafındaki 💩 Kaka, alıcının profil fotoğrafına herkesin göreceği bir "pislik" bırakır; temizlemek için başkasının
+1.999 jetonluk 💧 Su göndermesi gerekir ([`PROFIL_IZLERI.md`](PROFIL_IZLERI.md)).
+
+- **Mağaza riski (siz: karar):** herkese görünen aşağılayıcı bir işaret birini küçük düşürmek için kullanılabilir; Google
+  Play'in **Zorbalık ve taciz** politikası buna bakar, en çok kadın yayıncılara karşı. "Utancını başkası parayla
+  temizlesin" düzeni manipülatif bir ödeme biçimi gibi de görülebilir. İnceleme sorarsa aşağıdaki önlemler gösterilir.
+- **Önlemler (yapıldı):** kişi Ayarlar › Gizlilik'ten tek dokunuşla kapatır (izi de hemen gider, ona Kaka jeton düşmeden
+  reddedilir); iz 24 saatte kendiliğinden gider; engelleme hem yeni izi önler hem bırakılanı kaldırır; yönetim
+  (`POST /api/admin/marks/clear`, denetim kaydıyla) izi kaldırır; Canlı ayarlar › Profil izleri › süre 0 bütün özelliği
+  kapatır. Uygulamada "temizlemek için harca" diyen bir yönlendirme yok.
+- **Açık kalanlar:** eski APK kullanan kişi Gizlilik'te seçeneği göremez (sunucu yine de uyar; yeni APK dağıtılınca
+  Zorunlu sürüm yükseltilmeli). Panelde iz kaldırma sayfası henüz yok (sunucu uçları hazır, panel deposunun işi); o
+  zamana kadar şikâyet gelirse Canlı ayarla özellik kapatılabilir. Şikâyet akışında "profil izi" diye ayrı bir sebep yok.
+
 ## Mesaj bildirimi varsayılanı (18 Kasım 2026, sahip kararı)
 
 Mesajlar'daki "Yalnızca samimi kişilerden bildirim al" seçeneği herkeste açık başlar. Bu yüzden karşılıklı takipleşmeyen ve aralarında kalp seviyesi olmayan birinin mesajı telefona bildirim düşürmez. Yayıncılar, ilk kez yazıp ücret ödeyen kişinin mesajını uygulamayı açınca görür; yayıncı geliri düşerse ilk bakılacak yer burasıdır. Eski APK bu seçeneği göstermediği için eski APK kullanan kişi kapatamaz. Varsayılan `server/api/privacy.mjs` ve `migrations/095_contact_prefs.sql` içindedir.

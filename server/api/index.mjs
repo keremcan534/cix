@@ -121,6 +121,7 @@ import { withdrawRoutes } from './withdraw.mjs';
 import { refundSyncRoutes, startRefundSync, stopRefundSync } from './refunds.mjs';
 import { refreshOwnSubscription, startVipRecheck, stopVipRecheck, vipRoutes } from './vip.mjs';
 import { referralRoutes } from './referrals.mjs';
+import { markRoutes } from './profile-marks.mjs';
 
 const PORT = Number(env.API_PORT ?? 7890);
 const TEST_TOPUP = env.ALLOW_TEST_TOPUP === '1';
@@ -323,6 +324,7 @@ const routes = {
   ...levelRoutes,
   ...shopRoutes,
   ...guardRoutes,
+  ...markRoutes,
   ...backpackRoutes,
   ...pkRoutes,
   ...crossPkRoutes,

@@ -42,6 +42,7 @@ import { parseLiveLevels, type LiveLevels } from '@/lib/levels-live-core';
 import { mergeShop, parseLiveShop, type LiveShop } from '@/lib/shop-live-core';
 import { BOSS_SEAT_MIN_LEVEL, COSMETICS, MIC_PERMISSION_MIN_LEVEL, memberLimit, setLiveCosmetics } from '@/data/catalog';
 import { setLiveSeatColors } from '@/data/seat-colors';
+import { APP_MARKS, parseMarkRules, type GiftMark, type MarkRules } from '@/lib/profile-marks';
 import { parseFxList, type FxVideo } from '@/lib/fx-videos-core';
 import { parseCatalog, type CatalogPack } from '@/lib/live/billing-core';
 
@@ -94,6 +95,8 @@ export type LiveCatalog = {
   familyThemes: Record<string, number> | null;
   /** Oda seviyeleri as Canlı ayarlar has them; null from an older server: the app's own. */
   rooms: RoomNumbers | null;
+  /** Profil izleri (marks=1): on or off, the hours, which gift leaves or cleans a mark; null from an older server. */
+  marks: MarkRules | null;
 };
 /** The rooms' numbers (server/api/live-registry.mjs roomNumbersOf): mic and boss seat levels, people per level. */
 export type RoomNumbers = { micMinLevel: number; bossMinLevel: number; caps: number[] };
@@ -277,6 +280,7 @@ export function parseLiveCatalog(raw: unknown): LiveCatalog {
     bonds: parseBondNumbers(r.bonds),
     familyThemes: parseFamilyThemes(r.family),
     rooms: parseRoomNumbers(r.rooms),
+    marks: parseMarkRules(r.marks, r.gifts),
   };
 }
 
@@ -313,14 +317,16 @@ export function parseSavedLiveCatalog(raw: string | null): { catalog: LiveCatalo
       bonds: parseBondNumbers(r.bonds),
       familyThemes: parseFamilyThemes({ themes: r.familyThemes }),
       rooms: parseRoomNumbers(r.rooms),
+      marks: parseMarkRules(r.marks),
     },
     // A copy an older app saved counts as old: the next poll reads the catalog again. One from before the videos were
     // listed (no fx), or from before the shelves were (no shelf): that app hid the gifts put back on the shelves
     // (data/gifts-paused), and an updated phone would go on hiding them until the copy was ten minutes old.
     // One from before the level settings (no levels) too: the levels would stay the compiled ones until it was old.
     // And one whose shop came before the seat colors did (no seats): a room's color the panel added would be silver.
+    // And one from before Profil izleri (no marks): Kaka and Su would stay off its shelf until it was old.
     fetchedAt:
-      'fx' in r && 'shelf' in r && 'levels' in r && 'shop' in r && (r.shop === null || 'seats' in obj(r.shop)) && typeof r.fetchedAt === 'number' && Number.isFinite(r.fetchedAt)
+      'fx' in r && 'shelf' in r && 'levels' in r && 'shop' in r && (r.shop === null || 'seats' in obj(r.shop)) && 'marks' in r && typeof r.fetchedAt === 'number' && Number.isFinite(r.fetchedAt)
         ? r.fetchedAt
         : 0,
   };
@@ -422,6 +428,12 @@ export const bondLevelsNow = (c: LiveCatalog | null = current): readonly number[
 /** Every gift this phone can draw, the app's own as they are now and the admins' listed (the profile's gift wall). */
 export const everyGift = (c: LiveCatalog | null = current): Gift[] => [...viewsOf(c).byId.values()];
 
+/**
+ * What a gift does to its receiver's profile photo (Profil izleri, lib/profile-marks): the server's rule (marks=1), none
+ * while the feature is off or from an older server (it leaves no mark); the demo (no catalog) has the app's own two.
+ */
+export const giftMarkOf = (id: string, c: LiveCatalog | null = current): GiftMark | null => (c ? (c.marks?.on ? (c.marks.gifts[id] ?? null) : null) : (APP_MARKS[id] ?? null));
+
 /** A gift's icon address when the server gave one (an admin's gift, or one of the app's whose icon was replaced). */
 export const remoteIconOf = (id: string, c: LiveCatalog | null = current): string | undefined => c?.app[id]?.icon ?? c?.remote.find((g) => g.id === id)?.icon;
 
@@ -510,7 +522,8 @@ export function fetchLiveCatalog(): Promise<unknown> {
       // VIP ayarları (server/api/gifts.mjs).
       // shop=1: the shop's frames and entry effects (Yönetim › Mağaza).
       // family=1: this app has the Aile ve Dost shelf. lucky=1: it plays the Şanslı packages' videos (lucky-art.mjs).
-      const res = await fetch(`${BASE}/api/catalog?gifts=2&family=1&emoji=1&levels=1&shop=1&lucky=1`, { signal: ctrl.signal });
+      // marks=1: Profil izleri (Kaka and Su, each gift's mark).
+      const res = await fetch(`${BASE}/api/catalog?gifts=2&family=1&emoji=1&levels=1&shop=1&lucky=1&marks=1`, { signal: ctrl.signal });
       if (!res.ok) throw new Error(`Sunucu hatası (${res.status})`);
       const body: unknown = await res.json();
       fetchedAt = Date.now();
@@ -539,7 +552,7 @@ export const liveCatalogStale = (now = Date.now()) => !current || now - fetchedA
 /** The server named its current Çevir rate (409 rate_changed): the screens show it before the catalog is read again. */
 export function noteLiveRate(usdTry: unknown) {
   if (!validRate(usdTry)) return;
-  publish({ ...(current ?? { v: 0, giftIds: null, packs: [], campaign: null, fx: null, remote: [], shelf: null, app: {}, emoji: null, levels: null, shop: null, guard: null, bonds: null, familyThemes: null, rooms: null }), usdTry });
+  publish({ ...(current ?? { v: 0, giftIds: null, packs: [], campaign: null, fx: null, remote: [], shelf: null, app: {}, emoji: null, levels: null, shop: null, guard: null, bonds: null, familyThemes: null, rooms: null, marks: null }), usdTry });
 }
 
 const subscribe = (l: () => void) => {

@@ -32,6 +32,7 @@ import type { Look } from '@/lib/live/looks';
 import { parseLuckyIcon } from '@/lib/lucky-art';
 import type { BossNews } from '@/lib/patron-seat';
 import { parseMove, type Move } from '@/lib/room-moves';
+import { parseMarkNews, type MarkNews } from '@/lib/profile-marks';
 
 /**
  * `joinedAt`: when they came into the room, on the voice server's clock (ms; 0 or missing: not known). `via`: whom
@@ -50,8 +51,11 @@ export type PeerSignal =
   | { t: 'qpick'; id: string };
 /** A paid Hareketli the server announced (server/api/room-fx.mjs): `eventId` its room_animations row. */
 export type FxSignal = { t: 'fx'; animationId: string; eventId: number };
-/** A gift the server announced: `from` and `to` are server user ids, `eventId` its gift_events row. */
-export type GiftSignal = { t: 'gift'; giftId: string; count: number; to: string[]; eventId: number };
+/**
+ * A gift the server announced: `from` and `to` are server user ids, `eventId` its gift_events row; `mark` what it did to
+ * the receiver's profile photo (Profil izleri, lib/profile-marks), when it left or cleaned a mark.
+ */
+export type GiftSignal = { t: 'gift'; giftId: string; count: number; to: string[]; eventId: number; mark?: MarkNews };
 /**
  * An Şanslı send the server announced (server/api/lucky.mjs): `count` of the package to each of `to`; `best` the
  * highest multiplier drawn and `bigWin` its reward when the room is told about it (0 otherwise). The name and
@@ -334,14 +338,15 @@ export function parseServerFx(raw: unknown): { from: string; msg: FxSignal } | n
   return { from: m.from, msg: { t: 'fx', animationId: m.animationId, eventId: m.eventId as number } };
 }
 
-/** The server's gift packet: `{ type: 'gift', giftId, count, from, to, eventId }` (server/api/gifts.mjs). */
+/** The server's gift packet: `{ type: 'gift', giftId, count, from, to, eventId, mark? }` (server/api/gifts.mjs). */
 export function parseServerGift(raw: unknown): { from: string; msg: GiftSignal } | null {
   if (!raw || typeof raw !== 'object') return null;
   const m = raw as Record<string, unknown>;
   if (m.type !== 'gift' || typeof m.giftId !== 'string' || typeof m.from !== 'string' || typeof m.to !== 'string' || !m.from || !m.to) return null;
   if (!Number.isInteger(m.count) || (m.count as number) <= 0 || (m.count as number) > 10_000) return null;
   if (!Number.isSafeInteger(m.eventId) || (m.eventId as number) <= 0) return null;
-  return { from: m.from, msg: { t: 'gift', giftId: m.giftId.slice(0, 32), count: m.count as number, to: [m.to], eventId: m.eventId as number } };
+  const mark = parseMarkNews(m.mark);
+  return { from: m.from, msg: { t: 'gift', giftId: m.giftId.slice(0, 32), count: m.count as number, to: [m.to], eventId: m.eventId as number, ...(mark && { mark }) } };
 }
 
 /** The server's Şanslı packet: `{ type: 'lucky', giftId, name, emoji, count, from, to: [ids], eventIds, best, bigWin, icon?, price? }`. */

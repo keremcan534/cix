@@ -186,7 +186,7 @@ export function PersonCard({ uid, note, onClose, onGift, onMention, onReport, on
         <CardPanel style={[s.sheet, { maxHeight }]}>
           <View style={s.head}>
             <View style={s.avatar}>
-              <FramedAvatar uri={u.avatar} size={78} vipLevel={vip} frameId={frameId ?? undefined} artScale={1.6} />
+              <FramedAvatar uri={u.avatar} size={78} vipLevel={vip} frameId={frameId ?? undefined} artScale={1.6} markUid={uid} />
             </View>
             <View style={s.who}>
               {/* The name with their Yankı level on the crowned pill beside it, as in the design; a long name shrinks first. */}

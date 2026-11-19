@@ -14,6 +14,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { getRoom, join, leave, leaveSeat, takeSeat } from '@/lib/room-presence';
 import { rememberUser, refreshWallet, toLocal } from '@/lib/live';
 import { onServerSeat, onSignal, publishSeat, useLivePeers, type RoomSignal } from '@/lib/live/room-bus';
+import { reportMarkEvent } from '@/lib/mark-store';
 import { newPeerLog, peerStep, type PeerJoin } from '@/lib/room-entrance';
 
 type Hooks = {
@@ -104,6 +105,8 @@ export function useLiveRoomSync(roomId: string, enabled: boolean, mySeat: number
     return onSignal(roomId, (from, msg) => {
       const sender = toLocal(from);
       const gift = msg.t === 'gift' || msg.t === 'lucky';
+      // Profil izleri: a mark left or cleaned, my own gifts' too (the photos change on every phone; lib/mark-store).
+      if (msg.t === 'gift' && msg.mark) reportMarkEvent({ room: roomId, eventId: msg.eventId, from, to: msg.to[0], news: msg.mark });
       // My own gifts and paid Hareketli were drawn when the server said they were paid (no second time).
       if ((gift || msg.t === 'fx') && sender === 'me') return;
       if (gift && msg.to.some((t) => toLocal(t) === 'me')) void refreshWallet().catch(() => {});

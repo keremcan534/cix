@@ -100,6 +100,7 @@ describe('defaults are today', () => {
       guard_list_max: 50,
       guard_threshold_per_level: 50_000,
       guard_threshold_days: 7,
+      mark_hours: 24,
       bond_levels: '0, 10, 30, 60, 100, 200, 400, 700, 1200, 2000, 3000, 4500, 6500, 9000, 12000, 16000, 21000, 27000, 35000, 45000',
       family_task_chat_power: 1,
       family_task_room_power: 1,
@@ -282,6 +283,7 @@ describe('defaults are today', () => {
       'guard_list_max',
       'guard_threshold_per_level',
       'guard_threshold_days',
+      'mark_hours',
       'bond_levels',
       'family_task_chat_power',
       'family_task_room_power',
@@ -418,7 +420,7 @@ describe('validate', () => {
     assert.deepEqual(validate('gifts_hidden', ['g3', 'g1']), ['g1', 'g3']);
     refused(() => validate('gifts_hidden', ['g999']), /bilinmeyen/);
     refused(() => validate('gifts_hidden', [1]), /bilinmeyen/);
-    assert.equal(validate('gifts_hidden', [...GIFTS.keys()]).length, 73);
+    assert.equal(validate('gifts_hidden', [...GIFTS.keys()]).length, 75);
     const eight = PACKS.slice(0, 8).map((p) => p.id);
     assert.deepEqual(validate('packs_hidden', eight), eight);
     refused(() => validate('packs_hidden', PACKS.map((p) => p.id)), /En az bir paket/);

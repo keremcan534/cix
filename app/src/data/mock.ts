@@ -377,6 +377,10 @@ export const GIFTS: Gift[] = [
   { id: 'p8', name: 'Terlik At', emoji: '🩴', price: 1_299, cat: 'gameplay' },
   { id: 'p9', name: 'Konfeti Topu', emoji: '🎊', price: 1_999, cat: 'gameplay', badge: '3D' },
   { id: 'p10', name: 'Aşk Oku', emoji: '💘', price: 2_399, cat: 'gameplay', badge: '3D' },
+  // Profil izleri (server/api/profile-mark-rules.mjs, lib/profile-marks): Kaka leaves a mark on the receiver's profile
+  // photo for a while, Su (dearer) cleans it. Only a phone that asks for them (catalog marks=1) is offered them.
+  { id: 'k1', name: 'Kaka', emoji: '💩', price: 999, cat: 'gameplay' },
+  { id: 'k2', name: 'Su', emoji: '💧', price: 1_999, cat: 'gameplay' },
   // --- Çift ❤ (intimacy +2%) ---
   couple('c1', 'Can Dostum', '💞', 5_000),
   couple('c2', 'Dilek Kavanozu', '🫙', 8_999),

@@ -194,6 +194,7 @@ import { RPS, isMovePick, moveArt, moveLine, moveOfPick, moveShuffle, needsMic, 
 import { colors, fonts, gradient, semantic } from '@/theme';
 import { MuteBanner, useStopped } from '@/components/sanction-screen';
 import { refreshSanctions, showSanction } from '@/lib/sanctions';
+import { demoMarkGift, useMarkLines } from '@/lib/live/marks-live';
 
 // Short: the rules are the chat's first line already (ROOM_RULES_NOTICE), the bot doesn't repeat them.
 const BOT_TIPS = ['Mikrofona geçmek için boş bir koltuğa dokun.', 'Hediyeler oda seviyesini yükseltir.'];
@@ -1098,6 +1099,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     if (!isOnline()) offlineFeed.current.push(m);
     else setMessages((list) => mergeFeed(list, [m]));
   };
+  // Profil izleri: a mark left or cleaned here (lib/live/marks-live), one line per gift.
+  useMarkLines(id, (text, key) => addMsg({ id: key, system: true, text }));
   // A room note after a server call went through (so online), straight into the feed.
   const sysNote = (text: string) => setMessages((list) => mergeFeed(list, [{ system: true, text, id: msgId(), at: stamp() }]));
   // A server room: when the staff open a game table (server/api/room-games.mjs), the room hears of it (not from
@@ -2747,6 +2750,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     delivered.forEach((r) => {
       logGift('me', r.userId, gift, count);
       app.recordGift(r.userId, gift.id, count);
+      demoMarkGift(id, gift.id, gift.emoji, r.userId);
     });
     bump('giftsSent', count * delivered.length);
     addContrib('me', total);

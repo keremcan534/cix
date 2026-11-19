@@ -79,6 +79,8 @@ export type Settings = {
   videoCalls: boolean;
   messagePush: boolean;
   pushCloseOnly: boolean;
+  /** Profil izleri: others may leave a mark on my photo (Gizlilik's "Profilime iz bırakılmasın" is its opposite). */
+  profileMarks: boolean;
   profilePublic: boolean;
   notifySocial: boolean;
   notifyFinance: boolean;
@@ -523,6 +525,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       videoCalls: true,
       messagePush: true,
       pushCloseOnly: true,
+      profileMarks: true,
       profilePublic: true,
       notifySocial: true,
       notifyFinance: true,

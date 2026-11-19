@@ -695,13 +695,15 @@ export const lookup = (no: string) => call<unknown>('GET', `/api/lookup?no=${enc
  * sent it (unchecked: lib/person-card cardLookOf reads it).
  */
 export const userProfile = (id: string, visit = false, card = false) =>
-  call<{ user: PublicUser; room?: unknown; looks?: unknown } & Partial<ProfileTies>>('GET', `/api/user?id=${encodeURIComponent(id)}${visit ? '&visit=1' : ''}${card ? '&card=1&medals=1' : ''}`).then((r) => ({
+  call<{ user: PublicUser; room?: unknown; looks?: unknown; marks?: unknown } & Partial<ProfileTies>>('GET', `/api/user?id=${encodeURIComponent(id)}${visit ? '&visit=1' : ''}${card ? '&card=1&medals=1' : ''}`).then((r) => ({
     ...r.user,
     agency: r.agency ?? null,
     family: r.family ?? null,
     // The room they are in now ("Şu an odada"); an older server sends none.
     room: parseHereRoom(r.room),
     looks: r.looks,
+    // Profil izleri on their photo (unchecked: lib/profile-marks parseMarks reads it); an older server sends none.
+    marks: r.marks,
   }));
 /** Someone who opened my profile in the last 7 days. */
 export type ServerVisitor = { id: string; name: string; avatarUrl: string | null; visits: number; lastAt: string };
@@ -1102,6 +1104,8 @@ export type ServerPrivacy = {
   videoCalls: boolean;
   messagePush: boolean;
   pushCloseOnly: boolean;
+  /** Profil izleri (server/api/profile-marks.mjs): others may leave a mark on my photo; an older server sends none. */
+  profileMarks?: boolean;
 };
 /** Otomatik mesaj's choices (server/api/auto-chat.mjs, saved with the privacy settings); lib/live/auto-chat reads them. */
 export type AutoChoices = { autoReceive?: boolean; autoOpener?: boolean; autoOpenerSeen?: boolean; autoSend?: boolean };

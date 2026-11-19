@@ -5,6 +5,7 @@
 //   GET    /api/user?id=&visit=1                          → { user }  (public profile + counts (oneWay: Takipçi / Takip without friends) + relation; visit=1 from the profile screen records a visit;
 //                                                                       levels, friends, gifts, staff, extras and album: profiles.mjs;
 //                                                                       room: the room they are in now or null, presence-room.mjs;
+//                                                                       marks: Profil izleri on their photo, profile-marks.mjs;
 //                                                                       &medals=1 adds user.medals, &card=1 leaves out giftsReceived:
 //                                                                       the room's person card)
 //   GET    /api/me/visitors                               → { count, visitors, hidden }  (last 7 days; who only with the
@@ -30,6 +31,7 @@ import { cardsMore, medalsOf, privateMore, profileMore } from './profiles.mjs';
 import { cityDistance } from './city-coords.mjs';
 import { eraseDecor } from './room-decor.mjs';
 import { shownRoomOf } from './presence-room.mjs';
+import { clearMarks, eraseMarks, profileMarksOf } from './profile-marks.mjs';
 
 /** The interests the app offers (app/src/data/mock.ts INTERESTS). */
 export const INTERESTS = ['🎤 Karaoke', '🎮 Oyun', '💬 Sohbet', '⚽ Spor', '✈️ Seyahat', '🎬 Film', '💃 Dans', '📚 Kitap', '🎧 Müzik', '☕ Kahve'];
@@ -141,6 +143,8 @@ export async function eraseAccount(c, id, phone) {
     await c.query('DELETE FROM follows WHERE follower = $1 OR followee = $1', [id]);
     await c.query('DELETE FROM blocks WHERE blocker = $1 OR blocked = $1', [id]);
     await c.query('DELETE FROM profile_visits WHERE owner_id = $1 OR visitor_id = $1', [id]);
+    // Profil izleri: the marks on them go; the ones they left elsewhere lose their name (profile-marks.mjs).
+    await eraseMarks(c, id);
     // Their level drops and what the drops took off (levels-admin.mjs): no accounting record, nobody else's.
     await c.query('DELETE FROM level_drops WHERE user_id = $1', [id]);
     await c.query('DELETE FROM level_offsets WHERE user_id = $1', [id]);
@@ -333,6 +337,7 @@ export const socialRoutes = {
     // levels may be a minute old (profiles.mjs levelsOf), as Keşfet's cards are.
     const card = url.searchParams.get('card') === '1';
     const more = await profileMore(u, id === me.id, { gifts: !card, fresh: !card });
+    const looks = (await looksOf([u.id]))[u.id] ?? null;
     return {
       user: {
         ...shown,
@@ -352,7 +357,9 @@ export const socialRoutes = {
         // Their medals (Vitrin's Madalyalar, the same rules) for the person card, only when asked: older apps don't.
         ...(url.searchParams.get('medals') === '1' && { medals: await medalsOf(u, more.friends) }),
       },
-      looks: (await looksOf([u.id]))[u.id] ?? null,
+      looks,
+      // Profil izleri (profile-marks.mjs): the marks on their photo now; on my own profile with who left each.
+      marks: id === me.id ? await profileMarksOf(id, true) : (looks?.marks ?? []),
       agency: ag.rowCount ? { id: String(ag.rows[0].id), name: ag.rows[0].name } : null,
       family: await familyOf(id),
       // "Şu an odada" (presence-room.mjs): the room they are in now, as I may see it; null for none, for my own
@@ -477,6 +484,8 @@ export const socialRoutes = {
       // Following each other's room ends with it too (room-follow.mjs).
       await c.query('DELETE FROM room_follows WHERE (owner_id = $1 AND user_id = $2) OR (owner_id = $2 AND user_id = $1)', [me.id, to]);
     });
+    // Profil izleri: a mark the blocked person left on me comes off (its own transaction, my row locked first).
+    await clearMarks(me.id, { how: 'block', by: me.id, from: to });
     return { blocked: true };
   },
 

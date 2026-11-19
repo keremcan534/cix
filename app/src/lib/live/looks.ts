@@ -14,6 +14,8 @@ import { useEffect, useRef, useSyncExternalStore } from 'react';
 
 import { putServerUser, setServerFace } from '@/data/mock';
 import * as api from '@/lib/api';
+import { putMarks } from '@/lib/mark-store';
+import { parseMarks } from '@/lib/profile-marks';
 
 export type Look = {
   frame: string | null;
@@ -32,6 +34,10 @@ export type Look = {
   name?: string;
   /** Their photo (null: none); an older server sends no field, and the photo known from elsewhere stays. */
   avatarUrl?: string | null;
+  /** Profil izleri on their photo (lib/profile-marks parseMarks reads it); an older server sends none. */
+  marks?: unknown;
+  /** They refuse profile marks (Gizlilik): the gift sheet doesn't send them a gift that leaves one. */
+  noMarks?: boolean;
 };
 const TTL = 120_000;
 /** How long after a failed read it is tried again (first, second retry); after that the 30-second ask for missing faces. */
@@ -55,8 +61,10 @@ const subscribe = (l: () => void) => {
 let self: string | null = null;
 export const setLooksSelf = (id: string | null) => void (self = id);
 /** Keeps a look, and the person's name and photo as the server has them now (never for my own account). */
-const keep = (id: string, look: Look) => {
+const keep = (id: string, look: Look, at = Date.now()) => {
   store.set(id, { look, at: Date.now() });
+  // Profil izleri: the marks on their photo (lib/mark-store), mine too; an older server's look says nothing of them.
+  if (look.marks !== undefined) putMarks(id, parseMarks(look.marks), at);
   if (id === self) return;
   if (typeof look.name === 'string' && look.name) putServerUser({ id, name: look.name });
   if (look.avatarUrl !== undefined) setServerFace(id, look.avatarUrl);
@@ -93,7 +101,7 @@ async function readLooks(ids: string[], freshAfter: number, tries: number) {
       try {
         const r = await api.apiRequest<{ looks: Record<string, Look> }>('GET', `/api/looks?ids=${batch.join(',')}`);
         // A look the server sent while this was being read is newer than this answer.
-        for (const [id, look] of Object.entries(r.looks)) if ((store.get(id)?.at ?? 0) < started) keep(id, look);
+        for (const [id, look] of Object.entries(r.looks)) if ((store.get(id)?.at ?? 0) < started) keep(id, look, started);
         emit();
       } catch {
         // No answer: tried again in a moment (a few times), and asked again the next time someone looks.

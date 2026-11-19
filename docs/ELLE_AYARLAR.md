@@ -95,6 +95,17 @@ bekleme süresi.
 - **Panelde değişmeyenler:** profil listeleri (burç, etiket, dil, ülke) ve profil formunun sınırları: uygulama
   bunları kendi içinden gösterir, yeni seçenek eski APK'da seçilemez; ayrı bir iş ister.
 
+## Profil izleri (19 Kasım)
+
+| Grup | Ayar | Varsayılan |
+| --- | --- | --- |
+| Profil izleri | Profil izi süresi (saat) | 24 saat |
+
+Kaka gibi iz bırakan bir hediyenin izi alıcının profil fotoğrafında bu kadar kalır (izi temizleyen hediye gelirse daha
+önce gider); en çok 168 saat. Hediyenin panelde kendi süresi varsa o geçer. Konmuş izlerin bitişi değişmez. **0: profil
+izleri kapalı**: Kaka ve Su düz hediye olur, hiçbir iz görünmez (acil durdurma). Hangi hediyenin iz bıraktığı ya da
+temizlediği Hediyeler sayfasında, hediyenin kendi ayarıdır. Ayrıntı: [`PROFIL_IZLERI.md`](PROFIL_IZLERI.md).
+
 ## Ajans statüsü (19 Kasım)
 
 Aday ajans / aktif ajans kuralının sayıları (20 yayıncı, 10 × 10 USD kazanan, 20 altında adaya düşme, aylık 5 yeni
