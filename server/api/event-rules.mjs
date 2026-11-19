@@ -56,8 +56,10 @@ export const MAX_OPEN_PER_ROOM = 10;
 /** Ended events stay in the list's Tamamlandı this long. */
 export const ENDED_LISTED_DAYS = 30;
 
-/** A time-zone offset (minutes east of UTC, e.g. 180 for Türkiye) from a query value; Türkiye's when unreadable. */
+/** A time-zone offset (minutes east of UTC, e.g. 180 for Türkiye) from a query value; Türkiye's when missing or unreadable. */
 export function offsetOf(v) {
+  // Number(null) and Number('') are 0: without this, a request with no tz would count its days in UTC.
+  if (v == null || String(v).trim() === '') return 180;
   const n = Number(v);
   return Number.isInteger(n) && n >= -720 && n <= 840 ? n : 180;
 }

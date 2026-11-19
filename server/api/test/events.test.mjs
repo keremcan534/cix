@@ -14,6 +14,11 @@ const ok = async (p, what) => {
   return j;
 };
 const inMinutes = (m) => new Date(Date.now() + m * 60_000).toISOString();
+/** The offset (minutes east of UTC, as the app sends it) of a time zone where it is `hour`:00 now. */
+const tzAt = (hour) => {
+  const off = hour * 60 - (Math.floor(Date.now() / 60_000) % 1440);
+  return off < -720 ? off + 1440 : off > 840 ? off - 1440 : off;
+};
 const plan = (room, over = {}) => ({ room, category: 'tanisma', title: 'Akustik Gece', description: 'Gitarla şarkılar', rules: 'Saygılı ol', startsAt: inMinutes(90), minutes: 60, capacity: 3, ...over });
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 async function until(fn, ms = 4000) {
@@ -75,7 +80,12 @@ describe('Etkinlik Merkezi', () => {
     assert.ok(listed.events.some((e) => e.id === event.id && e.state === 'upcoming'));
     assert.equal((await ok(call('GET', '/api/events?q=akustik', null, fans[0].session), 'arama')).events.some((e) => e.id === event.id), true);
     assert.equal((await ok(call('GET', '/api/events?q=bulunmayan-kelime', null, fans[0].session), 'arama')).events.length, 0);
-    assert.equal((await ok(call('GET', '/api/events?when=tomorrow', null, fans[0].session), 'yarın')).events.some((e) => e.id === event.id), false);
+    // "Tomorrow" is the person's own day. Where it is 01:00 now, the event (90 minutes on) is today; where it is 23:00,
+    // it is tomorrow. Asked from both, the hour the tests run at doesn't matter (near midnight it used to fail).
+    const tomorrow = async (hour) =>
+      (await ok(call('GET', `/api/events?when=tomorrow&tz=${tzAt(hour)}&q=akustik`, null, fans[0].session), 'yarın')).events.some((e) => e.id === event.id);
+    assert.equal(await tomorrow(1), false, 'saatin 01.00 olduğu yerde etkinlik bugün');
+    assert.equal(await tomorrow(23), true, 'saatin 23.00 olduğu yerde etkinlik yarın');
     assert.equal((await call('GET', '/api/events?when=yarin-sabah', null, fans[0].session))[0], 400);
 
     // Places: one each, up to the capacity of 3.
