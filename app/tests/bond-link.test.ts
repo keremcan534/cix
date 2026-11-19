@@ -1,5 +1,5 @@
 /// <reference types="node" />
-// The Lv4 bond line between two bonded people side by side on the mics (lib/bond-link, components/room/room-bonds;
+// The bond line between two bonded people side by side on the mics, from Lv1 (lib/bond-link, components/room/room-bonds;
 // Güncelleme 7, madde 13): it passes behind both their frames, and its knot is in front of both. The left seat draws
 // the line before its own face; the right seat draws the knot after its own face.
 import { describe, test } from 'node:test';
@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import type { RoomBond } from '@/data/bonds';
-import { KNOT, bondParts, knotBox, lineBox } from '@/lib/bond-link';
+import { bondParts, knotBox, lineBox, markSize } from '@/lib/bond-link';
 
 const SRC = resolve(import.meta.dirname, '../src');
 const couple: RoomBond = { a: 'u-acm', b: 'u-artemis', kind: 'cift', level: 4 };
@@ -29,8 +29,9 @@ describe('Bağ çizgisi iki çerçevenin arkasından, düğümü önde', () => {
     assert.equal(bondParts([couple], seats, 1, undefined, { index: 0, gap: 0 }).knot?.bond, couple);
   });
 
-  test('Lv4 altı bağ, boş koltuk, yan yana olmayan (satır sonu) koltuk: ne çizgi ne düğüm', () => {
-    assert.deepEqual(bondParts([weak], ['u-x', 'u-y'], 0, { index: 1, gap: 0 }), { line: null, knot: null });
+  test('Lv1 bağ da çizilir (Güncelleme 7); boş koltuk, yan yana olmayan (satır sonu) koltuk: ne çizgi ne işaret', () => {
+    assert.deepEqual(bondParts([weak], ['u-x', 'u-y'], 0, { index: 1, gap: 0 }), { line: { bond: weak, gap: 0 }, knot: null });
+    assert.deepEqual(bondParts([{ ...weak, level: 1 }], ['u-x', 'u-y'], 1, undefined, { index: 0, gap: 0 }).knot?.bond.level, 1);
     assert.deepEqual(bondParts([couple], ['u-acm', null], 0, { index: 1, gap: 0 }), { line: null, knot: null });
     assert.deepEqual(bondParts([couple], ['u-acm', 'u-artemis'], 1), { line: null, knot: null }, 'önceki koltuk bilinmiyorsa düğüm yok');
   });
@@ -38,8 +39,10 @@ describe('Bağ çizgisi iki çerçevenin arkasından, düğümü önde', () => {
   test('düğüm iki koltuğun tam ortasında, yüzlerin orta çizgisinde; çizgi yüzden yüze', () => {
     for (const [size, gap] of [[48, 0], [56, 6], [60, 10]]) {
       const k = knotBox(size, gap);
-      assert.equal(k.left + KNOT / 2 + gap / 2, 0, 'sağ koltuğun sol kenarından boşluğun yarısı kadar solda');
-      assert.equal(k.top + KNOT / 2, size / 2);
+      const m = markSize(size);
+      assert.equal(k.width, m);
+      assert.equal(k.left + m / 2 + gap / 2, 0, 'sağ koltuğun sol kenarından boşluğun yarısı kadar solda');
+      assert.equal(k.top + m / 2, size / 2);
       const l = lineBox(size, gap);
       assert.equal(l.top + l.height / 2, size / 2, 'aynı çizgide');
       assert.equal(l.marginLeft, size / 2 - 1, 'soldaki yüzün kenarından');

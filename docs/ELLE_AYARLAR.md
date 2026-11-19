@@ -17,12 +17,17 @@ bekleme süresi.
 | Grup | Ayar | Varsayılan |
 | --- | --- | --- |
 | Bağlar | Çift bağı: kişi başına en fazla | 1 |
-| Bağlar | Aile bağları (Kardeş, Bacı, Ağabey, Abla, Yenge, Enişte): türü başına en fazla | 3 |
-| Bağlar | Kanka bağı: kişi başına en fazla | 5 |
+| Bağlar | Aile bağları (Kardeş, Bacı, Ağabey, Abla, Yenge, Enişte): türü başına en fazla | 1000 (Güncelleme 7'den önce 3) |
+| Bağlar | Kanka bağı: kişi başına en fazla | 1000 (Güncelleme 7'den önce 5) |
 | Bağlar | Bekleyen istek: en fazla | 10 |
 | Bağlar | İsteğe cevap süresi | 3 gün |
 | Bağlar | Bağ bitince bekleme | 7 gün |
 | Bağlar | Sohbetten günlük bağ puanı: en fazla | 10 |
+| Bağlar | Hediyesiz gece düşen puan (`bond_drop_pct`) | %10 |
+| Bağlar | Hediyesiz gece en az düşen puan (`bond_drop_flat`) | 10 puan |
+| Bağlar | Hediyesiz kalan bağ biter (`bond_idle_end_days`; 0: hiç bitmez) | 30 gün |
+| Bağlar | Bitmeden önce uyarı (`bond_idle_warn_days`; 0: uyarı yok) | 3 gün |
+| Bağlar | Seviye basamakları (`bond_levels`, Lv1–Lv20, 20 sayı, ilki 0; değişikliği iki kez sorar) | 0, 10, 30, 60, 100, 200, 400, 700, 1200, 2000, 3000, 4500, 6500, 9000, 12000, 16000, 21000, 27000, 35000, 45000 |
 | Koruma | Yüzde düşüş: bu puandan itibaren | 5.000 |
 | Koruma | Yüzde düşüş | %10 |
 | Koruma | Sabit düşüş | 1.000 puan |
@@ -39,7 +44,9 @@ bekleme süresi.
 - **Şanslı çanta listeleri** virgülle yazılır (`1000, 5000`), en çok 6 seçenek. Jeton çantası en çok **50.000 jeton**:
   çanta şansla dağıtılır, daha büyüğü sizin kararınız (`DENETIM.md`, şans özellikleri).
 - **Değişiklik sonrakinden başlar:** kurulmuş bağ, bekleyen istek (cevap süresi), konmuş eşik ve atılmış çanta kendi
-  değeriyle sürer.
+  değeriyle sürer. Gece düşüşü ve bitiş sayıları bir sonraki geceden geçerlidir. Seviye basamakları değişince herkesin
+  seviyesi yeni basamaklarla hesaplanır; seviyesi değişen bağın iki tarafına ilk hediyesinde ya da gece işinde
+  SimilarClub Sistem bildirimi gider (Güncelleme 7, [`BAGLAR.md`](BAGLAR.md)).
 - **Eski APK'lar:** sunucu yeni kuralı uygular. Çanta seçeneklerini eski APK da sunucudan alır, doğru gösterir.
   Bağlar ve Koruma yazılarındaki sayıları (3 gün, %10…) eski APK kendi içinden yazar; yeni APK katalogdan
   (`/api/catalog` `guard`, `bonds`) okur.

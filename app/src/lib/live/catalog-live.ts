@@ -32,7 +32,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSyncExternalStore } from 'react';
 
-import { BOND_KINDS, type BondKind, type BondKindInfo } from '@/data/bonds';
+import { BOND_KINDS, BOND_LEVELS, type BondKind, type BondKindInfo } from '@/data/bonds';
 import { GIFTS_PAUSED } from '@/data/gifts-paused';
 import { GIFTS, isBondGift, type Gift, type GiftCat } from '@/data/mock';
 import { RULES, type Rules } from '@/data/rules';
@@ -99,8 +99,21 @@ export type LiveCatalog = {
 export type RoomNumbers = { micMinLevel: number; bossMinLevel: number; caps: number[] };
 /** Koruma's numbers (server/api/guards.mjs guardRules) that the rules page says. */
 export type GuardNumbers = { dropFrom: number; dropShare: number; dropFlat: number; thresholdEveryDays: number };
-/** Bağlar's numbers (server/api/gifts.mjs catalog `bonds`): days to answer, days apart, talk points, per-kind limits. */
-export type BondNumbers = { answerDays: number; cooldownDays: number; talkDaily: number; max: Partial<Record<BondKind, number>> };
+/**
+ * Bağlar's numbers (server/api/bonds.mjs bondCatalog): days to answer, days apart, talk points, per-kind limits; from a
+ * server with Güncelleme 7 also the level steps (20) and the nightly drop and quiet end (each only when sound).
+ */
+export type BondNumbers = {
+  answerDays: number;
+  cooldownDays: number;
+  talkDaily: number;
+  max: Partial<Record<BondKind, number>>;
+  levels?: number[];
+  dropPct?: number;
+  dropFlat?: number;
+  idleEndDays?: number;
+  idleWarnDays?: number;
+};
 
 // --- Reading the server's answer, without trusting it ----------------------------------------------------
 const obj = (x: unknown): Record<string, unknown> => (x && typeof x === 'object' && !Array.isArray(x) ? (x as Record<string, unknown>) : {});
@@ -209,7 +222,10 @@ export function parseBondNumbers(x: unknown): BondNumbers | null {
     const n = whole(v, 1, 1000);
     if (n !== null && Object.hasOwn(BOND_KINDS, k)) max[k as BondKind] = n;
   }
-  return { answerDays, cooldownDays, talkDaily, max };
+  // Güncelleme 7's numbers: each one only when sound (an older server sends none; the app says its own).
+  const levels = Array.isArray(b.levels) && b.levels.length === BOND_LEVELS.length && b.levels.every((n, i, l) => whole(n, 0, 1e9) !== null && (i === 0 ? n === 0 : (n as number) > (l[i - 1] as number))) ? (b.levels as number[]) : null;
+  const extra = { dropPct: whole(b.dropPct, 0, 100), dropFlat: whole(b.dropFlat, 0, 1e9), idleEndDays: whole(b.idleEndDays, 0, 3650), idleWarnDays: whole(b.idleWarnDays, 0, 365) };
+  return { answerDays, cooldownDays, talkDaily, max, ...(levels ? { levels } : {}), ...Object.fromEntries(Object.entries(extra).filter(([, v]) => v !== null)) };
 }
 
 /** The catalog's `family.themes`; the sound entries only, null when none. */
@@ -399,6 +415,9 @@ export function bondKindOf(kind: BondKind, c: LiveCatalog | null = current): Bon
   const max = c?.bonds?.max[kind] ?? k.max;
   return g && Number.isSafeInteger(g.price) && g.price > 0 ? { ...k, gift: g.name, price: g.price, max } : max === k.max ? k : { ...k, max };
 }
+
+/** Bağlar's level steps now: the catalog's (Canlı ayarlar) or the app's own. */
+export const bondLevelsNow = (c: LiveCatalog | null = current): readonly number[] => c?.bonds?.levels ?? BOND_LEVELS;
 
 /** Every gift this phone can draw, the app's own as they are now and the admins' listed (the profile's gift wall). */
 export const everyGift = (c: LiveCatalog | null = current): Gift[] => [...viewsOf(c).byId.values()];

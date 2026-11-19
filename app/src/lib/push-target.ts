@@ -1,5 +1,5 @@
 // Where a tapped push notification opens (lib/push), from the data the server's notify calls send
-// (server/api: messages, gifts, follows, families, withdrawals, calls, room invites). Plain logic: the unit tests import it.
+// (server/api: messages, gifts, follows, families, withdrawals, calls, room invites, bonds). Plain logic: the unit tests import it.
 import type { Href } from 'expo-router';
 
 /** Where a tapped notification opens (its data from the server's notify calls). */
@@ -40,6 +40,10 @@ export function pushTarget(data: Record<string, unknown> | undefined): Href | nu
     // Named, changed or ended as an agency assistant (server/api/agency-assistants.mjs): the agency screen, my card there.
     case 'agency_assistant':
       return '/ajans';
+    // A bond's request, accept, refusal or end (server/api/bonds.mjs): my own Bağlar tab, where requests are answered.
+    // It opened the notifications before, which never list it (Güncelleme 7, madde 3a).
+    case 'bond':
+      return '/kullanici/me?tab=iliski' as Href;
     // A call: the app opens and its incoming call card rings; a missed one shows in the notifications.
     case 'call':
       return data.missed ? '/bildirimler' : null;
