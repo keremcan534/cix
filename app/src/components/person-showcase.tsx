@@ -1,20 +1,16 @@
 // The person design shared by the room's person card and the profile (the designer's package, Nov 2026): a dark
 // plum panel with pink and gold, the level pill by the name, the club and Aile pills, the interests row, four action
-// tiles, the Profili gör · Yönet · Şikâyet et row, and the three walls: İlişki Duvarı, Hediye Duvarı and Koruma
-// (small links on the card, banners on the profile). The card is drawn with the designer's picture set
+// tiles, the Profili gör · Yönet · Şikâyet et row, and the three walls' links: İlişki Duvarı, Hediye Duvarı and
+// Koruma (the profile draws the walls themselves, components/profile-design). The card is drawn with the designer's picture set
 // (components/person-card-art); every name, number and photo on it is the person's own.
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { Image, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Text } from '@/components/text';
-import { GiftArt } from '@/components/GiftArt';
 import { CardArt, DIVIDER_ART, SlicePill, TILE_ART, type CardArtName } from '@/components/person-card-art';
-import { Photo } from '@/components/photo';
 import { useAffiliations, type Affiliation } from '@/components/profile-badges';
 import type { User } from '@/data/mock';
-import { guardPoints, type GuardPerson } from '@/lib/guard-core';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -211,142 +207,6 @@ export function WallLinks({ onOpen }: { onOpen: (w: WallKey) => void }) {
   );
 }
 
-/** One of the profile's wall banners: the title between laurels, a picture on the left, the person's data. */
-function Banner({ wall, colors, art, onPress, children }: { wall: WallKey; colors: readonly [string, string, ...string[]]; art: React.ReactNode; onPress: () => void; children: React.ReactNode }) {
-  const w = WALLS[wall];
-  return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={w.label}>
-      <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.banner}>
-        <View style={s.bannerTitle}>
-          <Ionicons name="leaf" size={15} color={SHOW.gold} style={{ transform: [{ scaleX: -1 }] }} />
-          <Ionicons name={w.icon} size={18} color={w.colors[0]} />
-          <Text style={s.bannerTitleText}>{w.label}</Text>
-          <Ionicons name="leaf" size={15} color={SHOW.gold} />
-        </View>
-        <View style={s.bannerBody}>
-          <View style={s.bannerArt}>{art}</View>
-          <View style={s.bannerData}>{children}</View>
-        </View>
-      </LinearGradient>
-    </Pressable>
-  );
-}
-
-function Face({ uri, size, ring = SHOW.gold, style }: { uri: string | null | undefined; size: number; ring?: string; style?: StyleProp<ViewStyle> }) {
-  return (
-    <View style={[{ width: size, height: size, borderRadius: size / 2, borderWidth: 2, borderColor: ring, overflow: 'hidden', backgroundColor: SHOW.panel }, style]}>
-      {uri ? <Photo uri={uri} kind="face" style={{ width: '100%', height: '100%' }} /> : <Ionicons name="person" size={size * 0.55} color={SHOW.dim} style={{ alignSelf: 'center', marginTop: size * 0.2 }} />}
-    </View>
-  );
-}
-
-/** İlişki Duvarı: the person and their top bond's partner, and how many days it has lasted. */
-export function RelationshipBanner({ owner, partner, days, onPress }: { owner: string | null | undefined; partner: { uri: string | null | undefined; name: string } | null; days: number | null; onPress: () => void }) {
-  return (
-    <Banner wall="iliski" colors={['#5A1240', '#B0246E', '#4A0F37']} onPress={onPress} art={<Text style={s.bigEmoji}>💞</Text>}>
-      {partner ? (
-        <View style={s.pairRow}>
-          <View style={s.pair}>
-            <Face uri={owner} size={52} />
-            <Face uri={partner.uri} size={52} style={{ marginLeft: -12 }} />
-            <View style={s.pairHeart}>
-              <Ionicons name="heart" size={14} color="#fff" />
-            </View>
-          </View>
-          {days !== null && (
-            <View style={s.daysPill}>
-              <Ionicons name="heart" size={14} color={SHOW.pink} />
-              <Text style={s.daysText}>{days} gün</Text>
-            </View>
-          )}
-        </View>
-      ) : (
-        <Text style={s.empty}>Henüz bağ yok</Text>
-      )}
-    </Banner>
-  );
-}
-
-/** Hediye Duvarı: the three gifts they received most, and how many kinds of the catalog they have. */
-export function GiftWallBanner({ top, lit, total, received, onPress }: { top: { giftId: string; emoji: string }[]; lit: number | null; total: number | null; received: number | null; onPress: () => void }) {
-  return (
-    <Banner wall="hediye" colors={['#251C6B', '#4B3AC2', '#1E1659']} onPress={onPress} art={<GiftArt giftId={top[0]?.giftId} emoji={top[0]?.emoji ?? '🎁'} size={64} />}>
-      <View style={s.giftRow}>
-        <View style={s.giftBadges}>
-          {[0, 1, 2].map((i) =>
-            top[i] ? (
-              <GiftArt key={top[i].giftId} giftId={top[i].giftId} emoji={top[i].emoji} size={30} />
-            ) : (
-              <View key={`e${i}`} style={s.giftEmpty} />
-            ),
-          )}
-        </View>
-        <View style={s.giftCount}>
-          <Text style={s.giftCountText} numberOfLines={1} adjustsFontSizeToFit>
-            {lit !== null && total ? `${lit}/${total}` : received !== null ? guardPoints(received) : '—'}
-          </Text>
-          <Text style={s.giftCountSub}>{lit !== null && total ? 'çeşit' : 'hediye'}</Text>
-        </View>
-      </View>
-    </Banner>
-  );
-}
-
-/**
- * Koruma: their top guardian (the one over their threshold), and whom they guard most when that is someone else.
- * Empty: nobody yet, and how to become one.
- */
-export function GuardBanner({ guardian, ward, off, onPress }: { guardian: GuardPerson | null; ward: GuardPerson | null; off: boolean; onPress: () => void }) {
-  const second = ward && ward.id !== guardian?.id ? ward : null;
-  return (
-    <Banner wall="koruma" colors={['#3A0F4A', '#8A2A9E', '#3A0F4A']} onPress={onPress} art={<GiftArt giftId="koruma" emoji="🛡️" size={70} />}>
-      {guardian || second ? (
-        <View style={{ gap: 8 }}>
-          {guardian && <GuardLine person={guardian} label="Koruma" />}
-          {second && <GuardLine person={second} label="Koruduğu" />}
-        </View>
-      ) : (
-        <Text style={s.empty}>{off ? 'Koruma kapalı' : 'Henüz koruyucusu yok · Koruma Kartı gönder, koruyucusu ol'}</Text>
-      )}
-    </Banner>
-  );
-}
-
-function GuardLine({ person, label }: { person: GuardPerson; label: string }) {
-  return (
-    <View style={s.guardLine}>
-      <Face uri={person.avatarUrl} size={48} />
-      <View style={s.guardTag}>
-        <Ionicons name="shield-half" size={14} color={SHOW.gold} />
-        <View style={{ flexShrink: 1 }}>
-          <Text style={s.guardLabel}>{label}</Text>
-          <Text style={s.guardName} numberOfLines={1}>
-            {person.name} · {guardPoints(person.points)}
-          </Text>
-        </View>
-      </View>
-    </View>
-  );
-}
-
-/** The guardian on a profile's header: their photo in a gold ring under a "KORUMA" ribbon. */
-export function GuardBadge({ person, onPress }: { person: GuardPerson; onPress: () => void }) {
-  return (
-    <Pressable style={s.badge} onPress={onPress} accessibilityRole="button" accessibilityLabel={`Koruma: ${person.name}`}>
-      <LinearGradient colors={['#FFE6A8', '#FF7AB8', '#B23CF0']} style={s.badgeRing}>
-        <Face uri={person.avatarUrl} size={64} ring="#fff" />
-      </LinearGradient>
-      <LinearGradient colors={['#FFE29A', '#D99A1E']} style={s.badgeRibbon}>
-        <Ionicons name="shield" size={10} color="#5B2A00" />
-        <Text style={s.badgeText}>KORUMA</Text>
-      </LinearGradient>
-      <Text style={s.badgeName} numberOfLines={1}>
-        {person.name}
-      </Text>
-    </Pressable>
-  );
-}
-
 const LEVEL_H = 44;
 
 const s = StyleSheet.create({
@@ -376,32 +236,4 @@ const s = StyleSheet.create({
   link: { flexDirection: 'row', alignItems: 'center', gap: 2, minHeight: 36, paddingLeft: 26, paddingRight: 7 },
   linkArt: { position: 'absolute', left: -8, top: 0, bottom: 0, width: 34, alignItems: 'center', justifyContent: 'center' },
   linkText: { flex: 1, color: SHOW.text, fontSize: 10, lineHeight: 13, fontWeight: '800' },
-  banner: { borderRadius: 22, borderWidth: 1.5, borderColor: 'rgba(255,212,117,0.6)', padding: 12, gap: 6, overflow: 'hidden' },
-  bannerTitle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  bannerTitleText: { color: SHOW.text, fontSize: 19, fontWeight: '900' },
-  bannerBody: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 84 },
-  bannerArt: { width: 84, alignItems: 'center', justifyContent: 'center' },
-  bannerData: { flex: 1, minWidth: 0 },
-  bigEmoji: { fontSize: 54, lineHeight: 64 },
-  empty: { color: SHOW.dim, fontSize: 14, lineHeight: 20 },
-  pairRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
-  pair: { flexDirection: 'row', alignItems: 'center' },
-  pairHeart: { position: 'absolute', left: 33, bottom: -4, width: 24, height: 24, borderRadius: 12, backgroundColor: SHOW.pink, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
-  daysPill: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 999, borderWidth: 1.5, borderColor: SHOW.gold, backgroundColor: 'rgba(255,255,255,0.92)', paddingHorizontal: 12, paddingVertical: 5 },
-  daysText: { color: '#7A1450', fontSize: 15, fontWeight: '900' },
-  giftRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  giftBadges: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(104,202,255,0.35)', paddingVertical: 6 },
-  giftEmpty: { width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.08)' },
-  giftCount: { alignItems: 'center', minWidth: 64 },
-  giftCountText: { color: SHOW.gold, fontSize: 20, fontWeight: '900' },
-  giftCountSub: { color: SHOW.dim, fontSize: 11 },
-  guardLine: { flexDirection: 'row', alignItems: 'center' },
-  guardTag: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, marginLeft: -10, paddingLeft: 16, paddingRight: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.10)', borderWidth: 1, borderColor: 'rgba(255,212,117,0.35)', zIndex: -1 },
-  guardLabel: { color: SHOW.gold, fontSize: 11, fontWeight: '800' },
-  guardName: { color: SHOW.text, fontSize: 14, fontWeight: '800' },
-  badge: { width: 92, alignItems: 'center' },
-  badgeRing: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center' },
-  badgeRibbon: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: -12, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2, borderWidth: 1, borderColor: '#FEF3C7' },
-  badgeText: { color: '#5B2A00', fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
-  badgeName: { color: '#fff', fontSize: 12, fontWeight: '700', marginTop: 3, textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 3 },
 });

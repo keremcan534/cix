@@ -47,7 +47,7 @@ Ekran adları: **Profil** = `src/app/kullanici/[id].tsx`, **Ayarlar** = `src/app
 | Takipçi / takip sayısı | 2 | ✓ | Diğer kullanıcılarda sayılar örnek veri. |
 | Arkadaş sayısı | 2 | 🆕 | Arkadaş = karşılıklı takip. Ayrı bir istek sistemi için 3. bölümdeki ürün kararına bak. |
 | Profil ziyaretçileri | 2 | ✓ | *Ben → Ziyaretçiler* ve *Mesajlar → Profil ziyaretçilerin*: liste herkese açık (Güncelleme 5). Kimin baktığını yalnız **Abonelik** açar (VIP › Abonelik; sunucuda tutulur, `docs/SUNUCU.md` › Abonelik); VIP 1–10 ve Rütbe açmaz. Aboneliği olmayana ziyaretler bulanık görünür: kaç kez ve ne zaman yazar, kim olduğu yazmaz; üstte "Abone ol" daveti. Sunucu bu kişiye ziyaretçinin kimliğini hiç göndermez, bulanıklık açılamaz. Ziyarette profil sahibine bildirim gider (her ziyaretçi için günde en çok bir kez); abone olmayana "Biri profiline baktı", kim olduğu yazmaz. Sessiz ziyaret (VIP 7) iz ve bildirim bırakmaz. |
-| Katıldığı odalar / topluluklar | 2 | ✓ (ajans 🆕) | Profilde *Oda*, *Ajans* ve *Aile* kartları; ajans ve aile adı ayrıca adın altında küçük etiket olarak görünür (Profil sekmesinde de). Ajans herkese açık, odadaki ajans etiketi gibi; başkalarına yalnızca "Ajans sahibi" veya "Ajans yayıncısı" yazar, kazanç gösterilmez. Kapanmış ajans gösterilmez. Ajansı veya ailesi olmayan kişide etiket çıkmaz, kartta "Ajansı yok" / "Ailesi yok" yazar; sahibine "Katıl" önerilir. Etikete dokununca açılan sayfa o ajansı/aileyi gösteriyorsa bağlantı vardır. |
+| Katıldığı odalar / topluluklar | 2 | ✓ (ajans 🆕) | Profilde *Oda*, *Ajans* ve *Aile* kartları; ajans ve aile kartları profilin Bağlar sekmesinde ([`PROFIL_TASARIMI.md`](PROFIL_TASARIMI.md)); Ben sekmesinde adın altında küçük etiket olarak da görünür. Ajans herkese açık, odadaki ajans etiketi gibi; başkalarına yalnızca "Ajans sahibi" veya "Ajans yayıncısı" yazar, kazanç gösterilmez. Kapanmış ajans gösterilmez. Ajansı veya ailesi olmayan kişide etiket çıkmaz, kartta "Ajansı yok" / "Ailesi yok" yazar; sahibine "Katıl" önerilir. Etikete dokununca açılan sayfa o ajansı/aileyi gösteriyorsa bağlantı vardır. |
 | Rozetler ve başarılar | 2 | ✓ | *Onur* sekmesi: madalyalar, unvanlar, hediye duvarı, koleksiyonlar. |
 
 ## 2-D. Görseller ve kişiselleştirme
@@ -55,7 +55,7 @@ Ekran adları: **Profil** = `src/app/kullanici/[id].tsx`, **Ayarlar** = `src/app
 | Madde | Durum | Bu güncellemede | Nerede / not |
 |---|---|---|---|
 | Fotoğraf ekleme / değiştirme | 2 | 🆕 | Yukarıdaki profil fotoğrafı maddesine bak. |
-| Fotoğraf albümü | 2 | 🆕 yükleme | *Albüm*: en fazla 6 fotoğraf eklenip kaldırılabilir, paylaşılan anlardaki fotoğraflar da burada görünür. |
+| Fotoğraf albümü | 2 | 🆕 yükleme | *Albüm* (Vitrin sekmesi): en fazla 6 fotoğraf eklenip kaldırılabilir; sayı ile görünen fotoğraflar tutar. Anlar'da paylaşılan fotoğraflar Anlar sekmesinde ([`PROFIL_TASARIMI.md`](PROFIL_TASARIMI.md)). |
 | Profil çerçevesi | 2 | ✓ | Mağazadan alınan, hareketli çerçeveler dahil. |
 | Seviye ve seviye görseli | 2 | ✓ | Cömertlik ve Yankı seviye rozetleri. |
 | Özel unvan / rozet | 2 | ✓ | VIP unvanı, *Onur* sekmesindeki unvanlar. |
