@@ -137,6 +137,17 @@ export function fxMedia(kind: FxKind, id: string): FxMedia | null {
 }
 
 /**
+ * A clip already on the phone, or null; unlike fxMedia it never starts a download. The room's person card loops the
+ * person's entry clip only when the room (or fetching ahead) already brought it (components/room/entry-box).
+ */
+export function fxMediaKept(kind: FxKind, id: string): FxMedia | null {
+  const v = state.list.find((x) => x.kind === kind && x.id === id);
+  if (!v || !DIR) return null;
+  const name = fxFileName(v);
+  return state.ready.has(name) ? { uri: `${DIR}${name}`, ms: v.ms } : null;
+}
+
+/**
  * Yönetim › Hediyeler's preview of a gift's clip at `url` (this server's /api/fx/… address), which a gift not on the
  * shelves yet has in no list: downloaded once into the cache (never the clip folder, which sync() keeps to the list).
  */

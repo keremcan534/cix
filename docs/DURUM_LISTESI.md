@@ -248,7 +248,7 @@ Ayrıntı: [`OTOMATIK_MESAJ.md`](OTOMATIK_MESAJ.md).
 | 38 | Mikrofon sayısına göre boyut | Çalışıyor | |
 | 39 | Yazarken mikrofonlar kapanmasın | Telefonda denenmeli | |
 | 40 | @bahset | Yarım | Bahsetmeli mesaj iletişim filtresine takılıyordu. Düzeltmesi PR #87'de, sonraki APK'da gelir. Güncelleme 7 (yeni APK): görülmeden geçen bahsetme için sohbetin üstünde "Senden bahsedildi" düğmesi, dokununca o mesaja gider; telefonda denenmeli |
-| 41–42 | Kişi kartı | Çalışıyor | Güncelleme 7 (yeni APK): tasarımdaki gibi; profil ID'si (dokununca kopyalanır) ve ülkesi, Cömertlik ve Yankı seviyesi (VIP'nin gizlediği gizli kalır), VIP seviyesi, madalyaları (dokununca profilin Onur sekmesi). Eski APK eski kartı gösterir |
+| 41–42 | Kişi kartı | Çalışıyor | Güncelleme 7 (yeni APK): tasarımdaki gibi; profil ID'si (dokununca kopyalanır) ve ülkesi, Cömertlik ve Yankı seviyesi (VIP'nin gizlediği gizli kalır), VIP seviyesi, madalyaları (dokununca profilin Onur sekmesi). Eski APK eski kartı gösterir. Sonraki güncelleme: adının yanındaki kutuda kişinin giriş efekti döner (odaya girince ne görünüyorsa: videosu telefonda varsa video, yoksa küçük çizili bant; yalnız VIP'de VIP bandı; Hareketi azalt'ta duran bant, Düşük veri'de video yok; kart video indirmez), hiçbir şey takmayanda kutu yok; dar telefonda kutu daralır; telefonda denenmeli |
 | 43–44 | DJ yetkisi | Çalışıyor | |
 | 45 | Telefondan müzik çalma | Telefonda denenmeli | Depo (R2) kuruldu, şarkı yükleme açık |
 | 46 | "Benzer" yerine "Ana Sayfa" | Çalışıyor | Alt menüde de "Ana Sayfa" |

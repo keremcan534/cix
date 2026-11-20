@@ -44,11 +44,14 @@ describe('Kişi kartı: ID, madalya, görünüş ve ülke', () => {
   });
 
   test('görünüş: çerçeve, VIP seviyesi ve özel ID; bozuk alan yok sayılır', () => {
-    assert.deepEqual(cardLookOf({ frame: 'fr-rose', vipLevel: 7, specialId: 'id-777', entry: 'en-x', noble: null }), { frame: 'fr-rose', vipLevel: 7, specialId: 'id-777' });
-    assert.deepEqual(cardLookOf({ frame: null, vipLevel: 0, specialId: null }), { frame: null, vipLevel: 0, specialId: null });
-    assert.deepEqual(cardLookOf({ frame: 5, vipLevel: 'çok', specialId: {} }), { frame: null, vipLevel: 0, specialId: null });
-    assert.deepEqual(cardLookOf({ vipLevel: -3 }), { frame: null, vipLevel: 0, specialId: null });
-    assert.deepEqual(cardLookOf({ vipLevel: 4.7 }), { frame: null, vipLevel: 4, specialId: null });
+    const none = { frame: null, vipLevel: 0, specialId: null, entry: null, ride: null, noble: null };
+    assert.deepEqual(cardLookOf({ frame: 'fr-rose', vipLevel: 7, specialId: 'id-777', entry: 'en-x', noble: null }), { ...none, frame: 'fr-rose', vipLevel: 7, specialId: 'id-777', entry: 'en-x' });
+    // The entry box's part: their entry, ride and noble rank, as GET /api/looks has them (economy.mjs looksOf).
+    assert.deepEqual(cardLookOf({ frame: null, entry: 'en-dragon', ride: 'rd-sport', noble: 2, vipLevel: 6, bubble: 'bb-x' }), { ...none, vipLevel: 6, entry: 'en-dragon', ride: 'rd-sport', noble: 2 });
+    assert.deepEqual(cardLookOf({ frame: null, vipLevel: 0, specialId: null }), none);
+    assert.deepEqual(cardLookOf({ frame: 5, vipLevel: 'çok', specialId: {}, entry: 7, ride: '', noble: 'dük' }), none);
+    assert.deepEqual(cardLookOf({ vipLevel: -3, noble: -1 }), none);
+    assert.deepEqual(cardLookOf({ vipLevel: 4.7, noble: 2.5 }), { ...none, vipLevel: 4, noble: 2 });
     for (const bad of [null, undefined, 'x', 3, []]) assert.equal(cardLookOf(bad), null);
   });
 
@@ -98,7 +101,7 @@ describe('Kişi kartının profil okuması (card)', () => {
     const c = await loadPublicProfile(id, false, false, true);
     assert.deepEqual(seen, [`/api/user?id=${id}&card=1&medals=1`], 'ziyaret yazılmaz, kart işaretleri gider');
     assert.deepEqual(c.medals, ['md4', 'md1']);
-    assert.deepEqual(c.look, { frame: 'fr-crown-gold', vipLevel: 5, specialId: null });
+    assert.deepEqual(c.look, { frame: 'fr-crown-gold', vipLevel: 5, specialId: null, entry: null, ride: null, noble: null });
     assert.deepEqual(c.levels, { wealth: 12, charm: null }, 'gizlenen Yankı seviyesi gizli kalır');
     assert.equal(c.extras?.country, 'AZ');
     assert.equal('giftsReceived' in c, false);

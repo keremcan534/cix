@@ -8,18 +8,22 @@
 // "Yönet" for their actions on them. Live mode: the follow state, the counts, the levels (a level a VIP hides stays
 // hidden), the country, the medals and the heart are the server's (lib/live/profile with `card`, lib/live/one-on-one),
 // as on the profile screen; their frame, VIP level and special ID are the ones the room read (lib/live/looks), else
-// the profile answer's.
+// the profile answer's. Beside the name, the box the owners drew (20 Nov 2026): their room entrance playing round
+// (components/room/entry-box, lib/entry-box), what everyone sees when they come in; the levels then stand in a row
+// under the photo, as in the design, and on a narrow phone (or with large text) the box is a strip under the head.
+// Nobody wearing anything (or someone I blocked, whose entrance the room doesn't show me): no box, the head as before.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 
-import { Text } from '@/components/text';
+import { MAX_FONT_SCALE, Text } from '@/components/text';
 import { Art } from '@/components/Art';
 import { HeartBadge } from '@/components/heart-level';
 import { heartOf, usePair } from '@/components/one-on-one-bar';
 import { GenderChip } from '@/components/profile-badges';
 import { CardArt, CardPanel } from '@/components/person-card-art';
+import { EntryBox } from '@/components/room/entry-box';
 import { ActionTiles, ClubPills, InterestRow, LevelPill, ManageRow, SHOW, WallLinks, type WallKey } from '@/components/person-showcase';
 import { useSheetBottom } from '@/components/room/parts';
 import { FramedAvatar, VipBadge, VipTitle, WealthBadge } from '@/components/ui';
@@ -29,10 +33,12 @@ import { countryArt } from '@/data/rooms-ui';
 import { COUNTRIES } from '@/data/social-ui';
 import { showAlert } from '@/lib/alert';
 import { copyText } from '@/lib/clipboard';
+import { CARD_HEAD, ENTRY_BOX, entryBoxPlace } from '@/lib/entry-box';
 import { liveMode, message, toServer } from '@/lib/live';
 import { lookOf } from '@/lib/live/looks';
 import { followOnServer, loadPublicProfile } from '@/lib/live/profile';
 import { countryCodeOf, medalsFrom, shownPublicId, type CardLook } from '@/lib/person-card';
+import { entryPlanOf } from '@/lib/room-entrance';
 import { useSheetMax } from '@/lib/sheet-space';
 import { useApp } from '@/store';
 import { SCRIM } from '@/theme';
@@ -86,7 +92,7 @@ export type PersonCardProps = {
 };
 
 export function PersonCard({ uid, note, onClose, onGift, onMention, onReport, onManage }: PersonCardProps) {
-  const { following, toggleFollow, takeServerSocial, blocked, equipped, vipLevel, charmLevel, wealthLevel } = useApp();
+  const { following, toggleFollow, takeServerSocial, blocked, equipped, vipLevel, nobleTier, charmLevel, wealthLevel } = useApp();
   const u = userById(uid);
   const isMe = uid === 'me';
   const live = liveMode();
@@ -144,7 +150,12 @@ export function PersonCard({ uid, note, onClose, onGift, onMention, onReport, on
   // floats over the navigation bar, so that padding comes off; a busy room on a short phone still leaves it 380 to
   // hold its fixed rows and a part of the list.
   const sheet = useSheetMax(0.9);
-  const { height } = useWindowDimensions();
+  const { width, height, fontScale } = useWindowDimensions();
+  // Their entrance (lib/room-entrance): mine from the store, someone else's look as above; the demo's people wear none.
+  const entryPlan = isBlocked ? null : entryPlanOf(isMe ? { entry: equipped.entry, ride: equipped.ride, noble: nobleTier, vipLevel } : theirs);
+  const place = entryBoxPlace(width, fontScale, MAX_FONT_SCALE);
+  const boxed = !!entryPlan && place.beside;
+  const entryBox = entryPlan && <EntryBox plan={entryPlan} name={u.name} avatar={u.avatar} w={place.w} h={place.h} />;
   const maxHeight = typeof sheet === 'number' ? Math.min(Math.round(height * 0.9) - paddingBottom, Math.max(sheet - paddingBottom, 380)) : sheet;
 
   const act = (fn: () => void) => () => {
@@ -179,39 +190,60 @@ export function PersonCard({ uid, note, onClose, onGift, onMention, onReport, on
     if (shownId.id) void copyText(shownId.id, 'ID');
   };
 
+  const levelPill = charm !== null && <LevelPill level={charm} />;
+  const badges = (
+    <>
+      <AgePill user={u} />
+      {wealth !== null && <WealthBadge level={wealth} />}
+      {vip > 0 ? <VipTitle level={vip} /> : u.vip && <VipBadge />}
+      {heart && heart.level > 0 && <HeartBadge level={heart.level} />}
+    </>
+  );
+  const noteRow = !!note && (
+    <View style={s.row}>
+      <CardArt name="defne-sol" h={20} />
+      <Text style={s.note} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+        {note}
+      </Text>
+      <CardArt name="defne-sag" h={20} />
+    </View>
+  );
+
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={s.backdrop} onPress={onClose} accessibilityLabel="Kapat" />
       <View style={[s.float, { paddingBottom }]}>
         <CardPanel style={[s.sheet, { maxHeight }]}>
-          <View style={s.head}>
+          <View style={[s.head, boxed && s.headBoxed]}>
             <View style={s.avatar}>
               <FramedAvatar uri={u.avatar} size={78} vipLevel={vip} frameId={frameId ?? undefined} artScale={1.6} markUid={uid} />
             </View>
             <View style={s.who}>
-              {/* The name with their Yankı level on the crowned pill beside it, as in the design; a long name shrinks first. */}
-              <View style={[s.row, { paddingRight: 26 }]}>
-                <Text style={s.name} numberOfLines={1}>
+              {/* The name with their Yankı level on the crowned pill beside it, as in the design; a long name shrinks first.
+                  Beside the entry box the name stands alone (its level goes to the row under the photo). */}
+              <View style={[s.row, !boxed && { paddingRight: 26 }]}>
+                <Text style={s.name} numberOfLines={1} adjustsFontSizeToFit={boxed} minimumFontScale={0.75}>
                   {u.name}
                 </Text>
-                {charm !== null && <LevelPill level={charm} />}
+                {!boxed && levelPill}
               </View>
               {/* Room between wrapped lines: the badges' crowns and sparkles stand above them. */}
-              <View style={[s.row, s.wrap]}>
-                <AgePill user={u} />
-                {wealth !== null && <WealthBadge level={wealth} />}
-                {vip > 0 ? <VipTitle level={vip} /> : u.vip && <VipBadge />}
-                {heart && heart.level > 0 && <HeartBadge level={heart.level} />}
-              </View>
+              {!boxed && (
+                <View style={[s.row, s.wrap]}>
+                  {badges}
+                </View>
+              )}
               {(!!shownId.id || !!country) && (
                 <View style={[s.row, s.wrap]}>
                   {!!shownId.id && (
-                    <Pressable style={s.idPill} onPress={copyId} hitSlop={6} accessibilityRole="button" accessibilityLabel={`ID ${shownId.id}, kopyala`}>
-                      <Text style={[s.idText, shownId.special && s.idSpecial]} numberOfLines={1}>
+                    <Pressable style={[s.idPill, boxed && s.idPillBoxed]} onPress={copyId} hitSlop={6} accessibilityRole="button" accessibilityLabel={`ID ${shownId.id}, kopyala`}>
+                      {/* Beside the entry box a 12-digit ID takes the whole pill, a size smaller (tapping it still copies);
+                          a phone draws it smaller still rather than cut it. */}
+                      <Text style={[s.idText, boxed && s.idTextBoxed, shownId.special && s.idSpecial]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                         ID {shownId.id}
                         {shownId.special ? ' ✦' : ''}
                       </Text>
-                      <Ionicons name="copy-outline" size={11} color={SHOW.dim} />
+                      {!boxed && <Ionicons name="copy-outline" size={11} color={SHOW.dim} />}
                     </Pressable>
                   )}
                   {country && (
@@ -222,19 +254,23 @@ export function PersonCard({ uid, note, onClose, onGift, onMention, onReport, on
                   )}
                 </View>
               )}
-              {!!note && (
-                <View style={s.row}>
-                  <CardArt name="defne-sol" h={20} />
-                  <Text style={s.note} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-                    {note}
-                  </Text>
-                  <CardArt name="defne-sag" h={20} />
-                </View>
-              )}
+              {!boxed && noteRow}
             </View>
+            {boxed && <View style={s.entryAt}>{entryBox}</View>}
           </View>
+          {boxed && (
+            <>
+              <View style={[s.row, s.wrap]}>
+                {levelPill}
+                {badges}
+              </View>
+              {noteRow}
+            </>
+          )}
 
           <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ gap: 10 }} showsVerticalScrollIndicator={false}>
+            {/* No room beside the name (a narrow phone, large text): their entrance as a strip under the head. */}
+            {!place.beside && entryBox}
             <ClubPills user={u} onOpen={onClose} />
             <InterestRow interests={u.interests} />
             <WallLinks onOpen={openWall} />
@@ -301,8 +337,12 @@ const s = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: SCRIM },
   float: { position: 'absolute', left: 8, right: 8, bottom: 0 },
   sheet: { flexShrink: 1, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6, gap: 10 },
-  head: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  avatar: { width: 104, height: 104, alignItems: 'center', justifyContent: 'center' },
+  head: { flexDirection: 'row', alignItems: 'center', gap: CARD_HEAD.gap },
+  // Beside the entry box: everything from the top, the box as tall as the photo.
+  headBoxed: { alignItems: 'flex-start' },
+  avatar: { width: CARD_HEAD.avatar, height: CARD_HEAD.avatar, alignItems: 'center', justifyContent: 'center' },
+  // 8 from the name; the close button keeps its column to the right of the box, as in the design.
+  entryAt: { marginLeft: ENTRY_BOX.gap - CARD_HEAD.gap, marginRight: ENTRY_BOX.closeCol },
   who: { flex: 1, minWidth: 0, gap: 7, paddingTop: 8 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   wrap: { flexWrap: 'wrap', rowGap: 10 },
@@ -314,6 +354,8 @@ const s = StyleSheet.create({
   dim: { color: SHOW.dim, fontSize: 14 },
   strong: { color: SHOW.text, fontWeight: '800' },
   idPill: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1, minHeight: 22, paddingHorizontal: 8, borderRadius: 11, backgroundColor: SHOW.tile, borderWidth: 1, borderColor: SHOW.line },
+  idPillBoxed: { paddingHorizontal: 7 },
+  idTextBoxed: { fontSize: 11 },
   idText: { color: SHOW.dim, fontSize: 12, fontWeight: '700', flexShrink: 1 },
   idSpecial: { color: SHOW.gold },
   flag: { flexDirection: 'row', alignItems: 'center', gap: 3 },
