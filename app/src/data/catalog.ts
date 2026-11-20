@@ -29,8 +29,12 @@ export type Cosmetic = {
    * the entering person's name is written on, its chat bubble's look (`bubble`) or its voice wave's (`wave`).
    */
   remote?: {
-    /** A frame's still picture and hole (`at`: its centre when it isn't the middle), and its animated WebP (`motion`). */
-    art?: { url: string; hole: number; at?: { x: number; y: number }; motion?: { url: string } };
+    /**
+     * A frame's still picture and hole (`at`: its centre when it isn't the middle), its animated WebP (`motion`), and
+     * how far it is really drawn from the hole's centre (`reach`, shares of the picture's side: lib/shop-live-core
+     * FrameReach; none: the whole square, as before).
+     */
+    art?: { url: string; hole: number; at?: { x: number; y: number }; motion?: { url: string }; reach?: { x: number; top: number; bottom: number } };
     video?: true;
     plate?: Plate | null;
     /** An entry effect's picture in the shop, above its banner. */

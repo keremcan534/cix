@@ -175,17 +175,52 @@ describe('Aile ve Dost rafı', () => {
     }
   });
 
-  test('bağ hediyesi sıradan hediye olarak gönderilemez, bağ isteği olarak gider', async () => {
+  test('bağ hediyesi bağı olmayana sıradan hediye olarak gitmez (bond_needed), bağ isteği olarak gider', async () => {
     const [a, b] = [await person('Gönderen', 'Erkek'), await person('Alan', 'Kadın')];
     await h.credit(a.user.id, 5000, { channel: 'google' });
-    await refused(call('POST', '/api/gifts/send', { to: b.user.id, giftId: 'bag-kardes', count: 1, ref: ref() }, a.session), 400);
+    assert.equal((await refused(call('POST', '/api/gifts/send', { to: b.user.id, giftId: 'bag-kardes', count: 1, ref: ref() }, a.session), 409)).code, 'bond_needed');
     const r = await ok(call('POST', '/api/bonds/request', { to: b.user.id, kind: 'kardes', ref: ref(), room: 'oda-00000000-0000-4000-8000-000000000000' }, a.session));
     assert.equal(r.bond.status, 'pending');
     assert.equal(r.user.coins, 4000);
   });
 
-  test('panel: bağ hediyesinin fiyatı ve rafı değişmez, adı değişir', async () => {
-    await refused(call('POST', '/api/admin/gifts/update', { id: 'bag-kanka', price: 750 }, admin.session), 400, /fiyatı/);
+  test('panel: bağ hediyesinin fiyatı değişir; yeni uygulama gördüğünü öder, eski uygulama güncelleme ister', async () => {
+    const [a, b, c] = [await person('Bağ Kuran', 'Erkek'), await person('Bağ Alan', 'Kadın'), await person('Üçüncü', 'Kadın')];
+    await h.credit(a.user.id, 3000, { channel: 'google' });
+    const coins = async () => (await ok(call('GET', '/api/me', null, a.session))).user.coins;
+    const ask = (body, to = b) => call('POST', '/api/bonds/request', { to: to.user.id, kind: 'kanka', ...body }, a.session);
+    assert.equal((await ok(call('POST', '/api/admin/gifts/update', { id: 'bag-kanka', price: 750 }, admin.session))).gift.price, 750);
+    // The newer app's catalog and the bond kinds say the panel's price; an older app's catalog has no bond gifts anyway.
+    assert.equal((await ok(call('GET', '/api/catalog?gifts=2&family=1'))).gifts.find((g) => g.id === 'bag-kanka').price, 750);
+    assert.equal((await ok(call('GET', '/api/bonds/info'))).kinds.find((k) => k.id === 'kanka').price, 750);
+    // An older app sends no price and shows 500: asked to update, nothing taken.
+    const old = await refused(ask({ ref: ref() }), 409, /güncelle/);
+    assert.equal(old.code, 'update_required');
+    // A newer app that still showed 500: told the new price, nothing taken.
+    const moved = await refused(ask({ ref: ref(), price: 500 }), 409, /750/);
+    assert.deepEqual([moved.code, moved.price], ['price_changed', 750]);
+    await refused(ask({ ref: ref(), price: '750' }), 400, /fiyat/);
+    await refused(ask({ ref: ref(), price: -1 }), 400, /fiyat/);
+    assert.equal(await coins(), 3000);
+    // At the price shown: 750 held; a retry of it after the price moved again is its replay, not a second charge.
+    const sent = ref();
+    const r = await ok(ask({ ref: sent, price: 750 }));
+    assert.deepEqual([r.bond.price, r.user.coins], [750, 2250]);
+    await ok(call('POST', '/api/admin/gifts/update', { id: 'bag-kanka', price: 900 }, admin.session));
+    const again = await ok(ask({ ref: sent, price: 750 }));
+    assert.deepEqual([again.replay, again.user.coins], [true, 2250]);
+    // Refused: the 750 it held comes back, whatever the price is now.
+    assert.equal((await ok(call('POST', '/api/bonds/respond', { id: r.bond.id, accept: false }, b.session))).bond.status, 'refused');
+    assert.equal(await coins(), 3000);
+    // Back to the app's price: an older app sends again.
+    await ok(call('POST', '/api/admin/gifts/reset', { id: 'bag-kanka', fields: ['price'] }, admin.session));
+    const back = await ok(ask({ ref: ref() }, c));
+    assert.deepEqual([back.bond.price, back.user.coins], [500, 2500]);
+    const audits = await h.sql.query("SELECT count(*)::int AS n FROM audit_events WHERE action LIKE 'gift.%' AND detail->>'gift' = 'bag-kanka'");
+    assert.ok(audits.rows[0].n >= 3, 'fiyat değişiklikleri kayıtlı');
+  });
+
+  test('panel: bağ hediyesinin rafı değişmez, adı değişir', async () => {
     await refused(call('POST', '/api/admin/gifts/update', { id: 'bag-kanka', cat: 'hot' }, admin.session), 400, /rafında/);
     const g = await ok(call('POST', '/api/admin/gifts/update', { id: 'bag-kanka', name: 'Kanka Madalyası' }, admin.session));
     assert.equal(g.gift.name, 'Kanka Madalyası');

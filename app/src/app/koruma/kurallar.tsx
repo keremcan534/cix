@@ -1,4 +1,4 @@
-// The Koruma rules (lib/guard-core GUARD_RULES_TEXT; the numbers are server/api/guards.mjs GUARD_RULES).
+// The Koruma rules (lib/guard-core guardRulesText), with the server's numbers when the live catalog has them.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Pressable, ScrollView, View } from 'react-native';
@@ -6,14 +6,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
 import { GiftArt } from '@/components/GiftArt';
-import { GUARD_RULES_TEXT } from '@/lib/guard-core';
+import { guardRulesText } from '@/lib/guard-core';
+import { useLiveCatalog } from '@/lib/live/catalog-live';
 import { goBack } from '@/lib/nav';
 import { makeStyles } from '@/theme';
 
 export default function GuardRules() {
   const styles = useStyles();
   const insets = useSafeAreaInsets();
-  const [intro, how, ...rest] = GUARD_RULES_TEXT;
+  const numbers = useLiveCatalog()?.guard;
+  const [intro, how, ...rest] = guardRulesText(numbers ?? undefined);
   return (
     <LinearGradient colors={['#8B5CF6', '#D98BEA', '#F9B9E4']} style={{ flex: 1 }}>
       <ScrollView contentContainerStyle={{ paddingTop: insets.top + 6, paddingBottom: insets.bottom + 28, paddingHorizontal: 16, gap: 16 }}>

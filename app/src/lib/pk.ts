@@ -779,25 +779,44 @@ export type PkPillBox = {
 };
 
 /**
- * The points pill under a seat `slot` px wide, at the phone's text `scale`. It is as wide as the seat allows (up to
- * 72 px) and keeps that width: a growing score never widens it, never pushes the seats apart and never gets cut. The
- * number is always the short form (61.99k, 1.25m): two decimals where they fit, else one, else none. The gift icon
- * comes only where five characters (61.9k) still fit beside it.
+ * The points' text size: fixed, on every seat and phone (Güncelleme 7, madde 13: on some phones the number shrank until
+ * it couldn't be read). It doesn't grow with the phone's text size either (the seats and their points line don't), and
+ * it never shrinks to fit: the pill picks a short enough form instead.
  */
-export function pkPillBox(slot: number, scale = 1): PkPillBox {
+export const PK_TEXT = 12;
+
+/**
+ * The points pill under a seat `slot` px wide. It is as wide as the seat allows (up to 72 px) and keeps that width: a
+ * growing score never widens it, never pushes the seats apart and never gets cut. The number is always the short form
+ * (61.9k, 1.25m) in PK_TEXT: as many decimals as fit, else none. The gift icon comes only where five characters
+ * (61.9k) still fit beside it. A narrow pill keeps less side padding, so even the narrowest seat holds four (169k).
+ */
+export function pkPillBox(slot: number): PkPillBox {
   const width = Math.max(30, Math.min(72, Math.floor(slot) - 4));
-  // Never smaller than 10 px, however narrow the seat: a narrow pill takes fewer characters instead (1.2m, 169k).
-  const size = width >= 60 ? 11 : 10;
-  const pad = size === 11 ? 5 : 3;
-  const per = CHAR_EM * size * Math.max(1, scale);
+  const size = PK_TEXT;
+  const pad = width >= 60 ? 5 : width >= 44 ? 3 : 1;
+  const per = CHAR_EM * size;
   const inner = width - 2 - 2 * pad;
   const icon = inner - size - PILL_GAP >= 5 * per;
   const chars = Math.max(3, Math.floor((icon ? inner - size - PILL_GAP : inner) / per));
-  // As tall as the points line under the name (lib/seat-fit PK_LINE, 15 px) at the most.
-  return { width, height: Math.min(15, size + 5), size, pad, icon, chars };
+  // As tall as the points line under the name (lib/seat-fit PK_LINE, 15 px).
+  return { width, height: 15, size, pad, icon, chars };
 }
 /** The score as the pill shows it: 940, 61.99k (or 61.9k, 61k where fewer characters fit), 1.25m. */
 export const pkPointsText = (value: number, chars: number) => compactFit(Math.max(0, value), chars);
+
+/** `#rrggbb` of `tint` at `alpha` laid over the solid `base`: a see-through colour made solid. */
+export function tintOver(base: string, tint: string, alpha: number): string {
+  const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  const [a, b] = [rgb(base), rgb(tint)];
+  return `#${a.map((c, i) => Math.round(c + (b[i] - c) * alpha).toString(16).padStart(2, '0')).join('').toUpperCase()}`;
+}
+/** The dark the points pill's gold tint is laid over: the pill is opaque, so a lower row's crown under it is covered. */
+export const PILL_BASE = '#1A1024';
+/** The pill's gold (colors.gold). */
+const PILL_GOLD = '#F6BD60';
+/** The points pill's fill: its gold tint (18%; 30% after a big gift) over PILL_BASE, solid. */
+export const pkPillFill = (big = false) => tintOver(PILL_BASE, PILL_GOLD, big ? 0.3 : 0.18);
 
 /** Test support. */
 export function resetPk() {

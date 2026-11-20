@@ -272,3 +272,29 @@ describe('Patron koltuğu', () => {
     assert.deepEqual([j.room.boss, j.room.bossSeat], [null, null]);
   });
 });
+
+describe('Oda seviyeleri panelden (Canlı ayarlar)', () => {
+  test('mikrofon izni ve patron koltuğu seviyesi, yasaklı kelime sınırı, seviyenin kişi sınırı; katalog söyler', async () => {
+    const admin = await h.account('Oda Ayarcısı', 'admin');
+    const setLive = async (changes) => {
+      const view = await ok(call('GET', '/api/admin/live-settings', null, admin.session), 'ayarlar');
+      return ok(call('POST', '/api/admin/live-settings', { changes, reason: 'Oda testi', baseV: view.v, confirm: true }, admin.session), 'ayar kaydı');
+    };
+    await setLive({ room_mic_min_level: 2, room_boss_min_level: 2, room_words_max: 5, room_cap_lv2: 300 });
+    try {
+      const cat = await ok(call('GET', '/api/catalog'), 'katalog');
+      assert.deepEqual([cat.rooms.micMinLevel, cat.rooms.bossMinLevel, cat.rooms.caps[1], cat.rooms.caps[0]], [2, 2, 300, 50]);
+      const owner = await signUp('Ayarlı Oda Sahibi');
+      const room = await roomOf(owner);
+      assert.equal((await update(owner.session, { id: room, rules: { micPermission: 'members' } }))[1].error.includes('Lv.2'), true, 'Lv.1 oda açamaz');
+      await setLevelXp(owner, 100); // Lv.2
+      await ok(update(owner.session, { id: room, rules: { micPermission: 'members', bossSeat: true } }), 'Lv.2 açar');
+      await ok(update(owner.session, { id: room, rules: { limit: 300 } }), 'Lv.2 300 kişi');
+      const words = await update(owner.session, { id: room, rules: { words: ['bir', 'iki', 'üç', 'dört', 'beş', 'altı'] } });
+      assert.equal(words[0], 400);
+      assert.match(words[1].error, /En fazla 5/);
+    } finally {
+      await setLive({ room_mic_min_level: null, room_boss_min_level: null, room_words_max: null, room_cap_lv2: null });
+    }
+  });
+});

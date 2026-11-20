@@ -46,10 +46,10 @@ function Toggle({ k, ...row }: { k: BoolKey; title: string; subtitle?: string; i
 }
 
 /** A Gizlilik switch: in a live build kept on the server, which enforces it (lib/live/privacy). */
-function PrivacyToggle({ k, ...row }: { k: BoolKey & PrivacyKey; title: string; subtitle?: string; icon?: IconName }) {
+function PrivacyToggle({ k, invert, ...row }: { k: BoolKey & PrivacyKey; title: string; subtitle?: string; icon?: IconName; /** On means the setting is off ("… bırakılmasın"). */ invert?: boolean }) {
   const { settings } = useApp();
   const setPrivacy = usePrivacySetter();
-  return <ListSwitch {...row} value={settings[k]} onChange={(v) => setPrivacy(k, v)} />;
+  return <ListSwitch {...row} value={invert ? !settings[k] : settings[k]} onChange={(v) => setPrivacy(k, invert ? !v : v)} />;
 }
 
 const NOTIFY_ROWS: [NotifyType, string, IconName][] = [
@@ -307,6 +307,16 @@ export default function SettingsScreen() {
             title="Bulunduğum odayı profilimde göster"
             subtitle={live ? 'Kapalıyken bulunduğun oda kimseye gösterilmez.' : "Kapalıyken profilinden odana 'Git' ile gelinemez."}
           />
+          {/* Profil izleri (server/api/profile-marks.mjs): off by default, i.e. marks may be left. */}
+          <PrivacyToggle
+            k="profileMarks"
+            invert
+            icon="sparkles-outline"
+            title="Profilime iz bırakılmasın"
+            subtitle="Açıkken kimse sana 💩 gibi iz bırakan hediye gönderemez; profilindeki iz de hemen gider."
+          />
+          {/* Global hediye (server/api/global-gifts.mjs): a gift I send or get is announced in every room of the country. */}
+          <PrivacyToggle k="globalHideName" icon="earth-outline" title="Adım genel duyurularda görünmesin" subtitle="Global hediyelerde adın ve fotoğrafın yerine “Bir kullanıcı” yazar, odanın adı da yazmaz." />
           {!live && (
             <>
               <Toggle k="luckyAnnounce" icon="megaphone-outline" title="Kazançlarımda adım görünsün" subtitle="Kapalıyken “Bir kullanıcı kazandı” yazar." />

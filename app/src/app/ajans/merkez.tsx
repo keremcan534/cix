@@ -251,8 +251,9 @@ function NodeCard({ n, sub, demo, ask, after }: { n: TreeNode; sub?: boolean; de
           <Stat label="30g hacim" value={fmtD(n.volume30)} />
           <Stat label="Puan" value={n.score === null ? '—' : `${fmtScore(n.score)}${n.rank ? ` · #${n.rank}` : ''}`} />
         </View>
-        {(!!n.tierName || n.overtakes || n.flags.length > 0) && (
+        {(!!n.tierName || n.overtakes || n.flags.length > 0 || (n.status === 'approved' && !!n.activity)) && (
           <View style={st.pills}>
+            {n.status === 'approved' && !!n.activity && <Pill text={n.activity === 'active' ? 'Aktif ajans' : 'Aday ajans'} tone={n.activity === 'active' ? 'success' : 'money'} icon={n.activity === 'active' ? 'checkmark-circle-outline' : 'hourglass-outline'} />}
             {!!n.tierName && <Pill text={n.tierName} tone="action" icon="podium-outline" />}
             {n.overtakes && <Pill text="Üst ajansı geçti" tone="money" icon="trending-up" />}
             {n.flags.map((f) => (

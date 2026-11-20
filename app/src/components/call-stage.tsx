@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActionSheet } from '@/components/ActionSheet';
 import { CallVideo } from '@/components/call-video';
+import { useGiftStage } from '@/components/fx/gift-stage';
 import { useChatGift } from '@/components/one-on-one-bar';
 import { Photo } from '@/components/photo';
 import { useReport } from '@/components/report-sheet';
@@ -20,7 +21,7 @@ import { showAlert } from '@/lib/alert';
 import { applyBeautyStrength, BEAUTY_LEVELS, nextBeautyLevel, useBeautyLevel } from '@/lib/beauty';
 import { callGifts } from '@/lib/call-gifts';
 import { flipCallCamera, setCallCamera, setCallMic, useCallMedia } from '@/lib/call-media';
-import { giftShelf, useLiveCatalog } from '@/lib/live/catalog-live';
+import { giftById, giftShelf, useLiveCatalog } from '@/lib/live/catalog-live';
 import { applyMask, maskAvailable, maskName, nextMaskKind, useMaskKind } from '@/lib/mask';
 import { beatNow, liveSeconds, MODE_NAME, otherId, type CallView } from '@/lib/live/one-on-one';
 import { useApp } from '@/store';
@@ -167,6 +168,8 @@ export function CallStage({ call, onEnd, extra, banner }: { call: CallView; onEn
   // Each paid minute pops a cheer for the earner with the total so far; every CHEER_EVERY minutes a bigger one.
   const [cheer, setCheer] = useNote(2800);
   const [giftNote, setGiftNote] = useNote(3200);
+  // Gifts both ways play their animation over the call, without sound (the call's voices go on).
+  const stage = useGiftStage({ muted: true });
   const seen = useRef({ coins: call.coins, gift: gifts.last?.id ?? 0 });
   useEffect(() => {
     const was = seen.current.coins;
@@ -183,12 +186,14 @@ export function CallStage({ call, onEnd, extra, banner }: { call: CallView; onEn
     if (!lastGift || lastGift.id === seen.current.gift) return;
     seen.current.gift = lastGift.id;
     if (lastGift.fromMe) return;
-    const name = shelf.find((g) => g.id === lastGift.giftId)?.name ?? 'hediye';
+    const g = shelf.find((x) => x.id === lastGift.giftId) ?? giftById(lastGift.giftId);
+    const name = g?.name ?? 'hediye';
+    if (g) stage.play(g, call.other.name, me.name, lastGift.count);
     setGiftNote(`🎁 ${call.other.name} sana ${lastGift.count > 1 ? `${lastGift.count} × ` : ''}${name} gönderdi${earning ? ` · +${fmt(lastGift.total)} 💎` : ''}`);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastGift?.id]);
-  // A gift to them from the call, as from our chat (it costs what the gift sheet shows).
-  const gift = useChatGift(user, () => setGiftNote('🎁 Hediyen gönderildi'));
+  // A gift to them from the call, as from our chat (it costs what the gift sheet shows); its animation plays here.
+  const gift = useChatGift(user, () => setGiftNote('🎁 Hediyen gönderildi'), stage);
 
   return (
     <View style={styles.root}>
@@ -281,6 +286,7 @@ export function CallStage({ call, onEnd, extra, banner }: { call: CallView; onEn
       </SafeAreaView>
       {safety.sheet}
       {gift.sheet}
+      {stage.node}
     </View>
   );
 }

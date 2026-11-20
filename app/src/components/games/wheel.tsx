@@ -314,13 +314,13 @@ export function WheelPlayer({ entry }: { entry: Entry }) {
         visible={info}
         onClose={() => setInfo(false)}
         title="Rüzgâr Gülü"
-        rules={`Bir alan seç (Klasik, Yüksek, Zirve) ve çarkı 1, 10 ya da 50 kez çevir. Çarkta 12 dilim var ve her dilim bir şey öder; dilimler aynı boyda çizilir ama şansları farklıdır. 10 ve 50 turda çark bir kez döner, en iyi dilimde durur ve bütün turların özeti gösterilir. Sonucu sunucu belirler, çark yalnızca sonucu gösterir.`}
+        rules={`Bir alan seç (Klasik, Yüksek, Zirve) ve çarkı 1, 10 ya da 50 kez çevir. Çarkta 12 dilim var; dilimler aynı boyda çizilir ama şansları farklıdır, her dilimin ödediği kat ve şansı aşağıdaki tabloda. 10 ve 50 turda çark bir kez döner, en iyi dilimde durur ve bütün turların özeti gösterilir. Sonucu sunucu belirler, çark yalnızca sonucu gösterir.`}
       >
         <Odds tier={tier} />
         <View style={{ gap: 5 }}>
           <Text style={r.head}>JACKPOT ve sınırlar</Text>
           <Text style={r.note}>
-            {"Her turun %1,5'i o alanın fonuna eklenir; JACKPOT dilimine gelen fonun tamamını alır. Oynanan her 100 jetonun ortalama 40'ı kazanç olarak döner. Tur ücreti önce oyun jetonundan düşer."} Cömertlik Lv.{needLevel} ve üstü için açıktır; {limited ? `günlük üst sınır ${n(view.dailyLimit)} jeton, bugün kalan ${n(left)}.` : 'günlük üst sınır yok.'}
+            {'JACKPOT dilimine gelen, o alanın JACKPOT fonunun tamamını alır. Tur ücreti önce oyun jetonundan düşer.'} Cömertlik Lv.{needLevel} ve üstü için açıktır; {limited ? `günlük üst sınır ${n(view.dailyLimit)} jeton, bugün kalan ${n(left)}.` : 'günlük üst sınır yok.'}
             {entry.from === 'room' ? ' Oyun açıkken mikrofonun ve koltuğun aynen kalır.' : ''}
           </Text>
         </View>

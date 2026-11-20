@@ -1,6 +1,8 @@
 // Bağlar on a profile: the bonds (Çift, Kardeş, Kanka…), requests to answer, sending a new one with its bond
-// gift (from "Bağ kur" or, while Aile ve Dost is empty, its shelf of kinds), ending one, hiding them, and the Lv2
-// badge / Lv6 frame that a bond gives the profile header.
+// gift (from "Bağ kur" or, while Aile ve Dost is empty, its shelf of kinds), sending the bond gift again to someone I
+// have that bond with (an ordinary gift that adds bond points), ending one ("Bağı bitir"), hiding them, and the Lv2
+// badge / Lv6 frame that a bond gives the profile header. Each row has the bond's mark between the two faces
+// (components/bond-mark: it grows with the level). 50 bonds a page ("+N bağ daha").
 // Live mode reads and changes everything on the server (lib/live/bonds); the offline demo keeps it on the phone.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -9,29 +11,21 @@ import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode 
 import { Image, Pressable, View } from 'react-native';
 
 import { ActionSheet } from '@/components/ActionSheet';
+import { BOND_ART, BondMark } from '@/components/bond-mark';
 import { Text } from '@/components/text';
 import { Avatar } from '@/components/ui';
-import { BOND_KINDS, BOND_LEVELS, BOND_ORDER, BOND_REWARDS, BOND_RULES, bondDays, demoBondsOf, hasReward, sortBonds, topBond, type Bond, type BondKind } from '@/data/bonds';
+import { BOND_DECAY, BOND_KINDS, BOND_ORDER, BOND_REWARDS, bondDays, bondEndText, bondPointsOf, bondRulesText, bondTier, demoBondsOf, hasReward, levelFloor, sortBonds, tierLook, topBond, type Bond, type BondKind } from '@/data/bonds';
 import { userById, type User } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import { ApiError } from '@/lib/api';
 import { message } from '@/lib/live';
-import { liveBondsFor, liveEndBond, liveRequestBond, liveRespondBond, liveSetBondsHidden, liveWithdrawBond, loadBondRequests, loadBonds } from '@/lib/live/bonds';
+import { bondLevelsNow, liveCatalog, useLiveCatalog } from '@/lib/live/catalog-live';
+import { bondKindNow, bondRefusal, liveBondGift, liveBondsFor, liveEndBond, liveRequestBond, liveRespondBond, liveSetBondsHidden, liveWithdrawBond, loadBondRequests, loadBonds } from '@/lib/live/bonds';
 import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 
-/** Bond gift pictures (docs/BAGLAR.md "Görsel listesi", app/assets/bonds, 192 px). A kind without one yet keeps its
- *  sign on the kind's colours. */
-const BOND_ART: Partial<Record<BondKind, number>> = {
-  cift: require('../../assets/bonds/bag-cift.png'),
-  kardes: require('../../assets/bonds/bag-kardes.png'),
-  baci: require('../../assets/bonds/bag-baci.png'),
-  agabey: require('../../assets/bonds/bag-agabey.png'),
-  abla: require('../../assets/bonds/bag-abla.png'),
-  yenge: require('../../assets/bonds/bag-yenge.png'),
-  enishte: require('../../assets/bonds/bag-enishte.png'),
-  kanka: require('../../assets/bonds/bag-kanka.png'),
-};
+/** How many of a bond gift go at once from a row (the server's gift counts). */
+const BOND_GIFT_COUNTS = [1, 5, 10, 25, 50, 100];
 
 // --- Offline demo: my requests and endings on this phone, until the app closes ---------------------------
 type Demo = { sent: Bond[]; ended: Set<string>; hidden: boolean };
@@ -70,15 +64,20 @@ export type BondsState = {
   requests: Requests;
   loading: boolean;
   reload: () => void;
+  /** Bonds not loaded yet (50 a page); `more` loads the next page. */
+  left: number;
+  more: () => void;
 };
+type Loaded = { key: string; hidden: boolean; bonds: Bond[]; requests: Requests; next: number | null; total: number };
 
 /** Bonds on `userId`'s profile, and my requests. */
 export function useBonds(userId: string): BondsState {
   const live = liveBondsFor(userId);
   const d = useDemo();
   const [now] = useState(() => Date.now());
-  const [server, setServer] = useState<{ key: string; hidden: boolean; bonds: Bond[]; requests: Requests } | null>(null);
+  const [server, setServer] = useState<Loaded | null>(null);
   const [tick, setTick] = useState(0);
+  const [paging, setPaging] = useState(false);
   const reload = useCallback(() => setTick((n) => n + 1), []);
   const key = `${userId}:${tick}`;
 
@@ -87,7 +86,7 @@ export function useBonds(userId: string): BondsState {
     let alive = true;
     Promise.all([loadBonds(userId), loadBondRequests().catch(() => ({ incoming: [], outgoing: [] }))])
       .then(([b, requests]) => alive && setServer({ key: `${userId}:${tick}`, ...b, requests }))
-      .catch(() => alive && setServer((s) => (s ? { ...s, key: `${userId}:${tick}` } : { key: `${userId}:${tick}`, hidden: false, bonds: [], requests: { incoming: [], outgoing: [] } })));
+      .catch(() => alive && setServer((s) => (s ? { ...s, key: `${userId}:${tick}` } : { key: `${userId}:${tick}`, hidden: false, bonds: [], requests: { incoming: [], outgoing: [] }, next: null, total: 0 })));
     return () => {
       alive = false;
     };
@@ -96,13 +95,22 @@ export function useBonds(userId: string): BondsState {
   if (live) {
     // A reload keeps showing the last answer for the same person until the new one comes.
     const mine = server && server.key.startsWith(`${userId}:`) ? server : null;
-    return { live, bonds: mine?.bonds ?? [], hidden: mine?.hidden ?? false, requests: mine?.requests ?? { incoming: [], outgoing: [] }, loading: mine?.key !== key, reload };
+    const more = () => {
+      if (!mine || mine.next === null || paging) return;
+      setPaging(true);
+      loadBonds(userId, mine.next)
+        .then((p) => setServer((s) => (s && s.key === mine.key ? { ...s, bonds: [...s.bonds, ...p.bonds.filter((b) => !s.bonds.some((x) => x.id === b.id))], next: p.next, total: p.total } : s)))
+        .catch(() => {})
+        .finally(() => setPaging(false));
+    };
+    const left = mine && mine.next !== null ? Math.max(0, mine.total - mine.bonds.length) : 0;
+    return { live, bonds: mine?.bonds ?? [], hidden: mine?.hidden ?? false, requests: mine?.requests ?? { incoming: [], outgoing: [] }, loading: mine?.key !== key, reload, left, more };
   }
 
   // Demo: the person's sample bonds, minus the ones I ended on this phone.
   const bonds = demoBondsOf(userId, now).filter((b) => !d.ended.has(b.id));
   const hidden = userId === 'me' ? d.hidden : false;
-  return { live, bonds, hidden, requests: { incoming: [], outgoing: d.sent }, loading: false, reload };
+  return { live, bonds, hidden, requests: { incoming: [], outgoing: d.sent }, loading: false, reload, left: 0, more: () => {} };
 }
 
 /** The highest active bond, when the owner shows bonds (header badge and frame). */
@@ -118,7 +126,7 @@ export function BondBadge({ bond, onPress }: { bond: Bond | null; onPress: () =>
   return (
     <Pressable onPress={onPress} hitSlop={{ top: 8, bottom: 13, left: 6, right: 6 }} accessibilityLabel={`${k.label} bağı, seviye ${bond.level}`}>
       <LinearGradient colors={bond.kind === 'cift' ? ['#FF6F91', '#C2185B'] : ['#22B8CF', '#3B5BDB']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.badge}>
-        <Ionicons name={k.icon} size={11} color="#fff" />
+        <BondMark kind={bond.kind} level={bond.level} size={16} label={false} />
         <Text style={styles.badgeText}>
           {k.label} Lv.{bond.level}
         </Text>
@@ -148,6 +156,8 @@ export function BondFrame({ bond, size, children }: { bond: Bond | null; size: n
 type Seg = 'cift' | 'diger';
 
 export function BondsTab({ user, isMe, state, isBlocked, onMeetInvite }: { user: User; isMe: boolean; state: BondsState; isBlocked: boolean; onMeetInvite: () => void }) {
+  // Bond prices may be changed in the panel: shown and sent as the catalog says now (bondKindNow).
+  useLiveCatalog();
   const { colors, semantic, dark } = useTheme();
   const styles = useStyles();
   const { me, spendCoins, addCoins } = useApp();
@@ -155,7 +165,9 @@ export function BondsTab({ user, isMe, state, isBlocked, onMeetInvite }: { user:
   const [kindSheet, setKindSheet] = useState(false);
   const [busy, setBusy] = useState(false);
   const [now] = useState(() => Date.now());
-  const { live, bonds, hidden, requests, reload } = state;
+  const { live, bonds, hidden, requests, reload, left, more } = state;
+  // The bond gift again: which row's, and to whom (the count is picked in a sheet).
+  const [giftFor, setGiftFor] = useState<{ bond: Bond; to: User } | null>(null);
 
   const shown = isMe || !hidden;
   const list = sortBonds(bonds).filter((b) => (seg === 'cift' ? b.kind === 'cift' : b.kind !== 'cift'));
@@ -186,9 +198,9 @@ export function BondsTab({ user, isMe, state, isBlocked, onMeetInvite }: { user:
     ]);
 
   const request = (kind: BondKind) => {
-    const k = BOND_KINDS[kind];
+    const k = bondKindNow(kind);
     if (isBlocked) return showAlert('Engelli kullanıcı', 'Engellediğin biriyle bağ kuramazsın.');
-    if (live) return act(() => liveRequestBond(user.id, kind), `${k.label} isteği gönderildi. ${user.name} kabul edince ${k.gift} ona geçer; 3 gün içinde yanıt gelmezse jetonların geri gelir.`);
+    if (live) return act(() => liveRequestBond(user.id, kind, undefined, k.price), `${k.label} isteği gönderildi. ${user.name} kabul edince ${k.gift} ona geçer; ${liveCatalog()?.bonds?.answerDays ?? 3} gün içinde yanıt gelmezse jetonların geri gelir.`);
     // Demo: the same limits the server checks, coins from this phone.
     if (ours || myRequest) return showAlert('Zaten var', `${user.name} ile zaten bir bağın ya da bekleyen isteğin var.`);
     const mine = [...demoBondsOf('me', now), ...state.requests.outgoing].filter((b) => !demo.ended.has(b.id) && b.kind === kind).length;
@@ -209,7 +221,9 @@ export function BondsTab({ user, isMe, state, isBlocked, onMeetInvite }: { user:
 
   const end = (b: Bond) => {
     const partner = b.partnerId === 'me' ? me : userById(b.partnerId);
-    showAlert('Bağı bitir', `${partner.name} ile ${BOND_KINDS[b.kind].label} bağın biter. Seviye ve ödüller sıfırlanır, jeton iadesi olmaz. Aynı kişiyle 7 gün yeniden bağ kurulamaz.`, [
+    // Whose bond it is on someone else's profile: ours, so the other one is the profile's owner.
+    const other = isMe ? partner : user;
+    showAlert('Bağı bitir', bondEndText(other.name, b.kind, (live && liveCatalog()?.bonds) || undefined), [
       { text: 'Vazgeç', style: 'cancel' },
       {
         text: 'Bitir',
@@ -222,6 +236,28 @@ export function BondsTab({ user, isMe, state, isBlocked, onMeetInvite }: { user:
     ]);
   };
 
+  /**
+   * The bond gift again, `count` of it, to the other one of `b` (an ordinary gift that adds bond points: no request, no
+   * waiting). If the bond is gone meanwhile the server refuses it and nothing is taken.
+   */
+  const sendAgain = (b: Bond, to: User, count: number) => {
+    const k = bondKindNow(b.kind);
+    const total = k.price * count;
+    if (isBlocked) return showAlert('Engelli kullanıcı', 'Engellediğin birine hediye gönderemezsin.');
+    if (live)
+      return act(async () => {
+        try {
+          await liveBondGift(to.id, b.kind, count, k.price);
+        } catch (e) {
+          const why = bondRefusal(e);
+          if (why?.code === 'bond_needed') throw new Error(`${to.name} ile ${k.label} bağın artık yok; yeniden kurmak için bağ isteği gönder.`);
+          throw e;
+        }
+      }, `${k.gift} ×${count} ${to.name} kişisine gitti: +${bondPointsOf(total).toLocaleString('tr-TR')} bağ puanı.`);
+    if (!spendCoins(total, `Hediye: ${k.gift} ×${count} → ${to.name}`)) return noCoins();
+    showAlert('Gönderildi', `${k.gift} ×${count} ${to.name} kişisine gitti: +${bondPointsOf(total).toLocaleString('tr-TR')} bağ puanı.`);
+  };
+
   const togglePrivacy = () => {
     if (live) return void act(() => liveSetBondsHidden(!hidden));
     setDemo({ hidden: !demo.hidden });
@@ -230,14 +266,14 @@ export function BondsTab({ user, isMe, state, isBlocked, onMeetInvite }: { user:
   // A kind picked from the shelf: its price said once before the bond gift goes (the sheet's "Bağ kur" sends at once).
   const canAsk = !isMe && !ours && !myRequest && !theirRequest;
   const ask = (kind: BondKind) => {
-    const k = BOND_KINDS[kind];
+    const k = bondKindNow(kind);
     showAlert(`${k.label} bağı kur`, `${user.name} ile ${k.label} bağı için ${k.gift} gider: ${k.price.toLocaleString('tr-TR')} jeton. Kabul etmezse jetonların geri gelir.`, [
       { text: 'Vazgeç', style: 'cancel' },
       { text: 'İstek gönder', onPress: () => void request(kind) },
     ]);
   };
 
-  const rules = () => showAlert('Bağlar nasıl işler?', [...BOND_RULES, '', 'Ödüller: ' + BOND_REWARDS.map((r) => `Lv.${r.level} ${r.label}`).join(' · ')].join('\n'));
+  const rules = () => showAlert('Bağlar nasıl işler?', [...bondRulesText((live && liveCatalog()?.bonds) || undefined), '', 'Ödüller: ' + BOND_REWARDS.map((r) => `Lv.${r.level} ${r.label}`).join(' · ')].join('\n'));
 
   return (
     <View style={{ padding: 16, gap: 14 }}>
@@ -279,7 +315,18 @@ export function BondsTab({ user, isMe, state, isBlocked, onMeetInvite }: { user:
               <Text style={styles.meta}>{user.name} bağlarını gizli tutuyor.</Text>
             </View>
           ) : list.length ? (
-            list.map((b) => <BondRow key={b.id} owner={isMe ? me : user} bond={b} now={now} canEnd={isMe || b.partnerId === 'me'} onEnd={() => end(b)} />)
+            <>
+              {list.map((b) => {
+                const mine = isMe || b.partnerId === 'me';
+                const to = isMe ? (b.partnerId === 'me' ? me : userById(b.partnerId)) : user;
+                return <BondRow key={b.id} owner={isMe ? me : user} bond={b} now={now} mine={mine} onEnd={() => end(b)} onGift={() => setGiftFor({ bond: b, to })} />;
+              })}
+              {seg === 'diger' && left > 0 && (
+                <Pressable onPress={more} style={({ pressed }) => [styles.more, pressed && { opacity: 0.7 }]} accessibilityRole="button" accessibilityLabel={`${left} bağ daha göster`}>
+                  <Text style={styles.moreText}>+{left.toLocaleString('tr-TR')} bağ daha</Text>
+                </Pressable>
+              )}
+            </>
           ) : (
             <View style={styles.emptyBox}>
               <Text style={styles.meta}>{seg === 'cift' ? 'Henüz Çift bağı yok.' : 'Henüz aile ya da dost bağı yok.'}</Text>
@@ -323,11 +370,28 @@ export function BondsTab({ user, isMe, state, isBlocked, onMeetInvite }: { user:
       )}
 
       <ActionSheet
+        visible={!!giftFor}
+        title={giftFor ? `${bondKindNow(giftFor.bond.kind).gift} → ${giftFor.to.name}` : undefined}
+        onClose={() => setGiftFor(null)}
+        options={
+          giftFor
+            ? BOND_GIFT_COUNTS.map((n) => {
+                const k = bondKindNow(giftFor.bond.kind);
+                return {
+                  label: `×${n} · ${(k.price * n).toLocaleString('tr-TR')} jeton · +${bondPointsOf(k.price * n).toLocaleString('tr-TR')} puan`,
+                  icon: 'gift' as const,
+                  onPress: () => void sendAgain(giftFor.bond, giftFor.to, n),
+                };
+              })
+            : []
+        }
+      />
+      <ActionSheet
         visible={kindSheet}
         title={`${user.name} ile bağ kur`}
         onClose={() => setKindSheet(false)}
         options={BOND_ORDER.map((kind) => {
-          const k = BOND_KINDS[kind];
+          const k = bondKindNow(kind);
           return { label: `${k.label} · ${k.gift} · ${k.price.toLocaleString('tr-TR')} jeton`, icon: k.icon, onPress: () => void request(kind) };
         })}
       />
@@ -335,28 +399,35 @@ export function BondsTab({ user, isMe, state, isBlocked, onMeetInvite }: { user:
   );
 }
 
-function BondRow({ owner, bond, now, canEnd, onEnd }: { owner: User; bond: Bond; now: number; canEnd: boolean; onEnd: () => void }) {
+function BondRow({ owner, bond, now, mine, onEnd, onGift }: { owner: User; bond: Bond; now: number; mine: boolean; onEnd: () => void; onGift: () => void }) {
   const { colors } = useTheme();
   const styles = useStyles();
   const { me } = useApp();
   const partner = bond.partnerId === 'me' ? me : userById(bond.partnerId);
   const k = BOND_KINDS[bond.kind];
-  const art = BOND_ART[bond.kind];
-  const from = BOND_LEVELS[bond.level - 1] ?? 0;
+  const levels = bondLevelsNow();
+  const from = levelFloor(bond.level, levels);
   const progress = bond.nextLevelAt ? Math.min(1, Math.max(0, (bond.score - from) / (bond.nextLevelAt - from))) : 1;
+  const look = tierLook(bond.kind, bondTier(bond.level));
   const open = (id: string) => router.push(`/kullanici/${id}`);
+  // Quiet days: the points drop each night with no gift, and the bond ends after Canlı ayarlar' days (data/bonds).
+  const warnDays = liveCatalog()?.bonds?.idleWarnDays ?? BOND_DECAY.idleWarnDays;
+  const quiet = mine && bond.quietDays != null && bond.quietDays >= 2 ? bond.quietDays : null;
+  const ending = quiet !== null && bond.endsInDays != null && bond.endsInDays <= Math.max(warnDays, 1) ? bond.endsInDays : null;
   return (
     <View style={styles.bondRow}>
-      <View style={styles.lv}>
-        <Text style={styles.lvText}>
-          {k.label} Lv.{bond.level}
-        </Text>
+      <View style={styles.rowTop}>
+        <View style={styles.lv}>
+          <Text style={styles.lvText}>
+            {k.label} Lv.{bond.level}
+          </Text>
+        </View>
+        {mine && (
+          <Pressable style={styles.endBtn} onPress={onEnd} hitSlop={8} accessibilityRole="button" accessibilityLabel={`${k.label} bağını bitir`}>
+            <Text style={styles.endText}>Bağı bitir</Text>
+          </Pressable>
+        )}
       </View>
-      {canEnd && (
-        <Pressable style={styles.endBtn} onPress={onEnd} hitSlop={10} accessibilityLabel="Bağı bitir">
-          <Ionicons name="ellipsis-horizontal" size={16} color={colors.textDim} />
-        </Pressable>
-      )}
       <View style={styles.pair}>
         <Pressable style={styles.person} onPress={() => open(owner.id)}>
           <Avatar uri={owner.avatar} size={56} name={owner.name} />
@@ -364,15 +435,11 @@ function BondRow({ owner, bond, now, canEnd, onEnd }: { owner: User; bond: Bond;
             {owner.name}
           </Text>
         </Pressable>
-        <View style={{ alignItems: 'center', gap: 4 }}>
-          {art ? (
-            <Image source={art} style={styles.kindArt} resizeMode="contain" accessibilityIgnoresInvertColors />
-          ) : (
-            <LinearGradient colors={bond.kind === 'cift' ? ['#FF8AA6', '#D81B60'] : ['#5ED3E6', '#3B5BDB']} style={styles.kindDot}>
-              <Ionicons name={k.icon} size={20} color="#fff" />
-            </LinearGradient>
-          )}
-          <Text style={styles.kindLabel}>{k.label}</Text>
+        <View style={styles.middle}>
+          {/* The tie between the two faces, in the mark's colours, behind the mark. */}
+          <LinearGradient colors={[look.ring[0], look.ring[1], look.ring[0]]} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={styles.tie} />
+          <BondMark kind={bond.kind} level={bond.level} size={52} />
+          <Text style={[styles.kindLabel, { marginTop: 14 }]}>{k.label}</Text>
           <Text style={[styles.meta, { fontSize: 11 }]}>{bondDays(bond.since, now)} gün</Text>
         </View>
         <Pressable style={styles.person} onPress={() => open(partner.id)}>
@@ -386,8 +453,21 @@ function BondRow({ owner, bond, now, canEnd, onEnd }: { owner: User; bond: Bond;
         <View style={[styles.fill, { width: `${Math.round(progress * 100)}%` }]} />
       </View>
       <Text style={[styles.meta, { fontSize: 11, textAlign: 'center', marginTop: 4 }]}>
-        {bond.nextLevelAt ? `${bond.score} / ${bond.nextLevelAt} puan · Lv.${bond.level + 1} için ${bond.nextLevelAt - bond.score} puan` : `${bond.score} puan · en yüksek seviye`}
+        {bond.nextLevelAt ? `${bond.score.toLocaleString('tr-TR')} / ${bond.nextLevelAt.toLocaleString('tr-TR')} puan · Lv.${bond.level + 1} için ${(bond.nextLevelAt - bond.score).toLocaleString('tr-TR')} puan` : `${bond.score.toLocaleString('tr-TR')} puan · en yüksek seviye`}
       </Text>
+      {quiet !== null && (
+        <Text style={[styles.meta, { fontSize: 11, textAlign: 'center', marginTop: 2 }, ending !== null && { color: colors.red, fontWeight: '700' }]}>
+          {ending !== null ? `${quiet} gündür hediye yok: bağ ${ending} gün içinde biter` : `${quiet} gündür hediye yok: puan her gece düşüyor`}
+        </Text>
+      )}
+      {mine && (
+        <Pressable onPress={onGift} style={({ pressed }) => [styles.giftBtn, pressed && { opacity: 0.8 }]} accessibilityRole="button" accessibilityLabel={`${k.gift} gönder, bağ puanı kazan`}>
+          <Ionicons name="gift" size={15} color="#fff" />
+          <Text style={styles.giftText} numberOfLines={1}>
+            Bağ hediyesi gönder
+          </Text>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -421,12 +501,13 @@ function RequestRow({ bond, now, mine, children }: { bond: Bond; now: number; mi
  * shows what can be formed; on someone else's profile a kind can be picked from here (`onPick`).
  */
 function KindShelf({ onPick }: { onPick?: (kind: BondKind) => void }) {
+  useLiveCatalog();
   const { colors } = useTheme();
   const styles = useStyles();
   return (
     <View style={styles.shelf}>
       {BOND_ORDER.filter((kind) => kind !== 'cift').map((kind) => {
-        const k = BOND_KINDS[kind];
+        const k = bondKindNow(kind);
         const art = BOND_ART[kind];
         return (
           <Pressable
@@ -466,14 +547,21 @@ const useStyles = makeStyles(({ colors, semantic, lift, ink, dark }) => ({
   segmentText: { color: colors.textDim, fontWeight: '800', fontSize: 14 },
   meta: { color: colors.textDim, fontSize: 13 },
   emptyBox: { alignItems: 'center', gap: 6, paddingVertical: 18 },
-  bondRow: { backgroundColor: dark ? 'rgba(255,255,255,0.06)' : colors.card, borderRadius: 18, padding: 12, paddingTop: 24, ...lift },
-  lv: { position: 'absolute', top: 8, left: 10, backgroundColor: semantic.socialFill, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 1 },
+  bondRow: { backgroundColor: dark ? 'rgba(255,255,255,0.06)' : colors.card, borderRadius: 18, padding: 12, paddingTop: 10, ...lift },
+  rowTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, minHeight: 24 },
+  lv: { backgroundColor: semantic.socialFill, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 1 },
   lvText: { color: '#fff', fontSize: 12, fontWeight: '800' },
-  endBtn: { position: 'absolute', top: 6, right: 8, padding: 4, zIndex: 1 },
+  endBtn: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: dark ? 'rgba(255,255,255,0.18)' : ink(0.14) },
+  endText: { color: colors.textDim, fontSize: 12, fontWeight: '700' },
   pair: { flexDirection: 'row', alignItems: 'center' },
+  middle: { alignItems: 'center', width: 96 },
+  tie: { position: 'absolute', top: 24, left: -18, right: -18, height: 4, borderRadius: 2 },
+  giftBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, alignSelf: 'center', marginTop: 10, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 8, backgroundColor: semantic.socialFill },
+  giftText: { color: '#fff', fontWeight: '800', fontSize: 13 },
+  more: { alignSelf: 'center', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8, backgroundColor: dark ? 'rgba(255,255,255,0.08)' : ink(0.05) },
+  moreText: { color: colors.primaryText, fontWeight: '800', fontSize: 13 },
   person: { alignItems: 'center', gap: 4, flex: 1 },
   name: { color: colors.text, fontSize: 13, fontWeight: '600', maxWidth: 96 },
-  kindDot: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   kindArt: { width: 44, height: 44 },
   kindLabel: { color: colors.text, fontSize: 13, fontWeight: '800' },
   shelf: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginTop: 8 },

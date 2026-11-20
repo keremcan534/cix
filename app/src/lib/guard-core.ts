@@ -65,8 +65,12 @@ export function guardPoints(n: number): string {
   return n.toLocaleString('tr-TR');
 }
 
-/** The rules the Koruma page explains (server/api/guards.mjs GUARD_RULES says the same numbers). */
-export const GUARD_RULES_TEXT: { title: string; lines: string[] }[] = [
+/** Koruma's numbers the rules page says (server/api/guard-rules.mjs GUARD_RULES; Canlı ayarlar may change them). */
+export type GuardRuleNumbers = { dropFrom: number; dropShare: number; dropFlat: number; thresholdEveryDays: number };
+export const GUARD_NUMBERS: GuardRuleNumbers = { dropFrom: 5000, dropShare: 0.1, dropFlat: 1000, thresholdEveryDays: 7 };
+
+/** The rules the Koruma page explains, with these numbers (the live catalog's `guard` in a live build). */
+export const guardRulesText = (n: GuardRuleNumbers = GUARD_NUMBERS): { title: string; lines: string[] }[] => [
   { title: 'Koruma nedir?', lines: ['Koruma, birinin yanında olduğunu göstermenin yoludur. Birine Koruma Kartı gönderince onun koruyucusu olursun.'] },
   { title: 'Nasıl koruyucu olunur?', lines: ['Kişiye Koruma Kartı hediye et. Hediye gidince onun koruyucusu olursun; kartın jetonu ilk puanın olur.'] },
   {
@@ -77,12 +81,13 @@ export const GUARD_RULES_TEXT: { title: string; lines: string[] }[] = [
     title: 'Koruma nasıl sürer?',
     lines: [
       'Her gece 00:00’da (Türkiye saati) bir önceki gün hiç hediye göndermediysen puan düşer:',
-      '5.000 puan ve üstünde puanın %10’u düşer; 5.000’in altında 1.000 puan düşer.',
+      `${n.dropFrom.toLocaleString('tr-TR')} puan ve üstünde puanın %${Math.round(n.dropShare * 100)}’u düşer; ${n.dropFrom.toLocaleString('tr-TR')}’in altında ${n.dropFlat.toLocaleString('tr-TR')} puan düşer.`,
       'Kartı gönderdiğin günün gecesi puan düşmez.',
     ],
   },
   { title: 'Koruma nasıl biter?', lines: ['Korunan kişi korumayı bitiremez; yalnız koruyucu bitirir. Benim Koruma › Koruduklarım’da kişiye uzun bas.', 'Koruma bitince puan sıfırlanır.'] },
   { title: 'Korumayı kapatmak', lines: ['Kimsenin seni korumasını istemiyorsan Benim Koruma’daki ayarlardan ya da Ayarlar › Gizlilik’ten korumayı kapat. Başkalarının korumalarını yine görürsün.'] },
   { title: 'Koruma alanına nasıl çıkılır?', lines: ['En çok puanı olan koruyucu profilde görünür. Kişi bir eşik koyduysa o puana da ulaşmak gerekir.'] },
-  { title: 'Eşik nasıl ayarlanır?', lines: ['Benim Koruma › ayarlar’dan eşiği koyarsın. Yankı seviyen yükseldikçe koyabileceğin en yüksek eşik artar. Eşik haftada bir değişir.'] },
+  { title: 'Eşik nasıl ayarlanır?', lines: [`Benim Koruma › ayarlar’dan eşiği koyarsın. Yankı seviyen yükseldikçe koyabileceğin en yüksek eşik artar. Eşik ${n.thresholdEveryDays === 7 ? 'haftada bir' : `${n.thresholdEveryDays} günde bir`} değişir.`] },
 ];
+export const GUARD_RULES_TEXT = guardRulesText();

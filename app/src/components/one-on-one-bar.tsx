@@ -7,6 +7,7 @@ import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
 
+import type { GiftStage } from '@/components/fx/gift-stage';
 import { CHAT_HEART, ChatHeartMark } from '@/components/heart-level';
 import { ProfileGiftSheet } from '@/components/profile-gift-sheet';
 import { Text } from '@/components/text';
@@ -155,9 +156,10 @@ export function CallButtons({ userId, pair }: { userId: string; pair: Pair }) {
 /**
  * A gift from the chat (no confirmation, as every gift). Live mode: the server takes the coins at its price, pays
  * them and puts a line in the chat for both (POST /api/gifts/send, place chat); the prototype spends on this phone.
+ * `stage` (components/fx/gift-stage): the gift's animation plays there once it went.
  */
-export function useChatGift(user: User, onSent: () => void) {
-  const { coins, svipLevel, spendCoins, spendBlock, recordGift, bump, sendMessage } = useApp();
+export function useChatGift(user: User, onSent: () => void, stage?: GiftStage) {
+  const { coins, svipLevel, spendCoins, spendBlock, recordGift, bump, sendMessage, me } = useApp();
   const gifts = giftShelf(useLiveCatalog());
   const [open, setOpen] = useState(false);
   const toWallet = { text: 'Jeton yükle', onPress: () => router.push('/cuzdan') };
@@ -188,6 +190,7 @@ export function useChatGift(user: User, onSent: () => void) {
     recordGift(user.id, g.id, 1);
     bump('giftsSent', 1);
     onSent();
+    stage?.play(g, me.name, user.name, 1);
     return true;
   };
   const sheet = open ? <ProfileGiftSheet visible name={user.name} gifts={gifts} coins={coins} svipLevel={svipLevel} onClose={() => setOpen(false)} onSend={send} /> : null;

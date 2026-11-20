@@ -38,8 +38,22 @@ describe('Sunucu kataloğu uygulamayla aynı', () => {
     const { FX_VIDEOS } = await import('../../server/api/fx.mjs');
     assert.deepEqual([...GIFTS_PAUSED].sort(), [...(server.GIFTS_PAUSED as Set<string>)].sort());
     const animated = (id: string) => id in FX_VIDEOS.gift || !!giftShowOf(id);
-    // The bond gifts stay on their shelf without an animation: the team uploads theirs in the panel.
-    assert.deepEqual([...GIFTS_PAUSED].sort(), GIFTS.filter((g) => !animated(g.id) && !g.id.startsWith('bag-')).map((g) => g.id).sort());
+    // The bond gifts stay on their shelf without an animation: the team uploads theirs in the panel. Kaka and Su play
+    // on the receiver's photo instead (Profil izleri: the mark landing, the water's splash; components/profile-mark).
+    const { APP_MARKS } = await import('@/lib/profile-marks');
+    assert.deepEqual([...GIFTS_PAUSED].sort(), GIFTS.filter((g) => !animated(g.id) && !g.id.startsWith('bag-') && !(g.id in APP_MARKS)).map((g) => g.id).sort());
+  });
+
+  test('Profil izleri: uygulamanın kendi iz hediyeleri iki tarafta aynı; eski uygulama onları görmez', async () => {
+    const { APP_MARKS, MARK_HOURS } = await import('@/lib/profile-marks');
+    const rules = await import('../../server/api/profile-mark-rules.mjs');
+    const serverMarks = Object.fromEntries(Object.entries(rules.APP_MARKS as Record<string, { role: string; kind: string; hours: number | null }>).map(([id, m]) => [id, { role: m.role, kind: m.kind, ...(m.role === 'leave' ? { hours: m.hours ?? rules.MARK_HOURS } : {}) }]));
+    assert.deepEqual(APP_MARKS, serverMarks);
+    assert.equal(MARK_HOURS, rules.MARK_HOURS);
+    assert.deepEqual([...(rules.MARK_GIFTS as Set<string>)].sort(), Object.keys(APP_MARKS).sort());
+    // Su costs more than Kaka (the owners: "su boktan daha pahalı olmalı").
+    const price = (id: string) => GIFTS.find((g) => g.id === id)!.price;
+    assert.ok(price('k2') > price('k1'));
   });
 
   test('Popüler rafı videolu hediyelerle açılır: Roket, sonra yeni sekizi (panel Balkon çizgisinin altında iki satır gösterir)', async () => {

@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 
 import { COSMETICS, cosmeticById, setLiveCosmetics, shopCosmetics } from '@/data/catalog';
 import { fxFileName, parseFxList } from '@/lib/fx-videos-core';
-import { PLATE_LOOK, mergeShop, nineSlice, parseBubbleLook, parseLiveShop, parsePlate, parseWaveLook, plateLayout, plateText, trUpper } from '@/lib/shop-live-core';
+import { PLATE_LOOK, mergeShop, nineSlice, parseBubbleLook, parseFrameReach, parseLiveShop, parsePlate, parseWaveLook, plateLayout, plateText, trUpper } from '@/lib/shop-live-core';
 
 const ART = 'https://130-61-230-94.sslip.io/api/media/f/shopframe/00000000-0000-4000-8000-000000000001/halka.png';
 /** A plate as a server before the plate's look and timing sends it, and as the phone reads it. */
@@ -159,6 +159,46 @@ describe('Mağaza: sunucunun listesi', () => {
     })!;
     assert.deepEqual(shop.items.map((x) => x.art?.at), [{ x: 0.467, y: 0.42 }, undefined, undefined, undefined]);
     assert.deepEqual(mergeShop(COSMETICS, shop).find((c) => c.id === 'sf9')!.remote, { art: { url: ART, hole: 0.29, at: { x: 0.467, y: 0.42 } } });
+  });
+
+  test('çerçevenin ne kadar uzandığı gelir (sunucu ölçtüyse); eksik, bozuk ya da resmin dışına taşan ölçü düşer, çerçeve eskisi gibi çizilir', () => {
+    const frame = (sku: string, art: object) => ({ sku, kind: 'frame', name: `Çerçeve ${sku}`, price: 900, days: 30, minVip: 0, art: { url: ART, ...art } });
+    const shop = parseLiveShop({
+      items: [
+        // As shop-items.mjs sends it: round the hole's centre, at least the photo, at most the way to the edge.
+        frame('sf20', { hole: 0.2, at: { x: 0.5, y: 0.55 }, reach: { x: 0.3, top: 0.45, bottom: 0.3 } }),
+        frame('sf21', { hole: 0.25, reach: { x: 0.5, top: 0.25, bottom: 0.5 } }),
+        // A thousandth either way for rounding.
+        frame('sf22', { hole: 0.25, reach: { x: 0.5009, top: 0.2491, bottom: 0.4 } }),
+        // Malformed: one missing, a string, not finite, not an object.
+        frame('sf23', { hole: 0.25, reach: { x: 0.4, top: 0.3 } }),
+        frame('sf24', { hole: 0.25, reach: { x: '0.4', top: 0.3, bottom: 0.3 } }),
+        frame('sf25', { hole: 0.25, reach: { x: Infinity, top: 0.3, bottom: 0.3 } }),
+        frame('sf26', { hole: 0.25, reach: [0.4, 0.3, 0.3] }),
+        frame('sf27', { hole: 0.25, reach: 0.4 }),
+        // Out of range: less than the photo, past the picture's edge (here 0.45 up and 0.55 down from y 0.45).
+        frame('sf28', { hole: 0.3, reach: { x: 0.4, top: 0.29, bottom: 0.4 } }),
+        frame('sf29', { hole: 0.25, at: { x: 0.5, y: 0.45 }, reach: { x: 0.4, top: 0.47, bottom: 0.4 } }),
+        frame('sf30', { hole: 0.25, at: { x: 0.5, y: 0.45 }, reach: { x: 0.4, top: 0.3, bottom: 0.56 } }),
+        frame('sf31', { hole: 0.25, reach: { x: 0.52, top: 0.3, bottom: 0.3 } }),
+        // Measured round a hole's centre this phone left out (past the picture): the photo is centred, the reach goes.
+        frame('sf32', { hole: 0.27, at: { x: 0.9, y: 0.5 }, reach: { x: 0.4, top: 0.3, bottom: 0.3 } }),
+      ],
+    })!;
+    const reach = (sku: string) => shop.items.find((x) => x.sku === sku)?.art?.reach;
+    assert.deepEqual(reach('sf20'), { x: 0.3, top: 0.45, bottom: 0.3 });
+    assert.deepEqual(reach('sf21'), { x: 0.5, top: 0.25, bottom: 0.5 });
+    assert.deepEqual(reach('sf22'), { x: 0.5009, top: 0.2491, bottom: 0.4 });
+    for (const sku of ['sf23', 'sf24', 'sf25', 'sf26', 'sf27', 'sf28', 'sf29', 'sf30', 'sf31', 'sf32']) assert.equal(reach(sku), undefined, sku);
+    // Every frame stays in the shop with its picture and hole: only the reach is dropped.
+    assert.equal(shop.items.length, 13);
+    assert.ok(shop.items.every((x) => x.art?.url === ART));
+    assert.deepEqual(shop.items.find((x) => x.sku === 'sf32')!.art, { url: ART, hole: 0.27 });
+    assert.deepEqual(parseLiveShop(JSON.parse(JSON.stringify(shop))), shop, 'telefondaki kopya aynı okunur');
+    assert.deepEqual(mergeShop(COSMETICS, shop).find((c) => c.id === 'sf20')!.remote, { art: { url: ART, hole: 0.2, at: { x: 0.5, y: 0.55 }, reach: { x: 0.3, top: 0.45, bottom: 0.3 } } });
+    // The reach alone, read against the hole as the phone places it.
+    assert.deepEqual(parseFrameReach({ x: 0.3, top: 0.45, bottom: 0.3 }, 0.2, { x: 0.5, y: 0.55 }), { x: 0.3, top: 0.45, bottom: 0.3 });
+    for (const raw of [undefined, null, 'x', {}, { x: 0.3, top: 0.45, bottom: NaN }]) assert.equal(parseFrameReach(raw, 0.2, { x: 0.5, y: 0.5 }), null, String(raw));
   });
 });
 

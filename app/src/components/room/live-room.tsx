@@ -10,7 +10,7 @@ import { sheetSpace, steadyBox, steadyNext } from '@/lib/room-split';
 import { RoomSheetSpace } from '@/lib/sheet-space';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Text, TextInput } from '@/components/text';
+import { MAX_FONT_SCALE, Text, TextInput } from '@/components/text';
 import { ActionSheet, type SheetOption } from '@/components/ActionSheet';
 import { useReport } from '@/components/report-sheet';
 import { useRoomMute } from '@/components/room/room-mute';
@@ -55,6 +55,7 @@ import { LuckyBagCard, LuckyBagFloat, LuckyBagRain, LuckyBagSheet, bagWhat, type
 import { SeatMenu, type Rect, type SeatMenuItem } from '@/components/room/seat-menu';
 import { PersonCard } from '@/components/room/person-card';
 import { insertMention, mentionPicks, mentionQuery, mentions, stripMentions } from '@/lib/room-mention';
+import { addMention, mentionsIn, seenMentions, type MentionMark } from '@/lib/mention-chip';
 import { EntryEffect, type EntryFx, type EntryShow } from '@/components/fx/entry';
 import { storeArtOf } from '@/components/StoreArt';
 import { ROOM_ICON_ART } from '@/components/RoomArt';
@@ -69,6 +70,8 @@ import { GiftVideoFx, PlateName, VideoFx, entryClipOf, entryVideoOf, giftVideoOf
 import { giftShowOf, type GiftShow } from '@/data/gift-shows';
 import type { Animation } from '@/data/animations';
 import { ROOM, addCue, cueCount, cueTo, emptyStage, endCue, resumeCue, type Cue, type Stage } from '@/lib/fx-queue';
+import { stageRocket, type RocketPlay } from '@/lib/rocket-stage';
+import { bondParts, type Beside } from '@/lib/bond-link';
 import { SalonArt, salonArt } from '@/components/games/fx/salon-art';
 import { GamePanel, type OpenGame } from '@/components/games/game-panel';
 import type { CasinoGame } from '@/data/games';
@@ -88,12 +91,12 @@ import { StageBackdrop } from '@/components/room/stage-backdrop';
 import { useRoomLook } from '@/components/room/decor';
 import { StageLayout } from '@/components/room/stage-layout';
 import { FitStage } from '@/components/room/fit-stage';
-import { useRoomBonds } from '@/components/room/room-bonds';
-import { BOND_KINDS, bondTint, bubbleBondOf, jointEntries, micLinkOf, roomBondKey, type BondKind, type JointState, type RoomBond } from '@/data/bonds';
+import { bondGiftRefused, useRoomBonds } from '@/components/room/room-bonds';
+import { BOND_KINDS, bondTint, bubbleBondOf, jointEntries, roomBondKey, type BondKind, type JointState, type RoomBond } from '@/data/bonds';
 import { liveRequestBond } from '@/lib/live/bonds';
 import { Avatar } from '@/components/ui';
 import { AGENCIES } from '@/data/agency';
-import { BOSS_SEAT_MIN_LEVEL, COSMETICS, MUSIC_CATALOG, STANDARD_EMOJI, adminCapacity, cosmeticById, djCapacity, memberLimit, micCapacity, roomIdText, roomLevel, roomTypeInfo, ROOM_LEVEL_REWARDS, type RoomTheme, type Track } from '@/data/catalog';
+import { COSMETICS, MUSIC_CATALOG, STANDARD_EMOJI, adminCapacity, cosmeticById, djCapacity, micCapacity, roomIdText, roomLevel, ROOM_LEVEL_REWARDS, type RoomTheme, type Track } from '@/data/catalog';
 import { FAMILIES, INCOMING_GIFT_POOL, vipTier } from '@/data/economy';
 import { GATES, nobleInfo } from '@/data/status';
 import { LUCKY_RECIPIENT_SHARE, RULES, luckyHostDiamonds, pct } from '@/data/rules';
@@ -101,12 +104,12 @@ import { BOT_LINES, GIFTS, ME, USERS, isServerId, roomById, serverRoomCode, user
 import * as api from '@/lib/api';
 import { isLiveRoom, isLockedRoom, liveGift, liveMode, liveRoomAnimation, message as errorText, myServerId, putRoomAnswer, refreshServerRoom, rememberUser, toLocal, toServer, updateServerRoom } from '@/lib/live';
 import { liveBackpackGift } from '@/lib/live/backpack';
-import { giftById, refreshLiveCatalog } from '@/lib/live/catalog-live';
+import { giftById, liveBossMinLevel, liveMemberLimit, refreshLiveCatalog } from '@/lib/live/catalog-live';
 import { liveSticker } from '@/lib/live/emoji-live';
 import { useLiveRoomSync } from '@/lib/live/room';
 import { useRoomTop } from '@/lib/live/room-contrib';
 import { useRoomRocket } from '@/lib/live/room-rocket';
-import { onServerLook, onServerRoom, sendSignal, useBossNews, useLivePeers, type LuckySignal, type RoomSignal } from '@/lib/live/room-bus';
+import { onServerLook, onServerRoom, sendSignal, useBossNews, useLivePeers, type LuckySignal, type RocketNews, type RoomSignal } from '@/lib/live/room-bus';
 import { answerLiveCrossPk, refreshRoomPkSoon, useIncomingCrossPk, useRoomPkJoin, useRoomPkSync } from '@/lib/live/pk';
 import { useOwnerStats } from '@/lib/live/owner-stats';
 import { bagResult, grabCode, joinBag, useRoomBags, type Bag } from '@/lib/live/lucky-bags';
@@ -130,10 +133,13 @@ import { refreshCasino } from '@/lib/live/casino';
 import { useTableNews } from '@/lib/live/room-table';
 import { isTableGame } from '@/components/games/room-tables';
 import { announceWin, roomTitleOf } from '@/lib/broadcast';
+import { useGlobalGiftLines } from '@/lib/live/global-gift';
 import { emptyEntryLine, pushEntry, shiftEntry, type EntryItem, type EntryLine } from '@/lib/entry-queue';
 import { entranceView, entryPlanOf } from '@/lib/room-entrance';
+import { followLine, followedHere } from '@/lib/follow-room';
 import { getLucky, luckyGift, luckyPkPoints, sendLuckyBatch, type LuckyRecord } from '@/lib/lucky';
 import { liveLuckySend, refreshLucky } from '@/lib/live/lucky';
+import { luckyVideoPending, noteLuckyIcon } from '@/lib/lucky-art';
 import { getPk, joinRoomPk, markPkSeen, modeLabel, pkPointsFor, recordGift, reportMismatch, teamOf, usePk } from '@/lib/pk';
 import {
   KICK_BAN_MIN,
@@ -182,12 +188,14 @@ import { errorHaptic, micHaptic, successHaptic, tapHaptic } from '@/lib/haptics'
 import { stickerIdOf, stickerToken } from '@/lib/stickers';
 import { useApp, type MyRoom } from '@/store';
 import { similarity } from '@/lib/similarity';
-import { fitGrid, fitLayout, layoutPlan, type FitOpts, type Fitted } from '@/lib/seat-fit';
+import { ROW_GAP, STAGE_PAD_TOP, fitGrid, fitLayout, layoutPlan, type FitOpts, type Fitted } from '@/lib/seat-fit';
+import { gridPlace, stageTop } from '@/lib/stage-rows';
 import { BOSS_SEAT_DEFAULTS, bossLine, bossStep, patronOnSeat, type BossSitting } from '@/lib/patron-seat';
 import { RPS, isMovePick, moveArt, moveLine, moveOfPick, moveShuffle, needsMic, sideTarget, type Move, type Rect as MicRect } from '@/lib/room-moves';
 import { colors, fonts, gradient, semantic } from '@/theme';
 import { MuteBanner, useStopped } from '@/components/sanction-screen';
 import { refreshSanctions, showSanction } from '@/lib/sanctions';
+import { demoMarkGift, useMarkLines } from '@/lib/live/marks-live';
 
 // Short: the rules are the chat's first line already (ROOM_RULES_NOTICE), the bot doesn't repeat them.
 const BOT_TIPS = ['Mikrofona geçmek için boş bir koltuğa dokun.', 'Hediyeler oda seviyesini yükseltir.'];
@@ -214,12 +222,19 @@ const WHEEL_ROOM = 62;
 const CORNER_ROOM = 92;
 /** The header's small buttons: 44 px tall to the finger, without reaching their neighbours across the 8 px gaps. */
 const HEAD_SLOP = { top: 12, bottom: 12, left: 4, right: 4 };
-/** What a stage cue (lib/fx-queue) draws: a gift's video, a big gift's show, the other gifts' pop, a full-screen Hareketli. */
+/** The header's name line and the PK / rocket pill line under it (the rocket pill is 20 px tall). */
+const TITLE_LINE = 20;
+const PILL_LINE = 20;
+/**
+ * What a stage cue (lib/fx-queue) draws: a gift's video, a big gift's show, the other gifts' pop, a full-screen Hareketli,
+ * the Oda roketi's launch and winners (lib/rocket-stage).
+ */
 type StagePlay =
   | { kind: 'video'; gift: Gift; media: NonNullable<ReturnType<typeof giftVideoOf>> }
   | { kind: 'show'; gift: Gift; show: GiftShow }
   | { kind: 'pop'; gift: Gift }
-  | { kind: 'anim'; anim: Animation; origin: Point | null };
+  | { kind: 'anim'; anim: Animation; origin: Point | null }
+  | RocketPlay;
 /** How long they play, for the stage's backlog bound: the gift clips are 5 s; the pop is parts' GiftAnimation. */
 const VIDEO_MS = 5_000;
 const POP_MS = 2_500;
@@ -348,7 +363,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const agencyRoom = isOwn ? !!agencyId : !!base!.agency;
   const maxMics = micCapacity(agencyRoom, level);
   const theme = isOwn ? myRoom.theme : (base!.theme ?? 'chat');
-  const bossOn = isOwn ? myRoom.bossSeat && level >= BOSS_SEAT_MIN_LEVEL : !!base!.bossSeat;
+  const bossOn = isOwn ? myRoom.bossSeat && level >= liveBossMinLevel() : !!base!.bossSeat;
   // Patron koltuğu's mode and numbers: a server room's as the server reads them (server/api/boss-seat.mjs), the
   // demo's own (lib/patron-seat).
   const bossMode = isOwn ? myRoom.bossMode : real ? (base!.bossInfo?.mode ?? base!.rules?.bossMode ?? 'auto') : 'auto';
@@ -393,7 +408,6 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // be false there (güncelleme 6; the Rütbe page no longer lists it).
   const invisible = !real && settings.invisibleEntry && GATES.invisibleEntry(nobleTier);
   const roomType = isOwn ? myRoom.roomType : (base!.roomType ?? 'free');
-  const typeInfo = roomTypeInfo(roomType);
   // Seat locks: saved for my own room; in a server room the server keeps them; in other rooms I moderate they
   // last for this session.
   const [localLocks, setLocalLocks] = useState<number[]>([]);
@@ -580,7 +594,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     ...(entryInfo && !invisible ? [{ id: 'vip', system: true, text: entryInfo.text }] : []),
     ...(joinedInCall ? [{ id: 'incall', system: true, text: '📞 Görüşmedesin: odada dinleyicisin.' }] : []),
     // Arrived by following someone from a profile / agency / tribe chat.
-    ...(via && !invisible ? [{ id: 'via', system: true, text: `👣 ${ME.name}, ${userById(via).name} kişisini takip ederek odaya girdi` }] : []),
+    ...(via && !invisible ? [{ id: 'via', system: true, text: `👣 ${followLine(ME.name, userById(via).name)}` }] : []),
     ...(invisible ? [{ id: 'inv', system: true, text: '👻 Gizli girdin; seni yalnız moderasyon görür.' }] : []),
   ]);
   const [draft, setDraft] = useState('');
@@ -651,7 +665,29 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const playAnimFx = ({ anim, origin, from }: FullscreenAnim) => {
     if (visibleRef.current) pushFx({ from, what: anim.animation_id, to: { [ROOM]: 1 }, each: 1, price: anim.coin_price, ms: anim.duration_ms, payload: { kind: 'anim', anim, origin } });
   };
-  const [luckyFx, setLuckyFx] = useState<LuckyRecord[] | null>(null);
+  /**
+   * The Oda roketi's launch and winners (lib/rocket-stage, Güncelleme 7 madde 5b): in the same line, after the gift on
+   * screen and the ones waiting; the gifts after it wait for it. Not while the room is minimized, nor with effects off.
+   */
+  const playRocketFx = (news: RocketNews) => {
+    if (!visibleRef.current || settings.effectsOff) return;
+    const at = nowMs();
+    const held = entryVideoOn.current;
+    const key = `fx-${msgId()}`;
+    setFxStage((s) => stageRocket(s, news, { at, held, key }, (r) => r, (p) => (p.kind === 'rocket' ? p : null)));
+  };
+  // My Şanslı send's result card; `after`: the package whose video plays first (the card waits for it, lib/lucky-art).
+  const [luckyFx, setLuckyFx] = useState<{ records: LuckyRecord[]; after: string | null } | null>(null);
+  /**
+   * A Şanslı package's own video (Yönetim › Şanslı hediye, the catalog's lucky=1 clips) on the stage, in line with the
+   * gifts; true when there is one on the phone to play. None: the flight and the chat line show the send, as before.
+   */
+  const playLuckyFx = (gift: Gift, from: string, toIds: string[], count: number) => {
+    const media = giftVideoOf(gift.id);
+    if (!media) return false;
+    pushFx({ from, what: gift.id, to: Object.fromEntries(toIds.map((u) => [u, count])), each: count, price: gift.price, ms: media.ms || VIDEO_MS, payload: { kind: 'video', gift, media } });
+    return true;
+  };
   // The repeat wheel (components/room/gift-combo): after a send from the gift sheet, the same gift to the same people
   // with the same count, one tap per repeat (×1, ×2, ×3 …), Şanslı or not.
   const [combo, setCombo] = useState<(ComboSpec & { count: number; key: number }) | null>(null);
@@ -1015,7 +1051,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
 
   const gameEntry = { from: 'room' as const, roomId: id, roomTitle: title };
   // Table seats: me, people on the mics, then listeners (the game's own lobby, separate from room seats).
-  const gamePlayers = [{ id: 'me', name: ME.name, avatar: app.me.avatar }, ...[...seatedOthers.map(userById), ...audience].slice(0, 5)];
+  // Each face as known now (a look read after the Balkon list was made brings the photo), not from that list's copy.
+  const gamePlayers = [{ id: 'me', name: ME.name, avatar: app.me.avatar }, ...[...seatedOthers, ...audience.map((u) => u.id)].slice(0, 5).map(userById)];
   // A server room: the owner, its admins and its DJs play (the server checks it); the demo keeps the functions rule.
   const canControlMusic = real ? myRole !== 'member' || djIds.includes('me') : canFunctions;
   // A server room's music, as the room metadata has it, played on this phone at the room's clock.
@@ -1046,6 +1083,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const roomNames = useMemo(() => roomNamesKey.split('\n'), [roomNamesKey]);
   // Someone wrote my name (@bahset): a short buzz and a note over the chat, so I don't miss it.
   const [mentionNote, setMentionNote] = useState<{ name: string; n: number } | null>(null);
+  // The lines naming me not seen yet (lib/mention-chip): the chat's "Senden bahsedildi" chip goes to them. Kept here, so
+  // they outlive minimizing the room (its chat list goes away then).
+  const [unseenMentions, setUnseenMentions] = useState<MentionMark[]>([]);
   useEffect(() => {
     if (!mentionNote) return;
     const t = setTimeout(() => setMentionNote(null), 4_000);
@@ -1060,8 +1100,12 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     if (!isOnline()) offlineFeed.current.push(m);
     else setMessages((list) => mergeFeed(list, [m]));
   };
+  // Profil izleri: a mark left or cleaned here (lib/live/marks-live), one line per gift.
+  useMarkLines(id, (text, key) => addMsg({ id: key, system: true, text }));
   // A room note after a server call went through (so online), straight into the feed.
   const sysNote = (text: string) => setMessages((list) => mergeFeed(list, [{ system: true, text, id: msgId(), at: stamp() }]));
+  // Global hediye (lib/live/global-gift): a global gift sent in another room of my country gets a line here.
+  useGlobalGiftLines(id, blocked, addMsg);
   // A server room: when the staff open a game table (server/api/room-games.mjs), the room hears of it (not from
   // someone I block).
   useTableNews(id, real && unlocked, (t) => {
@@ -1083,8 +1127,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       // for someone back; their own entry effect (their shop look from the server, whatever their or my role in the
       // room) for a new entrance only.
       const v = entranceView(j, { blocked: blocked.has(uid), effectsOn: entryOn });
-      if (v.line) addMsg({ system: true, text: `${name} odaya girdi` });
       const sid = toServer(uid);
+      // Came following someone still here (their voice token's `via`, lib/follow-room): "Kaan, Artemis’i takip ederek geldi".
+      const followed = j.fresh && j.away === null && sid ? followedHere(roomMeta.peers, sid, myServerId()) : null;
+      if (v.line) addMsg({ system: true, text: followed ? `👣 ${followLine(name, userById(toLocal(followed)).name)}` : `${name} odaya girdi` });
       if (!v.effect || !sid) return;
       // Read now, not from a copy of a few minutes ago: what they wear may be new. A read that fails is tried once more.
       const playEntry = () => {
@@ -1113,11 +1159,13 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           if (nowMs() - (lastLineFrom.current.get(from) ?? 0) < SLOW_MS - 1_500) return;
           lastLineFrom.current.set(from, nowMs());
         }
+        const line = msgId();
         if (mentions(msg.text, app.me.name)) {
           successHaptic();
           setMentionNote((n) => ({ name: userById(from).name, n: (n?.n ?? 0) + 1 }));
+          setUnseenMentions((l) => addMention(l, { id: line, from }));
         }
-        return addMsg({ userId: from, text: mask(msg.text) });
+        return addMsg({ id: line, userId: from, text: mask(msg.text) });
       }
       // An emoji over their seat: only one from this phone's own emoji and sticker lists (never free text).
       if (msg.t === 'react') return seatEmojiOk(msg.emoji) ? react(from, msg.emoji) : undefined;
@@ -1230,7 +1278,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       joiningBags.current.delete(b.id);
     }
   };
-  // Bağlar in the room: Lv4 mic line, Lv8 joint entrance, Lv10 chat bubble (components/room/room-bonds).
+  // Bağlar in the room: the mic mark from Lv1, Lv8 joint entrance, Lv10 chat bubble (components/room/room-bonds).
   const roomBondsNow = useRoomBonds(live.members, real);
   const roomBonds = roomBondsNow ?? NO_BONDS;
   const [joint, setJoint] = useState<{ list: RoomBond[] | null; state: JointState | null }>({ list: null, state: null });
@@ -2705,6 +2753,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     delivered.forEach((r) => {
       logGift('me', r.userId, gift, count);
       app.recordGift(r.userId, gift.id, count);
+      demoMarkGift(id, gift.id, gift.emoji, r.userId);
     });
     bump('giftsSent', count * delivered.length);
     addContrib('me', total);
@@ -2770,8 +2819,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       addMsg({ system: true, text: `🤝 ${userById(to).name} kabul edince ${BOND_KINDS[kind].label} bağınız kurulur; kabul etmezse jetonun geri döner.` });
     };
     if (real)
-      return void liveRequestBond(to, kind, id).then(sent, (e) => {
+      return void liveRequestBond(to, kind, id, gift.price).then(sent, (e) => {
         errorHaptic();
+        // Already bonded (the room's bonds were behind): they are read again, so the next tap sends it as a gift.
+        bondGiftRefused(e, gift, to, userById(to).name, sendBondGift);
         showAlert('Bağ isteği gönderilemedi', errorText(e));
       });
     if (liveMode()) return showAlert('Hediye gönderilemedi', 'Bu örnek odada hediye gönderilemez. Hediyeleri gerçek odalarda gönderebilirsin.');
@@ -2813,6 +2864,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         else await liveGift(uid, gift.id, count, id, undefined, gift.price);
         sent.push(uid);
       } catch (e) {
+        // A bond gift sent again whose bond is gone meanwhile: offered as a bond request (room-bonds).
+        if (!sent.length && bondGiftRefused(e, gift, uid, userById(uid).name, sendBondGift)) return 0;
         error = errorText(e);
         break;
       }
@@ -2837,10 +2890,14 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   /** A Lucky send another phone made (the server announced it): the gift lines, the flight and a big win. */
   const showLuckyFrom = (from: string, toIds: string[], s: LuckySignal) => {
     const fromName = userById(from).name;
-    const price = luckyGift(s.giftId)?.price ?? 0;
+    // The packet names the package's icon and price (newer servers): one this phone hasn't read is drawn and counted.
+    noteLuckyIcon(s.giftId, s.icon);
+    const price = luckyGift(s.giftId)?.price ?? s.price ?? 0;
     toIds.forEach((to) => logGift(from, to, { id: s.giftId, name: s.name, emoji: s.emoji, price }, s.count));
     if (price) addContrib(from, price * s.count * toIds.length);
     flyGift(s.emoji, s.count, toIds, { x: 36, y: win.height * 0.72 }, s.giftId);
+    // Its video, as a gift's: only with gift effects on (Efekt ayarları, the room's choice), never minimized.
+    if (showFx(price) && visibleRef.current) playLuckyFx({ id: s.giftId, name: s.name, emoji: s.emoji, price }, from, toIds, s.count);
     const toText = toIds.length > 1 ? `${toIds.length} kişiye` : toIds[0] === 'me' ? 'sana' : `${userById(toIds[0]).name} kişisine`;
     addMsg({
       id: `gift:${s.eventId}`,
@@ -2967,7 +3024,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         kind: 'gift',
         text: settings.luckyAnnounce ? `🎉 ${ME.name} Şanslı hediyeden ×${best.mult.toLocaleString('tr-TR')} kazandı! +${reward.toLocaleString('tr-TR')} jeton` : `🎉 Bir kullanıcı Şanslı hediyeden ×${best.mult.toLocaleString('tr-TR')} kazandı!`,
       });
-    setLuckyFx(records);
+    // The package's video first, when it has one and effects are on; the result card comes once it is over.
+    const video = showFx(first.price) && visibleRef.current && playLuckyFx({ id: first.giftId, name: first.giftName, emoji: first.emoji, price: first.price }, 'me', sentTo, count);
+    setLuckyFx({ records, after: video ? first.giftId : null });
     // Some gifts didn't go (the balance ran out): the wheel stops; else it counts this send.
     if (error) stopCombo(spec);
     else countCombo(spec, viaWheel);
@@ -3055,7 +3114,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     }
     const { me, them, payout } = r;
     const opponent = pick(seatedOthers.length ? seatedOthers : USERS.map((u) => u.id));
-    addMsg({ system: true, text: `🎲 ${ME.name} (${me}) vs ${userById(opponent).name} (${them}) → ${payout > 0 ? `${ME.name} kazandı! +${payout} (oyun bakiyesine)` : 'kasa kazandı'}` });
+    addMsg({ system: true, text: `🎲 ${ME.name} (${me}) vs ${userById(opponent).name} (${them}) → ${payout > 0 ? `${ME.name} kazandı! +${payout} (oyun bakiyesine)` : 'kaybettin'}` });
     return { me, them, opponent };
   };
 
@@ -3312,7 +3371,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     ? roomPeopleCount([hostId, ...superIds, ...adminIds], roomMembers)
     : real
       ? (serverMembers?.total ?? 0)
-      : Math.min(memberLimit(level), Math.round(base!.listeners * 1.8)) + (membership === 'member' ? 1 : 0);
+      : Math.min(liveMemberLimit(level), Math.round(base!.listeners * 1.8)) + (membership === 'member' ? 1 : 0);
   // The members the cap counts: the owner and staff take no member's place (server/api/rooms.mjs memberCount).
   const memberJoined = isOwn ? myRoom.memberIds.filter((m) => m !== hostId && !superIds.includes(m) && !adminIds.includes(m)).length : real ? (serverMembers?.joined ?? 0) : memberTotal;
   const ownFamily = FAMILIES.find((f) => f.id === familyId);
@@ -3338,7 +3397,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // the same on every phone whenever it came in; the demo's from this visit's gifts.
   const serverTop = useRoomTop(id, real && unlocked, giftLog[0]?.id);
   // Oda roketi (lib/live/room-rocket): a server room's rocket today; read again after gifts and when it launches.
-  const roomRocket = useRoomRocket(real && unlocked ? id : null, { open: panel === 'rocket', bump: giftLog[0]?.id });
+  const roomRocket = useRoomRocket(real && unlocked ? id : null, { open: panel === 'rocket', bump: giftLog[0]?.id, onNews: playRocketFx });
   const top3 = real ? serverTop : ranking.slice(0, 3).map(([uid]) => uid);
 
   // Mic invites I sent: announce each answer once (accepted, declined, no answer, no free mic left).
@@ -3418,6 +3477,11 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     (m: FeedMsg) => (msgFilter.bot || !m.bot) && (msgFilter.joins || !(m.system && m.text.includes('odaya girdi'))) && (msgFilter.gifts || kindOf(m) !== 'gift'),
     [msgFilter],
   );
+  // @bahset chip (lib/mention-chip): only the unseen lines still in the feed (a line buffered offline joins it later).
+  const chipMentions = useMemo(() => (unseenMentions.length ? mentionsIn(unseenMentions, new Set(messages.map((m) => m.id))) : unseenMentions), [unseenMentions, messages]);
+  const mentionsSeen = useCallback((ids: string[]) => setUnseenMentions((l) => seenMentions(l, ids)), []);
+  // A line on screen counts as seen only while the chat can be read: the room in front, no sheet or game over it.
+  const chatAttended = full && !panel && !giftOpen && !peopleOpen && !inboxOpen && !person && !sheet && !seatMenu && !(game && !gameMin);
 
   const peopleActions: ParticipantActions = {
     invite: (uid) => {
@@ -3527,9 +3591,11 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const stripSlot: ArenaSlot = { width: stripW, size: Math.max(24, Math.min(34, stripW - 8)) };
   // Empty / locked / invite pending / mic on / mic off / muted by the room, per numbered mic.
   const slots = useMemo(() => slotStates(live, (uid) => uid === 'me' && !sending), [live, sending]);
-  const renderSeat = (i: number, extra?: { host?: boolean; compact?: boolean; slot?: ArenaSlot; grid?: ArenaSlot; next?: { index: number; gap: number }; mini?: boolean }) => {
+  const renderSeat = (i: number, extra?: { host?: boolean; compact?: boolean; slot?: ArenaSlot; grid?: ArenaSlot; next?: Beside; prev?: Beside; mini?: boolean; layer?: number }) => {
     const uid = allSeats[i];
-    const link = extra?.next ? micLinkOf(roomBonds, uid, allSeats[extra.next.index]) : null;
+    // Lv4 bond line: this seat draws the line to the next one behind both frames, the knot of the one from the seat
+    // before over them (lib/bond-link).
+    const link = bondParts(roomBonds, allSeats, i, extra?.next, extra?.prev);
     const host = extra?.slot ? false : (extra?.host ?? i === 0);
     return (
       <Seat
@@ -3558,7 +3624,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         pkPoints={pkPointsOf(uid)}
         avatarSize={extra?.slot?.size ?? extra?.grid?.size}
         slotWidth={extra?.slot?.width ?? extra?.grid?.width}
-        bondLink={link && extra?.next ? { bond: link, gap: extra.next.gap } : null}
+        roomTop={extra?.slot?.top ?? extra?.grid?.top}
+        layer={extra?.layer}
+        bondLink={link.line}
+        bondKnot={link.knot}
         mini={extra?.mini}
         seatColor={seatColor}
         enterDelay={Math.min(i, 24) * 22}
@@ -3575,8 +3644,12 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     if (v) seatViews.set(bossId, v);
     else seatViews.delete(bossId);
   };
-  /** The stage's mics, drawn with the sizes FitStage gives them (`f`: null for the strip and a team PK). */
-  const stageSeats = (f: Fitted | null) =>
+  /**
+   * The stage's mics, drawn with the sizes FitStage gives them (`f`: null for the strip and a team PK); `boards`: a board
+   * or banner is over them (FitStage measures them). The first row's faces have a row's room above them for their
+   * frames' crowns, whatever is over them (lib/stage-rows stageTop).
+   */
+  const stageSeats = (f: Fitted | null, boards: boolean) =>
     teamPk ? (
       <>
         {bossOn && (
@@ -3598,7 +3671,17 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} reaction={bossReaction} still={settings.reduceMotion} anchor={bossAnchor} pkPoints={pkPointsOf(bossId)} />
           </View>
         )}
-        <StageLayout layout={layout} width={win.width} face={f.face} seats={allSeats} pkRoom={theme === 'pk'} cameraOf={(uid) => (uid === 'me' ? camOn : !!camOf(uid))} videoOf={camOf} renderSeat={(i, slot, next) => renderSeat(i, { slot, next })} />
+        <StageLayout
+          layout={layout}
+          width={win.width}
+          face={f.face}
+          seats={allSeats}
+          pkRoom={theme === 'pk'}
+          cameraOf={(uid) => (uid === 'me' ? camOn : !!camOf(uid))}
+          videoOf={camOf}
+          top={stageTop({ boss: bossOn, boards, layout: true })}
+          renderSeat={(i, slot, next, prev) => renderSeat(i, { slot, next, prev })}
+        />
       </>
     ) : (
       <View style={styles.seatGrid}>
@@ -3609,9 +3692,18 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           </View>
         )}
         {/* Every mic, the host's first, `f.cols` to a row (equal widths, no gap): full rows, the same seats for every
-            mic count (lib/seat-fit gridCols), so the stage is symmetric and a new count only adds or takes rows. */}
+            mic count (lib/seat-fit gridCols), so the stage is symmetric and a new count only adds or takes rows. A
+            row higher on the screen is drawn over the rows under it (its names and points pills over a crown's tip). */}
         <View style={[styles.guestGrid, { width: f.cols * f.slot }]}>
-          {allSeats.map((_, i) => renderSeat(i, { grid: { width: f.slot, size: f.face }, next: i + 1 < allSeats.length && i % f.cols !== f.cols - 1 ? { index: i + 1, gap: 0 } : undefined }))}
+          {allSeats.map((_, i) => {
+            const at = gridPlace(i, f.cols, allSeats.length, stageTop({ boss: bossOn, boards }));
+            return renderSeat(i, {
+              grid: { width: f.slot, size: f.face, top: at.top },
+              layer: at.layer,
+              next: i + 1 < allSeats.length && i % f.cols !== f.cols - 1 ? { index: i + 1, gap: 0 } : undefined,
+              prev: i > 0 && i % f.cols !== 0 ? { index: i - 1, gap: 0 } : undefined,
+            });
+          })}
         </View>
       </View>
     );
@@ -3641,6 +3733,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     const p = cueNow.payload;
     const done = () => endFx(cueNow.key);
     if (p.kind === 'anim') return <AnimPlay key={cueNow.key} anim={p.anim} origin={p.origin} screen={win} lite={settings.lowData} onDone={done} />;
+    if (p.kind === 'rocket') return <RocketShow key={cueNow.key} news={p.news} then={p.paid} still={settings.reduceMotion} muted={fxMuted} onDone={done} />;
     const to = cueTo(cueNow);
     const play = {
       key: cueNow.key,
@@ -3695,12 +3788,21 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           <View style={styles.header} onLayout={(e) => setHeaderH(Math.round(e.nativeEvent.layout.height))}>
             <Pressable onPress={() => setPanel('info')} accessibilityLabel={`Oda kartı, Lv.${level}`} hitSlop={4}>
               <Avatar uri={userById(hostId).avatar} size={36} />
-              {/* On the photo's lower edge, so the room's name keeps the line's width. */}
-              <View style={styles.levelBadge} pointerEvents="none">
-                <Text style={styles.levelText}>Lv.{level}</Text>
+              {/* On the photo's lower edge, so the room's name keeps the line's width; on one line, wider than the photo
+                  when it has to be ("Lv.15" wrapped to "Lv.1 / 5" inside the 36 px photo: Güncelleme 7, madde 9). */}
+              <View style={styles.levelWrap} pointerEvents="none">
+                <View style={styles.levelBadge}>
+                  <Text style={styles.levelText} numberOfLines={1} maxFontSizeMultiplier={1}>
+                    Lv.{level}
+                  </Text>
+                </View>
               </View>
             </Pressable>
-            <View style={{ flex: 1 }}>
+            {/* The name, and under it the PK and rocket pills. The "N kişi · N mikrofon · oda türü" line is gone
+                (Güncelleme 7, madde 9): the people are on the Balkon button, the room type in the Oda kartı. Without a
+                pill the name stands in the middle; the block keeps the height of both, so the header never grows (and
+                the mics never shrink) when a PK starts or the rocket arrives. */}
+            <View style={[styles.headText, { minHeight: Math.ceil(TITLE_LINE * Math.min(win.fontScale || 1, MAX_FONT_SCALE)) + PILL_LINE }]}>
               <Pressable onPress={() => setPanel('info')} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                 {!!password && <Ionicons name="lock-closed" size={13} color={colors.textDim} />}
                 <Text style={styles.title} numberOfLines={1}>
@@ -3708,25 +3810,13 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                 </Text>
                 {hostId !== 'me' && <RoomFollowHeart roomId={id} title={title} />}
               </Pressable>
-              <View style={styles.subLine}>
-                {/* Normal PK: its timer pill leads the line; on a narrow phone the line's end gives way, not the pill. */}
-                {soloPk && <SoloPkPill pk={soloPk} canManage={canManage && !offline} />}
-                {roomRocket.rocket?.on && <RocketPill rocket={roomRocket.rocket} onPress={() => setPanel('rocket')} />}
-                <Pressable onPress={() => setPeopleOpen(true)} style={[styles.subRow, styles.subShrink]} accessibilityLabel={`${listeners} kişi, ${capacity} mikrofon. Odadaki kullanıcıları aç`}>
-                  <Ionicons name="people" size={11} color={colors.textDim} />
-                  <Text style={styles.sub}>{listeners}</Text>
-                  <Ionicons name="mic" size={11} color={colors.textDim} style={{ marginLeft: 4 }} />
-                  <Text style={styles.sub}>{capacity}</Text>
-                  {invisible && <Ionicons name="eye-off" size={11} color={colors.textDim} style={{ marginLeft: 4 }} accessibilityLabel="Gizli giriş" />}
-                  <Text style={[styles.sub, { flexShrink: 1, marginLeft: 2 }]} numberOfLines={1}>
-                    {' · '}
-                    {typeInfo.name}
-                    {layout ? ` · ${modeById(layout.modeId).name}` : ''}
-                    {agencyRoom ? ' · Ajans odası' : ''}
-                    {myRank === 3 ? ' · Sahibi' : myRank > 0 ? ` · ${rankLabel('me')}` : ''}
-                  </Text>
-                </Pressable>
-              </View>
+              {(soloPk || roomRocket.rocket?.on) && (
+                <View style={styles.subLine}>
+                  {/* Normal PK: its timer pill leads the line; on a narrow phone the line's end gives way, not the pill. */}
+                  {soloPk && <SoloPkPill pk={soloPk} canManage={canManage && !offline} />}
+                  {roomRocket.rocket?.on && <RocketPill rocket={roomRocket.rocket} onPress={() => setPanel('rocket')} />}
+                </View>
+              )}
             </View>
             {canManage && (micQueue || queue.length > 0) && (
               <Pressable onPress={() => setPanel('requests')} accessibilityLabel={`Konuşma istekleri, ${queue.length} kişi`} hitSlop={HEAD_SLOP}>
@@ -3847,7 +3937,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
               />
             }
             chat={(onBasis) => (
-              <ChatFeed messages={messages} visible={visibleInAll} renderItem={renderChat} renderTyping={renderTyping} screenHeight={win.height} fill={typing} onLarge={setSeatsSmall} onBasis={onBasis} hidden={emojiOpen && !typing} onTouch={emojiOpen ? () => setEmojiOpen(false) : undefined} sideRoom={wheelShown || (bagsUp && !typing) ? WHEEL_ROOM : 0} />
+              <ChatFeed messages={messages} visible={visibleInAll} renderItem={renderChat} renderTyping={renderTyping} screenHeight={win.height} fill={typing} onLarge={setSeatsSmall} onBasis={onBasis} hidden={emojiOpen && !typing} onTouch={emojiOpen ? () => setEmojiOpen(false) : undefined} sideRoom={wheelShown || (bagsUp && !typing) ? WHEEL_ROOM : 0} mentions={chipMentions} onMentionsSeen={mentionsSeen} attended={chatAttended} />
             )}
             overlay={
               emojiOpen && (
@@ -4028,6 +4118,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         onSend={sendGift}
         onSendLucky={sendLuckyGift}
         onSendBond={sendBondGift}
+        bonds={roomBonds}
       />
       <ActionSheet visible={!!sheet} title={sheet?.title} options={sheet?.options ?? []} onClose={() => (setSheet(null), backToMenu())} />
       {reporting.sheet}
@@ -4058,6 +4149,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         title={title}
         cover={cover}
         theme={theme}
+        roomType={roomType}
         level={level}
         xp={isOwn ? myRoom.xp : real ? (ownerStats?.xp ?? base!.xp ?? null) : null}
         // A server room's owner too (the server knows them: the room's owner id is mine).
@@ -4080,7 +4172,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         onLeave={leaveMembers}
         onApprove={(uid) => {
           if (real) return memberCall('Onaylanamadı', () => api.answerRoomMember(id, toServer(uid) ?? '', true), `🏠 ${userById(uid).name} oda üyesi oldu`);
-          if (memberJoined >= memberLimit(level)) return showAlert('Üye kapasitesi dolu', `Lv.${level} oda en fazla ${memberLimit(level)} üye alabilir.`);
+          if (memberJoined >= liveMemberLimit(level)) return showAlert('Üye kapasitesi dolu', `Lv.${level} oda en fazla ${liveMemberLimit(level)} üye alabilir.`);
           setMemberApps((l) => l.filter((x) => x !== uid));
           updateMyRoom({ memberIds: [...myRoom.memberIds, uid] });
           addMsg({ system: true, text: `🏠 ${userById(uid).name} oda üyesi oldu` });
@@ -4129,7 +4221,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                   manageMembers: liveRules?.manageMembers ?? 'admins',
                   manageFunctions: functionsBy,
                   autoRemoveDays: liveRules?.autoRemoveDays ?? 0,
-                  limit: liveRules?.limit ?? memberLimit(level),
+                  limit: liveRules?.limit ?? liveMemberLimit(level),
                   profileVisible: liveRules?.profileVisible ?? true,
                   videoPrivacy: !!liveRules?.videoPrivacy,
                   blacklist: (staff.bans ?? []).filter((b) => b.until === null).map((b) => b.uid),
@@ -4233,7 +4325,6 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       {panel === 'rocket' && roomRocket.rocket && (
         <RocketSheet rocket={roomRocket.rocket} onClose={closePanel} onGift={() => (setPanel(null), setGiftTo(null), setGiftOpen(true))} />
       )}
-      {roomRocket.show && !settings.effectsOff && <RocketShow key={`${roomRocket.show.launch}:${roomRocket.show.event}`} news={roomRocket.show} still={settings.reduceMotion} muted={fxMuted} onDone={roomRocket.next} />}
       {real && panel === 'bag' && (
         <LuckyBagSheet
           visible
@@ -4513,7 +4604,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           onExpire={() => setCombo(null)}
         />
       )}
-      {luckyFx && <LuckyResult key={luckyFx[0].txId} records={luckyFx} still={settings.effectsOff || settings.reduceMotion} onDone={() => setLuckyFx(null)} />}
+      {luckyFx && !(luckyFx.after && luckyVideoPending(fxStage, luckyFx.after)) && (
+        <LuckyResult key={luckyFx.records[0].txId} records={luckyFx.records} still={settings.effectsOff || settings.reduceMotion} onDone={() => setLuckyFx(null)} />
+      )}
       {/* Platform-wide win announcements (every room shows every win). */}
       {visible && !promptUp && <WinBanner top={typing && bagRain ? insets.top + 176 : noticeTop + (entries.now && !entryMedia ? 66 : 0)} still={settings.reduceMotion} />}
       {entries.now &&
@@ -4542,12 +4635,12 @@ function RoomRoot({ sheetSpace: space, children }: { sheetSpace: number | null; 
 const styles = StyleSheet.create({
   // Over the stage's headroom (components/room/fit-stage), so its buttons keep their whole touch area.
   header: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingTop: 4, paddingBottom: 8, zIndex: 1 },
-  title: { color: '#fff', fontSize: 15, fontWeight: '700', flexShrink: 1 },
-  sub: { color: colors.textDim, fontSize: 12 },
-  subRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  subLine: { flexDirection: 'row', alignItems: 'center', gap: 6, overflow: 'hidden' },
-  subShrink: { flexShrink: 1, minWidth: 0, overflow: 'hidden' },
-  levelBadge: { position: 'absolute', bottom: -4, alignSelf: 'center', backgroundColor: colors.primary, borderRadius: 6, paddingHorizontal: 4, borderWidth: 1, borderColor: 'rgba(165,243,245,0.35)', boxShadow: '0 0 8px rgba(255,95,162,0.35)' },
+  headText: { flex: 1, justifyContent: 'center' },
+  title: { color: '#fff', fontSize: 15, lineHeight: TITLE_LINE, fontWeight: '700', flexShrink: 1 },
+  subLine: { flexDirection: 'row', alignItems: 'center', gap: 6, height: PILL_LINE, overflow: 'hidden' },
+  // The badge may be wider than the photo (centred under it): a two-digit level stays on one line.
+  levelWrap: { position: 'absolute', bottom: -4, left: -10, right: -10, alignItems: 'center' },
+  levelBadge: { backgroundColor: colors.primary, borderRadius: 6, paddingHorizontal: 4, borderWidth: 1, borderColor: 'rgba(165,243,245,0.35)', boxShadow: '0 0 8px rgba(255,95,162,0.35)' },
   levelText: { color: '#fff', fontSize: 10, lineHeight: 13, fontWeight: '800' },
   reqBadge: { position: 'absolute', top: -4, right: -6, backgroundColor: colors.red, borderRadius: 8, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center' },
   reqBadgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
@@ -4581,12 +4674,15 @@ const styles = StyleSheet.create({
   callBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 12, marginTop: 6, backgroundColor: semantic.success, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
   callBannerText: { color: semantic.successInk, fontWeight: '800', flex: 1, fontSize: 13 },
   callBannerGo: { color: semantic.successInk, fontWeight: '900' },
-  topRow: { width: '100%', flexDirection: 'row', justifyContent: 'center', alignItems: 'flex-start', gap: 28 },
+  // Over the mics under it: its points line covers a crown's tip that rises into it.
+  topRow: { width: '100%', flexDirection: 'row', justifyContent: 'center', alignItems: 'flex-start', gap: 28, zIndex: 1 },
   topAvatar: { borderWidth: 2, borderRadius: 14 },
-  seatGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', paddingHorizontal: 8, paddingTop: 8, rowGap: 10 },
+  // Its top padding and row gap are what lib/seat-fit gridAt counts: with the stage's headroom (or the gap under a
+  // board) over it, the first row has a row's room above its faces (lib/stage-rows firstRowRoom).
+  seatGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', paddingHorizontal: 8, paddingTop: STAGE_PAD_TOP, rowGap: ROW_GAP },
   // Full rows for every mic count (lib/seat-fit gridCols); a count no row length fills keeps its short last row in the
   // middle, so the stage stays symmetric.
-  guestGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', rowGap: 10 },
+  guestGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', rowGap: ROW_GAP },
   // Küçült: the mics as one short strip (ten to a row, from the left), the chat takes the rest.
   micStrip: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-start', paddingHorizontal: 8, paddingTop: 6, paddingBottom: 2, rowGap: 6 },
   bottom: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 6 },

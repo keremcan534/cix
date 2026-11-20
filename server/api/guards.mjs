@@ -16,12 +16,29 @@
 // GUARD_SWEEP_MS: how often the midnight drop is looked for (default 5 min; it applies once per Türkiye day). Soon
 // after midnight matters: a gift sent before the drop is worked out counts as the day before's.
 import { HttpError, auth, db, env, int, limit, readJson, tx, userId } from './core.mjs';
+import { live } from './live-settings.mjs';
 import { levelsOf } from './profiles.mjs';
 import { notify } from './push.mjs';
 
 import { GUARD_CARD, GUARD_RULES } from './guard-rules.mjs';
 
 export { GUARD_CARD, GUARD_RULES };
+
+/**
+ * Koruma's numbers now: Canlı ayarlar › Koruma (live-registry.mjs guard_*), GUARD_RULES's values until saved. The app
+ * gets them in the catalog (`guard`) to say them on the rules page.
+ */
+export function guardRules(s = live()) {
+  const n = (v, d) => (Number.isSafeInteger(v) ? v : d);
+  return {
+    dropFrom: n(s.guardDropFrom, GUARD_RULES.dropFrom),
+    dropShare: n(s.guardDropPct, Math.round(GUARD_RULES.dropShare * 100)) / 100,
+    dropFlat: n(s.guardDropFlat, GUARD_RULES.dropFlat),
+    listMax: n(s.guardListMax, GUARD_RULES.listMax),
+    thresholdPerLevel: n(s.guardThresholdPerLevel, GUARD_RULES.thresholdPerLevel),
+    thresholdEveryDays: n(s.guardThresholdDays, GUARD_RULES.thresholdEveryDays),
+  };
+}
 const positive = (v, d) => {
   const n = Number(v ?? d);
   return Number.isSafeInteger(n) && n > 0 ? n : d;
@@ -70,7 +87,7 @@ export async function runGuardDecay() {
           decayed_on = ${TODAY}
         WHERE ended_at IS NULL AND first_day < ${TODAY} AND (decayed_on IS NULL OR decayed_on < ${TODAY})
         RETURNING (gift_day < ${TODAY} - 1 AND first_day < ${TODAY} - 1) AS dropped`,
-      [GUARD_RULES.dropFrom, GUARD_RULES.dropShare, GUARD_RULES.dropFlat],
+      [guardRules().dropFrom, guardRules().dropShare, guardRules().dropFlat],
     );
     const n = r.rows.filter((x) => x.dropped).length;
     if (n) console.log(`guard drop: ${n}`);
@@ -106,11 +123,11 @@ const settingsRow = async (q, id) => (await q.query('SELECT off, threshold, thre
 async function settingsView(id) {
   const s = await settingsRow(db, id);
   const charm = (await levelsOf([id]))[id]?.charm ?? 0;
-  const next = s.threshold_at ? new Date(new Date(s.threshold_at).getTime() + GUARD_RULES.thresholdEveryDays * 86400_000) : null;
+  const next = s.threshold_at ? new Date(new Date(s.threshold_at).getTime() + guardRules().thresholdEveryDays * 86400_000) : null;
   return {
     off: s.off,
     threshold: Number(s.threshold),
-    thresholdMax: GUARD_RULES.thresholdPerLevel * (charm + 1),
+    thresholdMax: guardRules().thresholdPerLevel * (charm + 1),
     thresholdNextAt: next && next.getTime() > Date.now() ? next.toISOString() : null,
   };
 }
@@ -156,13 +173,13 @@ export const guardRoutes = {
       `SELECT ${PERSON}, u.id AS guardian_id, u.name AS guardian_name, u.avatar_url AS guardian_avatar
          FROM guards g JOIN users u ON u.id = g.guardian AND u.deleted_at IS NULL
         WHERE g.ward = $1 AND g.ended_at IS NULL ORDER BY g.points DESC, g.started_at LIMIT $2`,
-      [me.id, GUARD_RULES.listMax],
+      [me.id, guardRules().listMax],
     );
     const wards = await db.query(
       `SELECT ${PERSON}, u.id AS ward_id, u.name AS ward_name, u.avatar_url AS ward_avatar
          FROM guards g JOIN users u ON u.id = g.ward AND u.deleted_at IS NULL
         WHERE g.guardian = $1 AND g.ended_at IS NULL ORDER BY g.points DESC, g.started_at LIMIT $2`,
-      [me.id, GUARD_RULES.listMax],
+      [me.id, guardRules().listMax],
     );
     return {
       guardians: guardians.rows.map((r) => personOf(r, 'guardian')),
@@ -194,7 +211,7 @@ export const guardRoutes = {
       threshold = int(b.threshold, 0, view.thresholdMax);
       if (threshold === null) throw new HttpError(400, `Koruma eşiği 0–${fmt(view.thresholdMax)} puan olabilir (Yankı seviyen yükseldikçe sınır artar)`);
       if (threshold === view.threshold) threshold = undefined;
-      else if (view.thresholdNextAt) throw new HttpError(429, `Koruma eşiği haftada bir değişir; bir sonraki: ${new Date(view.thresholdNextAt).toLocaleDateString('tr-TR', { timeZone: 'Europe/Istanbul' })}`);
+      else if (view.thresholdNextAt) throw new HttpError(429, `Koruma eşiği ${guardRules().thresholdEveryDays === 7 ? 'haftada bir' : `${guardRules().thresholdEveryDays} günde bir`} değişir; bir sonraki: ${new Date(view.thresholdNextAt).toLocaleDateString('tr-TR', { timeZone: 'Europe/Istanbul' })}`);
     }
     await tx(async (c) => {
       await c.query('INSERT INTO guard_settings (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING', [me.id]);

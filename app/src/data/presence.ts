@@ -7,8 +7,9 @@ export type Presence = { kind: 'room'; roomId: string; title: string; locked: bo
 // A few users are in a private call (can't be joined, only shown as busy).
 const IN_CALL: Record<string, 'sesli' | 'görüntülü'> = { u3: 'görüntülü', u8: 'sesli' };
 
-/** In live mode (a server address is set; read on each call so a test can switch it) there is no presence
- *  service yet, and the sample rooms and calls are not real: nobody is shown in a room or a call. */
+/** In live mode (a server address is set; read on each call so a test can switch it) the sample rooms and calls are
+ *  not real: nobody is shown in one here. A profile reads the room from the server instead (GET /api/user `room`,
+ *  lib/follow-room), and the agency and family lists bring each member's room with them. */
 export const presenceOf = (userId: string): Presence => {
   if (process.env.EXPO_PUBLIC_API_URL) return null;
   const room = ROOMS.find((r) => r.hostId === userId || r.seatUserIds.includes(userId));

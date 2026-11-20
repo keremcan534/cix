@@ -3,9 +3,11 @@
 // slot, server/api/catalog.mjs; data/catalog.ts COSMETICS) are drawn here in code and follow the same voice level: the
 // app's own four, and the ones the team adds in Yönetim › Mağaza (data/catalog remote.wave: one of the same styles in
 // its own colours, the sparkle style's sparks maybe a picture). Each app's wave is one of those styles too (OWN_LOOKS).
-// Every wave is drawn the same way and the same size (lib/seat-cell ringOf): behind the face and its frame, just
-// outside the face (never on the photo), and the voice takes it at most `reach` px further out. So a speaker's ring
-// looks the same on their own phone and on everyone else's whatever frame they wear, and never runs over the next seat.
+// Every wave is drawn the same way and the same size (lib/seat-cell ringOf): behind the face and its frame for every
+// face, framed or not (components/room/parts Seat; the owners' call in güncelleme 5, "dalgalar çerçeveyi kesiyor": the
+// ring never covers a frame), just outside the face (never on the photo), and the voice takes it at most `reach` px
+// further out. So a speaker's ring looks the same on their own phone and on everyone else's whatever frame they wear,
+// and never runs over the next seat.
 import { useEffect, useState } from 'react';
 import { Animated, Easing, Image, StyleSheet, View, type ViewStyle } from 'react-native';
 

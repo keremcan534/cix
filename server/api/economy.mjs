@@ -38,6 +38,7 @@ import { live } from './live-settings.mjs';
 // live.mjs imports rooms.mjs, which imports this file; the functions are only used inside handlers.
 import { roomPacket, roomService, voiceRoomsOf } from './live.mjs';
 import { paidCoins, spendCoins } from './wallet.mjs';
+import { marksView } from './profile-marks.mjs';
 import { wealthPoints } from './wheel.mjs';
 
 const DAY = 86_400_000;
@@ -299,14 +300,18 @@ export async function economyOf(uid, q = db) {
 
 /**
  * What others see of each person in `ids`: the worn items that are live, the highest live noble tier, the VIP level,
- * the gender that colors their speaking ring and their photo (rooms draw their mic and Balkon face with it).
+ * the gender that colors their speaking ring and their photo (rooms draw their mic and Balkon face with it), the
+ * profile marks on that photo (`marks`) and `noMarks` when they refuse new ones (Profil izleri).
  */
 export async function looksOf(ids, q = db) {
   if (!ids.length) return {};
   const r = await q.query(
     `SELECT u.id, u.name, u.equipped, u.svip_xp, u.gender, u.gender_hidden, u.avatar_url,
             (SELECT max(e.tier) FROM entitlements e WHERE e.user_id = u.id AND e.kind = 'noble' AND ${LIVE}) AS noble,
-            (SELECT coalesce(array_agg(e.kind || ':' || e.sku), '{}') FROM entitlements e WHERE e.user_id = u.id AND e.kind = ANY($2::text[]) AND ${LIVE}) AS owned
+            (SELECT coalesce(array_agg(e.kind || ':' || e.sku), '{}') FROM entitlements e WHERE e.user_id = u.id AND e.kind = ANY($2::text[]) AND ${LIVE}) AS owned,
+            (SELECT json_agg(json_build_object('kind', m.kind, 'gift_id', m.gift_id, 'expires_at', m.expires_at) ORDER BY m.id) FROM profile_marks m
+              WHERE m.user_id = u.id AND m.cleared_at IS NULL AND m.expires_at > now()) AS marks,
+            coalesce((SELECT p.profile_marks FROM privacy_settings p WHERE p.user_id = u.id), true) AS marks_open
        FROM users u WHERE u.id = ANY($1::uuid[])`,
     [ids, SLOTS],
   );
@@ -324,6 +329,9 @@ export async function looksOf(ids, q = db) {
       // screen has read yet (a new account) would sit on a mic without their photo.
       name: x.name,
       avatarUrl: x.avatar_url ?? null,
+      // Profil izleri (profile-marks.mjs): the marks on their photo now, and whether they refuse new ones.
+      marks: marksView(x.marks ?? []),
+      ...(!x.marks_open && { noMarks: true }),
     };
   }
   return out;

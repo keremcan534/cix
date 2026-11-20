@@ -6,6 +6,7 @@ import { Image, Pressable, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
+import { useIntroLanding } from '@/components/fx/intro';
 import { SCENES } from '@/components/fx/scenes';
 import { Backdrop } from '@/components/fx/surface';
 import { GradientButton } from '@/components/ui';
@@ -35,6 +36,9 @@ export default function WelcomeScreen() {
   const styles = useStyles();
   // A short phone with every sign-in way on: the logo block starts higher and smaller, clear of the first button.
   const short = useWindowDimensions().height < 700;
+  // On the first launch the opening's mark flies onto this logo (its name toward the title) as its navy rises off the
+  // screen; the logo's load tells it the screen has drawn.
+  const { box: landing, onLogo, onTitle, onLogoLoad } = useIntroLanding();
   const demoLogin = () => {
     updateMe({ name: 'Demo', age: 25, birthDate: '2001-03-14', verified: true, bio: '🎧 Müzik 🎮 Oyun', interests: ['🎧 Müzik', '🎮 Oyun', '💬 Sohbet'] });
     // Test balance so every paid flow (gifts, store, VIP) can be tried without the payment step.
@@ -114,9 +118,11 @@ export default function WelcomeScreen() {
       <SafeAreaView style={{ flex: 1 }}>
         <Backdrop scene={SCENES.login} />
         <View style={styles.hero}>
-          <View style={[styles.center, short && { top: '12%' }]}>
-            <Image source={LOGO} style={[styles.logoMark, short && { width: 72, height: 72 }]} resizeMode="contain" accessibilityIgnoresInvertColors />
-            <Text style={styles.logo} accessibilityRole="header">Similar Club</Text>
+          <View ref={landing} collapsable={false} style={[styles.center, short && { top: '12%' }]}>
+            <Image source={LOGO} onLayout={onLogo} onLoad={onLogoLoad} style={[styles.logoMark, short && { width: 72, height: 72 }]} resizeMode="contain" accessibilityIgnoresInvertColors />
+            <Text onLayout={onTitle} style={styles.logo} accessibilityRole="header">
+              Similar Club
+            </Text>
             <Text style={styles.tagline}>Sana benzeyen insanlarla{'\n'}aynı odada buluş.</Text>
           </View>
         </View>

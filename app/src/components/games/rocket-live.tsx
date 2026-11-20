@@ -282,7 +282,7 @@ export function LiveRocketPlayer({ entry }: { entry: Entry }) {
       <GameInfoSheet visible={info} onClose={() => setInfo(false)} title={game.name} rules={RULES}>
         <View style={s.pays}>
           {/* Upper case the Turkish way (i → İ): the style doesn't transform it. */}
-          <Text style={s.paysHead}>{`Roketin ulaşma şansı · kasa payı %${100 - ret}`.toLocaleUpperCase('tr-TR')}</Text>
+          <Text style={s.paysHead}>{'Roketin ulaşma şansı'.toLocaleUpperCase('tr-TR')}</Text>
           <View style={s.payRow}>
             <Text style={[s.payCell, s.payDim]}>Çarpan</Text>
             <Text style={[s.payCell, s.payDim, { textAlign: 'center' }]}>Ulaşma şansı</Text>
@@ -296,7 +296,7 @@ export function LiveRocketPlayer({ entry }: { entry: Entry }) {
             </View>
           ))}
           <Text style={s.paysNote}>
-            Oynanan her 100 jetonun ortalama {ret} jetonu kazananlara döner, {100 - ret} jetonu kasada kalır. Roket her 100 turun yaklaşık {100 - ret} turunda kalkmadan patlar. Bir turda en çok {fmt(st.game?.maxFuel ?? 0)} jeton yakıt alınır. Ödül havuzu yetmezse roket daha erken patlayabilir.
+            Roket her 100 turun yaklaşık {100 - ret} turunda kalkmadan patlar. Bir turda en çok {fmt(st.game?.maxFuel ?? 0)} jeton yakıt alınır. Ödül havuzu yetmezse roket daha erken patlayabilir.
           </Text>
         </View>
       </GameInfoSheet>

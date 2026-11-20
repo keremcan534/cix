@@ -73,7 +73,7 @@ describe('Aile görevleri ve sandıklar', () => {
     assert.ok(chat.messages.some((m) => m.author.id === member.user.id && m.text.includes('Kalp ×10')), 'sohbette görünür');
     const o = await overview(member.session);
     assert.deepEqual([task(o, 'k-chatgift').progress, task(o, 'k-chatgift').points], [500, 2], '400 jetonda 2 puan');
-    assert.deepEqual([task(o, 'k-cp').progress, task(o, 'k-cp').points], [777, 4], 'İkili hediyesi 350 jetonda 2 puan');
+    assert.deepEqual([task(o, 'k-cp').progress, task(o, 'k-cp').points], [777, 4], 'Çift hediyesi 350 jetonda 2 puan');
     assert.equal(task(o, 'k-newbie').progress, 2, 'yeni üyeye hediye');
     assert.equal(o.me.gifts, 1277);
     assert.equal(o.highlights[0].id, member.user.id);
@@ -172,3 +172,38 @@ describe('Aile görevleri ve sandıklar', () => {
   });
 });
 
+
+describe('Aile kuralları panelden (Canlı ayarlar)', () => {
+  test('görev puanı ve hedefi, sandığın hedefi, jetonu ve katkı sınırı, tema seviyesi', async () => {
+    const admin = await h.account('Aile Ayarcısı', 'admin');
+    const setLive = async (changes) => {
+      const view = await ok(call('GET', '/api/admin/live-settings', null, admin.session), 'ayarlar');
+      return ok(call('POST', '/api/admin/live-settings', { changes, reason: 'Aile testi', baseV: view.v, confirm: true }, admin.session), 'ayar kaydı');
+    };
+    await setLive({ family_task_checkin_power: 4, family_task_room_goal: 30, family_task_chatgift_per: 100, family_chest_c1_need: 2_000, family_chest_c1_coins: 7, family_chest_min_contribution: 0, family_theme_gece_level: 5 });
+    try {
+      const { family, lead, member } = await familyOf('Ayarlı');
+      await ok(call('POST', '/api/family/checkin', {}, lead.session), 'yoklama');
+      let o = await overview(lead.session);
+      assert.deepEqual([task(o, 'k-checkin').power, task(o, 'k-checkin').points, task(o, 'k-room').goal, task(o, 'k-chatgift').per], [4, 4, 30, 100]);
+      assert.equal(o.me.points, 4);
+      assert.deepEqual([o.chests[0].need, o.chests[0].coins, o.chestMin], [2_000, 7, 0]);
+      // 2.500 coins of family gifts reach the lowered goal; the member without a contribution opens it too (0).
+      await topUp(member.session, 5000);
+      await ok(call('POST', '/api/gifts/send', { to: lead.user.id, giftId: 'g5', count: 5, place: 'family', ref: rnd(6) }, member.session), 'hediye');
+      o = await overview(lead.session);
+      assert.equal(o.chests[0].reached, true);
+      const late = await signUp('Katkısız Üye');
+      await ok(call('POST', '/api/family/join', { id: family.id }, late.session), 'katıl');
+      const opened = await ok(call('POST', '/api/family/chest', { chest: 'c1', ref: rnd(6) }, late.session), 'sandık');
+      assert.equal(opened.coins, 7);
+      // A theme opens at the family's level as set: Gece Moru at Lv.5 now, the family is Lv.2.
+      const theme = await call('POST', '/api/family/settings', { theme: 'gece' }, lead.session);
+      assert.equal(theme[0], 403, JSON.stringify(theme[1]));
+      assert.match(theme[1].error, /Lv\.5/);
+      assert.equal((await ok(call('GET', '/api/catalog'), 'katalog')).family.themes.gece, 5);
+    } finally {
+      await setLive({ family_task_checkin_power: null, family_task_room_goal: null, family_task_chatgift_per: null, family_chest_c1_need: null, family_chest_c1_coins: null, family_chest_min_contribution: null, family_theme_gece_level: null });
+    }
+  });
+});

@@ -1,15 +1,17 @@
 // Yönetim › Hediyeler: gifts the admins add, change, take down and order from the panel, with no app update
 // (docs/HEDIYE_YONETIMI.md), and the app's own gifts (catalog.mjs GIFTS, in step with the app) changed the same way:
 // name, emoji, price, shelf, VIP level, order, on the shelves or not, icon and video, each back to the app's value at
-// will. Both live in the custom_gifts table (066, 069): an admin's gift is a row of its own ('a' and a number); a row
+// will. `mark`: the profile mark the gift leaves or cleans ({ role: 'leave'|'clean', kind, hours? } or null; Profil
+// izleri, profile-mark-rules.mjs, 101): a gift that cleans a kind must cost more than every gift that leaves it, or the
+// save is refused. Both live in the custom_gifts table (066, 069): an admin's gift is a row of its own ('a' and a number); a row
 // with a compiled gift's id (builtin) holds only what was changed about it, every NULL column "as in the app".
 //
-//   GET  /api/admin/gifts[?builtin=1]                      → { gifts, limits, convert, storage }  (builtin=1: the app's own too)
-//   POST /api/admin/gifts        { name, price, cat, minSvip?, emoji?, enabled?, icon, video? } → { gift }
+//   GET  /api/admin/gifts[?builtin=1]                      → { gifts, limits, convert, storage, globalMinPrice }  (builtin=1: the app's own too)
+//   POST /api/admin/gifts        { name, price, cat, minSvip?, emoji?, enabled?, icon, video?, mark?, global? } → { gift }
 //   POST /api/admin/gifts/update { id, …any of the above; video: null takes it off }        → { gift }
 //        an app's own gift too: icon: null gives it the app's picture again, video: null stops its video
 //   POST /api/admin/gifts/reset  { id, fields? }           → { gift }   an app's own gift back to the app's values
-//        (fields: any of name, emoji, price, cat — with its VIP level —, enabled, sort, icon, video; none: all)
+//        (fields: any of name, emoji, price, cat — with its VIP level —, enabled, sort, icon, video, mark, global; none: all)
 //   POST /api/admin/gifts/delete { id }                    → { deleted }  (an admin's gift; the app's own can't go)
 //   POST /api/admin/gifts/order  { ids }                   → { gifts }   (each id's place: its index; lower first)
 //   POST /api/admin/gifts/fetch  { slot: 'icon'|'video', url } → { url, link, kind, type, bytes, video, svga }
@@ -22,6 +24,9 @@
 // send (checkShownPrice: a newer app sends the price it showed, 409 price_changed when it moved meanwhile). A replaced
 // video reaches every app since the admins' gifts came (preview with /api/fx/g/); a gift put back on the shelves only
 // the apps that trust the server's list (gifts=2) show, the others keep the compiled pause list (catalog.mjs).
+//
+// global: true marks a Global hediye (global-gifts.mjs, 102: announced in every room of the sender's country), from
+// Canlı ayarlar' minimum price on (GET answers it as globalMinPrice), never a bond gift or Koruma Kartı (globalSave).
 //
 // Admins only; every change is an audit_events row (who, what, before and after, from where). `icon` and `video.url`
 // are files uploaded first (media.mjs kinds gifticon, giftvideo, giftsource). video: { url, kind: 'stacked' } is a
@@ -53,7 +58,10 @@ import { artUrl } from './art.mjs';
 import { BOND_GIFTS, GIFTS, GIFTS_PAUSED } from './catalog.mjs';
 import { HttpError, auth, clientIp, db, env, int, limit, readJson, text, tx } from './core.mjs';
 import { FX_PATH, giftClip, mp4Duration } from './fx.mjs';
+import { globalMinPrice, globalNow, globalSave } from './global-gifts.mjs';
+import { GUARD_CARD } from './guard-rules.mjs';
 import { panelDetail } from './panel.mjs';
+import { appMarkOf, markInput, markPriceProblem, storedMark } from './profile-mark-rules.mjs';
 import { download, linkOf } from './link-fetch.mjs';
 import { downloadStored, keyOf, kindMax, readStored, removeFiles, sendFile, storageOn, storeFile, storedUrl, verifyUpload, writeStored } from './media.mjs';
 
@@ -127,7 +135,10 @@ const viewOf = (r) =>
     icon: r.icon_url,
     video: r.video_url ? Object.freeze({ url: r.video_url, bytes: Number(r.video_bytes), ms: Number(r.video_ms ?? 0), v: r.video_v }) : null,
     videoOff: r.video_off === true,
+    global: r.global === true,
     job: r.job_status ?? null,
+    // Profil izleri (profile-mark-rules.mjs): undefined as in the app (or a plain admin's gift), null none, else the rule.
+    mark: storedMark(r),
     updatedAt: r.updated_at ?? null,
   });
 
@@ -190,6 +201,8 @@ function appGiftOf(base, o) {
     icon: o?.icon ?? null,
     video: o?.video ?? null,
     videoOff: !!o?.videoOff,
+    mark: appMarkOf(base.id, o?.mark),
+    global: o?.global === true,
   };
 }
 /** One of the app's gifts as it is now (appGiftOf); undefined for an id that isn't one of them. */
@@ -198,7 +211,7 @@ export function builtinGift(id) {
   return base ? appGiftOf(base, snap.rows.get(id) ?? null) : undefined;
 }
 /** An admin's gift as the rest of this module reads it. */
-const customGift = (r) => ({ ...r, builtin: false, videoOff: false });
+const customGift = (r) => ({ ...r, builtin: false, videoOff: false, mark: r.mark ?? null });
 
 const CAT_ORDER = (cat) => CATS.indexOf(cat);
 /** The shelves' order: shelf, place on it, an admin's before the app's at the same place, then the older first. */
@@ -220,18 +233,23 @@ const listed = () => allGifts().filter((g) => g.enabled);
 /**
  * A gift that may be sent now, at this server's price: an app's own one (as changed in the panel; also while it is off
  * the shelves, as the app's paused gifts always were: an older app or Çantam may still send it), or an admin's that is
- * on the shelves ({ id, name, price, cat, minSvip, emoji, custom: true }). Undefined for anything else.
+ * on the shelves ({ id, name, price, cat, minSvip, emoji, custom: true }); `mark`: the profile mark it leaves or cleans
+ * (profile-mark-rules.mjs), null for none. Undefined for anything else.
  */
 export function giftOf(id) {
   // A bond gift goes as a bond request (bonds.mjs), which holds its coins until the other person answers.
   if (typeof id !== 'string' || BOND_GIFTS.has(id)) return undefined;
   const app = builtinGift(id);
-  if (app) return { id, name: app.name, emoji: app.emoji, price: app.price, cat: app.cat, minSvip: app.minSvip, builtin: true };
+  if (app) return { id, name: app.name, emoji: app.emoji, price: app.price, cat: app.cat, minSvip: app.minSvip, builtin: true, mark: app.mark, ...(globalNow(app) ? { global: true, icon: app.icon } : {}) };
   const g = snap.rows.get(id);
-  return g && !g.builtin && g.enabled && !g.deleted ? { id: g.id, name: g.name, emoji: g.emoji, price: g.price, cat: g.cat, minSvip: g.minSvip, custom: true } : undefined;
+  return g && !g.builtin && g.enabled && !g.deleted
+    ? { id: g.id, name: g.name, emoji: g.emoji, price: g.price, cat: g.cat, minSvip: g.minSvip, custom: true, mark: g.mark ?? null, ...(globalNow(g) ? { global: true, icon: g.icon } : {}) }
+    : undefined;
 }
 /** A gift's name now, a taken-down or deleted one's too (history lines, Şanslı çanta); null when nothing has this id. */
 export const giftNameOf = (id) => builtinGift(id)?.name ?? snap.rows.get(id)?.name ?? null;
+/** A gift's emoji now, a taken-down or deleted one's too (Profil izleri's badge); null when nothing has this id. */
+export const giftEmojiOf = (id) => builtinGift(id)?.emoji ?? snap.rows.get(id)?.emoji ?? null;
 /** Every admin's gift that isn't deleted (the profile's Vitrin counts them; the app's own it counts anyway). */
 export const customGiftIds = () => [...snap.rows.values()].filter((g) => !g.builtin && !g.deleted).map((g) => g.id);
 
@@ -260,7 +278,8 @@ export function checkShownPrice(gift, shown) {
  * as changed, and `icon` when it was replaced (an app reading gifts=2 draws these; an older one only takes the id).
  * `app2`: the phone reads it all (?gifts=2); otherwise the app's gifts whose price was changed are left out, since
  * that app would show its own price. `family`: the phone has the Aile ve Dost shelf (?family=1); an older one gets no
- * bond gifts and sees that shelf's other gifts on İkili, where Koruma Kartı was.
+ * bond gifts and sees that shelf's other gifts on Çift (İkili before), where Koruma Kartı was. A global gift (global-gifts.mjs
+ * globalNow) also says global: true, which an older app ignores (it shows it on its shelf as any gift).
  */
 export function catalogGifts({ app2 = false, hidden = new Set(), family = false } = {}) {
   const out = [];
@@ -268,8 +287,8 @@ export function catalogGifts({ app2 = false, hidden = new Set(), family = false 
     const cat = family || g.cat !== 'family' ? g.cat : 'couple';
     if (g.builtin) {
       if (hidden.has(g.id) || (!family && BOND_GIFTS.has(g.id)) || (!app2 && g.price !== GIFTS.get(g.id).price)) continue;
-      out.push({ id: g.id, name: g.name, emoji: g.emoji, price: g.price, cat, minSvip: g.minSvip, ...(g.icon ? { icon: g.icon } : {}) });
-    } else out.push({ id: g.id, name: g.name, price: g.price, cat, minSvip: g.minSvip, emoji: g.emoji, icon: g.icon, custom: true });
+      out.push({ id: g.id, name: g.name, emoji: g.emoji, price: g.price, cat, minSvip: g.minSvip, ...(g.icon ? { icon: g.icon } : {}), ...(globalNow(g) ? { global: true } : {}) });
+    } else out.push({ id: g.id, name: g.name, price: g.price, cat, minSvip: g.minSvip, emoji: g.emoji, icon: g.icon, custom: true, ...(globalNow(g) ? { global: true } : {}) });
   }
   return out;
 }
@@ -346,7 +365,7 @@ const canFitIcon = () => (pillow ??= run(PYTHON, ['-I', '-c', 'import PIL'], { t
  * (tools/icon-fit.py: an optimised PNG, transparency kept). { url: the icon to keep, upload: the file it replaced,
  * to remove once the gift is saved (null: kept as uploaded) }.
  */
-async function checkIcon(url) {
+export async function checkIcon(url) {
   const key = keyOf(url);
   if (!key?.startsWith('gifticon/')) throw new HttpError(400, 'İkonu önce yükle');
   await verifyUpload(url, 'gifticon');
@@ -998,7 +1017,7 @@ const priceOf = (v) => {
   return n;
 };
 const catOf = (v) => {
-  if (!CATS.includes(v)) throw new HttpError(400, 'Raf Popüler, İkili, Aile ve Dost, Kutlama ya da Özel olmalı');
+  if (!CATS.includes(v)) throw new HttpError(400, 'Raf Popüler, Çift, Aile ve Dost, Kutlama ya da Özel olmalı');
   return v;
 };
 /** The VIP level a gift needs: only on the Özel shelf (1–10); 0 elsewhere. */
@@ -1047,6 +1066,29 @@ async function saving(fn) {
     throw e;
   }
 }
+/** `mark` in a body (profile-mark-rules.mjs markInput): undefined (unchanged) or the three columns to store. */
+function markCols(v) {
+  const m = markInput(v);
+  if (m.error) throw new HttpError(400, m.error);
+  return m.cols;
+}
+/**
+ * Refuses a save that leaves the gift breaking a rule between Profil izleri and the other features. `row`: the gift's
+ * row as the save's transaction just wrote it (the transaction rolls back on a refusal).
+ * - A gift that cleans a mark must cost more than a gift that leaves it (profile-mark-rules.mjs markPriceProblem).
+ * - A bond gift or Koruma Kartı leaves or cleans no mark: they start or feed a bond or a Koruma, and bonds.mjs
+ *   bondGiftOf never applies one, so the catalog would promise what the send doesn't do.
+ * - A gift that leaves or cleans a mark is never global (global-gifts.mjs): a Kaka told to every room of the country
+ *   would shame its receiver in front of everyone, and a Su would tell everyone they had been marked.
+ */
+function checkMarkPrices(row) {
+  const after = row.builtin ? appGiftOf(GIFTS.get(row.id), viewOf(row)) : customGift(viewOf(row));
+  const marks = after.mark?.role === 'leave' || after.mark?.role === 'clean';
+  if (marks && (BOND_GIFTS.has(row.id) || row.id === GUARD_CARD)) throw new HttpError(400, 'Bağ hediyesi ve Koruma Kartı profil izi bırakamaz ya da temizleyemez; iz kuralını boş bırakın');
+  if (marks && row.global === true) throw new HttpError(400, 'Profil izi bırakan ya da temizleyen hediye global olamaz; Global seçimini ya da iz kuralını kaldırın');
+  const problem = markPriceProblem([...allGifts().filter((g) => g.id !== row.id), after], row.id);
+  if (problem) throw new HttpError(400, problem);
+}
 /** What the audit keeps of a row (an app's gift's: null where it is as in the app). */
 const auditOf = (r) =>
   r && {
@@ -1061,9 +1103,11 @@ const auditOf = (r) =>
     icon: r.icon_url,
     video: r.video_url ?? null,
     ...(r.video_off ? { videoOff: true } : {}),
+    ...(r.global ? { global: true } : {}),
     job: r.job_status ?? null,
     iconLink: r.icon_link ?? null,
     videoLink: r.video_link ?? null,
+    ...(r.mark_role ? { mark: { role: r.mark_role, kind: r.mark_kind ?? null, hours: r.mark_hours ?? null } } : {}),
   };
 /** iconLink / videoLink in a body: undefined (unchanged), null (none: the file was uploaded) or a checked link. */
 const linkField = (v) => (v === undefined ? undefined : v === null || v === '' ? null : linkOf(v));
@@ -1100,6 +1144,7 @@ function originalOf(id) {
     cat: base.cat,
     minSvip: base.minSvip,
     enabled: !GIFTS_PAUSED.has(id),
+    mark: appMarkOf(id, undefined),
     icon: artUrl('gifts', id),
     video: clip ? { url: clip.url, bytes: clip.bytes, ms: clip.ms } : null,
   };
@@ -1117,8 +1162,10 @@ const changedOf = (r) =>
         ...(r.price !== null ? ['price'] : []),
         ...(r.cat !== null || r.min_svip !== null ? ['cat'] : []),
         ...(r.enabled !== null ? ['enabled'] : []),
+        ...(r.mark_role !== null && r.mark_role !== undefined ? ['mark'] : []),
         ...(r.icon_url !== null ? ['icon'] : []),
         ...(r.video_url !== null || r.video_off || r.job_status !== null ? ['video'] : []),
+        ...(r.global ? ['global'] : []),
       ];
 
 /** An admin's gift as the panel shows it. */
@@ -1132,6 +1179,9 @@ const customView = (x, sent) => ({
   minSvip: Number(x.min_svip),
   sort: Number(x.sort),
   enabled: x.enabled,
+  // Profil izleri: { role, kind, hours } or null (a plain gift).
+  mark: storedMark(x) ?? null,
+  global: x.global === true,
   icon: x.icon_url,
   // Where the icon and the video were fetched from (null: uploaded), for fetching them again.
   iconLink: x.icon_link ?? null,
@@ -1162,6 +1212,8 @@ function appView(id, x, sent) {
     minSvip: g.minSvip,
     sort: g.sort,
     enabled: g.enabled,
+    mark: g.mark,
+    global: g.global,
     icon: g.icon ?? original.icon,
     iconLink: x?.icon_link ?? null,
     videoLink: x?.video_link ?? null,
@@ -1264,7 +1316,7 @@ const writeLimit = (a) => limit(`gifts-admin:${a.id}`, 60, 'Çok fazla deneme, b
  * What POST /api/admin/gifts/reset can give back to one of the app's gifts; without `fields`, all but its place (an
  * ordered shelf keeps its order). Its place goes back with its shelf when it was moved to another one.
  */
-const RESET = ['name', 'emoji', 'price', 'cat', 'enabled', 'sort', 'icon', 'video'];
+const RESET = ['name', 'emoji', 'price', 'cat', 'enabled', 'sort', 'icon', 'video', 'mark', 'global'];
 const RESET_ALL = RESET.filter((f) => f !== 'sort');
 
 /**
@@ -1306,6 +1358,12 @@ async function updateApp(req, a, id, b) {
     if (typeof b.enabled !== 'boolean') throw new HttpError(400, 'Açık/kapalı geçersiz');
     next.enabled = b.enabled === !GIFTS_PAUSED.has(id) ? null : b.enabled;
   }
+  // Profil izleri: the app's own rule again is kept as "as in the app" (null columns).
+  const mark = markCols(b.mark);
+  if (mark !== undefined) next.mark = JSON.stringify(storedMark(mark) ?? null) === JSON.stringify(appMarkOf(id, undefined)) ? { mark_role: null, mark_kind: null, mark_hours: null } : mark;
+  // Global hediye (global-gifts.mjs): checked with the price it will have.
+  const global = globalSave(b, { id, price: next.price === undefined ? cur.price : (next.price ?? base.price), was: cur.global });
+  if (global !== undefined) next.global = global;
   // The app's picture as the panel shows it, or null: back to it. Another address: a new icon.
   if (b.icon !== undefined) {
     if (b.icon === null || b.icon === artUrl('gifts', id)) {
@@ -1340,6 +1398,8 @@ async function updateApp(req, a, id, b) {
       if (next.emoji !== undefined) set('emoji', next.emoji);
       if (next.enabled !== undefined) set('enabled', next.enabled);
       if (next.minSvip !== undefined) set('min_svip', next.minSvip);
+      if (next.mark !== undefined) for (const [col, v] of Object.entries(next.mark)) set(col, v);
+      if (next.global !== undefined) set('global', next.global);
       // Moved to another shelf: first there, as an admin's gift is.
       if (next.cat !== undefined) {
         set('cat', next.cat);
@@ -1369,6 +1429,7 @@ async function updateApp(req, a, id, b) {
       set('updated_by', a.id);
       sets.push('updated_at = now()', "rev = nextval('custom_gift_rev')");
       const after = await c.query(`UPDATE custom_gifts SET ${sets.join(', ')} WHERE id = $1 RETURNING *`, vals);
+      checkMarkPrices(after.rows[0]);
       await audited(c, a.id, 'gift.update', { gift: id, before: auditOf(r), after: auditOf(after.rows[0]), ...panelDetail(a) }, clientIp(req));
     }),
   );
@@ -1383,7 +1444,7 @@ export const customGiftRoutes = {
   async 'GET /api/admin/gifts'(req, url) {
     await admin(req);
     const app = url?.searchParams.get('builtin') === '1';
-    return { gifts: await adminGifts(null, { app }), limits: LIMITS, convert: await canConvert(), svga: await canSvga(), storage: storageOn() };
+    return { gifts: await adminGifts(null, { app }), limits: LIMITS, convert: await canConvert(), svga: await canSvga(), storage: storageOn(), globalMinPrice: globalMinPrice() };
   },
 
   /** A new gift, first on its shelf; on the shelves at once unless enabled is false. */
@@ -1397,6 +1458,8 @@ export const customGiftRoutes = {
     const minSvip = svipOf(b.minSvip, cat);
     const emoji = emojiOf(b.emoji);
     if (b.enabled !== undefined && typeof b.enabled !== 'boolean') throw new HttpError(400, 'Açık/kapalı geçersiz');
+    const mark = markCols(b.mark ?? null);
+    const global = globalSave(b, { price }) ?? null;
     nameFree(name, null);
     if (typeof b.icon !== 'string' || !b.icon) throw new HttpError(400, 'İkonu önce yükle');
     const icon = await checkIcon(b.icon);
@@ -1410,12 +1473,13 @@ export const customGiftRoutes = {
         const first = await firstSort(c, cat);
         const r = await c.query(
           `INSERT INTO custom_gifts (id, name, emoji, price, cat, min_svip, sort, enabled, icon_url, video_url, video_bytes, video_ms, video_v, job_status, job_source, job_fill,
-                                     created_by, updated_by, icon_link, video_link, job_opaque)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $17, $18, $19, $20) RETURNING *`,
+                                     created_by, updated_by, icon_link, video_link, job_opaque, mark_role, mark_kind, mark_hours, global)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $17, $18, $19, $20, $21, $22, $23, $24) RETURNING *`,
           [id, name, emoji, price, cat, minSvip, first, b.enabled !== false, icon.url, stacked?.url ?? null, stacked?.bytes ?? null, stacked?.ms ?? null, stacked?.v ?? null,
             video?.kind === 'source' ? 'processing' : null, video?.kind === 'source' ? video.url : null, video?.kind === 'source' ? video.fill : null, a.id, iconLink, videoLink,
-            video?.kind === 'source' && video.opaque],
+            video?.kind === 'source' && video.opaque, mark.mark_role === 'none' ? null : mark.mark_role, mark.mark_kind, mark.mark_hours, global],
         );
+        checkMarkPrices(r.rows[0]);
         await audited(c, a.id, 'gift.create', { gift: id, before: null, after: auditOf(r.rows[0]), ...panelDetail(a) }, clientIp(req));
         return id;
       }),
@@ -1435,8 +1499,8 @@ export const customGiftRoutes = {
     writeLimit(a);
     const b = await readJson(req, 8192);
     const id = idOf(b.id, { app: true });
-    // A bond gift's price is the bond's (bond-rules.mjs) and it stays on its shelf; its name, picture and video may change.
-    if (BOND_GIFTS.has(id) && b.price !== undefined && b.price !== GIFTS.get(id).price) throw new HttpError(400, 'Bağ hediyesinin fiyatı Bağlar kuralından gelir, buradan değişmez');
+    // A bond gift stays on its shelf. Its price may change: bonds.mjs charges it (an older app, which shows the app's
+    // price, is asked to update while it differs); a pending request keeps the coins it holds.
     if (BOND_GIFTS.has(id) && b.cat !== undefined && b.cat !== 'family') throw new HttpError(400, 'Bağ hediyesi Aile ve Dost rafında kalır');
     if (GIFTS.has(id)) return updateApp(req, a, id, b);
     const cur = snap.rows.get(id);
@@ -1455,6 +1519,10 @@ export const customGiftRoutes = {
       if (typeof b.enabled !== 'boolean') throw new HttpError(400, 'Açık/kapalı geçersiz');
       next.enabled = b.enabled;
     }
+    const mark = markCols(b.mark);
+    if (mark !== undefined) next.mark = { ...mark, mark_role: mark.mark_role === 'none' ? null : mark.mark_role };
+    const global = globalSave(b, { id, price: next.price ?? cur.price, was: cur.global });
+    if (global !== undefined) next.global = global;
     let iconUpload = null;
     if (b.icon !== undefined && b.icon !== cur.icon) {
       if (typeof b.icon !== 'string' || !b.icon) throw new HttpError(400, 'İkonu önce yükle');
@@ -1485,6 +1553,8 @@ export const customGiftRoutes = {
         if (next.minSvip !== undefined) set('min_svip', next.minSvip);
         if (next.emoji !== undefined) set('emoji', next.emoji);
         if (next.enabled !== undefined) set('enabled', next.enabled);
+        if (next.mark !== undefined) for (const [col, v] of Object.entries(next.mark)) set(col, v);
+        if (next.global !== undefined) set('global', next.global);
         // A gift moved to another shelf goes first there.
         if (next.cat !== undefined && next.cat !== r.cat) {
           set('cat', next.cat);
@@ -1513,6 +1583,7 @@ export const customGiftRoutes = {
         set('updated_by', a.id);
         sets.push('updated_at = now()', "rev = nextval('custom_gift_rev')");
         const after = await c.query(`UPDATE custom_gifts SET ${sets.join(', ')} WHERE id = $1 RETURNING *`, vals);
+        checkMarkPrices(after.rows[0]);
         await audited(c, a.id, 'gift.update', { gift: id, before: auditOf(r), after: auditOf(after.rows[0]), ...panelDetail(a) }, clientIp(req));
       }),
     );
@@ -1598,6 +1669,8 @@ export const customGiftRoutes = {
         if (fields.includes('price')) sets.push('price = NULL');
         if (fields.includes('cat')) sets.push('cat = NULL', 'min_svip = NULL');
         if (fields.includes('enabled')) sets.push('enabled = NULL');
+        if (fields.includes('mark')) sets.push('mark_role = NULL', 'mark_kind = NULL', 'mark_hours = NULL');
+        if (fields.includes('global')) sets.push('global = NULL');
         // Moved to another shelf: its place there means nothing on its own one.
         if (fields.includes('sort') || (fields.includes('cat') && r.cat !== null)) sets.push('sort = NULL');
         if (fields.includes('icon')) {
@@ -1611,6 +1684,7 @@ export const customGiftRoutes = {
         }
         sets.push('updated_by = $2', 'updated_at = now()', "rev = nextval('custom_gift_rev')");
         const after = await c.query(`UPDATE custom_gifts SET ${sets.join(', ')} WHERE id = $1 RETURNING *`, [id, a.id]);
+        checkMarkPrices(after.rows[0]);
         await audited(c, a.id, 'gift.reset', { gift: id, fields, before: auditOf(r), after: auditOf(after.rows[0]), ...panelDetail(a) }, clientIp(req));
       }),
     );

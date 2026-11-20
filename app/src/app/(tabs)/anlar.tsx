@@ -14,6 +14,7 @@ import { ContactNote } from '@/components/contact-note';
 import { useReport } from '@/components/report-sheet';
 import { FramedAvatar, GradientButton, StateIcon, VerifiedBadge } from '@/components/ui';
 import { ProfileGiftSheet } from '@/components/profile-gift-sheet';
+import { useGiftStage } from '@/components/fx/gift-stage';
 import { MOMENTS, userById, type Gift, type Moment, type User } from '@/data/mock';
 import {
   AUTHOR_SVIP,
@@ -600,10 +601,12 @@ function ComposeBar({ me, onPress, lockedBelow }: { me: User; onPress: () => voi
 
 /**
  * A gift to a post's writer, from the post (no confirmation, as every gift). Live mode: the server takes the coins at
- * its price and pays the writer (POST /api/gifts/send, no room); the prototype spends on this phone.
+ * its price and pays the writer (POST /api/gifts/send, no room); the prototype spends on this phone. Its animation
+ * plays over the screen once it went (components/fx/gift-stage; `sheet` draws it too).
  */
 function useMomentGift() {
-  const { coins, svipLevel, spendCoins, spendBlock, recordGift, bump } = useApp();
+  const { coins, svipLevel, spendCoins, spendBlock, recordGift, bump, me } = useApp();
+  const stage = useGiftStage();
   const gifts = giftShelf(useLiveCatalog());
   const [to, setTo] = useState<User | null>(null);
   const toWallet = { text: 'Jeton yükle', onPress: () => router.push('/cuzdan') };
@@ -631,9 +634,15 @@ function useMomentGift() {
     }
     recordGift(to.id, g.id, 1);
     bump('giftsSent', 1);
+    stage.play(g, me.name, to.name, 1);
     return true;
   };
-  const sheet = to ? <ProfileGiftSheet visible name={to.name} gifts={gifts} coins={coins} svipLevel={svipLevel} onClose={() => setTo(null)} onSend={send} /> : null;
+  const sheet = (
+    <>
+      {to ? <ProfileGiftSheet visible name={to.name} gifts={gifts} coins={coins} svipLevel={svipLevel} onClose={() => setTo(null)} onSend={send} /> : null}
+      {stage.node}
+    </>
+  );
   return { open: setTo, sheet };
 }
 

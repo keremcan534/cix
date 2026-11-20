@@ -45,6 +45,7 @@ import {
   type TeamId,
 } from '@/lib/pk';
 import { useSheetMax } from '@/lib/sheet-space';
+import { PK_LINE } from '@/lib/seat-fit';
 import { showAlert } from '@/lib/alert';
 import { SCRIM, colors, semantic } from '@/theme';
 import { Photo } from '@/components/photo';
@@ -531,7 +532,21 @@ export function PkBoard({ pk, viewerRoomId, canManage }: { pk: PkSession; viewer
   );
 }
 
-export type ArenaSlot = { width: number; size: number };
+/**
+ * Where a seat is drawn: its slot's width, its face and, where a container has less room above the face than a row of
+ * seats (lib/seat-cell SEAT_TOP), the px free there (`top`, Seat roomTop): a frame's crown keeps within it.
+ */
+export type ArenaSlot = { width: number; size: number; top?: number };
+/** The gaps inside a team's half (under its name, between its rows of seats). */
+const HALF_GAP = 3;
+/**
+ * The line of a half's name and head count. It is drawn over the seats under it, like a row's points pill: a frame's
+ * crown in the first row may rise behind it (3 px of gap alone would cut nearly every frame there), so it has a dark,
+ * nearly opaque backing (st.halfHead) and its text a shadow: the crown's tip is covered and the name reads.
+ */
+const HEAD_LINE = 16;
+/** The PK's other mics: room above their faces, inside the row's scroller (which cuts what passes its edge). */
+const OTHERS_TOP = 10;
 /**
  * Takım PK arena: the mic area splits in two, Red (the lion) on the left and Blue (the wolf) on the right, each team's
  * people on mics in its own half; the two scores, VS and the timer on top. Seats keep their own press handlers (room
@@ -587,13 +602,21 @@ export function TeamArena({
               const tint = t.id === 'red' ? (['rgba(226,38,63,0.34)', 'rgba(120,10,40,0.12)'] as const) : (['rgba(47,123,255,0.34)', 'rgba(16,40,120,0.12)'] as const);
               return (
                 <LinearGradient key={t.id} colors={tint} style={[st.half, { borderColor: `${t.color}AA` }]} accessibilityLabel={`${t.name}: ${compact(t.score)} puan, ${t.members.length} kişi`}>
-                  <View style={st.halfHead}>
+                  <View style={[st.halfHead, { zIndex: 1 }]}>
                     <Text style={[st.halfName, { color: t.id === 'red' ? '#FF9DB5' : '#9CD3FF' }]} numberOfLines={1}>
                       {t.name}
                     </Text>
                     <Text style={st.halfCount}>{t.members.length} kişi</Text>
                   </View>
-                  <View style={st.halfSeats}>{onMic.map((m) => <View key={m}>{renderSeat(seats.indexOf(m), { width: slotW, size })}</View>)}</View>
+                  <View style={st.halfSeats}>
+                    {/* Over a face: the gap and the half's name line (first row) or the row above's points line, both
+                        drawn over a crown's tip that rises into them; a higher row is drawn over the rows under it. */}
+                    {onMic.map((m, k) => (
+                      <View key={m} style={{ zIndex: Math.ceil(onMic.length / cols) - Math.floor(k / cols) }}>
+                        {renderSeat(seats.indexOf(m), { width: slotW, size, top: HALF_GAP + (k < cols ? HEAD_LINE : PK_LINE) })}
+                      </View>
+                    ))}
+                  </View>
                   {onBoss && (
                     <View style={st.awayRow} accessibilityLabel={`${nameOf(onBoss)} patron koltuğunda, ${compact(pk.points[onBoss] ?? 0)} puan`}>
                       <Photo uri={userById(onBoss).avatar} kind="face" style={st.mini} />
@@ -627,7 +650,7 @@ export function TeamArena({
           <Text style={st.othersTitle}>PK dışındaki mikrofonlar · {others.filter((o) => o.uid).length}/{others.length}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.othersRow}>
             {others.map(({ i }) => (
-              <View key={i}>{renderSeat(i, { width: 56, size: 34 })}</View>
+              <View key={i}>{renderSeat(i, { width: 56, size: 34, top: OTHERS_TOP })}</View>
             ))}
           </ScrollView>
         </View>
@@ -920,17 +943,17 @@ const st = StyleSheet.create({
   mini: { width: 20, height: 20, borderRadius: 10, marginRight: -4, borderWidth: 1, borderColor: colors.bg },
   arenaRim: { marginHorizontal: 8, marginTop: 4 },
   arena: { backgroundColor: 'rgba(30,8,48,0.86)', borderRadius: 16.5, padding: 5, gap: 4 },
-  half: { flex: 1, minWidth: 0, borderRadius: 12, borderWidth: 1, paddingVertical: 3, paddingHorizontal: 2, gap: 3 },
-  halfHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 4, gap: 4 },
-  halfName: { fontWeight: '800', fontSize: 12, flexShrink: 1 },
-  halfCount: { color: PK.dim, fontSize: 11, fontWeight: '700' },
-  halfSeats: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', rowGap: 3 },
+  half: { flex: 1, minWidth: 0, borderRadius: 12, borderWidth: 1, paddingVertical: 3, paddingHorizontal: 2, gap: HALF_GAP },
+  halfHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 4, gap: 4, borderRadius: 8, backgroundColor: 'rgba(20,10,32,0.9)' },
+  halfName: { fontWeight: '800', fontSize: 12, lineHeight: HEAD_LINE, flexShrink: 1, textShadowColor: 'rgba(0,0,0,0.75)', textShadowRadius: 3 },
+  halfCount: { color: PK.dim, fontSize: 11, lineHeight: HEAD_LINE, fontWeight: '700', textShadowColor: 'rgba(0,0,0,0.75)', textShadowRadius: 3 },
+  halfSeats: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', rowGap: HALF_GAP },
   awayRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, paddingHorizontal: 4 },
   away: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   awayText: { color: PK.dim, fontSize: 12 },
   others: { marginHorizontal: 8, marginTop: 4, gap: 2 },
   othersTitle: { color: colors.textDim, fontSize: 12, fontWeight: '700' },
-  othersRow: { flexDirection: 'row' },
+  othersRow: { flexDirection: 'row', paddingTop: OTHERS_TOP },
   center: { flex: 1, backgroundColor: SCRIM, alignItems: 'center', justifyContent: 'center', padding: 16 },
   detailWrap: { width: '100%', maxWidth: 420, maxHeight: '88%' },
   detailBody: { paddingHorizontal: 10, paddingVertical: 8, gap: 7 },

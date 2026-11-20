@@ -37,7 +37,7 @@ Ekran adları: **Profil** = `src/app/kullanici/[id].tsx`, **Ayarlar** = `src/app
 | Çevrimiçi / çevrimdışı | 2 | ✓ (gizlilik 🆕) | Kullanıcı gizlediyse profilde "Durum gizli" yazar. |
 | Son görülme | 2 | 🆕 | Örnek: "Son görülme Dün 23:40". Kendi son görülmesini kapatan kişi başkalarınınkini de göremez. |
 | Meşgul / görüşmede | 2 | ✓ | "Şu an sesli/görüntülü görüşmede". Görüşmeye katılınamaz. |
-| Mevcut bir odada mı | 2 | ✓ | "Şu an odada: … · Git" (şifreli odada şifre sorulur). |
+| Mevcut bir odada mı | 2 | ✓ | "Şu an odada: … · Git" (şifreli odada şifre sorulur). Canlı uygulamada sunucudan gelir (`GET /api/user` `room`, Güncelleme 7): engellenen kişiye, giremeyeceği odada (atılmış, oda sahibiyle engelli, üyesi olmadığı özel oda) ve bire bir görüşmede görünmez. "Git" ile gelen kişi için odadaki herkes "Kaan, Artemis'i takip ederek geldi" görür (Artemis hâlâ odadaysa). |
 | Oda bilgisini gizleme | 2 | 🆕 | *Ayarlar → Bulunduğum odayı profilimde göster*. Kapalıysa profilde oda kartı ve "Git" görünmez. |
 
 ## 2-C. Sosyal bilgiler

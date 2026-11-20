@@ -14,7 +14,7 @@ Kaynaklar: *SIMILARCLUP — PK BATTLE MODÜLÜ* ve *Gelişmiş PK Modu, Takım P
 | `src/components/room/pk-result.tsx` | Sonuç ekranı ve "Taç Kazandıranlar" ekranı. |
 | `src/components/room/pk-premium.tsx` | PK Premium görünümü (güncelleme 6): mor zemin, altın çerçeveler, defne çerçeveli yüzler, VS, aslan/kurt sancakları, kupa. Süsler `assets/pk/` içindeki şeffaf parçalar (`scripts/pk-art-cut.py` konsept görsellerden keser). |
 | `src/lib/compact.ts` | Bütün PK sayıları ve sıralamalar için kısaltma: 1k, 1.1k, 10.12k, 1m (aşağı yuvarlanır). |
-| `src/components/room/parts.tsx` | Koltuk altında canlı PK puanı (`PkPoints`), koltuğun genişliğine göre (Puanlama'da). Patron koltuğunda da gösterilir (`owner.tsx` `BossSeat`). |
+| `src/components/room/parts.tsx` | Koltuk altında canlı PK puanı (`PkPoints`), koltuğun genişliğine göre (Puanlama'da). Patron koltuğunda da gösterilir (`owner.tsx` `BossSeat`). Sayı her telefonda aynı, okunur boyda (12, `lib/pk` `PK_TEXT`): telefonun yazı boyutuyla büyümez, sığsın diye küçülmez (Güncelleme 7, madde 13: Android bazı telefonlarda sayıyı birkaç piksele küçültüyordu). Rozet sığacak kısa yazımı kendisi seçer (61.9k, 169k); en dar koltukta da 4 karakter sığar. |
 | `src/app/oda/[id].tsx` | Menü › **PK** (oda sahibi ve yöneticiler); hediyeler tek işlem kimliğiyle PK'ya yazılır. |
 | `src/app/pk-yonetimi.tsx` | Yönetim paneli (`pk.manage`): modlar, süreler, takım sınırları, hediye puanları, aktif PK (bitir/iptal/iade testi), geçmiş, kayıtlar. |
 | `tests/pk.test.ts` | Sunucu kurallarının otomatik testleri. |

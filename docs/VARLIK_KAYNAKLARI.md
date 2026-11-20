@@ -27,7 +27,7 @@ Aşağıdaki görseller yapay zekâ araçlarıyla bu proje için üretildi. Yay�
 
 | Varlık | Araç | Commit (tarih) | Not |
 | --- | --- | --- | --- |
-| `assets/brand/logo.png` (marka işareti) | ChatGPT | d62c790 (2026-11-01) | Uygulama ikonları `scripts/app-icons.py` ile bu dosyadan üretiliyor. |
+| `assets/brand/logo.png` (marka işareti) | Sahiplerin 2026-11-19'da gönderdiği yeni logo (araç yazılmalı) | 2026-11-19 | Lacivert kareden şeffaf işaret olarak çıkarıldı (parlama yumuşak saydamlık). Uygulama ikonları `scripts/app-icons.py` ile bu dosyadan üretiliyor. Önceki logo: ChatGPT, d62c790 (2026-11-01). |
 | `assets/art/` (185 ikon, 192 px) | ChatGPT | 5ec27cc (2026-10-28) | |
 | `assets/icons/` | ChatGPT | 3ba3278 (2026-10-26) | Tek bir üretilmiş paftadan kesildi. |
 | `assets/frames/` (profil çerçeveleri) | ChatGPT | 2858a8f (2026-10-26) | |

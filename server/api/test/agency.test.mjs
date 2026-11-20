@@ -530,6 +530,12 @@ describe('Askı, personel, BD, ödemeler, raporlar', () => {
     const period = (await q('SELECT DISTINCT period FROM agency_ledger'))[0].period;
     refused(await admin.post('/api/admin/agency/periods/close', { period }), 400, 'bitmemiş dönem kapanmaz');
     await q('INSERT INTO agency_periods (period) VALUES ($1)', [period]);
+    // Aday ajans (agency-activity.mjs): fewer than 20 streamers, the commission waits; the rule off, it is paid.
+    const cand = refused(await tOwner.post('/api/agency/payouts/request', { id: T.id, currency: 'USD', ref: ref() }), 409, 'aday ajans');
+    assert.equal(cand.code, 'agency_candidate');
+    assert.match(cand.error, /Aday ajans ödeme alamaz/);
+    const view0 = ok(await admin.get('/api/admin/live-settings'));
+    ok(await admin.post('/api/admin/live-settings', { changes: { agency_activation_hosts: 0 }, reason: 'Ödeme testi', baseV: view0.v, confirm: true }), 'aday kuralı kapalı');
     const r0 = ref();
     const p = ok(await tOwner.post('/api/agency/payouts/request', { id: T.id, currency: 'USD', ref: r0 }));
     const expected = num((await q("SELECT sum(amount) AS s FROM agency_ledger WHERE agency_id = $1", [T.id]))[0].s);

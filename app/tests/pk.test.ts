@@ -3,9 +3,12 @@
 // refunds and crown relations (Gelişmiş PK şartnamesi §2–§10).
 import { afterEach, beforeEach, describe, mock, test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 import {
   CHAR_EM,
+  PK_TEXT,
   applyServerPk,
   computeAwards,
   computeCrowns,
@@ -555,19 +558,29 @@ describe('Sunucu PK’sı (canlı mod): herkes aynı skoru ve sonucu görür', (
 
 describe('Koltuk altındaki PK puanı her mikrofon düzeninde okunur', () => {
   test('her zaman kısa yazım (k, m, b), aşağı yuvarlanır; yer azsa daha az ondalık', () => {
-    const pill = (value: number, slot: number, scale = 1) => {
-      const box = pkPillBox(slot, scale);
+    const pill = (value: number, slot: number) => {
+      const box = pkPillBox(slot);
       return `${box.icon ? '🎁' : ''}${pkPointsText(value, box.chars)}`;
     };
     // Ekran görüntüsündeki 61.990: artık "61.9…" diye kesilmez.
-    assert.equal(pill(61_990, 96), '🎁61.99k');
-    assert.equal(pill(61_990, 66), '🎁61.9k');
-    assert.equal(pill(940, 66), '🎁940');
-    assert.equal(pill(1_234_567, 57), '🎁1.23m');
+    assert.equal(pill(61_990, 96), '🎁61.9k');
+    assert.equal(pill(61_990, 66), '61.99k');
+    assert.equal(pill(940, 96), '🎁940');
+    assert.equal(pill(1_234_567, 57), '1.23m');
     assert.equal(pill(1_234_567, 40), '1.2m');
     // 30 mikrofonun en dar koltuğu: hediye simgesi yok, sayı yine kısa.
     assert.equal(pill(169_990, 40), '169k');
-    assert.equal(pill(999_999, 96), '🎁999.9k');
+    assert.equal(pill(999_999, 96), '🎁999k');
+  });
+
+  test('puan her telefonda aynı, okunur boyda (12): küçülmez, telefonun yazı boyutuyla büyümez (Güncelleme 7, madde 13)', () => {
+    for (const slot of [34, 40, 48, 57, 66, 96]) assert.equal(pkPillBox(slot).size, PK_TEXT);
+    assert.equal(PK_TEXT, 12);
+    const parts = readFileSync(resolve(import.meta.dirname, '../src/components/room/parts.tsx'), 'utf8');
+    const line = parts.split('\n').find((l) => l.includes('format={(n) => pkPointsText(n, box.chars)}')) ?? '';
+    assert.match(line, /maxFontSizeMultiplier=\{1\}/, 'telefonun yazı boyutu büyütmez');
+    assert.doesNotMatch(line, /shrink=|adjustsFontSizeToFit/, 'Android sayıyı birkaç piksele küçültmesin');
+    assert.match(line, /lineHeight: box\.height - 2/, 'satırı rozetin içi kadar');
   });
 
   test('rozet koltuk için sabit genişlikte: puan büyüdükçe genişlemez, koltuktan taşmaz', () => {
@@ -575,20 +588,20 @@ describe('Koltuk altındaki PK puanı her mikrofon düzeninde okunur', () => {
     for (const phone of [320, 360, 390, 412, 430])
       for (const l of ROOM_LAYOUTS) for (const pkRoom of [false, true]) widths.add(layoutPlan(l.layoutSchema, phone, pkRoom).micW);
     for (const phone of [320, 360, 390, 412]) for (const mics of [4, 10, 15]) for (const h of [200, 300, 420]) widths.add(fitGrid(mics, phone, h).slot);
-    for (const width of widths)
-      for (const scale of [1, 1.15]) {
-        const box = pkPillBox(width, scale);
-        assert.ok(box.width <= width - 4 || box.width === 30, `${width} px: rozet ${box.width}`);
-        assert.ok(box.height <= PK_LINE, 'rozet puan satırına sığar');
-        // Every value in the same pill: its width never depends on the score.
-        for (const value of [0, 7, 940, 9_999, 16_450, 61_990, 123_456, 999_999, 1_250_000, 9_999_999, 2_500_000_000]) {
-          const text = pkPointsText(value, box.chars);
-          // Counted at the pill's generous width per character, the text fits beside the icon.
-          const drawn = 2 + 2 * box.pad + (box.icon ? box.size + 2 : 0) + text.length * CHAR_EM * box.size * Math.max(1, scale);
-          if (width >= 44) assert.ok(drawn <= box.width + 0.5, `${width} px, ${scale}x, ${value}: "${text}" ${drawn.toFixed(1)} > ${box.width}`);
-          assert.ok(!text.includes('…'));
-        }
+    for (const width of widths) {
+      const box = pkPillBox(width);
+      assert.ok(box.width <= width - 4 || box.width === 30, `${width} px: rozet ${box.width}`);
+      assert.ok(box.height <= PK_LINE, 'rozet puan satırına sığar');
+      // Every value in the same pill: its width never depends on the score.
+      for (const value of [0, 7, 940, 9_999, 16_450, 61_990, 123_456, 999_999, 1_250_000, 9_999_999, 2_500_000_000]) {
+        const text = pkPointsText(value, box.chars);
+        // Counted at the pill's generous width per character, the text fits beside the icon, on every real seat
+        // (the narrowest is 40 px: it no longer shrinks to fit).
+        const drawn = 2 + 2 * box.pad + (box.icon ? box.size + 2 : 0) + text.length * CHAR_EM * box.size;
+        assert.ok(drawn <= box.width + 0.5, `${width} px, ${value}: "${text}" ${drawn.toFixed(1)} > ${box.width}`);
+        assert.ok(!text.includes('…'));
       }
+    }
   });
 });
 

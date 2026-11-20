@@ -15,8 +15,13 @@
 import { EXCHANGE, GIFTS, PACKS, SHOP, WITHDRAW, exchangeCoins } from './catalog.mjs';
 import { DAILY_ROUNDS as CASINO_DAILY_ROUNDS, GAMES as CASINO_GAMES, STAKES as CASINO_STAKES } from './casino-rules.mjs';
 import { REMINDER_KINDS, REMINDER_LABEL } from './event-rules.mjs';
+import { CHEST_MIN_CONTRIBUTION, FAMILY_CHESTS, FAMILY_TASKS, FAMILY_THEMES } from './family-rules.mjs';
+import { MEDAL_RULES, TITLE_RULES } from './profile-rules.mjs';
+import { MARK_HOURS } from './profile-mark-rules.mjs';
 import { HOUSE_PCT as ROCKET_HOUSE_PCT } from './rocket-live-rules.mjs';
+import { LEVELS as BOND_LEVELS, levelsOf as bondLevelsOf } from './bond-rules.mjs';
 import { AUTO_CHAT, AUTO_PARTS, AUTO_PART_LABEL, AUTO_PART_OFF, AUTO_TEXTS, NOTICE_CATEGORIES, NOTICE_LABEL, linesOf } from './auto-chat-rules.mjs';
+import { GLOBAL_GIFT_AMOUNTS } from './global-gift-rules.mjs';
 
 /** Every feature that can be switched off (features.mjs ROUTES). `games` is mostly in the app; Rüzgâr Gülü is on the server. */
 export const FEATURES = ['gifts', 'purchases', 'topup', 'exchange', 'jeton', 'games', 'dm', 'rooms', 'withdraw', 'shop'];
@@ -118,12 +123,26 @@ export function defaultsOf(e = process.env) {
     // Odalar: a room without its staff closes after 5 minutes (room-autoclose.mjs); Patron koltuğu 25.000 jeton, 10
     // dakika (boss-seat.mjs). The owner's numbers (Güncelleme 4).
     ...Object.fromEntries(Object.entries(ROOM_AMOUNTS).map(([k, x]) => [k, x.default])),
+    // Bağlar's level steps (bond-rules.mjs LEVELS), as the panel writes them.
+    bond_levels: BOND_LEVELS.join(', '),
+    // Aile's game (FAMILY_AMOUNTS): family-rules.mjs's numbers.
+    ...Object.fromEntries(Object.entries(FAMILY_AMOUNTS).map(([k, x]) => [k, x.default])),
+    // Ajans statüsü (AGENCY_AMOUNTS): the owners' numbers.
+    ...Object.fromEntries(Object.entries(AGENCY_AMOUNTS).map(([k, x]) => [k, x.default])),
+    // Oda seviyeleri and Vitrin (ROOM_LEVEL_AMOUNTS, BADGE_AMOUNTS): room-rules.mjs's and profile-rules.mjs's numbers.
+    ...Object.fromEntries(Object.entries(ROOM_LEVEL_AMOUNTS).map(([k, x]) => [k, x.default])),
+    ...Object.fromEntries(Object.entries(BADGE_AMOUNTS).map(([k, x]) => [k, x.default])),
     // Etkinlik Merkezi (events.mjs): every room owner may apply; 30 minutes ahead at least, 3 hours, 500 places.
     ...Object.fromEntries(Object.entries(EVENT_RULES).map(([k, x]) => [k, x.default])),
     // Every reminder on: 1 hour and 15 minutes before, and at the start.
     event_reminders_off: [],
     // Every Şanslı win is announced in every room (the owner's wish, Güncelleme 5).
     lucky_announce_min_coins: 0,
+    // Global hediye (global-gifts.mjs): from 300.000 coins, one announcement every 10 seconds (the owners, Güncelleme 7).
+    ...Object.fromEntries(Object.entries(GLOBAL_GIFT_AMOUNTS).map(([k, x]) => [k, x.default])),
+    // Şanslı çanta's choices as lucky-bag-rules.mjs had them (BAG_LISTS), the way the panel writes them.
+    ...Object.fromEntries(Object.entries(BAG_LISTS).map(([k, x]) => [k, x.default.join(', ')])),
+    lucky_bag_seconds: 30,
     // Otomatik mesaj (auto-chat-rules.mjs): the spec's numbers and texts, every part on, every SimilarClub Sistem notice on.
     auto_chat_off: [],
     ...Object.fromEntries(Object.entries(AUTO_CHAT).map(([k, x]) => [k, x.default])),
@@ -360,11 +379,148 @@ const ROOM_AMOUNTS = {
   // Aile (streamer-rule.mjs, families.mjs): the owners' numbers, 18 Nov.
   family_cashout_members: { group: 'Aile', field: 'familyCashoutMembers', label: 'Aile sahibinin çekim hakkı: en az üye', default: 10, bounds: { min: 0, max: 500, step: 1 }, unit: ' üye', help: 'Erkek hesaplar para çekemez; ajans sahipleri ile en az bu kadar üyeli ailenin sahibi hariç. Bu aile sahipleri yayıncı da sayılır. Aile kurmak ucuz olduğu için düşük tutma.', text: (a, b) => `Aile sahibinin çekim hakkı için gereken üye ${a} → ${b}.` },
   family_rejoin_days: { group: 'Aile', field: 'familyRejoinDays', label: 'Aileden ayrılan yayıncının bekleme süresi', default: 90, bounds: { min: 0, max: 365, step: 1 }, unit: ' gün', help: 'Kendi isteğiyle aileden ayrılan yayıncı bu kadar gün başka bir aileye katılamaz ve aile kuramaz. Ayrıldığı aileye dönebilir. Aileden çıkarılan kişi beklemez.', text: (a, b) => `Aileden ayrılan yayıncının bekleme süresi ${a} → ${b} gün.` },
+  // Bağlar (bonds.mjs, docs/BAGLAR.md): how many bonds of a kind one person may have, the requests and their days.
+  bond_max_cift: { group: 'Bağlar', field: 'bondMaxCift', label: 'Çift bağı: kişi başına en fazla', default: 1, bounds: { min: 1, max: 5, step: 1 }, unit: ' bağ', help: 'Bir kişinin aynı anda kaç Çift bağı olabilir. Kurulmuş bağlar sınır düşse de sürer; yalnız yenisi kurulamaz.', text: (a, b) => `Kişi başına Çift bağı ${a} → ${b}.` },
+  bond_max_kin: { group: 'Bağlar', field: 'bondMaxKin', label: 'Aile bağları: türü başına en fazla', default: 1000, bounds: { min: 1, max: 1000, step: 1 }, unit: ' bağ', help: 'Kardeş, Bacı, Ağabey, Abla, Yenge ve Enişte bağlarının her birinden bir kişinin aynı anda kaç tane olabilir. 1000: pratikte sınırsız (sahiplerin kararı, Güncelleme 7). Kurulmuş bağlar sürer.', text: (a, b) => `Kardeş, Bacı, Ağabey, Abla, Yenge, Enişte: türü başına ${a} → ${b} bağ.` },
+  bond_max_kanka: { group: 'Bağlar', field: 'bondMaxKanka', label: 'Kanka bağı: kişi başına en fazla', default: 1000, bounds: { min: 1, max: 1000, step: 1 }, unit: ' bağ', help: 'Bir kişinin aynı anda kaç Kanka bağı olabilir. 1000: pratikte sınırsız. Kurulmuş bağlar sürer.', text: (a, b) => `Kişi başına Kanka bağı ${a} → ${b}.` },
+  bond_pending_max: { group: 'Bağlar', field: 'bondPendingMax', label: 'Bekleyen istek: en fazla', default: 10, bounds: { min: 1, max: 50, step: 1 }, unit: ' istek', help: 'Bir kişinin cevap bekleyen bağ isteği en çok bu kadar olabilir (her istek jetonunu bekletir).', text: (a, b) => `Aynı anda bekleyen bağ isteği ${a} → ${b}.` },
+  bond_answer_days: { group: 'Bağlar', field: 'bondAnswerDays', label: 'İsteğe cevap süresi (gün)', default: 3, bounds: { min: 1, max: 14, step: 1 }, unit: ' gün', help: 'Bu süre içinde cevaplanmayan bağ isteğinin jetonu gönderene döner. Bekleyen isteklerin süresi değişmez.', text: (a, b) => `Yeni bağ isteklerine cevap süresi ${a} → ${b} gün.` },
+  bond_cooldown_days: { group: 'Bağlar', field: 'bondCooldownDays', label: 'Bağ bitince bekleme (gün)', default: 7, bounds: { min: 0, max: 90, step: 1 }, unit: ' gün', help: 'Bağı biten iki kişi bu kadar gün yeniden bağ kuramaz. 0: hemen kurabilir.', text: (a, b) => `Bağ bitince yeniden kurmak için ${a} → ${b} gün beklenir.` },
+  bond_talk_daily: { group: 'Bağlar', field: 'bondTalkDaily', label: 'Sohbetten günlük bağ puanı: en fazla', default: 10, bounds: { min: 0, max: 100, step: 1 }, unit: ' puan', help: 'Bağlı iki kişinin birbirine cevap verdiği her mesaj 1 bağ puanı getirir, günde en çok bu kadar. 0: sohbet puan getirmez.', text: (a, b) => `Sohbetten günde en çok ${a} → ${b} bağ puanı.` },
+  // The nightly drop and the end of a bond with no gift (bond-life.mjs, bond-rules.mjs DECAY; the owners' numbers).
+  bond_drop_pct: { group: 'Bağlar', field: 'bondDropPct', label: 'Hediyesiz gece düşen puan (%)', default: 10, bounds: { min: 0, max: 50, step: 1 }, unit: ' %', help: 'İki taraftan biri o gün hediye göndermediyse bağın puanından gece bu kadar yüzde düşer (en az aşağıdaki kadar). Kabulden sonraki ilk gece düşmez. Mesajlaşma puan getirir ama düşüşü durdurmaz. 0: yüzde düşmez.', text: (a, b) => `Hediyesiz gece düşen bağ puanı %${a} → %${b}.` },
+  bond_drop_flat: { group: 'Bağlar', field: 'bondDropFlat', label: 'Hediyesiz gece en az düşen puan', default: 10, bounds: { min: 0, max: 100_000, step: 1 }, unit: ' puan', help: 'Hediyesiz bir gecede bağdan en az bu kadar puan düşer (puan 0’ın altına inmez). 0: yalnız yüzde düşer.', text: (a, b) => `Hediyesiz gece en az ${a} → ${b} bağ puanı düşer.` },
+  bond_idle_end_days: { group: 'Bağlar', field: 'bondIdleEndDays', label: 'Hediyesiz kalan bağ biter (gün)', default: 30, bounds: { min: 0, max: 365, step: 1 }, unit: ' gün', help: 'Bu kadar gün iki taraftan hiç hediye gitmezse bağ kendiliğinden biter: jeton iadesi yok, yeniden kurmak için bekleme yok. 0: hiç bitmez.', text: (a, b) => `Hediyesiz bağ ${a} → ${b} gün sonra biter.` },
+  bond_idle_warn_days: { group: 'Bağlar', field: 'bondIdleWarnDays', label: 'Bitmeden önce uyarı (gün)', default: 3, bounds: { min: 0, max: 30, step: 1 }, unit: ' gün', help: 'Hediyesiz bağ bitmeden bu kadar gün önce iki tarafa SimilarClub Sistem’den bir kez uyarı gider. 0: uyarı yok.', text: (a, b) => `Bağ bitmeden ${a} → ${b} gün önce uyarı.` },
+  // Koruma (guards.mjs, docs/KORUMA.md): the midnight drop, the list's length and the profile's threshold.
+  guard_drop_from: { group: 'Koruma', field: 'guardDropFrom', label: 'Yüzde düşüş: bu puandan itibaren', default: 5000, bounds: { min: 0, max: 10_000_000, step: 100 }, unit: ' puan', help: 'Önceki gün hediye göndermeyen koruyucunun puanı gece düşer: bu puan ve üstündeyse yüzdeyle, altındaysa sabit miktarla.', text: (a, b) => `Gece yüzdeyle düşüş ${a} → ${b} puandan itibaren.` },
+  guard_drop_pct: { group: 'Koruma', field: 'guardDropPct', label: 'Yüzde düşüş (%)', default: 10, bounds: { min: 0, max: 50, step: 1 }, unit: ' %', help: 'Hediye göndermeyen koruyucunun puanından gece düşen yüzde. 0: düşmez.', text: (a, b) => `Gece düşen yüzde %${a} → %${b}.` },
+  guard_drop_flat: { group: 'Koruma', field: 'guardDropFlat', label: 'Sabit düşüş', default: 1000, bounds: { min: 0, max: 1_000_000, step: 10 }, unit: ' puan', help: 'Yüzde düşüş eşiğinin altındaki koruyucunun puanından gece düşen miktar. 0: düşmez.', text: (a, b) => `Eşiğin altında gece ${a} → ${b} puan düşer.` },
+  guard_list_max: { group: 'Koruma', field: 'guardListMax', label: 'Koruma listesi: en fazla kişi', default: 50, bounds: { min: 10, max: 200, step: 1 }, unit: ' kişi', help: 'Benim Koruma listelerinde en çok bu kadar kişi görünür.', text: (a, b) => `Koruma listesinde ${a} → ${b} kişi.` },
+  guard_threshold_per_level: { group: 'Koruma', field: 'guardThresholdPerLevel', label: 'Eşik: Yankı seviyesi başına en fazla', default: 50_000, bounds: { min: 0, max: 10_000_000, step: 1000 }, unit: ' puan', help: 'Kişinin koyabileceği en yüksek eşik: bu sayı × (Yankı seviyesi + 1). Konmuş eşikler değişmez.', text: (a, b) => `Yankı seviyesi başına eşik ${a} → ${b} puan.` },
+  guard_threshold_days: { group: 'Koruma', field: 'guardThresholdDays', label: 'Eşik değiştirme aralığı (gün)', default: 7, bounds: { min: 1, max: 30, step: 1 }, unit: ' gün', help: 'Kişi eşiğini en çok bu kadar günde bir değiştirebilir.', text: (a, b) => `Eşik ${a} → ${b} günde bir değişir.` },
+  // Profil izleri (profile-marks.mjs, docs/PROFIL_IZLERI.md): how long a mark stays with no cleaning gift; 0 turns it off.
+  mark_hours: { group: 'Profil izleri', field: 'markHours', label: 'Profil izi süresi (saat)', default: MARK_HOURS, bounds: { min: 0, max: 168, step: 1 }, unit: ' saat', help: 'Kaka gibi iz bırakan bir hediyenin izi alıcının profil fotoğrafında bu kadar saat kalır (izi temizleyen hediye gelirse daha önce gider). Hediyenin kendi süresi varsa o geçer. Konmuş izlerin bitişi değişmez. 0: profil izleri kapalı; bu hediyeler düz hediye olur ve hiçbir iz görünmez.', text: (a, b) => (b === '0' ? 'Profil izleri kapanır: hediyeler düz hediye olur, izler görünmez.' : `Yeni izler ${a} → ${b} saat kalır.`) },
 };
+/**
+ * Aile's game (family-more.mjs, family-rules.mjs): each daily task's points (and the room task's minutes, the coin
+ * tasks' coins per step), each weekly chest's goal and reward coins (ödül jetonu, spent in Çarşı), the least a member
+ * must give to open one, and the family level each theme opens at. Built from family-rules.mjs, so the defaults stay
+ * today's. A change counts from the next read: today's progress is counted again with it.
+ */
+const FAMILY_TASK_NAME = {
+  'k-chat': 'Aile sohbetine mesaj',
+  'k-room': 'Aile odasında kalma',
+  'k-newbie': 'Yeni üyeye hediye',
+  'k-checkin': 'Aile yoklaması',
+  'k-roomgift': 'Aile odasında hediye',
+  'k-cp': 'Çift hediyesi',
+  'k-chatgift': 'Aile sohbetinde hediye',
+};
+const FAMILY_THEME_NAME = { gece: 'Gece Moru', ates: 'Kızıl Ay', orman: 'Zümrüt Orman', okyanus: 'Gece Mavisi', altin: 'Altın Saray', galaksi: 'Galaksi' };
+const keyOfTask = (id) => id.slice(2).replace('-', '_');
+const FAMILY_AMOUNTS = {
+  ...Object.fromEntries(
+    FAMILY_TASKS.flatMap((t) => {
+      const name = FAMILY_TASK_NAME[t.id] ?? t.id;
+      const k = keyOfTask(t.id);
+      const out = [[`family_task_${k}_power`, { group: 'Aile görevleri', field: `familyTask_${k}_power`, task: t.id, part: 'power', label: `${name}: puan`, default: t.power, bounds: { min: 0, max: 100, step: 1 }, unit: ' puan', help: t.kind === 'count' ? `“${name}” görevi bitince verilen puan. 0: puan vermez.` : `“${name}” görevinde her adımda verilen puan. 0: puan vermez.`, text: (a, b) => `${name}: ${a} → ${b} puan.` }]];
+      if (t.kind === 'rate') out.push([`family_task_${k}_per`, { group: 'Aile görevleri', field: `familyTask_${k}_per`, task: t.id, part: 'per', label: `${name}: kaç jetonda bir`, default: t.per, bounds: { min: 10, max: 1_000_000, step: 10 }, unit: ' jeton', help: `“${name}” görevinde her bu kadar jeton bir adım sayılır.`, text: (a, b) => `${name}: her ${a} → ${b} jetonda bir puan.` }]);
+      else if (t.goal > 1) out.push([`family_task_${k}_goal`, { group: 'Aile görevleri', field: `familyTask_${k}_goal`, task: t.id, part: 'goal', label: `${name}: hedef (dakika)`, default: t.goal, bounds: { min: 1, max: 600, step: 1 }, unit: ' dakika', help: `“${name}” görevi bu kadar dakikada biter.`, text: (a, b) => `${name}: ${a} → ${b} dakika.` }]);
+      return out;
+    }),
+  ),
+  ...Object.fromEntries(
+    FAMILY_CHESTS.flatMap((c) => [
+      [`family_chest_${c.id}_need`, { group: 'Aile sandıkları', field: `familyChest_${c.id}_need`, chest: c.id, part: 'need', label: `${c.name}: haftalık hedef`, default: c.need, bounds: { min: 1_000, max: 100_000_000, step: 1_000 }, unit: ' güç', help: `Ailenin haftalık gücü bu kadar olunca ${c.name} açılır.`, text: (a, b) => `${c.name} ${a} → ${b} güçte açılır.` }],
+      [`family_chest_${c.id}_coins`, { group: 'Aile sandıkları', field: `familyChest_${c.id}_coins`, chest: c.id, part: 'coins', label: `${c.name}: ödül jetonu`, default: c.coins, bounds: { min: 1, max: 1_000, step: 1, money: true }, unit: ' ödül jetonu', help: `${c.name}'nı açan her üyeye verilen ödül jetonu (Çarşı'da harcanır, çekilemez). Haftada bir kez.`, text: (a, b) => `${c.name}: üye başına ${a} → ${b} ödül jetonu.` }],
+    ]),
+  ),
+  family_chest_min_contribution: { group: 'Aile sandıkları', field: 'familyChestMin', label: 'Sandık için en az katkı', default: CHEST_MIN_CONTRIBUTION, bounds: { min: 0, max: 1_000_000, step: 1 }, unit: '', help: 'Bir üyenin sandık açabilmesi için o hafta aileye verdiği en az katkı (hediye jetonu + görev puanı). 0: katkısız da açar.', text: (a, b) => `Sandık için en az katkı ${a} → ${b}.` },
+  ...Object.fromEntries(
+    FAMILY_THEMES.map((t) => [`family_theme_${t.id}_level`, { group: 'Aile', field: `familyTheme_${t.id}`, theme: t.id, label: `${FAMILY_THEME_NAME[t.id] ?? t.id} teması: aile seviyesi`, default: t.minLevel, bounds: { min: 1, max: 15, step: 1 }, unit: '', help: `${FAMILY_THEME_NAME[t.id] ?? t.id} teması bu aile seviyesinden itibaren seçilir. Seçilmiş tema kalır.`, text: (a, b) => `${FAMILY_THEME_NAME[t.id] ?? t.id} teması Lv.${a} → Lv.${b} ailede açılır.` }]),
+  ),
+};
+/** Aile's tasks, chests and themes as Canlı ayarlar has them (snapshot `s`), in family-rules.mjs's shapes. */
+export function familyRulesOf(s) {
+  const v = (field, d) => (Number.isSafeInteger(s?.[field]) ? s[field] : d);
+  return {
+    tasks: FAMILY_TASKS.map((t) => {
+      const k = keyOfTask(t.id);
+      return { ...t, power: v(`familyTask_${k}_power`, t.power), per: t.kind === 'rate' ? v(`familyTask_${k}_per`, t.per) : t.per, goal: t.kind === 'count' ? v(`familyTask_${k}_goal`, t.goal) : t.goal };
+    }),
+    chests: FAMILY_CHESTS.map((c) => ({ ...c, need: v(`familyChest_${c.id}_need`, c.need), coins: v(`familyChest_${c.id}_coins`, c.coins) })),
+    chestMin: v('familyChestMin', CHEST_MIN_CONTRIBUTION),
+    themes: FAMILY_THEMES.map((t) => ({ ...t, minLevel: v(`familyTheme_${t.id}`, t.minLevel) })),
+  };
+}
+
+/**
+ * Oda seviyeleri (room-rules.mjs, rooms.mjs): the level Mikrofon izni and Patron koltuğu open at, the room's own
+ * forbidden words, and how many people a room of each level may hold. One busy 200-person room fills one core
+ * (docs/YUK_TESTI.md): the caps stay within today's largest (5.000).
+ */
+const ROOM_CAPS_DEFAULT = [50, 100, 200, 300, 500, 600, 800, 1_200, 1_350, 1_500, 1_750, 2_000, 2_500, 3_000, 5_000];
+const LEVELS_GROUP = 'Oda seviyeleri';
+const ROOM_LEVEL_AMOUNTS = {
+  room_mic_min_level: { group: LEVELS_GROUP, field: 'roomMicMinLevel', label: 'Mikrofon izni: oda seviyesi', default: 4, bounds: { min: 1, max: 15, step: 1 }, unit: '', help: 'Oda sahibi "Mikrofonu yalnız üyeler alsın" ayarını bu oda seviyesinden itibaren açabilir. Açılmış ayar kalır.', text: (a, b) => `Mikrofon izni Lv.${a} → Lv.${b} odada açılır.` },
+  room_boss_min_level: { group: LEVELS_GROUP, field: 'roomBossMinLevel', label: 'Patron koltuğu: oda seviyesi', default: 3, bounds: { min: 1, max: 15, step: 1 }, unit: '', help: 'Patron koltuğu bu oda seviyesinden itibaren açılır ve çalışır.', text: (a, b) => `Patron koltuğu Lv.${a} → Lv.${b} odada açılır.` },
+  room_words_max: { group: LEVELS_GROUP, field: 'roomWordsMax', label: 'Odanın yasaklı kelimeleri: en fazla', default: 30, bounds: { min: 5, max: 100, step: 1 }, unit: ' kelime', help: 'Bir odanın kendi yasaklı kelime listesine eklenebilecek en çok kelime.', text: (a, b) => `Oda başına yasaklı kelime ${a} → ${b}.` },
+  ...Object.fromEntries(
+    ROOM_CAPS_DEFAULT.map((n, i) => [
+      `room_cap_lv${i + 1}`,
+      { group: LEVELS_GROUP, field: `roomCapLv${i + 1}`, label: `Lv.${i + 1} oda: en fazla kişi`, default: n, bounds: { min: 10, max: 5_000, step: 10 }, unit: ' kişi', help: `Lv.${i + 1} bir odaya aynı anda girebilecek ve üye olabilecek en çok kişi. Tek sunucu yoğun bir 200 kişilik odayı taşır; yüksek sayılar sunucuyu büyütmeyi gerektirir.`, text: (a, b) => `Lv.${i + 1} oda ${a} → ${b} kişi alır.` },
+    ]),
+  ),
+};
+/** The rooms' numbers as Canlı ayarlar has them (snapshot `s`). */
+export function roomNumbersOf(s) {
+  const v = (field, d) => (Number.isSafeInteger(s?.[field]) ? s[field] : d);
+  return {
+    micMinLevel: v('roomMicMinLevel', 4),
+    bossMinLevel: v('roomBossMinLevel', 3),
+    wordsMax: v('roomWordsMax', 30),
+    caps: ROOM_CAPS_DEFAULT.map((n, i) => v(`roomCapLv${i + 1}`, n)),
+  };
+}
+/**
+ * Ajans statüsü (agency-activity.mjs, docs/AJANS_STATUSU.md, the owners' rule of 19 Nov 2026): an agency is a
+ * candidate until it has `agency_activation_hosts` streamers and `agency_activation_earners` of them earned
+ * `agency_activation_earn_usd` each in it; an active agency falls back to candidate below `agency_demote_below`
+ * streamers. A candidate's commission is kept but not paid out. An active agency that brought fewer than
+ * `agency_monthly_new_hosts` new streamers in a month gets `agency_monthly_penalty_pct` points less of its own share
+ * the next month. A streamer neither signed in nor withdrew for `agency_inactive_days` leaves the agency (0: never).
+ */
+const AGENCY_GROUP = 'Ajans statüsü';
+const AGENCY_AMOUNTS = {
+  agency_activation_hosts: { group: AGENCY_GROUP, field: 'agencyActivationHosts', label: 'Aktif ajans için yayıncı', default: 20, bounds: { min: 0, max: 1_000, step: 1 }, unit: ' yayıncı', help: 'Ajans bu kadar yayıncıya (ve aşağıdaki kazanç şartına) ulaşınca aday ajanstan aktif ajansa geçer. Aday ajansın komisyonu birikir ama ödenmez. 0: kural kapalı, her ajans aktif.', text: (a, b) => `Aktif ajans için ${a} → ${b} yayıncı.` },
+  agency_activation_earners: { group: AGENCY_GROUP, field: 'agencyActivationEarners', label: 'Aktif ajans için kazanan yayıncı', default: 10, bounds: { min: 0, max: 1_000, step: 1 }, unit: ' yayıncı', help: 'Aktif olmak için yayıncılardan en az bu kadarının bu ajanstayken aşağıdaki kadar kazanmış olması gerekir. 0: kazanç şartı yok.', text: (a, b) => `Kazanan yayıncı şartı ${a} → ${b}.` },
+  agency_activation_earn_usd: { group: AGENCY_GROUP, field: 'agencyActivationEarnUsd', label: 'Kazanan yayıncı: en az kazanç (USD)', default: 10, bounds: { min: 0, max: 10_000, step: 1 }, unit: ' USD', help: 'Bir yayıncının "kazanan" sayılması için bu ajanstayken kazandığı en az tutar (elması USD olarak).', text: (a, b) => `Kazanan yayıncı için en az ${a} → ${b} USD.` },
+  agency_demote_below: { group: AGENCY_GROUP, field: 'agencyDemoteBelow', label: 'Aday ajansa düşme: yayıncı bunun altına inerse', default: 20, bounds: { min: 0, max: 1_000, step: 1 }, unit: ' yayıncı', help: 'Aktif ajansın yayıncı sayısı bunun altına inerse (örneğin 90 gün pasif kalanlar düşünce) yeniden aday ajans olur.', text: (a, b) => `Aktif ajans ${a} → ${b} yayıncının altında adaya düşer.` },
+  agency_monthly_new_hosts: { group: AGENCY_GROUP, field: 'agencyMonthlyNewHosts', label: 'Aylık yeni yayıncı şartı', default: 5, bounds: { min: 0, max: 1_000, step: 1 }, unit: ' yayıncı', help: 'Aktif ajans bir ayda bu kadar yeni yayıncı getirmezse bir sonraki ay komisyonu aşağıdaki kadar düşer. 0: şart yok.', text: (a, b) => `Aylık yeni yayıncı şartı ${a} → ${b}.` },
+  agency_monthly_penalty_pct: { group: AGENCY_GROUP, field: 'agencyMonthlyPenaltyPct', label: 'Aylık şart tutmazsa komisyon düşüşü (puan)', default: 5, bounds: { min: 0, max: 40, step: 1, money: true }, unit: ' puan', help: 'Aylık yeni yayıncı şartını tutmayan ajansın kendi komisyon oranı bir sonraki ay bu kadar puan düşer (%40 ise %35). Düşen kısım platformda kalır; üst ajansın payı değişmez.', text: (a, b) => `Aylık şart tutmazsa komisyon ${a} → ${b} puan düşer.` },
+  agency_inactive_days: { group: AGENCY_GROUP, field: 'agencyInactiveDays', label: 'Pasif yayıncı ajanstan düşer (gün)', default: 90, bounds: { min: 0, max: 3_650, step: 1 }, unit: ' gün', help: 'Bu kadar gün uygulamaya girmeyen ve para çekmeyen yayıncı ajanstan düşer ve yönetim yayıncısı olur; kazancı ve çekimi sürer. 0: kimse düşmez.', text: (a, b) => `Pasif yayıncı ${a} → ${b} günde ajanstan düşer.` },
+};
+/** The agency status rule as Canlı ayarlar has it (snapshot `s`). */
+export function agencyRuleOf(s) {
+  return Object.fromEntries(Object.entries(AGENCY_AMOUNTS).map(([, x]) => [x.field.replace(/^agency/, '').replace(/^./, (c) => c.toLowerCase()), Number.isSafeInteger(s?.[x.field]) ? s[x.field] : x.default]));
+}
+
+/** Vitrin (profiles.mjs): what earns a medal or a title. Earned ones come and go with the rule. */
+const BADGES = 'Profil rozetleri';
+const BADGE_AMOUNTS = {
+  medal_week_top: { group: BADGES, field: 'medalWeekTop', label: 'Haftanın Yıldızı: haftanın ilk kaçı', default: MEDAL_RULES.weekTop, bounds: { min: 1, max: 50, step: 1 }, unit: ' kişi', help: 'Bu haftanın Yankı sıralamasında ilk bu kadar kişi Haftanın Yıldızı madalyası alır.', text: (a, b) => `Haftanın Yıldızı: ilk ${a} → ${b} kişi.` },
+  medal_generous_people: { group: BADGES, field: 'medalGenerousPeople', label: 'Cömert Kalp: farklı kişiye hediye', default: MEDAL_RULES.generousPeople, bounds: { min: 1, max: 1_000, step: 1 }, unit: ' kişi', help: 'Bu kadar farklı kişiye hediye gönderen Cömert Kalp madalyası alır.', text: (a, b) => `Cömert Kalp: ${a} → ${b} farklı kişi.` },
+  medal_friends: { group: BADGES, field: 'medalFriends', label: 'Sosyal Kelebek: arkadaş sayısı', default: MEDAL_RULES.friends, bounds: { min: 1, max: 10_000, step: 1 }, unit: ' arkadaş', help: 'Karşılıklı takipleştiği bu kadar kişisi olan Sosyal Kelebek madalyası alır.', text: (a, b) => `Sosyal Kelebek: ${a} → ${b} arkadaş.` },
+  title_room_level: { group: BADGES, field: 'titleRoomLevel', label: 'Oda Efsanesi: oda seviyesi', default: TITLE_RULES.roomLevel, bounds: { min: 1, max: 15, step: 1 }, unit: '', help: 'Odası bu seviyeye ulaşan Oda Efsanesi unvanını alır.', text: (a, b) => `Oda Efsanesi: Lv.${a} → Lv.${b} oda.` },
+  title_rising_charm: { group: BADGES, field: 'titleRisingCharm', label: 'Yükselen Yıldız: Yankı seviyesi', default: TITLE_RULES.risingCharm, bounds: { min: 1, max: 50, step: 1 }, unit: '', help: 'Katıldıktan sonraki günlerde bu Yankı seviyesine ulaşan Yükselen Yıldız unvanını alır.', text: (a, b) => `Yükselen Yıldız: Yankı Lv.${a} → Lv.${b}.` },
+  title_rising_days: { group: BADGES, field: 'titleRisingDays', label: 'Yükselen Yıldız: katıldıktan sonra gün', default: TITLE_RULES.risingDays, bounds: { min: 1, max: 365, step: 1 }, unit: ' gün', help: 'Yükselen Yıldız unvanı katıldıktan sonra bu kadar gün içinde kazanılır.', text: (a, b) => `Yükselen Yıldız: ilk ${a} → ${b} gün.` },
+};
+
 /** The room keys as registry entries; a coin amount that more than doubles or halves, or a close sooner than 3 minutes, asks twice. */
-const roomEntries = () =>
+const roomEntries = (table = ROOM_AMOUNTS) =>
   Object.fromEntries(
-    Object.entries(ROOM_AMOUNTS).map(([k, x]) => [
+    Object.entries(table).map(([k, x]) => [
       k,
       {
         field: x.field,
@@ -403,6 +559,48 @@ const winEntries = () => {
     },
   };
 };
+
+/**
+ * Şanslı çanta (lucky-bags.mjs, lucky-bag-rules.mjs BAG_RULES): the choices a bag offers, as a list the panel writes
+ * as "1000, 5000, 10000". Every phone reads them from the server (GET /api/lucky-bags), older apps too. The coins stay
+ * within today's largest (50.000): bags are given away by chance, a bigger one is the owners' decision.
+ */
+const BAGS = 'Şanslı çanta';
+const BAG_LISTS = {
+  lucky_bag_coins: { field: 'luckyBagCoins', label: 'Jeton çantası: jeton seçenekleri', default: [1_000, 5_000, 10_000, 50_000], bounds: { min: 100, max: 50_000, step: 100, items: 6 }, unit: ' jeton', help: 'Jeton çantasına konabilecek miktarlar, virgülle: 1000, 5000, 10000, 50000. En çok 6 seçenek, her biri 100 ile 50.000 arasında ve 100’ün katı.' },
+  lucky_bag_coin_packets: { field: 'luckyBagCoinPackets', label: 'Jeton çantası: pay seçenekleri', default: [5, 10, 20, 30], bounds: { min: 1, max: 100, step: 1, items: 6 }, unit: ' pay', help: 'Jeton çantasının kaç paya bölüneceği, virgülle: 5, 10, 20, 30. En küçük jeton seçeneğinden fazla olamaz.' },
+  lucky_bag_gift_counts: { field: 'luckyBagGiftCounts', label: 'Hediye çantası: adet seçenekleri', default: [10, 30, 99], bounds: { min: 1, max: 999, step: 1, items: 6 }, unit: ' adet', help: 'Hediye çantasına konabilecek hediye adetleri, virgülle: 10, 30, 99.' },
+  lucky_bag_gift_packets: { field: 'luckyBagGiftPackets', label: 'Hediye çantası: pay seçenekleri', default: [5, 10, 15], bounds: { min: 1, max: 100, step: 1, items: 6 }, unit: ' pay', help: 'Hediye çantasının kaç paya bölüneceği, virgülle: 5, 10, 15. En küçük adet seçeneğinden fazla olamaz.' },
+  lucky_bag_delays: { field: 'luckyBagDelays', label: 'Açılma zamanı seçenekleri (saniye)', default: [0, 120, 300], bounds: { min: 0, max: 3_600, step: 1, items: 6 }, unit: ' saniye', help: 'Çantanın atıldıktan kaç saniye sonra açılacağı, virgülle: 0, 120, 300. 0: hemen.' },
+};
+/** "1000, 5.000 ,10000" (or a list of numbers) → [1000, 5000, 10000], sorted, each checked; refuses anything else. */
+function intListOf(v, { min, max, step, items }, what, unit) {
+  const parts = Array.isArray(v) ? v : typeof v === 'string' ? v.split(',').map((x) => x.trim()).filter(Boolean).map((x) => (/^\d{1,3}(\.\d{3})*$|^\d+$/.test(x) ? Number(x.replaceAll('.', '')) : NaN)) : null;
+  if (!parts || !parts.length) bad(`${what}: en az bir sayı yaz, virgülle ayır`);
+  if (parts.length > items) bad(`${what}: en çok ${items} seçenek olabilir`);
+  const out = [...new Set(parts.map((x) => wholeOf(x, { min, max, step }, what, unit)))].sort((a, b) => a - b);
+  return out;
+}
+const listText = (xs) => xs.map(fmt).join(', ');
+const bagEntries = () =>
+  Object.fromEntries(
+    Object.entries(BAG_LISTS).map(([k, x]) => [
+      k,
+      {
+        field: x.field,
+        group: BAGS,
+        label: x.label,
+        help: x.help,
+        type: 'text',
+        bounds: { max: 80 },
+        parse: (v) => listText(intListOf(v, x.bounds, x.label, x.unit)).replaceAll('.', ''),
+        big: () => false,
+        impact: (before, after) => `${x.label}: ${listText(bagList(before))} → ${listText(bagList(after))}.`,
+      },
+    ]),
+  );
+/** A stored list setting ("1000, 5000") as numbers; the default list for anything unreadable. */
+export const bagList = (v) => (Array.isArray(v) ? v : String(v ?? '').split(',').map((x) => Number(x.trim())).filter((n) => Number.isSafeInteger(n)));
 
 const freezeDeep = (o) => (o && typeof o === 'object' ? Object.freeze(Object.values(o).forEach(freezeDeep) ?? o) : o);
 export const DEFAULTS = freezeDeep(defaultsOf());
@@ -910,8 +1108,41 @@ export const REGISTRY = {
   },
   ...decorEntries(),
   ...roomEntries(),
+  // Bağlar's level steps (bond-rules.mjs LEVELS), written as the panel shows them: "0, 10, 30, …".
+  bond_levels: {
+    field: 'bondLevels',
+    group: 'Bağlar',
+    label: 'Seviye basamakları (puan)',
+    help: 'Lv1 … Lv20 için gereken bağ puanı, virgülle ve küçükten büyüğe: 20 sayı, ilki 0. Her 100 jeton 1 puan. Değişince herkesin seviyesi yeni basamaklarla hesaplanır; seviyesi değişene ilk hediyede bildirim gider.',
+    type: 'text',
+    bounds: { max: 300 },
+    parse(v) {
+      const xs = bondLevelsOf(v);
+      if (!xs) bad('Seviye basamakları: 20 tam sayı yaz, virgülle; ilki 0 ve her biri öncekinden büyük olmalı');
+      return xs.join(', ');
+    },
+    big: () => true,
+    impact: (before, after) => `Lv2 ${fmt(bondLevelsOf(before)?.[1] ?? 0)} → ${fmt(bondLevelsOf(after)?.[1] ?? 0)}, Lv10 ${fmt(bondLevelsOf(before)?.[9] ?? 0)} → ${fmt(bondLevelsOf(after)?.[9] ?? 0)}, Lv20 ${fmt(bondLevelsOf(before)?.[19] ?? 0)} → ${fmt(bondLevelsOf(after)?.[19] ?? 0)} puan.`,
+  },
+  ...roomEntries(FAMILY_AMOUNTS),
+  ...roomEntries(AGENCY_AMOUNTS),
+  ...roomEntries(ROOM_LEVEL_AMOUNTS),
+  ...roomEntries(BADGE_AMOUNTS),
   ...eventEntries(),
   ...winEntries(),
+  ...roomEntries(GLOBAL_GIFT_AMOUNTS),
+  ...bagEntries(),
+  lucky_bag_seconds: {
+    field: 'luckyBagSeconds',
+    group: BAGS,
+    label: 'Çantanın açık kaldığı süre (saniye)',
+    help: 'Çanta açılınca bu kadar saniye düşer; o sırada dokunan herkes katılır ve çekiliş bitince yapılır. Atılmış çantalar kendi süresiyle biter.',
+    type: 'int',
+    bounds: { min: 10, max: 300, step: 5 },
+    parse: (v) => wholeOf(v, { min: 10, max: 300, step: 5 }, 'Çantanın açık kaldığı süre', ' saniye'),
+    big: () => false,
+    impact: (before, after) => `Yeni çantalar açılınca ${fmt(before)} → ${fmt(after)} saniye açık kalır.`,
+  },
   ...autoEntries(),
   admin_site: {
     field: 'adminSite',
@@ -990,7 +1221,7 @@ const readOnlySet = (xs) => {
  *     heartVideo, heartMsg, heartMsgDaily, heartGrace, heartHalf, backpackCallTask, rewardsOff: Set, welcomeCoins, inviteCoins, inviteDailyCap, casinoOff: Set, casinoOpen: Set, casinoMaxBet,
  *     casinoDailyRounds, rocketHousePct, roomDecorOff: Set, roomBgCustomPrice, roomBgCustomDays, roomStaffAwayMinutes, bossSeatCoins,
  *     bossSeatMinutes, eventMinRoomLevel, eventMinLead, eventMaxMinutes, eventMaxCapacity, eventGrace, eventStrikeLimit,
- *     eventBlockDays, eventRemindersOff: Set, luckyAnnounceMinCoins, invalid }
+ *     eventBlockDays, eventRemindersOff: Set, luckyAnnounceMinCoins, globalGiftMinPrice, globalGiftGapSeconds, invalid }
  */
 export function snapshotOf(rows = [], e = process.env, { v = 0 } = {}) {
   const d = defaultsOf(e);
@@ -1036,9 +1267,19 @@ export function snapshotOf(rows = [], e = process.env, { v = 0 } = {}) {
     roomDecorOff: readOnlySet(val('room_decor_off')),
     ...Object.fromEntries(Object.entries(DECOR_AMOUNTS).map(([k, x]) => [x.field, val(k)])),
     ...Object.fromEntries(Object.entries(ROOM_AMOUNTS).map(([k, x]) => [x.field, val(k)])),
+    // As written ("0, 10, 30"); bonds.mjs reads it with bond-rules.mjs levelsOf.
+    bondLevels: val('bond_levels'),
+    ...Object.fromEntries(Object.entries(FAMILY_AMOUNTS).map(([k, x]) => [x.field, val(k)])),
+    ...Object.fromEntries(Object.entries(AGENCY_AMOUNTS).map(([k, x]) => [x.field, val(k)])),
+    ...Object.fromEntries(Object.entries(ROOM_LEVEL_AMOUNTS).map(([k, x]) => [x.field, val(k)])),
+    ...Object.fromEntries(Object.entries(BADGE_AMOUNTS).map(([k, x]) => [x.field, val(k)])),
     ...Object.fromEntries(Object.entries(EVENT_RULES).map(([k, x]) => [x.field, val(k)])),
     eventRemindersOff: readOnlySet(val('event_reminders_off')),
     luckyAnnounceMinCoins: val('lucky_announce_min_coins'),
+    ...Object.fromEntries(Object.entries(GLOBAL_GIFT_AMOUNTS).map(([k, x]) => [x.field, val(k)])),
+    // As written ("1000, 5000"), so the panel shows it so; lucky-bags.mjs reads it with bagList.
+    ...Object.fromEntries(Object.entries(BAG_LISTS).map(([k, x]) => [x.field, val(k)])),
+    luckyBagSeconds: val('lucky_bag_seconds'),
     autoChatOff: readOnlySet(val('auto_chat_off')),
     ...Object.fromEntries(Object.entries(AUTO_CHAT).map(([k, x]) => [x.field, val(k)])),
     ...Object.fromEntries(Object.entries(AUTO_TEXTS).map(([k, x]) => [x.field, val(k)])),

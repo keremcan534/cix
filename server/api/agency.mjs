@@ -50,6 +50,7 @@ import {
   usdOf,
   viewerOf,
 } from './agency-lib.mjs';
+import { activityOf, candidatePayoutText } from './agency-activity.mjs';
 import {
   HELD_MSG,
   LEAVE_MSG,
@@ -139,6 +140,8 @@ const card = (a, s) => ({
   parentId: a.parent_id,
   tier: a.tier,
   tierName: tierName(s, a.tier),
+  // Aday ajans / aktif ajans (agency-activity.mjs), as last worked out; an older app ignores it.
+  activity: a.activity ?? 'candidate',
   country: a.country,
   region: a.region,
   createdAt: a.created_at,
@@ -423,6 +426,8 @@ export const agencyRoutes = {
       notices: ['owner', 'staff'].includes(viewerOf(x.acc, a)) ? notices.rows.map((r) => ({ id: Number(r.id), kind: r.kind, title: r.title, body: r.body, createdAt: r.created_at })) : [],
       tiers: x.s.tiers,
       poolCap: x.s.pool_cap,
+      // Aday ajans / aktif ajans with its progress (agency-activity.mjs): streamers, earners, this month's new ones.
+      activity: a.status === 'approved' ? await activityOf(db, a) : null,
     };
   },
 
@@ -899,6 +904,9 @@ export const agencyRoutes = {
       const total = d4(rows.rows.reduce((s, l) => s + Number(l.amount), 0));
       if (total <= 0) throw new HttpError(409, 'Ödenebilir kazanç yok (dönem kapanınca ödenebilir olur)');
       if (total < x.s.payout_policy.min_diamonds) throw new HttpError(409, `Ödeme alt limiti ${x.s.payout_policy.min_diamonds.toLocaleString('tr-TR')} elmas`);
+      // Aday ajans: its commission is kept, a payout waits until it is active (agency-activity.mjs).
+      const act = await activityOf(c, a, { save: true, actor: x.u.id });
+      if (act.status !== 'active') throw Object.assign(new HttpError(409, candidatePayoutText(act)), { extra: { code: 'agency_candidate' } });
       const p = await c.query('INSERT INTO agency_payouts (agency_id, ref, amount, usd, currency, requested_by) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *', [a.id, r0, total, usdOf(total), b.currency, x.u.id]);
       await c.query('UPDATE agency_ledger SET payout_id = $1 WHERE id = ANY($2::bigint[])', [p.rows[0].id, rows.rows.map((l) => l.id)]);
       await c.query("INSERT INTO agency_payout_history (payout_id, from_status, to_status, actor_id) VALUES ($1, NULL, 'pending', $2)", [p.rows[0].id, x.u.id]);

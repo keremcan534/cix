@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 
 import { ROOM_LAYOUTS } from '@/data/room-layouts';
 import { MIC_COUNT_OPTIONS } from '@/data/catalog';
-import { FACE_MAX, FACE_MIN, FACE_STD, PK_LINE, fitFace, fitGrid, fitLayout, gridCols, layoutHeight, layoutPlan, layoutSizes, nameLine, seatHeight } from '@/lib/seat-fit';
+import { FACE_MAX, FACE_MIN, FACE_STD, PK_LINE, STAGE_PAD_TOP, fitFace, fitGrid, fitLayout, gridCols, layoutHeight, layoutPlan, layoutSizes, nameLine, seatHeight } from '@/lib/seat-fit';
 
 const PHONES = [360, 390, 412];
 
@@ -108,8 +108,9 @@ describe('Seçilen sahne düzeni', () => {
     const l = ROOM_LAYOUTS.find((x) => x.id === 'audio-30')!;
     const plan = layoutPlan(l.layoutSchema, 390, false);
     const least = layoutHeight(l.layoutSchema, plan, FACE_MIN);
-    // Five rows, each with its PK points line (15 px): 75 px more than before, so the chat gives a little way.
-    assert.ok(least <= 380, `${least} px`);
+    // Five rows, each with its PK points line (15 px): 75 px more than before, so the chat gives a little way; and 7 px
+    // more over the first row, so its frames have a row's room above them (STAGE_PAD_TOP 15, was 8).
+    assert.ok(least <= 380 + STAGE_PAD_TOP - 8, `${least} px`);
     assert.ok(fitLayout(l.layoutSchema, plan, 420).face > FACE_MIN);
   });
 

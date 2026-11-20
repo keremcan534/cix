@@ -82,12 +82,33 @@ Bunların hepsi otomatik testlerle denendi.
      gitmiyordu.
    - Artık hepsi panelin zaten tanıdığı olay türleriyle gidiyor. Panelin kendi kodunda denendi: hepsi kabul edildi.
 
+7. **Odada gönderilen hediye ve Şanslı hediye kilitlenebiliyordu (hata, 19 Kasım 2026):**
+   - Odadaki hediye, oda sahibinin hesabını (oda puanı için) gönderen ve alandan sonra, sırasız kilitliyordu. Oda sahibi
+     aynı anda o kişilerden birine hediye gönderince ikisi birbirini bekliyordu.
+   - Şanslı gönderimi gönderenin aynı jeton partisine iki kez yazıyor (alıcının payı ve kalan). Veritabanı ikinci yazışta
+     partinin satın alımını ve jetonu satan Jeton Noktası'nı yeniden denetliyor; aynı anda bir iade ya da Jeton Noktası
+     satışı varsa kilitleniyordu.
+   - Kullanıcı "Sunucu hatası" görüyordu, para kaymıyordu. Düzeltme: oda sahibi, satın alım ve satan hesap baştan,
+     sunucunun geri kalanıyla aynı sırada kilitleniyor (`server/api/send-locks.mjs`).
+   - Rastgele işlem testi Şanslı gönderimi (eski sayfanın fiyatı ve sürümü dahil) ve odada hediye eklenince buldu.
+   - **İnceleme (20 Kasım 2026):** sahibi baştan kilitlemek yeni bir kilitlenme doğurdu: sahip, odadaki bir hediye
+     sürerken anket açınca (mikrofon daveti, müzik, yasak, PK, odaya yeniden girme de) iki işlem birbirini bekliyordu ve
+     biri "Sunucu hatası" alıyordu; odanın bütün hediyeleri de birbirini baştan sona bekliyordu (dolu bir odada hediye
+     hızı yarıya indi, [`YUK_TESTI.md`](YUK_TESTI.md)). Düzeltme: hediye sahibin hesabına hiç dokunmuyor; oda XP'si
+     hediye bitince ayrı bir adımla ekleniyor (`room-xp-add.mjs`, `103_room_xp_pending.sql`; çökme olursa dakikada bir
+     süpürme ekler). Gönderen ve alan, yabancı anahtar denetimlerini bekletmeyen bir kilitle (`FOR NO KEY UPDATE`)
+     alınıyor; Jeton Noktası yalnız denetimin istediği paylaşılan kilitle, böylece aynı Jeton Noktası'ndan almış iki
+     kişi aynı anda Şanslı gönderince birbirini beklemiyor. Rastgele işlem testine sahibin anketleri, odada bağ
+     hediyeleri, engeller ve gecenin kendiliğinden bitirdiği bağlar eklendi; test sonunda odadaki her hediyenin
+     jetonunun sahibin oda XP'sine bir kez ve eksiksiz geçtiği de denetleniyor (`test/gift-locks.test.mjs`,
+     `test/money-fuzz.test.mjs`).
+
 ## Kalanlar
 
 **Sizden karar gerekenler:**
 - **Ekranda görülen fiyat kontrolü olmayan yerler:**
-  - Şanslı hediye (fiyatı panelden değişebiliyor), ücretli mesaj ve arama fiyatı (Canlı ayarlar), bağ, aile kurma,
-    animasyon ve koltuk rengi.
+  - Ücretli mesaj ve arama fiyatı (Canlı ayarlar), bağ, aile kurma, animasyon ve koltuk rengi. Şanslı hediye
+    Güncelleme 7 madde 10'da kapandı (yeni APK fiyatı ve ayar sürümünü gönderir; eski APK'lar için Zorunlu sürüm).
   - Kuralımız şu: Fiyat değiştiyse işlem reddedilir, eski fiyattan para alınmaz. Bunun için uygulamanın gördüğü fiyatı
     göndermesi gerekiyor, yani yeni APK. Öneri: Hediyede yaptığımız gibi yapalım.
 - **Jeton Noktası'nda elmas bozdurma ile Çevir farklı kurla çalışıyor:**

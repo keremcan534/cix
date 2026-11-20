@@ -24,7 +24,7 @@ import { BOSS_HOLD_MS, bossStep } from './boss-rules.mjs';
 import { HttpError, auth, blockedBetween, db, env, limit, readJson, userId } from './core.mjs';
 import { live } from './live-settings.mjs';
 import { announceRoom, roomPacket } from './live.mjs';
-import { BOSS_SEAT_MIN_LEVEL, rulesOf } from './room-rules.mjs';
+import { roomNumbers, rulesOf } from './room-rules.mjs';
 // rooms.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
 import { liveKitName, roomLevel, roomOut, roomRow, withVoiceCounts } from './rooms.mjs';
 
@@ -66,16 +66,20 @@ export function bossOf(r, now = Date.now()) {
  */
 export async function bossGift(c, { roomId, sender, coins }) {
   if (!roomId || !(coins > 0)) return [];
+  // FOR NO KEY UPDATE: only the seat's columns change, so a room action's foreign-key check on the room (a poll, a mic
+  // invite) never waits for a gift, nor a gift for it. The room's level counts the XP gifts hold for the owner that
+  // isn't on users.room_xp yet, this one's included (room-xp-add.mjs).
   const r = (
     await c.query(
-      `SELECT r.rules, r.boss_id, r.boss_since, r.boss_until, r.boss_spent, u.room_xp, now() AS now
-         FROM rooms r JOIN users u ON u.id = r.owner WHERE r.id = $1 AND r.closed_at IS NULL FOR UPDATE OF r`,
+      `SELECT r.rules, r.boss_id, r.boss_since, r.boss_until, r.boss_spent, now() AS now,
+              u.room_xp + coalesce((SELECT sum(p.xp) FROM room_xp_pending p WHERE p.owner = r.owner), 0) AS room_xp
+         FROM rooms r JOIN users u ON u.id = r.owner WHERE r.id = $1 AND r.closed_at IS NULL FOR NO KEY UPDATE OF r`,
       [roomId],
     )
   ).rows[0];
   if (!r) return [];
   const rules = rulesOf(r.rules);
-  if (!rules.bossSeat || rules.bossMode !== 'auto' || roomLevel(r.room_xp ?? 0) < BOSS_SEAT_MIN_LEVEL) return [];
+  if (!rules.bossSeat || rules.bossMode !== 'auto' || roomLevel(r.room_xp ?? 0) < roomNumbers().bossMinLevel) return [];
   if ((await c.query('SELECT 1 FROM room_bans WHERE room_id = $1 AND user_id = $2 AND (until IS NULL OR until > now())', [roomId, sender])).rowCount) return [];
   const seat = r.boss_id ? { holder: r.boss_id, since: ms(r.boss_since) ?? 0, until: ms(r.boss_until), spent: Number(r.boss_spent) } : null;
   const s = live();

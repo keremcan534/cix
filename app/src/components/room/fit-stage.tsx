@@ -14,17 +14,16 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { LayoutAnimation, ScrollView, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
 
 import { STAGE_PAD, fitMics, stageHeight } from '@/lib/room-split';
-import { easedChange, type Fitted } from '@/lib/seat-fit';
+import { BOARD_GAP, STAGE_HEADROOM as HEADROOM, easedChange, type Fitted } from '@/lib/seat-fit';
 import { useSettings } from '@/store';
 
 /** A real change of the mics' sizes (a banner came or went, another layout) glides into place. */
 const GLIDE = { duration: 260, update: { type: LayoutAnimation.Types.easeInEaseOut } };
 
-/**
- * The stage reaches this far up into the header's lower padding: the first row's host frame and crown rise above the
- * seat and would be cut by the scroll view's edge. The seats themselves stay where they were (the same top padding).
- */
-const HEADROOM = 8;
+// The stage reaches HEADROOM up into the header's lower padding (lib/seat-fit STAGE_HEADROOM): with no board over the
+// mics, the first row's frames have it above them (their crowns rise above the seat and would be cut by the scroll
+// view's edge). A board covers it, so BOARD_GAP is left under the boards instead: the first row has the same room
+// either way (lib/stage-rows firstRowRoom).
 
 const chatInFlow: ViewStyle = { flex: 1, minHeight: 0 };
 /** Three of the chat's short typing lines (17 px each) over the lower mics. */
@@ -71,7 +70,8 @@ export function FitStage({
   guess: number;
   /** Boards and banners above the mics. */
   top: ReactNode;
-  seats: (fit: Fitted | null) => ReactNode;
+  /** The mics, with their sizes and whether a board or banner is over them (the first row's room, lib/stage-rows). */
+  seats: (fit: Fitted | null, boards: boolean) => ReactNode;
   /** The Balkon bar under the stage: the line the bottom part starts at. */
   balcony: ReactNode;
   /** The chat; it says how tall the person chose it (its basis): the stage leaves it at least that. */
@@ -96,8 +96,11 @@ export function FitStage({
 
   const box = steadyBox > 0 ? steadyBox : own;
   const known = box > 0 && basis >= 0;
+  // Boards over the mics (measured: several of them draw nothing at times), and the gap left under them.
+  const boards = topH > 0;
+  const boardsH = boards ? topH + BOARD_GAP : 0;
   // The mics keep the sizes they have in the room with no boards and no PK; the boards take from the chat.
-  const next = !fit ? null : !known ? fit(guess) : fitMics(fit, calm, box, bar, basis, topH);
+  const next = !fit ? null : !known ? fit(guess) : fitMics(fit, calm, box, bar, basis, boardsH);
   // The sizes the mics are drawn with, replaced only when they change, so a drag of the chat's handle doesn't draw
   // every mic again for every pixel.
   const { reduceMotion } = useSettings();
@@ -107,11 +110,12 @@ export function FitStage({
     setShown(next);
   }
   const fitted = fit ? (shown ?? next) : null;
-  const seatsNode = useMemo(() => seats(fitted), [seats, fitted]);
+  // Redrawn with the boards' coming or going in the same pass as the sizes they change (fitMics measures them too).
+  const seatsNode = useMemo(() => seats(fitted, boards), [seats, fitted, boards]);
   const chatNode = useMemo(() => chat((px) => setBasis(Math.round(px))), [chat]);
 
   // What the stage holds: the boards and the mics (as fitted, or as drawn when they are taller or not fitted).
-  const holds = topH + Math.max(fitted?.height ?? 0, drawn) + STAGE_PAD;
+  const holds = boardsH + Math.max(fitted?.height ?? 0, drawn) + STAGE_PAD;
   const height = known && (fitted || drawn > 0) ? (fitted ? stageHeight(holds, box, bar) : stageHeight(holds, box, bar, basis, floor)) : null;
   const style: StyleProp<ViewStyle> = height !== null ? { height: height + HEADROOM, marginTop: -HEADROOM, flexGrow: 0, flexShrink: 0 } : { marginTop: -HEADROOM, flexGrow: 0, flexShrink: 1 };
   const line = stageH > 0 ? stageH - HEADROOM + bar : 0;
@@ -130,6 +134,7 @@ export function FitStage({
           {top}
           {pkTop}
         </View>
+        {boards && <View style={{ height: BOARD_GAP }} />}
         {/* Centred when the stage is taller than they are; measured as they are, not as the room around them. */}
         <View style={{ flexGrow: 1, justifyContent: 'center' }}>
           <View onLayout={measure(setDrawn)}>{seatsNode}</View>

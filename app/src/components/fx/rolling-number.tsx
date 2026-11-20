@@ -16,6 +16,7 @@ export function RollingNumber({
   duration = 700,
   numberOfLines,
   shrink,
+  maxFontSizeMultiplier,
 }: {
   value: number;
   style?: StyleProp<TextStyle>;
@@ -25,6 +26,8 @@ export function RollingNumber({
   numberOfLines?: number;
   /** One line that shrinks its letters (down to this share) instead of ever being cut with "…". */
   shrink?: number;
+  /** How far the phone's text size may grow it (1: not at all); the app's own limit when not given. */
+  maxFontSizeMultiplier?: number;
 }) {
   const { reduceMotion } = useSettings();
   const [shown, setShown] = useState(value);
@@ -48,7 +51,12 @@ export function RollingNumber({
     return () => cancelAnimationFrame(frame);
   }, [value, duration, reduceMotion]);
   return (
-    <Text style={[{ fontVariant: ['tabular-nums'] }, style]} numberOfLines={shrink ? 1 : numberOfLines} adjustsFontSizeToFit={!!shrink} minimumFontScale={shrink}>
+    <Text
+      style={[{ fontVariant: ['tabular-nums'] }, style]}
+      numberOfLines={shrink ? 1 : numberOfLines}
+      adjustsFontSizeToFit={!!shrink}
+      minimumFontScale={shrink}
+      {...(maxFontSizeMultiplier !== undefined && { maxFontSizeMultiplier })}>
       {format(reduceMotion ? value : shown)}
     </Text>
   );

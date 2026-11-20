@@ -3,7 +3,11 @@
 //   PATCH  /api/me      { name?, username?, gender?, birthDate?, city?, bio?, interests?, avatarUrl? } → { user }
 //   DELETE /api/me                                        → { deleted: true }
 //   GET    /api/user?id=&visit=1                          → { user }  (public profile + counts (oneWay: Takipçi / Takip without friends) + relation; visit=1 from the profile screen records a visit;
-//                                                                       levels, friends, gifts, staff, extras and album: profiles.mjs)
+//                                                                       levels, friends, gifts, staff, extras and album: profiles.mjs;
+//                                                                       room: the room they are in now or null, presence-room.mjs;
+//                                                                       marks: Profil izleri on their photo, profile-marks.mjs;
+//                                                                       &medals=1 adds user.medals, &card=1 leaves out giftsReceived:
+//                                                                       the room's person card)
 //   GET    /api/me/visitors                               → { count, visitors, hidden }  (last 7 days; who only with the
 //                                                                       Abonelik, without it `hidden`: when, never who)
 //   POST   /api/follow  { to, follow }                    → { following }
@@ -23,9 +27,12 @@ import { familyOf, leaveFamily } from './families.mjs';
 import { dropFromQueues } from './music.mjs';
 import { removeFiles, removeUserFiles, verifyUpload } from './media.mjs';
 import { shownToViewer } from './privacy.mjs';
-import { cardsMore, privateMore, profileMore } from './profiles.mjs';
+import { cardsMore, medalsOf, privateMore, profileMore } from './profiles.mjs';
 import { cityDistance } from './city-coords.mjs';
 import { eraseDecor } from './room-decor.mjs';
+import { shownRoomOf } from './presence-room.mjs';
+import { clearMarks, eraseMarks, profileMarksOf } from './profile-marks.mjs';
+import { endBondOnBlock } from './bonds.mjs';
 
 /** The interests the app offers (app/src/data/mock.ts INTERESTS). */
 export const INTERESTS = ['🎤 Karaoke', '🎮 Oyun', '💬 Sohbet', '⚽ Spor', '✈️ Seyahat', '🎬 Film', '💃 Dans', '📚 Kitap', '🎧 Müzik', '☕ Kahve'];
@@ -137,6 +144,8 @@ export async function eraseAccount(c, id, phone) {
     await c.query('DELETE FROM follows WHERE follower = $1 OR followee = $1', [id]);
     await c.query('DELETE FROM blocks WHERE blocker = $1 OR blocked = $1', [id]);
     await c.query('DELETE FROM profile_visits WHERE owner_id = $1 OR visitor_id = $1', [id]);
+    // Profil izleri: the marks on them go; the ones they left elsewhere lose their name (profile-marks.mjs).
+    await eraseMarks(c, id);
     // Their level drops and what the drops took off (levels-admin.mjs): no accounting record, nobody else's.
     await c.query('DELETE FROM level_drops WHERE user_id = $1', [id]);
     await c.query('DELETE FROM level_offsets WHERE user_id = $1', [id]);
@@ -325,7 +334,11 @@ export const socialRoutes = {
     );
     // "Profilim herkese açık" off: someone they don't follow gets no age, city, bio or interests (privacy.mjs).
     const [shown] = await shownToViewer(db, me.id, [{ id: u.id, name: u.name, ...profileOf(u) }]);
-    const more = await profileMore(u, id === me.id);
+    // The room's person card (card=1) doesn't show the received-gift count, a sum over all their gifts: left out; its
+    // levels may be a minute old (profiles.mjs levelsOf), as Keşfet's cards are.
+    const card = url.searchParams.get('card') === '1';
+    const more = await profileMore(u, id === me.id, { gifts: !card, fresh: !card });
+    const looks = (await looksOf([u.id]))[u.id] ?? null;
     return {
       user: {
         ...shown,
@@ -342,10 +355,17 @@ export const socialRoutes = {
         distance: id === me.id ? null : cityDistance(me.city, shown.city),
         // A private profile keeps its personal extras and album from people it doesn't follow, like age and city.
         ...(shown.private ? privateMore(more) : more),
+        // Their medals (Vitrin's Madalyalar, the same rules) for the person card, only when asked: older apps don't.
+        ...(url.searchParams.get('medals') === '1' && { medals: await medalsOf(u, more.friends) }),
       },
-      looks: (await looksOf([u.id]))[u.id] ?? null,
+      looks,
+      // Profil izleri (profile-marks.mjs): the marks on their photo now; on my own profile with who left each.
+      marks: id === me.id ? await profileMarksOf(id, true) : (looks?.marks ?? []),
       agency: ag.rowCount ? { id: String(ag.rows[0].id), name: ag.rows[0].name } : null,
       family: await familyOf(id),
+      // "Şu an odada" (presence-room.mjs): the room they are in now, as I may see it; null for none, for my own
+      // profile and for someone I blocked. An added field: an older app reads none.
+      room: x.blocked_by_me ? null : await shownRoomOf(id, me.id),
     };
   },
 
@@ -448,7 +468,7 @@ export const socialRoutes = {
     return followList(await auth(req), url, 'followers');
   },
 
-  /** Blocking also ends follows both ways; the other person is not told. */
+  /** Blocking also ends follows both ways and a bond between us; the other person is not told. */
   async 'POST /api/block'(req) {
     const me = await auth(req);
     const b = await readJson(req);
@@ -464,7 +484,11 @@ export const socialRoutes = {
       await c.query('DELETE FROM follows WHERE (follower = $1 AND followee = $2) OR (follower = $2 AND followee = $1)', [me.id, to]);
       // Following each other's room ends with it too (room-follow.mjs).
       await c.query('DELETE FROM room_follows WHERE (owner_id = $1 AND user_id = $2) OR (owner_id = $2 AND user_id = $1)', [me.id, to]);
+      // So does a bond between us, told to nobody (bonds.mjs).
+      await endBondOnBlock(c, me.id, to);
     });
+    // Profil izleri: a mark the blocked person left on me comes off (its own transaction, my row locked first).
+    await clearMarks(me.id, { how: 'block', by: me.id, from: to });
     return { blocked: true };
   },
 

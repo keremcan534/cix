@@ -17,10 +17,15 @@
 //   slowMode       boolean                  one chat line per 10 seconds for everyone but staff
 //   words          string[]                 the room's own forbidden words (chat lines with them are dropped)
 import { HttpError } from './core.mjs';
+import { roomNumbersOf } from './live-registry.mjs';
+import { live } from './live-settings.mjs';
+
+/** The rooms' numbers now (Canlı ayarlar › Oda seviyeleri): mic and boss seat levels, words, people per level. */
+export const roomNumbers = () => roomNumbersOf(live());
 
 /** Members (and the people limit) a room of each level may have: app data/catalog ROOM_LIMITS[].members. */
 export const ROOM_MEMBER_CAPS = [50, 100, 200, 300, 500, 600, 800, 1_200, 1_350, 1_500, 1_750, 2_000, 2_500, 3_000, 5_000];
-export const memberCap = (level) => ROOM_MEMBER_CAPS[Math.min(Math.max(Number(level) || 1, 1), ROOM_MEMBER_CAPS.length) - 1];
+export const memberCap = (level, caps = roomNumbers().caps) => caps[Math.min(Math.max(Number(level) || 1, 1), caps.length) - 1];
 /** The people limits Oda ayarları offers (app components/room/owner "Katılımcı limiti"). */
 export const LIMIT_OPTIONS = [50, 100, 200, 300, 500, 1_200, 2_000, 5_000];
 export const MIC_PERMISSION_MIN_LEVEL = 4;
@@ -68,7 +73,7 @@ export function rulesOf(raw) {
   for (const [k, list] of Object.entries(ONE_OF)) if (list.includes(r[k])) out[k] = r[k];
   for (const k of BOOLS) if (typeof r[k] === 'boolean') out[k] = r[k];
   if (Number.isInteger(r.limit) && LIMIT_OPTIONS.includes(r.limit)) out.limit = r.limit;
-  if (Array.isArray(r.words)) out.words = [...new Set(r.words.filter((w) => typeof w === 'string').map(normWord).filter(wordOk))].slice(0, MAX_WORDS);
+  if (Array.isArray(r.words)) out.words = [...new Set(r.words.filter((w) => typeof w === 'string').map(normWord).filter(wordOk))].slice(0, Math.max(MAX_WORDS, roomNumbers().wordsMax));
   return out;
 }
 
@@ -82,6 +87,7 @@ export function applyRules(now, patch, { rank, level }) {
   const keys = Object.keys(patch);
   if (!keys.length) throw new HttpError(400, 'Değişiklik yok');
   const next = { ...now, words: [...now.words] };
+  const n = roomNumbers();
   for (const k of keys) {
     const v = patch[k];
     const staffRule = STAFF_RULES.includes(k);
@@ -90,18 +96,18 @@ export function applyRules(now, patch, { rank, level }) {
     }
     if (ONE_OF[k]) {
       if (!ONE_OF[k].includes(v)) throw new HttpError(400, 'Geçersiz oda ayarı');
-      if (k === 'micPermission' && v === 'members' && level < MIC_PERMISSION_MIN_LEVEL) throw new HttpError(403, `Mikrofon izni Lv.${MIC_PERMISSION_MIN_LEVEL} odada açılır`);
+      if (k === 'micPermission' && v === 'members' && level < n.micMinLevel) throw new HttpError(403, `Mikrofon izni Lv.${n.micMinLevel} odada açılır`);
       next[k] = v;
     } else if (BOOLS.includes(k)) {
       if (typeof v !== 'boolean') throw new HttpError(400, 'Geçersiz oda ayarı');
-      if (k === 'bossSeat' && v && level < BOSS_SEAT_MIN_LEVEL) throw new HttpError(403, `Patron koltuğu Lv.${BOSS_SEAT_MIN_LEVEL} odada açılır`);
+      if (k === 'bossSeat' && v && level < n.bossMinLevel) throw new HttpError(403, `Patron koltuğu Lv.${n.bossMinLevel} odada açılır`);
       next[k] = v;
     } else if (k === 'limit') {
       if (v !== null && !LIMIT_OPTIONS.includes(v)) throw new HttpError(400, 'Geçersiz katılımcı limiti');
-      if (v !== null && v > memberCap(level)) throw new HttpError(403, `Lv.${level} oda en fazla ${memberCap(level).toLocaleString('tr-TR')} kişi alabilir`);
+      if (v !== null && v > memberCap(level, n.caps)) throw new HttpError(403, `Lv.${level} oda en fazla ${memberCap(level, n.caps).toLocaleString('tr-TR')} kişi alabilir`);
       next.limit = v;
     } else if (k === 'words') {
-      if (!Array.isArray(v) || v.length > MAX_WORDS || !v.every((w) => typeof w === 'string')) throw new HttpError(400, `En fazla ${MAX_WORDS} yasaklı kelime eklenebilir`);
+      if (!Array.isArray(v) || v.length > n.wordsMax || !v.every((w) => typeof w === 'string')) throw new HttpError(400, `En fazla ${n.wordsMax} yasaklı kelime eklenebilir`);
       const words = v.map(normWord);
       if (!words.every(wordOk)) throw new HttpError(400, 'Yasaklı kelime 2–20 harf ya da rakam olmalı');
       next.words = [...new Set(words)];

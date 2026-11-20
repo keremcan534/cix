@@ -81,7 +81,7 @@ export default function BagScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.grid}>
-        {tab === 'gift' && <Text style={styles.note}>Çantandaki hediyeler bir odada, hediye panelinin Çantam rafından ücretsiz gönderilir.</Text>}
+        {tab === 'gift' && <Text style={styles.note}>Çantandaki hediyeler bir odada, hediye panelindeki çanta simgesine dokunarak ücretsiz gönderilir.</Text>}
         {tab === 'entry' && <Text style={styles.note}>Bir giriş efekti ve bir binek birlikte takılır.</Text>}
         {waiting ? (
           <Text style={styles.empty}>Yükleniyor…</Text>

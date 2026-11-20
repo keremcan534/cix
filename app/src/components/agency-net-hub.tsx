@@ -273,11 +273,11 @@ function StreamerJoin({ d, demo, reload, askFor }: { d: Me; demo: boolean; reloa
     return (
       <Panel>
         <View style={ns.rowBetween}>
-          <Text style={[ns.title, { flex: 1 }]}>Merkez hesabındasın</Text>
+          <Text style={[ns.title, { flex: 1 }]}>Yönetim yayıncısısın</Text>
           <Pill text="Transferle geçiş" tone="money" icon="swap-horizontal" />
         </View>
         <Text style={ns.dim}>
-          Kayıttan sonraki {s.pickDays} gün içinde bir ajansa katılmadığın için merkez hesabına bağlısın. Bir ajansa ancak transfer talebiyle geçebilirsin; talebi ajans ve merkez onaylar.
+          Kayıttan sonraki {s.pickDays} gün içinde bir ajansa katılmadığın (ya da ajanstan ayrıldığın) için yönetime bağlı yayıncısın; kazancın ve para çekme hakkın sürer. Bir ajansa kodla katılamazsın, ancak transfer talebiyle geçebilirsin; talebi ajans ve merkez onaylar.
         </Text>
         <Button title="Transfer talebi oluştur" icon="swap-horizontal" onPress={request} />
       </Panel>

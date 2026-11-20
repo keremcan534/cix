@@ -114,6 +114,19 @@ Her tur `GM-…` işlem numarasıyla Oyun Merkezi › Geçmiş'te ve cüzdan har
 
 ## Kasa kuralı: %60 kasa, %40 dağıtım
 
+**Oyuncuya yazılmaz (Güncelleme 7, sahip kararı, Kasım 2026).** Bu bölüm personel bilgisidir. Oyunlarda ve Şanslı
+hediyede kasa payı ("kasaya %60 kalır, %40'ı kazananlara dağılır"), JACKPOT'a giden pay ("her bahsin %2'si"), ortalama
+geri ödeme ("100 jetonun ortalama N'i döner"), "çarpan × şans %40 eder" ve Rüzgâr Gülü'nün fon payı kaldırıldı; Canlı
+Yörünge'nin başlığındaki "kasa payı %N" de. Kalanlar: oyunun nasıl oynandığı, ödeme tabloları, en yüksek kazanç
+sınırları (oyun kuralıdır) ve **olasılık tabloları**. Olasılıklar kaldırılamaz: Google Play (Ödemeler politikası §7)
+ve Apple (3.1.1), satın alınan jetonla oynanan rastgele ödüllerde olasılıkların satın almadan önce gösterilmesini
+ister. Canlı Yörünge'de "Ödül havuzu yetmezse roket daha erken patlayabilir" cümlesi de kalır; yoksa tablo şansı
+olduğundan yüksek gösterir. Havuz yetmediğinde gelen ret de kasa ayrıntısı vermez: "Bu bahis şu an alınamıyor. Daha
+küçük bir bahisle dene; jetonun düşülmedi." (sunucunun yazısı, eski APK'lara da hemen gider). Uygulamadaki yazılar
+yeni APK ile gelir; eski APK'lar eski yazıları gösterir. `app/tests/game-texts.test.ts` bu sözlerin oyuncu
+ekranlarına geri dönmesini ve olasılık tablolarının kaybolmasını yakalar. Odadaki Zar Düellosu sohbet satırındaki
+"kasa kazandı" yazısı oda ekranındadır (`live-room.tsx`), ayrı iş.
+
 Bütün jetonlu oyunlarda (Şans Çarkı, Zar, Gece Yarısı Çarkı, Ejder ile Kaplan, Altın Kasa ve odadaki Zar Düellosu) oynanan jetonun %60'ı kasaya kalır, %40'ı kazananlara rastgele dağılır.
 
 - **Olasılıklar** (`app/src/lib/casino-odds.ts`): her oyun ve her seçimde beklenen geri ödeme %40'tır. Testler bütün sonuçları tek tek sayarak bunu kanıtlar (`tests/casino-odds.test.ts`). Ejder ile Kaplan'da Ejder/Kaplan seçimi %39,94'tür (kart farkı kuralı tam %40'a bölünmüyor; kasa lehine yuvarlandı).

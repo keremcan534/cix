@@ -32,6 +32,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSyncExternalStore } from 'react';
 
+import { BOND_KINDS, BOND_LEVELS, type BondKind, type BondKindInfo } from '@/data/bonds';
 import { GIFTS_PAUSED } from '@/data/gifts-paused';
 import { GIFTS, isBondGift, type Gift, type GiftCat } from '@/data/mock';
 import { RULES, type Rules } from '@/data/rules';
@@ -39,9 +40,11 @@ import { selfExchangeRate } from '@/lib/coins-bank';
 import { parseLiveEmoji, type LiveEmoji } from '@/lib/emoji-live-core';
 import { parseLiveLevels, type LiveLevels } from '@/lib/levels-live-core';
 import { mergeShop, parseLiveShop, type LiveShop } from '@/lib/shop-live-core';
-import { COSMETICS, setLiveCosmetics } from '@/data/catalog';
+import { BOSS_SEAT_MIN_LEVEL, COSMETICS, MIC_PERMISSION_MIN_LEVEL, memberLimit, setLiveCosmetics } from '@/data/catalog';
 import { setLiveSeatColors } from '@/data/seat-colors';
+import { APP_MARKS, parseMarkRules, type GiftMark, type MarkRules } from '@/lib/profile-marks';
 import { parseFxList, type FxVideo } from '@/lib/fx-videos-core';
+import { parseGlobalIds } from '@/lib/global-gift-core';
 import { parseCatalog, type CatalogPack } from '@/lib/live/billing-core';
 
 const BASE = process.env.EXPO_PUBLIC_API_URL ?? '';
@@ -85,6 +88,37 @@ export type LiveCatalog = {
   levels: LiveLevels | null;
   /** The shop's frames and entry effects (shop=1, Yönetim › Mağaza); null from an older server: the compiled shop. */
   shop: LiveShop | null;
+  /** Koruma's numbers as Canlı ayarlar has them; null from an older server: the app's own. */
+  guard: GuardNumbers | null;
+  /** Bağlar's limits and days as Canlı ayarlar has them; null from an older server: the app's own. */
+  bonds: BondNumbers | null;
+  /** Aile's themes: id → the family level it opens at, as Canlı ayarlar has them; null from an older server. */
+  familyThemes: Record<string, number> | null;
+  /** Oda seviyeleri as Canlı ayarlar has them; null from an older server: the app's own. */
+  rooms: RoomNumbers | null;
+  /** Profil izleri (marks=1): on or off, the hours, which gift leaves or cleans a mark; null from an older server. */
+  marks: MarkRules | null;
+  /** The gifts the server marks global (Global hediye, lib/global-gift-core); absent when none. */
+  global?: string[];
+};
+/** The rooms' numbers (server/api/live-registry.mjs roomNumbersOf): mic and boss seat levels, people per level. */
+export type RoomNumbers = { micMinLevel: number; bossMinLevel: number; caps: number[] };
+/** Koruma's numbers (server/api/guards.mjs guardRules) that the rules page says. */
+export type GuardNumbers = { dropFrom: number; dropShare: number; dropFlat: number; thresholdEveryDays: number };
+/**
+ * Bağlar's numbers (server/api/bonds.mjs bondCatalog): days to answer, days apart, talk points, per-kind limits; from a
+ * server with Güncelleme 7 also the level steps (20) and the nightly drop and quiet end (each only when sound).
+ */
+export type BondNumbers = {
+  answerDays: number;
+  cooldownDays: number;
+  talkDaily: number;
+  max: Partial<Record<BondKind, number>>;
+  levels?: number[];
+  dropPct?: number;
+  dropFlat?: number;
+  idleEndDays?: number;
+  idleWarnDays?: number;
 };
 
 // --- Reading the server's answer, without trusting it ----------------------------------------------------
@@ -172,6 +206,59 @@ function shelfOf(list: unknown, app: Record<string, AppGiftEdit>, remote: Remote
   return [...new Set(ids)];
 }
 
+const whole = (v: unknown, min: number, max: number): number | null => (typeof v === 'number' && Number.isSafeInteger(v) && v >= min && v <= max ? v : null);
+/** The catalog's `guard`; null unless every number is sound. */
+export function parseGuardNumbers(x: unknown): GuardNumbers | null {
+  const g = obj(x);
+  const dropFrom = whole(g.dropFrom, 0, 1e9);
+  const dropFlat = whole(g.dropFlat, 0, 1e9);
+  const days = whole(g.thresholdEveryDays, 1, 365);
+  const share = typeof g.dropShare === 'number' && Number.isFinite(g.dropShare) && g.dropShare >= 0 && g.dropShare <= 1 ? g.dropShare : null;
+  return dropFrom === null || dropFlat === null || days === null || share === null ? null : { dropFrom, dropShare: share, dropFlat, thresholdEveryDays: days };
+}
+/** The catalog's `bonds`; null unless the days are sound (a bad per-kind limit is left out: the app's own). */
+export function parseBondNumbers(x: unknown): BondNumbers | null {
+  const b = obj(x);
+  const answerDays = whole(b.answerDays, 1, 365);
+  const cooldownDays = whole(b.cooldownDays, 0, 365);
+  const talkDaily = whole(b.talkDaily, 0, 1000);
+  if (answerDays === null || cooldownDays === null || talkDaily === null) return null;
+  const max: Partial<Record<BondKind, number>> = {};
+  for (const [k, v] of Object.entries(obj(b.max))) {
+    const n = whole(v, 1, 1000);
+    if (n !== null && Object.hasOwn(BOND_KINDS, k)) max[k as BondKind] = n;
+  }
+  // Güncelleme 7's numbers: each one only when sound (an older server sends none; the app says its own).
+  const levels = Array.isArray(b.levels) && b.levels.length === BOND_LEVELS.length && b.levels.every((n, i, l) => whole(n, 0, 1e9) !== null && (i === 0 ? n === 0 : (n as number) > (l[i - 1] as number))) ? (b.levels as number[]) : null;
+  const extra = { dropPct: whole(b.dropPct, 0, 100), dropFlat: whole(b.dropFlat, 0, 1e9), idleEndDays: whole(b.idleEndDays, 0, 3650), idleWarnDays: whole(b.idleWarnDays, 0, 365) };
+  return { answerDays, cooldownDays, talkDaily, max, ...(levels ? { levels } : {}), ...Object.fromEntries(Object.entries(extra).filter(([, v]) => v !== null)) };
+}
+
+/** The catalog's `family.themes`; the sound entries only, null when none. */
+export function parseFamilyThemes(x: unknown): Record<string, number> | null {
+  const out: Record<string, number> = {};
+  for (const [id, v] of Object.entries(obj(obj(x).themes))) {
+    const n = whole(v, 1, 100);
+    if (n !== null && /^[a-z0-9_-]{1,32}$/.test(id)) out[id] = n;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+/** The catalog's `rooms`; null unless the levels are sound and there are 15 caps. */
+export function parseRoomNumbers(x: unknown): RoomNumbers | null {
+  const r = obj(x);
+  const mic = whole(r.micMinLevel, 1, 15);
+  const boss = whole(r.bossMinLevel, 1, 15);
+  const caps = Array.isArray(r.caps) && r.caps.length === 15 ? r.caps.map((n) => whole(n, 1, 100_000)) : null;
+  return mic === null || boss === null || !caps || caps.some((n) => n === null) ? null : { micMinLevel: mic, bossMinLevel: boss, caps: caps as number[] };
+}
+/** The room level Mikrofon izni opens at: the server's, else the app's own. */
+export const liveMicMinLevel = (c: LiveCatalog | null = current) => c?.rooms?.micMinLevel ?? MIC_PERMISSION_MIN_LEVEL;
+/** The room level Patron koltuğu opens at: the server's, else the app's own. */
+export const liveBossMinLevel = (c: LiveCatalog | null = current) => c?.rooms?.bossMinLevel ?? BOSS_SEAT_MIN_LEVEL;
+/** How many people a room of `level` holds: the server's, else the app's own. */
+export const liveMemberLimit = (level: number, c: LiveCatalog | null = current) => c?.rooms?.caps[Math.min(Math.max(level, 1), 15) - 1] ?? memberLimit(level);
+
 /** GET /api/catalog as the live catalog; anything malformed is left out (the compiled value is used), never thrown. */
 export function parseLiveCatalog(raw: unknown): LiveCatalog {
   const r = obj(raw);
@@ -192,8 +279,15 @@ export function parseLiveCatalog(raw: unknown): LiveCatalog {
     emoji: parseLiveEmoji(r.emoji),
     levels: parseLiveLevels(r.levels),
     shop: parseLiveShop(r.shop),
+    guard: parseGuardNumbers(r.guard),
+    bonds: parseBondNumbers(r.bonds),
+    familyThemes: parseFamilyThemes(r.family),
+    rooms: parseRoomNumbers(r.rooms),
+    marks: parseMarkRules(r.marks, r.gifts),
+    ...globalOf(parseGlobalIds(r.gifts)),
   };
 }
+const globalOf = (ids: string[]) => (ids.length ? { global: ids } : {});
 
 type Saved = LiveCatalog & { fetchedAt: number };
 /** The copy kept on the phone ({v, giftIds, packs, campaign, usdTry, fetchedAt}); null when broken. */
@@ -224,14 +318,21 @@ export function parseSavedLiveCatalog(raw: string | null): { catalog: LiveCatalo
       emoji: parseLiveEmoji(r.emoji),
       levels: parseLiveLevels(r.levels),
       shop: parseLiveShop(r.shop),
+      guard: parseGuardNumbers(r.guard),
+      bonds: parseBondNumbers(r.bonds),
+      familyThemes: parseFamilyThemes({ themes: r.familyThemes }),
+      rooms: parseRoomNumbers(r.rooms),
+      marks: parseMarkRules(r.marks),
+      ...globalOf(parseGlobalIds(Array.isArray(r.global) ? r.global.map((id) => ({ id, global: true })) : null)),
     },
     // A copy an older app saved counts as old: the next poll reads the catalog again. One from before the videos were
     // listed (no fx), or from before the shelves were (no shelf): that app hid the gifts put back on the shelves
     // (data/gifts-paused), and an updated phone would go on hiding them until the copy was ten minutes old.
     // One from before the level settings (no levels) too: the levels would stay the compiled ones until it was old.
     // And one whose shop came before the seat colors did (no seats): a room's color the panel added would be silver.
+    // And one from before Profil izleri (no marks): Kaka and Su would stay off its shelf until it was old.
     fetchedAt:
-      'fx' in r && 'shelf' in r && 'levels' in r && 'shop' in r && (r.shop === null || 'seats' in obj(r.shop)) && typeof r.fetchedAt === 'number' && Number.isFinite(r.fetchedAt)
+      'fx' in r && 'shelf' in r && 'levels' in r && 'shop' in r && (r.shop === null || 'seats' in obj(r.shop)) && 'marks' in r && typeof r.fetchedAt === 'number' && Number.isFinite(r.fetchedAt)
         ? r.fetchedAt
         : 0,
   };
@@ -316,8 +417,30 @@ export function giftById(id: string | null | undefined, c: LiveCatalog | null = 
   return viewsOf(c).byId.get(id);
 }
 
+/**
+ * A bond kind with its bond gift's name and price as the catalog says now (bag-<kind>: Yönetim › Hediyeler can change
+ * them, server/api/bonds.mjs charges that price). The app's own (data/bonds) without a catalog or for a bad price.
+ */
+export function bondKindOf(kind: BondKind, c: LiveCatalog | null = current): BondKindInfo {
+  const k = BOND_KINDS[kind];
+  const g = giftById(`bag-${kind}`, c);
+  const max = c?.bonds?.max[kind] ?? k.max;
+  return g && Number.isSafeInteger(g.price) && g.price > 0 ? { ...k, gift: g.name, price: g.price, max } : max === k.max ? k : { ...k, max };
+}
+
+/** Bağlar's level steps now: the catalog's (Canlı ayarlar) or the app's own. */
+export const bondLevelsNow = (c: LiveCatalog | null = current): readonly number[] => c?.bonds?.levels ?? BOND_LEVELS;
+/** Whether the server marks this gift global (Global hediye): the gift panel's Global shelf and the tile's badge. */
+export const isGlobalGift = (id: string, c: LiveCatalog | null = current) => !!c?.global?.includes(id);
+
 /** Every gift this phone can draw, the app's own as they are now and the admins' listed (the profile's gift wall). */
 export const everyGift = (c: LiveCatalog | null = current): Gift[] => [...viewsOf(c).byId.values()];
+
+/**
+ * What a gift does to its receiver's profile photo (Profil izleri, lib/profile-marks): the server's rule (marks=1), none
+ * while the feature is off or from an older server (it leaves no mark); the demo (no catalog) has the app's own two.
+ */
+export const giftMarkOf = (id: string, c: LiveCatalog | null = current): GiftMark | null => (c ? (c.marks?.on ? (c.marks.gifts[id] ?? null) : null) : (APP_MARKS[id] ?? null));
 
 /** A gift's icon address when the server gave one (an admin's gift, or one of the app's whose icon was replaced). */
 export const remoteIconOf = (id: string, c: LiveCatalog | null = current): string | undefined => c?.app[id]?.icon ?? c?.remote.find((g) => g.id === id)?.icon;
@@ -406,8 +529,9 @@ export function fetchLiveCatalog(): Promise<unknown> {
       // gifts=2: the whole story about the app's own gifts too; emoji=1: the emoji panel's packs; levels=1: Seviye ve
       // VIP ayarları (server/api/gifts.mjs).
       // shop=1: the shop's frames and entry effects (Yönetim › Mağaza).
-      // family=1: this app has the Aile ve Dost shelf.
-      const res = await fetch(`${BASE}/api/catalog?gifts=2&family=1&emoji=1&levels=1&shop=1`, { signal: ctrl.signal });
+      // family=1: this app has the Aile ve Dost shelf. lucky=1: it plays the Şanslı packages' videos (lucky-art.mjs).
+      // marks=1: Profil izleri (Kaka and Su, each gift's mark).
+      const res = await fetch(`${BASE}/api/catalog?gifts=2&family=1&emoji=1&levels=1&shop=1&lucky=1&marks=1`, { signal: ctrl.signal });
       if (!res.ok) throw new Error(`Sunucu hatası (${res.status})`);
       const body: unknown = await res.json();
       fetchedAt = Date.now();
@@ -436,7 +560,7 @@ export const liveCatalogStale = (now = Date.now()) => !current || now - fetchedA
 /** The server named its current Çevir rate (409 rate_changed): the screens show it before the catalog is read again. */
 export function noteLiveRate(usdTry: unknown) {
   if (!validRate(usdTry)) return;
-  publish({ ...(current ?? { v: 0, giftIds: null, packs: [], campaign: null, fx: null, remote: [], shelf: null, app: {}, emoji: null, levels: null, shop: null }), usdTry });
+  publish({ ...(current ?? { v: 0, giftIds: null, packs: [], campaign: null, fx: null, remote: [], shelf: null, app: {}, emoji: null, levels: null, shop: null, guard: null, bonds: null, familyThemes: null, rooms: null, marks: null }), usdTry });
 }
 
 const subscribe = (l: () => void) => {

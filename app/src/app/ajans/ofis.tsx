@@ -11,6 +11,7 @@ import { Linking, Pressable, ScrollView, Share, StyleSheet, View } from 'react-n
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
+  AgencyStatusCard,
   Empty,
   Kpi,
   KpiGrid,
@@ -32,6 +33,7 @@ import {
   type Ask,
 } from '@/components/agency-net';
 import { HubSections, TransferCard, openOffice } from '@/components/agency-net-hub';
+import { parseAgencyActivity } from '@/lib/agency-activity';
 import { AssistantsTab } from '@/components/agency-assistants';
 import { InviteSheet } from '@/components/agency-invite-sheet';
 import { SCENES } from '@/components/fx/scenes';
@@ -174,6 +176,8 @@ function Summary({ c }: { c: Ctx }) {
   const sub = a.level > 1;
   const p = o.performance;
   const e = o.earnings;
+  // Aday ajans / aktif ajans (server/api/agency-activity.mjs); none from an older server.
+  const activity = parseAgencyActivity(o.activity);
   const share = () => Share.share({ message: `${a.name} ajansına katılmak için kod: ${a.code}` }).catch(() => {});
   return (
     <View style={{ gap: space.xl }}>
@@ -190,6 +194,7 @@ function Summary({ c }: { c: Ctx }) {
               <Pill text={LEVEL_TEXT(a.level)} tone="action" />
               <Pill text={STATUS_TEXT[a.status]} tone={statusTone(a.status)} />
               {sub && !!a.tierName && <Pill text={a.tierName} tone="money" icon="trending-up" />}
+              {activity && !activity.off && <Pill text={activity.status === 'active' ? 'Aktif ajans' : 'Aday ajans'} tone={activity.status === 'active' ? 'success' : 'money'} icon={activity.status === 'active' ? 'checkmark-circle-outline' : 'hourglass-outline'} />}
             </View>
           </View>
         </View>
@@ -204,6 +209,8 @@ function Summary({ c }: { c: Ctx }) {
 
       {a.status === 'suspended' && <Banner icon="pause-circle-outline" tone="danger" text="Ajans askıda. Yeni üye ve alt ajans alınamaz, ödeme talebi açılamaz; geçmiş kayıtlar ve kazançlar korunur." />}
       {(a.status === 'pending' || a.status === 'draft') && <Banner icon="hourglass-outline" tone="money" text={a.status === 'draft' ? 'Taslak: onaya gönderilmedi.' : 'Başvuru inceleniyor. Onaylanınca panel açılır.'} />}
+
+      {activity && !activity.off && <AgencyStatusCard a={activity} />}
 
       {e && (
         <KpiGrid>

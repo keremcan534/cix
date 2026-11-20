@@ -96,8 +96,8 @@ export function vipOutcomeAlert(o: VipOutcome): { title: string; body: string } 
   switch (o.kind) {
     case 'done': {
       const end = o.until ? ` Bitiş: ${dateTr(o.until)}.` : '';
-      if (o.replay) return o.until ? { title: 'VIP aktif', body: `Bu abonelik zaten hesabında.${end}` } : { title: 'Abonelik bitmiş', body: 'Bu abonelik artık geçerli değil. Yeni bir plan seçebilirsin.' };
-      return { title: 'VIP aktif 🎉', body: `Aboneliğin başladı.${end}` };
+      if (o.replay) return o.until ? { title: 'Abonelik aktif', body: `Bu abonelik zaten hesabında.${end}` } : { title: 'Abonelik bitmiş', body: 'Bu abonelik artık geçerli değil. Yeni bir plan seçebilirsin.' };
+      return { title: 'Abonelik aktif 🎉', body: `Aboneliğin başladı.${end}` };
     }
     case 'pending':
       return { title: 'Ödeme onay bekliyor', body: 'Ödemen tamamlandığında aboneliğin kendiliğinden başlar.' };
@@ -117,8 +117,8 @@ export function vipOutcomeAlert(o: VipOutcome): { title: string; body: string } 
 /** The free test subscription's answer, in words (no store, no payment). */
 export function testAlert(r: { replay: boolean; until: string | null; days: number }): { title: string; body: string } {
   const end = r.until ? ` Bitiş: ${dateTr(r.until)}.` : '';
-  if (r.replay) return { title: 'VIP aktif', body: `Bu test aboneliği daha önce eklenmişti.${end}` };
-  return { title: 'VIP aktif 🎉', body: `${r.days} gün eklendi (test sürümü, ödeme alınmadı).${end}` };
+  if (r.replay) return { title: 'Abonelik aktif', body: `Bu test aboneliği daha önce eklenmişti.${end}` };
+  return { title: 'Abonelik aktif 🎉', body: `${r.days} gün eklendi (test sürümü, ödeme alınmadı).${end}` };
 }
 
 const STORE_FAILED = {

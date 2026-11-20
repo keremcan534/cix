@@ -1,6 +1,7 @@
 // Other people's profiles, the rest of what the profile screen and the Ana Sayfa cards show (social.mjs has the basics).
 //
-//   GET   /api/user (social.mjs) also carries, from here: levels, friends, giftsReceived, staff, extras, photos
+//   GET   /api/user (social.mjs) also carries, from here: levels, friends, giftsReceived, staff, extras, photos;
+//                   with &medals=1 their medals (medalsOf), with &card=1 no giftsReceived (the room's person card)
 //   GET   /api/discover (social.mjs): each person's levels and country, read for the whole list at once
 //   GET   /api/user/showcase?id=          → { gifts, rides, entries, medals, titles }   (Vitrin)
 //   PATCH /api/me/extras { height?, weight?, job?, languages?, zodiac?, tags?, relationship?, education?, slogan?,
@@ -31,7 +32,8 @@ import { customGiftIds } from './custom-gifts.mjs';
 import { LIVE, announceLook, statusOf } from './economy.mjs';
 import { topBoard } from './gifts.mjs';
 import { removeFiles, verifyUpload } from './media.mjs';
-import { ALBUM_MAX, COUNTRIES, EDUCATION, EXTRA_LIMITS as L, LANGUAGES, MEDAL_RULES, RELATIONSHIP, TAGS, TITLE_RULES, ZODIACS } from './profile-rules.mjs';
+import { live } from './live-settings.mjs';
+import { ALBUM_MAX, COUNTRIES, EDUCATION, EXTRA_LIMITS as L, LANGUAGES, MEDAL_RULES as MEDAL_DEFAULTS, RELATIONSHIP, TAGS, TITLE_RULES as TITLE_DEFAULTS, ZODIACS } from './profile-rules.mjs';
 import { roomLevel } from './rooms.mjs';
 import { charmPointsOf } from './wallet.mjs';
 import { wealthPointsOf } from './wheel.mjs';
@@ -137,23 +139,27 @@ const photosOf = async (id) =>
 
 /**
  * What GET /api/user adds for person `u` (a users row): read fresh, a handful of queries for one profile. `self`: my
- * own profile, which also says which of my levels others don't see now (levelsHidden).
+ * own profile, which also says which of my levels others don't see now (levelsHidden). For the room's person card
+ * (`card=1`, opened on every tap in a busy room): `gifts: false` leaves out the received-gift count (`giftsReceived`),
+ * a sum over all their gifts the card doesn't show, and `fresh: false` takes levels read in the last minute.
  */
-export async function profileMore(u, self = false) {
+export async function profileMore(u, self = false, { gifts = true, fresh = true } = {}) {
   const [levels, counts, extras, photos] = await Promise.all([
-    shownLevels([u.id], { fresh: true }),
-    db.query(
-      `SELECT (${FRIENDS}) AS friends,
-              (SELECT coalesce(sum(count), 0) FROM gift_events WHERE recipient = $1 AND gift_id = ANY($2::text[])) AS gifts`,
-      [u.id, giftIds()],
-    ),
+    shownLevels([u.id], { fresh }),
+    gifts
+      ? db.query(
+          `SELECT (${FRIENDS}) AS friends,
+                  (SELECT coalesce(sum(count), 0) FROM gift_events WHERE recipient = $1 AND gift_id = ANY($2::text[])) AS gifts`,
+          [u.id, giftIds()],
+        )
+      : db.query(`SELECT (${FRIENDS}) AS friends`, [u.id]),
     db.query('SELECT * FROM profile_extras WHERE user_id = $1', [u.id]),
     photosOf(u.id),
   ]);
   return {
     levels: levels[u.id],
     friends: Number(counts.rows[0].friends),
-    giftsReceived: Number(counts.rows[0].gifts),
+    ...(gifts && { giftsReceived: Number(counts.rows[0].gifts) }),
     // Staff are shown as such (Yönetici / Moderatör), so people can tell the real team from someone posing as it.
     staff: STAFF[u.role] ?? null,
     extras: extrasView(extras.rows[0]),
@@ -195,27 +201,62 @@ async function readable(me, id) {
 }
 
 // --- Vitrin ----------------------------------------------------------------------------------------------------------
+/** What earns a medal or a title now: Canlı ayarlar › Profil rozetleri, profile-rules.mjs's values until saved. */
+function badgeRules(s = live()) {
+  const v = (x, d) => (Number.isSafeInteger(x) ? x : d);
+  return {
+    medal: { weekTop: v(s.medalWeekTop, MEDAL_DEFAULTS.weekTop), generousPeople: v(s.medalGenerousPeople, MEDAL_DEFAULTS.generousPeople), friends: v(s.medalFriends, MEDAL_DEFAULTS.friends) },
+    title: { roomLevel: v(s.titleRoomLevel, TITLE_DEFAULTS.roomLevel), risingCharm: v(s.titleRisingCharm, TITLE_DEFAULTS.risingCharm), risingDays: v(s.titleRisingDays, TITLE_DEFAULTS.risingDays) },
+  };
+}
 /** This week's top receivers (Haftanın Yıldızı), read again at most once a minute (LEVELS_CACHE_MS). */
-let weekTop = { at: 0, rows: [] };
+let weekTop = { at: 0, n: 0, rows: [] };
 async function weekStars() {
-  if (Date.now() - weekTop.at >= CACHE_MS) weekTop = { at: Date.now(), rows: await topBoard('charm', 'week', MEDAL_RULES.weekTop) };
+  const n = badgeRules().medal.weekTop;
+  if (Date.now() - weekTop.at >= CACHE_MS || weekTop.n !== n) weekTop = { at: Date.now(), n, rows: await topBoard('charm', 'week', n) };
   return weekTop.rows;
+}
+
+/**
+ * How many different people `id` gave gifts to (Cömert Kalp). The room's person card asks on every tap, and this counts
+ * over all of their gift rows, so a count is kept GIVEN_MS (ten times the levels' minute; 0 with LEVELS_CACHE_MS=0) for
+ * at most GIVEN_MAX people. `fresh`: counted now (the Vitrin), which also renews what the card shows.
+ */
+const GIVEN_MS = CACHE_MS * 10;
+const GIVEN_MAX = 5000;
+const given = new Map();
+async function givenPeople(id, { fresh = false } = {}) {
+  const now = Date.now();
+  const c = given.get(id);
+  if (!fresh && c && now - c.at < GIVEN_MS) return c.n;
+  const r = await db.query('SELECT count(DISTINCT recipient) AS n FROM gift_events WHERE sender = $1', [id]);
+  const n = Number(r.rows[0].n);
+  given.delete(id);
+  given.set(id, { at: now, n });
+  // Old counts go first, then the longest kept, so the map never grows past GIVEN_MAX.
+  if (given.size > GIVEN_MAX) for (const [k, v] of given) if (now - v.at >= GIVEN_MS) given.delete(k);
+  while (given.size > GIVEN_MAX) given.delete(given.keys().next().value);
+  return n;
+}
+
+/**
+ * The medals of person `u` (a users row) by the rules of profile-rules.mjs, from server records only: Haftanın Yıldızı
+ * (this week's board, read at most once a minute), Cömert Kalp (givenPeople), Sosyal Kelebek (`friends`, their count of
+ * people who follow each other). `fresh`: the gift count read now (the Vitrin); the person card takes a kept one.
+ */
+export async function medalsOf(u, friends, { fresh = false } = {}) {
+  const [week, people] = await Promise.all([weekStars(), givenPeople(u.id, { fresh })]);
+  const { medal: MEDAL_RULES } = badgeRules();
+  return [week.some((x) => x.user.id === u.id) && 'md1', people >= MEDAL_RULES.generousPeople && 'md4', friends >= MEDAL_RULES.friends && 'md6'].filter(Boolean);
 }
 
 /** Medals and titles of person `u` (a users row) by the rules of profile-rules.mjs, from server records only. */
 async function honoursOf(u, friends) {
-  const [week, given] = await Promise.all([
-    weekStars(),
-    db.query('SELECT count(DISTINCT recipient) AS n FROM gift_events WHERE sender = $1', [u.id]),
-  ]);
+  const medals = await medalsOf(u, friends, { fresh: true });
   // A Yankı level its owner hides earns nothing that would show it.
   const charm = (await shownLevels([u.id], { fresh: true }))[u.id].charm ?? 0;
   const days = (Date.now() - new Date(u.created_at).getTime()) / 86_400_000;
-  const medals = [
-    week.some((x) => x.user.id === u.id) && 'md1',
-    Number(given.rows[0].n) >= MEDAL_RULES.generousPeople && 'md4',
-    friends >= MEDAL_RULES.friends && 'md6',
-  ].filter(Boolean);
+  const { title: TITLE_RULES } = badgeRules();
   const titles = [
     roomLevel(Number(u.room_xp ?? 0)) >= TITLE_RULES.roomLevel && 't2',
     days <= TITLE_RULES.risingDays && charm >= TITLE_RULES.risingCharm && 't5',

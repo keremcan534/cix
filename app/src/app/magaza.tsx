@@ -17,6 +17,7 @@ import { useLiveCatalog } from '@/lib/live/catalog-live';
 import { livePacks } from '@/lib/live/emoji-live';
 import { useApp } from '@/store';
 import { ItemPreview, Shelf } from '@/components/store-item';
+import { FramePreviewSheet } from '@/components/frame-preview';
 import { fonts, makeStyles, useTheme } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
 import { EMOJI_PACKS_ICON, StickerArt } from '@/components/ReactionArt';
@@ -31,6 +32,8 @@ export default function StoreScreen() {
   const stickerPacks = livePacks(useLiveCatalog());
   const [tab, setTab] = useState<Tab>('frame');
   const [preview, setPreview] = useState<EntryShow | null>(null);
+  // Çerçeveler: the frame round my own photo, large, on a room seat and on my profile, before I buy it (components/frame-preview).
+  const [frameShown, setFrameShown] = useState<string | null>(null);
   const t = useTheme();
   const styles = useStyles();
   const playPreview = (c: Cosmetic) => {
@@ -54,6 +57,37 @@ export default function StoreScreen() {
   const items = shopCosmetics().filter((c) => (tab === 'entry' ? c.kind === 'entry' || c.kind === 'ride' : c.kind === tab) && !c.retired);
   // Read once per preview: a clip not on the phone yet starts downloading and the drawn banner plays this time.
   const [previewMedia, setPreviewMedia] = useState<ReturnType<typeof entryClipOf>>(null);
+
+  // The item's button: wear or take off what I own, the VIP lock, or its price (buy, with the confirmation). The same in
+  // the frame preview's sheet; `onLock`: the sheet closes before the VIP page opens.
+  const cta = (c: Cosmetic, onLock?: () => void) => {
+    const isEquipped = equipped[c.kind] === c.id;
+    if (inventory.has(c.id))
+      return (
+        <PressableScale hitSlop={7} onPress={() => equip(isEquipped ? null : c.id, c.kind)}>
+          <GlossButton label={isEquipped ? 'Çıkar' : 'Kullan'} tone={isEquipped ? 'locked' : 'action'} small />
+        </PressableScale>
+      );
+    if (c.minVip && vipLevel < c.minVip)
+      return (
+        <PressableScale
+          hitSlop={7}
+          onPress={() => {
+            onLock?.();
+            router.push('/vip');
+          }}
+        >
+          <GlossButton label={`VIP ${c.minVip}`} tone="locked" small icon={<Ionicons name="lock-closed" size={12} color={t.dark ? '#C7D2E5' : t.colors.textDim} />} />
+        </PressableScale>
+      );
+    return (
+      <PressableScale hitSlop={7} onPress={() => buy(c)}>
+        <GlossButton label={c.price.toLocaleString('tr-TR')} small icon={<Icon3D name="coin" size={16} />} />
+      </PressableScale>
+    );
+  };
+  // The frame the preview sheet shows, as the shop lists it now (it may have left the shelf meanwhile).
+  const framePreview = frameShown ? (shopCosmetics().find((c) => c.id === frameShown && c.kind === 'frame') ?? null) : null;
 
   const buy = (c: Cosmetic) => {
     showAlert(`${c.emoji} ${c.name}`, `Fiyat: ${c.price.toLocaleString('tr-TR')} jeton · Süre: ${c.days ? `${c.days} gün` : 'kalıcı'}`, [
@@ -132,17 +166,28 @@ export default function StoreScreen() {
               );
             })
           : items.map((c, i) => {
-              const owned = inventory.has(c.id);
               const isEquipped = equipped[c.kind] === c.id;
               return (
                 <Shelf key={c.id} hue={c.color?.[0] ?? hueAt(i)} on={isEquipped}>
                   {/* One height for every kind of preview, so names and durations line up across a row. */}
-                  <View style={styles.previewSlot}>
+                  {/* A frame's picture opens its preview sheet too (round my photo, large, on a seat, on my profile). */}
+                  <Pressable
+                    style={styles.previewSlot}
+                    disabled={c.kind !== 'frame'}
+                    onPress={() => setFrameShown(c.id)}
+                    accessibilityRole={c.kind === 'frame' ? 'button' : undefined}
+                    accessibilityLabel={c.kind === 'frame' ? `${c.name} önizle` : undefined}
+                  >
                     <ItemPreview item={c} avatar={me.avatar} voice={voiceOf(me.gender, me.showGender !== false)} still={settings.reduceMotion} />
-                  </View>
-                  {(c.kind === 'entry' || c.kind === 'ride') && (
-                    <Pressable onPress={() => playPreview(c)} style={styles.previewBtn} accessibilityRole="button" accessibilityLabel={`${c.name} önizle`}>
-                      <Ionicons name="play" size={12} color={t.colors.primaryText} />
+                  </Pressable>
+                  {(c.kind === 'entry' || c.kind === 'ride' || c.kind === 'frame') && (
+                    <Pressable
+                      onPress={() => (c.kind === 'frame' ? setFrameShown(c.id) : playPreview(c))}
+                      style={styles.previewBtn}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${c.name} önizle`}
+                    >
+                      <Ionicons name={c.kind === 'frame' ? 'eye' : 'play'} size={12} color={t.colors.primaryText} />
                       <Text style={styles.previewText}>Önizle</Text>
                     </Pressable>
                   )}
@@ -153,26 +198,13 @@ export default function StoreScreen() {
                     {c.minVip ? ` · VIP ${c.minVip}+` : ''}
                   </Text>
                   {/* Pinned to the card bottom so prices line up when a name wraps to two lines. */}
-                  <View style={styles.cta}>
-                    {owned ? (
-                      <PressableScale hitSlop={7} onPress={() => equip(isEquipped ? null : c.id, c.kind)}>
-                        <GlossButton label={isEquipped ? 'Çıkar' : 'Kullan'} tone={isEquipped ? 'locked' : 'action'} small />
-                      </PressableScale>
-                    ) : c.minVip && vipLevel < c.minVip ? (
-                      <PressableScale hitSlop={7} onPress={() => router.push('/vip')}>
-                        <GlossButton label={`VIP ${c.minVip}`} tone="locked" small icon={<Ionicons name="lock-closed" size={12} color={t.dark ? '#C7D2E5' : t.colors.textDim} />} />
-                      </PressableScale>
-                    ) : (
-                      <PressableScale hitSlop={7} onPress={() => buy(c)}>
-                        <GlossButton label={c.price.toLocaleString('tr-TR')} small icon={<Icon3D name="coin" size={16} />} />
-                      </PressableScale>
-                    )}
-                  </View>
+                  <View style={styles.cta}>{cta(c)}</View>
                 </Shelf>
               );
             })}
       </ScrollView>
       <Text style={styles.footer}>Kozmetik satın alımları komisyon programına dahil değildir.</Text>
+      <FramePreviewSheet item={framePreview} onClose={() => setFrameShown(null)} footer={framePreview ? cta(framePreview, () => setFrameShown(null)) : undefined} />
       {preview &&
         (previewMedia ? (
           // A video entry plays its clip as in a room, with the name banner over it; the clip ends the preview.

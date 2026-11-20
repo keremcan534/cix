@@ -248,7 +248,7 @@ export function ContribBoard({
 
             <View style={[s.mine, { paddingBottom }]} accessibilityLabel={mine.rank ? `Sıralamadaki yerin: ${mine.rank}.` : 'Henüz sıralamada değilsin'}>
               <Text style={[s.mineRank, mine.rank !== null && { color: tone.accent }]}>{mine.rank ?? '–'}</Text>
-              <Face who={person('me')} size={40} />
+              <Face who={person('me')} size={40} spread={ROW_FRAME_SPREAD} />
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={s.name} numberOfLines={1}>
                   {me.name}
@@ -278,12 +278,19 @@ function Amount({ unit, n, small }: { unit: 'coin' | 'diamond'; n: number; small
 }
 
 /**
- * Their photo in their own shop frame when they wear one; otherwise in `wreath` (a podium place's laurel), in `ring`
- * (the place's metal, when there is no laurel) or plain.
+ * How far a shop frame's picture may spread round a face in the list's rows and the "mine" row (ArtFrame maxScale; 1.8
+ * elsewhere, the podium included): the rows sit close, and a wider picture ran into the next row's.
  */
-function Face({ who, size, ring, wreath }: { who: Person; size: number; ring?: readonly [string, string, string]; wreath?: number }) {
+const ROW_FRAME_SPREAD = 1.4;
+
+/**
+ * Their photo in their own shop frame when they wear one; otherwise in `wreath` (a podium place's laurel), in `ring`
+ * (the place's metal, when there is no laurel) or plain. `spread`: how far a frame's picture may spread (ArtFrame
+ * maxScale; none: as everywhere).
+ */
+function Face({ who, size, ring, wreath, spread }: { who: Person; size: number; ring?: readonly [string, string, string]; wreath?: number; spread?: number }) {
   const s = useStyles();
-  if (who.frame || who.vip > 0) return <FramedAvatar uri={who.avatar} size={size} frameId={who.frame} vipLevel={who.vip} />;
+  if (who.frame || who.vip > 0) return <FramedAvatar uri={who.avatar} size={size} frameId={who.frame} vipLevel={who.vip} artScale={spread} />;
   if (wreath !== undefined) {
     const w = Math.round(size * CONTRIB_WREATH_SCALE);
     return (
@@ -350,7 +357,7 @@ function Row({ row, who, me, unit, onPress }: { row: ContribRow; who: Person; me
   return (
     <Pressable onPress={onPress} disabled={!onPress} style={({ pressed }) => [s.row, me && s.rowMe, pressed && s.rowPressed]} accessibilityLabel={`${row.rank}. ${who.name}, ${contribAmount(row.score)} puan`}>
       <Text style={s.rank}>{row.rank}</Text>
-      <Face who={who} size={40} />
+      <Face who={who} size={40} spread={ROW_FRAME_SPREAD} />
       <Text style={s.name} numberOfLines={1}>
         {me ? youLabel(who.name) : who.name}
       </Text>

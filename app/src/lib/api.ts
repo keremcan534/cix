@@ -18,6 +18,7 @@ import type { RoomBackground } from '@/data/catalog';
 import type { Outcome } from '@/lib/casino-odds';
 import { noteContactStrike, type ContactStrike } from '@/lib/contact-filter';
 import { deviceInfo } from '@/lib/device-info';
+import { parseHereRoom, takeVia } from '@/lib/follow-room';
 import { forgetRoomPassword, roomPassword } from '@/lib/live/room-password';
 import { parseLookup } from '@/lib/public-no';
 import type { CardsMove, CardsSeen } from '@/lib/room-games/cards';
@@ -238,9 +239,10 @@ export async function retrySignIn(): Promise<boolean> {
 /** Any route of the API with this session (the agency panels go through lib/agency-net). */
 export const apiRequest = <T>(method: 'GET' | 'POST', path: string, body?: object) => call<T>(method, path, body);
 
-/** The live line, with the wins announced to everyone (server/api/live-line.mjs lineWin; lib/live/win-news) and Canlı
- *  Yörünge's round while its screen is open (lineRocket; lib/live/rocket-live). */
-const LIVE_LINE = '/api/live?wins=1&rocket=1';
+/** The live line, with the wins announced to everyone (server/api/live-line.mjs lineWin; lib/live/win-news), Canlı
+ *  Yörünge's round while its screen is open (lineRocket; lib/live/rocket-live) and the global gifts of my country
+ *  (lineGlobal; lib/live/global-gift). */
+const LIVE_LINE = '/api/live?wins=1&rocket=1&global=1';
 /**
  * Opens my live line (lib/live/live-line): a request that stays open while the server writes events into it.
  * Null when there is no server or no session yet. Not compressed, so each event comes through as it is written.
@@ -353,13 +355,19 @@ export const testTopup = (amount: number, ref = newRef()) => call<{ user: Server
 export const gift = (to: string, amount: number, ref = newRef()) => call<{ user: ServerUser; replay: boolean }>('POST', '/api/wallet/gift', { to, amount, ref });
 /**
  * LiveKit token for a room; needs a signed-in user. A password room's token needs the password the person typed
- * (lib/live/room-password, keyed by the room id in `oda-<id>`); a refusal forgets it, so the room asks again.
+ * (lib/live/room-password, keyed by the room id in `oda-<id>`); a refusal forgets it, so the room asks again. The
+ * first connect after following someone there from their profile names them (`via`, lib/follow-room; the server
+ * checks it and an older one ignores it).
  */
 export async function voiceToken(room: string) {
   const id = room.startsWith('oda-') ? room.slice(4) : room;
   const password = roomPassword(id);
+  const via = takeVia(id);
   try {
-    const r = await call<{ token: string }>('GET', `/token?room=${encodeURIComponent(room)}${password ? `&password=${encodeURIComponent(password)}` : ''}`);
+    const r = await call<{ token: string }>(
+      'GET',
+      `/token?room=${encodeURIComponent(room)}${password ? `&password=${encodeURIComponent(password)}` : ''}${via ? `&via=${encodeURIComponent(via)}` : ''}`,
+    );
     return r.token;
   } catch (e) {
     if (password && e instanceof ApiError && e.status === 403) forgetRoomPassword(id);
@@ -561,7 +569,10 @@ export type ServerMe = ServerUser & ServerProfile & { role?: string; genderHidde
 export type CityDistance = { km: number; sameCity: boolean };
 /** `followers` / `following`: totals; `oneWay`: the same without the people who follow each other (friends), as the
  *  profile shows them (lib/follow-ties tieCounts; an older server sends none). */
-export type PublicUser = { id: string; name: string } & ServerProfile & { followers: number; following: number; oneWay?: { followers: number; following: number }; isFollowing: boolean; blockedByMe: boolean } & Partial<ProfileMore> & { distance?: CityDistance | null };
+export type PublicUser = { id: string; name: string } & ServerProfile & { followers: number; following: number; oneWay?: { followers: number; following: number }; isFollowing: boolean; blockedByMe: boolean } & Partial<ProfileMore> & { distance?: CityDistance | null } & {
+  /** Asked with `card` (userProfile): their medal ids; unchecked, lib/person-card medalIds reads them. */
+  medals?: unknown;
+};
 export type UserCard = { id: string; name: string; avatarUrl: string | null; publicNo?: string | null };
 /** `level` / `xp`: the owner's room level, earned on the server from gifts in their room. `micCount` / `layoutId`:
  *  the mics and layout the owner or a room admin chose (null = the default). `lockedSeats`: mics the staff locked;
@@ -660,7 +671,8 @@ export type RoomMember = UserCard & { since: string | null };
  */
 export type RoomMembers = { members: RoomMember[]; total: number; joined?: number; cap: number; mine: 'owner' | 'admin' | 'member' | 'pending' | null; joinMode: RoomRules['joinMode']; canManage: boolean; pending: RoomMember[] };
 /** `image`: a photo in the chat (its storage address), null for text only. */
-export type DirectMessage = { id: number; from: string; to: string; text: string; image?: string | null; event?: SharedEvent; createdAt: string; readAt: string | null };
+/** `gift`: the line a gift sent from a chat writes (newer servers; lib/dm-gift-fx parses it). */
+export type DirectMessage = { id: number; from: string; to: string; text: string; image?: string | null; event?: SharedEvent; gift?: unknown; createdAt: string; readAt: string | null };
 /** An event sent in a message (Etkinlik Merkezi "Arkadaşına gönder"); older servers never send it. */
 export type SharedEvent = { id: number; title: string | null; startsAt: string | null };
 export type ServerConversation = { user: UserCard; last: DirectMessage; unread: number };
@@ -677,9 +689,23 @@ export type ProfileTies = { agency: { id: string; name: string } | null; family:
  * call, also 404); a malformed answer: null.
  */
 export const lookup = (no: string) => call<unknown>('GET', `/api/lookup?no=${encodeURIComponent(no)}`).then(parseLookup);
-/** `visit`: opened on the profile screen, so it counts as a visit (Profil ziyaretçileri); a person card doesn't. */
-export const userProfile = (id: string, visit = false) =>
-  call<{ user: PublicUser } & Partial<ProfileTies>>('GET', `/api/user?id=${encodeURIComponent(id)}${visit ? '&visit=1' : ''}`).then((r) => ({ ...r.user, agency: r.agency ?? null, family: r.family ?? null }));
+/**
+ * `visit`: opened on the profile screen, so it counts as a visit (Profil ziyaretçileri); a person card doesn't. `card`:
+ * the room's person card, which asks for their medals (`user.medals`) and not for the received-gift count it doesn't
+ * show (server/api/social.mjs `card=1&medals=1`; an older server ignores both). `looks`: their shop look as the server
+ * sent it (unchecked: lib/person-card cardLookOf reads it).
+ */
+export const userProfile = (id: string, visit = false, card = false) =>
+  call<{ user: PublicUser; room?: unknown; looks?: unknown; marks?: unknown } & Partial<ProfileTies>>('GET', `/api/user?id=${encodeURIComponent(id)}${visit ? '&visit=1' : ''}${card ? '&card=1&medals=1' : ''}`).then((r) => ({
+    ...r.user,
+    agency: r.agency ?? null,
+    family: r.family ?? null,
+    // The room they are in now ("Şu an odada"); an older server sends none.
+    room: parseHereRoom(r.room),
+    looks: r.looks,
+    // Profil izleri on their photo (unchecked: lib/profile-marks parseMarks reads it); an older server sends none.
+    marks: r.marks,
+  }));
 /** Someone who opened my profile in the last 7 days. */
 export type ServerVisitor = { id: string; name: string; avatarUrl: string | null; visits: number; lastAt: string };
 /** A visit without who made it (no VIP): how many times and when, to the minute. */
@@ -950,13 +976,26 @@ export const adminEventReport = (days: number) => call<{ report: EventReport }>(
 export type ServerBond = {
   id: number; kind: string; label: string; status: 'pending' | 'active' | 'refused' | 'expired' | 'withdrawn' | 'ended'; requester: boolean;
   partner: UserCard; price: number; score: number; level: number; nextLevelAt: number | null; createdAt: string; expiresAt: string; since: string | null;
+  /** Güncelleme 7 (an older server sends none): days since the last gift either way, days before a quiet bond ends. */
+  quietDays?: number | null; endsInDays?: number | null;
 };
-export const bonds = (user?: string) => call<{ hidden: boolean; bonds: ServerBond[] }>('GET', user ? `/api/bonds?user=${encodeURIComponent(user)}` : '/api/bonds');
-export const bondRequests = () => call<{ incoming: ServerBond[]; outgoing: ServerBond[] }>('GET', '/api/bonds/requests');
-export const requestBond = (to: string, kind: string, ref = newRef(), room?: string) => call<{ user: ServerUser; replay: boolean; bond: ServerBond }>('POST', '/api/bonds/request', { to, kind, ref, ...(room ? { room } : {}) });
-export const respondBond = (id: number, accept: boolean) => call<{ bond: ServerBond }>('POST', '/api/bonds/respond', { id, accept }).then((r) => r.bond);
-export const withdrawBond = (id: number) => call<{ bond: ServerBond }>('POST', '/api/bonds/withdraw', { id }).then((r) => r.bond);
-export const endBond = (id: number) => call<{ bond: ServerBond }>('POST', '/api/bonds/end', { id }).then((r) => r.bond);
+/**
+ * `lv=20` on every bond route: the server sends a bond's real points and next step (the bar is drawn from the
+ * server's 20 steps, levelFloor). Without it the server moves them for the f9671d9 APK's ten compiled steps.
+ */
+const BOND_LV = 'lv=20';
+/** 50 a page from `offset`; `next`: the next page's offset (null at the end; an older server sends none). */
+export const bonds = (user?: string, offset = 0) => {
+  const q = [user ? `user=${encodeURIComponent(user)}` : '', offset > 0 ? `offset=${offset}` : '', BOND_LV].filter(Boolean).join('&');
+  return call<{ hidden: boolean; bonds: ServerBond[]; total?: number; next?: number | null }>('GET', `/api/bonds?${q}`);
+};
+export const bondRequests = () => call<{ incoming: ServerBond[]; outgoing: ServerBond[] }>('GET', `/api/bonds/requests?${BOND_LV}`);
+/** `price`: the bond gift's price this phone showed; another one now is a 409 price_changed and nothing is taken. */
+export const requestBond = (to: string, kind: string, ref = newRef(), room?: string, price?: number) =>
+  call<{ user: ServerUser; replay: boolean; bond: ServerBond }>('POST', `/api/bonds/request?${BOND_LV}`, { to, kind, ref, ...(room ? { room } : {}), ...(price !== undefined ? { price } : {}) });
+export const respondBond = (id: number, accept: boolean) => call<{ bond: ServerBond }>('POST', `/api/bonds/respond?${BOND_LV}`, { id, accept }).then((r) => r.bond);
+export const withdrawBond = (id: number) => call<{ bond: ServerBond }>('POST', `/api/bonds/withdraw?${BOND_LV}`, { id }).then((r) => r.bond);
+export const endBond = (id: number) => call<{ bond: ServerBond }>('POST', `/api/bonds/end?${BOND_LV}`, { id }).then((r) => r.bond);
 export const bondsAmong = (ids: string[]) => call<{ bonds: { a: string; b: string; kind: string; level: number }[] }>('POST', '/api/bonds/among', { ids }).then((r) => r.bonds);
 export const setBondsHidden =(hidden: boolean) => call<{ hidden: boolean }>('POST', '/api/bonds/privacy', { hidden }).then((r) => r.hidden);
 
@@ -976,7 +1015,12 @@ export const wheelSpin = (tier: string, count: number, ref = newRef()) => call<{
 // Şanslı hediyeler (server/api/lucky.mjs): the server draws and pays; rewards are game coins, the recipients get
 // their share as diamonds. `draws`: one multiplier per gift, recipient by recipient (`count` each).
 export type ServerLuckyTier = { mult: number; weight: number };
-export type ServerLuckyGift = { id: string; name: string; emoji: string; price: number; enabled: boolean; tiers: ServerLuckyTier[]; open?: boolean };
+/** `since`: the settings' version its price and odds are as now from; `icon` / `fx`: its own picture and video from the
+ *  panel (server/api/lucky-art.mjs; null: none). The three are newer servers' (lib/lucky-art reads them defensively). */
+export type ServerLuckyGift = {
+  id: string; name: string; emoji: string; price: number; enabled: boolean; tiers: ServerLuckyTier[]; open?: boolean;
+  since?: number; icon?: string | null; fx?: { url: string; bytes: number; ms: number } | null;
+};
 export type ServerLuckySend = {
   id: number; ref: string; giftId: string; room: string | null; count: number; to: string[]; price: number; cost: number; shared: number;
   payout: number; best: number; draws: number[]; configVersion: number; odds: ServerLuckyTier[]; at: string;
@@ -986,9 +1030,13 @@ export type ServerLucky = {
   minAge: number; gameCoins: number; mine: ServerLuckySend[];
 };
 export const lucky = () => call<ServerLucky>('GET', '/api/lucky');
-/** `named`: a win may carry my name and photo to every room (Ayarlar › "Kazançlarımda adım görünsün"). */
-export const luckySend = (giftId: string, to: string[], count: number, room?: string, ref = newRef(), named = false) =>
-  call<{ send: ServerLuckySend; user: ServerUser; replay: boolean }>('POST', '/api/lucky/send', { giftId, to, count, room, ref, named });
+/**
+ * `named`: a win may carry my name and photo to every room (Ayarlar › "Kazançlarımda adım görünsün"). `shown`: the
+ * package's price this phone showed and the settings' version it read them at: a moved one is a 409 price_changed /
+ * odds_changed and nothing moves (server/api/lucky-rules.mjs checkShownLucky).
+ */
+export const luckySend = (giftId: string, to: string[], count: number, room?: string, ref = newRef(), named = false, shown?: { price: number; version: number }) =>
+  call<{ send: ServerLuckySend; user: ServerUser; replay: boolean }>('POST', '/api/lucky/send', { giftId, to, count, room, ref, named, ...shown });
 export type ServerLuckyConfig = { gifts: ServerLuckyGift[]; dailyPayoutLimit: number; announceFrom: number };
 export type ServerLuckyStats = { sends: number; spent: number; paid: number; shared: number };
 export type ServerLuckyAdminSend = ServerLuckySend & { sender: { id: string; name: string } };
@@ -1062,6 +1110,11 @@ export type ServerPrivacy = {
   videoCalls: boolean;
   messagePush: boolean;
   pushCloseOnly: boolean;
+  /** Profil izleri (server/api/profile-marks.mjs): others may leave a mark on my photo; an older server sends none. */
+  profileMarks?: boolean;
+  /** Gizlilik › "Adım genel duyurularda görünmesin": global gifts I send or receive name me "Bir kullanıcı". An older
+   *  server doesn't say. */
+  globalHideName?: boolean;
 };
 /** Otomatik mesaj's choices (server/api/auto-chat.mjs, saved with the privacy settings); lib/live/auto-chat reads them. */
 export type AutoChoices = { autoReceive?: boolean; autoOpener?: boolean; autoOpenerSeen?: boolean; autoSend?: boolean };
@@ -1407,7 +1460,7 @@ export const appealSanction = (sanction: number, text: string, as?: string | nul
 export const roomMute = (room: string, user: string, kind: 'text' | 'voice', minutes: number | null, reason?: string) =>
   call<{ sanction: SanctionView }>('POST', '/api/rooms/mute', { room, user, kind, minutes, ...(reason ? { reason } : {}) });
 export const roomUnmute = (sanction: number) => call<{ lifted: boolean }>('POST', '/api/rooms/unmute', { sanction });
-export const roomMutes = (room: string) => call<{ mutes: (SanctionView & { userId: string; userName: string })[] }>('GET', `/api/rooms/mutes?room=${encodeURIComponent(room)}`).then((r) => r.mutes);
+export const roomMutes = (room: string) => call<{ mutes: (SanctionView & { userId: string; userName: string; userAvatar?: string | null })[] }>('GET', `/api/rooms/mutes?room=${encodeURIComponent(room)}`).then((r) => r.mutes);
 
 // --- Canlı ayarlar (server/api/live-settings.mjs): admin role only (403 otherwise). Every save sends the reason,
 // the version it was based on (baseV) and this app's version; a stale baseV answers 409 stale, a big change

@@ -1,11 +1,10 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useRef, useState, type ComponentRef } from 'react';
+import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { useEffect, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Switch } from '@/components/luxe-switch';
 import { Text } from '@/components/text';
 import { decayLineOf, nobleRightsOf, nobleTiersOf, subPlansOf, subRightsOf, vipLevelsOf, vipRightsOf } from '@/lib/levels-live-core';
 import { useLevels } from '@/lib/live/levels-live';
@@ -13,17 +12,25 @@ import { goBack } from '@/lib/nav';
 import { showAlert } from '@/lib/alert';
 import { openLegal } from '@/lib/legal';
 import { useApp } from '@/store';
-import { makeStyles, useTheme } from '@/theme';
+import { ThemeScope, makeStyles, useTheme } from '@/theme';
 import { SCENES } from '@/components/fx/scenes';
 import { Backdrop } from '@/components/fx/surface';
 import { Art } from '@/components/Art';
-import { Avatar, LevelChips } from '@/components/ui';
 import { saveExtras } from '@/lib/api';
 import { liveMode, message, myServerId } from '@/lib/live';
 import { loadPublicProfile } from '@/lib/live/profile';
 import { buyVip, openPlaySubscriptions, openVipShop, useVipShop } from '@/lib/live/vip';
 import { vipProductOf } from '@/lib/live/vip-core';
 import { featureOff } from '@/lib/remote-control';
+import { SUB_BUY_TITLE, defaultPlanDays, demoBuyText, rightsOpen, startIndex, subStatusText, testBuyText } from '@/lib/vip-screen';
+import { VipHeroCarousel } from '@/components/vip/vip-hero';
+import { RightsGrid, RightsHeading, VipPointsInfo } from '@/components/vip/vip-rights';
+import { PrivilegeTopBar, VipSubTabs } from '@/components/vip/vip-tabs';
+import { SUB } from '@/components/vip/sub-look';
+import { PlanCards, SubBuyButton, SubStatus } from '@/components/vip/sub-plans';
+import { SubHeading, SubPerks } from '@/components/vip/sub-rights';
+import { SubCompare } from '@/components/vip/sub-compare';
+import { SubHideLevels } from '@/components/vip/sub-hide-levels';
 
 type Tab = 'svip' | 'vip' | 'noble';
 const GOLD = '#F5D7A1';
@@ -33,50 +40,71 @@ const useGold = () => {
   return dark ? GOLD : colors.gold;
 };
 const fmt = (n: number) => n.toLocaleString('tr-TR');
-const short = (n: number) => (n >= 1_000_000 ? `${n / 1_000_000}M` : n >= 1_000 ? `${n / 1_000}k` : String(n));
 
 export default function PrivilegeCenter() {
   const params = useLocalSearchParams<{ tab?: string }>();
   const [tab, setTab] = useState<Tab>(params.tab === 'vip' || params.tab === 'noble' ? params.tab : 'svip');
-  const { colors } = useTheme();
+  const app = useTheme();
+  const focused = useIsFocused();
+  // The VIP tab is the client's night-purple design and Abonelik its light-pink one, in both color schemes; Rütbe
+  // follows the app's.
+  const night = tab === 'svip';
+  const pink = tab === 'vip';
+  return (
+    <ThemeScope scheme={night ? 'dark' : pink ? 'light' : app.scheme}>
+      <Center tab={tab} setTab={setTab} />
+      {/* A dark tab in the light app keeps a light status bar while this screen is on top, the pink one in the dark
+          app a dark one. */}
+      {night && !app.dark && focused && <StatusBar style="light" />}
+      {pink && app.dark && focused && <StatusBar style="dark" />}
+    </ThemeScope>
+  );
+}
+
+function Center({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
   const styles = useStyles();
   const levels = useLevels();
+  const { dark } = useTheme();
+  const night = tab === 'svip';
+  const pink = tab === 'vip';
   return (
-    <SafeAreaView style={styles.safe}>
-      <Backdrop scene={SCENES.vip} />
-      <View style={styles.header}>
-        <Pressable onPress={() => goBack()} hitSlop={10} accessibilityLabel="Geri">
-          <Ionicons name="chevron-back" size={26} color={colors.text} />
-        </Pressable>
-        <View style={styles.segment}>
-          {(
-            [
-              ['svip', 'VIP'],
-              ['vip', 'Abonelik'],
-              ['noble', 'Rütbe'],
-            ] as const
-          ).map(([k, l]) => (
-            <Pressable key={k} onPress={() => setTab(k)} style={[styles.segBtn, tab === k && styles.segActive]}>
-              <Text style={[styles.segText, tab === k && { color: '#3B2A12' }]}>{l}</Text>
-            </Pressable>
-          ))}
-        </View>
-        <Pressable
-          onPress={() =>
-            showAlert(
-              'Ayrıcalıklar',
-              `VIP: yüklediğin her jeton 1 puan${decayLineOf(levels, 'vip') ? '; uzun süre yükleme yapmazsan seviyen düşebilir' : ', seviyen hiç düşmez'}.\nAbonelik: VIP aboneliği, seçtiğin süre kadar.\nRütbe: jetonla alınır, kademenin süresi kadar geçerli.\nTüm ayrıcalıklar sunucuda doğrulanır.`,
-            )
-          }
-          hitSlop={10}
-          accessibilityLabel="Yardım">
-          <Ionicons name="help-circle-outline" size={26} color={colors.text} />
-        </Pressable>
-      </View>
+    <SafeAreaView style={[styles.safe, night && { backgroundColor: VIP_BG }, pink && { backgroundColor: SUB.ground }]}>
+      {night ? <VipBackdrop /> : pink ? <SubBackdrop /> : <Backdrop scene={SCENES.vip} />}
+      <PrivilegeTopBar
+        tab={tab}
+        onTab={setTab}
+        variant={dark ? 'night' : 'light'}
+        onBack={() => goBack()}
+        onHelp={() =>
+          showAlert(
+            'Ayrıcalıklar',
+            `VIP: yüklediğin her jeton 1 puan${decayLineOf(levels, 'vip') ? '; uzun süre yükleme yapmazsan seviyen düşebilir' : ', seviyen hiç düşmez'}.\nAbonelik: seçtiğin süre kadar geçerli.\nRütbe: jetonla alınır, kademenin süresi kadar geçerli.\nTüm ayrıcalıklar sunucuda doğrulanır.`,
+          )
+        }
+      />
       {tab === 'svip' ? <Svip /> : tab === 'vip' ? <Vip /> : <Noble />}
     </SafeAreaView>
   );
 }
+
+/** The VIP tab's ground: the design's night purple, a little lighter at the top and the bottom. */
+const VIP_BG = '#0c071c';
+function VipBackdrop() {
+  return (
+    <View style={[StyleSheet.absoluteFill, { pointerEvents: 'none' }]}>
+      <LinearGradient colors={['#130829', '#0c061f', '#0b061e', '#140b2a']} locations={[0, 0.3, 0.7, 1]} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={['rgba(110,60,190,0.07)', 'rgba(110,60,190,0)']} style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 260 }} />
+    </View>
+  );
+}
+
+/** The Abonelik tab's ground: the design's almost flat pink. */
+function SubBackdrop() {
+  return <LinearGradient colors={SUB.page} locations={SUB.pageAt} style={[StyleSheet.absoluteFill, { pointerEvents: 'none' }]} />;
+}
+
+/** Wider windows (web, tablets) keep the phone layout, centred. */
+const VIP_MAX_W = 480;
 
 function Svip() {
   const { svipXp, svipLevel } = useApp();
@@ -86,146 +114,59 @@ function Svip() {
   const rights = vipRightsOf(levels);
   const decay = decayLineOf(levels, 'vip');
   const nameOf = (level: number) => list.find((x) => x.level === level)?.name ?? `VIP ${level}`;
-  const styles = useStyles();
-  const { colors } = useTheme();
-  const { width } = useWindowDimensions();
-  const cardW = Math.min(width, 520) - 48;
-  const [index, setIndex] = useState(Math.max(0, svipLevel - 1));
-  const [sub, setSub] = useState<'rights' | 'shop'>('rights');
-  // The carousel opens on the member's own level and a tapped card slides to the centre, so the card in
-  // view always matches the perks listed under it.
-  const step = cardW + 12;
-  const carousel = useRef<ComponentRef<typeof ScrollView>>(null);
-  const placed = useRef(false);
-  const select = (i: number) => {
-    setIndex(i);
-    carousel.current?.scrollTo({ x: i * step, animated: true });
-  };
+  const { width, fontScale } = useWindowDimensions();
+  const contentW = Math.min(width, VIP_MAX_W);
+  const [index, setIndex] = useState(() => startIndex(svipLevel, list));
   const lv = list[Math.min(index, list.length - 1)];
+  if (!lv) return null;
   return (
-    <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-      <View style={[styles.segment, { alignSelf: 'center', marginBottom: 12 }]}>
-        {(
-          [
-            ['rights', 'Ayrıcalıklar'],
-            ['shop', 'Üyelere Özel'],
-          ] as const
-        ).map(([k, l]) => (
-          <Pressable key={k} onPress={() => (k === 'shop' ? router.push('/magaza') : setSub(k))} style={[styles.segBtn, sub === k && styles.segActive]}>
-            <Text style={[styles.segText, sub === k && { color: '#3B2A12' }]}>{l}</Text>
-          </Pressable>
-        ))}
+    <ScrollView contentContainerStyle={{ width: contentW, alignSelf: 'center', paddingBottom: 28 }}>
+      <VipSubTabs onMembers={() => router.push('/magaza')} />
+      <View style={{ marginTop: 14 }}>
+        <VipHeroCarousel
+          levels={list}
+          index={index}
+          onIndex={setIndex}
+          width={contentW}
+          myLevel={svipLevel}
+          myPoints={svipXp}
+          decay={!!decay}
+          onLoad={() => router.push('/cuzdan')}
+        />
       </View>
-      <ScrollView
-        ref={carousel}
-        horizontal
-        pagingEnabled={false}
-        snapToInterval={step}
-        decelerationRate="fast"
-        showsHorizontalScrollIndicator={false}
-        contentOffset={{ x: index * step, y: 0 }}
-        onContentSizeChange={() => {
-          if (placed.current) return;
-          placed.current = true;
-          carousel.current?.scrollTo({ x: index * step, animated: false });
-        }}
-        contentContainerStyle={{ paddingHorizontal: 24, gap: 12 }}
-        onMomentumScrollEnd={(e) => setIndex(Math.max(0, Math.min(list.length - 1, Math.round(e.nativeEvent.contentOffset.x / step))))}>
-        {list.map((l, i) => {
-          const locked = svipLevel < l.level;
-          const isNext = svipLevel === l.level - 1;
-          return (
-            <Pressable key={l.level} onPress={() => select(i)} style={{ width: cardW }} accessibilityLabel={`${l.name} kartı`}>
-              <LinearGradient colors={l.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.svipCard, index === i && { borderColor: GOLD }]}>
-                {locked && (
-                  <View style={styles.lockChip}>
-                    <Ionicons name="lock-closed" size={11} color="#fff" />
-                    <Text style={styles.lockText}>Kilitli</Text>
-                  </View>
-                )}
-                {/* The level's emblem, large, in the card's open middle; the title keeps the left and the progress and
-                    Yükle stay clear below it. */}
-                <View style={styles.svipEmblem} pointerEvents="none">
-                  {l.art ? <Art name={l.art} size={92} /> : <Text style={{ fontSize: 68 }}>{l.emoji}</Text>}
-                </View>
-                <Text style={styles.svipTitle}>{l.name}</Text>
-                {isNext ? (
-                  <>
-                    <Text style={styles.cardText}>
-                      {short(svipXp)} / {short(l.xp)}
-                    </Text>
-                    {/* The right side is the Yükle button's column. */}
-                    <View style={[styles.track, styles.clearLoad]}>
-                      <View style={{ height: 6, width: `${Math.min(100, (svipXp / l.xp) * 100)}%`, backgroundColor: GOLD }} />
-                    </View>
-                  </>
-                ) : locked ? (
-                  <Text style={[styles.cardText, styles.clearLoad]}>Bu seviyeye {fmt(l.xp - svipXp)} puan kaldı</Text>
-                ) : (
-                  <Text style={[styles.cardText, { color: GOLD }]}>{decay ? '✓ Açıldı' : '✓ Açıldı · kalıcı'}</Text>
-                )}
-                {locked && (
-                  <Pressable style={styles.loadBtn} onPress={() => router.push('/cuzdan')}>
-                    <Text style={{ color: '#B45309', fontWeight: '800' }}>Yükle</Text>
-                  </Pressable>
-                )}
-              </LinearGradient>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-      <View style={styles.rightsTitleRow}>
-        <Art name="svip-svip-isareti" size={22} />
-        <Text style={[styles.rightsTitle, { marginVertical: 0 }]}>
-          {lv.name} hakları {rights.filter((r) => r.level <= lv.level).length}/{rights.length}
-        </Text>
-        <Art name="svip-svip-isareti" size={22} />
+      {/* Just under the carousel's dots (not in the design), where the design has the heading; the cards where the
+          design has them. */}
+      <View style={{ marginTop: 1.5, marginBottom: 18.5 }}>
+        <RightsHeading title={`${lv.name} Hakları ${rightsOpen(rights, lv.level)}/${rights.length}`} />
       </View>
-      <View style={styles.grid}>
-        {/* Only the rights the real app gives today (güncelleme 6); each opens at its own level. */}
-        {rights.map((r) => {
-          const on = r.level <= lv.level;
-          return (
-            <Pressable
-              key={r.name}
-              style={styles.rightCell}
-              accessibilityState={{ disabled: !on }}
-              onPress={() => showAlert(r.name, on ? `${lv.name} ile kullanabilirsin.` : `${nameOf(r.level)} ile açılır.`)}>
-              {/* Locked: only the art fades; the name stays readable (textDim). */}
-              <View style={[styles.rightIcon, !on && { opacity: 0.38 }]}>
-                {r.art ? <Art name={r.art} size={34} /> : <Text style={{ fontSize: 26 }}>{r.emoji}</Text>}
-              </View>
-              <Text style={[styles.rightName, !on && { color: colors.textDim }]} numberOfLines={2}>
-                {r.name}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-      <Text style={styles.note}>Yüklediğin her jeton 1 VIP puanı kazandırır. Bonus jetonlar ve hediye gelen jetonlar sayılmaz; iade edilen yüklemenin puanı geri alınır.</Text>
-      {decay && <Text style={styles.note}>Seviye düşmesi: {decay}</Text>}
+      {/* Only the rights the real app gives today (güncelleme 6); each opens at its own level. */}
+      <RightsGrid
+        rights={rights}
+        level={lv.level}
+        width={contentW}
+        fontScale={fontScale}
+        onPress={(r, on) => showAlert(r.name, on ? `${lv.name} ile kullanabilirsin.` : `${nameOf(r.level)} ile açılır.`)}
+      />
+      <VipPointsInfo decay={decay} width={contentW} />
     </ScrollView>
   );
 }
 
+/** The Abonelik tab's side margins (the design's 17–18 dp on a 390 dp phone). */
+const SUB_MARGIN = 17;
+
 function Vip() {
   const { vipDays, buyVipPlan, me, wealthLevel, charmLevel, settings, setSetting } = useApp();
-  const { colors, ink, dark } = useTheme();
-  const styles = useStyles();
-  const gold = useGold();
-  // Plan prices that are not selected: zinc on the night screen, slate on white cards.
-  const soft = dark ? '#D4D4D8' : '#33425A';
   // The plans and rights shown, as Seviye ve VIP ayarları have them (the price paid is the store's).
   const levels = useLevels();
   const plans = subPlansOf(levels);
   const { compare, perks } = subRightsOf(levels);
+  const { width, fontScale } = useWindowDimensions();
+  const contentW = Math.min(width, VIP_MAX_W) - 2 * SUB_MARGIN;
   // The month opens selected, as it always did; without it (hidden in the panel) the first plan shown.
-  const [plan, setPlan] = useState((plans.find((x) => x.days === 30) ?? plans[0]).days);
-  const [perkPage, setPerkPage] = useState(0);
-  const [pageW, setPageW] = useState(0);
+  const [plan, setPlan] = useState(() => defaultPlanDays(plans));
   const p = plans.find((x) => x.days === plan) ?? plans[0];
   const store = Platform.OS === 'ios' ? 'App Store' : 'Google Play';
-  const perkPages = Math.ceil(perks.length / 4);
   const live = liveMode();
   // Live mode: the subscription is the server's (lib/live/vip): free on a test server, through Google Play otherwise;
   // the days left above come from the server's answer. The demo adds the days here.
@@ -246,7 +187,7 @@ function Vip() {
         .finally(() => setBuying(false));
     };
     if (sale.mode === 'test')
-      return showAlert('VIP satın al', `VIP ${p.label} · Test sürümü: ücretsiz, gerçek ödeme alınmaz. ${p.days} gün eklensin mi?`, [
+      return showAlert(SUB_BUY_TITLE, testBuyText(p), [
         { text: 'Vazgeç', style: 'cancel' },
         { text: 'Ekle', onPress: run },
       ]);
@@ -262,9 +203,9 @@ function Vip() {
   const buy = () =>
     live
       ? buyLive()
-      : showAlert('VIP satın al', `VIP ${p.label} · ${p.tl} TL (${store}). Onaylıyor musun?`, [
+      : showAlert(SUB_BUY_TITLE, demoBuyText(p, store), [
           { text: 'Vazgeç', style: 'cancel' },
-          { text: 'Satın al', onPress: () => buyVipPlan(p.days) && showAlert('VIP aktif 🎉', `${p.days} gün eklendi.`) },
+          { text: 'Satın al', onPress: () => buyVipPlan(p.days) && showAlert('Abonelik aktif 🎉', `${p.days} gün eklendi.`) },
         ]);
   // Live mode: what others see is the server's (server/api/profiles.mjs, VIP 1+ by SVIP level or Rütbe, or the Abonelik
   // there), so the switches start from it and a change goes there first; the server says no without either.
@@ -293,167 +234,94 @@ function Vip() {
       return;
     }
     if (vipDays <= 0)
-      return showAlert('VIP ayrıcalığı', 'Seviyeleri gizlemek VIP ayrıcalığıdır.', [
+      return showAlert('Abonelik ayrıcalığı', 'Seviyeleri gizlemek abonelik ayrıcalığıdır.', [
         { text: 'Vazgeç', style: 'cancel' },
-        { text: 'VIP Satın Al', onPress: buy },
+        { text: 'Abonelik Satın Al', onPress: buy },
       ]);
     setSetting(k, v);
   };
-  // A grid of 2x2 perks per page, swiped horizontally.
-  const pages = Array.from({ length: perkPages }, (_, i) => perks.slice(i * 4, i * 4 + 4));
+  const mayHide = live || vipDays > 0;
+  const status = subStatusText(vipDays);
+  const hint = p ? `${p.label} planı seçili` : undefined;
   return (
-    <ScrollView contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: 40 }}>
-      {vipDays > 0 && <Text style={[styles.cardText, { color: gold, textAlign: 'center' }]}>👑 VIP aktif · {vipDays} gün kaldı</Text>}
-      {live && sale.renewing?.platform === 'android' && (
-        <Text style={[styles.legalLink, { textAlign: 'center' }]} onPress={() => openPlaySubscriptions(sale.renewing?.productId)} accessibilityRole="link">
-          Aboneliği Google Play&apos;de yönet
-        </Text>
+    <ScrollView contentContainerStyle={{ width: contentW + 2 * SUB_MARGIN, alignSelf: 'center', paddingHorizontal: SUB_MARGIN, paddingBottom: 28 }}>
+      {status && (
+        <View style={{ marginTop: 2.5 }}>
+          <SubStatus text={status} />
+        </View>
       )}
-      <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-        {plans.map((x) => (
-          <Pressable key={x.days} onPress={() => setPlan(x.days)} style={[styles.plan, plan === x.days && styles.planOn]} accessibilityLabel={`VIP ${x.label}, ${x.tl} TL`}>
-            {x.save > 0 && (
-              <Text style={styles.planTag} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>
-                %{x.save} daha uygun
-              </Text>
-            )}
-            <Text style={{ color: colors.textDim, fontSize: 15, marginTop: 10 }}>{x.label}</Text>
-            <Text style={{ color: plan === x.days ? colors.text : soft, fontWeight: '900', fontSize: 26 }}>
-              <Text style={{ fontSize: 11, fontWeight: '600' }}>TRY</Text>
-              {fmt(x.tl)}
-            </Text>
-            {x.was > 0 && <Text style={{ color: colors.textDim, fontSize: 12, textDecorationLine: 'line-through' }}>TRY{fmt(x.was)}</Text>}
-          </Pressable>
-        ))}
+      {live && sale.renewing?.platform === 'android' && (
+        <Pressable onPress={() => openPlaySubscriptions(sale.renewing?.productId)} accessibilityRole="link" style={sub.manage}>
+          <Text style={sub.link}>Aboneliği Google Play&apos;de yönet</Text>
+        </Pressable>
+      )}
+      <View style={{ marginTop: status ? 11.5 : 14 }}>
+        <PlanCards plans={plans} selected={p?.days ?? 0} onSelect={setPlan} width={contentW} fontScale={fontScale} />
       </View>
-      <BuyButton onPress={buy} busy={buying} />
-      {live && sale.mode === 'test' && <Text style={[styles.note, { textAlign: 'center', marginTop: 0 }]}>Test sürümü · abonelik ücretsiz, gerçek ödeme alınmaz</Text>}
-
-      <Text style={[styles.h1, { marginTop: 8 }]}>VIP Ayrıcalıkları ({p.label})</Text>
-      <View style={styles.box}>
-        <ScrollView
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          onLayout={(e) => setPageW(e.nativeEvent.layout.width)}
-          onMomentumScrollEnd={(e) => setPerkPage(Math.round(e.nativeEvent.contentOffset.x / e.nativeEvent.layoutMeasurement.width))}>
-          {pages.map((page, i) => (
-            <View key={i} style={{ width: pageW, flexDirection: 'row', flexWrap: 'wrap', rowGap: 18 }}>
-              {page.map((r) => (
-                // Two columns leave too little room for a word on a small phone: one column there.
-                <View key={r.name} style={[styles.perk, pageW < 300 && { width: '100%' }]}>
-                  <View style={styles.perkIcon}>
-                    <Ionicons name={r.icon as keyof typeof Ionicons.glyphMap} size={22} color={gold} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: gold, fontSize: 14, fontWeight: '700' }} numberOfLines={2}>
-                      {r.name}
-                    </Text>
-                    <Text style={{ color: colors.textDim, fontSize: 11, lineHeight: 15 }} numberOfLines={3}>
-                      {r.desc}
-                    </Text>
-                  </View>
-                </View>
-              ))}
-            </View>
-          ))}
-        </ScrollView>
-        <Dots count={perkPages} index={perkPage} />
-        {/* "Hoş Geldin Kutusu" comes back once the server grants it (güncelleme 6). */}
+      <View style={{ marginTop: 11.5 }}>
+        <SubBuyButton onPress={buy} busy={buying} hint={hint} />
       </View>
 
-      <Text style={[styles.h1, { marginTop: 8 }]}>Ayrıcalık Karşılaştırması</Text>
-      <View style={styles.table}>
-        <View style={styles.tr}>
-          <Text style={[styles.th, { flex: 1.1 }]}>Ayrıcalıklar</Text>
-          <Text style={[styles.th, styles.mid]}>VIP olmayan</Text>
-          <Text style={[styles.th, styles.vipCol, { color: gold, fontSize: 20, fontStyle: 'italic', fontWeight: '900' }]}>VIP</Text>
-        </View>
-        {compare.map(([name, free, vip]) => (
-          <View key={name} style={styles.tr}>
-            <Text style={[styles.td, { flex: 1.1 }]}>{name}</Text>
-            <CompareCell value={free} style={styles.mid} />
-            <CompareCell value={vip} style={styles.vipCol} vip />
+      {perks.length > 0 && (
+        <>
+          <View style={sub.heading}>
+            <SubHeading title="Abonelik Ayrıcalıkları" />
           </View>
-        ))}
-      </View>
+          <SubPerks perks={perks} width={contentW} />
+        </>
+      )}
 
-      <View style={styles.box}>
-        <Text style={[styles.rightsTitle, { color: colors.text, marginVertical: 4 }]}>
-          <Text style={{ color: gold }}>◆ </Text>Seviyeyi Gizle<Text style={{ color: gold }}> ◆</Text>
-        </Text>
-        <View style={{ alignItems: 'center', gap: 8 }}>
-          <Avatar uri={me.avatar} size={76} />
-          <Text style={{ color: gold, fontWeight: '800', fontSize: 17 }}>{me.name}</Text>
-          <LevelChips wealth={wealthLevel} charm={charmLevel} hideWealth={(live || vipDays > 0) && settings.hideWealth} hideCharm={(live || vipDays > 0) && settings.hideCharm} />
-        </View>
-        <View style={styles.toggles}>
-          {(
-            [
-              ['hideWealth', 'Cömertlik seviyesini gizle'],
-              ['hideCharm', 'Yankı seviyesini gizle'],
-            ] as const
-          ).map(([k, l], i) => (
-            <View key={k} style={[styles.toggleRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: ink(0.1) }]}>
-              <Text style={{ color: colors.textDim, fontSize: 15, flex: 1 }}>{l}</Text>
-              <Switch value={(live || vipDays > 0) && settings[k]} onValueChange={(v) => toggleHide(k, v)} accessibilityLabel={l} />
-            </View>
-          ))}
-        </View>
-      </View>
+      {compare.length > 0 && (
+        <>
+          <View style={sub.heading}>
+            <SubHeading title="Ayrıcalık Karşılaştırması" />
+          </View>
+          <SubCompare rows={compare} />
+        </>
+      )}
 
-      <Text style={styles.note}>
+      <View style={sub.heading}>
+        <SubHeading title="Seviyeyi Gizle" both />
+      </View>
+      <SubHideLevels
+        avatar={me.avatar}
+        name={me.name}
+        wealth={wealthLevel}
+        charm={charmLevel}
+        hidden={{ hideWealth: mayHide && settings.hideWealth, hideCharm: mayHide && settings.hideCharm }}
+        onToggle={toggleHide}
+      />
+
+      {live && sale.mode === 'test' && <Text style={[sub.note, { marginTop: 14, textAlign: 'center' }]}>Test sürümü · abonelik ücretsiz, gerçek ödeme alınmaz</Text>}
+      <Text style={[sub.note, { marginTop: 12 }]}>
         Ödeme {store} hesabından, hesabındaki ödeme yöntemiyle ve yerel para biriminde alınır. Ülkene göre vergi eklenebilir; son fiyatı {store} ödeme sayfasında
         görürsün. Abonelik, süresi bitmeden 24 saat önce kendiliğinden yenilenir ve ücretlendirilir. İstediğin zaman {store} üzerinden iptal edebilirsin. Satın alarak
         şunları kabul edersin:{' '}
-        <Text style={styles.legalLink} onPress={() => openLegal('subscription')} accessibilityRole="link">
+        <Text style={sub.link} onPress={() => openLegal('subscription')} accessibilityRole="link">
           Abonelik Koşulları
         </Text>{' '}
         ve{' '}
-        <Text style={styles.legalLink} onPress={() => openLegal('privacy')} accessibilityRole="link">
+        <Text style={sub.link} onPress={() => openLegal('privacy')} accessibilityRole="link">
           Gizlilik Politikası
         </Text>
         .
       </Text>
-      <BuyButton onPress={buy} busy={buying} />
+      <View style={{ marginTop: 14 }}>
+        <SubBuyButton onPress={buy} busy={buying} hint={hint} />
+      </View>
     </ScrollView>
   );
 }
 
-function CompareCell({ value, style, vip }: { value: string | boolean; style: object; vip?: boolean }) {
-  const { dark } = useTheme();
-  const styles = useStyles();
-  const gold = useGold();
-  if (typeof value === 'boolean')
-    return (
-      <View style={[styles.tdBox, style]}>
-        <Ionicons name={value ? 'checkmark-sharp' : 'close-sharp'} size={26} color={value ? (dark ? '#F5B94A' : '#C98A1E') : dark ? '#D4D4D8' : '#8A96A8'} accessibilityLabel={value ? 'Var' : 'Yok'} />
-      </View>
-    );
-  return <Text style={[styles.td, style, vip && { color: gold, fontWeight: '700' }]}>{value}</Text>;
-}
-
-function BuyButton({ onPress, busy }: { onPress: () => void; busy?: boolean }) {
-  const styles = useStyles();
-  return (
-    <Pressable onPress={onPress} disabled={busy} accessibilityRole="button" accessibilityState={{ busy: !!busy }}>
-      <LinearGradient colors={['#FDE7C7', '#F5C189']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.buyBtn, busy && { opacity: 0.7 }]}>
-        <Text style={{ color: '#3B2A12', fontWeight: '900', fontSize: 18 }}>{busy ? 'İşleniyor…' : 'VIP Satın Al'}</Text>
-      </LinearGradient>
-    </Pressable>
-  );
-}
-
-function Dots({ count, index }: { count: number; index: number }) {
-  const { ink, dark } = useTheme();
-  return (
-    <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 4, marginTop: 14 }}>
-      {Array.from({ length: count }, (_, i) => (
-        <View key={i} style={{ width: i === index ? 28 : 14, height: 4, borderRadius: 2, backgroundColor: i === index ? (dark ? '#D4D4D8' : '#8A96A8') : ink(0.15) }} />
-      ))}
-    </View>
-  );
-}
+/** The Abonelik tab's own text styles (always the light design). */
+const sub = StyleSheet.create({
+  // Above a heading 12.5 dp, under it 5.5 (the design's line-to-card 13.7–16 dp from the heading's middle).
+  heading: { marginTop: 12.5, marginBottom: 5.5 },
+  note: { color: SUB.mauveSoft, fontSize: 11, lineHeight: 15.5, paddingHorizontal: 6 },
+  link: { color: SUB.goldDeep, fontWeight: '700', textDecorationLine: 'underline' },
+  // A 44 dp tall touch area round the one-line link.
+  manage: { alignSelf: 'center', minHeight: 44, justifyContent: 'center', paddingHorizontal: 12, marginVertical: -6 },
+});
 
 function Noble() {
   const { nobleTier, nobleDays, buyNoble, coins } = useApp();
@@ -534,54 +402,18 @@ function Noble() {
 // Light scheme only: the soft card shadow (the night screen's cards stand out by color).
 const LIGHT_SHADOW = '0 1px 2px rgba(64,20,40,0.05), 0 6px 16px rgba(64,20,40,0.06)';
 
-// The privilege center keeps its warm night palette in the dark scheme. In the light one the screen, the plan cards,
-// boxes and table become white cards with dark-gold text; the VIP level cards, emblems and gold fills stay as they are.
-const useStyles = makeStyles(({ colors, surface, ink, dark }) => {
+// Rütbe keeps its warm night palette in the dark scheme; in the light one its cards become white with dark-gold text
+// (the VIP tab draws its own night design, the Abonelik tab its own light one: components/vip).
+const useStyles = makeStyles(({ colors, ink, dark }) => {
   const gold = dark ? GOLD : colors.gold;
   const shadow = dark ? {} : { boxShadow: LIGHT_SHADOW };
   return {
     safe: { flex: 1, backgroundColor: dark ? '#0B0A0F' : colors.bg },
-    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 8 },
-    segment: { flexDirection: 'row', backgroundColor: ink(0.08), borderRadius: 999, padding: 3 },
-    segBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999 },
-    segActive: { backgroundColor: GOLD },
-    segText: { color: colors.textDim, fontWeight: '800' },
-    svipCard: { borderRadius: 16, padding: 16, minHeight: 170, gap: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },
-    lockChip: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(22,14,18,0.55)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
-    lockText: { color: '#fff', fontWeight: '800', fontSize: 12 },
-    svipTitle: { color: GOLD, fontSize: 40, fontWeight: '900', fontStyle: 'italic' },
-    // Over the right three fifths, clear of the progress line and the Yükle button below (the bottom 70 px).
-    svipEmblem: { position: 'absolute', top: 8, bottom: 70, left: '38%', right: 8, alignItems: 'center', justifyContent: 'center' },
     cardText: { color: '#fff', fontSize: 14 },
-    track: { height: 6, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 3, overflow: 'hidden' },
-    loadBtn: { position: 'absolute', right: 16, bottom: 16, backgroundColor: '#FDE7C7', borderRadius: 999, paddingHorizontal: 22, paddingVertical: 8 },
-    clearLoad: { marginRight: 100 },
     rightsTitle: { color: gold, fontWeight: '900', fontSize: 18, textAlign: 'center', marginVertical: 18 },
-    rightsTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginVertical: 18 },
     grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 10, rowGap: 12 },
     rightCell: { width: '31.3%', marginHorizontal: '1%', alignItems: 'center', gap: 8, paddingVertical: 14, borderRadius: 14, borderWidth: 1, borderColor: dark ? 'rgba(245,215,161,0.35)' : 'rgba(183,131,46,0.28)', backgroundColor: dark ? '#15120C' : colors.card, ...shadow },
-    rightIcon: { width: 54, height: 54, borderRadius: 27, backgroundColor: '#E8B979', alignItems: 'center', justifyContent: 'center' },
     rightName: { color: gold, fontSize: 12, textAlign: 'center', paddingHorizontal: 4 },
-    note: { color: colors.textDim, fontSize: 12, lineHeight: 17, paddingHorizontal: 16, marginTop: 12 },
-    legalLink: { color: gold, fontWeight: '700', textDecorationLine: 'underline' },
-    h1: { color: colors.text, fontWeight: '900', fontSize: 20 },
-    table: { borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: ink(0.1), ...(dark ? {} : { backgroundColor: colors.card, boxShadow: LIGHT_SHADOW }) },
-    tr: { flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: surface.hairline },
-    th: { color: colors.textDim, padding: 12, textAlign: 'center', fontSize: 13 },
-    td: { color: dark ? '#D4D4D8' : '#33425A', padding: 12, textAlign: 'center', fontSize: 13 },
-    tdBox: { padding: 10, alignItems: 'center', justifyContent: 'center' },
-    mid: { flex: 1, backgroundColor: surface.pressed },
-    vipCol: { flex: 1, backgroundColor: dark ? 'rgba(245,215,161,0.06)' : 'rgba(232,185,121,0.12)' },
-    plan: { flex: 1, alignItems: 'center', gap: 4, paddingTop: 18, paddingBottom: 14, borderRadius: 14, borderWidth: 2, borderColor: 'transparent', backgroundColor: dark ? '#1E1C22' : colors.card, ...shadow },
-    planOn: { borderColor: dark ? GOLD : '#D9A24A' },
-    planTag: { position: 'absolute', top: -2, left: -2, backgroundColor: '#E5484D', color: '#fff', fontSize: 11, fontWeight: '800', borderTopLeftRadius: 12, borderBottomRightRadius: 10, paddingHorizontal: 8, paddingVertical: 3, overflow: 'hidden' },
-    buyBtn: { borderRadius: 999, paddingVertical: 16, alignItems: 'center' },
-    box: { borderRadius: 18, borderWidth: 1, borderColor: ink(0.1), backgroundColor: dark ? '#1A181E' : colors.card, padding: 16, gap: 12, overflow: 'hidden', ...shadow },
-    perk: { width: '50%', flexDirection: 'row', alignItems: 'center', gap: 10, paddingRight: 10 },
-    perkIcon: { width: 46, height: 46, borderRadius: 23, backgroundColor: dark ? 'rgba(255,255,255,0.06)' : 'rgba(232,185,121,0.16)', alignItems: 'center', justifyContent: 'center' },
-    giftBox: { backgroundColor: dark ? 'rgba(255,255,255,0.04)' : 'rgba(232,185,121,0.10)', borderRadius: 14, padding: 14, gap: 12 },
-    toggles: { backgroundColor: surface.pressed, borderRadius: 14, paddingHorizontal: 14 },
-    toggleRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14 },
     noble: { flex: 1, backgroundColor: dark ? '#2A1A22' : '#F6E9EF' },
     nobleTabs: { flexDirection: 'row', justifyContent: 'space-around', paddingTop: 10 },
     nobleTab: { color: ink(0.5), fontSize: 16, fontWeight: '700', paddingVertical: 6 },

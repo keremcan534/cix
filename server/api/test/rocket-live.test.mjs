@@ -261,7 +261,7 @@ describe('Canlı Yörünge', () => {
     let id = await nextRound(a.session);
     const [st, e] = await fuel(a.session, id, { bet: 1000 });
     assert.equal(st, 409);
-    assert.match(e.error, /Ödül havuzu/);
+    assert.match(e.error, /Bu bahis şu an alınamıyor/);
     await q('UPDATE casino_bank SET pool = 2000 WHERE id = 1');
     id = await nextRound(a.session, id);
     await rig(id, 1000);

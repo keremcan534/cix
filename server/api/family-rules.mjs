@@ -30,7 +30,7 @@ export const FAMILY_THEMES = [
   { id: 'altin', minLevel: 10 },
   { id: 'galaksi', minLevel: 13 },
 ];
-/** Pair (İkili) gifts: the Uyum Köşesi task counts them. */
+/** Pair (Çift) gifts: the Uyum Köşesi task counts them. */
 export const CP_GIFT_IDS = ['c9', 'c12', 'c1'];
 /** The weekly family bonus rate by family level (shown as an estimate; paying it is a management decision). */
 export const FAMILY_RATES = [0.01, 0.0125, 0.015, 0.0175, 0.02, 0.0225, 0.025, 0.0275, 0.03, 0.0325, 0.035, 0.0375, 0.04, 0.045, 0.05];

@@ -38,7 +38,7 @@ import {
   vehiclesOf,
   wealthCharmOf,
 } from '@/data/profile';
-import { followRoute, presenceOf } from '@/data/presence';
+import { followRoute, presenceOf, type Presence } from '@/data/presence';
 import { showAlert } from '@/lib/alert';
 import { callsAvailable, liveCalls, liveGift, liveMode, loadRooms, message, toServer } from '@/lib/live';
 import { callLabel, callPair, heartOf, usePair } from '@/components/one-on-one-bar';
@@ -63,6 +63,7 @@ import { similarity } from '@/lib/similarity';
 import { SimilarityCard } from '@/components/similarity';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { ProfileGiftSheet } from '@/components/profile-gift-sheet';
+import { useGiftStage } from '@/components/fx/gift-stage';
 import { AffiliationPills, FEMALE_FILL, GenderChip, MALE_FILL, useAffiliations, useStaffBadge, type Affiliation } from '@/components/profile-badges';
 import { Icon3D } from '@/components/Icon3D';
 import { useApp, type FanClub } from '@/store';
@@ -71,6 +72,7 @@ import { Art, type ArtName } from '@/components/Art';
 import { Photo } from '@/components/photo';
 import { useReport } from '@/components/report-sheet';
 import { BondBadge, BondFrame, BondsTab, shownTopBond, useBonds } from '@/components/bonds';
+import { MarkLayer, OwnMarkNote } from '@/components/profile-mark';
 
 const REPORT_REASONS = ['Sahte profil', 'Taciz / hakaret', 'Uygunsuz içerik', 'Dolandırıcılık', 'Reşit değil'];
 
@@ -402,6 +404,8 @@ export default function UserProfile() {
 
   // Live mode: only a real person (a server id) can get a gift; a sample person has no Hediye button.
   const giftable = !live || !!serverId;
+  // My gift's animation plays here once it went (components/fx/gift-stage).
+  const giftStage = useGiftStage();
   /** One gift, no confirmation; true once it went. */
   const deliverGift = async (g: Gift): Promise<boolean> => {
     // Same VIP (SVIP) lock as the room's gift sheet.
@@ -444,6 +448,7 @@ export default function UserProfile() {
     bump('giftsSent', 1);
     addFanPoints(user.id, Math.ceil(g.price / 10), `Hediye gönderdin (${g.price} jeton)`);
     successHaptic();
+    giftStage.play(g, me.name, user.name, 1);
     return true;
   };
   const sendGift = (g: Gift) => {
@@ -566,7 +571,10 @@ export default function UserProfile() {
   const showsGender = !!user.gender && (isMe || user.showGender !== false);
   const hasBasics = !live || publicId !== null || !!user.username || showsGender || !!country || (isMe && !!birthday) || !!user.joinedAt || !!extras.relationship || !!extras.education;
 
-  const presence = priv.showCurrentRoom ? presenceOf(user.id) : null;
+  // Live mode: the room the server says they are in now (their "Bulunduğum odayı göster", blocks and the room's door
+  // already applied; one-to-one calls never shown); the demo: its sample rooms and calls.
+  const here = live ? counts?.room : null;
+  const presence: Presence = live ? (here ? { kind: 'room', roomId: here.id, title: here.title, locked: here.locked } : null) : priv.showCurrentRoom ? presenceOf(user.id) : null;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -585,7 +593,7 @@ export default function UserProfile() {
                 <Pressable onPress={() => pickPhoto(false)} accessibilityLabel="Profil fotoğrafını değiştir">
                   {/* A frame from the store wins over the bond frame. */}
                   <BondFrame bond={equipped.frame ? null : topBondShown} size={96}>
-                    <FramedAvatar uri={pendingAvatar ?? user.avatar} size={96} vipLevel={vipLevel} frameId={equipped.frame} artScale={2.2} />
+                    <FramedAvatar uri={pendingAvatar ?? user.avatar} size={96} vipLevel={vipLevel} frameId={equipped.frame} artScale={2.2} markUid="me" />
                   </BondFrame>
                   <View style={styles.cameraBadge}>
                     <Ionicons name="camera" size={14} color="#fff" />
@@ -594,7 +602,11 @@ export default function UserProfile() {
               ) : (
                 <>
                   <BondFrame bond={topBondShown} size={96}>
-                    <Avatar uri={user.avatar} size={96} ring={user.vip && !topBondShown} />
+                    <View>
+                      <Avatar uri={user.avatar} size={96} ring={user.vip && !topBondShown} />
+                      {/* Profil izleri: on the photo, under the bond frame (components/profile-mark). */}
+                      <MarkLayer uid={id} size={96} />
+                    </View>
                   </BondFrame>
                   {heart && <HeartPin level={heart.level} style={styles.heartPin} />}
                 </>
@@ -699,6 +711,9 @@ export default function UserProfile() {
               )}
             </Pressable>
           )}
+
+          {/* Profil izleri: my own mark, who left it, how long it stays and what cleans it. */}
+          {isMe && <OwnMarkNote textColor={glass.deep} />}
 
           <View style={styles.stats}>
             {/* Someone else's numbers open nothing: who follows them and whom they follow is theirs alone. */}
@@ -1125,7 +1140,7 @@ export default function UserProfile() {
           onSave={saveEdit}
         />
       )}
-
+      {giftStage.node}
     </View>
   );
 }

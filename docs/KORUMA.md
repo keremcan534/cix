@@ -22,6 +22,8 @@ kişi kartında Koruma alanı (`components/person-showcase.tsx`).
 | Liste | Benim Koruma'da iki yön ayrı ayrı, puana göre ilk 50. |
 | Engel | Engelli kişiler arasında kart gitmez (hediye kuralı). |
 
+Gece düşüşü, eşik ve liste sayıları Canlı ayarlar › **Koruma**'dan değişir ([`ELLE_AYARLAR.md`](ELLE_AYARLAR.md)); tablodakiler varsayılandır.
+
 ## Sahiplerin kararı
 
 - **Kartın fiyatı 999 jeton** (varsayılan). Yönetim › Hediyeler'den değiştirilebilir.
@@ -30,7 +32,7 @@ kişi kartında Koruma alanı (`components/person-showcase.tsx`).
 
 ## Eski APK'lar
 
-Kart eski uygulamalarda sıradan bir hediye olarak "İkili" rafında görünür ve gönderilebilir: Koruma yine başlar ve puan
+Kart eski uygulamalarda sıradan bir hediye olarak "İkili" rafında (bugünkü adıyla Çift) görünür ve gönderilebilir: Koruma yine başlar ve puan
 yine sayılır. Eski uygulamada Benim Koruma sayfası, profildeki Koruma alanı ve kurallar yoktur.
 
 ## Veri

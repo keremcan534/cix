@@ -30,6 +30,8 @@ import { loadMyList } from '@/lib/live/follows';
 import { useMeStats } from '@/lib/live/me-stats';
 import { splitTies, tiesOf, type TieSide } from '@/lib/follow-ties';
 import { myCompletion, rowVisible, type MenuFlags } from '@/lib/me-view';
+import { OwnMarkNote } from '@/components/profile-mark';
+import { useMyMarks } from '@/lib/live/marks-live';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 type OneWay = Exclude<TieSide, 'friends'>;
@@ -96,6 +98,7 @@ export default function ProfileScreen() {
     if (ziyaretciler) router.setParams({ ziyaretciler: undefined });
   }, [ziyaretciler]);
   const completion = myCompletion(me, live);
+  useMyMarks(live);
   // My public id: the one others see on my profile, my own number from the server (an older server: the one made
   // from my server id, data/profile publicIdOf); none until known.
   const serverId = server.stats?.serverId ?? myServerId();
@@ -127,7 +130,7 @@ export default function ProfileScreen() {
       <ScrollView contentContainerStyle={{ paddingBottom: 32, gap: 12 }}>
         <View style={styles.top}>
           <Pressable onPress={() => router.push('/kullanici/me')} accessibilityLabel="Profilim">
-            <FramedAvatar uri={me.avatar} size={78} vipLevel={vipLevel} frameId={equipped.frame} artScale={1.4} />
+            <FramedAvatar uri={me.avatar} size={78} vipLevel={vipLevel} frameId={equipped.frame} artScale={1.4} markUid="me" />
           </Pressable>
           <View style={{ flex: 1, gap: 5 }}>
             <View style={styles.nameRow}>
@@ -157,6 +160,9 @@ export default function ProfileScreen() {
             <Ionicons name="chevron-forward" size={14} color={colors.text} />
           </Pressable>
         </View>
+
+        {/* Profil izleri: a mark on my photo, who left it and how it goes (my marks read when the tab opens). */}
+        <OwnMarkNote style={{ marginHorizontal: 16 }} />
 
         <View style={styles.stats}>
           <Stat n={followers} label="Takipçiler" onPress={() => setList('followers')} />

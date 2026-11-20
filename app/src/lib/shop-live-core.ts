@@ -4,7 +4,8 @@
 //
 // The app's own (data/catalog COSMETICS) keep their art and animation; the server says their name, price, days, VIP
 // level, whether they are on the shelf and their order. The admins' own come only from here: a frame's picture (`art`:
-// its address and the empty centre's radius as a share of its width); an entry effect's video (in the catalog's `fx`
+// its address and the empty centre's radius as a share of its width, and how far it is really drawn round it once the
+// server measured it: FrameReach); an entry effect's video (in the catalog's `fx`
 // as entry <its id>) with its name plate (`plate`): where, how wide and how big the entering person's name is written
 // over the clip, as shares of its 540 × 960 frame, how it looks and when it shows, and its icon in the shop (`icon`);
 // a chat bubble's look (two colours, the text's colour, and a picture
@@ -58,6 +59,13 @@ export type WaveStyle = (typeof WAVE_STYLES)[number];
 const WAVE_COLORS: Record<WaveStyle, readonly [number, number]> = { ring: [1, 1], double: [2, 2], spin: [2, 4], ripple: [1, 1], sparkle: [2, 2] };
 /** An admin's voice wave: a style the app draws, its colours, and for the sparkle style a picture for its sparks. */
 export type WaveLook = { style: WaveStyle; colors: readonly string[]; art?: { url: string } };
+/**
+ * How far an admin's frame is really drawn from the hole's centre, as shares of the picture's side (server/api/
+ * shop-items.mjs reachOf, measured over the still picture and every frame of the moving one): across (the further of
+ * left and right), up and down. Each is at least the photo's radius and at most the way to the picture's edge on that
+ * side. None (not measured yet, an older server): the whole square is drawn, as before.
+ */
+export type FrameReach = { x: number; top: number; bottom: number };
 /** The kinds the shop's list covers; the others stay the app's own. */
 export const SHOP_LIST_KINDS = ['frame', 'entry', 'bubble', 'wave'] as const;
 type ListKind = (typeof SHOP_LIST_KINDS)[number];
@@ -72,9 +80,10 @@ export type ShopItem = {
   off: boolean;
   /**
    * An admin's frame: its still picture, the hole (its radius; `at`: its centre when it isn't the picture's middle, as
-   * shares of the picture), and the animated WebP the app plays when it has one.
+   * shares of the picture), the animated WebP the app plays when it has one, and how far its drawn part reaches from
+   * the hole's centre once the server measured it (`reach`: FrameReach).
    */
-  art?: { url: string; hole: number; at?: { x: number; y: number }; motion?: { url: string } };
+  art?: { url: string; hole: number; at?: { x: number; y: number }; motion?: { url: string }; reach?: FrameReach };
   video?: boolean;
   plate?: Plate | null;
   /** An admin's entry effect's picture in the shop. */
@@ -103,6 +112,19 @@ function paintOf<K extends 'size' | 'alpha'>(raw: unknown, amount: K, min: numbe
   const color = hex(r.color);
   const n = share(r[amount], min, max);
   return color && n !== null ? ({ color, [amount]: n } as { color: string } & Record<K, number>) : null;
+}
+
+/**
+ * A frame's `reach` the server sent, read against its hole (radius `hole`, centre `at`, shares of the picture): null
+ * when any of the three is missing, not a number, less than the photo's radius or past the picture's edge on its side
+ * (a thousandth either way for rounding). The frame is then drawn as before, the whole square.
+ */
+export function parseFrameReach(raw: unknown, hole: number, at: { x: number; y: number }): FrameReach | null {
+  const r = obj(raw);
+  const x = share(r.x, hole - 0.001, Math.max(at.x, 1 - at.x) + 0.001);
+  const top = share(r.top, hole - 0.001, at.y + 0.001);
+  const bottom = share(r.bottom, hole - 0.001, 1 - at.y + 0.001);
+  return x !== null && top !== null && bottom !== null ? { x, top, bottom } : null;
 }
 
 /**
@@ -228,7 +250,11 @@ export function parseLiveShop(raw: unknown): LiveShop | null {
     const cx = share(c.x, 0.3, 0.7);
     const cy = share(c.y, 0.3, 0.7);
     const at = hole !== null && cx !== null && cy !== null && [cx, cy].every((n) => n - hole >= -0.001 && n + hole <= 1.001) ? { at: { x: cx, y: cy } } : {};
-    const art = kind === 'frame' && typeof a.url === 'string' && ART_URL.test(a.url) && hole !== null ? { url: a.url, hole, ...at, ...motion } : undefined;
+    // How far it is drawn, read against the hole as this phone places it; one measured round a centre left out above
+    // can't be trusted, so it goes too (drawn as before).
+    const reached = hole !== null && (a.at === undefined || at.at) ? parseFrameReach(a.reach, hole, at.at ?? { x: 0.5, y: 0.5 }) : null;
+    const reach = reached ? { reach: reached } : {};
+    const art = kind === 'frame' && typeof a.url === 'string' && ART_URL.test(a.url) && hole !== null ? { url: a.url, hole, ...at, ...motion, ...reach } : undefined;
     const builtin = r.builtin === true;
     const bubble = !builtin && kind === 'bubble' ? parseBubbleLook(r.look) : null;
     const wave = !builtin && kind === 'wave' ? parseWaveLook(r.look) : null;
