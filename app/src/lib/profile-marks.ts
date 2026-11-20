@@ -2,7 +2,8 @@
 // on the receiver's profile photo for a while (24 hours, Canlı ayarlar) or until someone sends 💧 Temizlik Suyu, which
 // costs more; 🩴 Terlik Geldi! leaves Kırık Cam the same way. The kinds are data (server/api/mark-kinds.mjs): a kind's
 // name, the overlay picture staff uploaded, its minutes; this app since 1.1.0 reads them (catalog marks=2). One mark at
-// a time: the same kind again starts its time again, another kind takes its place. Someone may limit who marks them in
+// a time: while one shows, a gift of another kind leaves none (a plain gift; the sheet says so before, the send's
+// answer `markNote` after); the same kind again is the newest sender's and never ends sooner. Someone may limit who marks them in
 // Gizlilik ("Kimler profilime iz bırakabilir": everyone, the people they follow — the default —, nobody), and the gift
 // sheet says so before anyone taps; the marks they have stay. Pure: the server's answers read defensively (a malformed
 // one shows no mark, never throws), the lines the room and the profile say, which picture a mark is drawn with, and
@@ -13,7 +14,7 @@
 export type GiftMark = { role: 'leave' | 'clean'; kind: string; hours?: number; minutes?: number };
 /** A mark on someone's photo: its kind, the gift that left it (its badge), until when (ms), on my own profile who. */
 export type ProfileMark = { kind: string; gift: string; emoji: string; until: number; from?: { id: string; name: string } | null };
-/** A gift packet's (or a send's answer's) `mark`: what that gift just did (`replaced`: the kinds it took the place of). */
+/** A gift packet's (or a send's answer's) `mark`: what that gift just did (`minutes`: how long it shows from now). */
 export type MarkNews = {
   role: 'leave' | 'clean';
   kind: string;
@@ -24,7 +25,6 @@ export type MarkNews = {
   minutes?: number;
   clean?: string | null;
   again?: boolean;
-  replaced?: string[];
 };
 /** A kind as the server says it is now (marks=2): its name, its overlay (url + version), its own minutes. */
 export type MarkKind = { name: string; stack: 'refresh' | 'replace'; minutes?: number; art?: { url: string; v: string; px?: number } };
@@ -130,7 +130,6 @@ export function parseMarkNews(x: unknown): MarkNews | null {
   const until = timeOf(m.until);
   if (until === null) return null;
   const minutes = minutesOf(m.minutes, 1);
-  const replaced = Array.isArray(m.replaced) ? m.replaced.filter((k): k is string => typeof k === 'string' && KIND.test(k)).slice(0, 5) : [];
   return {
     ...base,
     until,
@@ -138,8 +137,16 @@ export function parseMarkNews(x: unknown): MarkNews | null {
     ...(minutes ? { minutes } : {}),
     clean: typeof m.clean === 'string' && m.clean.trim() && m.clean.length <= 16 ? m.clean.trim() : null,
     again: m.again === true,
-    ...(replaced.length ? { replaced } : {}),
   };
+}
+
+/**
+ * A send's answer's `markNote` (server/api/gifts.mjs): why a gift that leaves a mark left none (their photo shows a
+ * mark of another kind: it went as a plain gift). Null for none or anything malformed.
+ */
+export function parseMarkNote(x: unknown): string | null {
+  const t = typeof x === 'string' ? x.replace(/\s+/g, ' ').trim() : '';
+  return t && t.length <= 300 ? t : null;
 }
 
 /** The mark showing on a photo now (the one that lasts longest), or null. */
@@ -149,10 +156,14 @@ export function activeMark(marks: readonly ProfileMark[] | undefined, now = Date
   return best;
 }
 
-/** `marks` after a gift's news: a leave is the one mark now (one at a time), a clean takes its kind off. */
+/**
+ * `marks` after a gift's news: a leave is its kind's mark now (the server sends one only when no other kind shows, so
+ * one at a time holds; another kind left from before stays as the server keeps it), a clean takes its kind off.
+ */
 export function marksAfter(marks: readonly ProfileMark[], news: MarkNews): ProfileMark[] {
-  if (news.role === 'clean' || news.until === undefined) return marks.filter((m) => m.kind !== news.kind);
-  return [{ kind: news.kind, gift: news.gift, emoji: news.emoji, until: news.until }];
+  const rest = marks.filter((m) => m.kind !== news.kind);
+  if (news.role === 'clean' || news.until === undefined) return rest;
+  return [...rest, { kind: news.kind, gift: news.gift, emoji: news.emoji, until: news.until }];
 }
 
 /** "24 saat", "90 dakika" → "1 saat 30 dakika", "2 gün": a mark's time (server/api/profile-mark-rules.mjs durationText). */
@@ -242,6 +253,45 @@ export function refusalLine(gift: { name: string }, refusing: readonly string[],
   }
   if (refusing.length === all) return off ? `Seçtiğin kişiler profillerine iz bırakılmasını kapattı. ${gift.name} onlara gönderilemez.` : `Seçtiğin kişiler senden iz kabul etmiyor. ${gift.name} onlara gönderilemez.`;
   return off ? `${refusing.length} kişi profiline iz bırakılmasını kapattı; ${gift.name} yalnız diğer ${all - refusing.length} kişiye gider.` : `${refusing.length} kişi senden iz kabul etmiyor; ${gift.name} yalnız diğer ${all - refusing.length} kişiye gider.`;
+}
+
+/**
+ * The gift sheet's rule for a gift that leaves a mark, among the people it goes to: whose photo shows a mark of another
+ * kind now (and none of its own), to whom it goes as a plain gift (the server leaves their mark as it is). `marksOf(id)`:
+ * the marks on their photo as this phone has them; `now`: the server's clock.
+ */
+export const keepingMarks = (rule: GiftMark | null, targets: readonly string[], marksOf: (id: string) => readonly ProfileMark[], now: number) =>
+  rule?.role === 'leave'
+    ? targets.filter((id) => {
+        const showing = marksOf(id).filter((m) => m.until > now);
+        return showing.length > 0 && !showing.some((m) => m.kind === rule.kind);
+      })
+    : [];
+
+/** The sheet's line when some of the people it goes to already show another mark (it still goes; never a nudge). */
+export function keptLine(gift: { name: string }, kept: readonly string[], nameOf: (id: string) => string, all: number): string {
+  if (kept.length === 1 && all === 1) return `${nameOf(kept[0])}, profilinde zaten bir iz var. ${gift.name} iz bırakmaz, düz hediye olarak gider.`;
+  if (kept.length === all) return `Seçtiğin kişilerin profilinde zaten bir iz var. ${gift.name} iz bırakmaz, onlara düz hediye olarak gider.`;
+  return `${kept.length} kişinin profilinde zaten bir iz var; ${gift.name} onlara düz hediye olarak gider, diğer ${all - kept.length} kişiye iz bırakır.`;
+}
+
+/** The line after a send whose gift went as a plain gift to people who already show a mark (the answers' markNote). */
+export function keptAfterLine(gift: { name: string }, notes: readonly string[]): string | null {
+  if (!notes.length) return null;
+  if (notes.length === 1) return notes[0];
+  return `${notes.length} kişinin profilinde zaten bir iz vardı; ${gift.name} onlara düz hediye olarak gitti.`;
+}
+
+/**
+ * The İz önizleme screen's photo (app/iz-onizleme ?foto=): only a file this app's own server keeps
+ * (`<API>/api/media/f/…`), never any other address; null for anything else (the screen uses my own photo then).
+ */
+export function previewFaceOf(foto: unknown, apiBase: string): string | null {
+  if (typeof foto !== 'string' || !apiBase || foto.length > 600) return null;
+  const base = apiBase.replace(/\/+$/, '');
+  if (!/^https?:\/\/[^/\s]+$/.test(base) || !foto.startsWith(`${base}/api/media/f/`)) return null;
+  const rest = foto.slice(base.length + '/api/media/f/'.length);
+  return /^[A-Za-z0-9._~%/-]+(\?[A-Za-z0-9=&._~%-]*)?$/.test(rest) && !rest.split('/').includes('..') ? foto : null;
 }
 
 /** A pair on the Muzip shelf: the gift that leaves a mark, how long, and the gift that cleans it (none: time alone). */

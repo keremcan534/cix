@@ -2,7 +2,8 @@
 
 Güncelleme 7, madde 11'de 💩 Kaka ve 💧 Su ile başladı. 20 Kasım 2026'da "Muzip hediyeler" şartnamesiyle genişledi.
 Sahiplerin o günkü kararları şartnameden önce gelir. Kısaca: raf adı **Muzip**, iz türleri panelden eklenir, süre
-dakikayla, aynı anda tek iz, "Kimler profilime iz bırakabilir", ücretsiz kaldırma yok.
+dakikayla, aynı anda tek iz (iz varken başka tür düz hediye gider), "Kimler profilime iz bırakabilir", ücretsiz
+kaldırma yok.
 
 ## Kısaca ne yapıyor
 
@@ -20,9 +21,19 @@ dakikayla, aynı anda tek iz, "Kimler profilime iz bırakabilir", ücretsiz kald
   adımlar [`HEDIYE_YONETIMI.md`](HEDIYE_YONETIMI.md) › "Yeni bir şaka çifti".
 - **Süre:** Hediyenin kendi süresi dakikayla verilir (5 dakika – 7 gün). Hediyede yoksa türün süresi, o da yoksa Canlı
   ayarlar › Profil izleri süresi (24 saat). Pilotların ikisi de **24 saat**.
-- **Aynı anda tek iz:** Aynı tür yeniden gelirse süre baştan başlar. Başka bir tür gelirse eskisinin **yerine geçer**:
-  Kaka İzi olan birine Terlik Geldi! gelirse kaka gider, kırık cam kalır. Eski iz kayıtta "yerine geçti" (`replaced`)
-  diye durur.
+- **Aynı anda tek iz** (sahiplerin ikinci kararı, 20 Kasım 2026; ilk karardaki "başka tür yerine geçer" kalktı):
+  - **İz varken başka türden bir iz hediyesi izi değiştirmez.** Hediye **düz hediye** olarak gider: jeton düşer, elmas
+    alıcıya gider, iz yazılmaz, profildeki iz olduğu gibi kalır. Reddedilmez. Kaka İzi olan birine Terlik Geldi! gelirse
+    kaka kalır, kırık cam olmaz.
+  - Gönderen bunu okur. Yeni uygulama göndermeden önce söyler: "Ayşe, profilinde zaten bir iz var. Terlik Geldi! iz
+    bırakmaz, düz hediye olarak gider." Gönderildikten sonra sunucunun cümlesi: "Ayşe, profilinde zaten bir iz var;
+    Terlik Geldi! düz hediye olarak gitti."
+  - **Aynı tür yeniden gelirse iz yenilenir ama hiç kısalmaz.** Bitiş, kalan süreyle yeni hediyenin süresinden uzun
+    olanıdır. 24 saatlik Kaka İzi'ne 5 dakikalık ucuz bir aynı tür hediye gelirse iz yine 24 saat kalır. İz en son
+    gönderenin olur (kendi profilimde onun adı yazar).
+  - Neden: incelemede iki açık bulundu. 777 jetonluk 5 dakikalık aynı tür hediye 24 saatlik izi 5 dakikaya
+    indiriyordu, 500 jetonluk başka tür bir hediye (ör. Kar Topu) kakanın yerine geçip ucuz temizleyici oluyordu. İkisi
+    de kapandı, testi var.
 - **Kimler iz bırakabilir** (Ayarlar › Gizlilik › "Kimler profilime iz bırakabilir?"):
   - Herkes
   - **Yalnız takip ettiklerim** (varsayılan): kişinin kendisinin takip ettiği kişiler. Bu ayarı hiç seçmemiş herkes ve
@@ -81,8 +92,12 @@ panelden eklenir. Her türün alanları:
 | Ad | 1–24 harf: "Kırık Cam", "Kaka İzi" |
 | İz resmi | Fotoğrafın üstüne çizilen saydam resim (aşağıda). Boşsa uygulamanın kendi resmi (Kaka İzi ve Kırık Cam için var), o da yoksa hediyenin küçük resmi rozet olarak |
 | Süre | Hediyede süre yoksa bu (dakika, 5–10.080). Boşsa Canlı ayarlardaki süre |
-| Aynı iz yeniden gelince | **Süre yeniden başlar** (varsayılan) ya da **eskisi kalkar, yenisi konur**. İki seçenekte de profilde tek iz olur. Fark kayıtta ("süresi bitti" / "yerine geçti") ve odadaki "yeniden" sözünde |
+| Aynı iz yeniden gelince | İki seçenekte de profilde aynı şey olur: tek iz, en son göndereninki, **süresi kısalmaz**. Fark yalnız geçmiş kaydında: **"süresi bitti"** (`refresh`, varsayılan) ya da **"yerine geçti"** (`replace`) |
 | Açık / kapalı | Kapalı türün hediyeleri düz hediye olur, izleri görünmez. Bir türü anında durdurmanın yolu bu. Açınca süresi dolmamış izler geri gelir |
+
+**Bir resim, bir tür:** Başka bir türün kullandığı resim kaydedilmez ("Bu resim "Kaka İzi" türünde kullanılıyor; her
+tür için ayrı bir resim yükleyin"). Biri değişince öbürü de resimsiz kalırdı. Kayıt bir nedenle reddedilirse
+küçültülmüş kopya ve yüklenen dosya silinir.
 
 **Silme:** Yalnız hiçbir hediyenin kullanmadığı tür silinebilir. Kullanan varsa hangi hediyeler olduğu yazar. Satır
 silinmez, gizlenir; eski izler ve kayıtlar adını korur.
@@ -135,6 +150,9 @@ Uygulamanın Yönetim › Hediyeler sayfasında **"İz türlerini önizle"** dü
 - kişi kartı 78 px, profil 96 px,
 - açık ve koyu zeminde, düşüş ve temizlenme oynatılarak.
 
+Canlı sürümde ekranı yalnız yönetici hesabı açar; başkası "Bu ekran yönetim içindir" yazısını görür. Altta kendi
+fotoğrafım durur; başka bir fotoğraf yalnız uygulamanın sunucusundaki bir dosyaysa (`/api/media/f/…`) kullanılır.
+
 ## Hangi uygulama ne görür
 
 | | Eski APK (f9671d9 ve öncesi) | G7 APK (preview-191/192) | Yeni APK (1.1.0) |
@@ -143,15 +161,37 @@ Uygulamanın Yönetim › Hediyeler sayfasında **"İz türlerini önizle"** dü
 | İz kurallı hediyeler | **Hiçbiri rafta yok** (Kaka Şakası, Temizlik Suyu, Terlik Geldi!, Kar Topu, Domates At, panelin bütün iz hediyeleri) | Var (`marks=1`) | Var (`marks=2`) |
 | Süre | – | Saat; dakikalı süre yukarı yuvarlanmış yazılır (90 dk: "2 saat") | Dakika ("1 saat 30 dakika") |
 | İz resmi | Çizmez | Yalnız Kaka İzi kendi resmiyle; öteki türler hediyenin rozeti | Yüklenen resim, yoksa kendi resmi (Kaka İzi, Kırık Cam), yoksa rozet |
-| Tek iz kuralı | – | Sunucu uygular; oda görünüm paketiyle eski izi siler | Uygular |
+| Tek iz kuralı | – | Sunucu uygular | Uygular |
+| İz varken başka tür | – | Düz hediye gider; G7 bunu söylemez (iz değişmez) | Göndermeden önce ve sonra söyler |
 | Gizlilik | Seçenek yok, varsayılan geçer (yalnız takip ettikleri) | "Profilime iz bırakılmasın" anahtarı: kapalı = "Kimse", açınca varsayılan | Anahtar ve "Kimler profilime iz bırakabilir" |
 | Reddedilen gönderim | Türkçe hata cümlesi | Türkçe hata cümlesi; çoğu zaman göndermeden önce soluk | Göndermeden önce söyler; birden çok alıcıda ötekilere gider |
 
-- Eski APK'nın önbelleğindeki bir iz hediyesi gönderilirse sunucu yine kurala uyar: iz bırakır ya da reddeder.
+- Eski APK'nın önbelleğindeki bir iz hediyesi gönderilirse sunucu yine kurala uyar: iz bırakır, düz hediye yapar ya da
+  reddeder.
+- **G7 APK'nın içindeki eski cümleler (sunucu değiştiremez):** G7 kendi içine yazılmış üç cümleyi göstermeye devam eder.
+  Sunucu artık bunları yapmıyor:
+  - Gizlilik'teki "Profilime iz bırakılmasın" açıklaması: "…profilindeki iz de hemen gider." Artık gitmez: anahtar
+    yalnız yeni izi engeller.
+  - Kendi profilindeki iz notu: "İstemezsen Ayarlar › Gizlilik'ten kapatabilirsin." Kapatmak yeni izi engeller, olan iz
+    kalır.
+  - Hediye panelindeki ret: "X, profiline iz bırakılmasını kapattı." Bunu "Yalnız takip ettiklerim" yüzünden
+    reddedilen kişiler için de yazar (varsayılan bu olduğu için çoğu kişide görünür). Hediye yine gönderilmez (doğru),
+    jeton düşmez; yalnız nedeni yanlış yazılır. Sunucunun doğru cümlesi ("…yalnız takip ettiği kişilerin iz bırakmasına
+    izin veriyor…") G7'de yalnız soluk göstermeden denenen gönderimde görünür. G7'nin soluk göstermesini kaldırmak bu
+    cümleyi düzeltirdi ama birden çok alıcıya gönderimde G7 ilk ret alan kişide durur, ötekilere de gitmezdi. Bu
+    yüzden dokunulmadı.
+  - Çaresi: yeni APK dağıtılınca **Canlı ayarlar › Zorunlu sürüm `1.1.0`** (aşağıda).
+  - G7 iz varken başka tür bir iz hediyesini gönderince "gönderildi" der ama iz bırakmadığını söylemez.
 - Yeni APK eski bir sunucuyla da çalışır. Kataloğu `marks=1&marks=2` diye ister, eski sunucu ilkini okur. Uygulama
   o zaman G7 gibi davranır: tür yok, kendi resimleri ve rozet.
 - Zorunlu güncelleme: Canlı ayarlar › Zorunlu sürüm `1.1.0` yapılırsa eski APK'lar "Güncelleme gerekli" ekranında
   kalır. Bu sizin kararınız; açılmadıkça eski APK'lar çalışmaya devam eder.
+  - **Nereden kaydedilir:** Sunucu zorunlu sürümü yalnız o sürüm ya da daha yenisi olan bir uygulamadan kabul eder
+    (kendini kilitlememek için). Yani `1.1.0`'ı **1.1.0 APK'nın Yönetim › Canlı ayarlar** ekranından, yönetici
+    hesabıyla kaydedin. Uygulama kendi sürümünü gönderir.
+  - Finans paneli uygulama sürümü göndermez. Panelden kaydedilirse sunucu "Uygulama sürümün gelmedi; zorunlu sürümü
+    uygulamadan kaydet" der ve kaydetmez. G7 APK'dan (sürümü 1.1.0'dan eski) "Kendi uygulamandan (…) yeni bir sürümü
+    zorunlu yapamazsın" der.
 
 ## Canlı ayar
 
@@ -176,6 +216,8 @@ Yalnız jetonla gönderilen hediye (hediye paneli, profil, sohbet) iz bırakır 
     - yönetim izi kaldırır;
     - iz süreyle gider;
     - Canlı ayarla tür ya da bütün özellik kapanır.
+- **Ucuz temizleme (kapandı):** Ucuz bir hediyeyle pahalı izi kaldırmak ya da kısaltmak artık olmuyor: başka tür iz
+  varken düz hediye gider, aynı tür izi kısaltmaz.
 - **"Utancını parayla temizlet" görüntüsü:** Temizlemenin tek hızlı yolu başkasının para harcaması. Mağaza incelemesi
   bunu manipülatif bir ödeme düzeni gibi görebilir. Hiçbir ekranda "temizlemek için harca" yok, öyle kalmalı.
 - **Para:** Yeni bir akış yok. İki hediye de normal hediye: bire bir elmas, ajans komisyonu. Reddedilen gönderimde
@@ -197,10 +239,14 @@ Yalnız jetonla gönderilen hediye (hediye paneli, profil, sohbet) iz bırakır 
    - Eski kod `marks_from`'u bilmez: "Kimse" seçenler (`profile_marks` false) yine korunur, "Yalnız takip
      ettiklerim"dekiler herkese açık olur.
    - Eski kod gizlilik anahtarı kapatılınca izleri yine siler.
+   - Eski kodda bir kişide farklı türden birden çok iz olabilir, aynı tür yeniden gelince süre kısalabilir, engelle
+     yarışan bir iz kalabilir (bu daldan önceki hâl).
 3. **Uygulama:** Yeni APK geri çekilmez.
    - Eski APK'lar bozulmadan çalışır: her şey ek alan ve yeni bayrak.
-   - Yeni APK eski sunucuyla da çalışır, G7 gibi davranır. Yalnız "Kimler profilime iz bırakabilir" seçimi eski
-     sunucuda kaydedilemez ("Ayar kaydedilemedi").
+   - Yeni APK eski sunucuyla da çalışır, G7 gibi davranır. Gizlilik'teki anahtar da çalışır: eski sunucu seçimi
+     bilmediği için uygulama anahtarın kendisini gönderir (açık: kimse, kapalı: herkes). "Kimler profilime iz
+     bırakabilir"de "Yalnız takip ettiklerim" eski sunucuda olmadığı için kayıttan sonra "Herkes" görünür; "Kimse"
+     ve "Herkes" kaydedilir.
 4. **Panel:** Panel PR'ı geri alınır. Uygulamanın uçları kalır, zararsız.
 5. **Veri:** `profile_marks` ve `mark_kinds` satırları kalır (geçmiş ve veri kopyası için). Silinecek bir şey yok.
 
@@ -212,15 +258,26 @@ Yalnız jetonla gönderilen hediye (hediye paneli, profil, sohbet) iz bırakır 
   - `profile-mark-rules.mjs`: saf kurallar, süre cümlesi, resim kuralları.
   - `privacy.mjs`: `marksFrom`.
   - Migration `101_profile_marks.sql` ve `105_mark_kinds.sql`.
-- **Gönderimdeki sıra:** iki kişinin satırı kilitlenir → ref alınır → hediye satırı yazılır → "kimler iz bırakabilir"
-  denetlenir (ret: 403, işlem geri alınır, hiçbir şey hareket etmez) → gösterilen iz kapatılır ya da süresi bitirilir →
-  yeni iz yazılır → jeton ve elmas. Aynı istek tekrarlanırsa iz yeniden yazılmaz. Tekrarın cevabı izi yine söyler.
-  Aynı anda gelen temizlik ve yeni iz sırayla işlenir, sonuç tutarlıdır (test edildi).
+- **Gönderimdeki sıra:** iki kişinin satırı kilitlenir → ref alınır → **engel denetlenir** (ret: 403 "Bu kişiye hediye
+  gönderemezsin") → hediye satırı yazılır → "kimler iz bırakabilir" denetlenir (ret: 403, işlem geri alınır, hiçbir
+  şey hareket etmez) → başka tür iz görünüyorsa iz yazılmaz (cevapta `mark: null` ve `markNote`) → aynı tür
+  görünüyorsa yeni iz onun bitişinden önce bitmez, eskisinin süresi biter (ya da `replace` türde "yerine geçti") → yeni
+  iz yazılır → jeton ve elmas. Aynı istek tekrarlanırsa iz yeniden yazılmaz. Tekrarın cevabı izi yine söyler
+  (düz hediyeye dönen gönderimin tekrarında not yok). Aynı anda gelen temizlik ve yeni iz sırayla işlenir, sonuç
+  tutarlıdır (test edildi).
+- **Engel yarışı (kapandı):** Engel, ref alındıktan sonra iki kişinin kilidi altında okunur. Engellemeden hemen önce
+  yola çıkmış bir iz ya reddedilir ya da engel onu hemen ardından kaldırır (engelin iz kaldırması bu kilitleri bekler).
+  Önceden engel kilitlerden önce okunuyordu ve yoldaki iz engelden sonra 24 saat kalabiliyordu (incelemede bulundu;
+  düzeltmesiz test 20 turda iz bıraktı, düzeltmeyle 0). Engelden önce gitmiş bir gönderimin tekrarı reddedilmez,
+  tekrarını alır.
+- **Gizlilik değişince oda duyar:** "Kimler iz bırakabilir" değişince kişinin görünümü bulunduğu odalara gider
+  (`marksFrom`, "Kimse"de `noMarks`).
 - **Okuma:**
   - `GET /api/user` `marks`.
   - `GET /api/looks` `marks`, `marksFrom` ve okuyana göre `noMarks`. Odanın görünüm paketi herkese gittiği için
     `noMarks`'ı yalnız "Kimse"de taşır.
-  - Odanın hediye paketi `mark` (`minutes`, `replaced`).
+  - Odanın hediye paketi `mark` (`minutes`: şimdiden itibaren kalacağı süre, `again`). Gönderimin cevabında iz yazılmadıysa
+    `mark: null` ve `markNote`.
   - Katalog `marks=2`: `marks.kinds`, `minutes`, `serverNow`.
 - **Saat:** Telefon izin bitişini sunucunun saatiyle sayar (`lib/sanction-time` `serverNow`). Saati yanlış telefonda
   da kısa bir iz doğru anda gider. Sunucu biten izi okumalarda göstermez.
@@ -230,9 +287,12 @@ Yalnız jetonla gönderilen hediye (hediye paneli, profil, sohbet) iz bırakır 
   - `components/profile-mark.tsx`: çizim, düşüş, su ve parıltı.
   - `app/iz-onizleme.tsx`: önizleme ekranı.
 - **Testler:**
-  - Sunucu: `server/api/test/muzip.test.mjs` (türler, resim denetimi, katalog bayrakları, dakika, tek iz, kimler iz
-    bırakabilir, birden çok alıcı, tekrar, yarış, kodsuz üçüncü çift, pilot), `profile-marks.test.mjs`,
-    `money-fuzz.test.mjs` (iki tür, takip ve gizlilik yarışları).
+  - Sunucu: `server/api/test/muzip.test.mjs` (türler, resim denetimi ve Türkçe ekleri, bir resim bir tür, katalog
+    bayrakları, dakika, tek iz, iz varken başka tür, hiç kısalmayan yenileme, ucuz temizleme yok, kimler iz
+    bırakabilir, gizlilik değişince oda, birden çok alıcı, tekrar, yarış, engel yarışı, kodsuz üçüncü çift, pilot),
+    `profile-marks.test.mjs`, `money-fuzz.test.mjs` (iki tür, takip, gizlilik ve engel yarışları; sonunda herkeste en
+    çok bir iz ve engellenenin izi yok).
+  - Panel: `tests/panel-forms.test.ts` iz resmi cümlelerini uygulamanınkiyle harfi harfine karşılaştırır.
   - Uygulama: `app/tests/profile-marks.test.ts`, `server-catalog.test.ts`.
 - **Veri kopyası** (`GET /api/me/export`):
   - `profileMarks`: üstüme bırakılan ve benim bıraktığım izler, nasıl kalktıkları.

@@ -1,8 +1,9 @@
 // Muzip hediyeler (docs/PROFIL_IZLERI.md, the owners' decisions of 20 Nov 2026): the kinds of profile mark as data
-// (mark-kinds.mjs: CRUD, audit, the overlay's pixel check), minutes, one mark at a time (the same kind starts its time
-// again, another kind takes its place), "Kimler profilime iz bırakabilir" (everyone, the people I follow — the
-// default —, nobody) checked before any coin moves, the switch that keeps the marks showing, sends to many, retries,
-// a clean racing a new mark, the catalog for each app (none, marks=1, marks=2), and a third pair (Çamur Bombası →
+// (mark-kinds.mjs: CRUD, audit, the overlay's pixel check, one overlay per kind), minutes, one mark at a time (while one
+// shows, another kind's gift is a plain gift and says so; the same kind is the newest sender's and never ends sooner),
+// "Kimler profilime iz bırakabilir" (everyone, the people I follow — the default —, nobody) checked before any coin
+// moves, the switch that keeps the marks showing and tells the room, sends to many, retries, a clean racing a new mark,
+// a block racing marks in flight, the catalog for each app (none, marks=1, marks=2), and a third pair (Çamur Bombası →
 // Köpük Banyosu) made through the admin routes alone.
 import { after, before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -157,13 +158,13 @@ describe('Muzip hediyeler', () => {
     await ok(adminPost('/api/admin/mark-kinds', { kind: 'resim-deneme', name: 'Resim Deneme' }), 'tür');
     const set = (url) => adminPost('/api/admin/mark-kinds/update', { kind: 'resim-deneme', art: url });
     // A square opaque everywhere (an alpha channel that says nothing is transparent).
-    await refused(set(await art(rgbaPng(512, 512, () => 255))), 400, /en az %30'i tam saydam \(alfa 0\) olmalı, bunda %0/);
+    await refused(set(await art(rgbaPng(512, 512, () => 255))), 400, /^İz resminin en az %30'u tam saydam \(alfa 0\) olmalı, bunda %0:/);
     // Faintly visible all over: not alpha 0.
     await refused(set(await art(rgbaPng(512, 512, () => 3))), 400, /tam saydam/);
     // No alpha channel at all.
     await refused(set(await art(rgbaPng(512, 512, () => 255, { alpha: false }))), 400, /saydamlık yok/);
     // The face covered: a disc in the middle, the edge transparent.
-    await refused(set(await art(rgbaPng(512, 512, (x, y) => (Math.hypot(x - 255.5, y - 255.5) < 170 ? 255 : 0)))), 400, /yüzü kapatıyor/);
+    await refused(set(await art(rgbaPng(512, 512, (x, y) => (Math.hypot(x - 255.5, y - 255.5) < 170 ? 255 : 0)))), 400, /yüzü kapatıyor: ortadaki dairenin en çok %20'si dolu olabilir, bunda %\d+\./);
     // Moving (an animated PNG's header).
     await refused(set(await art(rgbaPng(512, 512, ringAlpha(512), { apng: true }))), 400, /hareketsiz/);
     // Not square, too small, too big.
@@ -193,9 +194,25 @@ describe('Muzip hediyeler', () => {
     assert.equal(cat.marks.kinds['resim-deneme'].art.v, r.kind.art.v);
     assert.equal(cat.marks.kinds['resim-deneme'].art.px, 512);
     assert.match(cat.marks.kinds['resim-deneme'].art.url, /\/api\/media\/f\/markart\//, 'telefon dosyayı bu sunucudan alır');
+    // One kind's overlay can't be another's (taking it off one would take it off both): the copy, nor the upload.
+    await refused(adminPost('/api/admin/mark-kinds', { kind: 'resim-iki', name: 'Resim İki', art: r.kind.art.url }), 400, /^Bu resim "Resim Deneme" türünde kullanılıyor/);
+    // A save that fails after the picture was made smaller (the kind exists; no such kind): the upload and its copy go.
+    const stored = () => [...bucket.stored.keys()].filter((k) => k.startsWith('markart/'));
+    for (const [what, body] of [
+      ['zaten var', (url) => adminPost('/api/admin/mark-kinds', { kind: 'resim-deneme', name: 'Yeniden', art: url })],
+      ['tür yok', (url) => adminPost('/api/admin/mark-kinds/update', { kind: 'yok-boyle', art: url })],
+    ]) {
+      const upload = await art(rgbaPng(1024, 1024, ringAlpha(1024)));
+      const had = new Set(stored());
+      const [st] = await body(upload);
+      assert.ok(st === 409 || st === 404, `${what}: ${st}`);
+      const key = upload.slice(upload.indexOf('markart/'));
+      assert.ok(await until(() => !bucket.stored.has(key) && stored().every((k) => had.has(k))), `${what}: yüklenen ve küçültülen kopya silindi`);
+    }
     // A 512 px one is kept as uploaded; taking it off goes back to the app's own (here: none, the badge).
     const small = await art(rgbaPng(512, 512, ringAlpha(512)));
     assert.equal((await ok(set(small), '512')).kind.art.url, small);
+    await refused(adminPost('/api/admin/mark-kinds', { kind: 'resim-iki', name: 'Resim İki', art: small }), 400, /türünde kullanılıyor/);
     assert.equal((await ok(set(null), 'resim kalkar')).kind.art, null);
     assert.equal((await catalog('?gifts=2&marks=2')).marks.kinds['resim-deneme'].art, undefined);
     await ok(adminPost('/api/admin/mark-kinds/delete', { kind: 'resim-deneme' }), 'sil');
@@ -278,54 +295,131 @@ describe('Muzip hediyeler', () => {
     assert.equal((await privacy(r, { profileMarks: true })).privacy.marksFrom, 'following');
     await privacy(r, { marksFrom: 'everyone' });
     assert.equal((await privacy(r, { profileMarks: true })).privacy.marksFrom, 'everyone', 'açıkken açmak seçimi bozmaz');
-    // In a room, a look packet (heard by everyone) says noMarks only for nobody.
+    // A row whose two columns disagree (written by hand, or by a server before 105) reads as the rule that applies.
+    await q("UPDATE privacy_settings SET profile_marks = true, marks_from = 'nobody' WHERE user_id = $1", [r.user.id]);
+    let read = (await ok(call('GET', '/api/me/privacy', null, r.session), 'gizlilik')).privacy;
+    assert.deepEqual([read.marksFrom, read.profileMarks], ['nobody', false]);
+    await q("UPDATE privacy_settings SET profile_marks = false, marks_from = 'everyone' WHERE user_id = $1", [r.user.id]);
+    read = (await ok(call('GET', '/api/me/privacy', null, r.session), 'gizlilik')).privacy;
+    assert.deepEqual([read.marksFrom, read.profileMarks], ['nobody', false]);
+    assert.equal((await look(ali, r)).marksFrom, 'nobody');
+    // In a room: a change of who may mark them reaches it as their look (heard by everyone: noMarks only for nobody);
+    // the same choice again, or another setting, sends nothing.
+    const roomId = crypto.randomUUID();
+    await q("INSERT INTO room_presence (room, identity, sid) VALUES ($1, $2, 'PA_muzip_p')", [`oda-${roomId}`, r.user.id]);
+    const theirs = (from) => packets(from, 'look').filter((x) => x.user === r.user.id);
+    let from = lkCalls.length;
     await privacy(r, { marksFrom: 'following' });
+    assert.ok(await until(() => theirs(from).length > 0), 'görünüm paketi');
+    assert.deepEqual([theirs(from).at(-1).look.marksFrom, theirs(from).at(-1).look.noMarks], ['following', undefined]);
+    assert.equal(theirs(from).at(-1).room, `oda-${roomId}`);
+    from = lkCalls.length;
+    await privacy(r, { marksFrom: 'nobody' });
+    assert.ok(await until(() => theirs(from).length > 0), 'kimse');
+    assert.deepEqual([theirs(from).at(-1).look.marksFrom, theirs(from).at(-1).look.noMarks], ['nobody', true]);
+    from = lkCalls.length;
+    await privacy(r, { profileMarks: false });
+    await privacy(r, { showOnline: true });
+    await sleep(300);
+    assert.equal(theirs(from).length, 0, 'değişmeyen seçim duyurulmaz');
+    await privacy(r, { profileMarks: true });
+    assert.ok(await until(() => theirs(from).length > 0), 'eski anahtar');
+    assert.equal(theirs(from).at(-1).look.marksFrom, 'following');
+    await q('DELETE FROM room_presence WHERE identity = $1', [r.user.id]);
     await wipe(r);
   });
 
-  test('tek iz: aynı tür süreyi yeniler; başka tür yerine geçer (replaced) ve odaya duyurulur; replace politikası', async () => {
+  test('tek iz: iz varken başka türün hediyesi düz gider (iz değişmez, not söyler); aynı tür yeniler, hiç kısaltmaz; replace yalnız kaydı değiştirir', async () => {
     const t = await target('Tek İz');
     const roomId = crypto.randomUUID();
     await q("INSERT INTO room_presence (room, identity, sid) VALUES ($1, $2, 'PA_muzip')", [`oda-${roomId}`, t.user.id]);
     const first = await ok(kaka(ali, t), 'kaka');
-    assert.equal(first.mark.replaced, undefined);
+    assert.equal(first.markNote, undefined);
+    // Another kind while Kaka İzi shows: a plain gift (coins and diamonds move, no mark row), the mark as it was.
     let from = lkCalls.length;
+    const before = await balances(deniz, t);
     const glass = await ok(terlik(deniz, t, { room: roomId }), 'terlik');
-    assert.equal(glass.mark.kind, 'kirik-cam');
-    assert.deepEqual(glass.mark.replaced, ['kaka']);
-    assert.equal(glass.mark.again, false);
+    assert.equal(glass.mark, null, 'iz bırakmadı');
+    assert.equal(glass.markNote, 'Tek İz, profilinde zaten bir iz var; Terlik Geldi! düz hediye olarak gitti.');
+    assert.equal(glass.total, 1299);
+    const after = await balances(deniz, t);
+    assert.deepEqual([after[deniz.user.id][0], after[t.user.id][1]], [before[deniz.user.id][0] - 1299, before[t.user.id][1] + 1299], 'düz hediye gibi ödendi');
     const rows = await q('SELECT * FROM profile_marks WHERE user_id = $1 ORDER BY id', [t.user.id]);
-    assert.deepEqual(rows.map((m) => [m.kind, m.cleared_how]), [['kaka', 'replaced'], ['kirik-cam', null]]);
-    assert.equal(rows[0].cleared_by, deniz.user.id);
-    assert.ok(rows[0].clear_event_id);
-    assert.equal((await showing(t)).length, 1, 'tek iz');
-    assert.deepEqual((await profileMarks(can, t)).map((m) => m.kind), ['kirik-cam']);
-    // The room: the gift packet with the mark, and the look (an app before one mark at a time keeps the old one else).
-    // The first Kaka's look (sent from a profile) may still be on its way: the last look says the glass alone.
-    const glassLook = () => packets(from, 'look').some((p) => p.look.marks.some((m) => m.kind === 'kirik-cam'));
-    assert.ok(await until(() => packets(from, 'gift').length > 0 && glassLook()), 'paketler');
-    assert.deepEqual(packets(from, 'gift')[0].mark, glass.mark);
-    assert.deepEqual(packets(from, 'look').at(-1).look.marks.map((m) => m.kind), ['kirik-cam']);
-    // Kaka İzi's cleaner on Kırık Cam: a plain gift, the glass stays.
-    assert.equal((await ok(su(can, t), 'su')).mark, undefined);
+    assert.deepEqual(rows.map((m) => [m.kind, m.cleared_how, m.expires_at.toISOString()]), [['kaka', null, first.mark.until]], 'iz aynen kaldı');
+    assert.deepEqual((await profileMarks(can, t)).map((m) => [m.kind, m.until]), [['kaka', first.mark.until]]);
+    // The room: a plain gift's packet (no mark), and no look (nothing changed on the photo).
+    assert.ok(await until(() => packets(from, 'gift').length > 0), 'hediye paketi');
+    assert.equal(packets(from, 'gift')[0].mark, undefined);
+    // The same from a profile, and a retry of it: a plain gift's replay (no mark, nothing written twice).
+    const ref = `mz-kept-${rnd()}`;
+    const once = await ok(terlik(deniz, t, { ref, place: 'profile' }), 'profilden terlik');
+    assert.deepEqual([once.mark, typeof once.markNote], [null, 'string']);
+    const again = await ok(terlik(deniz, t, { ref, place: 'profile' }), 'tekrar');
+    assert.deepEqual([again.replay, again.mark, again.markNote], [true, undefined, undefined]);
     assert.equal((await showing(t)).length, 1);
-    // The same kind again: its time starts again (refresh), the newest sender's.
+    // Kaka İzi's cleaner still cleans it; on the clean photo the glass lands.
+    assert.equal((await ok(su(can, t), 'su')).mark.role, 'clean');
+    const landed = await ok(terlik(deniz, t), 'temiz profile terlik');
+    assert.deepEqual([landed.mark.kind, landed.mark.again, landed.markNote], ['kirik-cam', false, undefined]);
+    // Kaka İzi's cleaner on Kırık Cam: a plain gift, the glass stays (no note: it leaves no mark).
+    const water = await ok(su(can, t), 'camda su');
+    assert.deepEqual([water.mark, water.markNote], [undefined, undefined]);
+    assert.equal((await showing(t)).length, 1);
+    // The same kind again with less time left: its time starts again (refresh), the newest sender's.
     await q("UPDATE profile_marks SET expires_at = now() + interval '1 hour' WHERE user_id = $1 AND cleared_at IS NULL", [t.user.id]);
-    const again = await ok(terlik(ali, t), 'ikinci terlik');
-    assert.equal(again.mark.again, true);
-    assert.equal(again.mark.replaced, undefined);
+    const longer = await ok(terlik(ali, t), 'ikinci terlik');
+    assert.deepEqual([longer.mark.again, longer.mark.minutes], [true, 1440]);
     assert.equal((await showing(t)).length, 1);
+    assert.equal((await showing(t))[0].from_user, ali.user.id);
     assert.ok(Date.parse((await profileMarks(t, t))[0].until) - Date.now() > 23.9 * 3_600_000, 'süre yeniden 24 saat');
-    // stack replace: the old one set aside as 'replaced', the new one lands as new.
+    // With more time left than the gift gives: the end stays (never shorter); the answer says the time it shows.
+    await q("UPDATE profile_marks SET expires_at = now() + interval '30 hours' WHERE user_id = $1 AND cleared_at IS NULL", [t.user.id]);
+    const end = (await showing(t))[0].expires_at.toISOString();
+    const shorter = await ok(terlik(can, t), 'üçüncü terlik');
+    assert.equal(shorter.mark.until, end, 'bitiş kısalmadı');
+    assert.deepEqual([shorter.mark.again, shorter.mark.minutes, shorter.mark.hours], [true, 1800, 30]);
+    assert.deepEqual((await showing(t)).map((m) => [m.from_user, m.expires_at.toISOString()]), [[can.user.id, end]], 'en yeni gönderenin, aynı bitişle');
+    // stack replace: the same on the photo; only the record differs (the old one set aside as 'replaced').
     await ok(adminPost('/api/admin/mark-kinds/update', { kind: 'kirik-cam', stack: 'replace' }), 'replace');
     await sleep(300);
-    const third = await ok(terlik(can, t), 'üçüncü terlik');
-    assert.equal(third.mark.again, false);
-    const last = await q('SELECT kind, cleared_how FROM profile_marks WHERE user_id = $1 ORDER BY id DESC LIMIT 2', [t.user.id]);
-    assert.deepEqual(last.map((m) => m.cleared_how), [null, 'replaced']);
+    const fourth = await ok(terlik(deniz, t), 'dördüncü terlik');
+    assert.deepEqual([fourth.mark.again, fourth.mark.until], [true, end]);
+    const last = await q('SELECT kind, cleared_how, cleared_by FROM profile_marks WHERE user_id = $1 ORDER BY id DESC LIMIT 2', [t.user.id]);
+    assert.deepEqual(last.map((m) => [m.cleared_how, m.cleared_by]), [[null, null], ['replaced', deniz.user.id]]);
+    assert.equal((await showing(t)).length, 1);
     await ok(adminPost('/api/admin/mark-kinds/update', { kind: 'kirik-cam', stack: 'refresh' }), 'refresh');
+    // Nothing set a mark aside for another kind: each 'replaced' row's place went to a mark of its own kind.
+    assert.deepEqual(await q("SELECT m.id FROM profile_marks m WHERE m.cleared_how = 'replaced' AND NOT EXISTS (SELECT 1 FROM profile_marks n WHERE n.gift_event_id = m.clear_event_id AND n.kind = m.kind)"), []);
     await q('DELETE FROM room_presence WHERE identity = $1', [t.user.id]);
     await sleep(300);
+  });
+
+  test('ucuz temizleme yok (inceleme): aynı türün kısa süreli ucuz hediyesi izi kısaltmaz, başka türün ucuz hediyesi izi kaldırmaz', async () => {
+    // As staff may set up: a cheap gift of another kind with 5 minutes (Su Kovası, 500), and a cheap one of the same kind
+    // with 5 minutes (Pasta At, 777), both cheaper than Temizlik Suyu (1.999).
+    await ok(adminPost('/api/admin/mark-kinds', { kind: 'kar-ucuz', name: 'Kar' }), 'tür');
+    await ok(adminPost('/api/admin/gifts/update', { id: 'p5', enabled: true, mark: { role: 'leave', kind: 'kar-ucuz', minutes: 5 } }), 'p5');
+    await ok(adminPost('/api/admin/gifts/update', { id: 'p6', enabled: true, mark: { role: 'leave', kind: 'kaka', minutes: 5 } }), 'p6');
+    await sleep(300);
+    const cat = await catalog('?gifts=2&marks=1&marks=2');
+    const price = (id) => cat.gifts.find((g) => g.id === id).price;
+    assert.deepEqual([price('k1'), price('k2'), price('p5'), price('p6')], [999, 1999, 500, 777]);
+    const t = await target('Ucuz Temizlik');
+    const k = await ok(kaka(ali, t), 'kaka');
+    // Su Kovası (another kind) while Kaka İzi shows: a plain gift, Kaka İzi keeps its 24 hours.
+    const other = await ok(send(deniz, t, 'p5', 500), 'başka tür');
+    assert.equal(other.mark, null);
+    assert.match(other.markNote, /^Ucuz Temizlik, profilinde zaten bir iz var; Su Kovası düz hediye olarak gitti\.$/);
+    assert.deepEqual((await profileMarks(can, t)).map((m) => [m.kind, m.until]), [['kaka', k.mark.until]], 'kaka 24 saat kalır');
+    // Pasta At (the same kind, 5 minutes) on 24 hours of Kaka İzi: the newest sender's, the same end.
+    const same = await ok(send(deniz, t, 'p6', 777), 'aynı tür, 5 dakika');
+    assert.deepEqual([same.mark.kind, same.mark.again, same.mark.until], ['kaka', true, k.mark.until]);
+    assert.ok(same.mark.minutes > 23 * 60, `kısalmadı (${same.mark.minutes} dakika)`);
+    const left = (Date.parse((await profileMarks(t, t))[0].until) - Date.now()) / 3_600_000;
+    assert.ok(left > 23.9, `hâlâ 24 saat (${left})`);
+    for (const id of ['p5', 'p6']) await ok(adminPost('/api/admin/gifts/reset', { id }), 'geri al');
+    await sleep(300);
+    await wipe(t);
   });
 
   test('birden çok alıcı: her biri ayrı ödenir ve ayrı iz alır; izi kabul etmeyen yalnız kendisi reddedilir', async () => {
@@ -438,8 +532,41 @@ describe('Muzip hediyeler', () => {
   test('engel: engellenen kişi iz bırakamaz, bıraktığı iz kalkar (bugünkü gibi)', async () => {
     const t = await target('Engelleyen');
     await ok(kaka(ali, t), 'kaka');
+    const ref = `mz-before-block-${rnd()}`;
+    await ok(su(deniz, t, { ref }), 'engelden önce');
+    await ok(kaka(ali, t), 'yeniden kaka');
     await ok(call('POST', '/api/block', { to: ali.user.id }, t.session), 'engelle');
     assert.deepEqual(await profileMarks(t, t), [], 'engelleyince bıraktığı iz kalkar');
     await refused(kaka(ali, t), 403, /hediye gönderemezsin/);
+    // Either way: the blocker can't send the blocked person one either.
+    await refused(call('POST', '/api/gifts/send', { to: ali.user.id, giftId: 'g6', count: 1, ref: `mz-${rnd()}` }, t.session), 403, /hediye gönderemezsin/);
+    // A retry of a gift that went through before a block (here: Deniz blocked now) gets its replay, not a refusal.
+    await ok(call('POST', '/api/block', { to: deniz.user.id }, t.session), 'denizi engelle');
+    const replay = await ok(su(deniz, t, { ref }), 'engelden önceki isteğin tekrarı');
+    assert.equal(replay.replay, true);
+    for (const who of [ali, deniz]) await ok(call('POST', '/api/block', { to: who.user.id, block: false }, t.session), 'engeli kaldır');
+  });
+
+  test('engel yarışı: yoldaki iz hediyeleri engelden sonra iz bırakmaz (inceleme)', async () => {
+    // Marks on their way while the receiver blocks their sender: each is refused, or taken off by the block right after
+    // (gifts.mjs reads the block under both people's locks; social.mjs clearMarks waits for them).
+    const harasser = await h.signUp('Yarış Atan');
+    await h.credit(harasser.user.id, 2_000_000);
+    let leaked = 0;
+    let refusedAfter = 0;
+    const rounds = 20;
+    for (let round = 0; round < rounds; round++) {
+      const victim = await target(`Yarış Hedef ${round}`);
+      const sends = Array.from({ length: 10 }, () => kaka(harasser, victim));
+      await sleep(2 + (round % 5));
+      await ok(call('POST', '/api/block', { to: harasser.user.id }, victim.session), 'engelle');
+      const out = await Promise.all(sends);
+      assert.ok(out.every(([st]) => st === 200 || st === 403), JSON.stringify(out.map(([st, j]) => [st, j.error])));
+      refusedAfter += out.filter(([st]) => st === 403).length;
+      const left = await q('SELECT id FROM profile_marks WHERE user_id = $1 AND from_user = $2 AND cleared_at IS NULL AND expires_at > now()', [victim.user.id, harasser.user.id]);
+      if (left.length) leaked++;
+    }
+    assert.equal(leaked, 0, `${rounds} turda engelden sonra kalan iz`);
+    assert.ok(refusedAfter > 0, 'bazı gönderimler engelden sonra reddedildi');
   });
 });

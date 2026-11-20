@@ -5,8 +5,9 @@
 // owners' rules (20 Nov 2026, docs/PROFIL_IZLERI.md):
 //   - a mark stays its gift's minutes (else its kind's, else Canlı ayarlar › Profil izleri hours: 24) or until someone
 //     sends a gift that cleans its kind;
-//   - one mark at a time: the same kind again starts its time again (kind stack 'refresh'; 'replace': the old one is
-//     set aside), another kind takes the place of the one showing (cleared_how 'replaced');
+//   - one mark at a time: while one shows, a gift that leaves another kind is a plain gift (the mark stays; the
+//     send's answer says so); the same kind again is the newest sender's mark and never ends sooner than the one
+//     showing (kind stack 'refresh': the old row expires; 'replace': it is set aside as 'replaced', the record alone);
 //   - who may leave one is the receiver's Gizlilik choice (privacy.mjs marksFrom: everyone, the people they follow —
 //     the default, also for whoever never chose —, nobody; "Profilime iz bırakılmasın" is nobody): anyone else is
 //     refused before any coin moves (403 marks_off / marks_following), each receiver of a send to many on their own;
@@ -24,14 +25,15 @@
 // `marks`, a block takes the blocked person's marks off, account deletion), privacy.mjs (marksFrom, profileMarks),
 // my-data.mjs (marksDataOf), live-registry.mjs (mark_hours; 0 turns the feature off: the gifts are plain gifts and no
 // mark shows), mark-kinds.mjs (a kind turned off does the same for its gifts and marks).
-// A mark that changed outside a room's gift packet (a gift sent from a profile or a chat, a mark another kind
-// replaced, a clean by staff, a block) reaches the rooms the person is in as their look (economy.mjs announceLook).
+// A mark that changed outside a room's gift packet (a gift sent from a profile or a chat, a clean by staff, a block, a
+// Gizlilik choice that changes who may mark them) reaches the rooms the person is in as their look (economy.mjs
+// announceLook).
 import { HttpError, auth, clientIp, db, readJson, tx, userId } from './core.mjs';
 import { allGifts, giftEmojiOf, giftNameOf } from './custom-gifts.mjs';
 import { live } from './live-settings.mjs';
 import { kindsCatalog, markKindOf, markKindOn } from './mark-kinds.mjs';
 import { panelDetail } from './panel.mjs';
-import { KIND, MARK_GIFTS, MARK_ROLES, hoursFor, markNotice, marksAllow, marksRuleOf } from './profile-mark-rules.mjs';
+import { KIND, MARK_GIFTS, MARK_ROLES, hoursFor, keptNote, markNotice, marksAllow, marksRuleOf } from './profile-mark-rules.mjs';
 
 /** Profil izleri run (Canlı ayarlar › Profil izleri › süre above 0). */
 export const marksOn = (s = live()) => Number(s.markHours) > 0;
@@ -73,11 +75,17 @@ function marksRefusal(rule, name, gift) {
  * Inside a gift's transaction (gifts.mjs), after both people's users rows are locked (send-locks.mjs), the ref is
  * claimed and the gift's row is written (`eventId`), before any coin moves: what `gift` does to `to`'s profile.
  * A gift that leaves a mark on someone whose Gizlilik doesn't let this sender (nobody, or only the people they follow
- * and they don't follow `from`) is refused here (403: the transaction rolls back, nothing moved). Each row is written
- * once, and `to` has one mark showing at most: a leave of the kind showing ends it (refresh: it expires now; replace:
- * set aside), one of another kind sets that one aside ('replaced'), then its own row starts. A clean takes the kind's
- * showing mark off (none: a plain gift). Null when nothing changed; else what the room's packet and the answer carry
- * (`hours` rounded up for an app before minutes; `replaced`: the kinds it took the place of).
+ * and they don't follow `from`) is refused here (403: the transaction rolls back, nothing moved). `to` has one mark
+ * showing at most (the owners' decisions, 20 Nov 2026):
+ *   - a mark of another kind showing: nothing changes, the gift is a plain gift ({ role: 'kept', note }: the send's
+ *     answer says so; never a refusal, so a cheap gift of another kind can't clean a dear one off either);
+ *   - the same kind showing: the newest sender's mark takes its place and never ends sooner than the one showing did
+ *     (the later of its end and now + this gift's minutes, so a short gift can't cut a long one); the one before
+ *     expires now (kind stack 'refresh') or is set aside as 'replaced' (stack 'replace': only the record differs);
+ *   - none: its own row, now + its minutes.
+ * Each row is written once. A clean takes the kind's showing mark off (none: a plain gift). Null when nothing changed;
+ * else what the room's packet and the answer carry (`minutes`: how long it shows from now, `hours` rounded up for an
+ * app before minutes; `again`: the same kind was showing).
  */
 export async function markGift(c, { gift, from, to, eventId, s = live() }) {
   const rule = gift.mark;
@@ -93,32 +101,34 @@ export async function markGift(c, { gift, from, to, eventId, s = live() }) {
     const allowed = marksRuleOf(who?.profile_marks ?? true, who?.marks_from);
     if (!marksAllow(allowed, who?.follows_sender === true)) throw marksRefusal(allowed, who?.name, gift);
     const minutes = markMinutesOf(rule, s);
-    // Their users row is locked (the gift's): nothing else writes their marks meanwhile.
-    const showing = (await c.query('SELECT id, kind FROM profile_marks WHERE user_id = $1 AND cleared_at IS NULL AND expires_at > now() ORDER BY id', [to])).rows;
+    // Their users row is locked (the gift's): nothing else writes their marks meanwhile. A kind turned off doesn't
+    // show, so it doesn't count as the one showing.
+    const showing = (await c.query('SELECT id, kind FROM profile_marks WHERE user_id = $1 AND cleared_at IS NULL AND expires_at > now() ORDER BY id', [to])).rows.filter((m) => markKindOn(m.kind));
     const same = showing.filter((m) => m.kind === rule.kind).map((m) => m.id);
-    const other = showing.filter((m) => m.kind !== rule.kind);
-    const refresh = (markKindOf(rule.kind)?.stack ?? 'refresh') === 'refresh';
-    const aside = [...other.map((m) => m.id), ...(refresh ? [] : same)];
-    if (refresh && same.length) await c.query('UPDATE profile_marks SET expires_at = now() WHERE id = ANY($1::bigint[])', [same]);
-    if (aside.length) {
-      await c.query("UPDATE profile_marks SET cleared_at = now(), cleared_by = $2, clear_event_id = $3, cleared_how = 'replaced' WHERE id = ANY($1::bigint[])", [aside, from, eventId]);
-    }
+    if (!same.length && showing.length) return { role: 'kept', kind: showing[0].kind, note: keptNote(who?.name, gift.name) };
+    // The new row first, its end read from the one(s) showing in the same statement (never shorter), then those end.
     const r = await c.query(
-      'INSERT INTO profile_marks (user_id, from_user, kind, gift_id, gift_event_id, expires_at) VALUES ($1, $2, $3, $4, $5, now() + make_interval(mins => $6)) RETURNING expires_at',
-      [to, from, rule.kind, gift.id, eventId, minutes],
+      `INSERT INTO profile_marks (user_id, from_user, kind, gift_id, gift_event_id, expires_at)
+       SELECT $1, $2, $3, $4, $5, GREATEST(now() + make_interval(mins => $6), coalesce((SELECT max(expires_at) FROM profile_marks WHERE id = ANY($7::bigint[])), '-infinity'))
+       RETURNING expires_at, round(extract(epoch FROM expires_at - now()) / 60)::int AS left_min`,
+      [to, from, rule.kind, gift.id, eventId, minutes, same],
     );
-    const replaced = [...new Set(other.map((m) => m.kind))];
+    if (same.length) {
+      const refresh = (markKindOf(rule.kind)?.stack ?? 'refresh') === 'refresh';
+      if (refresh) await c.query('UPDATE profile_marks SET expires_at = now() WHERE id = ANY($1::bigint[])', [same]);
+      else await c.query("UPDATE profile_marks SET cleared_at = now(), cleared_by = $2, clear_event_id = $3, cleared_how = 'replaced' WHERE id = ANY($1::bigint[])", [same, from, eventId]);
+    }
+    const shows = Math.max(minutes, Number(r.rows[0].left_min) || 0);
     return {
       role: 'leave',
       kind: rule.kind,
       gift: gift.id,
       emoji: gift.emoji,
       until: r.rows[0].expires_at.toISOString(),
-      hours: hoursFor(minutes),
-      minutes,
-      again: refresh && same.length > 0,
+      hours: hoursFor(shows),
+      minutes: shows,
+      again: same.length > 0,
       clean: cleanEmojiOf(rule.kind, s),
-      ...(replaced.length ? { replaced } : {}),
     };
   }
   const r = await c.query(
@@ -259,8 +269,8 @@ export async function marksDataOf(c, uid) {
     at: m.created_at,
     until: m.expires_at,
     clearedAt: m.cleared_at,
-    // How it came off: a cleaning gift, staff, my own Gizlilik choice (before 105), a block or another mark that took
-    // its place (staff are never named).
+    // How it came off: a cleaning gift, staff, my own Gizlilik choice (before 105), a block or a newer mark of the same
+    // kind that took its place (kind stack 'replace'; staff are never named).
     cleared: m.cleared_how ?? null,
   });
   return {

@@ -38,8 +38,9 @@ import { Icon3D } from '@/components/Icon3D';
 import { GiftArt, MUSIC_BADGE } from '@/components/GiftArt';
 import { RollingNumber } from '@/components/fx/rolling-number';
 import { useRoomSheetSpace, useSheetMax } from '@/lib/sheet-space';
-import { marksRefusalOf, marksShelfNote, refusesMarks } from '@/lib/live/marks-live';
-import { refusalLine, refusingMarks } from '@/lib/profile-marks';
+import { marksRefusalOf, marksShelfNote, photoMarksOf, refusesMarks } from '@/lib/live/marks-live';
+import { keepingMarks, keptLine, refusalLine, refusingMarks } from '@/lib/profile-marks';
+import { serverNow } from '@/lib/sanction-time';
 
 type Shelf = GiftCat | 'lucky' | 'fav' | 'bag' | 'global';
 type PriceSort = 'default' | 'asc' | 'desc';
@@ -235,6 +236,9 @@ export function GiftSheet({
   // the people they follow); the others still get it, each paid apart.
   const refusing = isLucky ? [] : refusingMarks(giftMarkOf(gift.id), targets, refusesMarks);
   const sendTo = refusing.length ? targets.filter((id) => !refusing.includes(id)) : targets;
+  // Profil izleri: whoever already shows a mark of another kind gets it as a plain gift (the server leaves their mark as
+  // it is); said before the tap, and it still goes. Not from Çantam (a plain gift anyway).
+  const keeping = isLucky || fromBag ? [] : keepingMarks(giftMarkOf(gift.id), sendTo, photoMarksOf, serverNow());
   const total = isLucky ? lg.price * count * targets.length : (fromBag ? 0 : gift.price) * sendCount * sendTo.length;
   const short = fromBag ? 0 : total - coins;
   const bagNeed = needOf(count, targets.length);
@@ -347,6 +351,8 @@ export function GiftSheet({
               ? { tone: 'bond' as const, text: `+${fmt(bondPointsOf(total))} bağ puanı · Kalan: ${fmt(coins - total)} jeton`, cta: `Gönder · ${fmt(total)}`, variant: 'money' as const }
             : refusing.length
               ? { tone: 'warn' as const, text: refusalLine(gift, refusing, (id) => userById(id).name, targets.length, marksRefusalOf), cta: `Gönder · ${fmt(total)}`, variant: 'money' as const }
+            : keeping.length
+              ? { tone: 'warn' as const, text: keptLine(gift, keeping, (id) => userById(id).name, sendTo.length), cta: `Gönder · ${fmt(total)}`, variant: 'money' as const }
             : { tone: 'info' as const, text: `Kalan: ${fmt(coins - total)} jeton`, cta: `Gönder · ${fmt(total)}`, variant: 'money' as const };
 
   const sortBtn =

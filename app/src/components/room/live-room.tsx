@@ -197,6 +197,7 @@ import { colors, fonts, gradient, semantic } from '@/theme';
 import { MuteBanner, useStopped } from '@/components/sanction-screen';
 import { refreshSanctions, showSanction } from '@/lib/sanctions';
 import { demoMarkGift, useMarkLines } from '@/lib/live/marks-live';
+import { keptAfterLine, parseMarkNote } from '@/lib/profile-marks';
 
 // Short: the rules are the chat's first line already (ROOM_RULES_NOTICE), the bot doesn't repeat them.
 const BOT_TIPS = ['Mikrofona geçmek için boş bir koltuğa dokun.', 'Hediyeler oda seviyesini yükseltir.'];
@@ -2841,8 +2842,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     const sent: string[] = [];
     let error: string | null = null;
     // Profil izleri: someone who takes no mark from me (their Gizlilik, found only now) refuses theirs alone, with
-    // nothing moved; the others still get theirs, each paid apart.
+    // nothing moved; the others still get theirs, each paid apart. Someone whose photo already shows another kind's
+    // mark got it as a plain gift: the server's sentence (markNote) is said in the chat, to me alone.
     const refused: string[] = [];
+    const kept: string[] = [];
     for (const uid of toIds) {
       // The daily limit holds here too (the balance is the server's to check); each answer counts toward it.
       const limited = fromBag ? null : spendBlock(gift.price * count);
@@ -2852,7 +2855,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       }
       try {
         if (fromBag) await liveBackpackGift(uid, gift.id, count, id);
-        else await liveGift(uid, gift.id, count, id, undefined, gift.price);
+        else {
+          const note = parseMarkNote(((await liveGift(uid, gift.id, count, id, undefined, gift.price)) as { markNote?: unknown }).markNote);
+          if (note) kept.push(note);
+        }
         sent.push(uid);
       } catch (e) {
         // A bond gift sent again whose bond is gone meanwhile: offered as a bond request (room-bonds).
@@ -2880,6 +2886,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     }
     successHaptic();
     showGift('me', sent, gift, count, quiet && !error);
+    const keptLine = keptAfterLine(gift, kept);
+    if (keptLine) addMsg({ system: true, text: `ℹ️ ${keptLine}` });
     sent.forEach((uid) => app.recordGift(uid, gift.id, count));
     bump('giftsSent', count * sent.length);
     if (error) showAlert('Bazı hediyeler gönderilemedi', `${sent.length} kişiye gitti. ${error}`);

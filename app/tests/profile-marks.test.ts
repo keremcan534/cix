@@ -19,6 +19,11 @@ import {
   parseMarkNews,
   parseMarkRules,
   parseMarks,
+  keepingMarks,
+  keptAfterLine,
+  keptLine,
+  parseMarkNote,
+  previewFaceOf,
   refusalLine,
   refusingMarks,
   shelfNoteOf,
@@ -93,13 +98,13 @@ describe('Profil izleri: gösterilen iz', () => {
     assert.deepEqual(activeMark([a, { ...a, kind: 'camur', until: NOW + 2 * H }], NOW)?.kind, 'camur');
   });
 
-  test('yeni haber: bırakma türünü değiştirir (birikmez), temizleme kaldırır', () => {
+  test('yeni haber: bırakma kendi türünü değiştirir (birikmez), temizleme kaldırır, başka tür olduğu gibi kalır', () => {
     const left = marksAfter([a], { role: 'leave', kind: 'kaka', gift: 'k1', emoji: '💩', until: NOW + 24 * H });
     assert.deepEqual(left, [{ kind: 'kaka', gift: 'k1', emoji: '💩', until: NOW + 24 * H }]);
     assert.deepEqual(marksAfter(left, { role: 'clean', kind: 'kaka', gift: 'k2', emoji: '💧' }), []);
     assert.deepEqual(marksAfter([a], { role: 'clean', kind: 'camur', gift: 'x', emoji: '🚿' }), [a], 'başka tür kalır');
-    // One mark at a time: another kind takes its place.
-    assert.deepEqual(marksAfter([a], { role: 'leave', kind: 'kirik-cam', gift: 'p8', emoji: '🩴', until: NOW + 2 * H, replaced: ['kaka'] }), [{ kind: 'kirik-cam', gift: 'p8', emoji: '🩴', until: NOW + 2 * H }]);
+    // The server sends a leave only when no other kind shows (one mark at a time); one kept from before stays.
+    assert.deepEqual(marksAfter([a], { role: 'leave', kind: 'kirik-cam', gift: 'p8', emoji: '🩴', until: NOW + 2 * H }), [a, { kind: 'kirik-cam', gift: 'p8', emoji: '🩴', until: NOW + 2 * H }]);
   });
 
   test('kalan süre: saat ya da dakika', () => {
@@ -190,9 +195,9 @@ describe('Muzip hediyeler: türler, dakika, çizim', () => {
     for (const m of [5, 59, 60, 61, 1439, 1440, 4320]) assert.equal(durationText(m), serverRules.durationText(m), `${m} dakika: sunucuyla aynı`);
   });
 
-  test('hediye paketi: dakika, yerine geçtiği türler; eski sunucunun paketi (saat) de okunur', () => {
+  test('hediye paketi: dakika; bilinmeyen alan yok sayılır; eski sunucunun paketi (saat) de okunur', () => {
     const news = parseMarkNews({ role: 'leave', kind: 'kirik-cam', gift: 'p8', emoji: '🩴', until: iso(NOW + 90 * 60_000), hours: 2, minutes: 90, clean: '🪟', again: false, replaced: ['kaka', 'BAD', 7] });
-    assert.deepEqual(news, { role: 'leave', kind: 'kirik-cam', gift: 'p8', emoji: '🩴', until: NOW + 90 * 60_000, hours: 2, minutes: 90, clean: '🪟', again: false, replaced: ['kaka'] });
+    assert.deepEqual(news, { role: 'leave', kind: 'kirik-cam', gift: 'p8', emoji: '🩴', until: NOW + 90 * 60_000, hours: 2, minutes: 90, clean: '🪟', again: false });
     assert.equal(markLine(news!, 'Ali', 'me', 'Ben'), 'Ali sana 🩴 attı; 1 saat 30 dakika kalır ya da biri 🪟 gönderene kadar');
     assert.equal(markLine(news!, 'Ali', 'x', 'Ayşe'), '🩴 Ayşe: profilinde 1 saat 30 dakika iz kalır ya da biri 🪟 gönderene kadar');
     const old = parseMarkNews({ role: 'leave', kind: 'kaka', gift: 'k1', emoji: '💩', until: iso(NOW + 24 * H), hours: 24, clean: '💧' });
@@ -230,5 +235,71 @@ describe('Muzip hediyeler: türler, dakika, çizim', () => {
     ]);
     assert.equal(many, 'Bazı hediyeler alıcının profil fotoğrafında iz bırakır: 💩 Kaka Şakası (24 saat, 💧 temizler), 🩴 Terlik Geldi! (24 saat, 🪟 temizler), ❄️ Kar Topu (1 saat 30 dakika) ve 1 hediye daha. Aynı anda tek iz kalır. Kimlerin iz bırakabileceğini herkes Ayarlar › Gizlilik’ten seçer.');
     for (const line of [one, many]) assert.ok(!/harca|temizlet|satın/i.test(line ?? ''), 'harcamaya itmez');
+  });
+});
+
+describe('Muzip hediyeler: profilde iz varken (sahiplerin kararı, 20 Kasım 2026)', () => {
+  const NOW2 = Date.parse('2026-11-20T12:00:00Z');
+  const kakaRule = { role: 'leave', kind: 'kaka' } as const;
+  const marks: Record<string, ProfileMark[]> = {
+    a: [{ kind: 'kirik-cam', gift: 'p8', emoji: '🩴', until: NOW2 + 3_600_000 }],
+    b: [{ kind: 'kaka', gift: 'k1', emoji: '💩', until: NOW2 + 3_600_000 }],
+    c: [{ kind: 'kirik-cam', gift: 'p8', emoji: '🩴', until: NOW2 - 1 }],
+    d: [],
+  };
+  const of = (id: string) => marks[id] ?? [];
+  const name = (id: string) => ({ a: 'Ayşe', b: 'Banu', c: 'Cem', d: 'Deniz' })[id] ?? id;
+
+  test('başka türden görünen iz: hediye ona düz gider; aynı tür, süresi geçmiş ya da izi olmayan için değil', () => {
+    assert.deepEqual(keepingMarks(kakaRule, ['a', 'b', 'c', 'd'], of, NOW2), ['a']);
+    assert.deepEqual(keepingMarks({ role: 'clean', kind: 'kaka' }, ['a'], of, NOW2), [], 'temizleyen hediye için yok');
+    assert.deepEqual(keepingMarks(null, ['a'], of, NOW2), [], 'düz hediye');
+    // A photo with both (left from before one at a time): the same kind is there, so its own mark is refreshed.
+    assert.deepEqual(keepingMarks(kakaRule, ['x'], () => [...marks.a, ...marks.b], NOW2), []);
+  });
+
+  test('gönderimden önce söylenen: tek kişi, hepsi, bazıları; "harca" yok', () => {
+    const g = { name: 'Kaka Şakası' };
+    assert.equal(keptLine(g, ['a'], name, 1), 'Ayşe, profilinde zaten bir iz var. Kaka Şakası iz bırakmaz, düz hediye olarak gider.');
+    assert.equal(keptLine(g, ['a', 'c'], name, 2), 'Seçtiğin kişilerin profilinde zaten bir iz var. Kaka Şakası iz bırakmaz, onlara düz hediye olarak gider.');
+    assert.equal(keptLine(g, ['a'], name, 3), '1 kişinin profilinde zaten bir iz var; Kaka Şakası onlara düz hediye olarak gider, diğer 2 kişiye iz bırakır.');
+    for (const line of [keptLine(g, ['a'], name, 1), keptLine(g, ['a'], name, 3)]) assert.ok(!/harca|temizlet|satın/i.test(line));
+  });
+
+  test('gönderimden sonra: sunucunun cümlesi (markNote) aynen; birden çoksa tek satır; bozuksa yok', () => {
+    const note = 'Ayşe, profilinde zaten bir iz var; Kaka Şakası düz hediye olarak gitti.';
+    assert.equal(parseMarkNote(note), note);
+    assert.equal(parseMarkNote(`  ${note}\n`), note);
+    for (const bad of [undefined, null, 7, '', '   ', 'x'.repeat(301), { text: note }]) assert.equal(parseMarkNote(bad), null);
+    assert.equal(keptAfterLine({ name: 'Kaka Şakası' }, []), null);
+    assert.equal(keptAfterLine({ name: 'Kaka Şakası' }, [note]), note);
+    assert.equal(keptAfterLine({ name: 'Kaka Şakası' }, [note, note]), '2 kişinin profilinde zaten bir iz vardı; Kaka Şakası onlara düz hediye olarak gitti.');
+  });
+
+  test('sunucunun cümlesi (server/api/profile-mark-rules.mjs keptNote) okunur ve aynen gösterilir', () => {
+    const note = serverRules.keptNote('Ayşe', 'Kaka Şakası');
+    assert.equal(parseMarkNote(note), 'Ayşe, profilinde zaten bir iz var; Kaka Şakası düz hediye olarak gitti.');
+    assert.equal(keptAfterLine({ name: 'Kaka Şakası' }, [note]), note);
+  });
+});
+
+describe('İz önizleme: ?foto= yalnız uygulamanın sunucusundaki dosya', () => {
+  const API = 'https://130-61-230-94.sslip.io';
+  test('kendi sunucusunun /api/media/f/ dosyası olur; başka adres, yol oyunu ya da bozuk girdi olmaz', () => {
+    assert.equal(previewFaceOf(`${API}/api/media/f/avatar/u1/abc.jpg`, API), `${API}/api/media/f/avatar/u1/abc.jpg`);
+    assert.equal(previewFaceOf(`${API}/api/media/f/avatar/u1/abc.jpg?v=3`, `${API}/`), `${API}/api/media/f/avatar/u1/abc.jpg?v=3`);
+    for (const bad of [
+      'https://kotu.example/yuz.jpg',
+      `${API}.kotu.example/api/media/f/a.jpg`,
+      `${API}/api/media/f/../admin`,
+      `${API}/api/other/f/a.jpg`,
+      `${API}/api/media/f/a b.jpg`,
+      `${API}/api/media/f/a.jpg"onerror`,
+      `javascript:alert(1)`,
+      42,
+      undefined,
+    ])
+      assert.equal(previewFaceOf(bad, API), null, String(bad));
+    assert.equal(previewFaceOf(`${API}/api/media/f/a.jpg`, ''), null, 'sunucusuz (demo): yalnız kendi fotoğrafım');
   });
 });

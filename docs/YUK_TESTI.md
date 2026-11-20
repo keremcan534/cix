@@ -135,7 +135,8 @@ koltuğu ve oda roketi satırları) Güncelleme 7'den önceki gibi.
 İz bırakan hediye artık gönderimin içinde iki şeye daha bakıyor:
 
 - alıcının "Kimler profilime iz bırakabilir" seçimi ve göndereni takip edip etmediği (bir indeksli okuma);
-- aynı anda tek iz kuralı (kişinin görünen izleri, kişinin satırı zaten kilitliyken).
+- aynı anda tek iz kuralı (kişinin görünen izleri, kişinin satırı zaten kilitliyken; aynı türde yeni iz görünenin
+  bitişinden önce bitmez).
 
 Ölçüm için `room-gifts.mjs`'e `--gift k1` eklendi. Bununla Kaka Şakası gönderilir; alıcılar göndereni önce takip eder,
 böylece varsayılan "Yalnız takip ettiklerim" kuralı denetlenip geçilir.
@@ -150,6 +151,20 @@ Bu makinede ölçüldü: API tek çekirdekte, 30 gönderen × 15 hediye, 4 tur, 
 | Sonra | Kaka Şakası (iz) | 238–272 | 110–118 ms / 127–188 ms |
 
 Fark ölçüm gürültüsünün içinde: hediye yolu yavaşlamadı. Hiç hata olmadı.
+
+**İnceleme düzeltmelerinden sonra (aynı gün):** gönderimde engel artık iki kişinin kilidi altında okunuyor (önceden
+kilitten önce, işlemin dışında), aynı tür iz kısalmasın diye yeni izin bitişi görünen izden okunuyor. Aynı ölçüm, aynı
+makinede arka arkaya (makine bu sefer biraz daha yavaştı; karşılaştırma iki satır arasında):
+
+| Sürüm | Hediye | Saniyede hediye | Gecikme (yarısı / 100'de 95'i) |
+| --- | --- | --- | --- |
+| Önce (1df0bde) | Roket (düz) | 213–246 | 120–130 ms / 145–215 ms |
+| Önce (1df0bde) | Kaka Şakası (iz) | 207–225 | 130–138 ms / 157–207 ms |
+| Sonra | Roket (düz) | 210–254 | 114–134 ms / 146–220 ms |
+| Sonra | Kaka Şakası (iz) | 207–223 | 129–142 ms / 169–180 ms |
+
+Fark yine gürültünün içinde, hata yok. Kaka ölçümünde her alıcı aynı göndericiden 15 Kaka alıyor, yani ilkinden sonra
+hepsi "aynı tür yeniden" yolundan geçiyor.
 
 ## Sonra: büyürken
 

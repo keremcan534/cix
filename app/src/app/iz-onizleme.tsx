@@ -3,9 +3,11 @@
 // row, 52 the standard, 96 the largest, 112 the host's), the person card (78) and a profile (96), each without a frame,
 // with a VIP ring and with a shop frame, on a light and a dark ground; and its landing and cleaning played. The kinds
 // are the app's own (Kaka İzi, Kırık Cam) and every kind the catalog lists (an overlay uploaded in the panel shows
-// here as on everyone's phone). The photo under it is my own (a real one, as the spec asks), else ?foto=<address>.
+// here as on everyone's phone). The photo under it is my own (a real one, as the spec asks), else ?foto=<address> of a
+// file this app's server keeps (/api/media/f/…; any other address is ignored: lib/profile-marks previewFaceOf).
 // It reads and changes nothing on the server: the marks and faces are this screen's own (lib/live/marks-live
-// PREVIEW_KEY). ?tur=<kind>&zemin=acik|koyu open it on one.
+// PREVIEW_KEY). ?tur=<kind>&zemin=acik|koyu open it on one. In a live build only admins open it (Yönetim's button); the
+// demo opens it for anyone (no server, sample people).
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
@@ -18,11 +20,12 @@ import { Text } from '@/components/text';
 import { Avatar, FramedAvatar } from '@/components/ui';
 import { ME, USERS, putServerUser } from '@/data/mock';
 import { liveMode } from '@/lib/live';
+import { useIsAdmin } from '@/lib/live/admin';
 import { everyGift, giftMarkOf, markKinds, useLiveCatalog } from '@/lib/live/catalog-live';
 import { PREVIEW_KEY } from '@/lib/live/marks-live';
 import { applyMarkNews, putMarks } from '@/lib/mark-store';
 import { goBack } from '@/lib/nav';
-import { COMPILED_MARKS } from '@/lib/profile-marks';
+import { COMPILED_MARKS, previewFaceOf } from '@/lib/profile-marks';
 import { serverNow } from '@/lib/sanction-time';
 import { makeStyles } from '@/theme';
 
@@ -38,12 +41,33 @@ const PILOT: Record<string, { gift: string; emoji: string }> = { kaka: { gift: '
 const keyOf = (n: number) => `${PREVIEW_KEY}${n}`;
 const KEYS = Array.from({ length: 20 }, (_, i) => keyOf(i));
 
+/** Admins only in a live build (the screen is Yönetim's); anyone else reads why and goes back. */
 export default function MarkPreview() {
+  const isAdmin = useIsAdmin();
+  const styles = useStyles();
+  const insets = useSafeAreaInsets();
+  if (!liveMode() || isAdmin) return <PreviewBody />;
+  return (
+    <View style={{ flex: 1, backgroundColor: '#160F28', paddingTop: insets.top + 8, paddingHorizontal: 12, gap: 14 }}>
+      <View style={styles.bar}>
+        <Pressable onPress={() => goBack('/')} hitSlop={8} accessibilityRole="button" accessibilityLabel="Geri">
+          <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+        </Pressable>
+        <Text style={[styles.title, { color: '#FFFFFF' }]} accessibilityRole="header">
+          İz önizleme
+        </Text>
+      </View>
+      <Text style={[styles.hint, { color: '#FFFFFF' }]}>Bu ekran yönetim içindir. Yönetici hesabıyla girdiğinde Yönetim › Hediyeler’den açılır.</Text>
+    </View>
+  );
+}
+
+function PreviewBody() {
   const styles = useStyles();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ tur?: string; zemin?: string; foto?: string }>();
-  // The photo the marks sit on: an address given (?foto=), else mine.
-  const face = typeof params.foto === 'string' && /^https?:\/\/\S{1,600}$/.test(params.foto) ? params.foto : ME.avatar;
+  // The photo the marks sit on: a file of this app's server given (?foto=), else mine.
+  const face = previewFaceOf(params.foto, process.env.EXPO_PUBLIC_API_URL ?? '') ?? ME.avatar;
   // The preview faces are people of their own (lib/live/marks-live PREVIEW_KEY), with that photo.
   // (Kept before the faces are drawn: the seats read them by id.)
   for (const k of KEYS) putServerUser({ id: k, name: 'Ayşe', avatar: face, verified: false });

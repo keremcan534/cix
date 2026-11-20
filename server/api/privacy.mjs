@@ -38,7 +38,7 @@
 // A block either way refuses all three. The other person is never told which setting refused them beyond the
 // reason the demo shows ("… yalnızca takip ettiği kişilerden mesaj alıyor").
 import { HttpError, auth, db, limit, readJson } from './core.mjs';
-import { MARKS_FROM, MARKS_FROM_DEFAULT } from './profile-mark-rules.mjs';
+import { MARKS_FROM, MARKS_FROM_DEFAULT, marksRuleOf } from './profile-mark-rules.mjs';
 
 export const PRIVACY_DEFAULTS = Object.freeze({
   profilePublic: true,
@@ -88,8 +88,17 @@ const CHOICES = { dmFrom: ['everyone', 'following', 'mutual'], callsFrom: ['ever
 /** A session seen this recently is online (as Keşfet has always counted it). */
 export const ONLINE_MS = 5 * 60_000;
 
-/** A privacy_settings row (or a LEFT JOIN's nulls) as the API names it, the defaults filling what is missing. */
-const fromRow = (r) => Object.fromEntries(Object.entries(COLUMN).map(([k, col]) => [k, r?.[col] ?? PRIVACY_DEFAULTS[k]]));
+/**
+ * A privacy_settings row (or a LEFT JOIN's nulls) as the API names it, the defaults filling what is missing. Profil
+ * izleri's two read as the rule that applies (marksRuleOf: profile_marks false is nobody), so a row whose two columns
+ * disagree still reads as one setting.
+ */
+const fromRow = (r) => {
+  const out = Object.fromEntries(Object.entries(COLUMN).map(([k, col]) => [k, r?.[col] ?? PRIVACY_DEFAULTS[k]]));
+  out.marksFrom = marksRuleOf(r?.profile_marks ?? true, r?.marks_from);
+  out.profileMarks = out.marksFrom !== 'nobody';
+  return out;
+};
 
 /** The settings of each of `ids` (defaults for anyone without a row). */
 export async function privacyMap(q, ids) {
@@ -262,6 +271,8 @@ export const privacyRoutes = {
     limit(`privacy:${me.id}`, 30, 'Çok sık değiştiriyorsun, biraz bekle');
     const set = patchOf(await readJson(req));
     const cols = Object.keys(set);
+    // Profil izleri: who may mark me is in my look (marksFrom, noMarks), which the rooms I'm in hear when it changes.
+    const marksWere = 'profile_marks' in set ? (await privacyOf(db, me.id)).marksFrom : null;
     // "Profilime iz bırakılmasın" from an app that has only the switch: off is nobody; on is the default (the people
     // I follow) after nobody, and leaves everyone or following as they are.
     const marksOnly = 'profile_marks' in set && !('marks_from' in set);
@@ -276,7 +287,10 @@ export const privacyRoutes = {
     // Back to every default: nothing to keep.
     await db.query(`DELETE FROM privacy_settings WHERE user_id = $1 AND ${ALL_DEFAULT}`, [me.id]);
     // Profil izleri: the choice blocks new marks only; the ones I have stay (the owners' decision, 20 Nov 2026).
-    return { privacy: await privacyOf(db, me.id) };
+    const privacy = await privacyOf(db, me.id);
+    // Imported when needed (profile-marks.mjs reaches this module through its own imports).
+    if (marksWere !== null && privacy.marksFrom !== marksWere) void import('./profile-marks.mjs').then((m) => m.announceMarks(me.id)).catch(() => {});
+    return { privacy };
   },
 
   /**

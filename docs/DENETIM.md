@@ -222,7 +222,12 @@ Suyu, Cam Tamiri) gönderince gider ([`PROFIL_IZLERI.md`](PROFIL_IZLERI.md)).
   - "Kimse" seçeneği ve "Profilime iz bırakılmasın" anahtarı yeni izi engeller. Reddedilen gönderimde jeton düşmez.
   - İz kendiliğinden gider (pilotlarda 24 saat).
   - Engelleme hem yeni izi önler hem o kişinin bıraktığı izi hemen kaldırır (bugünkü gibi kaldı). Fiilen tek ücretsiz
-    kaldırma yolu bu.
+    kaldırma yolu bu. **Engel yarışı (kapandı, incelemede bulundu):** engellemeden hemen önce yola çıkmış bir iz hediyesi
+    engelden sonra işlenip izi 24 saat bırakabiliyordu. Artık engel iki kişinin kilidi altında yeniden okunur: yoldaki
+    hediye ya reddedilir ya da engel izi hemen ardından kaldırır (test 20 turda 0; düzeltmesiz aynı test iz bırakıyor).
+  - **Ucuz temizleme yok (kapandı, sahiplerin ikinci kararı, 20 Kasım 2026):** iz varken başka türden bir iz hediyesi
+    izi değiştirmez, düz hediye olarak gider; aynı tür izi hiç kısaltmaz. Önceden 500 jetonluk başka tür bir hediye
+    24 saatlik izin yerine geçebiliyor, 777 jetonluk 5 dakikalık aynı tür hediye onu 5 dakikaya indirebiliyordu.
   - Yönetim izi kaldırır (`POST /api/admin/marks/clear`, denetim kaydıyla).
   - Bir tür panelden anında kapatılır. Canlı ayarlar › Profil izleri › süre 0 bütün özelliği kapatır.
   - İz hediyesi Global olamaz: bütün ülkeye duyurulmaz.
@@ -235,11 +240,17 @@ Suyu, Cam Tamiri) gönderince gider ([`PROFIL_IZLERI.md`](PROFIL_IZLERI.md)).
 - **İçerik derecesi:** Mağaza formunda "kaba mizah" işaretlenmesi gerekebilir ([`YAYIN_HAZIRLIGI.md`](YAYIN_HAZIRLIGI.md)).
   Doğrulanmadı.
 - **Açık kalanlar:**
-  - Panelde İz türleri, iz kaldırma ve hediye formundaki dakika alanı henüz yok. Sunucu uçları hazır; panel deposunun
-    işi.
+  - Panelde İz türleri, iz kaldırma ve hediye formundaki dakika alanı panel deposunun dalında hazır, birleşmedi.
   - Eski APK'larda Gizlilik'te "Kimler iz bırakabilir" yok; varsayılan onlar için de geçerli.
   - Odadaki görünüm paketinde kimin izin verildiği kişiye göre değil. Eski APK, "Yalnız takip ettiklerim" diyen birine
     hediyeyi bazen soluk göstermeden dener; sunucu jeton düşmeden reddeder.
+  - **G7 APK'nın (preview-191/192) içindeki üç eski cümle** artık doğru değil ve sunucu değiştiremez: Gizlilik
+    anahtarının açıklaması ("profilindeki iz de hemen gider"), kendi izinin notu ("İstemezsen Ayarlar › Gizlilik'ten
+    kapatabilirsin": kapatmak olan izi kaldırmaz) ve hediye panelinin reddi ("profiline iz bırakılmasını kapattı",
+    "Yalnız takip ettiklerim" yüzünden reddedilenlere de). Para ve kurallar doğru çalışır, yalnız yazılar yanlış. G7 iz
+    varken başka türün hediyesinin düz gittiğini de söylemez. **Çaresi (siz):** 1.1.0 dağıtılınca Canlı ayarlar ›
+    Zorunlu sürüm `1.1.0`, 1.1.0 APK'nın Yönetim › Canlı ayarlar ekranından (panel sürüm göndermediği için oradan
+    kaydedilmez). Ayrıntı [`PROFIL_IZLERI.md`](PROFIL_IZLERI.md) › "Hangi uygulama ne görür".
 
 ## Mesaj bildirimi varsayılanı (18 Kasım 2026, sahip kararı)
 

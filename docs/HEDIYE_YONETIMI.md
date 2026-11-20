@@ -134,7 +134,12 @@ ve Terlik Geldi! de dahil.
 - **Ad:** "Kırık Cam" gibi.
 - **İz resmi:** fotoğrafın üstüne çizilen saydam PNG ya da WebP.
 - **Süre:** dakika.
-- **Aynı iz yeniden gelince:** süre yeniden başlar ya da eskisi kalkar.
+- **Aynı iz yeniden gelince:** iki seçenekte de profilde tek iz kalır, en son göndereninki olur ve **süresi kısalmaz**
+  (kalan süreyle yeni hediyenin süresinden uzun olanı geçer). Fark yalnız geçmiş kaydında: "süresi bitti" ya da
+  "yerine geçti".
+- **İz varken başka tür:** profilde iz varken başka türden bir iz hediyesi izi değiştirmez, düz hediye olarak gider
+  (jeton düşer, iz bırakmaz). Bu bir ayar değil, her tür için böyle. Böylece ucuz bir hediye pahalı bir izi kaldıramaz.
+- **Bir resim, bir tür:** başka bir türün kullandığı resim kaydedilmez; her türe ayrı dosya yükleyin.
 - **Açık / kapalı.**
 
 İz resmi yüklenirken sunucu piksel piksel denetler:
@@ -196,7 +201,9 @@ yükleyince o kullanılır.
    panelden. Kaka için yeni bir iz resmi isterseniz İz türleri › Kaka İzi'ne yükleyin. Yüklenen resim yeni APK'da
    uygulamanınkinin yerine geçer, G7 APK uygulamanınkini çizmeye devam eder.
 5. **Zorunlu güncelleme (sizin kararınız):** Canlı ayarlar › Zorunlu sürüm `1.1.0` yapılınca eski APK'lar güncellemeye
-   yönlendirilir.
+   yönlendirilir. Bunu **1.1.0 APK'nın Yönetim › Canlı ayarlar** ekranından kaydedin: sunucu zorunlu sürümü yalnız o
+   sürüm ya da daha yenisi olan uygulamadan kabul eder. Finans paneli uygulama sürümü göndermediği için oradan
+   kaydedilmez ("Uygulama sürümün gelmedi…").
 
 **Panel tarafı (finans paneli deposu, ayrı iş):**
 

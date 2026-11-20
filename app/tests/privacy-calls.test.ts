@@ -7,7 +7,7 @@ import type { ServerCallLog, ServerPrivacy } from '@/lib/api';
 import type { User } from '@/data/mock';
 import { liveCallRows } from '@/lib/call-rows';
 import { friendRows } from '@/lib/friend-rows';
-import { privacySync } from '@/lib/privacy-sync';
+import { marksShown, privacyBody, privacySync } from '@/lib/privacy-sync';
 
 const SERVER: ServerPrivacy = { profilePublic: true, showOnline: true, showLastSeen: true, showCurrentRoom: true, dmFrom: 'everyone', callsFrom: 'everyone', invitesFrom: 'everyone', voiceCalls: true, videoCalls: true, messagePush: true, pushCloseOnly: true };
 
@@ -47,6 +47,38 @@ describe('Gizlilik: hemen görünür, reddedilirse geri döner', () => {
     s.reset();
     const id = s.begin('dmFrom');
     assert.equal(s.failed('dmFrom', id, 'following'), 'following');
+  });
+});
+
+describe('Gizlilik: profil izleri, geri alınmış (marksFrom bilmeyen) sunucuda', () => {
+  const OLD: ServerPrivacy = { ...SERVER, profileMarks: true };
+  const NEW: ServerPrivacy = { ...SERVER, profileMarks: true, marksFrom: 'following' };
+
+  test('marksFrom bilmeyen sunucuya anahtar kendi adıyla gider; bilen sunucuya seçim olduğu gibi', () => {
+    const s = privacySync();
+    s.loaded(OLD);
+    assert.deepEqual(privacyBody('marksFrom', 'nobody', s.known()), { profileMarks: false }, 'anahtar açılınca: kimse');
+    assert.deepEqual(privacyBody('marksFrom', 'following', s.known()), { profileMarks: true }, 'anahtar kapanınca');
+    assert.deepEqual(privacyBody('marksFrom', 'everyone', s.known()), { profileMarks: true });
+    assert.deepEqual(privacyBody('profileMarks', false, s.known()), { profileMarks: false });
+    assert.deepEqual(privacyBody('dmFrom', 'mutual', s.known()), { dmFrom: 'mutual' }, 'başka ayar etkilenmez');
+    const fresh = privacySync();
+    fresh.loaded(NEW);
+    assert.deepEqual(privacyBody('marksFrom', 'nobody', fresh.known()), { marksFrom: 'nobody' });
+    // Not read yet: sent as chosen (this server knows it).
+    assert.deepEqual(privacyBody('marksFrom', 'following', privacySync().known()), { marksFrom: 'following' });
+  });
+
+  test('cevaptan gösterilen: iki ayar ya da eski sunucunun anahtarı (açık: herkes, kapalı: kimse)', () => {
+    assert.deepEqual(marksShown(NEW), { marksFrom: 'following', profileMarks: true });
+    assert.deepEqual(marksShown(OLD), { marksFrom: 'everyone', profileMarks: true });
+    assert.deepEqual(marksShown({ ...OLD, profileMarks: false }), { marksFrom: 'nobody', profileMarks: false });
+    assert.equal(marksShown(SERVER), null, 'profil izinden önceki sunucu');
+    const s = privacySync();
+    s.loaded(OLD);
+    const id = s.begin('marksFrom');
+    s.saved('marksFrom', id, { ...OLD, profileMarks: false });
+    assert.deepEqual(marksShown(s.known()), { marksFrom: 'nobody', profileMarks: false }, 'son cevap bilinir');
   });
 });
 

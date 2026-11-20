@@ -12,10 +12,11 @@
 // markart, checked here: a still square PNG or WebP, real transparency, the face left open, profile-mark-rules.mjs
 // markArtProblem with tools/mark-art-check.py; made at most 512 px / 300 KB for phones; null: the app's own compiled
 // picture where it has one, else the gift's badge), `minutes` its mark's time when the gift says none (null: Canlı
-// ayarlar › Profil izleri), `stack` what the same kind again does to a showing mark (refresh: its time starts again,
-// the default; replace: the old one is set aside as 'replaced'), `enabled` (false: its gifts are plain gifts and its
-// marks don't show, an instant stop for one kind). A different kind always takes the place of the one showing: one
-// mark at a time (profile-marks.mjs markGift).
+// ayarlar › Profil izleri), `stack` how the record keeps the same kind again (either way the newest sender's mark
+// shows, never ending sooner than the one before: refresh, the default, ends the old row; replace sets it aside as
+// 'replaced'), `enabled` (false: its gifts are plain gifts and its marks don't show, an instant stop for one kind).
+// One mark at a time: while one shows, a gift of another kind leaves none (a plain gift; profile-marks.mjs markGift).
+// An overlay is one kind's own: a picture another kind uses is refused (taking it off one would take it off both).
 //
 // What phones get: GET /api/catalog?marks=2 `marks.kinds` (kindsCatalog: the enabled ones, art only once checked, with
 // its version), and markKindsRev() is part of the catalog's and /api/config's `v`. An app before kinds (marks=1, G7)
@@ -234,13 +235,29 @@ function minutesIn(v) {
   return v;
 }
 function stackIn(v) {
-  if (!STACKS.includes(v)) throw new HttpError(400, 'Aynı iz yeniden gelince: "refresh" (süre yeniden başlar) ya da "replace" (eskisi kalkar, yenisi konur) olmalı');
+  if (!STACKS.includes(v)) throw new HttpError(400, 'Aynı iz yeniden gelince: "refresh" (eski kayıt süresi bitti olur) ya da "replace" (eski kayıt yerine geçti olur) olmalı');
   return v;
 }
 function enabledIn(v) {
   if (typeof v !== 'boolean') throw new HttpError(400, 'Açık ya da kapalı olmalı');
   return v;
 }
+
+/** Refuses an overlay (`url`) another kind that isn't deleted already uses: removing it from one would take it from both. */
+async function artFree(url, kind) {
+  const key = typeof url === 'string' ? keyOf(url) : null;
+  if (!key) return;
+  const r = await db.query('SELECT kind, name, art_url FROM mark_kinds WHERE art_url IS NOT NULL AND deleted_at IS NULL AND kind <> $1', [kind]);
+  const other = r.rows.find((k) => keyOf(k.art_url) === key);
+  if (other) throw new HttpError(400, `Bu resim "${other.name}" türünde kullanılıyor; her tür için ayrı bir resim yükleyin`);
+}
+/** The overlay `url` checked (checkMarkArt) once no other kind uses it. */
+const artFor = async (url, kind) => {
+  await artFree(url, kind);
+  return checkMarkArt(url);
+};
+/** A save that failed after the overlay was made smaller: the upload and its copy go (nothing points at either). */
+const dropArt = (art) => art?.upload && removeFiles([art.upload, art.url]);
 
 /** The gifts that leave or clean `kind` now (custom-gifts.mjs allGifts: the admins' and the app's own as changed). */
 const giftsOf = (kind) =>
@@ -296,7 +313,7 @@ export const markKindRoutes = {
     const minutes = b.minutes === undefined ? null : minutesIn(b.minutes);
     const stack = b.stack === undefined ? 'refresh' : stackIn(b.stack);
     const enabled = b.enabled === undefined ? true : enabledIn(b.enabled);
-    const art = b.art === undefined || b.art === null ? null : await checkMarkArt(b.art);
+    const art = b.art === undefined || b.art === null ? null : await artFor(b.art, kind);
     await tx(async (c) => {
       const had = (await c.query('SELECT * FROM mark_kinds WHERE kind = $1 FOR UPDATE', [kind])).rows[0];
       if (had && !had.deleted_at) throw new HttpError(409, `"${kind}" türü zaten var (${had.name}); onu düzenleyin`);
@@ -315,6 +332,9 @@ export const markKindRoutes = {
         );
       }
       await audited(c, a.id, 'markkind.create', { kind, before: had ? auditView(viewOf(had)) : null, after: { name, art: art ? { url: art.url } : null, minutes, stack, enabled }, ...panelDetail(a) }, clientIp(req));
+    }).catch((e) => {
+      dropArt(art);
+      throw e;
     });
     if (art?.upload) removeFiles([art.upload]);
     return { kind: staffKind(await fresh(kind)) };
@@ -331,7 +351,7 @@ export const markKindRoutes = {
     if (b.minutes !== undefined) set.minutes = minutesIn(b.minutes);
     if (b.stack !== undefined) set.stack = stackIn(b.stack);
     if (b.enabled !== undefined) set.enabled = enabledIn(b.enabled);
-    const art = b.art === undefined ? undefined : b.art === null ? null : await checkMarkArt(b.art);
+    const art = b.art === undefined ? undefined : b.art === null ? null : await artFor(b.art, kind);
     if (art !== undefined) {
       set.art_url = art?.url ?? null;
       set.art_v = art ? crypto.randomBytes(6).toString('hex') : null;
@@ -353,6 +373,9 @@ export const markKindRoutes = {
       );
       const after = viewOf((await c.query('SELECT * FROM mark_kinds WHERE kind = $1', [kind])).rows[0]);
       await audited(c, a.id, 'markkind.update', { kind, before: auditView(old), after: auditView(after), ...panelDetail(a) }, clientIp(req));
+    }).catch((e) => {
+      dropArt(art);
+      throw e;
     });
     // The picture it replaced (and the upload a smaller copy was made from) goes once the new one is saved.
     if (art !== undefined) removeFiles([old?.art?.url, art?.upload].filter((u) => u && u !== art?.url));

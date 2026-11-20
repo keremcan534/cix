@@ -1,7 +1,7 @@
 // Profil izleri's reads for the screens (lib/profile-marks has the rules, lib/mark-store the marks): who refuses a mark
-// from me (their look's noMarks, read for me with the room's people, and why: marksFrom), which gift cleans a kind now,
-// the Muzip shelf's note, and my own marks read again when my profile tab opens (a Kaka sent to me outside a room
-// arrives as a push only).
+// from me (their look's noMarks, read for me with the room's people, and why: marksFrom), whose photo shows a mark
+// already (a mark gift of another kind goes to them as a plain gift), which gift cleans a kind now, the Muzip shelf's
+// note, and my own marks read again when my profile tab opens (a Kaka sent to me outside a room arrives as a push only).
 import { useEffect, useRef } from 'react';
 
 import { userById } from '@/data/mock';
@@ -22,6 +22,11 @@ export const markKeyOf = (uid: string | null | undefined): string | null => (!ui
 export const refusesMarks = (uid: string) => (liveMode() ? lookOf(toServer(uid))?.noMarks === true : false);
 /** Why `uid` takes no mark from me: only the people they follow, or nobody (an older server: nobody). */
 export const marksRefusalOf = (uid: string): MarkRefusal => (lookOf(toServer(uid))?.marksFrom === 'following' ? 'following' : 'nobody');
+/** The marks on `uid`'s photo as this phone has them (their look, the room's packets, my own sends). */
+export const photoMarksOf = (uid: string) => {
+  const key = markKeyOf(uid);
+  return key ? marksOf(key) : [];
+};
 
 /** The gift that cleans a mark of `kind` now (the cheapest on the shelves), or undefined. */
 export function cleanGiftFor(kind: string) {
@@ -88,14 +93,17 @@ export function useMarkLines(room: string, say: (text: string, id: string) => vo
 let demoEvent = 0;
 /**
  * The demo room (no server): a gift that leaves or cleans a mark does it on this phone, as the server would (a clean
- * on a clean photo does nothing). Live rooms hear it from the server instead.
+ * on a clean photo does nothing; a leave while another kind shows does nothing either; the same kind again never ends
+ * sooner). Live rooms hear it from the server instead.
  */
 export function demoMarkGift(room: string, giftId: string, emoji: string, to: string) {
   const rule = giftMarkOf(giftId);
   if (!rule || liveMode()) return;
-  const showing = activeMark(marksOf(to).filter((m) => m.kind === rule.kind), serverNow());
+  const now = serverNow();
+  const showing = activeMark(marksOf(to).filter((m) => m.kind === rule.kind), now);
   if (rule.role === 'clean' && !showing) return;
-  const minutes = markMinutes(rule);
+  if (rule.role === 'leave' && !showing && activeMark(marksOf(to), now)) return;
+  const minutes = Math.max(markMinutes(rule), showing ? Math.round((showing.until - now) / 60_000) : 0);
   const clean = rule.role === 'leave' ? (cleanGiftFor(rule.kind)?.emoji ?? null) : null;
   demoEvent -= 1;
   reportMarkEvent({
@@ -105,7 +113,7 @@ export function demoMarkGift(room: string, giftId: string, emoji: string, to: st
     to,
     news:
       rule.role === 'leave'
-        ? { role: 'leave', kind: rule.kind, gift: giftId, emoji, until: serverNow() + minutes * 60_000, hours: Math.ceil(minutes / 60), minutes, clean, again: !!showing }
+        ? { role: 'leave', kind: rule.kind, gift: giftId, emoji, until: Math.max(now + markMinutes(rule) * 60_000, showing?.until ?? 0), hours: Math.min(168, Math.ceil(minutes / 60)), minutes, clean, again: !!showing }
         : { role: 'clean', kind: rule.kind, gift: giftId, emoji },
   });
 }

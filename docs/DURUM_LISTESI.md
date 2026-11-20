@@ -182,21 +182,24 @@ Güncelleme 7'de geldi; 20 Kasım'da "Muzip hediyeler" ile değişti (aşağıda
 - **Yeni iz türleri panelden**, uygulama güncellemesi olmadan: ad, saydam iz resmi (sunucu piksel piksel denetler),
   dakika cinsinden süre, aç/kapat. Yeni APK yüklenen resmi çizer. G7 APK yalnız Kaka İzi'ni çizer, öteki türlerde
   hediyenin küçük resmini gösterir.
-- **Aynı anda tek iz:** başka tür eskisinin yerine geçer, aynı tür süreyi yeniler.
+- **Aynı anda tek iz:** iz varken başka türün hediyesi düz hediye gider (iz değişmez, uygulama göndermeden önce ve sonra
+  söyler); aynı tür izi yeniler ama hiç kısaltmaz.
 - **Gizlilik › "Kimler profilime iz bırakabilir?":** Herkes / **Yalnız takip ettiklerim** (varsayılan) / Kimse.
   "Profilime iz bırakılmasın" artık mevcut izi kaldırmaz.
 - **Ücretsiz kaldırma yok** (sizin kararınız; risk [`DENETIM.md`](DENETIM.md)'de).
 - **Birden çok alıcı:** izi kabul etmeyen yalnız kendisi reddedilir, jeton düşmez, ötekilere gider.
 - **Eski APK (f9671d9 ve öncesi):** iz kurallı hiçbir hediyeyi görmez (Kar Topu ve Domates At de kalktı).
 - **Yönetim › Hediyeler › "İz türlerini önizle":** türler telefonun kendi çiziminde, gerçek koltuk (30/52/96/112), kart
-  (78) ve profil (96) boylarında; açık/koyu zemin, VIP ve mağaza çerçevesiyle.
-- **Panel:** İz türleri sayfası, hediye formunda tür listesi ve dakika, `markart` yüklemesi: sunucu hazır, panel
-  deposunda yapılacak.
+  (78) ve profil (96) boylarında; açık/koyu zemin, VIP ve mağaza çerçevesiyle. Canlı sürümde yalnız yönetici açar.
+- **Panel:** İz türleri sayfası, hediye formunda tür listesi ve dakika, `markart` yüklemesi: panel deposunun aynı adlı
+  dalında hazır, birleşmedi.
 - **Telefonda denenmeli:**
   - İki telefonla odada Terlik Geldi! → Cam Tamiri ve Kaka Şakası → Temizlik Suyu: koltuk, kart, profil, sohbet
     satırı, düşüş, su ve parıltı.
   - 30 ve 52 boyundaki koltukta kırık camın okunması: geçici resim ince, gerçek sanat daha kalın çizgili olmalı.
   - "Yalnız takip ettiklerim"de soluk hediye ve red cümlesi.
+  - Kaka İzi olan birine Terlik Geldi!: göndermeden önceki uyarı, gönderdikten sonraki sohbet satırı, iz değişmeden
+    kalması.
   - Birden çok kişiye gönderim.
   - G7 APK'nın aynı odada yeni bir türü (rozetle) göstermesi.
   - Düşük donanımda performans.

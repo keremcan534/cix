@@ -7,9 +7,10 @@
 -- (media.mjs markart, checked by tools/mark-art-check.py: real transparency, the face left open, square, still; at
 -- most 512 px as phones get it) with its version and size, or none (art_url NULL: the app's own compiled picture
 -- where it has one, else the gift's badge). `minutes`: how long its mark stays when the gift says nothing (NULL: Canlı
--- ayarlar › Profil izleri). `stack`: what the same kind again does to a showing one (refresh: its time starts again;
--- replace: the old one is set aside as 'replaced' and the new one lands as new); a different kind always takes the
--- place of the one showing (one mark at a time, the owners' decision, 20 Nov 2026). `enabled` false: its gifts are
+-- ayarlar › Profil izleri). `stack`: how the record keeps the same kind again (the newest sender's mark shows either
+-- way and never ends sooner than the one before; refresh: the old row expires; replace: it is set aside as
+-- 'replaced'); while a mark shows, a gift of another kind leaves none (one mark at a time, the owners' decisions,
+-- 20 Nov 2026: a plain gift, profile-marks.mjs markGift). `enabled` false: its gifts are
 -- plain gifts and its marks don't show. `rev` takes the next mark_kind_rev on every change, and the catalog's `v` adds
 -- the largest, so phones read the catalog again. A row is never deleted (deleted_at): marks and audit rows name it.
 CREATE SEQUENCE IF NOT EXISTS mark_kind_rev;
@@ -35,17 +36,18 @@ CREATE TABLE IF NOT EXISTS mark_kinds (
   CHECK ((art_url IS NULL) = (art_v IS NULL))
 );
 -- The pilots' kinds (the owners' names, 20 Nov 2026), drawn by the app's own pictures until staff upload theirs, and
--- every kind the panel already gave a gift (Kar Topu, Domates At on the live server), named by their word until staff
--- name them, so every saved gift still names a kind that exists. Their rev is 0: a deploy doesn't move the catalog's
--- `v`, so no phone reads it again for them.
+-- every kind a gift on the panel's list already names (Kar Topu, Domates At on the live server; a deleted gift's kind
+-- is left out), named by their word until staff name them, so every saved gift still names a kind that exists. Their
+-- rev is 0: a deploy doesn't move the catalog's `v`, so no phone reads it again for them.
 INSERT INTO mark_kinds (kind, name, rev) VALUES ('kaka', 'Kaka İzi', 0), ('kirik-cam', 'Kırık Cam', 0) ON CONFLICT (kind) DO NOTHING;
-INSERT INTO mark_kinds (kind, name, rev) SELECT DISTINCT mark_kind, mark_kind, 0 FROM custom_gifts WHERE mark_kind IS NOT NULL ON CONFLICT (kind) DO NOTHING;
+INSERT INTO mark_kinds (kind, name, rev) SELECT DISTINCT mark_kind, mark_kind, 0 FROM custom_gifts WHERE mark_kind IS NOT NULL AND deleted_at IS NULL ON CONFLICT (kind) DO NOTHING;
 
 -- A mark's time in minutes (5 minutes to 7 days); NULL: the kind's, else Canlı ayarlar'. mark_hours stays written
 -- (rounded up), so a server rolled back to before this keeps a mark at least that long.
 ALTER TABLE custom_gifts ADD COLUMN IF NOT EXISTS mark_minutes integer CHECK (mark_minutes BETWEEN 5 AND 10080);
 
--- 'replaced': another mark took its place (one at a time), or the same kind again with stack 'replace'.
+-- 'replaced': a newer mark of the same kind took its place (the kind's stack 'replace'; before the owners' second
+-- decision of 20 Nov 2026 also another kind's, which nothing writes now).
 ALTER TABLE profile_marks DROP CONSTRAINT IF EXISTS profile_marks_cleared_how_check;
 ALTER TABLE profile_marks ADD CONSTRAINT profile_marks_cleared_how_check CHECK (cleared_how IN ('gift', 'admin', 'self', 'block', 'replaced'));
 

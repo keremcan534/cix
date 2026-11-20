@@ -117,6 +117,13 @@ export function markNotice(fromName, emoji, minutes, clean) {
   return `${fromName} sana ${emoji} attı; ${durationText(minutes)} kalır${clean ? ` ya da biri ${clean} gönderene kadar` : ''}`;
 }
 
+/**
+ * What a leave gift does while `name`'s photo shows a mark of another kind (the owners' decision, 20 Nov 2026): nothing
+ * to the mark; the gift goes as a plain gift. The sentence the sender's app shows (the send's answer `markNote`; the
+ * name stands alone, as everywhere: no suffix after a name anyone chose).
+ */
+export const keptNote = (name, giftName) => `${name ?? 'Bu kişi'}, profilinde zaten bir iz var; ${giftName} düz hediye olarak gitti.`;
+
 // --- Who may leave a mark on me (Gizlilik, privacy.mjs marksFrom) ------------------------------------------------
 /** "Kimler profilime iz bırakabilir": everyone, the people I follow (the default, the owners' decision), nobody. */
 export const MARKS_FROM = ['everyone', 'following', 'nobody'];
@@ -138,6 +145,19 @@ export const marksAllow = (rule, followed) => rule === 'everyone' || (rule === '
  */
 export const MARK_ART = Object.freeze({ minPx: 256, maxPx: 2048, servePx: 512, serveBytes: 300 * 1024, clearMin: 0.3, faceMax: 0.2, faceRadius: 0.3 });
 const pct = (x) => `%${Math.round(x * 100)}`;
+// The third-person possessive ending after a whole number as it is read aloud ("%30'u", "%20'si", "%40'ı", "%14'ü"):
+// the last spoken word decides (bir, iki, üç…; on, yirmi, otuz…; yüz; bin). The panel's web/mark-kinds.js has the same.
+const UNIT_END = ['', 'i', 'si', 'ü', 'ü', 'i', 'sı', 'si', 'i', 'u'];
+const TEN_END = ['', 'u', 'si', 'u', 'ı', 'si', 'ı', 'i', 'i', 'ı'];
+export function possessiveEnd(n) {
+  const v = Math.abs(Math.round(n));
+  if (v === 0) return 'ı';
+  if (v % 10) return UNIT_END[v % 10];
+  if (v % 100) return TEN_END[(v / 10) % 10];
+  return v % 1000 ? 'ü' : 'i';
+}
+/** A share as a percentage with its possessive ending: "%30'u", "%20'si". */
+const pctOf = (x) => `${pct(x)}'${possessiveEnd(Math.round(x * 100))}`;
 /**
  * Why an overlay can't be used, from its header (`info`, custom-gifts.mjs imageInfo) and what the checker measured
  * (`stats`: { width, height, frames, clear, face }), as the Turkish sentence the panel shows; null when it can.
@@ -151,10 +171,10 @@ export function markArtProblem(info, stats) {
   if (!info.alpha) return 'İz resminde saydamlık yok: arka planı tam saydam (alfa 0) bir PNG ya da WebP yükleyin';
   if (!stats) return null;
   if (stats.clear < MARK_ART.clearMin) {
-    return `İz resminin en az ${pct(MARK_ART.clearMin)}'i tam saydam (alfa 0) olmalı, bunda ${pct(stats.clear)}: fotoğraf görünmez kalır. Arka planı silinmiş, kenarlarda çizim olan bir resim yükleyin`;
+    return `İz resminin en az ${pctOf(MARK_ART.clearMin)} tam saydam (alfa 0) olmalı, bunda ${pct(stats.clear)}: fotoğraf görünmez kalır. Arka planı silinmiş, kenarlarda çizim olan bir resim yükleyin`;
   }
   if (stats.face > MARK_ART.faceMax) {
-    return `İz resmi yüzü kapatıyor: ortadaki dairenin en çok ${pct(MARK_ART.faceMax)}'i dolu olabilir, bunda ${pct(stats.face)}. Çizimi kenarlara alın, ortayı boş bırakın`;
+    return `İz resmi yüzü kapatıyor: ortadaki dairenin en çok ${pctOf(MARK_ART.faceMax)} dolu olabilir, bunda ${pct(stats.face)}. Çizimi kenarlara alın, ortayı boş bırakın`;
   }
   return null;
 }
