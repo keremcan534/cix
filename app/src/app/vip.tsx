@@ -22,9 +22,9 @@ import { loadPublicProfile } from '@/lib/live/profile';
 import { buyVip, openPlaySubscriptions, openVipShop, useVipShop } from '@/lib/live/vip';
 import { vipProductOf } from '@/lib/live/vip-core';
 import { featureOff } from '@/lib/remote-control';
-import { SUB_BUY_TITLE, defaultPlanDays, demoBuyText, rightNote, rightsOpen, startIndex, subStatusText, testBuyText, withSetRights } from '@/lib/vip-screen';
+import { SUB_BUY_TITLE, defaultPlanDays, demoBuyText, rightNote, rightsOpen, startIndex, subStatusText, testBuyText, withSetRights, type VipTint } from '@/lib/vip-screen';
 import { VipHeroCarousel } from '@/components/vip/vip-hero';
-import { RightsGrid, RightsHeading, VipPointsInfo } from '@/components/vip/vip-rights';
+import { RightsGrid, RightsHeading, VipPointsInfo, tintOfLevel } from '@/components/vip/vip-rights';
 import { PrivilegeTopBar, VipSubTabs } from '@/components/vip/vip-tabs';
 import { SUB } from '@/components/vip/sub-look';
 import { PlanCards, SubBuyButton, SubStatus } from '@/components/vip/sub-plans';
@@ -67,9 +67,12 @@ function Center({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
   const { dark } = useTheme();
   const night = tab === 'svip';
   const pink = tab === 'vip';
+  // The VIP level picked in the carousel: the page takes its colours (VIP seti).
+  const [picked, setPicked] = useState(0);
+  const tint = night ? tintOfLevel(picked) : null;
   return (
-    <SafeAreaView style={[styles.safe, night && { backgroundColor: VIP_BG }, pink && { backgroundColor: SUB.ground }]}>
-      {night ? <VipBackdrop /> : pink ? <SubBackdrop /> : <Backdrop scene={SCENES.vip} />}
+    <SafeAreaView style={[styles.safe, night && { backgroundColor: tint?.page[1] ?? VIP_BG }, pink && { backgroundColor: SUB.ground }]}>
+      {night ? <VipBackdrop tint={tint} /> : pink ? <SubBackdrop /> : <Backdrop scene={SCENES.vip} />}
       <PrivilegeTopBar
         tab={tab}
         onTab={setTab}
@@ -82,18 +85,18 @@ function Center({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
           )
         }
       />
-      {tab === 'svip' ? <Svip /> : tab === 'vip' ? <Vip /> : <Noble />}
+      {tab === 'svip' ? <Svip onLevel={setPicked} /> : tab === 'vip' ? <Vip /> : <Noble />}
     </SafeAreaView>
   );
 }
 
 /** The VIP tab's ground: the design's night purple, a little lighter at the top and the bottom. */
 const VIP_BG = '#0c071c';
-function VipBackdrop() {
+function VipBackdrop({ tint }: { tint: VipTint | null }) {
   return (
     <View style={[StyleSheet.absoluteFill, { pointerEvents: 'none' }]}>
-      <LinearGradient colors={['#130829', '#0c061f', '#0b061e', '#140b2a']} locations={[0, 0.3, 0.7, 1]} style={StyleSheet.absoluteFill} />
-      <LinearGradient colors={['rgba(110,60,190,0.07)', 'rgba(110,60,190,0)']} style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 260 }} />
+      <LinearGradient colors={tint?.page ?? ['#130829', '#0c061f', '#0b061e', '#140b2a']} locations={[0, 0.3, 0.7, 1]} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={tint ? [tint.pageTop, 'rgba(0,0,0,0)'] : ['rgba(110,60,190,0.07)', 'rgba(110,60,190,0)']} style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 260 }} />
     </View>
   );
 }
@@ -106,7 +109,7 @@ function SubBackdrop() {
 /** Wider windows (web, tablets) keep the phone layout, centred. */
 const VIP_MAX_W = 480;
 
-function Svip() {
+function Svip({ onLevel }: { onLevel: (level: number) => void }) {
   const { svipXp, svipLevel } = useApp();
   // VIP levels and rights as Seviye ve VIP ayarları have them (the app's own until the server says).
   const levels = useLevels();
@@ -119,6 +122,8 @@ function Svip() {
   const contentW = Math.min(width, VIP_MAX_W);
   const [index, setIndex] = useState(() => startIndex(svipLevel, list));
   const lv = list[Math.min(index, list.length - 1)];
+  const picked = lv?.level ?? 0;
+  useEffect(() => onLevel(picked), [picked, onLevel]);
   if (!lv) return null;
   return (
     <ScrollView contentContainerStyle={{ width: contentW, alignSelf: 'center', paddingBottom: 28 }}>
@@ -148,7 +153,7 @@ function Svip() {
         fontScale={fontScale}
         onPress={(r, on) => showAlert(r.name, rightNote(r, on, lv.name, nameOf(r.level)))}
       />
-      <VipPointsInfo decay={decay} width={contentW} />
+      <VipPointsInfo decay={decay} width={contentW} level={lv.level} />
     </ScrollView>
   );
 }

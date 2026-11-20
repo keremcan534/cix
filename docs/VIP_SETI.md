@@ -12,6 +12,16 @@ Müşterinin paketi (20 Kasım): "vip 1-10lvl sistem". İçinde her VIP seviyesi
 | Giriş efekti | Her seviyenin giriş efekti o seviyeye gelenin **Çantam**'ına gelir. Odaya girenin adı efektin üst kısmında, yumuşak koyu bir bandın üstünde yazar. |
 | Giriş efekti resimleri | VIP sayfasına "Giriş efekti" kartı eklendi, seçilen seviyenin resmini gösterir. Aynı resim mağazada efektin ikonu olarak da kullanılır. |
 
+## VIP sayfası rozet renginde (20 Kasım, akşam)
+
+Müşteri: "VIP rozetinin rengiyle ana ekranları eşleştirsin; VIP rozeti tabeladaki çerçevenin yerine gelsin; hepsi böyle eşleşsin."
+
+- **Tabela (üstteki büyük kart):** her seviyede kendi rozetinin renginde (VIP 1–2–4–8 lacivert/mavi, 3 yeşil, 5–6–10 kırmızı, 7–9 mor). Kanatlı halka kalktı, yerine o seviyenin rozeti çıkar. Altın kenar ve altın dalgalar kaldı.
+- **Sayfa zemini, hak kartları ve alttaki bilgi kutusu:** kaydırılan seviyenin rozet renginde; kartların kenarı o seviyenin kenar tonunda (VIP 1 gümüş, VIP 8 buz mavisi, diğerleri altın).
+- Rozetler 192 piksel; tabelada büyütüldüğü için çok keskin ekranlarda hafif yumuşak görünebilir. Paketin büyük rozet dosyaları gelirse daha keskin yapılır.
+- Eski APK'lar eski görünümü gösterir; yeni görünüm yeni APK ile gelir.
+- Tabela resimleri `app/scripts/vip-hero-assets.py` ile üretildi (tasarımın VIP 1 tabelasından, halkasız, rozet rengine boyanmış).
+
 ## Çantam'a gelenler
 
 - Sahibin kararı (20 Kasım): **süresiz**, **satışta değil**. Yalnız VIP ödülü olarak gelir.

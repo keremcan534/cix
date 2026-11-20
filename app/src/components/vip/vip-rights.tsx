@@ -6,7 +6,7 @@ import { Image, Pressable, StyleSheet, View } from 'react-native';
 
 import { Art } from '@/components/Art';
 import { Text } from '@/components/text';
-import { artGlows, artScaleFor, cardMetrics, gridColumns, levelArtFor, lowerCrownFits, rightArtKey, wideSpaces, type ListRight } from '@/lib/vip-screen';
+import { BADGE_COLORS, artGlows, artScaleFor, cardMetrics, gridColumns, levelArtFor, lowerCrownFits, rightArtKey, vipTint, wideSpaces, type ListRight, type VipTint } from '@/lib/vip-screen';
 import { DECO, LOWER_GLOW, PX, RIGHT_ART, SOFT_GLOW } from './assets';
 import { GoldText } from './gold-text';
 import { VIP_LEVEL_ART } from './level-art';
@@ -17,6 +17,13 @@ const HEADING_STOPS = [0.36, 0.47, 0.58, 1] as const;
 const DIM = '#b9a8c9';
 /** Between the last row of cards and the points panel (the lower crown reaches 3 dp under the panel's rim). */
 const PANEL_GAP = 16;
+/** The picked level's colours (its badge's, with the VIP set's rim tones), or null: the design's purple. */
+export const tintOfLevel = (level: number): VipTint | null => {
+  const at = levelArtFor(level);
+  const badge = at ? BADGE_COLORS[at] : undefined;
+  const card = at ? VIP_LEVEL_ART[at]?.card : undefined;
+  return badge && card ? vipTint({ inner: [badge, badge], rim: card.rim }) : null;
+};
 
 export function RightsHeading({ title }: { title: string }) {
   return (
@@ -49,6 +56,7 @@ export function RightsGrid({
   const crownW = DECO.lowerCrown.w * PX;
   const crown = lowerCrownFits(rights.length, cols, m.cardW, m.gap, crownW);
   const k = width / 841; // dp per design px
+  const tint = tintOfLevel(level);
   return (
     <View style={{ paddingHorizontal: m.margin }}>
       {/* The design's purple wave behind the last row's empty cells and the crown, on down the panel's right side
@@ -69,7 +77,7 @@ export function RightsGrid({
       )}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: m.gap, rowGap: m.rowGap }}>
         {rights.map((r) => (
-          <RightCard key={r.name} right={r} level={level} open={r.level <= level} m={m} onPress={() => onPress(r, r.level <= level)} />
+          <RightCard key={r.name} right={r} level={level} tint={tint} open={r.level <= level} m={m} onPress={() => onPress(r, r.level <= level)} />
         ))}
       </View>
       {/* The design's crown in the last row's empty cells, its cut bottom edge under the panel's rim. */}
@@ -82,7 +90,7 @@ export function RightsGrid({
 
 type Metrics = ReturnType<typeof cardMetrics>;
 
-function RightCard({ right, level, open, m, onPress }: { right: ListRight; level: number; open: boolean; m: Metrics; onPress: () => void }) {
+function RightCard({ right, level, tint, open, m, onPress }: { right: ListRight; level: number; tint: VipTint | null; open: boolean; m: Metrics; onPress: () => void }) {
   const key = rightArtKey(right);
   // VIP seti: the picked level's own badge, frame, bubble or entry effect picture, fitted to the picture's box.
   const setLevel = right.set ? levelArtFor(level) : null;
@@ -109,15 +117,16 @@ function RightCard({ right, level, open, m, onPress }: { right: ListRight; level
       <View style={s.topPool}>
         <Image source={SOFT_GLOW} resizeMode="stretch" style={s.topPoolGlow} />
       </View>
-      {/* A thin rim, pale lavender at the top, gold at the bottom, then the dark purple glass. */}
-      <LinearGradient colors={['#e0cde0', '#8a6f84', '#7c5f72', '#ecc99e']} locations={[0, 0.25, 0.75, 1]} style={[s.rim, { padding: m.rim, borderRadius: radius }]}>
-        <LinearGradient colors={['#3e2862', '#281a45', '#1a102e', '#140a1e']} locations={[0, 0.22, 0.5, 1]} style={[s.glass, { borderRadius: radius - m.rim }]}>
+      {/* A thin rim, pale lavender at the top, gold at the bottom, then the dark purple glass; in the picked level's
+          rim and inner colours when it has them (VIP seti). */}
+      <LinearGradient colors={tint?.rim ?? ['#e0cde0', '#8a6f84', '#7c5f72', '#ecc99e']} locations={[0, 0.25, 0.75, 1]} style={[s.rim, { padding: m.rim, borderRadius: radius }]}>
+        <LinearGradient colors={tint?.glass ?? ['#3e2862', '#281a45', '#1a102e', '#140a1e']} locations={[0, 0.22, 0.5, 1]} style={[s.glass, { borderRadius: radius - m.rim }]}>
           {/* The lavender light under the rim's top middle (a soft glow centred on the top edge, no band) and the
               purple at the bottom right. Gradient offsets are in locations, not start/end points: the web keeps
               only a gradient's angle, so both draw it the same. */}
-          <Image source={SOFT_GLOW} resizeMode="stretch" style={[s.topGlow, { top: -m.cardH * 0.34, height: m.cardH * 0.68 }]} />
+          <Image source={SOFT_GLOW} resizeMode="stretch" style={[s.topGlow, { top: -m.cardH * 0.34, height: m.cardH * 0.68 }, tint && { tintColor: tint.glow }]} />
           <LinearGradient
-            colors={['rgba(70,36,118,0)', 'rgba(70,36,118,0)', 'rgba(70,36,118,0.6)']}
+            colors={tint ? ['rgba(0,0,0,0)', 'rgba(0,0,0,0)', tint.corner] : ['rgba(70,36,118,0)', 'rgba(70,36,118,0)', 'rgba(70,36,118,0.6)']}
             locations={[0, 0.5, 1]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
@@ -168,7 +177,8 @@ const STREAK = ['rgba(255,214,140,0)', 'rgba(255,224,160,0.6)', 'rgba(255,246,21
 const STREAK_AT = [0, 0.3, 0.5, 0.7, 1] as const;
 
 /** The bottom panel: how VIP points are earned (the server's rule, as today), then the level drop rule if one is on. */
-export function VipPointsInfo({ decay, width }: { decay: string | null; width: number }) {
+export function VipPointsInfo({ decay, width, level = 0 }: { decay: string | null; width: number; /** The picked level: its colours. */ level?: number }) {
+  const tint = tintOfLevel(level);
   // Under 370 dp a slightly smaller text and crown and tighter padding keep the rule in three lines, as in the design.
   const narrow = width < 370;
   const crownK = narrow ? 0.8 : 1;
@@ -177,22 +187,22 @@ export function VipPointsInfo({ decay, width }: { decay: string | null; width: n
     // The purple light around and under the panel, then its cream-gold rim (rose down the sides) with a light line
     // along the top.
     <View style={s.infoGlow}>
-      <LinearGradient colors={['#f4dccb', '#d9b2b4', '#b98b9e', '#d3a9a6', '#fde6cd']} locations={[0, 0.15, 0.5, 0.85, 1]} style={s.infoRim}>
+      <LinearGradient colors={tint?.infoRim ?? ['#f4dccb', '#d9b2b4', '#b98b9e', '#d3a9a6', '#fde6cd']} locations={[0, 0.15, 0.5, 0.85, 1]} style={s.infoRim}>
         <LinearGradient
-          colors={['#4c336b', '#372452', '#221535', '#170c26', '#170b25', '#1e0f30']}
+          colors={tint?.info ?? ['#4c336b', '#372452', '#221535', '#170c26', '#170b25', '#1e0f30']}
           locations={[0, 0.12, 0.32, 0.5, 0.8, 1]}
           style={[s.info, narrow && s.infoNarrow]}>
           {/* Dark behind the words, violet growing toward the right edge, lavender sheens at the right corners and a
               rose one at the bottom left, as in the design. */}
           <LinearGradient
-            colors={['rgba(110,52,175,0)', 'rgba(110,52,175,0)', 'rgba(120,56,190,0.45)', 'rgba(150,70,215,0.8)']}
+            colors={tint ? [tint.infoSide[0], tint.infoSide[0], tint.infoSide[1], tint.infoSide[2]] : ['rgba(110,52,175,0)', 'rgba(110,52,175,0)', 'rgba(120,56,190,0.45)', 'rgba(150,70,215,0.8)']}
             locations={[0, 0.58, 0.86, 1]}
             start={{ x: 0, y: 0.5 }}
             end={{ x: 1, y: 0.5 }}
             style={StyleSheet.absoluteFill}
           />
-          <Image source={SOFT_GLOW} resizeMode="stretch" style={s.infoSheen} />
-          <Image source={SOFT_GLOW} resizeMode="stretch" style={s.infoSheenLow} />
+          <Image source={SOFT_GLOW} resizeMode="stretch" style={[s.infoSheen, tint && { tintColor: tint.glow }]} />
+          <Image source={SOFT_GLOW} resizeMode="stretch" style={[s.infoSheenLow, tint && { tintColor: tint.glow }]} />
           <Image source={SOFT_GLOW} resizeMode="stretch" style={s.infoSheenLeft} />
           <LinearGradient colors={['rgba(255,226,195,0)', 'rgba(255,232,205,0.4)', 'rgba(255,226,195,0)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.infoTopLight} />
           {/* The design's faint second line just inside the rim. */}

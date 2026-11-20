@@ -488,3 +488,27 @@ describe('VIP seti: her seviyenin kendi resimleri', () => {
     assert.equal(rightNote(other, true, 'VIP 4', 'VIP 1'), 'VIP 4 ile kullanabilirsin.');
   });
 });
+
+describe('VIP sekmesi seviyenin renginde', () => {
+  test('renk karıştırma', async () => {
+    const { mixHex, alphaHex } = await import('@/lib/vip-screen');
+    assert.equal(mixHex('#000000', '#ffffff', 0.5), '#808080');
+    assert.equal(mixHex('#024c14', '#000000', 0), '#024c14');
+    assert.equal(mixHex('kötü', '#ffffff', 0.5), 'kötü');
+    assert.equal(alphaHex('#ff0080', 0.5), 'rgba(255,0,128,0.5)');
+  });
+
+  test('her seviyenin rengi sayfaya, kartlara ve panele; bozuk renk tasarımın morunda kalır', async () => {
+    const { vipTint, BADGE_COLORS } = await import('@/lib/vip-screen');
+    for (let n = 1; n <= 10; n++) assert.match(BADGE_COLORS[n], /^#[0-9a-f]{6}$/i, String(n));
+    const green = vipTint({ inner: ['#024010', '#024C14'], rim: ['#FCF797', '#FCE741'] })!;
+    assert.equal(green.glass[1], '#024C14');
+    assert.deepEqual([green.rim[0], green.rim[3]], ['#FCF797', '#FCE741']);
+    // Green stays green: the page is a deep green, never the purple.
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(green.page[1].slice(i, i + 2), 16));
+    assert.ok(g > r && g > b, green.page[1]);
+    for (const list of [green.page, green.glass, green.info]) for (const h of list) assert.match(h, /^#[0-9a-f]{6}$/i);
+    assert.equal(vipTint(null), null);
+    assert.equal(vipTint({ inner: ['#024010', 'yeşil'], rim: ['#FCF797', '#FCE741'] }), null);
+  });
+});

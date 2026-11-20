@@ -1,5 +1,5 @@
 // The VIP tab's hero ("tabela"): one card per VIP level in a snapping carousel, each on its level's coloured
-// background (assets/vip/hero-<n>.webp: VIP 1 is the design's purple, the others recoloured) inside the design's gold
+// background (assets/vip/hero-<n>.webp: each in its badge's colour without the design's winged ring, scripts/vip-hero-assets.py; the badge is drawn where the ring was) inside the design's gold
 // light (hero-glow.webp, the same on every level), with live text on the left, clear of the winged ring: the level's
 // name and where the member stands (open, progress, points left).
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -8,10 +8,11 @@ import { useEffect, useRef, type ComponentRef } from 'react';
 import { Image, Platform, Pressable, ScrollView, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 
 import { Text } from '@/components/text';
-import { HERO_ART, HERO_BOX, HERO_GLOW, HERO_LOAD, HERO_LOCK, HERO_TEXT, groupDigits, heroFor, snapIndex, statusLine, titleFit, wideSpaces, type HeroStatus } from '@/lib/vip-screen';
+import { HERO_ART, HERO_BADGE, HERO_BOX, HERO_GLOW, levelArtFor, HERO_LOAD, HERO_LOCK, HERO_TEXT, groupDigits, heroFor, snapIndex, statusLine, titleFit, wideSpaces, type HeroStatus } from '@/lib/vip-screen';
 import { useSettings } from '@/store';
 import { DECO, HERO_GLOW_IMAGE, HERO_IMAGES } from './assets';
 import { GoldText } from './gold-text';
+import { VIP_LEVEL_ART } from './level-art';
 
 type Level = { level: number; xp: number; name: string };
 
@@ -124,6 +125,9 @@ function VipHero({ level, width, selected, status, onPress, onLoad }: { level: L
   const statusSize = (locked ? HERO_TEXT.statusLocked : HERO_TEXT.status) * u;
   const tick = status.kind === 'open' && status.text.startsWith('✓ ');
   const fit = titleFit(level.name);
+  // The level's badge where the design's ring was (the hero pictures are drawn without it, in the badge's colour).
+  const art = levelArtFor(level.level);
+  const badge = art ? VIP_LEVEL_ART[art]?.badge : undefined;
   return (
     <View style={{ width, aspectRatio: HERO_BOX.w / HERO_BOX.h }}>
       <Image
@@ -138,6 +142,14 @@ function VipHero({ level, width, selected, status, onPress, onLoad }: { level: L
         style={{ position: 'absolute', left: `${HERO_ART.left * 100}%`, top: `${HERO_ART.top * 100}%`, width: `${HERO_ART.width * 100}%`, height: `${HERO_ART.height * 100}%` }}
         accessibilityIgnoresInvertColors
       />
+      {badge && (
+        <Image
+          source={badge.source}
+          resizeMode="contain"
+          style={{ position: 'absolute', left: HERO_BADGE.left * u, top: HERO_BADGE.top * u, width: HERO_BADGE.size * u, height: HERO_BADGE.size * u, pointerEvents: 'none' }}
+          accessibilityIgnoresInvertColors
+        />
+      )}
       {/* The whole card selects its level; Yükle is its own button on top. */}
       <Pressable
         onPress={onPress}
