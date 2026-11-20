@@ -167,15 +167,42 @@ Ayrıntı: [`OTOMATIK_MESAJ.md`](OTOMATIK_MESAJ.md).
   - Hâlâ görünmeyen biri olursa: o kişinin ID'si ve hangi ekranda olduğu (mikrofon, Balkon, sohbet, Mesajlar). Fotoğrafını eski bir APK'da seçip hiç yeni APK açmamış biri, profilini bir kez açınca fotoğrafı sunucuya gider.
 - **"Şu an odada" (madde 15):** Birinin profilinde bulunduğu oda yine görünüyor: "Şu an odada: <oda> · Git". Şifreli odada "Şifreli oda · girişte şifre sorulur". Kişinin "Bulunduğum odayı göster" ayarına uyar (başta açık); engellenen kişiye, giremeyeceği odada ve bire bir görüşmede görünmez. "Git" ile (profil, ajans sohbeti, aile) gelen için odadaki herkes "Kaan, Artemis'i takip ederek geldi" görür, Artemis hâlâ odadaysa. Eski APK'lar profilde odayı göstermez ve girişte yine "X odaya girdi" yazar. **Telefonda denenmeli:** satır, ses sunucusunun (LiveKit 1.9.1) giriş anahtarındaki katılımcı özelliğine dayanıyor; bilgisayarda değil, gerçek iki telefonla denenmeli.
 
-## Profil izleri: 💩 Kaka ve 💧 Su (yeni APK)
+## Profil izleri: 💩 Kaka ve 💧 Su (G7 APK)
 
-- **Kutlama rafı:** 💩 Kaka (999 jeton) alıcının profil fotoğrafında biraz pislik ve küçük bir 💩 bırakır; 💧 Su (1.999 jeton) temizler, elması temizlenen kişiye gider. İz 24 saat kalır (Canlı ayarlar › Profil izleri), ikinci Kaka süreyi yeniden başlatır. Temiz profile Su düz hediyedir. Ayrıntı: [`PROFIL_IZLERI.md`](PROFIL_IZLERI.md).
-- **Nerede:** profil fotoğrafı, odadaki kişi kartı, mikrofon koltuğu (çerçevenin altında). İz düşerken fotoğrafa çarpar, Su gelince su sıçrar ve leke akıp gider.
-- **Alıcıya:** odada "Ali sana 💩 attı; 24 saat kalır ya da biri 💧 gönderene kadar", oda dışında aynı cümle bildirim olarak; kendi profilinde kimin bıraktığı ve ne zaman gideceği yazar.
-- **İstemeyen:** Ayarlar › Gizlilik › "Profilime iz bırakılmasın". Açınca izi gider, Kaka ona jeton düşmeden reddedilir; hediye panelinde o kişi seçiliyse Kaka soluk görünür.
-- **Eski APK:** Kaka ve Su görünmez, izleri çizmez, Gizlilik'te seçenek yok. Sunucu kuralları (reddetme dahil) her uygulamaya işler.
-- **Panel:** hediye formunda "Profil izi" ve kişinin izlerini kaldırma için sunucu hazır; panel sayfaları henüz yok.
-- **Telefonda denenmeli:** iki telefonla odada Kaka ve Su (koltuk, sohbet satırı, su sıçraması), oda dışından Kaka bildirimi, Gizlilik'te kapatınca Kaka'nın soluklaşması.
+Güncelleme 7'de geldi; 20 Kasım'da "Muzip hediyeler" ile değişti (aşağıda). Ayrıntı: [`PROFIL_IZLERI.md`](PROFIL_IZLERI.md).
+
+## Muzip hediyeler (yeni APK 1.1.0, sunucu bu dalda; canlıda değil)
+
+- **Raf adı Muzip** (eski adı Kutlama). Eski APK'lar "Kutlama" yazmaya devam eder.
+- **Pilot çiftler:**
+  - 💩 **Kaka Şakası** → Kaka İzi → 💧 **Temizlik Suyu**: hazır.
+  - 🩴 **Terlik Geldi!** → Kırık Cam → **Cam Tamiri**: panelden kurulur, adımlar
+    [`HEDIYE_YONETIMI.md`](HEDIYE_YONETIMI.md).
+  - Fiyatları siz verirsiniz. Süre 24 saat.
+- **Yeni iz türleri panelden**, uygulama güncellemesi olmadan: ad, saydam iz resmi (sunucu piksel piksel denetler),
+  dakika cinsinden süre, aç/kapat. Yeni APK yüklenen resmi çizer. G7 APK yalnız Kaka İzi'ni çizer, öteki türlerde
+  hediyenin küçük resmini gösterir.
+- **Aynı anda tek iz:** iz varken başka türün hediyesi düz hediye gider (iz değişmez, uygulama göndermeden önce ve sonra
+  söyler); aynı tür izi yeniler ama hiç kısaltmaz.
+- **Gizlilik › "Kimler profilime iz bırakabilir?":** Herkes / **Yalnız takip ettiklerim** (varsayılan) / Kimse.
+  "Profilime iz bırakılmasın" artık mevcut izi kaldırmaz.
+- **Ücretsiz kaldırma yok** (sizin kararınız; risk [`DENETIM.md`](DENETIM.md)'de).
+- **Birden çok alıcı:** izi kabul etmeyen yalnız kendisi reddedilir, jeton düşmez, ötekilere gider.
+- **Eski APK (f9671d9 ve öncesi):** iz kurallı hiçbir hediyeyi görmez (Kar Topu ve Domates At de kalktı).
+- **Yönetim › Hediyeler › "İz türlerini önizle":** türler telefonun kendi çiziminde, gerçek koltuk (30/52/96/112), kart
+  (78) ve profil (96) boylarında; açık/koyu zemin, VIP ve mağaza çerçevesiyle. Canlı sürümde yalnız yönetici açar.
+- **Panel:** İz türleri sayfası, hediye formunda tür listesi ve dakika, `markart` yüklemesi: panel deposunun aynı adlı
+  dalında hazır, birleşmedi.
+- **Telefonda denenmeli:**
+  - İki telefonla odada Terlik Geldi! → Cam Tamiri ve Kaka Şakası → Temizlik Suyu: koltuk, kart, profil, sohbet
+    satırı, düşüş, su ve parıltı.
+  - 30 ve 52 boyundaki koltukta kırık camın okunması: geçici resim ince, gerçek sanat daha kalın çizgili olmalı.
+  - "Yalnız takip ettiklerim"de soluk hediye ve red cümlesi.
+  - Kaka İzi olan birine Terlik Geldi!: göndermeden önceki uyarı, gönderdikten sonraki sohbet satırı, iz değişmeden
+    kalması.
+  - Birden çok kişiye gönderim.
+  - G7 APK'nın aynı odada yeni bir türü (rozetle) göstermesi.
+  - Düşük donanımda performans.
 
 ## Depo (R2): kuruldu, az yer kaplıyor
 

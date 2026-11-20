@@ -74,7 +74,7 @@ Bunlar olmadan ilgili mühendislik işi bitemez. Sıra, yayına etkisine göre.
 
 | | Durum |
 |---|---|
-| Yaş derecesi anketleri (IARC, Apple): 18+, kullanıcı içeriği, varsa simüle şans oyunu | ⏳ |
+| Yaş derecesi anketleri (IARC, Apple): 18+, kullanıcı içeriği, varsa simüle şans oyunu; Muzip hediyelerin profil izi (💩, kırık cam) için "kaba mizah" sorusu ve kullanıcının kullanıcıyı küçük düşürebildiği etkileşim ([`PROFIL_IZLERI.md`](PROFIL_IZLERI.md), ücretsiz kaldırma yok: [`DENETIM.md`](DENETIM.md)) | ⏳ |
 | Veri güvenliği formu (Play) ve gizlilik etiketleri (Apple): telefon, e-posta adresi (giriş; Brevo, Resend ve WhatsApp açılırsa Meta veri işleyen olarak gizlilik politikasında), ad, doğum tarihi, şehir, fotoğraf/selfie, ses, mesajlar, satın almalar (mağaza ürünleri dahil; giyilen çerçeve, efekt ve özel numarayı başkaları görür) | ⏳ |
 | Uygulama içi hesap silme | ✅ sunucu · ⏳ uygulama bağlantısı |
 | Web'den hesap silme bağlantısı (Play şartı) | ⏳ alan adıyla |

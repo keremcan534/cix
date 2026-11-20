@@ -1,8 +1,10 @@
-// Profil izleri (profile-marks.mjs, docs/PROFIL_IZLERI.md): 💩 Kaka leaves a mark on its receiver's profile photo for
-// Canlı ayarlar › Profil izleri hours (24) or until someone sends 💧 Su (dearer), whose diamonds go to the cleaned
-// person. A second Kaka starts the time again; Su on a clean profile is a plain gift; someone who refuses marks
-// (Gizlilik) is never sent a Kaka and nothing moves; staff take a mark off with an audit row; a block takes off the
-// blocked person's mark. An older app's catalog has neither gift; a Kaka it sends still leaves the mark.
+// Profil izleri (profile-marks.mjs, docs/PROFIL_IZLERI.md): 💩 Kaka Şakası leaves a mark on its receiver's profile
+// photo for Canlı ayarlar › Profil izleri hours (24) or until someone sends 💧 Temizlik Suyu (dearer), whose diamonds go
+// to the cleaned person. A second Kaka starts the time again; Su on a clean profile is a plain gift; someone who refuses
+// marks (Gizlilik) is never sent a Kaka and nothing moves, and the marks they have stay; staff take a mark off with an
+// audit row; a block takes off the blocked person's mark. An older app's catalog has neither gift; a Kaka it sends
+// still leaves the mark. The people marked here let everyone mark them (marksFrom everyone; the default, only the
+// people they follow, and the rest of Muzip hediyeler are test/muzip.test.mjs).
 import { after, describe, test, before } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
@@ -81,6 +83,7 @@ describe('Profil izleri', () => {
     can = await h.signUp('Can Temizleyen');
     deniz = await h.signUp('Deniz Diğer');
     for (const p of [ali, can, deniz]) await h.credit(p.user.id, 100_000);
+    for (const p of [ayse, deniz]) await ok(call('PATCH', '/api/me/privacy', { marksFrom: 'everyone' }, p.session), 'herkes iz bırakabilir');
   });
 
   test('katalog: eski uygulama Kaka ve Su görmez; yenisi (marks=1) kuralıyla görür', async () => {
@@ -90,8 +93,8 @@ describe('Profil izleri', () => {
     const fresh = await ok(call('GET', '/api/catalog?gifts=2&marks=1'), 'yeni katalog');
     const k1 = fresh.gifts.find((g) => g.id === 'k1');
     const k2 = fresh.gifts.find((g) => g.id === 'k2');
-    assert.deepEqual(k1, { id: 'k1', name: 'Kaka', emoji: '💩', price: 999, cat: 'gameplay', minSvip: 0, mark: { role: 'leave', kind: 'kaka', hours: 24 } });
-    assert.deepEqual(k2, { id: 'k2', name: 'Su', emoji: '💧', price: 1999, cat: 'gameplay', minSvip: 0, mark: { role: 'clean', kind: 'kaka' } });
+    assert.deepEqual(k1, { id: 'k1', name: 'Kaka Şakası', emoji: '💩', price: 999, cat: 'gameplay', minSvip: 0, mark: { role: 'leave', kind: 'kaka', hours: 24 } });
+    assert.deepEqual(k2, { id: 'k2', name: 'Temizlik Suyu', emoji: '💧', price: 1999, cat: 'gameplay', minSvip: 0, mark: { role: 'clean', kind: 'kaka' } });
     assert.ok(!fresh.gifts.find((g) => g.id === 'g6').mark, 'düz hediyenin kuralı yok');
   });
 
@@ -175,7 +178,8 @@ describe('Profil izleri', () => {
     const two = await ok(kaka(ali, ayse, { ref }), 'aynı istek');
     assert.equal(one.replay, false);
     assert.equal(two.replay, true);
-    assert.equal(two.mark, undefined, 'tekrar iz yazmaz');
+    // The retry answers the mark that request left (a phone whose first answer was lost draws it), writing none.
+    assert.deepEqual(two.mark, { ...one.mark, again: false }, 'tekrar aynı izi söyler');
     assert.equal((await balances(ali))[ali.user.id][0], before[ali.user.id][0] - 999);
     assert.equal((await q('SELECT count(*)::int AS n FROM profile_marks WHERE gift_event_id = (SELECT id FROM gift_events WHERE sender = $1 AND ref = $2)', [ali.user.id, ref]))[0].n, 1);
     // 24 hours later: gone, and Su is a plain gift.
@@ -185,28 +189,34 @@ describe('Profil izleri', () => {
     assert.equal((await ok(su(can, ayse), 'süresi dolmuşa su')).mark, undefined);
   });
 
-  test('"Profilime iz bırakılmasın": izi gider, Kaka para oynamadan reddedilir; Su düz hediye; tekrar açılır', async () => {
+  test('"Profilime iz bırakılmasın": yeni Kaka para oynamadan reddedilir, mevcut iz kalır; Su temizler; tekrar açılır', async () => {
     await ok(kaka(ali, ayse), 'kaka');
     const ref = `m-before-off-${rnd()}`;
     await ok(kaka(deniz, ayse, { ref }), 'kapatmadan önce');
     const p = await ok(call('PATCH', '/api/me/privacy', { profileMarks: false }, ayse.session), 'gizlilik');
     assert.equal(p.privacy.profileMarks, false);
-    assert.deepEqual((await profile(ayse, ayse)).marks, [], 'kapatınca iz gider');
-    assert.equal((await rows(ayse)).filter((m) => m.cleared_how === 'self').length, 1);
+    assert.equal(p.privacy.marksFrom, 'nobody', 'eski anahtar: kimse');
+    // The owners' decision (20 Nov 2026): the switch blocks new marks, the one showing stays.
+    assert.equal((await profile(ayse, ayse)).marks.length, 1, 'kapatınca mevcut iz kalır');
+    assert.equal((await rows(ayse)).filter((m) => m.cleared_how === 'self').length, 0);
     assert.equal((await looks(deniz, ayse)).noMarks, true, 'odadakiler bilir');
     const before = await balances(ali, ayse);
     const events = (await q('SELECT count(*)::int AS n FROM gift_events'))[0].n;
     const [st, j] = await kaka(ali, ayse);
     assert.equal(st, 403);
     assert.equal(j.code, 'marks_off');
-    assert.match(j.error, /^Ayşe Alan, profiline iz bırakılmasını kapattı\. Kaka ona gönderilemez/);
+    assert.match(j.error, /^Ayşe Alan, profiline iz bırakılmasını kapattı\. Kaka Şakası ona gönderilemez/);
     assert.deepEqual(await balances(ali, ayse), before, 'hiçbir şey oynamadı');
     assert.equal((await q('SELECT count(*)::int AS n FROM gift_events'))[0].n, events, 'hediye kaydı yok');
     // A retry of a Kaka that went through before: its replay, not the refusal.
     const again = await ok(kaka(deniz, ayse, { ref }), 'önceki isteğin tekrarı');
     assert.equal(again.replay, true);
-    assert.equal((await ok(su(can, ayse), 'su')).mark, undefined, 'Su düz hediye');
-    await ok(call('PATCH', '/api/me/privacy', { profileMarks: true }, ayse.session), 'yeniden aç');
+    assert.equal((await ok(su(can, ayse), 'su')).mark?.role, 'clean', 'Su kalan izi temizler');
+    assert.equal((await ok(su(can, ayse), 'su')).mark, undefined, 'temiz profile Su düz hediye');
+    // On again from an app that has only the switch: back to the choice before (everyone here).
+    const on = await ok(call('PATCH', '/api/me/privacy', { profileMarks: true }, ayse.session), 'yeniden aç');
+    assert.equal(on.privacy.marksFrom, 'following', 'kapatınca seçim gitti: yeniden açınca varsayılan');
+    await ok(call('PATCH', '/api/me/privacy', { marksFrom: 'everyone' }, ayse.session), 'herkes');
     assert.equal((await ok(kaka(ali, ayse), 'açınca kaka')).mark.role, 'leave');
   });
 
@@ -253,19 +263,24 @@ describe('Profil izleri', () => {
     const update = (body) => call('POST', '/api/admin/gifts/update', body, admin.session);
     const [s1, j1] = await update({ id: 'k2', price: 999 });
     assert.equal(s1, 400);
-    assert.match(j1.error, /^Su izi temizlediği için onu bırakan hediyelerden pahalı olmalı: Kaka 999 jeton, bu 999 jeton\.$/);
+    assert.match(j1.error, /^Temizlik Suyu izi temizlediği için onu bırakan hediyelerden pahalı olmalı: Kaka Şakası 999 jeton, bu 999 jeton\.$/);
     const [s2, j2] = await update({ id: 'k1', price: 2500 });
     assert.equal(s2, 400);
-    assert.match(j2.error, /^Kaka iz bıraktığı için onu temizleyen hediyelerden ucuz olmalı: Su 1\.999 jeton, bu 2\.500 jeton\.$/);
+    assert.match(j2.error, /^Kaka Şakası iz bıraktığı için onu temizleyen hediyelerden ucuz olmalı: Temizlik Suyu 1\.999 jeton, bu 2\.500 jeton\.$/);
     // An admin's gift that cleans the same kind must also cost more than Kaka; one that leaves it, less than Su.
     const up = await ok(call('POST', '/api/media/upload-url', { kind: 'gifticon', contentType: 'image/png', size: 1000 }, admin.session), 'ikon adresi');
     const make = (body) => call('POST', '/api/admin/gifts', { cat: 'gameplay', icon: up.publicUrl, ...body }, admin.session);
     const [s3, j3] = await make({ name: 'Sabun', price: 500, mark: { role: 'clean', kind: 'kaka' } });
     assert.equal(s3, 400, 'ucuz temizleyici');
-    assert.equal(j3.error, 'Sabun izi temizlediği için onu bırakan hediyelerden pahalı olmalı: Kaka 999 jeton, bu 500 jeton.');
+    assert.equal(j3.error, 'Sabun izi temizlediği için onu bırakan hediyelerden pahalı olmalı: Kaka Şakası 999 jeton, bu 500 jeton.');
     assert.equal((await make({ name: 'Çamur', price: 1999, mark: { role: 'leave', kind: 'kaka' } }))[0], 400, 'Su kadar pahalı bırakan');
+    // A kind is one of İz türleri (mark-kinds.mjs): a word nobody made is refused.
+    const [s0, j0] = await make({ name: 'Çamur', price: 300, mark: { role: 'leave', kind: 'camur', hours: 6 } });
+    assert.equal(s0, 400);
+    assert.match(j0.error, /^"camur" diye bir iz türü yok/);
+    await ok(call('POST', '/api/admin/mark-kinds', { kind: 'camur', name: 'Çamur' }, admin.session), 'tür');
     const mud = await ok(make({ name: 'Çamur', price: 300, mark: { role: 'leave', kind: 'camur', hours: 6 } }), 'başka bir iz');
-    assert.deepEqual(mud.gift.mark, { role: 'leave', kind: 'camur', hours: 6 });
+    assert.deepEqual(mud.gift.mark, { role: 'leave', kind: 'camur', hours: 6, minutes: 360 });
     assert.equal((await make({ name: 'Hortum', price: 300, mark: { role: 'clean', kind: 'camur' } }))[0], 400, 'çamurdan pahalı olmalı');
     const hose = await ok(make({ name: 'Hortum', price: 301, mark: { role: 'clean', kind: 'camur' } }), 'çamuru temizleyen');
     assert.equal((await update({ id: mud.gift.id, price: 301 }))[0], 400, 'bırakan temizleyen kadar olamaz');
@@ -273,7 +288,7 @@ describe('Profil izleri', () => {
     assert.equal((await ok(update({ id: mud.gift.id, price: 5000 }), 'temizleyen yokken serbest')).gift.price, 5000);
     for (const id of [mud.gift.id, hose.gift.id]) await ok(call('POST', '/api/admin/gifts/delete', { id }, admin.session), 'sil');
     const g = await ok(update({ id: 'k1', price: 1500, mark: { role: 'leave', kind: 'kaka', hours: 2 } }), 'kaka 1.500, 2 saat');
-    assert.deepEqual(g.gift.mark, { role: 'leave', kind: 'kaka', hours: 2 });
+    assert.deepEqual(g.gift.mark, { role: 'leave', kind: 'kaka', hours: 2, minutes: 120 });
     assert.deepEqual(g.gift.changed.sort(), ['mark', 'price']);
     assert.equal((await call('POST', '/api/admin/gifts/update', { id: 'k1', mark: { role: 'leave', kind: 'kaka', hours: 500 } }, admin.session))[0], 400);
     assert.equal((await call('POST', '/api/admin/gifts/update', { id: 'k2', mark: { role: 'clean', kind: 'kaka', hours: 3 } }, admin.session))[0], 400, 'temizleyenin süresi olmaz');
@@ -287,10 +302,10 @@ describe('Profil izleri', () => {
     assert.equal(os, 409);
     assert.equal(oj.code, 'update_required');
     const back = await ok(call('POST', '/api/admin/gifts/reset', { id: 'k1' }, admin.session), 'geri al');
-    assert.deepEqual(back.gift.mark, { role: 'leave', kind: 'kaka', hours: null });
+    assert.deepEqual(back.gift.mark, { role: 'leave', kind: 'kaka', hours: null, minutes: null });
     assert.deepEqual(back.gift.changed, []);
     const audit = (await q("SELECT detail FROM audit_events WHERE action = 'gift.update' AND detail->>'gift' = 'k1' ORDER BY id DESC LIMIT 1"))[0];
-    assert.deepEqual(audit.detail.after.mark, { role: 'leave', kind: 'kaka', hours: 2 });
+    assert.deepEqual(audit.detail.after.mark, { role: 'leave', kind: 'kaka', hours: 2, minutes: 120 });
     // Kaka made a plain gift: no mark.
     await ok(update({ id: 'k1', mark: null }), 'düz hediye');
     await sleep(300);
@@ -318,9 +333,9 @@ describe('Profil izleri', () => {
     assert.ok(mine.profileMarks.received.length >= 5);
     const first = mine.profileMarks.received[0];
     assert.deepEqual(first.from, { id: ali.user.id, name: 'Ali Atan' });
-    assert.equal(first.gift, 'Kaka');
+    assert.equal(first.gift, 'Kaka Şakası');
     assert.deepEqual(mine.profileMarks.left, []);
-    assert.equal(mine.privacy.settings, null, 'ayar varsayılana döndü');
+    assert.equal(mine.privacy.settings.marks_from, 'everyone', 'kimlerin iz bırakabileceği kopyada');
     const theirs = await ok(call('GET', '/api/me/export', null, ali.session), 'kopya');
     assert.ok(theirs.profileMarks.left.length >= 3);
     assert.deepEqual(theirs.profileMarks.left[0].on, { id: ayse.user.id, name: 'Ayşe Alan' });
@@ -360,6 +375,7 @@ describe('Profil izleri', () => {
   test('hesap silinince üzerindeki izler gider, bıraktıkları adsız kalır', async () => {
     const gone = await h.signUp('Gidecek');
     await h.credit(gone.user.id, 5_000);
+    await ok(call('PATCH', '/api/me/privacy', { marksFrom: 'everyone' }, gone.session), 'herkes');
     await ok(kaka(gone, deniz), 'kaka');
     await ok(kaka(ali, gone), 'kaka');
     await ok(call('DELETE', '/api/me', null, gone.session), 'sil');

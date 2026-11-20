@@ -201,21 +201,56 @@ Hukuk riski Kritik §1'de. Bu işte ayrıca:
 - **Yük:** videolar öteki hediye videoları gibi API sunucusundan iner (CDN yok, "Medya dağıtımı"); yalnız satıştaki
   paketlerin videosu ve yalnız yeni APK'ya listelenir.
 
-## Profil izleri: taciz riski (19 Kasım 2026)
+## Muzip hediyeler ve profil izleri: taciz ve mağaza riski (19–20 Kasım 2026, sahiplerin kararı)
 
-Kutlama rafındaki 💩 Kaka, alıcının profil fotoğrafına herkesin göreceği bir "pislik" bırakır; temizlemek için başkasının
-1.999 jetonluk 💧 Su göndermesi gerekir ([`PROFIL_IZLERI.md`](PROFIL_IZLERI.md)).
+Muzip rafında iz bırakan hediyeler var: 💩 Kaka Şakası ve 🩴 Terlik Geldi!. Alıcının profil fotoğrafına herkesin
+göreceği bir "pislik" ya da "kırık cam" bırakırlar. İz süresi dolunca ya da başkası temizleyen hediyeyi (💧 Temizlik
+Suyu, Cam Tamiri) gönderince gider ([`PROFIL_IZLERI.md`](PROFIL_IZLERI.md)).
 
-- **Mağaza riski (siz: karar):** herkese görünen aşağılayıcı bir işaret birini küçük düşürmek için kullanılabilir; Google
-  Play'in **Zorbalık ve taciz** politikası buna bakar, en çok kadın yayıncılara karşı. "Utancını başkası parayla
-  temizlesin" düzeni manipülatif bir ödeme biçimi gibi de görülebilir. İnceleme sorarsa aşağıdaki önlemler gösterilir.
-- **Önlemler (yapıldı):** kişi Ayarlar › Gizlilik'ten tek dokunuşla kapatır (izi de hemen gider, ona Kaka jeton düşmeden
-  reddedilir); iz 24 saatte kendiliğinden gider; engelleme hem yeni izi önler hem bırakılanı kaldırır; yönetim
-  (`POST /api/admin/marks/clear`, denetim kaydıyla) izi kaldırır; Canlı ayarlar › Profil izleri › süre 0 bütün özelliği
-  kapatır. Uygulamada "temizlemek için harca" diyen bir yönlendirme yok.
-- **Açık kalanlar:** eski APK kullanan kişi Gizlilik'te seçeneği göremez (sunucu yine de uyar; yeni APK dağıtılınca
-  Zorunlu sürüm yükseltilmeli). Panelde iz kaldırma sayfası henüz yok (sunucu uçları hazır, panel deposunun işi); o
-  zamana kadar şikâyet gelirse Canlı ayarla özellik kapatılabilir. Şikâyet akışında "profil izi" diye ayrı bir sebep yok.
+- **Ücretsiz kaldırma yok: sizin kararınız (20 Kasım 2026).** Kişi kendi izini kendisi kaldıramaz. Şartnamenin güvenlik
+  kuralı (§7C: "profil sahibi istemediği izi ücretsiz, hemen kaldırabilir") bilerek uygulanmadı.
+  - **Mağaza riski:** Herkese görünen aşağılayıcı bir işaret birini küçük düşürmek için kullanılabilir. Google Play
+    **Zorbalık ve taciz** politikası ve App Store 1.1 buna bakar, en çok kadın yayıncılara karşı.
+  - Kişinin izi kaldırmasının tek hızlı yolu başkasının para harcaması. Bu, "utancını parayla temizlet" diye
+    manipülatif bir ödeme düzeni gibi görülebilir.
+  - Mağaza incelemesi ya da bir şikâyet bunu sorarsa ilk istenecek şey tek dokunuşla ücretsiz kaldırmadır. Gerekirse
+    Claude ekler (kod hazır değil, bilerek yapılmadı).
+  - Karar sizin; riski burada yazılı.
+- **Azaltanlar (yapıldı):**
+  - "Kimler profilime iz bırakabilir" **varsayılanı "Yalnız takip ettiklerim"**: kişinin takip etmediği biri iz
+    bırakamaz. Ayarı hiç seçmemiş herkes ve eski APK kullananlar da bu kuraldadır.
+  - "Kimse" seçeneği ve "Profilime iz bırakılmasın" anahtarı yeni izi engeller. Reddedilen gönderimde jeton düşmez.
+  - İz kendiliğinden gider (pilotlarda 24 saat).
+  - Engelleme hem yeni izi önler hem o kişinin bıraktığı izi hemen kaldırır (bugünkü gibi kaldı). Fiilen tek ücretsiz
+    kaldırma yolu bu. **Engel yarışı (kapandı, incelemede bulundu):** engellemeden hemen önce yola çıkmış bir iz hediyesi
+    engelden sonra işlenip izi 24 saat bırakabiliyordu. Artık engel iki kişinin kilidi altında yeniden okunur: yoldaki
+    hediye ya reddedilir ya da engel izi hemen ardından kaldırır (test 20 turda 0; düzeltmesiz aynı test iz bırakıyor).
+  - **Ucuz temizleme yok (kapandı, sahiplerin ikinci kararı, 20 Kasım 2026):** iz varken başka türden bir iz hediyesi
+    izi değiştirmez, düz hediye olarak gider; aynı tür izi hiç kısaltmaz. Önceden 500 jetonluk başka tür bir hediye
+    24 saatlik izin yerine geçebiliyor, 777 jetonluk 5 dakikalık aynı tür hediye onu 5 dakikaya indirebiliyordu.
+  - Yönetim izi kaldırır (`POST /api/admin/marks/clear`, denetim kaydıyla).
+  - Bir tür panelden anında kapatılır. Canlı ayarlar › Profil izleri › süre 0 bütün özelliği kapatır.
+  - İz hediyesi Global olamaz: bütün ülkeye duyurulmaz.
+  - Hiçbir ekranda "temizlemek için harca" yok.
+- **Değişen (sizin kararınız):** "Profilime iz bırakılmasın" artık **profildeki izi kaldırmaz**, yalnız yenisini
+  engeller.
+- **Sıklık sınırı yok (sizin kararınız):** Aynı kişi aynı kişiye art arda iz bırakabilir. Taciz şikâyeti gelirse ilk
+  bakılacak önlem bu. Panelde "bu kişinin bıraktığı izler" görünümü ve şikâyette "profil izi" sebebi de yok, sonraki
+  iş.
+- **İçerik derecesi:** Mağaza formunda "kaba mizah" işaretlenmesi gerekebilir ([`YAYIN_HAZIRLIGI.md`](YAYIN_HAZIRLIGI.md)).
+  Doğrulanmadı.
+- **Açık kalanlar:**
+  - Panelde İz türleri, iz kaldırma ve hediye formundaki dakika alanı panel deposunun dalında hazır, birleşmedi.
+  - Eski APK'larda Gizlilik'te "Kimler iz bırakabilir" yok; varsayılan onlar için de geçerli.
+  - Odadaki görünüm paketinde kimin izin verildiği kişiye göre değil. Eski APK, "Yalnız takip ettiklerim" diyen birine
+    hediyeyi bazen soluk göstermeden dener; sunucu jeton düşmeden reddeder.
+  - **G7 APK'nın (preview-191/192) içindeki üç eski cümle** artık doğru değil ve sunucu değiştiremez: Gizlilik
+    anahtarının açıklaması ("profilindeki iz de hemen gider"), kendi izinin notu ("İstemezsen Ayarlar › Gizlilik'ten
+    kapatabilirsin": kapatmak olan izi kaldırmaz) ve hediye panelinin reddi ("profiline iz bırakılmasını kapattı",
+    "Yalnız takip ettiklerim" yüzünden reddedilenlere de). Para ve kurallar doğru çalışır, yalnız yazılar yanlış. G7 iz
+    varken başka türün hediyesinin düz gittiğini de söylemez. **Çaresi (siz):** 1.1.0 dağıtılınca Canlı ayarlar ›
+    Zorunlu sürüm `1.1.0`, 1.1.0 APK'nın Yönetim › Canlı ayarlar ekranından (panel sürüm göndermediği için oradan
+    kaydedilmez). Ayrıntı [`PROFIL_IZLERI.md`](PROFIL_IZLERI.md) › "Hangi uygulama ne görür".
 
 ## Mesaj bildirimi varsayılanı (18 Kasım 2026, sahip kararı)
 

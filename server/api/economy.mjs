@@ -39,6 +39,7 @@ import { live } from './live-settings.mjs';
 import { roomPacket, roomService, voiceRoomsOf } from './live.mjs';
 import { paidCoins, spendCoins } from './wallet.mjs';
 import { marksView } from './profile-marks.mjs';
+import { marksAllow, marksRuleOf } from './profile-mark-rules.mjs';
 import { wealthPoints } from './wheel.mjs';
 
 const DAY = 86_400_000;
@@ -301,9 +302,11 @@ export async function economyOf(uid, q = db) {
 /**
  * What others see of each person in `ids`: the worn items that are live, the highest live noble tier, the VIP level,
  * the gender that colors their speaking ring and their photo (rooms draw their mic and Balkon face with it), the
- * profile marks on that photo (`marks`) and `noMarks` when they refuse new ones (Profil izleri).
+ * profile marks on that photo (`marks`), who may leave one (`marksFrom`: everyone, following, nobody) and `noMarks`
+ * when a new one would be refused (Profil izleri): for `viewer` (GET /api/looks: someone they don't follow, under
+ * "following"), else (a room's look packet, heard by everyone there) only when nobody may.
  */
-export async function looksOf(ids, q = db) {
+export async function looksOf(ids, q = db, viewer = null) {
   if (!ids.length) return {};
   const r = await q.query(
     `SELECT u.id, u.name, u.equipped, u.svip_xp, u.gender, u.gender_hidden, u.avatar_url,
@@ -311,14 +314,17 @@ export async function looksOf(ids, q = db) {
             (SELECT coalesce(array_agg(e.kind || ':' || e.sku), '{}') FROM entitlements e WHERE e.user_id = u.id AND e.kind = ANY($2::text[]) AND ${LIVE}) AS owned,
             (SELECT json_agg(json_build_object('kind', m.kind, 'gift_id', m.gift_id, 'expires_at', m.expires_at) ORDER BY m.id) FROM profile_marks m
               WHERE m.user_id = u.id AND m.cleared_at IS NULL AND m.expires_at > now()) AS marks,
-            coalesce((SELECT p.profile_marks FROM privacy_settings p WHERE p.user_id = u.id), true) AS marks_open
-       FROM users u WHERE u.id = ANY($1::uuid[])`,
-    [ids, SLOTS],
+            p.profile_marks, p.marks_from,
+            ($3::uuid IS NOT NULL AND EXISTS (SELECT 1 FROM follows f WHERE f.follower = u.id AND f.followee = $3)) AS follows_viewer
+       FROM users u LEFT JOIN privacy_settings p ON p.user_id = u.id WHERE u.id = ANY($1::uuid[])`,
+    [ids, SLOTS, viewer],
   );
   const out = {};
   for (const x of r.rows) {
     const worn = wornOf(x.equipped, (slot, sku) => x.owned.includes(`${slot}:${sku}`));
     const noble = x.noble === null ? null : Number(x.noble);
+    const marksFrom = marksRuleOf(x.profile_marks ?? true, x.marks_from);
+    const refused = marksFrom === 'nobody' || (viewer !== null && viewer !== x.id && !marksAllow(marksFrom, x.follows_viewer));
     // The gender colors their speaking ring in rooms (pink, blue); a hidden one is none, as on the profile.
     out[x.id] = {
       ...Object.fromEntries(SLOTS.map((s) => [s, worn[s] ?? null])),
@@ -329,9 +335,11 @@ export async function looksOf(ids, q = db) {
       // screen has read yet (a new account) would sit on a mic without their photo.
       name: x.name,
       avatarUrl: x.avatar_url ?? null,
-      // Profil izleri (profile-marks.mjs): the marks on their photo now, and whether they refuse new ones.
+      // Profil izleri (profile-marks.mjs): the marks on their photo now, who may leave one, and whether a new one
+      // would be refused (an app before marksFrom greys its mark gifts by noMarks alone).
       marks: marksView(x.marks ?? []),
-      ...(!x.marks_open && { noMarks: true }),
+      marksFrom,
+      ...(refused && { noMarks: true }),
     };
   }
   return out;
@@ -504,7 +512,8 @@ export const economyRoutes = {
     const me = await auth(req);
     const ids = [...new Set(String(url.searchParams.get('ids') ?? '').split(',').map((x) => x.trim()).filter(Boolean))];
     if (ids.length > 50 || !ids.every((x) => UUID.test(x))) throw new HttpError(400, 'En çok 50 geçerli kullanıcı kimliği');
-    const looks = await looksOf(ids);
+    // noMarks for me: whether a gift that leaves a mark would be refused from me now (their Gizlilik, whom they follow).
+    const looks = await looksOf(ids, db, me.id);
     // Someone who blocked me: their look stays (it is on their mic anyway), their name and photo don't come, as
     // GET /api/user doesn't show them.
     const hidden = await db.query('SELECT b.blocker FROM blocks b WHERE b.blocker = ANY($1::uuid[]) AND b.blocked = $2', [ids, me.id]);

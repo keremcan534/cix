@@ -40,7 +40,7 @@ hediyeyi sessizce atlar, videosunu indirmez (adresi `/api/fx/g/…`, onların s�
 | --- | --- |
 | Kim yapar | Yalnız yönetici hesabı (`role = admin`); her işlem `audit_events`'e yazılır (kim, ne, önce/sonra, IP) |
 | Fiyat | 1 – 1.000.000 jeton, tam sayı; değişiklik yeni gönderimlerden itibaren geçer, geçmiş gönderim kendi fiyatıyla kalır |
-| Raf | Popüler, Çift, Kutlama, Özel (Özel'de en düşük VIP 1–10). Çift rafının adı Kasım 2026'ya kadar İkili'ydi; eski APK'lar hâlâ "İkili" yazar |
+| Raf | Popüler, Çift, Muzip, Özel (Özel'de en düşük VIP 1–10). Çift rafının adı Kasım 2026'ya kadar İkili'ydi, Muzip'inki Kutlama'ydı (20 Kasım 2026); eski APK'lar eski adları yazar. Rafın kimliği (`gameplay`) aynı |
 | Sıra | Yöneticinin hediyeleri kendi rafının başında, paneldeki sırayla; yeni eklenen en başa |
 | Ad | 2–24 karakter; aynı adda iki hediye olmaz (derlenmişlerle de) |
 | İkon | PNG ya da WebP, saydam, kare (en çok 1:1,25), 128–4096 px (önerilen 512 × 512), en çok 10 MB. Telefonlar hediye panelinin bütün ikonlarını indirir: 1024 px'ten ya da 1 MB'tan büyük ikonu sunucu kaydederken küçültür (en çok 1024 px ve 1 MB, saydam PNG, `tools/icon-fit.py`); yüklenen büyük dosya silinir |
@@ -94,23 +94,125 @@ değerleri (`original`), neyin değiştirildiği (`changed`) ve son 30 günde ka
 Saklama: `custom_gifts` tablosunda uygulama hediyesinin kimliğiyle bir satır (`builtin`, 069); her boş sütun
 "uygulamadaki gibi" demektir, satır hiç silinmez (katalog sürümü yalnız artar).
 
-## Profil izi (Kaka ve Su)
+## Profil izi ve iz türleri (Muzip hediyeler)
 
-Her hediyenin bir **Profil izi** ayarı var (101, [`PROFIL_IZLERI.md`](PROFIL_IZLERI.md)): yok, **bırakır** (izin türü ve
-isteğe bağlı süre, 1–168 saat; boşsa Canlı ayarlar › Profil izleri'ndeki süre) ya da **temizler** (izin türü). Gönderirken
-`mark: {role: 'leave'|'clean', kind, hours?}` ya da `mark: null`; listede her hediyenin `mark`'ı gelir, uygulamanın
-hediyesinde `original.mark` ve değiştirildiyse `changed` içinde `mark`; "Orijinale dön" `mark` alanını da geri alır.
+Ayrıntı: [`PROFIL_IZLERI.md`](PROFIL_IZLERI.md).
 
-- Uygulamanın kendi iki hediyesi: **💩 Kaka** (`k1`, 999 jeton, Kutlama) `kaka` izi bırakır; **💧 Su** (`k2`, 1.999
-  jeton, Kutlama) `kaka` izini temizler. Kaka'nın kuralı kaldırılırsa (`mark: null`) düz hediye olur.
-- **Kural:** bir izi temizleyen hediye, o izi bırakan her hediyeden pahalı olmalı. Kaydı bozan değişiklik (fiyat, kural,
-  geri alma) reddedilir: "Su izi temizlediği için onu bırakan hediyelerden pahalı olmalı: Kaka 999 jeton, bu 999 jeton."
-- Panelde başka bir çift yapılabilir (ör. `camur`: Çamur bırakır, Hortum temizler). Uygulamada resmi olan tür şimdilik
-  yalnız `kaka`; başka bir türde fotoğrafta yalnız hediyenin küçük resmi görünür.
-- Eski APK'da Kaka ve Su hiç görünmez (uygulamanın içinde yoklar); yöneticinin eklediği iz hediyesi eski APK'da düz bir
-  hediye gibi görünür, iz yine sunucuda yazılır.
-- **Panel tarafı (finans paneli deposu, sonra):** hediye formuna "Profil izi" alanı; Kullanıcılar sayfasına kişinin izleri
-  ve "İzi kaldır" (`GET /api/admin/marks`, `POST /api/admin/marks/clear`).
+**Hediyenin ayarı:** Her hediyenin bir **Profil izi** ayarı var: yok, **bırakır** ya da **temizler**.
+
+- **Bırakır:** iz türü (listeden) ve isteğe bağlı süre. Süre dakika (5–10.080) ya da saat (1–168). Boşsa türün
+  süresi, o da boşsa Canlı ayarlar › Profil izleri'ndeki süre (24 saat).
+- **Temizler:** iz türü.
+- Sunucuya giden: `mark: {role: 'leave', kind, minutes?}` (eski panel `hours?` gönderebilir), `{role: 'clean', kind}`
+  ya da `null`.
+- Listede her hediyenin `mark`'ı `{role, kind, hours, minutes}` olarak gelir. Uygulamanın hediyesinde `original.mark`
+  ve değiştirildiyse `changed` içinde `mark`; "Orijinale dön" kuralı da geri alır.
+
+**Kurallar:**
+
+- Tür, **İz türleri** listesinde olmalı. Olmayan bir kelime reddedilir: '"camur" diye bir iz türü yok: önce
+  Hediyeler › İz türleri'nden bu türü ekleyin'.
+- Bir izi temizleyen hediye, o izi bırakan her hediyeden **pahalı olmalı**. Kaydı bozan değişiklik (fiyat, kural, geri
+  alma) reddedilir: "Cam Tamiri izi temizlediği için onu bırakan hediyelerden pahalı olmalı: Terlik Geldi! 1.299
+  jeton, bu 1.299 jeton."
+- İz kurallı hediye Global olamaz. Bağ hediyeleri ve Koruma Kartı iz bırakamaz.
+
+**Uygulamanın kendi hediyeleri:**
+
+- **💩 Kaka Şakası** (`k1`, 999 jeton) `kaka` izi bırakır.
+- **💧 Temizlik Suyu** (`k2`, 1.999 jeton) `kaka` izini temizler.
+- **🩴 Terlik Geldi!** (`p8`, 1.299 jeton) düz hediyedir ve rafta değildir; kuralını panelde siz verirsiniz (aşağıdaki
+  adımlar).
+
+**Eski APK'lar:** İz kurallı hiçbir hediye eski APK'nın (f9671d9 ve öncesi) rafında görünmez. Buna Kar Topu, Domates At
+ve Terlik Geldi! de dahil.
+
+**İz türleri** (`GET /api/admin/mark-kinds`, `POST /api/admin/mark-kinds`, `/update`, `/delete`; yükleme türü
+`markart`): Her türün alanları şunlar:
+
+- **Anahtar:** küçük harf, rakam, tire; sonradan değişmez.
+- **Ad:** "Kırık Cam" gibi.
+- **İz resmi:** fotoğrafın üstüne çizilen saydam PNG ya da WebP.
+- **Süre:** dakika.
+- **Aynı iz yeniden gelince:** iki seçenekte de profilde tek iz kalır, en son göndereninki olur ve **süresi kısalmaz**
+  (kalan süreyle yeni hediyenin süresinden uzun olanı geçer). Fark yalnız geçmiş kaydında: "süresi bitti" ya da
+  "yerine geçti".
+- **İz varken başka tür:** profilde iz varken başka türden bir iz hediyesi izi değiştirmez, düz hediye olarak gider
+  (jeton düşer, iz bırakmaz). Bu bir ayar değil, her tür için böyle. Böylece ucuz bir hediye pahalı bir izi kaldıramaz.
+- **Bir resim, bir tür:** başka bir türün kullandığı resim kaydedilmez; her türe ayrı dosya yükleyin.
+- **Açık / kapalı.**
+
+İz resmi yüklenirken sunucu piksel piksel denetler:
+
+- kare, 256–2048 piksel, en çok 2 MB, hareketsiz;
+- en az %30'u tam saydam;
+- ortadaki yüz dairesinin en çok %20'si dolu.
+
+Uymayanı nedeniyle reddeder. Büyüğü 512 piksele küçültür. Her değişiklik denetim kaydıdır (`markkind.create`,
+`markkind.update`, `markkind.delete`; önce ve sonra). Bir türü kullanan hediye varken tür silinemez.
+
+### Yeni bir şaka çifti nasıl eklenir (adım adım, uygulama güncellemesi olmadan)
+
+Örnek: **Çamur Bombası** çamur izi bırakır, **Köpük Banyosu** temizler. Sunucu testi aynı adımları yalnız bu uçlarla
+yapar (`server/api/test/muzip.test.mjs`, "kodsuz üçüncü çift").
+
+1. **Resimleri hazırlayın.** Ekipten:
+   - **iz resmi:** 512 × 512 saydam PNG. Çizim kenarlarda, ortası (yüz) boş, boş yerler tam saydam (alfa 0). Büyük opak
+     kare olmaz.
+   - iki hediyenin **ikonu:** 512 × 512 saydam PNG.
+   - isteğe bağlı **gönderim animasyonları:** SVGA 2.x, 3–5 sn; temizleme 2–4 sn.
+2. **İz türünü ekleyin:** Panel › Uygulama › Hediyeler › **İz türleri** › Yeni tür.
+   - Anahtar `camur`, ad "Çamur".
+   - İz resmini yükleyin. Kontrolden geçmezse nedeni yazar: "İz resmi yüzü kapatıyor: …" ya da "İz resminin en az
+     %30'u tam saydam olmalı…".
+   - İsterseniz süre verin (ör. 60 dakika).
+   - Önizlemede örnek fotoğraf üstünde bakın.
+3. **İz bırakan hediyeyi ekleyin:** Hediyeler › Yeni hediye.
+   - Ad "Çamur Bombası", raf **Muzip**, fiyatı siz verin, ikon, varsa video.
+   - **Profil izi: Bırakır**, tür **Çamur**, süre boş (türün süresi) ya da kendi süresi.
+4. **Temizleyen hediyeyi ekleyin:**
+   - Ad "Köpük Banyosu", raf Muzip, **Çamur Bombası'ndan pahalı** bir fiyat.
+   - **Profil izi: Temizler**, tür Çamur.
+5. **Telefonda bakın** (yeni APK, 1.1.0):
+   - Yönetim › Hediyeler › **İz türlerini önizle** › Çamur: koltuk, kart ve profil boylarında, açık ve koyu zeminde,
+     düşüş ve temizlenme.
+   - Sonra iki hesapla deneyin. Alıcı göndereni takip etmeli ya da Gizlilik'te "Herkes" seçili olmalı.
+6. **Yayından kaldırmak gerekirse:** türü **kapalı** yapın (hediyeler düz hediye olur, izler görünmez), ya da hediyeleri
+   raftan kaldırın.
+
+### Pilot: Terlik Geldi! → Kırık Cam → Cam Tamiri
+
+Kırık Cam türü kurulumla gelir (`kirik-cam`). Uygulamanın içinde geçici bir kırık cam resmi var. Kendi resminizi
+yükleyince o kullanılır.
+
+1. **Gerçek resim (isteğe bağlı, sonra da olur):** İz türleri › Kırık Cam › iz resmini yükleyin. Hazır geçici dosya:
+   `docs/gorseller/muzip/kirik-cam-512.png`.
+2. **Terlik Geldi! (`p8`):** Hediyeler › uygulamanın hediyeleri › Terlik Geldi! › Düzenle.
+   - **Rafa koy** (bugün rafta değil).
+   - **Profil izi: Bırakır**, tür **Kırık Cam**, süre **24 saat** (1.440 dakika).
+   - Fiyatı değiştirirseniz eski APK'lar onu zaten görmez.
+   - İsterseniz "terlik fırlatma + cam çatlama" SVGA'sını Video'ya yükleyin.
+3. **Cam Tamiri:** Hediyeler › Yeni hediye.
+   - Ad "Cam Tamiri", raf Muzip, ikon `docs/gorseller/muzip/cam-tamiri-512.png` (geçici), emoji 🪟.
+   - **Fiyat Terlik Geldi!'den yüksek** (bugün 1.299 jeton; değilse kayıt reddedilir).
+   - **Profil izi: Temizler**, tür Kırık Cam.
+   - İsterseniz "cam onarma + parıltı" SVGA'sı.
+4. **Kaka Şakası çifti** hazır: Kaka Şakası `kaka` bırakır (24 saat, Canlı ayar), Temizlik Suyu temizler. Fiyatları
+   panelden. Kaka için yeni bir iz resmi isterseniz İz türleri › Kaka İzi'ne yükleyin. Yüklenen resim yeni APK'da
+   uygulamanınkinin yerine geçer, G7 APK uygulamanınkini çizmeye devam eder.
+5. **Zorunlu güncelleme (sizin kararınız):** Canlı ayarlar › Zorunlu sürüm `1.1.0` yapılınca eski APK'lar güncellemeye
+   yönlendirilir. Bunu **1.1.0 APK'nın Yönetim › Canlı ayarlar** ekranından kaydedin: sunucu zorunlu sürümü yalnız o
+   sürüm ya da daha yenisi olan uygulamadan kabul eder. Finans paneli uygulama sürümü göndermediği için oradan
+   kaydedilmez ("Uygulama sürümün gelmedi…").
+
+**Panel tarafı (finans paneli deposu, ayrı iş):**
+
+- hediye formunda tür listeden seçim ve dakika;
+- İz türleri sayfası ve önizlemesi;
+- yükleme türü `markart`;
+- Kullanıcılar'da kişinin izleri.
+
+Uçlar [`SUNUCU.md`](SUNUCU.md)'de, `PANEL_ROUTES` sunucuda hazır.
 
 ## Yöneticinin adımları
 

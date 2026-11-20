@@ -1,7 +1,7 @@
 // Gifts at the server's price, and the rankings they feed.
 //
-//   GET  /api/catalog[?gifts=2][&family=1][&emoji=1][&levels=1][&shop=1][&marks=1] → { gifts, counts, packs, vipPlans, svipXp, purchases, campaign, exchange, fx, v, emoji?, levels?, shop?, marks? }
-//   POST /api/gifts/send  { to, giftId, count, price?, room?, place?, ref } → { user, replay, total, mark? }  (place: chat|moment|profile|family)
+//   GET  /api/catalog[?gifts=2][&family=1][&emoji=1][&levels=1][&shop=1][&marks=1][&marks=2] → { gifts, counts, packs, vipPlans, svipXp, purchases, campaign, exchange, fx, v, emoji?, levels?, shop?, marks? }
+//   POST /api/gifts/send  { to, giftId, count, price?, room?, place?, ref } → { user, replay, total, mark?, markNote? }  (place: chat|moment|profile|family)
 //   GET  /api/rankings?board=wealth|charm|agency&period=day|week|month → { rows }  (agency: rows carry agency, not user)
 //
 // The sender's coins become the recipient's diamonds 1 to 1 (app/src/data/rules.ts creatorDiamondsPerCoin);
@@ -46,7 +46,8 @@ import { fuelRocket, launchRockets, rocketFx, rocketVideosRev } from './room-roc
 import { luckyArtRev, luckyFx } from './lucky-art.mjs';
 import { lockSendAccounts } from './send-locks.mjs';
 import { addHeldRoomXp, holdRoomXp } from './room-xp-add.mjs';
-import { announceMarks, markGift, markPushBody, marksInfo, withMarks } from './profile-marks.mjs';
+import { announceMarks, markGift, markOfEvent, markPushBody, marksInfo, marksLevel, withMarks } from './profile-marks.mjs';
+import { markKindsRev } from './mark-kinds.mjs';
 import { announceGlobalGift } from './global-gifts.mjs';
 
 export const ROOM = /^[A-Za-z0-9_-]{1,64}$/;
@@ -124,12 +125,15 @@ export const giftRoutes = {
     const app2 = url?.searchParams.get('gifts') === '2';
     // The Aile ve Dost shelf (custom-gifts.mjs catalogGifts): only for a phone that has it.
     const family = url?.searchParams.get('family') === '1';
+    // Profil izleri (profile-marks.mjs marksLevel): 0 an app without them, 1 G7's (hours), 2 kinds and minutes.
+    const marks = marksLevel(url);
     return {
       // Every gift on the shelves in the shelves' order (custom-gifts.mjs): the admins' with their icon (an older app
       // skips them), the app's own as changed in the panel. Off the shelves (the app's paused ones unless put back,
       // catalog.mjs GIFTS_PAUSED) or hidden in Canlı ayarlar: left out, so older apps drop them too.
-      // Profil izleri (profile-marks.mjs): Kaka and Su, and each gift's `mark`, only for a phone that has them (marks=1).
-      gifts: withMarks(catalogGifts({ app2, hidden: s.giftsHidden, family }), url?.searchParams.get('marks') === '1', s),
+      // Profil izleri (profile-marks.mjs): the gifts that leave or clean a mark, and each one's `mark`, only for a phone
+      // that has them (marks=1, marks=2).
+      gifts: withMarks(catalogGifts({ app2, hidden: s.giftsHidden, family }), marks, s),
       ...(app2 ? { giftsFormat: 2 } : {}),
       counts: GIFT_COUNTS,
       packs: PACKS.filter((p) => !s.packsHidden.has(p.id)).map(({ id, productId, coins, firstBonus }) => ({ id, productId, coins, firstBonus })),
@@ -153,16 +157,17 @@ export const giftRoutes = {
       ...(url?.searchParams.get('levels') === '1' ? { levels: levelsPayload() } : {}),
       // Yönetim › Mağaza (shop-items.mjs): only for an app that asks (shop=1).
       ...(url?.searchParams.get('shop') === '1' ? { shop: shopCatalog() } : {}),
-      // Profil izleri (profile-marks.mjs): on or off and the Canlı ayar's hours, for an app that asks (marks=1).
-      ...(url?.searchParams.get('marks') === '1' ? { marks: marksInfo(s) } : {}),
+      // Profil izleri (profile-marks.mjs): on or off and the Canlı ayar's hours, for an app that asks (marks=1); with
+      // marks=2 also the kinds (mark-kinds.mjs: name, overlay picture, minutes).
+      ...(marks ? { marks: marksInfo(s, marks) } : {}),
       // Koruma's and Bağlar's numbers as Canlı ayarlar has them, for the screens that say them (an older app says its own).
       guard: guardRules(s),
       rooms: (({ micMinLevel, bossMinLevel, caps }) => ({ micMinLevel, bossMinLevel, caps }))(roomNumbersOf(s)),
       family: { themes: Object.fromEntries(familyRulesOf(s).themes.map((t) => [t.id, t.minLevel])) },
       bonds: bondCatalog(s),
-      // Grows with every live settings save, every change in Yönetim › Hediyeler and Emojiler, and every Seviye
-      // ayarları save (as /api/config's).
-      v: s.v + customGiftsRev() + emojiRev() + levelsRev() + shopItemsRev() + rocketVideosRev() + luckyArtRev(),
+      // Grows with every live settings save, every change in Yönetim › Hediyeler (its İz türleri too) and Emojiler,
+      // and every Seviye ayarları save (as /api/config's).
+      v: s.v + customGiftsRev() + emojiRev() + levelsRev() + shopItemsRev() + rocketVideosRev() + luckyArtRev() + markKindsRev(),
     };
   },
 
@@ -185,7 +190,6 @@ export const giftRoutes = {
     const place = room === null && PLACES.includes(b.place) ? b.place : null;
     const needVip = vipItemNeed('vip_gifts', gift.minSvip);
     if (needVip && svipLevel(u.svip_xp) < needVip) throw new HttpError(403, `${gift.name} VIP ${needVip} ve üstü için`);
-    if (await blockedBetween(u.id, to)) throw new HttpError(403, 'Bu kişiye hediye gönderemezsin');
     const total = gift.price * count;
     const label = count > 1 ? `${gift.name} ×${count}` : gift.name;
     let eventId = null;
@@ -194,11 +198,16 @@ export const giftRoutes = {
     let guardNew = false;
     let rocket = null;
     let mark = null;
+    let markNote = null;
     let xpOwner = null;
     const out = await once(u.id, 'coin', b.ref, async (c) => {
       // Both rows in id order, so two gifts at once can't deadlock (send-locks.mjs).
       if (!(await lockSendAccounts(c, [u.id, to]))) throw new HttpError(404, 'Alıcı bulunamadı');
       await claimRef(c, u.id, 'coin', b.ref);
+      // A block either way, read under both people's locks: a block that commits after this read takes this gift's mark
+      // off right after it (social.mjs: its clearMarks waits for these locks), one before it refuses the gift. After the
+      // ref check: a retry of a gift that went through before the block gets its replay.
+      if (await blockedBetween(u.id, to, c)) throw new HttpError(403, 'Bu kişiye hediye gönderemezsin');
       // After the ref check: a retry of a gift that went through before the hide gets its replay, not a 400.
       if (s.giftsHidden.has(gift.id)) throw new HttpError(400, 'Bu hediye artık yok');
       // The price the phone showed (none from an older app): a gift whose price moved is refused, nothing moves.
@@ -218,8 +227,11 @@ export const giftRoutes = {
         b.ref,
       ]);
       eventId = Number(g.rows[0].id);
-      // Profil izleri: a mark left or cleaned; refused (nothing moves) for someone who refuses marks.
-      mark = await markGift(c, { gift, from: u.id, to, eventId, s });
+      // Profil izleri: a mark left or cleaned; refused (nothing moves) for someone who refuses marks; a plain gift (the
+      // answer's markNote says so) while they show a mark of another kind.
+      const did = await markGift(c, { gift, from: u.id, to, eventId, s });
+      mark = did?.role === 'kept' ? null : did;
+      markNote = did?.role === 'kept' ? did.note : null;
       // A gift from a chat shows in that chat, for both of them (a line of its own; no message price). Its ref is a
       // server ref (':'), so no phone can take it first and hide the line or put its own words in it; the chat reads
       // the gift back from it (messages.mjs GIFT_LINE: this ref and this transaction's moment).
@@ -274,10 +286,14 @@ export const giftRoutes = {
     // Global hediye (global-gifts.mjs): sent in a server room, every room of the sender's country hears of it, paced
     // (not awaited). A send from a chat, a profile, the family chat or Anlar stays between the two.
     if (!out.replay && eventId !== null && gift.global && lkRoom) void announceGlobalGift({ sender: u.id, to, gift, count, eventId, roomId: lkRoom.slice(4) });
-    if (!out.replay) return { ...out, total, ...(mark && { mark }) };
-    // A replay reports what that ref sent, not this body's gift and count (0: the ref was no gift).
-    const sent = (await db.query('SELECT total FROM gift_events WHERE sender = $1 AND ref = $2', [u.id, b.ref])).rows[0];
-    return { ...out, total: Number(sent?.total ?? 0) };
+    // A leave gift that left nothing because another kind's mark shows: `mark: null` and the sentence the new app shows
+    // (an older one reads no mark and sees a plain gift).
+    if (!out.replay) return { ...out, total, ...(mark && { mark }), ...(markNote && { mark: null, markNote }) };
+    // A replay reports what that ref sent, not this body's gift and count (0: the ref was no gift), and the mark it
+    // left (while it shows) or cleaned, so a phone whose first answer was lost draws it.
+    const sent = (await db.query('SELECT id, total FROM gift_events WHERE sender = $1 AND ref = $2', [u.id, b.ref])).rows[0];
+    const was = sent ? await markOfEvent(Number(sent.id), s) : null;
+    return { ...out, total: Number(sent?.total ?? 0), ...(was && { mark: was }) };
   },
 
   async 'GET /api/rankings'(req, url) {

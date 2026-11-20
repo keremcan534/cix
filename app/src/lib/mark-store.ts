@@ -4,9 +4,12 @@
 // room's people and their 'look' packets), a profile read (lib/live/profile), a room's gift packet (lib/live/room-bus:
 // the leave or clean of a Kaka or a Su someone just sent) and, in the demo, the gift the demo room sends. The newest word
 // wins. Screens draw a mark with components/profile-mark (useMarkOf), the room says the line with onMarkNews.
+// A mark runs out by the server's clock (lib/sanction-time serverNow, from the last answer that carried it), not the
+// phone's: a phone set an hour off would hide a short mark at once or keep it an hour too long.
 import { useSyncExternalStore } from 'react';
 
 import { activeMark, marksAfter, type MarkNews, type ProfileMark } from '@/lib/profile-marks';
+import { serverNow } from '@/lib/sanction-time';
 
 /** A landing or a wash older than this has happened already: the mark just shows (or doesn't). */
 export const FRESH_MS = 3_000;
@@ -36,11 +39,13 @@ const later = (fn: () => void, ms: number) => {
  */
 function keep(key: string, marks: ProfileMark[], at: number, fresh: Fresh | null) {
   store.get(key)?.timers.forEach(clearTimeout);
+  // `until` is the server's time; `at` and `fresh` this phone's (when it heard).
   const now = Date.now();
-  const showing = activeMark(marks, now);
+  const server = serverNow();
+  const showing = activeMark(marks, server);
   const entry: Entry = { marks, at, showing, fresh: fresh && now - fresh.at < FRESH_MS ? fresh : null, timers: [] };
   const again = () => store.get(key) === entry && (keep(key, entry.marks, entry.at, entry.fresh), emit());
-  if (showing) entry.timers.push(later(again, showing.until - now + 50));
+  if (showing) entry.timers.push(later(again, showing.until - server + 50));
   if (entry.fresh) entry.timers.push(later(again, entry.fresh.at + FRESH_MS - now + 10));
   store.set(key, entry);
 }
@@ -57,15 +62,16 @@ export function putMarks(key: string | null, marks: ProfileMark[], at = Date.now
 }
 
 /**
- * A gift's news for `key` (a room packet, my own send, the demo): a leave puts the mark on at once (it lands), a clean
- * takes it off with the water's splash. Each kind keeps one mark.
+ * A gift's news for `key` (a room packet, my own send, the demo): a leave puts the mark on at once (it lands) in the
+ * place of any other (one at a time), a clean takes it off (the water's splash for Kaka İzi, a sparkle for the others).
  */
 export function applyMarkNews(key: string | null, news: MarkNews, at = Date.now()) {
   if (!key) return;
   const had = store.get(key);
   const before = had?.marks ?? [];
   const marks = marksAfter(before, news);
-  const gone = news.role === 'clean' ? before.find((m) => m.kind === news.kind && m.until > at) : undefined;
+  const server = serverNow();
+  const gone = news.role === 'clean' ? before.find((m) => m.kind === news.kind && m.until > server) : undefined;
   const landed = news.role === 'leave' ? marks.find((m) => m.kind === news.kind) : undefined;
   keep(key, marks, at, landed ? { type: 'land', at, mark: landed } : gone ? { type: 'wash', at, mark: gone } : (had?.fresh ?? null));
   emit();

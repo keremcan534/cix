@@ -82,3 +82,45 @@ export function png(w, h, { alpha = true } = {}) {
   ihdr[9] = alpha ? 6 : 2;
   return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', ihdr), chunk('IDAT', zlib.deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
 }
+
+/**
+ * A PNG of w × h with each pixel's alpha from `alphaAt(x, y)` (0–255) on one colour (`rgb`): a profile mark's overlay
+ * as the server's pixel check sees it (mark-kinds.mjs). `apng`: an acTL chunk before the pixels (an animated PNG's
+ * header), `alpha: false` an RGB picture with no transparency at all.
+ */
+export function rgbaPng(w, h, alphaAt, { rgb = [120, 90, 200], apng = false, alpha = true } = {}) {
+  const bpp = alpha ? 4 : 3;
+  const row = w * bpp + 1;
+  const raw = Buffer.alloc(row * h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const o = y * row + 1 + x * bpp;
+      [raw[o], raw[o + 1], raw[o + 2]] = rgb;
+      if (alpha) raw[o + 3] = alphaAt(x, y);
+    }
+  }
+  const chunk = (type, data) => {
+    const len = Buffer.alloc(4);
+    len.writeUInt32BE(data.length);
+    const body = Buffer.concat([Buffer.from(type, 'latin1'), data]);
+    const crc = Buffer.alloc(4);
+    crc.writeUInt32BE((zlib.crc32?.(body) ?? 0) >>> 0);
+    return Buffer.concat([len, body, crc]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(w, 0);
+  ihdr.writeUInt32BE(h, 4);
+  ihdr[8] = 8;
+  ihdr[9] = alpha ? 6 : 2;
+  const actl = Buffer.alloc(8);
+  actl.writeUInt32BE(2, 0);
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', ihdr),
+    ...(apng ? [chunk('acTL', actl)] : []),
+    chunk('IDAT', zlib.deflateSync(raw)),
+    chunk('IEND', Buffer.alloc(0)),
+  ]);
+}
+/** A ring round the edge of a w × w square (from `inner` of the half side out), the rest fully transparent: an overlay that leaves the face open. */
+export const ringAlpha = (w, inner = 0.72) => (x, y) => (Math.hypot(x - (w - 1) / 2, y - (w - 1) / 2) >= inner * (w / 2) ? 255 : 0);

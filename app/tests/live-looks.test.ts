@@ -115,4 +115,34 @@ describe('Odadaki görünümler', () => {
     await reading;
     assert.equal(lookOf(A)?.frame, 'fr-frost');
   });
+
+  test('odanın paketi bana özel "iz kabul etmiyor" bilgisini korurken okuma zamanını tazelemez', async () => {
+    const C = 'aaaaaaaa-0000-4000-8000-0000000000f6';
+    const E = 'aaaaaaaa-0000-4000-8000-0000000000f7';
+    const realNow = Date.now;
+    let now = realNow();
+    Date.now = () => now;
+    try {
+      // My own read: they let only the people they follow, and not me.
+      answer = async (ids) => Object.fromEntries(ids.map((id) => [id, { ...look(null), noMarks: true, marksFrom: 'following' }]));
+      await loadLooks([C, E]);
+      assert.deepEqual(asked.sort(), [C, E].sort());
+      // A minute and a half later the room's packet (everyone's: noMarks only for nobody) for both: C still lets only
+      // the people they follow (my refusal stays, its read time too); E now lets everyone (a fresh look).
+      now += 90_000;
+      putLook(C, { ...look('fr-frost'), marksFrom: 'following' });
+      putLook(E, { ...look('fr-frost'), marksFrom: 'everyone' });
+      assert.deepEqual([lookOf(C)?.noMarks, lookOf(C)?.frame], [true, 'fr-frost']);
+      assert.equal(lookOf(E)?.noMarks, undefined);
+      // Two minutes after my read: C is read again (they may have followed me since); E's look is a minute old.
+      now += 31_000;
+      asked = [];
+      answer = async (ids) => Object.fromEntries(ids.map((id) => [id, { ...look('fr-frost'), marksFrom: 'following' }]));
+      await loadLooks([C, E]);
+      assert.deepEqual(asked, [C]);
+      assert.equal(lookOf(C)?.noMarks, undefined, 'yeni okuma: artık kabul ediyor');
+    } finally {
+      Date.now = realNow;
+    }
+  });
 });

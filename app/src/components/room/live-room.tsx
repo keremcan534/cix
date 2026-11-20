@@ -103,7 +103,7 @@ import { GATES, nobleInfo } from '@/data/status';
 import { LUCKY_RECIPIENT_SHARE, RULES, luckyHostDiamonds, pct } from '@/data/rules';
 import { BOT_LINES, GIFTS, ME, USERS, isServerId, roomById, serverRoomCode, userById, type Gift } from '@/data/mock';
 import * as api from '@/lib/api';
-import { isLiveRoom, isLockedRoom, liveGift, liveMode, liveRoomAnimation, message as errorText, myServerId, putRoomAnswer, refreshServerRoom, rememberUser, toLocal, toServer, updateServerRoom } from '@/lib/live';
+import { isLiveRoom, isLockedRoom, isMarkRefusal, liveGift, liveMode, liveRoomAnimation, message as errorText, myServerId, putRoomAnswer, refreshServerRoom, rememberUser, toLocal, toServer, updateServerRoom } from '@/lib/live';
 import { liveBackpackGift } from '@/lib/live/backpack';
 import { giftById, liveBossMinLevel, liveMemberLimit, refreshLiveCatalog } from '@/lib/live/catalog-live';
 import { liveSticker } from '@/lib/live/emoji-live';
@@ -197,6 +197,7 @@ import { colors, fonts, gradient, semantic } from '@/theme';
 import { MuteBanner, useStopped } from '@/components/sanction-screen';
 import { refreshSanctions, showSanction } from '@/lib/sanctions';
 import { demoMarkGift, useMarkLines } from '@/lib/live/marks-live';
+import { keptAfterLine, parseMarkNote } from '@/lib/profile-marks';
 
 // Short: the rules are the chat's first line already (ROOM_RULES_NOTICE), the bot doesn't repeat them.
 const BOT_TIPS = ['Mikrofona geçmek için boş bir koltuğa dokun.', 'Hediyeler oda seviyesini yükseltir.'];
@@ -2840,6 +2841,11 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     const gift = fromBag ? (giftById(sheetGift.id) ?? sheetGift) : sheetGift;
     const sent: string[] = [];
     let error: string | null = null;
+    // Profil izleri: someone who takes no mark from me (their Gizlilik, found only now) refuses theirs alone, with
+    // nothing moved; the others still get theirs, each paid apart. Someone whose photo already shows another kind's
+    // mark got it as a plain gift: the server's sentence (markNote) is said in the chat, to me alone.
+    const refused: string[] = [];
+    const kept: string[] = [];
     for (const uid of toIds) {
       // The daily limit holds here too (the balance is the server's to check); each answer counts toward it.
       const limited = fromBag ? null : spendBlock(gift.price * count);
@@ -2849,18 +2855,28 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       }
       try {
         if (fromBag) await liveBackpackGift(uid, gift.id, count, id);
-        else await liveGift(uid, gift.id, count, id, undefined, gift.price);
+        else {
+          const note = parseMarkNote(((await liveGift(uid, gift.id, count, id, undefined, gift.price)) as { markNote?: unknown }).markNote);
+          if (note) kept.push(note);
+        }
         sent.push(uid);
       } catch (e) {
         // A bond gift sent again whose bond is gone meanwhile: offered as a bond request (room-bonds).
         if (!sent.length && bondGiftRefused(e, gift, uid, userById(uid).name, sendBondGift)) return 0;
         error = errorText(e);
+        if (isMarkRefusal(e)) {
+          refused.push(uid);
+          continue;
+        }
         break;
       }
     }
+    // More than one refused the mark: one line for them all.
+    if (refused.length > 1 && refused.length === toIds.length - sent.length) error = `${refused.length} kişi senden iz kabul etmiyor; onlara gitmedi, jeton düşmedi.`;
     if (!sent.length) {
       errorHaptic();
-      if (fromBag) showAlert('Hediye gönderilemedi', error ?? 'Gönderilemedi.');
+      // Nobody takes the mark: no coins are missing, so no wallet button.
+      if (fromBag || (refused.length && refused.length === toIds.length)) showAlert('Hediye gönderilemedi', error ?? 'Gönderilemedi.');
       else
         showAlert('Hediye gönderilemedi', error ?? 'Gönderilemedi.', [
           { text: 'Tamam', style: 'cancel' },
@@ -2870,6 +2886,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     }
     successHaptic();
     showGift('me', sent, gift, count, quiet && !error);
+    const keptLine = keptAfterLine(gift, kept);
+    if (keptLine) addMsg({ system: true, text: `ℹ️ ${keptLine}` });
     sent.forEach((uid) => app.recordGift(uid, gift.id, count));
     bump('giftsSent', count * sent.length);
     if (error) showAlert('Bazı hediyeler gönderilemedi', `${sent.length} kişiye gitti. ${error}`);

@@ -14,7 +14,7 @@ import { Avatar, Button, FramedAvatar, GradientButton, LevelChips, VerifiedBadge
 import { COSMETICS, FAN_LEVELS, cosmeticById, fanLevel, roomLevel, ROOM_LEVEL_ICONS } from '@/data/catalog';
 import { callPrice } from '@/data/economy';
 import { FOLLOWS_ME, INTERESTS, MOMENTS, ROOMS, userById, type Gift, type Moment, type Room, type User } from '@/data/mock';
-import { giftById, giftShelf, useLiveCatalog } from '@/lib/live/catalog-live';
+import { giftById, giftMarkOf, giftShelf, useLiveCatalog } from '@/lib/live/catalog-live';
 import { EMPTY_AREA, loadGuardArea, sendGuardCard } from '@/lib/live/guard';
 import { GUARD_CARD, guardPoints, type GuardArea } from '@/lib/guard-core';
 import { GiftWallBanner, GuardBadge, GuardBanner, RelationshipBanner } from '@/components/person-showcase';
@@ -73,6 +73,9 @@ import { Photo } from '@/components/photo';
 import { useReport } from '@/components/report-sheet';
 import { BondBadge, BondFrame, BondsTab, shownTopBond, useBonds } from '@/components/bonds';
 import { MarkLayer, OwnMarkNote } from '@/components/profile-mark';
+import { keepingMarks, keptLine, parseMarkNote } from '@/lib/profile-marks';
+import { photoMarksOf } from '@/lib/live/marks-live';
+import { serverNow } from '@/lib/sanction-time';
 
 const REPORT_REASONS = ['Sahte profil', 'Taciz / hakaret', 'Uygunsuz içerik', 'Dolandırıcılık', 'Reşit değil'];
 
@@ -408,6 +411,7 @@ export default function UserProfile() {
   const giftStage = useGiftStage();
   /** One gift, no confirmation; true once it went. */
   const deliverGift = async (g: Gift): Promise<boolean> => {
+    let keptNote: string | null = null;
     // Same VIP (SVIP) lock as the room's gift sheet.
     if ((g.minSvip ?? 0) > svipLevel) {
       showAlert('Üyelere özel hediye', `${g.name}, VIP ${g.minSvip} ve üstü için. Senin seviyen: VIP ${svipLevel}.`);
@@ -423,7 +427,9 @@ export default function UserProfile() {
         return false;
       }
       try {
-        await liveGift(user.id, g.id, 1, undefined, 'profile', g.price);
+        // Profil izleri: a mark gift to someone whose photo already shows another kind's mark goes as a plain gift; the
+        // server's sentence says so once it went.
+        keptNote = parseMarkNote(((await liveGift(user.id, g.id, 1, undefined, 'profile', g.price)) as { markNote?: unknown }).markNote);
       } catch (e) {
         errorHaptic();
         showAlert('Hediye gönderilemedi', message(e), [
@@ -449,6 +455,7 @@ export default function UserProfile() {
     addFanPoints(user.id, Math.ceil(g.price / 10), `Hediye gönderdin (${g.price} jeton)`);
     successHaptic();
     giftStage.play(g, me.name, user.name, 1);
+    if (keptNote) showAlert('Hediye gönderildi', keptNote);
     return true;
   };
   const sendGift = (g: Gift) => {
@@ -1125,7 +1132,19 @@ export default function UserProfile() {
         }
       />
       {isMe && <FollowListSheet visible={list !== null} {...MY_LISTS[list ?? 'followers']} load={() => loadList(list ?? 'followers')} onClose={() => setList(null)} />}
-      {giftable && <ProfileGiftSheet visible={sheet === 'gift'} name={user.name} gifts={giftChoices} coins={coins} svipLevel={svipLevel} onClose={() => setSheet('none')} onSend={sendGift} />}
+      {giftable && (
+        <ProfileGiftSheet
+          visible={sheet === 'gift'}
+          name={user.name}
+          gifts={giftChoices}
+          coins={coins}
+          svipLevel={svipLevel}
+          onClose={() => setSheet('none')}
+          onSend={sendGift}
+          // Profil izleri: a mark gift to a photo that shows another kind's mark goes as a plain gift; said before the tap.
+          noteOf={(g) => (keepingMarks(giftMarkOf(g.id), [user.id], photoMarksOf, serverNow()).length ? keptLine(g, [user.id], () => user.name, 1) : null)}
+        />
+      )}
 
       {editOpen && (
         <EditSheet

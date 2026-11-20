@@ -123,6 +123,7 @@ import { refundSyncRoutes, startRefundSync, stopRefundSync } from './refunds.mjs
 import { refreshOwnSubscription, startVipRecheck, stopVipRecheck, vipRoutes } from './vip.mjs';
 import { referralRoutes } from './referrals.mjs';
 import { markRoutes } from './profile-marks.mjs';
+import { markKindRoutes, refreshMarkKinds, startMarkKinds, stopMarkKinds } from './mark-kinds.mjs';
 
 const PORT = Number(env.API_PORT ?? 7890);
 const TEST_TOPUP = env.ALLOW_TEST_TOPUP === '1';
@@ -326,6 +327,7 @@ const routes = {
   ...shopRoutes,
   ...guardRoutes,
   ...markRoutes,
+  ...markKindRoutes,
   ...backpackRoutes,
   ...pkRoutes,
   ...crossPkRoutes,
@@ -538,6 +540,7 @@ function shutdown(signal) {
   stopGuardSweep();
   stopShopItems();
   stopLuckyArt();
+  stopMarkKinds();
   server.close();
   const started = Date.now();
   const wait = setInterval(async () => {
@@ -557,6 +560,7 @@ await refreshEmoji();
 await refreshLevels();
 await refreshShopItems();
 await refreshLuckyArt();
+await refreshMarkKinds();
 // A live Yörünge round the last process left in the air: its fuel goes back before anyone can play again.
 await recoverRocket();
 server.listen(PORT, '127.0.0.1', () => console.log(`api on 127.0.0.1:${PORT} version ${VERSION}${TEST_TOPUP ? ' (test top-up on)' : ''}`));
@@ -585,4 +589,5 @@ startLevelDecay();
 startGuardSweep();
 startShopItems();
 startLuckyArt();
+startMarkKinds();
 startSeatColorSweep();

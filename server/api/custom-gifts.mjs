@@ -1,9 +1,9 @@
 // Yönetim › Hediyeler: gifts the admins add, change, take down and order from the panel, with no app update
 // (docs/HEDIYE_YONETIMI.md), and the app's own gifts (catalog.mjs GIFTS, in step with the app) changed the same way:
 // name, emoji, price, shelf, VIP level, order, on the shelves or not, icon and video, each back to the app's value at
-// will. `mark`: the profile mark the gift leaves or cleans ({ role: 'leave'|'clean', kind, hours? } or null; Profil
-// izleri, profile-mark-rules.mjs, 101): a gift that cleans a kind must cost more than every gift that leaves it, or the
-// save is refused. Both live in the custom_gifts table (066, 069): an admin's gift is a row of its own ('a' and a number); a row
+// will. `mark`: the profile mark the gift leaves or cleans ({ role: 'leave'|'clean', kind, minutes? (or hours?) } or
+// null; Profil izleri, profile-mark-rules.mjs, 101, 105): the kind one of Hediyeler › İz türleri (mark-kinds.mjs), and
+// a gift that cleans a kind must cost more than every gift that leaves it, or the save is refused. Both live in the custom_gifts table (066, 069): an admin's gift is a row of its own ('a' and a number); a row
 // with a compiled gift's id (builtin) holds only what was changed about it, every NULL column "as in the app".
 //
 //   GET  /api/admin/gifts[?builtin=1]                      → { gifts, limits, convert, storage, globalMinPrice }  (builtin=1: the app's own too)
@@ -1017,7 +1017,7 @@ const priceOf = (v) => {
   return n;
 };
 const catOf = (v) => {
-  if (!CATS.includes(v)) throw new HttpError(400, 'Raf Popüler, Çift, Aile ve Dost, Kutlama ya da Özel olmalı');
+  if (!CATS.includes(v)) throw new HttpError(400, 'Raf Popüler, Çift, Aile ve Dost, Muzip ya da Özel olmalı');
   return v;
 };
 /** The VIP level a gift needs: only on the Özel shelf (1–10); 0 elsewhere. */
@@ -1066,7 +1066,7 @@ async function saving(fn) {
     throw e;
   }
 }
-/** `mark` in a body (profile-mark-rules.mjs markInput): undefined (unchanged) or the three columns to store. */
+/** `mark` in a body (profile-mark-rules.mjs markInput): undefined (unchanged) or the four columns to store. */
 function markCols(v) {
   const m = markInput(v);
   if (m.error) throw new HttpError(400, m.error);
@@ -1080,12 +1080,17 @@ function markCols(v) {
  *   bondGiftOf never applies one, so the catalog would promise what the send doesn't do.
  * - A gift that leaves or cleans a mark is never global (global-gifts.mjs): a Kaka told to every room of the country
  *   would shame its receiver in front of everyone, and a Su would tell everyone they had been marked.
+ * - Its kind is one of Hediyeler › İz türleri (mark_kinds, 105, mark-kinds.mjs): its row is held (FOR SHARE) till the
+ *   save commits, so a kind deleted in the same moment waits and then sees this gift use it.
  */
-function checkMarkPrices(row) {
+async function checkMarkPrices(c, row) {
   const after = row.builtin ? appGiftOf(GIFTS.get(row.id), viewOf(row)) : customGift(viewOf(row));
   const marks = after.mark?.role === 'leave' || after.mark?.role === 'clean';
   if (marks && (BOND_GIFTS.has(row.id) || row.id === GUARD_CARD)) throw new HttpError(400, 'Bağ hediyesi ve Koruma Kartı profil izi bırakamaz ya da temizleyemez; iz kuralını boş bırakın');
   if (marks && row.global === true) throw new HttpError(400, 'Profil izi bırakan ya da temizleyen hediye global olamaz; Global seçimini ya da iz kuralını kaldırın');
+  if (marks && !(await c.query('SELECT 1 FROM mark_kinds WHERE kind = $1 AND deleted_at IS NULL FOR SHARE', [after.mark.kind])).rowCount) {
+    throw new HttpError(400, `"${after.mark.kind}" diye bir iz türü yok: önce Hediyeler › İz türleri'nden bu türü ekleyin`);
+  }
   const problem = markPriceProblem([...allGifts().filter((g) => g.id !== row.id), after], row.id);
   if (problem) throw new HttpError(400, problem);
 }
@@ -1107,7 +1112,7 @@ const auditOf = (r) =>
     job: r.job_status ?? null,
     iconLink: r.icon_link ?? null,
     videoLink: r.video_link ?? null,
-    ...(r.mark_role ? { mark: { role: r.mark_role, kind: r.mark_kind ?? null, hours: r.mark_hours ?? null } } : {}),
+    ...(r.mark_role ? { mark: { role: r.mark_role, kind: r.mark_kind ?? null, hours: r.mark_hours ?? null, minutes: r.mark_minutes ?? null } } : {}),
   };
 /** iconLink / videoLink in a body: undefined (unchanged), null (none: the file was uploaded) or a checked link. */
 const linkField = (v) => (v === undefined ? undefined : v === null || v === '' ? null : linkOf(v));
@@ -1360,7 +1365,7 @@ async function updateApp(req, a, id, b) {
   }
   // Profil izleri: the app's own rule again is kept as "as in the app" (null columns).
   const mark = markCols(b.mark);
-  if (mark !== undefined) next.mark = JSON.stringify(storedMark(mark) ?? null) === JSON.stringify(appMarkOf(id, undefined)) ? { mark_role: null, mark_kind: null, mark_hours: null } : mark;
+  if (mark !== undefined) next.mark = JSON.stringify(storedMark(mark) ?? null) === JSON.stringify(appMarkOf(id, undefined)) ? { mark_role: null, mark_kind: null, mark_hours: null, mark_minutes: null } : mark;
   // Global hediye (global-gifts.mjs): checked with the price it will have.
   const global = globalSave(b, { id, price: next.price === undefined ? cur.price : (next.price ?? base.price), was: cur.global });
   if (global !== undefined) next.global = global;
@@ -1429,7 +1434,7 @@ async function updateApp(req, a, id, b) {
       set('updated_by', a.id);
       sets.push('updated_at = now()', "rev = nextval('custom_gift_rev')");
       const after = await c.query(`UPDATE custom_gifts SET ${sets.join(', ')} WHERE id = $1 RETURNING *`, vals);
-      checkMarkPrices(after.rows[0]);
+      await checkMarkPrices(c, after.rows[0]);
       await audited(c, a.id, 'gift.update', { gift: id, before: auditOf(r), after: auditOf(after.rows[0]), ...panelDetail(a) }, clientIp(req));
     }),
   );
@@ -1473,13 +1478,13 @@ export const customGiftRoutes = {
         const first = await firstSort(c, cat);
         const r = await c.query(
           `INSERT INTO custom_gifts (id, name, emoji, price, cat, min_svip, sort, enabled, icon_url, video_url, video_bytes, video_ms, video_v, job_status, job_source, job_fill,
-                                     created_by, updated_by, icon_link, video_link, job_opaque, mark_role, mark_kind, mark_hours, global)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $17, $18, $19, $20, $21, $22, $23, $24) RETURNING *`,
+                                     created_by, updated_by, icon_link, video_link, job_opaque, mark_role, mark_kind, mark_hours, mark_minutes, global)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $17, $18, $19, $20, $21, $22, $23, $24, $25) RETURNING *`,
           [id, name, emoji, price, cat, minSvip, first, b.enabled !== false, icon.url, stacked?.url ?? null, stacked?.bytes ?? null, stacked?.ms ?? null, stacked?.v ?? null,
             video?.kind === 'source' ? 'processing' : null, video?.kind === 'source' ? video.url : null, video?.kind === 'source' ? video.fill : null, a.id, iconLink, videoLink,
-            video?.kind === 'source' && video.opaque, mark.mark_role === 'none' ? null : mark.mark_role, mark.mark_kind, mark.mark_hours, global],
+            video?.kind === 'source' && video.opaque, mark.mark_role === 'none' ? null : mark.mark_role, mark.mark_kind, mark.mark_hours, mark.mark_minutes, global],
         );
-        checkMarkPrices(r.rows[0]);
+        await checkMarkPrices(c, r.rows[0]);
         await audited(c, a.id, 'gift.create', { gift: id, before: null, after: auditOf(r.rows[0]), ...panelDetail(a) }, clientIp(req));
         return id;
       }),
@@ -1583,7 +1588,7 @@ export const customGiftRoutes = {
         set('updated_by', a.id);
         sets.push('updated_at = now()', "rev = nextval('custom_gift_rev')");
         const after = await c.query(`UPDATE custom_gifts SET ${sets.join(', ')} WHERE id = $1 RETURNING *`, vals);
-        checkMarkPrices(after.rows[0]);
+        await checkMarkPrices(c, after.rows[0]);
         await audited(c, a.id, 'gift.update', { gift: id, before: auditOf(r), after: auditOf(after.rows[0]), ...panelDetail(a) }, clientIp(req));
       }),
     );
@@ -1669,7 +1674,7 @@ export const customGiftRoutes = {
         if (fields.includes('price')) sets.push('price = NULL');
         if (fields.includes('cat')) sets.push('cat = NULL', 'min_svip = NULL');
         if (fields.includes('enabled')) sets.push('enabled = NULL');
-        if (fields.includes('mark')) sets.push('mark_role = NULL', 'mark_kind = NULL', 'mark_hours = NULL');
+        if (fields.includes('mark')) sets.push('mark_role = NULL', 'mark_kind = NULL', 'mark_hours = NULL', 'mark_minutes = NULL');
         if (fields.includes('global')) sets.push('global = NULL');
         // Moved to another shelf: its place there means nothing on its own one.
         if (fields.includes('sort') || (fields.includes('cat') && r.cat !== null)) sets.push('sort = NULL');
@@ -1684,7 +1689,7 @@ export const customGiftRoutes = {
         }
         sets.push('updated_by = $2', 'updated_at = now()', "rev = nextval('custom_gift_rev')");
         const after = await c.query(`UPDATE custom_gifts SET ${sets.join(', ')} WHERE id = $1 RETURNING *`, [id, a.id]);
-        checkMarkPrices(after.rows[0]);
+        await checkMarkPrices(c, after.rows[0]);
         await audited(c, a.id, 'gift.reset', { gift: id, fields, before: auditOf(r), after: auditOf(after.rows[0]), ...panelDetail(a) }, clientIp(req));
       }),
     );

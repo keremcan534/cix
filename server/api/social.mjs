@@ -338,7 +338,8 @@ export const socialRoutes = {
     // levels may be a minute old (profiles.mjs levelsOf), as Keşfet's cards are.
     const card = url.searchParams.get('card') === '1';
     const more = await profileMore(u, id === me.id, { gifts: !card, fresh: !card });
-    const looks = (await looksOf([u.id]))[u.id] ?? null;
+    // noMarks for me, as GET /api/looks answers it.
+    const looks = (await looksOf([u.id], db, me.id))[u.id] ?? null;
     return {
       user: {
         ...shown,

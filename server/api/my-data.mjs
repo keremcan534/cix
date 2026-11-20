@@ -593,7 +593,7 @@ export async function exportOf(c, uid) {
     album: await all('SELECT url, created_at FROM profile_photos WHERE user_id = $1 ORDER BY id', (x) => ({ url: x.url, at: x.created_at })),
   };
   const privacy = {
-    settings: (await all('SELECT profile_public, show_online, show_last_seen, show_current_room, dm_from, calls_from, invites_from, voice_calls, video_calls, message_push, push_close_only, auto_receive, auto_opener, auto_opener_seen, auto_send, profile_marks, global_hide_name, updated_at FROM privacy_settings WHERE user_id = $1'))[0] ?? null,
+    settings: (await all('SELECT profile_public, show_online, show_last_seen, show_current_room, dm_from, calls_from, invites_from, voice_calls, video_calls, message_push, push_close_only, auto_receive, auto_opener, auto_opener_seen, auto_send, profile_marks, marks_from, global_hide_name, updated_at FROM privacy_settings WHERE user_id = $1'))[0] ?? null,
     callHistoryClearedAt: (await all('SELECT cleared_at FROM call_history_cleared WHERE user_id = $1'))[0]?.cleared_at ?? null,
   };
   // Otomatik mesaj (auto-chat.mjs, message-holds.mjs): my own templates, the rights I used, the automatic messages

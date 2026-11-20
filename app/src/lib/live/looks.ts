@@ -36,15 +36,22 @@ export type Look = {
   avatarUrl?: string | null;
   /** Profil izleri on their photo (lib/profile-marks parseMarks reads it); an older server sends none. */
   marks?: unknown;
-  /** They refuse profile marks (Gizlilik): the gift sheet doesn't send them a gift that leaves one. */
+  /**
+   * A gift that leaves a profile mark would be refused from me (Gizlilik: nobody, or only the people they follow and
+   * not me): the gift sheet doesn't send it to them. GET /api/looks answers it for me; a room's look packet (heard by
+   * everyone there) only for nobody.
+   */
   noMarks?: boolean;
+  /** Who may leave a mark on them (Kimler profilime iz bırakabilir); an older server sends none. */
+  marksFrom?: 'everyone' | 'following' | 'nobody';
 };
 const TTL = 120_000;
 /** How long after a failed read it is tried again (first, second retry); after that the 30-second ask for missing faces. */
 export const LOOK_RETRY_MS = [5_000, 15_000];
 /** How often a screen asks again for the people on it whose look is still not read. */
 const MISSING_EVERY_MS = 30_000;
-const store = new Map<string, { look: Look; at: number }>();
+/** `at`: when the look was kept (a newer one wins over an older answer); `readAt`: when it counts as read (the TTL). */
+const store = new Map<string, { look: Look; at: number; readAt: number }>();
 /** Reads on their way, by account: a second ask for the same person waits for the first one. */
 const asking = new Map<string, Promise<void>>();
 let version = 0;
@@ -60,9 +67,12 @@ const subscribe = (l: () => void) => {
 // My own server id (lib/live sets it at sign-in): my own name and photo are this phone's, never overwritten here.
 let self: string | null = null;
 export const setLooksSelf = (id: string | null) => void (self = id);
-/** Keeps a look, and the person's name and photo as the server has them now (never for my own account). */
-const keep = (id: string, look: Look, at = Date.now()) => {
-  store.set(id, { look, at: Date.now() });
+/**
+ * Keeps a look, and the person's name and photo as the server has them now (never for my own account). `at`: when the
+ * server said it (the marks' clock); `readAt`: when it counts as read (the two-minute TTL runs from it).
+ */
+const keep = (id: string, look: Look, at = Date.now(), readAt = Date.now()) => {
+  store.set(id, { look, at: Date.now(), readAt });
   // Profil izleri: the marks on their photo (lib/mark-store), mine too; an older server's look says nothing of them.
   if (look.marks !== undefined) putMarks(id, parseMarks(look.marks), at);
   if (id === self) return;
@@ -73,9 +83,27 @@ const keep = (id: string, look: Look, at = Date.now()) => {
 /** The look of a server account, if read (undefined: not yet). */
 export const lookOf = (serverId: string | null | undefined): Look | undefined => (serverId ? store.get(serverId)?.look : undefined);
 
-/** A look the server sent into the room as it changed (lib/live/room-bus onServerLook). */
+/**
+ * A look the server sent into the room as it changed (lib/live/room-bus onServerLook). It is everyone's, so its noMarks
+ * says nobody only: while they still let only the people they follow, the refusal my own read found for me stays, and
+ * so does that read's time, so it is read again when it is two minutes old (they may have followed me since).
+ */
 export function putLook(serverId: string, look: Look) {
-  keep(serverId, look);
+  const had = store.get(serverId);
+  const stale = !!had?.look.noMarks && !look.noMarks && look.marksFrom === 'following' && had.look.marksFrom === 'following';
+  if (stale) keep(serverId, { ...look, noMarks: true }, Date.now(), had.readAt);
+  else keep(serverId, look);
+  emit();
+}
+
+/**
+ * A send that the server refused because of their Gizlilik (403 marks_off / marks_following): the sheet greys the mark
+ * gifts for them at once, until their look is read again.
+ */
+export function noteMarksRefused(serverId: string, code: 'marks_off' | 'marks_following') {
+  const had = store.get(serverId);
+  if (!had) return;
+  store.set(serverId, { ...had, look: { ...had.look, noMarks: true, marksFrom: code === 'marks_off' ? 'nobody' : 'following' } });
   emit();
 }
 
@@ -93,7 +121,7 @@ async function readLooks(ids: string[], freshAfter: number, tries: number) {
   const now = Date.now();
   const wanted = [...new Set(ids)].filter((id) => /^[0-9a-f-]{36}$/.test(id));
   const waiting = wanted.map((id) => asking.get(id)).filter((p): p is Promise<void> => !!p);
-  const need = wanted.filter((id) => !asking.has(id) && (store.get(id)?.at ?? 0) <= Math.max(now - TTL, freshAfter));
+  const need = wanted.filter((id) => !asking.has(id) && (store.get(id)?.readAt ?? 0) <= Math.max(now - TTL, freshAfter));
   for (let i = 0; i < need.length; i += 50) {
     const batch = need.slice(i, i + 50);
     const started = Date.now();

@@ -28,6 +28,7 @@ export function ProfileGiftSheet({
   svipLevel,
   onClose,
   onSend,
+  noteOf,
 }: {
   visible: boolean;
   /** Who gets it (shown in the title). */
@@ -39,6 +40,8 @@ export function ProfileGiftSheet({
   onClose: () => void;
   /** Sends one of the gift; true once it went (any refusal is shown by the sender). */
   onSend: (gift: Gift) => Promise<boolean> | boolean;
+  /** A line about the picked gift before it goes (Profil izleri: their photo shows another mark already), or null. */
+  noteOf?: (gift: Gift) => string | null;
 }) {
   const { colors, semantic } = useTheme();
   const s = useStyles();
@@ -148,6 +151,7 @@ export function ProfileGiftSheet({
               Bakiyen {fmt(coins)} jeton. Bu hediye için {fmt(gift.price - coins)} jeton eksik.
             </Text>
           )}
+          {!short && !locked && gift && noteOf?.(gift) && <Text style={s.note}>{noteOf(gift)}</Text>}
           <Button title={action.title} variant="money" disabled={'disabled' in action && action.disabled} onPress={'onPress' in action ? action.onPress : undefined} />
         </View>
       </View>

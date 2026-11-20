@@ -158,6 +158,9 @@ function RootStack() {
           <Stack.Screen name="kabile/kasa" />
           <Stack.Screen name="coins-bank" />
           <Stack.Screen name="ajans/basvuru" />
+          {/* İz önizleme (Yönetim › Hediyeler): the mark kinds on a photo with this phone's drawing; reads only the public
+              catalog and changes nothing, so signed in is enough (staff open it from Yönetim). */}
+          <Stack.Screen name="iz-onizleme" />
           {/* Staff and demo screens that only have local sample data so far (sample roles, providers, agency stats):
               a live build leaves them out, so a deep link or a typed URL is redirected to an open screen instead. */}
           <Stack.Protected guard={!liveMode()}>

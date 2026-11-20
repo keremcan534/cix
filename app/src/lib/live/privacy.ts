@@ -7,7 +7,7 @@ import { useEffect } from 'react';
 import * as api from '@/lib/api';
 import { showAlert } from '@/lib/alert';
 import { liveMode, message, onAccountChange } from '@/lib/live';
-import { PRIVACY_KEYS, privacySync, type PrivacyKey } from '@/lib/privacy-sync';
+import { PRIVACY_KEYS, marksShown, privacyBody, privacySync, type PrivacyKey } from '@/lib/privacy-sync';
 import { useApp, type Settings } from '@/store';
 
 export { PRIVACY_KEYS, type PrivacyKey };
@@ -19,8 +19,12 @@ onAccountChange(() => sync.reset());
 /** Reads my choices from the server into the store (`put`: the store's setSetting). */
 export async function loadPrivacy(put: Put) {
   if (!liveMode()) return;
-  const shown = sync.loaded(await api.myPrivacy());
+  const p = await api.myPrivacy();
+  const shown = sync.loaded(p);
   for (const k of PRIVACY_KEYS) if (shown[k] !== undefined) put(k, shown[k] as Settings[typeof k]);
+  // A server before "Kimler profilime iz bırakabilir": its switch alone (on: everyone could).
+  const marks = p.marksFrom === undefined && shown.profileMarks !== undefined ? marksShown(p) : null;
+  if (marks) put('marksFrom', marks.marksFrom);
 }
 
 /** The setter Ayarlar uses for these choices: live, shown at once and saved on the server; the demo, the store only. */
@@ -31,13 +35,33 @@ export function usePrivacySetter() {
     setSetting(k, v);
     if (!liveMode()) return;
     const id = sync.begin(k);
+    // Profil izleri: the switch and "Kimler profilime iz bırakabilir" are one setting (nobody = off): the other moves too.
+    if (k === 'marksFrom') setSetting('profileMarks', v !== 'nobody');
+    if (k === 'profileMarks' && v === false) setSetting('marksFrom', 'nobody');
+    // A server before marksFrom (rolled back) takes the switch's own key only (lib/privacy-sync privacyBody).
+    const body = privacyBody(k, v as api.ServerPrivacy[K], sync.known());
     api
-      .updatePrivacy({ [k]: v })
-      .then((p) => sync.saved(k, id, p))
+      .updatePrivacy(body)
+      .then((p) => {
+        sync.saved(k, id, p);
+        // Both as the server keeps them now (a server before marksFrom: "Yalnız takip ettiklerim" shows as Herkes, what
+        // its switch on does).
+        const marks = k === 'marksFrom' || k === 'profileMarks' ? marksShown(p) : null;
+        if (marks) {
+          setSetting('marksFrom', marks.marksFrom);
+          setSetting('profileMarks', marks.profileMarks);
+        }
+      })
       .catch((e) => {
         const back = sync.failed(k, id, before as api.ServerPrivacy[K]);
         if (back === undefined) return;
         setSetting(k, back as Settings[K]);
+        // Profil izleri: the other one moved with it; both go back to what the server last confirmed.
+        const marks = k === 'marksFrom' || k === 'profileMarks' ? marksShown(sync.known()) : null;
+        if (marks) {
+          setSetting('marksFrom', marks.marksFrom);
+          setSetting('profileMarks', marks.profileMarks);
+        }
         showAlert('Ayar kaydedilemedi', message(e));
       });
   };

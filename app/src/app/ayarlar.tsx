@@ -307,13 +307,14 @@ export default function SettingsScreen() {
             title="Bulunduğum odayı profilimde göster"
             subtitle={live ? 'Kapalıyken bulunduğun oda kimseye gösterilmez.' : "Kapalıyken profilinden odana 'Git' ile gelinemez."}
           />
-          {/* Profil izleri (server/api/profile-marks.mjs): off by default, i.e. marks may be left. */}
-          <PrivacyToggle
-            k="profileMarks"
-            invert
+          {/* Profil izleri (server/api/profile-marks.mjs): the same setting as "Kimler profilime iz bırakabilir" below
+              (on = Kimse). It blocks new marks only: the owners' decision (20 Nov 2026), the one showing stays. */}
+          <ListSwitch
             icon="sparkles-outline"
             title="Profilime iz bırakılmasın"
-            subtitle="Açıkken kimse sana 💩 gibi iz bırakan hediye gönderemez; profilindeki iz de hemen gider."
+            subtitle="Açıkken kimse sana 💩 ya da kırık cam gibi iz bırakan hediye gönderemez. Profilindeki iz kalır: süresi dolunca ya da biri temizleyince gider."
+            value={settings.marksFrom === 'nobody'}
+            onChange={(v) => setPrivacy('marksFrom', v ? 'nobody' : 'following')}
           />
           {/* Global hediye (server/api/global-gifts.mjs): a gift I send or get is announced in every room of the country. */}
           <PrivacyToggle k="globalHideName" icon="earth-outline" title="Adım genel duyurularda görünmesin" subtitle="Global hediyelerde adın ve fotoğrafın yerine “Bir kullanıcı” yazar, odanın adı da yazmaz." />
@@ -354,6 +355,20 @@ export default function SettingsScreen() {
           <ListBlock title="Beni kimler arayabilir?">
             <Text style={styles.blockHint}>{live ? 'Sesli ve görüntülü aramalar; Hemen Tanış eşleşmeleri etkilenmez' : 'Ücretli sesli ve görüntülü aramalar'}</Text>
             <ChoiceChips value={settings.callsFrom} options={Object.entries(CALLS_FROM_LABEL) as [CallsFrom, string][]} onChange={(v) => setPrivacy('callsFrom', v)} />
+          </ListBlock>
+          {/* Profil izleri (server/api/privacy.mjs marksFrom): a gift that leaves a mark from anyone else is refused before
+              any coin moves. "Yalnız takip ettiklerim" is the default, also for whoever never chose. */}
+          <ListBlock title="Kimler profilime iz bırakabilir?">
+            <Text style={styles.blockHint}>Muzip hediyelerden iz bırakanlar (💩, kırık cam). Yeni izler için geçerli; olan iz kalır.</Text>
+            <ChoiceChips
+              value={settings.marksFrom}
+              options={[
+                ['everyone', 'Herkes'],
+                ['following', 'Yalnız takip ettiklerim'],
+                ['nobody', 'Kimse'],
+              ]}
+              onChange={(v) => setPrivacy('marksFrom', v)}
+            />
           </ListBlock>
           <ListBlock title="Beni odalara kimler davet edebilir?">
             <ChoiceChips

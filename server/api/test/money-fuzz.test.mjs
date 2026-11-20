@@ -41,10 +41,18 @@ describe('Para: aynı anda rastgele işlemler', () => {
     await ok(call('POST', '/api/admin/jeton/wholesale', { bank: bank.user.id, coins: 500_000, paymentRef: 'DEKONT-1', ref: rnd(6) }, admin.session), 'toptan');
     for (const p of people) await ok(call('POST', '/api/wallet/test-topup', { amount: 10000, ref: rnd(6) }, p.session), 'yükleme');
     const room = (await ok(call('POST', '/api/rooms', { title: `Para ${rnd(2)}` }, people[0].session), 'oda')).room.id;
+    // Half of them let everyone mark them at first (the default lets only the people they follow), so marks land.
+    for (const p of people.slice(5)) await ok(call('PATCH', '/api/me/privacy', { marksFrom: 'everyone' }, p.session), 'iz tercihi');
+    // Muzip hediyeler: Terlik Geldi! leaves Kırık Cam and Konfeti Topu cleans it (the panel's rules), beside Kaka Şakası
+    // and Temizlik Suyu: two kinds, so a mark of one makes the other's gift a plain gift while cleans and blocks race them.
+    await ok(call('POST', '/api/admin/gifts/update', { id: 'p8', enabled: true, mark: { role: 'leave', kind: 'kirik-cam', minutes: 60 } }, admin.session), 'terlik');
+    await ok(call('POST', '/api/admin/gifts/update', { id: 'p9', enabled: true, mark: { role: 'clean', kind: 'kirik-cam' } }, admin.session), 'cam tamiri');
     // The shelf's gifts anyone may send (most are paused or for VIPs): Roket 1.999, and the like.
-    // Kaka and Su too (marks=1): a profile mark written, ended or cleaned in the gift's transaction (profile-marks.mjs).
-    const gifts = (await ok(call('GET', '/api/catalog?gifts=2&marks=1'), 'katalog')).gifts.filter((g) => !g.minSvip && g.price <= 3000);
+    // The mark gifts too (marks=2): a profile mark written, ended, kept (another kind shows) or cleaned in the gift's transaction
+    // (profile-marks.mjs), refused before any coin moves when the receiver's Gizlilik doesn't let the sender.
+    const gifts = (await ok(call('GET', '/api/catalog?gifts=2&marks=1&marks=2'), 'katalog')).gifts.filter((g) => !g.minSvip && g.price <= 3000);
     assert.ok(gifts.length >= 1);
+    assert.ok(['k1', 'k2', 'p8', 'p9'].every((id) => gifts.some((g) => g.id === id && g.mark)), 'iz hediyeleri karışımda');
     const shop = [['fr-neon', 150], ['en-sparkle', 200], ['fr-silver', 800]];
     const other = (u) => {
       for (;;) {
@@ -73,8 +81,10 @@ describe('Para: aynı anda rastgele işlemler', () => {
         const where = random() < 0.5 ? { room } : { place: pick(['profile', 'chat']) };
         return ['hediye', 'POST', '/api/gifts/send', { to: other(u).user.id, giftId: g.id, count: 1, price: g.price, ...where, ref: rnd(6) }, u.session];
       }],
-      // Profil izleri: refusing marks (a Kaka to them is refused, their marks come off in a transaction of their own).
-      [2, async (u) => ['iz tercihi', 'PATCH', '/api/me/privacy', { profileMarks: random() < 0.5 }, u.session]],
+      // Profil izleri: who may mark me (everyone, the people I follow, nobody; the older switch too), and follows that
+      // decide it, racing the marks.
+      [2, async (u) => ['iz tercihi', 'PATCH', '/api/me/privacy', random() < 0.3 ? { profileMarks: random() < 0.5 } : { marksFrom: pick(['everyone', 'following', 'nobody']) }, u.session]],
+      [2, async (u) => ['takip', 'POST', '/api/follow', { to: other(u).user.id, follow: random() < 0.7 }, u.session]],
       [6, async (u) => ['test hediyesi', 'POST', '/api/wallet/gift', { to: other(u).user.id, amount: 1 + Math.floor(random() * 500), ref: rnd(6) }, u.session]],
       [8, async (u) => ['çevir', 'POST', '/api/wallet/exchange', { diamonds: pick([100, 500, 1000]), ref: rnd(6) }, u.session]],
       [5, async (u) => ['bağ isteği', 'POST', '/api/bonds/request', { to: other(u).user.id, kind: pick(['kardes', 'kanka']), ref: rnd(6) }, u.session]],
@@ -229,7 +239,15 @@ describe('Para: aynı anda rastgele işlemler', () => {
       [people[0].user.id, room],
     );
     assert.deepEqual([Number(xp.xp), Number(xp.waiting)], [Number(xp.sent), 0], 'oda XP\'si eksiksiz ve bir kez');
+    // Profil izleri: one mark at a time on everyone, and none on anyone from someone they block now (a block takes the
+    // blocked person's off, and a gift of theirs racing it is refused or taken off right after: gifts.mjs, social.mjs).
+    const [marks] = await q(
+      `SELECT (SELECT count(*) FROM (SELECT user_id FROM profile_marks WHERE cleared_at IS NULL AND expires_at > now() GROUP BY user_id HAVING count(*) > 1) x) AS doubled,
+              (SELECT count(*) FROM profile_marks m JOIN blocks b ON b.blocker = m.user_id AND b.blocked = m.from_user WHERE m.cleared_at IS NULL AND m.expires_at > now()) AS blocked,
+              (SELECT count(*) FROM profile_marks) AS total`,
+    );
+    assert.deepEqual([Number(marks.doubled), Number(marks.blocked)], [0, 0], 'tek iz; engellenenin izi kalmaz');
     const [idle] = await q("SELECT count(*) AS n FROM bonds WHERE end_reason = 'idle'");
-    console.log(`para karıştırma: tohum ${startSeed}; ${summary}; kendiliğinden biten bağ: ${idle.n}; oda XP: ${xp.xp}`);
+    console.log(`para karıştırma: tohum ${startSeed}; ${summary}; kendiliğinden biten bağ: ${idle.n}; oda XP: ${xp.xp}; iz satırı: ${marks.total}`);
   });
 });
