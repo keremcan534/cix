@@ -814,7 +814,7 @@ function Odds({ board, id }: { board: Board; id: BoardId }) {
           <Text style={o.chance}>{percentText(resultShare(board, r))}</Text>
         </View>
       ))}
-      <Text style={o.note}>Şans, o seçeneğin bir turda kazanma olasılığıdır (onu ödeyen bütün sonuçlar sayılır). Her seçenekte çarpan × şans %40 eder.</Text>
+      <Text style={o.note}>Şans, o seçeneğin bir turda kazanma olasılığıdır (onu ödeyen bütün sonuçlar sayılır).</Text>
     </View>
   );
 }

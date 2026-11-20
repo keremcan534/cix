@@ -36,7 +36,7 @@ describe('Bağlar ve Koruma sayıları panelden (Canlı ayarlar)', () => {
     const c = parseLiveCatalog({ gifts: [], bonds: { answerDays: 5, cooldownDays: 0, talkDaily: 0, max: { kanka: 2, kardes: 'çok', xyz: 4 } } });
     assert.deepEqual(c.bonds, { answerDays: 5, cooldownDays: 0, talkDaily: 0, max: { kanka: 2 } });
     assert.equal(bondKindOf('kanka', c).max, 2);
-    assert.equal(bondKindOf('kardes', c).max, 3);
+    assert.equal(bondKindOf('kardes', c).max, 1000, 'uygulamanın kendi sınırı: pratikte sınırsız');
     const text = bondRulesText(c.bonds!).join(' ');
     assert.match(text, /5 gün içinde/);
     assert.match(text, /hemen yeniden/);

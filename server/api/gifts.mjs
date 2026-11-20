@@ -1,7 +1,7 @@
 // Gifts at the server's price, and the rankings they feed.
 //
-//   GET  /api/catalog[?gifts=2][&family=1][&emoji=1][&levels=1][&shop=1]     → { gifts, counts, packs, vipPlans, svipXp, purchases, campaign, exchange, fx, v, emoji?, levels?, shop? }
-//   POST /api/gifts/send  { to, giftId, count, price?, room?, place?, ref } → { user, replay, total }  (place: chat|moment|profile|family)
+//   GET  /api/catalog[?gifts=2][&family=1][&emoji=1][&levels=1][&shop=1][&marks=1] → { gifts, counts, packs, vipPlans, svipXp, purchases, campaign, exchange, fx, v, emoji?, levels?, shop?, marks? }
+//   POST /api/gifts/send  { to, giftId, count, price?, room?, place?, ref } → { user, replay, total, mark? }  (place: chat|moment|profile|family)
 //   GET  /api/rankings?board=wealth|charm|agency&period=day|week|month → { rows }  (agency: rows carry agency, not user)
 //
 // The sender's coins become the recipient's diamonds 1 to 1 (app/src/data/rules.ts creatorDiamondsPerCoin);
@@ -22,9 +22,10 @@
 // shop=1: the shop's frames and entry effects as Yönetim › Mağaza has them (shop-items.mjs shopCatalog); `v` too.
 // A members-only gift needs its own VIP level and at least the one the settings open `vip_gifts` at (vipItemNeed).
 // A gift sent in a server room is announced to the room's voice connection from here, after it is paid
-// (LiveKit SendData, so no phone can fake one); the phones draw only these, never a peer's own claim.
+// (LiveKit SendData, so no phone can fake one); the phones draw only these, never a peer's own claim. A global gift
+// (global-gifts.mjs) is also told, once paid, to every room of the sender's country; the catalog marks it `global`.
 import { recordIncome } from './agency-lib.mjs';
-import { KINDS as BOND_KINDS, addBondCoins, maxOf as bondMax } from './bonds.mjs';
+import { addBondCoins, bondCatalog, bondGiftOf, checkBondGift } from './bonds.mjs';
 import { HttpError, auth, blockedBetween, claimRef, db, env, int, once, readJson, userId } from './core.mjs';
 import { EXCHANGE, GIFT_COUNTS, PACKS, VIP_SUBS } from './catalog.mjs';
 import { docsNow, levelsPayload, levelsRev, svipLevel, vipItemNeed } from './levels.mjs';
@@ -39,10 +40,14 @@ import { notify } from './push.mjs';
 import { purchaseOptions } from './purchases.mjs';
 import { giftCoins } from './wallet.mjs';
 import { announceRoom, roomService } from './live.mjs';
-import { roomLevel } from './rooms.mjs';
 import { announceBoss, bossGift } from './boss-seat.mjs';
 import { GUARD_CARD, guardRules, guardStarted, startGuard } from './guards.mjs';
 import { fuelRocket, launchRockets, rocketFx, rocketVideosRev } from './room-rocket.mjs';
+import { luckyArtRev, luckyFx } from './lucky-art.mjs';
+import { lockSendAccounts } from './send-locks.mjs';
+import { addHeldRoomXp, holdRoomXp } from './room-xp-add.mjs';
+import { announceMarks, markGift, markPushBody, marksInfo, withMarks } from './profile-marks.mjs';
+import { announceGlobalGift } from './global-gifts.mjs';
 
 export const ROOM = /^[A-Za-z0-9_-]{1,64}$/;
 const BOARDS = { wealth: 'sender', charm: 'recipient' };
@@ -123,7 +128,8 @@ export const giftRoutes = {
       // Every gift on the shelves in the shelves' order (custom-gifts.mjs): the admins' with their icon (an older app
       // skips them), the app's own as changed in the panel. Off the shelves (the app's paused ones unless put back,
       // catalog.mjs GIFTS_PAUSED) or hidden in Canlı ayarlar: left out, so older apps drop them too.
-      gifts: catalogGifts({ app2, hidden: s.giftsHidden, family }),
+      // Profil izleri (profile-marks.mjs): Kaka and Su, and each gift's `mark`, only for a phone that has them (marks=1).
+      gifts: withMarks(catalogGifts({ app2, hidden: s.giftsHidden, family }), url?.searchParams.get('marks') === '1', s),
       ...(app2 ? { giftsFormat: 2 } : {}),
       counts: GIFT_COUNTS,
       packs: PACKS.filter((p) => !s.packsHidden.has(p.id)).map(({ id, productId, coins, firstBonus }) => ({ id, productId, coins, firstBonus })),
@@ -139,21 +145,24 @@ export const giftRoutes = {
       campaign: c && Date.parse(c.startsAt) <= now && now < Date.parse(c.endsAt) ? { percent: c.percent, startsAt: c.startsAt, endsAt: c.endsAt, label: c.label } : null,
       exchange: { usdTry: s.usdTry, minDiamonds: EXCHANGE.minDiamonds },
       // The gift and entry videos the phones download and keep (fx.mjs, and the admins' gifts'); an older app ignores it.
-      fx: [...fxCatalog(s.giftsHidden, replacedClips()), ...giftFx(s.giftsHidden, family), ...shopFx(), ...rocketFx()],
+      // Şanslı packages' videos (lucky-art.mjs) only for an app that plays them (lucky=1).
+      fx: [...fxCatalog(s.giftsHidden, replacedClips()), ...giftFx(s.giftsHidden, family), ...shopFx(), ...rocketFx(), ...(url?.searchParams.get('lucky') === '1' ? luckyFx() : [])],
       // The emoji panel's packs and stickers as they are now (emoji.mjs): only for an app that asks (emoji=1).
       ...(url?.searchParams.get('emoji') === '1' ? { emoji: emojiCatalog() } : {}),
       // Seviye ve VIP ayarları (levels.mjs): only for an app that asks (levels=1).
       ...(url?.searchParams.get('levels') === '1' ? { levels: levelsPayload() } : {}),
       // Yönetim › Mağaza (shop-items.mjs): only for an app that asks (shop=1).
       ...(url?.searchParams.get('shop') === '1' ? { shop: shopCatalog() } : {}),
+      // Profil izleri (profile-marks.mjs): on or off and the Canlı ayar's hours, for an app that asks (marks=1).
+      ...(url?.searchParams.get('marks') === '1' ? { marks: marksInfo(s) } : {}),
       // Koruma's and Bağlar's numbers as Canlı ayarlar has them, for the screens that say them (an older app says its own).
       guard: guardRules(s),
       rooms: (({ micMinLevel, bossMinLevel, caps }) => ({ micMinLevel, bossMinLevel, caps }))(roomNumbersOf(s)),
       family: { themes: Object.fromEntries(familyRulesOf(s).themes.map((t) => [t.id, t.minLevel])) },
-      bonds: { answerDays: s.bondAnswerDays, cooldownDays: s.bondCooldownDays, talkDaily: s.bondTalkDaily, max: Object.fromEntries(Object.keys(BOND_KINDS).map((k) => [k, bondMax(k, s)])) },
+      bonds: bondCatalog(s),
       // Grows with every live settings save, every change in Yönetim › Hediyeler and Emojiler, and every Seviye
       // ayarları save (as /api/config's).
-      v: s.v + customGiftsRev() + emojiRev() + levelsRev() + shopItemsRev() + rocketVideosRev(),
+      v: s.v + customGiftsRev() + emojiRev() + levelsRev() + shopItemsRev() + rocketVideosRev() + luckyArtRev(),
     };
   },
 
@@ -163,8 +172,8 @@ export const giftRoutes = {
     const s = live();
     const b = await readJson(req);
     // One of the app's gifts (as changed in the panel) or an admin's on the shelves (custom-gifts.mjs), at this
-    // server's price either way.
-    const gift = giftOf(b.giftId);
+    // server's price either way. A bond gift (bag-<kind>) only to someone I have that bond with (bonds.mjs).
+    const gift = giftOf(b.giftId) ?? bondGiftOf(b.giftId);
     if (!gift) throw new HttpError(400, 'Bu hediye artık yok');
     const count = int(b.count ?? 1, 1, 10_000);
     if (!count || !GIFT_COUNTS.includes(count)) throw new HttpError(400, `Adet ${GIFT_COUNTS.join(', ')} olabilir`);
@@ -184,15 +193,17 @@ export const giftRoutes = {
     let boss = [];
     let guardNew = false;
     let rocket = null;
+    let mark = null;
+    let xpOwner = null;
     const out = await once(u.id, 'coin', b.ref, async (c) => {
-      // Lock both rows in id order so two people gifting each other at once can't deadlock.
-      const locked = await c.query('SELECT id FROM users WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL ORDER BY id FOR UPDATE', [[u.id, to]]);
-      if (locked.rowCount < 2) throw new HttpError(404, 'Alıcı bulunamadı');
+      // Both rows in id order, so two gifts at once can't deadlock (send-locks.mjs).
+      if (!(await lockSendAccounts(c, [u.id, to]))) throw new HttpError(404, 'Alıcı bulunamadı');
       await claimRef(c, u.id, 'coin', b.ref);
       // After the ref check: a retry of a gift that went through before the hide gets its replay, not a 400.
       if (s.giftsHidden.has(gift.id)) throw new HttpError(400, 'Bu hediye artık yok');
       // The price the phone showed (none from an older app): a gift whose price moved is refused, nothing moves.
       checkShownPrice(gift, b.price);
+      if (gift.bond) await checkBondGift(c, u.id, to, gift.bond);
       // Koruma Kartı (guards.mjs): starts a Koruma before the gift's row, so its coins are the first points.
       if (gift.id === GUARD_CARD) guardNew = await startGuard(c, u.id, to);
       const g = await c.query('INSERT INTO gift_events (sender, recipient, gift_id, count, unit_price, total, room, place, ref) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id', [
@@ -207,8 +218,12 @@ export const giftRoutes = {
         b.ref,
       ]);
       eventId = Number(g.rows[0].id);
-      // A gift from a chat shows in that chat, for both of them (a line of its own; no message price).
-      if (place === 'chat') await c.query('INSERT INTO messages (sender, recipient, body, ref) VALUES ($1,$2,$3,$4) ON CONFLICT (sender, ref) DO NOTHING', [u.id, to, `Hediye gönderdi: ${label}`, `gift-${b.ref}`]);
+      // Profil izleri: a mark left or cleaned; refused (nothing moves) for someone who refuses marks.
+      mark = await markGift(c, { gift, from: u.id, to, eventId, s });
+      // A gift from a chat shows in that chat, for both of them (a line of its own; no message price). Its ref is a
+      // server ref (':'), so no phone can take it first and hide the line or put its own words in it; the chat reads
+      // the gift back from it (messages.mjs GIFT_LINE: this ref and this transaction's moment).
+      if (place === 'chat') await c.query('INSERT INTO messages (sender, recipient, body, ref) VALUES ($1,$2,$3,$4) ON CONFLICT (sender, ref) DO NOTHING', [u.id, to, `Hediye gönderdi: ${label}`, `gift:${b.ref}`]);
       // A gift from the family chat: only to someone of my family, and the family chat shows it (family-more.mjs task).
       if (place === 'family') {
         const fam = await c.query(
@@ -224,11 +239,12 @@ export const giftRoutes = {
       await addBondCoins(c, u.id, to, total);
       // Oda içi PK (pk.mjs): scores for the recipient while a PK runs in this room; never fails the gift.
       if (room) await scorePkGift(c, { room, eventId, sender: u.id, recipient: to, coins: total });
-      // Room level (rooms.mjs roomLevel): the coins count as XP for the owner of the open server room.
+      // Room level (rooms.mjs roomLevel): the coins count as XP for the owner of the open server room, held here and
+      // added once this commits (room-xp-add.mjs: the owner's row is never locked by a gift).
       const roomId = liveKitRoom(room)?.slice(4);
+      xpOwner = null;
       if (roomId) {
-        const x = await c.query('UPDATE users SET room_xp = room_xp + $2 WHERE id = (SELECT owner FROM rooms WHERE id = $1 AND closed_at IS NULL) RETURNING room_xp', [roomId, total]);
-        if (x.rowCount && roomLevel(Number(x.rows[0].room_xp)) > roomLevel(Number(x.rows[0].room_xp) - total)) levelUp = true;
+        xpOwner = await holdRoomXp(c, roomId, eventId, total);
         // Patron koltuğu (boss-seat.mjs): this send may sit its sender down, extend their sitting or take the seat.
         boss = await bossGift(c, { roomId, sender: u.id, coins: total });
         // Oda roketi (room-rocket.mjs): the coins fill today's rocket; a level it fills launches once this commits.
@@ -240,18 +256,25 @@ export const giftRoutes = {
     // once() keys on (sender, coin, ref), which spends, bonds and Jeton Noktası share: only a gift of this ref is
     // this gift's replay. Another feature's ref is refused, so a success always means the gift went.
     if (out.replay && !(await db.query('SELECT 1 FROM gift_events WHERE sender = $1 AND ref = $2', [u.id, b.ref])).rowCount) throw new HttpError(409, 'Geçersiz istek kimliği');
+    // The room XP it held reaches the owner (before the answer, so a room read after it has the new level).
+    if (!out.replay && xpOwner) levelUp = await addHeldRoomXp(xpOwner, [eventId]);
     // In a room the recipient sees it on stage; elsewhere (profile, chat) they get a notification.
     const lkRoom = liveKitRoom(room);
-    if (!out.replay && eventId !== null && lkRoom) announceGift(lkRoom, { giftId: gift.id, count, from: u.id, to, eventId });
+    if (!out.replay && eventId !== null && lkRoom) announceGift(lkRoom, { giftId: gift.id, count, from: u.id, to, eventId, ...(mark && { mark }) });
+    // A mark left or cleaned from a profile or a chat: the rooms they sit in redraw their face.
+    if (!out.replay && mark && !lkRoom) void announceMarks(to).catch(() => {});
     // A new room level: the room's phones read the room again (more mics from Lv.8 on).
     if (!out.replay && levelUp && lkRoom) announceRoom(lkRoom);
     // Patron koltuğu: the room hears who sat, took it or whose time ended.
     if (!out.replay && lkRoom) await announceBoss(lkRoom.slice(4), boss);
     // Oda roketi: a level this gift filled launches and is paid (not awaited: the gift is done).
     if (!out.replay && lkRoom && rocket) void launchRockets(lkRoom.slice(4), rocket);
-    if (!out.replay && !room) notify([to], { title: 'Hediye geldi', body: `${u.name} sana ${label} gönderdi`, data: { type: 'gift', from: u.id } });
+    if (!out.replay && !room) notify([to], { title: 'Hediye geldi', body: markPushBody(mark, u.name) ?? `${u.name} sana ${label} gönderdi`, data: { type: 'gift', from: u.id } });
     if (!out.replay && guardNew) guardStarted(u, to);
-    if (!out.replay) return { ...out, total };
+    // Global hediye (global-gifts.mjs): sent in a server room, every room of the sender's country hears of it, paced
+    // (not awaited). A send from a chat, a profile, the family chat or Anlar stays between the two.
+    if (!out.replay && eventId !== null && gift.global && lkRoom) void announceGlobalGift({ sender: u.id, to, gift, count, eventId, roomId: lkRoom.slice(4) });
+    if (!out.replay) return { ...out, total, ...(mark && { mark }) };
     // A replay reports what that ref sent, not this body's gift and count (0: the ref was no gift).
     const sent = (await db.query('SELECT total FROM gift_events WHERE sender = $1 AND ref = $2', [u.id, b.ref])).rows[0];
     return { ...out, total: Number(sent?.total ?? 0) };

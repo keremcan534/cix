@@ -1,16 +1,19 @@
 // Şanslı hediyeler in live mode: the server (server/api/lucky.mjs) keeps the packages and odds, takes the price,
 // gives each recipient their 20 % as diamonds, draws and pays the rewards in coins. This phone reads the
-// packages into lib/lucky (applyServerLucky), sends, and shows what the server answered.
+// packages into lib/lucky (applyServerLucky; malformed ones left out, lib/lucky-art) and their own icons into
+// lib/lucky-art, sends with the price and the settings' version the sheet showed (a moved one is refused with nothing
+// moved, and the sheet reads the packages again), and shows what the server answered.
 import * as api from '@/lib/api';
 import { applyServerUser, liveMode, once, rememberUser, toLocal, toServer } from '@/lib/live';
-import { addServerRecords, applyServerLucky, type LuckyGift, type LuckyRecord } from '@/lib/lucky';
+import { addServerRecords, applyServerLucky, getLucky, luckyGift, type LuckyGift, type LuckyRecord } from '@/lib/lucky';
+import { luckyShown, parseLuckyPackages, setLuckyIcons, type ServerLuckyPackage } from '@/lib/lucky-art';
 import { luckyHostDiamonds } from '@/data/rules';
 
 const clock = (t: number) => `${new Date(t).toLocaleDateString('tr-TR')} ${new Date(t).toTimeString().slice(0, 8)}`;
-const toGift = (g: api.ServerLuckyGift): LuckyGift => ({ id: g.id, name: g.name, emoji: g.emoji, price: g.price, enabled: g.enabled, tiers: g.tiers });
+const toGift = (g: ServerLuckyPackage): LuckyGift => ({ id: g.id, name: g.name, emoji: g.emoji, price: g.price, enabled: g.enabled, tiers: g.tiers });
 
 /** One record per draw: draw k went to recipient to[floor(k / count)]. */
-function records(s: api.ServerLuckySend, gifts: Map<string, api.ServerLuckyGift>, ts = Date.parse(s.at)): LuckyRecord[] {
+function records(s: api.ServerLuckySend, gifts: Map<string, ServerLuckyPackage>, ts = Date.parse(s.at)): LuckyRecord[] {
   const g = gifts.get(s.giftId);
   return s.draws.map((mult, k) => ({
     txId: `${s.ref}-${k}`,
@@ -31,20 +34,22 @@ function records(s: api.ServerLuckySend, gifts: Map<string, api.ServerLuckyGift>
   }));
 }
 
-let known = new Map<string, api.ServerLuckyGift>();
+let known = new Map<string, ServerLuckyPackage>();
 
 /** Reads the packages (and my last sends) from the server. Offline: nothing to read. */
 export async function refreshLucky() {
   if (!liveMode()) return;
   const r = await api.lucky();
-  known = new Map(r.gifts.map((g) => [g.id, g]));
+  const gifts = parseLuckyPackages(r.gifts);
+  known = new Map(gifts.map((g) => [g.id, g]));
+  setLuckyIcons(gifts);
   applyServerLucky({
     version: r.version,
-    gifts: r.gifts.map(toGift),
+    gifts: gifts.map(toGift),
     announceFrom: r.announceFrom,
-    open: Object.fromEntries(r.gifts.map((g) => [g.id, g.open !== false])),
+    open: Object.fromEntries(gifts.map((g) => [g.id, g.open])),
     allowed: r.allowed,
-    records: r.mine.flatMap((s) => records(s, known)),
+    records: (Array.isArray(r.mine) ? r.mine : []).flatMap((s) => records(s, known)),
   });
 }
 
@@ -58,7 +63,9 @@ export async function liveLuckySend(giftId: string, toIds: string[], count: numb
   if (to.some((x) => !x)) throw new Error('Bu kişiye Şanslı hediye gönderilemez.');
   const ids = to as string[];
   const g = known.get(giftId);
-  const r = await once(`lucky:${giftId}:${ids.join(',')}:${count}:${roomId}`, (ref) => api.luckySend(giftId, ids, count, roomId, ref, named));
+  // What the sheet showed: the package's price and the settings' version they came with (lib/lucky's copy).
+  const shown = luckyShown(luckyGift(giftId), getLucky().config.version);
+  const r = await once(`lucky:${giftId}:${ids.join(',')}:${count}:${roomId}`, (ref) => api.luckySend(giftId, ids, count, roomId, ref, named, shown));
   // Two rows, the price and the reward, so the whole price counts as spending (store SERVER_TAKES).
   const won = r.send.payout;
   const what = `${g?.name ?? giftId} ×${count * ids.length}`;

@@ -8,22 +8,26 @@
 // used only for the money action, and a short balance turns the action into "top up" instead of
 // failing after the tap. Product rule: no gift ever asks for a confirmation; one tap sends.
 // Gifts the owner hid in Yönetim › Canlı ayarlar are left off every shelf (lib/live/catalog-live visibleGifts).
+// Global: the gifts the server marks global (Global hediye, announced in every room of the country), gathered from
+// their own shelves (no shelf of their own on the server, so an older app keeps them where the admin put them), each
+// with a Global badge.
 // Çantam: free gifts from rewards. A live build shows the server's backpack (lib/live/backpack), read each time the
 // sheet opens; the server takes the gifts out when it sends them. The demo keeps its sample stock on this phone.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type ComponentRef } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
 import { Avatar, Button } from '@/components/ui';
+import { BOND_KINDS, bondGiftMode, bondPointsOf, type RoomBond } from '@/data/bonds';
 import { GIFTS, isBondGift, userById, type Gift, type GiftCat } from '@/data/mock';
 import { LUCKY_RECIPIENT_SHARE, pct } from '@/data/rules';
 import { bagCounts, bagLabel, bagNeed as needOf, bagShort as shortOf } from '@/lib/backpack';
 import { gamblingLevelOk } from '@/lib/games';
 import { pressHaptic, tapHaptic } from '@/lib/haptics';
-import { bagGifts, roomGiftShelf, useLiveCatalog } from '@/lib/live/catalog-live';
+import { bagGifts, giftMarkOf, isGlobalGift, roomGiftShelf, useLiveCatalog, type LiveCatalog } from '@/lib/live/catalog-live';
 import { liveMode } from '@/lib/live';
 import { refreshBackpack, useBackpack } from '@/lib/live/backpack';
 import { refreshLucky } from '@/lib/live/lucky';
@@ -34,30 +38,37 @@ import { Icon3D } from '@/components/Icon3D';
 import { GiftArt, MUSIC_BADGE } from '@/components/GiftArt';
 import { RollingNumber } from '@/components/fx/rolling-number';
 import { useRoomSheetSpace, useSheetMax } from '@/lib/sheet-space';
+import { marksShelfNote, refusesMarks } from '@/lib/live/marks-live';
+import { refusalLine, refusingMarks } from '@/lib/profile-marks';
 
-type Shelf = GiftCat | 'lucky' | 'fav' | 'bag';
+type Shelf = GiftCat | 'lucky' | 'fav' | 'bag' | 'global';
 type PriceSort = 'default' | 'asc' | 'desc';
 
 const SHELVES: { key: Shelf; label: string; icon?: keyof typeof Ionicons.glyphMap }[] = [
   { key: 'hot', label: 'Popüler' },
+  { key: 'global', label: 'Global', icon: 'globe' },
   { key: 'lucky', label: 'Şanslı', icon: 'leaf' },
-  { key: 'couple', label: 'İkili' },
+  { key: 'couple', label: 'Çift' },
   { key: 'family', label: 'Aile ve Dost' },
   { key: 'gameplay', label: 'Kutlama' },
   { key: 'privilege', label: 'Özel' },
   { key: 'fav', label: 'Favoriler', icon: 'star' },
-  { key: 'bag', label: 'Çantam', icon: 'bag-handle' },
+  // Drawn as the 3D bag with its count (the label is for screen readers).
+  { key: 'bag', label: 'Çantam' },
 ];
 /** The shelves that are a gift category: one with no gift left on it (all off the shelf for now) isn't shown. */
 const CATEGORY_SHELVES = new Set<Shelf>(['hot', 'couple', 'family', 'gameplay', 'privilege']);
 /** One neutral line that explains the shelf; no countdowns, no "spend more" nudges. */
 const SHELF_NOTE: Record<Shelf, string> = {
   hot: 'En çok gönderilen hediyeler.',
-  lucky: `Ödül garanti değildir: gönderdiğin hediyenin katları kadar jeton kazanma ihtimalin var, olasılıklar aşağıda. Kazandığın jeton bakiyene eklenir. Alıcıya ve PK puanına hediye değerinin ${pct(LUCKY_RECIPIENT_SHARE)}’si yazılır.`,
-  gameplay: 'Alıcının koltuğuna animasyonla atılır. Fiyat sabit, sürpriz ödül yok.',
-  couple: 'İkili hediyeler yakınlık puanını ekstra %2 artırır.',
-  family: 'Koruma Kartı seni koruyucu yapar. Bağ hediyesi bağ isteği olarak gider; kabul edilmezse jetonun geri döner.',
+  // How it is played and where its odds are, nothing about what can be won (the owners, Güncelleme 7).
+  lucky: `Her gönderimde bir çekiliş yapılır; olasılıklar aşağıda. Ödül garanti değildir. Alıcıya ve PK puanına hediye değerinin ${pct(LUCKY_RECIPIENT_SHARE)}’si yazılır.`,
+  // While a gift here leaves a profile mark (Kaka), the note says so instead (lib/live/marks-live marksShelfNote).
+  gameplay: 'Atılan hediye alıcının koltuğuna düşer. Fiyat sabit, sürpriz ödül yok.',
+  couple: 'Sevdiğine özel hediyeler.',
+  family: 'Koruma Kartı koruyucu yapar. Bağ hediyesi istek olur, kabul edilmezse jeton döner; bağın varsa puan getirir.',
   privilege: 'VIP üyelerine özel hediyeler.',
+  global: 'Gönderince ülkendeki bütün odalarda adınla duyurulur. Adını Ayarlar › Gizlilik’ten gizleyebilirsin.',
   fav: 'Bir hediyeye uzun basarak favorilere ekle veya çıkar.',
   bag: 'Görev ve giriş ödüllerin. Gönderirken jeton harcanmaz.',
 };
@@ -89,11 +100,11 @@ const levelOf = (spent: number) => LEVEL_XP.filter((x) => spent >= x).length;
 const isLocked = (g: Gift, svip: number) => (g.minSvip ?? 0) > svip;
 
 /** `shown`: the gifts the server still offers (giftShelf); `inBag`: what the backpack may send (bagGifts). */
-function shelfGifts(shown: Gift[], shelf: Shelf, sort: PriceSort, favs: Set<string>, bag: Record<string, number>, inBag: Gift[]) {
+function shelfGifts(shown: Gift[], shelf: Shelf, sort: PriceSort, favs: Set<string>, bag: Record<string, number>, inBag: Gift[], catalog: LiveCatalog | null) {
   if (shelf === 'lucky') return [];
   if (shelf === 'fav') return shown.filter((g) => favs.has(g.id));
   if (shelf === 'bag') return inBag.filter((g) => (bag[g.id] ?? 0) > 0);
-  const list = shown.filter((g) => (g.cat ?? 'hot') === shelf);
+  const list = shown.filter((g) => (shelf === 'global' ? isGlobalGift(g.id, catalog) : (g.cat ?? 'hot') === shelf));
   if (sort !== 'default') list.sort((a, b) => (sort === 'asc' ? a.price - b.price : b.price - a.price));
   return list;
 }
@@ -108,6 +119,7 @@ export function GiftSheet({
   onSend,
   onSendLucky,
   onSendBond,
+  bonds,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -126,6 +138,8 @@ export function GiftSheet({
   onSendLucky: (giftId: string, toIds: string[], count: number) => void;
   /** A bond gift of the Aile ve Dost shelf: one, to one person, as a bond request. */
   onSendBond: (g: Gift, to: string) => void;
+  /** The room's bonds (room-bonds useRoomBonds): a bond gift to someone I have that bond with goes as a gift (onSend). */
+  bonds?: readonly RoomBond[];
 }) {
   const { svipLevel, spentTotal, me, spendBlock, wealthLevel } = useApp();
   // Android modals draw edge to edge: the Gönder row must sit above the navigation bar.
@@ -155,6 +169,21 @@ export function GiftSheet({
   }, [visible, luckyShelf]);
   const [luckyId, setLuckyId] = useState(lucky.config.gifts[0]?.id ?? '');
   const [luckyView, setLuckyView] = useState<'odds' | 'history'>('odds');
+  // The "Olasılıklar" link under the button: the odds table of the gift picked, scrolled into sight (store rules want the
+  // odds close to the purchase). `want`: the table is still to be laid out (it was the history).
+  const gridRef = useRef<ComponentRef<typeof ScrollView>>(null);
+  const oddsAt = useRef({ shelf: 0, table: 0, want: false });
+  const scrollToOdds = () => {
+    const a = oddsAt.current;
+    a.want = false;
+    gridRef.current?.scrollTo({ y: Math.max(0, a.shelf + a.table - 8), animated: true });
+  };
+  const showOdds = () => {
+    tapHaptic();
+    if (luckyView === 'odds') return scrollToOdds();
+    oddsAt.current.want = true;
+    setLuckyView('odds');
+  };
   const [pickedShelf, setShelf] = useState<Shelf>('hot');
   const shelf: Shelf = pickedShelf === 'lucky' && !luckyShelf ? 'hot' : pickedShelf;
   const [sort, setSort] = useState<PriceSort>('default');
@@ -186,17 +215,25 @@ export function GiftSheet({
   const pickedListeners = roomAll ? [] : targets.filter((id) => !micIds.includes(id));
   const lg = lucky.config.gifts.find((x) => x.id === luckyId) ?? lucky.config.gifts[0];
   const isLucky = shelf === 'lucky' && !!lg;
-  const list = shelfGifts(shown, shelf, sort, favs, bag, inBag);
+  const list = shelfGifts(shown, shelf, sort, favs, bag, inBag, catalog);
+  const kutlamaNote = shelf === 'gameplay' ? marksShelfNote() : null;
   // A pick from Çantam may be a gift off the shelf for now (Kalp from the call task).
   const gift = (sel.bag ? inBag : shown).find((g) => g.id === sel.id) ?? shown[0];
   // An empty shelf (bag, favorites, no Lucky packages) keeps the last pick in state; never send it from here.
   const onShelf = shelf === 'lucky' ? !!lg : list.some((it) => it.id === sel.id && sel.bag === (shelf === 'bag'));
   const fromBag = sel.bag;
   const locked = !fromBag && isLocked(gift, svipLevel);
-  // A bond gift goes one at a time, to one person: it asks them for a bond.
-  const bondGift = !isLucky && !fromBag && isBondGift(gift.id);
+  // A bond gift to someone I have that bond with goes as an ordinary gift, any count, and adds bond points; to someone
+  // with a bond of another kind it can't go (one bond per pair); else it goes one at a time, to one person, and asks
+  // them for a bond (data/bonds bondGiftMode).
+  const bondMode = !isLucky && !fromBag ? bondGiftMode(bonds ?? [], 'me', targets, gift.id) : null;
+  const bondAgain = bondMode?.mode === 'again';
+  const bondGift = !isLucky && !fromBag && isBondGift(gift.id) && !bondAgain;
   const sendCount = bondGift ? 1 : count;
-  const total = isLucky ? lg.price * count * targets.length : (fromBag ? 0 : gift.price) * sendCount * targets.length;
+  // Profil izleri: a gift that leaves a mark doesn't go to someone who refuses marks (Gizlilik); the others still get it.
+  const refusing = isLucky ? [] : refusingMarks(giftMarkOf(gift.id), targets, refusesMarks);
+  const sendTo = refusing.length ? targets.filter((id) => !refusing.includes(id)) : targets;
+  const total = isLucky ? lg.price * count * targets.length : (fromBag ? 0 : gift.price) * sendCount * sendTo.length;
   const short = fromBag ? 0 : total - coins;
   const bagNeed = needOf(count, targets.length);
   const bagShort = fromBag && shortOf(bag, gift.id, count, targets.length);
@@ -211,7 +248,7 @@ export function GiftSheet({
   const pickShelf = (s: Shelf) => {
     tapHaptic();
     setShelf(s);
-    const l = shelfGifts(shown, s, sort, favs, bag, inBag);
+    const l = shelfGifts(shown, s, sort, favs, bag, inBag, catalog);
     const keep = l.some((g) => g.id === sel.id) && sel.bag === (s === 'bag');
     if (!keep && l[0]) setSel({ id: l[0].id, bag: s === 'bag' });
   };
@@ -252,7 +289,7 @@ export function GiftSheet({
   const send = () => {
     if (!onShelf) return;
     if (isLucky) return sendLucky();
-    if (!targets.length || locked || bagShort) return;
+    if (!sendTo.length || locked || bagShort) return;
     if (bondGift) {
       if (targets.length !== 1) return;
       if (short > 0) return goWallet();
@@ -262,7 +299,7 @@ export function GiftSheet({
     }
     if (fromBag) {
       // Stock goes down only after the gift really went out (offline sends nothing). Live: the server's answer.
-      if (!onSend({ ...gift, price: 0 }, targets, count, true) || live) return;
+      if (!onSend({ ...gift, price: 0 }, sendTo, count, true) || live) return;
       const next = { ...demoBag, [gift.id]: (demoBag[gift.id] ?? 0) - bagNeed };
       Object.assign(backpackStock, next);
       setBag(next);
@@ -271,11 +308,9 @@ export function GiftSheet({
     if (short > 0) return goWallet();
     if (overLimit) return;
     pressHaptic();
-    onSend(gift, targets, count);
+    onSend(gift, sendTo, count);
   };
 
-  const top = isLucky ? maxMult(lg) : 0;
-  const topOdds = isLucky ? (lg.tiers.find((t) => t.mult === top)?.weight ?? 0) : 0;
   // Footer state: exactly one message and one primary action at a time.
   const footer = !targets.length
     ? { tone: 'info' as const, text: roomIds.length ? 'Yukarıdan alıcı seç.' : 'Odada hediye gönderebileceğin kimse yok.', cta: 'Önce alıcı seç', disabled: true }
@@ -288,9 +323,14 @@ export function GiftSheet({
           ? { tone: 'warn' as const, text: `${fmt(total - coins)} jeton eksik.`, cta: 'Jeton yükle', variant: 'money' as const }
           : overLimit
             ? { tone: 'lock' as const, text: overLimit, cta: 'Günlük limiti aşıyor', disabled: true }
-          : { tone: 'info' as const, text: `${count * targets.length > 1 ? `Her hediye için ayrı çekiliş yapılır. ` : ''}En yüksek ödül ×${fmt(top)} = ${fmt(lg.price * top)} jeton (olasılık ${oddsLabel(topOdds)}). Ödül garanti değildir.`, cta: `Gönder · ${fmt(total)}`, variant: 'money' as const }
+          : // The odds a tap away, next to the purchase (store rules); no prize amount here.
+            { tone: 'info' as const, text: `${count * targets.length > 1 ? `Her hediye için ayrı çekiliş yapılır. ` : ''}Ödül garanti değildir`, odds: true, cta: `Gönder · ${fmt(total)}`, variant: 'money' as const }
     : bondGift && targets.length !== 1
       ? { tone: 'info' as const, text: 'Bağ hediyesi tek kişiye gönderilir: alıcılardan birini seç.', cta: 'Tek kişi seç', disabled: true }
+    : bondMode?.mode === 'other' && bondMode.bond
+      ? { tone: 'lock' as const, text: `Aranızda ${BOND_KINDS[bondMode.bond.kind].label} bağı var; bir kişiyle tek bağ kurulur.`, cta: 'Gönderilemez', disabled: true }
+    : refusing.length === targets.length
+      ? { tone: 'lock' as const, text: refusalLine(gift, refusing, (id) => userById(id).name, targets.length), cta: 'Gönderilemez', disabled: true }
     : locked
       ? { tone: 'lock' as const, text: `VIP ${gift.minSvip} ve üzerine özel (sen VIP ${svipLevel}).`, cta: 'VIP ayrıcalıklarını gör', variant: 'tonal' as const, onPress: goVip }
       : bagShort
@@ -301,6 +341,10 @@ export function GiftSheet({
             ? { tone: 'warn' as const, text: `${fmt(short)} jeton eksik.`, cta: 'Jeton yükle', variant: 'money' as const }
             : overLimit
               ? { tone: 'lock' as const, text: overLimit, cta: 'Günlük limiti aşıyor', disabled: true }
+            : bondAgain
+              ? { tone: 'bond' as const, text: `+${fmt(bondPointsOf(total))} bağ puanı · Kalan: ${fmt(coins - total)} jeton`, cta: `Gönder · ${fmt(total)}`, variant: 'money' as const }
+            : refusing.length
+              ? { tone: 'warn' as const, text: refusalLine(gift, refusing, (id) => userById(id).name, targets.length), cta: `Gönder · ${fmt(total)}`, variant: 'money' as const }
             : { tone: 'info' as const, text: `Kalan: ${fmt(coins - total)} jeton`, cta: `Gönder · ${fmt(total)}`, variant: 'money' as const };
 
   const sortBtn =
@@ -321,6 +365,7 @@ export function GiftSheet({
     ) : null;
   // Compact: the total is in the button; a notice only for Şanslı (its odds) or when something is wrong.
   const noticeShown = !compact || isLucky || footer.tone !== 'info';
+  const toneIcon = footer.tone === 'warn' ? 'alert-circle' : footer.tone === 'lock' ? 'lock-closed' : footer.tone === 'bond' ? 'link' : 'information-circle';
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -387,27 +432,40 @@ export function GiftSheet({
         {/* What: shelves (compact: the price sort at their end, as the shelf notes are left out) */}
         <View style={g.shelfBar}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={g.shelves}>
-          {SHELVES.filter((s) => (s.key === 'lucky' ? luckyShelf : !CATEGORY_SHELVES.has(s.key) || shown.some((g) => (g.cat ?? 'hot') === s.key))).map((s) => {
+          {SHELVES.filter((s) =>
+            s.key === 'lucky' ? luckyShelf : s.key === 'global' ? shown.some((g) => isGlobalGift(g.id, catalog)) : !CATEGORY_SHELVES.has(s.key) || shown.some((g) => (g.cat ?? 'hot') === s.key),
+          ).map((s) => {
             const on = shelf === s.key;
             const n = s.key === 'bag' ? Object.values(bag).filter((x) => x > 0).length : 0;
+            // Çantam is the app's 3D bag alone, its count on a badge; the word stays for screen readers.
+            if (s.key === 'bag')
+              return (
+                <Pressable key={s.key} onPress={() => pickShelf(s.key)} hitSlop={{ top: 4, bottom: 4 }} style={[g.shelf, g.shelfIcon, on && g.shelfOn]} accessibilityRole="tab" accessibilityState={{ selected: on }} accessibilityLabel={n ? `${s.label}, ${n} çeşit hediye` : s.label}>
+                  <Icon3D name="bag" size={24} />
+                  {n > 0 && (
+                    <View style={g.shelfBadge}>
+                      <Text style={g.shelfBadgeText} numberOfLines={1}>
+                        {n > 99 ? '99+' : n}
+                      </Text>
+                    </View>
+                  )}
+                </Pressable>
+              );
             return (
               <Pressable key={s.key} onPress={() => pickShelf(s.key)} hitSlop={{ top: 4, bottom: 4 }} style={[g.shelf, on && g.shelfOn]} accessibilityRole="tab" accessibilityState={{ selected: on }}>
                 {s.icon && <Ionicons name={s.icon} size={14} color={on ? '#fff' : colors.textDim} />}
-                <Text style={[g.shelfText, on && { color: '#fff' }]}>
-                  {s.label}
-                  {n ? ` ${n}` : ''}
-                </Text>
+                <Text style={[g.shelfText, on && { color: '#fff' }]}>{s.label}</Text>
               </Pressable>
             );
           })}
         </ScrollView>
         {compact && sortBtn}
         </View>
-        {/* The notes that carry a rule (Şanslı, Aile ve Dost) open the grid below instead, in full. */}
+        {/* The notes that carry a rule (Şanslı, Aile ve Dost, Global) open the grid below instead, in full. */}
         {!compact && shelf !== 'lucky' && (
         <View style={g.noteRow}>
           <Text style={[g.dim, { flex: 1 }]} numberOfLines={2}>
-            {shelf === 'family' ? '' : shelf === 'privilege' ? `${SHELF_NOTE.privilege} Senin seviyen: VIP ${svipLevel}.` : shelf === 'bag' && live ? LIVE_BAG_NOTE : SHELF_NOTE[shelf]}
+            {shelf === 'family' || shelf === 'global' || (shelf === 'gameplay' && kutlamaNote) ? '' : shelf === 'privilege' ? `${SHELF_NOTE.privilege} Senin seviyen: VIP ${svipLevel}.` : shelf === 'bag' && live ? LIVE_BAG_NOTE : SHELF_NOTE[shelf]}
           </Text>
           {sortBtn}
         </View>
@@ -415,9 +473,11 @@ export function GiftSheet({
 
         {/* What: grid */}
         {/* Keyed by shelf: each shelf opens at its top, not at the previous shelf's scroll offset. */}
-        <ScrollView key={shelf} style={compact ? g.gridFill : g.gridScroll} contentContainerStyle={g.grid}>
-          {/* Şanslı's disclaimer and the bond gifts' refund rule: always shown in full, at the top of their shelf. */}
-          {(shelf === 'lucky' || shelf === 'family') && <Text style={[g.dim, g.shelfNote]}>{SHELF_NOTE[shelf]}</Text>}
+        <ScrollView key={shelf} ref={gridRef} style={compact ? g.gridFill : g.gridScroll} contentContainerStyle={g.grid}>
+          {/* Şanslı's disclaimer, the bond gifts' refund rule and Global's announcement: always in full, atop their shelf. */}
+          {(shelf === 'lucky' || shelf === 'family' || shelf === 'global') && <Text style={[g.dim, g.shelfNote]}>{SHELF_NOTE[shelf]}</Text>}
+          {/* Kutlama with a gift that leaves a profile mark: what it does, what cleans it, that anyone may refuse it. */}
+          {shelf === 'gameplay' && kutlamaNote && <Text style={[g.dim, g.shelfNote]}>{kutlamaNote}</Text>}
           {isLucky ? (
             <LuckyShelf
               gifts={lucky.config.gifts}
@@ -426,6 +486,11 @@ export function GiftSheet({
               onToggleView={() => setLuckyView((v) => (v === 'odds' ? 'history' : 'odds'))}
               history={lucky.records.filter((r) => r.userId === 'me')}
               version={lucky.config.version}
+              onShelfAt={(y) => (oddsAt.current.shelf = y)}
+              onTableAt={(y) => {
+                oddsAt.current.table = y;
+                if (oddsAt.current.want) scrollToOdds();
+              }}
               onPick={(id) => {
                 tapHaptic();
                 setLuckyId(id);
@@ -451,6 +516,8 @@ export function GiftSheet({
                 selected={sel.id === it.id && sel.bag === (shelf === 'bag')}
                 favorite={favs.has(it.id)}
                 locked={shelf !== 'bag' && isLocked(it, svipLevel)}
+                muted={targets.length > 0 && refusingMarks(giftMarkOf(it.id), targets, refusesMarks).length === targets.length}
+                global={isGlobalGift(it.id, catalog)}
                 stock={shelf === 'bag' ? bag[it.id] : undefined}
                 onPress={() => {
                   tapHaptic();
@@ -486,12 +553,20 @@ export function GiftSheet({
           </View>
           )}
 
-          {noticeShown && (
+          {noticeShown && 'odds' in footer ? (
+          // Şanslı: a tap shows the odds table of the gift picked.
+          <Pressable onPress={showOdds} hitSlop={{ top: 6, bottom: 6 }} style={g.notice} accessibilityRole="link" accessibilityLabel={`${footer.text}. Olasılık tablosunu göster`}>
+            <Ionicons name="information-circle" size={16} color={colors.textDim} />
+            <Text style={[g.dim, { flex: 1 }]}>
+              {footer.text} · <Text style={g.noticeLink}>Olasılıklar</Text>
+            </Text>
+          </Pressable>
+          ) : noticeShown ? (
           <View style={[g.notice, footer.tone === 'warn' && g.noticeWarn, footer.tone === 'lock' && g.noticeLock]}>
-            <Ionicons name={footer.tone === 'warn' ? 'alert-circle' : footer.tone === 'lock' ? 'lock-closed' : 'information-circle'} size={16} color={footer.tone === 'info' ? colors.textDim : colors.gold} />
-            <Text style={[g.dim, { flex: 1 }, footer.tone !== 'info' && { color: '#FDE68A' }]}>{footer.text}</Text>
+            <Ionicons name={toneIcon} size={16} color={footer.tone === 'info' ? colors.textDim : footer.tone === 'bond' ? '#FF8AA6' : colors.gold} />
+            <Text style={[g.dim, { flex: 1 }, footer.tone !== 'info' && { color: footer.tone === 'bond' ? '#FFD3DF' : '#FDE68A' }]}>{footer.text}</Text>
           </View>
-          )}
+          ) : null}
 
           <View style={g.actions}>
             <Pressable onPress={() => setCountOpen((o) => !o)} style={[g.countBtn, compact && { height: 48 }]} accessibilityRole="button" accessibilityLabel={`Adet ${count}, değiştir`}>
@@ -564,10 +639,31 @@ function GroupPick({ icon, on, label, onPress }: { icon: 'home' | 'mic'; on: boo
 }
 
 /** Lucky packages, then either the full odds table of the selected one or the user's own Lucky history. */
-function LuckyShelf({ gifts, selected, view, onToggleView, history, version, onPick }: { gifts: LuckyGift[]; selected: LuckyGift; view: 'odds' | 'history'; onToggleView: () => void; history: LuckyRecord[]; version: number; onPick: (id: string) => void }) {
+function LuckyShelf({
+  gifts,
+  selected,
+  view,
+  onToggleView,
+  history,
+  version,
+  onShelfAt,
+  onTableAt,
+  onPick,
+}: {
+  gifts: LuckyGift[];
+  selected: LuckyGift;
+  view: 'odds' | 'history';
+  onToggleView: () => void;
+  history: LuckyRecord[];
+  version: number;
+  /** Where this shelf and its odds table sit in the grid (the "Olasılıklar" link under the button scrolls there). */
+  onShelfAt: (y: number) => void;
+  onTableAt: (y: number) => void;
+  onPick: (id: string) => void;
+}) {
   const top = maxMult(selected);
   return (
-    <View style={{ width: '100%' }}>
+    <View style={{ width: '100%' }} onLayout={(e) => onShelfAt(e.nativeEvent.layout.y)}>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
         {gifts.map((it) => {
           const on = it.id === selected.id;
@@ -605,7 +701,7 @@ function LuckyShelf({ gifts, selected, view, onToggleView, history, version, onP
         </Pressable>
       </View>
       {view === 'odds' ? (
-        <View style={g.odds} accessibilityLabel={`${selected.name} olasılık tablosu`}>
+        <View style={g.odds} accessibilityLabel={`${selected.name} olasılık tablosu`} onLayout={(e) => onTableAt(e.nativeEvent.layout.y)}>
           <View style={g.oddsHead}>
             <Text style={[g.oddsCell, g.oddsHeadText]}>Çarpan</Text>
             <Text style={[g.oddsCell, g.oddsHeadText, { textAlign: 'center' }]}>Olasılık</Text>
@@ -619,7 +715,7 @@ function LuckyShelf({ gifts, selected, view, onToggleView, history, version, onP
             </View>
           ))}
           <Text style={[g.dim, { marginTop: 6 }]}>
-            Bu oranlar sunucudaki gerçek ayarlardır (sürüm {version}). Ödül garanti değildir. Ödül jeton olarak bakiyene eklenir; ödülle yaptığın harcama Cömertlik puanına sayılmaz. Hediyeyi alan kişiye fiyatın {pct(LUCKY_RECIPIENT_SHARE)}’si elmas olarak yazılır.
+            Bu oranlar sunucudaki gerçek ayarlardır (sürüm {version}). Ödül garanti değildir. Ödül jeton olarak bakiyene eklenir; ödülle yaptığın harcama Cömertlik puanına sayılmaz.
           </Text>
         </View>
       ) : history.length === 0 ? (
@@ -651,6 +747,8 @@ function GiftTile({
   selected,
   favorite,
   locked,
+  muted = false,
+  global,
   stock,
   onPress,
   onLongPress,
@@ -659,21 +757,27 @@ function GiftTile({
   selected: boolean;
   favorite: boolean;
   locked: boolean;
+  /** Can't go to the people picked (they refuse the profile mark it leaves): drawn faded, without a lock. */
+  muted?: boolean;
+  /** Global hediye: announced in every room of the country; its badge takes the corner. */
+  global?: boolean;
   stock?: number;
   onPress: () => void;
   onLongPress: () => void;
 }) {
-  // At most one corner badge: a lock beats the effect type, so the important fact is never crowded out.
-  const badge = locked ? null : gift.badge === '3D' || gift.badge === 'music' ? gift.badge : null;
-  const a11y = `${gift.name}, ${stock !== undefined ? `ücretsiz, ${stock} adet` : `${fmt(gift.price)} jeton`}${locked ? `, VIP ${gift.minSvip} gerekli` : ''}${favorite ? ', favori' : ''}`;
+  // At most one corner badge: Global (it says the whole country hears of it), else the effect type unless locked, so
+  // the important fact is never crowded out.
+  const badge = global ? 'global' : locked ? null : gift.badge === '3D' || gift.badge === 'music' ? gift.badge : null;
+  const a11y = `${gift.name}, ${stock !== undefined ? `ücretsiz, ${stock} adet` : `${fmt(gift.price)} jeton`}${global ? ', global hediye' : ''}${locked ? `, VIP ${gift.minSvip} gerekli` : ''}${muted ? ', alıcı iz kabul etmiyor' : ''}${favorite ? ', favori' : ''}`;
+  const faded = locked || muted;
   return (
     <Pressable onPress={onPress} onLongPress={onLongPress} delayLongPress={350} style={g.tileWrap} accessibilityRole="button" accessibilityState={{ selected }} accessibilityLabel={a11y} accessibilityHint="Uzun bas: favorilere ekle veya çıkar">
       <View style={[g.tile, selected && g.tileOn]}>
         <View style={g.tileArtBox}>
-          <GiftArt giftId={gift.id} emoji={gift.emoji} size={44} style={locked && { opacity: 0.4 }} textStyle={[g.tileArt, locked && { opacity: 0.4 }]} />
+          <GiftArt giftId={gift.id} emoji={gift.emoji} size={44} style={faded && { opacity: 0.4 }} textStyle={[g.tileArt, faded && { opacity: 0.4 }]} />
         </View>
         <View style={g.tileNameBox}>
-          <Text style={[g.tileName, locked && { color: colors.textDim }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.85}>
+          <Text style={[g.tileName, faded && { color: colors.textDim }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.85}>
             {gift.name}
           </Text>
         </View>
@@ -694,7 +798,12 @@ function GiftTile({
             </Text>
           </View>
         )}
-        {badge === 'music' ? (
+        {badge === 'global' ? (
+          <View style={g.globalBadge}>
+            <Ionicons name="globe" size={9} color="#1A1014" />
+            <Text style={g.globalBadgeText}>Global</Text>
+          </View>
+        ) : badge === 'music' ? (
           <Image source={MUSIC_BADGE} style={g.musicBadge} accessibilityIgnoresInvertColors />
         ) : badge ? (
           <View style={g.badge}>
@@ -754,6 +863,10 @@ const g = StyleSheet.create({
   shelves: { gap: space.sm, paddingHorizontal: space.lg, paddingVertical: space.xs, alignItems: 'center' },
   shelf: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 36, paddingHorizontal: space.md, borderRadius: radius.pill, backgroundColor: colors.cardAlt },
   shelfOn: { backgroundColor: colors.primary },
+  // Çantam: the bag icon alone, the pill as wide as it is tall; the count on its corner.
+  shelfIcon: { width: 44, paddingHorizontal: 0, justifyContent: 'center' },
+  shelfBadge: { position: 'absolute', top: -3, right: -3, minWidth: 17, height: 17, borderRadius: 9, paddingHorizontal: 4, backgroundColor: colors.gold, borderWidth: 1.5, borderColor: colors.card, alignItems: 'center', justifyContent: 'center' },
+  shelfBadgeText: { color: '#1A1014', fontSize: 10, fontWeight: '900', fontVariant: ['tabular-nums'] },
   shelfText: { color: colors.textDim, fontSize: type.body, fontWeight: '700' },
   noteRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingHorizontal: space.lg, minHeight: 32 },
   sortBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 32, paddingHorizontal: space.sm },
@@ -786,6 +899,8 @@ const g = StyleSheet.create({
   luckyBadge: { alignSelf: 'center', minWidth: 20, height: 16, borderRadius: 5, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
   badgeText: { color: colors.text, fontSize: 10, fontWeight: '900' },
   musicBadge: { position: 'absolute', top: 2, right: 2, width: 20, height: 20 },
+  globalBadge: { position: 'absolute', top: 2, right: 2, flexDirection: 'row', alignItems: 'center', gap: 1, height: 14, borderRadius: 5, paddingHorizontal: 3, backgroundColor: colors.gold },
+  globalBadgeText: { color: '#1A1014', fontSize: 9, fontWeight: '900' },
   // The left corner, clear of the name: the selection above, the favourite star under it.
   favMark: { position: 'absolute', top: 20, left: 4 },
   check: { position: 'absolute', top: 2, left: 2 },
@@ -796,6 +911,7 @@ const g = StyleSheet.create({
   totalLabel: { color: colors.textDim, fontSize: type.caption },
   total: { color: colors.text, fontSize: type.title, fontWeight: '900', fontVariant: ['tabular-nums'] },
   notice: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, paddingVertical: 2 },
+  noticeLink: { color: colors.primaryText, fontWeight: '700', textDecorationLine: 'underline' },
   noticeWarn: { backgroundColor: 'rgba(251,191,36,0.1)', borderRadius: radius.sm, padding: space.sm },
   noticeLock: { backgroundColor: 'rgba(251,191,36,0.08)', borderRadius: radius.sm, padding: space.sm },
   actions: { flexDirection: 'row', alignItems: 'center', gap: space.sm },

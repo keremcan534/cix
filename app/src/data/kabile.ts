@@ -186,12 +186,12 @@ export const KABILE_TASKS: KabileTask[] = [
   { id: 'k-newbie', emoji: '🎁', title: 'Aileye yeni katılan üyeye hediye gönder', source: 'giftsSent', kind: 'count', goal: 1, per: 0, power: 3, treasure: 3, doneBy: ['u5', 'u11', 'u1', 'u9'], doneCount: 10 },
   { id: 'k-checkin', emoji: '📅', title: 'Aile yoklamasına katıl', source: 'checkIn', kind: 'count', goal: 1, per: 0, power: 1, treasure: 1, doneBy: ['u4', 'u7', 'u1', 'u2', 'u11'], doneCount: 17 },
   { id: 'k-roomgift', emoji: '🎉', title: 'Aile odasında hediye gönder', source: 'roomGiftCoins', kind: 'rate', goal: 0, per: 500, power: 2, treasure: 2, doneBy: ['u1', 'u11'], doneCount: 6 },
-  { id: 'k-cp', emoji: '💞', title: 'Aile üyelerinden biriyle ikili kur ve İkili hediyesi gönder', source: 'cpGiftCoins', kind: 'rate', goal: 0, per: 350, power: 2, treasure: 2, doneBy: ['u5', 'u9'], doneCount: 4 },
+  { id: 'k-cp', emoji: '💞', title: 'Aile üyelerinden biriyle ikili kur ve Çift hediyesi gönder', source: 'cpGiftCoins', kind: 'rate', goal: 0, per: 350, power: 2, treasure: 2, doneBy: ['u5', 'u9'], doneCount: 4 },
   { id: 'k-chatgift', emoji: '💌', title: 'Aile sohbetinde hediye gönder', source: 'chatGiftCoins', kind: 'rate', goal: 0, per: 400, power: 2, treasure: 2, doneBy: ['u7'], doneCount: 3 },
 ];
 /** Gifts that can be sent in the kabile chat (fixed price, no random rewards). */
 export const CHAT_GIFT_IDS = ['g1', 'g2', 'g3', 'g4', 'g5'];
-/** Pair (İkili) gifts offered in Uyum Köşesi. */
+/** Pair (Çift) gifts offered in Uyum Köşesi. */
 export const CP_GIFT_IDS = ['c9', 'c12', 'c1'];
 
 // --- Uyum Köşesi ---------------------------------------------------------
@@ -225,7 +225,7 @@ export const memberPower = (id: string, i: number) => (id === 'me' ? 0 : Math.ma
 export const KASA_HISTORY_MOCK = [
   { id: 'h1', userId: 'u1', text: 'Aile odasında hediye', power: 24, treasure: 24, time: 'Bugün 14:20' },
   { id: 'h2', userId: 'u5', text: 'Yoklama', power: 1, treasure: 1, time: 'Bugün 12:05' },
-  { id: 'h3', userId: 'u11', text: 'İkili hediyesi', power: 12, treasure: 12, time: 'Dün 23:41' },
+  { id: 'h3', userId: 'u11', text: 'Çift hediyesi', power: 12, treasure: 12, time: 'Dün 23:41' },
   { id: 'h4', userId: 'u2', text: 'Aile odasında 15 dakika', power: 1, treasure: 1, time: 'Dün 22:10' },
 ];
 

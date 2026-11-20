@@ -1,8 +1,9 @@
 // Bağlar: two people tied as Çift, Kardeş, Ağabey, Kanka… (docs/BAGLAR.md).
 //
 //   GET  /api/bonds/info                         → { kinds, levels, rewards }           (public)
-//   GET  /api/bonds?user=                        → { hidden, bonds }                    (someone's active bonds; mine without user;
-//                                                                                        hidden: only the viewer's own bond with them)
+//   GET  /api/bonds?user=&offset=                → { hidden, bonds, total, next }       (someone's active bonds, 50 a page; mine without
+//                                                                                        user; hidden: only the viewer's own bond with them;
+//                                                                                        next: the offset of the next page, null at the end)
 //   GET  /api/bonds/requests                     → { incoming, outgoing }               (my pending requests)
 //   POST /api/bonds/request  { to, kind, ref, room?, price? } → { bond, user, replay }   (room: sent from a room's gift panel, the room sees the gift;
 //                                                                                   price: the bond gift's price the phone showed)
@@ -10,7 +11,16 @@
 //   POST /api/bonds/withdraw { id }              → { bond }                             (the requester takes it back)
 //   POST /api/bonds/end      { id }              → { bond }                             (either side, any time)
 //   POST /api/bonds/privacy  { hidden }          → { hidden }
-//   POST /api/bonds/among    { ids }             → { bonds: [{ a, b, kind, level }] }   (room effects; hidden ones left out)
+//   POST /api/bonds/among    { ids }             → { bonds: [{ a, b, kind, level }] }   (room effects: the bonds between two of them, and
+//                                                                                        each one's best Lv10+ bond for the bubble; hidden
+//                                                                                        ones left out)
+//   POST /api/gifts/send     { giftId: 'bag-<kind>', … } (gifts.mjs)                    (a bond gift to someone I have that bond with:
+//                                                                                        an ordinary gift that adds bond points)
+//
+// `?lv=20` on every route above that answers bonds (the app since Lv20 sends it): `score` and `nextLevelAt` are the
+// bond's points and the next level's. Without it (the f9671d9 APK) they are moved so that APK's bar, drawn from its
+// own ten compiled steps (0 past Lv10), shows the real progress within the level; its text still says how many points
+// the next level needs (oldAppPoints).
 //
 // Price: the bond gift's (bag-<kind>) as Yönetim › Hediyeler set it (custom-gifts.mjs builtinGift; bond-rules.mjs KINDS
 // is the app's own). A newer app sends the price it showed: another one now is a 409 price_changed and nothing moves.
@@ -20,7 +30,13 @@
 // agency income), so the finance panel sees a gift. Refused, withdrawn or unanswered for 3 days: the coins go
 // back to the same lots, untouched by the panel. Ending a bond refunds nothing.
 // Points: every coin the two spend on each other while bonded (the bond gift included) is 1/100 point, and each
-// message that answers the other's adds 1 (at most 10 a day). Points never drop; ending resets the level.
+// message that answers the other's adds 1 (at most 10 a day). A night after a day with no gift either way takes some
+// back, and a bond nobody gifts for long ends by itself (bond-life.mjs); ending resets the level.
+// Again (Güncelleme 7): the same bond gift to someone I already have that bond with is an ordinary paid gift through
+// POST /api/gifts/send (coins → their diamonds at once, agency income, PK, rocket, room level, Koruma like any gift),
+// any count, and adds bond points; without that bond it is a 409 bond_needed (the app then sends a request), and a bond
+// gift of another kind than ours a 409 bond_kind: one bond per pair. Every change of a bond is told in SimilarClub
+// Sistem (bond-life.mjs).
 import { recordIncome } from './agency-lib.mjs';
 import { HttpError, auth, blockedBetween, claimRef, db, env, int, limit, move, once, readJson, tx, userId } from './core.mjs';
 import { roomPacket } from './live.mjs';
@@ -28,17 +44,23 @@ import { live } from './live-settings.mjs';
 import { notify } from './push.mjs';
 import { giftDiamonds, spendCoins } from './wallet.mjs';
 import { builtinGift, checkShownPrice } from './custom-gifts.mjs';
-import { KINDS, LEVELS, REWARDS, levelOf } from './bond-rules.mjs';
+import { KINDS, LEVELS, REWARDS, levelOf, oldAppPoints, rewardLevel, scoreOf } from './bond-rules.mjs';
+import { bondNumbers, levelSql, levelsSoon, runBondDecay, scoreSql, tellLevels, tellStatus, warnQuietBonds } from './bond-life.mjs';
 
-export { KINDS, LEVELS, REWARDS, levelOf };
+export { KINDS, LEVELS, REWARDS, levelOf, scoreOf };
 
-// Limits and days (Canlı ayarlar › Bağlar, live-registry.mjs; defaults 1 Çift, 3 of each family kind, 5 Kanka, 10
-// pending requests, 3 days to answer, 7 days apart after an end, 10 talk points a day).
+// Limits and days (Canlı ayarlar › Bağlar, live-registry.mjs; defaults 1 Çift, 1000 of each family kind and of Kanka
+// (practically unlimited), 10 pending requests (each holds its coins), 3 days to answer, 7 days apart after an end
+// someone chose, 10 talk points a day).
 const FAMILY_KINDS = new Set(['kardes', 'baci', 'agabey', 'abla', 'yenge', 'enishte']);
 /** How many bonds of `kind` one person may have now. */
 export const maxOf = (kind, s = live()) => (kind === 'cift' ? s.bondMaxCift : kind === 'kanka' ? s.bondMaxKanka : FAMILY_KINDS.has(kind) ? s.bondMaxKin : KINDS[kind].max);
 /** People asked about at once by /api/bonds/among (a room's mics and Balkon). */
 const AMONG_MAX = 80;
+/** The level of the chat bubble (REWARDS 'balon'): among's partner-anywhere bonds; the index 099 bonds_top_* has it. */
+const BUBBLE = rewardLevel('balon');
+/** A profile's bonds a page. */
+const PAGE = 50;
 /** A room's announcement of a bond gift has an id of its own, far from any gift_events row's (the phones drop repeats by it). */
 const ROOM_EVENT_BASE = 9_000_000_000_000;
 const voiceRoom = (room) => /^(?:oda-)?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/.exec(typeof room === 'string' ? room : '')?.[1] ?? null;
@@ -48,17 +70,73 @@ export function bondGift(kind) {
   const g = builtinGift(`bag-${kind}`);
   return { id: `bag-${kind}`, name: g?.name ?? KINDS[kind].gift, price: g?.price ?? KINDS[kind].price };
 }
+const kindOfGift = (id) => {
+  const m = typeof id === 'string' ? /^bag-([a-z]+)$/.exec(id) : null;
+  return m && Object.hasOwn(KINDS, m[1]) ? m[1] : null;
+};
 
-export const scoreOf = (b) => Math.floor(Number(b.gift_coins) / 100) + Number(b.talk_points);
+/**
+ * POST /api/gifts/send's bond gift (custom-gifts.mjs giftOf leaves them out): the gift as giftOf would give it, with
+ * `bond` its kind; undefined for any other id. Whether the two have that bond is checkBondGift's, in the transaction.
+ * Bağ Yüzüğü (Çift) is on no shelf (catalog.mjs has no bag-cift): it goes at the app's name and price, as its request
+ * and its accept's gift_events row always did.
+ */
+export function bondGiftOf(id) {
+  const kind = kindOfGift(id);
+  if (!kind) return undefined;
+  const g = builtinGift(id);
+  const { name, price } = bondGift(kind);
+  return { id, name, emoji: g?.emoji ?? '💍', price, cat: g?.cat ?? 'family', minSvip: 0, builtin: true, bond: kind };
+}
+
+/**
+ * In the gift's transaction, after its accounts are locked and its ref claimed (a retry of a send that went through
+ * gets its replay): the two must have an active bond of this kind. Its row is held FOR SHARE, so an end waits for the
+ * gift and the gift's points go to a bond that was there.
+ */
+export async function checkBondGift(c, sender, recipient, kind) {
+  const r = await c.query(`SELECT kind FROM bonds WHERE pair_lo = LEAST($1::uuid, $2::uuid) AND pair_hi = GREATEST($1::uuid, $2::uuid) AND status = 'active' FOR SHARE`, [sender, recipient]);
+  if (!r.rowCount) throw Object.assign(new HttpError(409, `Aranızda ${KINDS[kind].label} bağı yok: bu hediye önce bağ isteği olarak gider`), { extra: { code: 'bond_needed', kind } });
+  const have = r.rows[0].kind;
+  if (have !== kind) throw Object.assign(new HttpError(409, `Aranızda ${KINDS[have].label} bağı var`), { extra: { code: 'bond_kind', kind: have } });
+}
+
+/** GET /api/catalog `bonds`: Bağlar's numbers as Canlı ayarlar has them (an older app reads the first four). */
+export function bondCatalog(s = live()) {
+  const n = bondNumbers(s);
+  return {
+    answerDays: s.bondAnswerDays,
+    cooldownDays: s.bondCooldownDays,
+    talkDaily: s.bondTalkDaily,
+    max: Object.fromEntries(Object.keys(KINDS).map((k) => [k, maxOf(k, s)])),
+    levels: n.levels,
+    dropPct: n.dropPct,
+    dropFlat: n.dropFlat,
+    idleEndDays: n.idleEndDays,
+    idleWarnDays: n.idleWarnDays,
+  };
+}
 
 const SELECT = `SELECT x.*, ua.name AS a_name, ua.avatar_url AS a_avatar, ub.name AS b_name, ub.avatar_url AS b_avatar
                   FROM bonds x JOIN users ua ON ua.id = x.a JOIN users ub ON ub.id = x.b`;
 
-/** A bond as `me` sees it: the other person is the partner. */
-function out(b, me) {
+const TODAY = "(now() AT TIME ZONE 'Europe/Istanbul')::date";
+const QUIET = `${TODAY} - x.gift_day AS quiet`;
+
+/** Whether the app asked for the real points (?lv=20). */
+const realPoints = (url) => url?.searchParams.get('lv') === '20';
+
+/**
+ * A bond as `me` sees it: the other person is the partner. `n`: Bağlar's numbers now (bondNumbers). `viewer`: who
+ * asked (another person's list: GET /api/bonds?user=); the quiet days, which tell when the two last sent each other a
+ * gift (a chat's or a profile's too), only go to one of the two. `real`: the app sent ?lv=20 (else oldAppPoints).
+ */
+function out(b, me, { n = bondNumbers(), viewer = me, real = false } = {}) {
   const mine = b.a === me;
   const score = scoreOf(b);
-  const level = levelOf(score);
+  const level = levelOf(score, n.levels);
+  const points = real ? { score, nextLevelAt: n.levels[level] ?? null } : oldAppPoints(score, level, n.levels);
+  const quiet = b.status === 'active' && b.quiet !== null && b.quiet !== undefined && (viewer === b.a || viewer === b.b) ? Number(b.quiet) : null;
   return {
     id: Number(b.id),
     kind: b.kind,
@@ -67,12 +145,15 @@ function out(b, me) {
     requester: mine,
     partner: mine ? { id: b.b, name: b.b_name, avatarUrl: b.b_avatar ?? null } : { id: b.a, name: b.a_name, avatarUrl: b.a_avatar ?? null },
     price: Number(b.held_coins),
-    score,
+    score: points.score,
     level,
-    nextLevelAt: LEVELS[level] ?? null,
+    nextLevelAt: points.nextLevelAt,
     createdAt: b.created_at,
     expiresAt: b.expires_at,
     since: b.accepted_at,
+    // Days since either sent the other a gift, and the days left before such a quiet bond ends (null: it never does).
+    quietDays: quiet,
+    endsInDays: quiet !== null && n.idleEndDays > 0 ? Math.max(0, n.idleEndDays + 1 - quiet) : null,
   };
 }
 
@@ -82,7 +163,7 @@ async function bondRow(c, id, lock = false) {
   if (!r.rowCount) throw new HttpError(404, 'Bağ bulunamadı');
   return r.rows[0];
 }
-const view = async (id, me) => out((await db.query(`${SELECT} WHERE x.id = $1`, [id])).rows[0], me);
+const view = async (id, me, real = false) => out((await db.query(`${SELECT.replace('SELECT x.*', `SELECT x.*, ${QUIET}`)} WHERE x.id = $1`, [id])).rows[0], me, { real });
 
 /** Active bonds of `kind` someone has, plus (for the requester) their own pending requests of it. */
 async function countKind(c, user, kind, withPending) {
@@ -97,14 +178,14 @@ async function countKind(c, user, kind, withPending) {
  * Puts a pending bond's coins back on the requester's lots (`lots`: all it holds, or the part a store refund left)
  * and ends it. The requester's row and the bond must be locked.
  */
-async function refund(c, bond, status, reason, lots = Array.isArray(bond.held_lots) ? bond.held_lots : []) {
+async function refund(c, bond, status, reason, lots = Array.isArray(bond.held_lots) ? bond.held_lots : [], why = null) {
   for (const p of lots) if (p.lot) await c.query('UPDATE coin_lots SET remaining = LEAST(amount, remaining + $2) WHERE id = $1', [p.lot, p.amount]);
   const coins = lots.reduce((n, p) => n + Number(p.amount), 0);
   // No channel: the coins come back, none are created, so the finance panel has nothing to record. The bond's own
   // refs have a ':', which no request's ref may (core.mjs REF): nobody can take them first and block the bond
   // (they were `bond-{id}`, `bond-{id}-in` and `bond-{id}-iade`).
   if (coins > 0) await move(c, bond.a, 'coin', coins, reason, `bond:${bond.id}:iade`, bond.b, { detail: { bond: Number(bond.id), lots } });
-  await c.query('UPDATE bonds SET status = $2, ended_at = now() WHERE id = $1', [bond.id, status]);
+  await c.query('UPDATE bonds SET status = $2, ended_at = now(), end_reason = $3 WHERE id = $1', [bond.id, status, why]);
 }
 
 /**
@@ -127,9 +208,26 @@ export async function voidRefundedBonds(c, lotIds) {
     const parts = Array.isArray(bond.held_lots) ? bond.held_lots : [];
     const keep = parts.filter((p) => !(p.lot && refunded.has(Number(p.lot))));
     gone += Number(bond.held_coins) - keep.reduce((n, p) => n + Number(p.amount), 0);
-    await refund(c, bond, 'withdrawn', `Bağ isteği iadesi: ${KINDS[bond.kind]?.label ?? 'Bağ'} (satın alma iade edildi)`, keep);
+    // Told by the bond sweep (bond-life.mjs tellStatus) once this refund's transaction is committed.
+    await refund(c, bond, 'withdrawn', `Bağ isteği iadesi: ${KINDS[bond.kind]?.label ?? 'Bağ'} (satın alma iade edildi)`, keep, 'refund');
   }
   return gone;
+}
+
+/**
+ * Inside POST /api/block's transaction (social.mjs), after its blocks row: the two's active bond ends (end_reason
+ * 'block', ended_by the blocker), told to nobody (a block is never told, and the blocker's own notice would name the
+ * other) and with no wait before a new bond once they unblock each other. A pending request stays: it can't be
+ * accepted while they block, and goes back to its sender when its days run out. ended_by's key check needs the
+ * blocker's row, which the blocks row's own check holds already: nothing more is waited for. → the bond's id or null.
+ */
+export async function endBondOnBlock(c, blocker, blocked) {
+  const r = await c.query(
+    `UPDATE bonds SET status = 'ended', ended_at = now(), ended_by = $1, end_reason = 'block', told_status = 'ended'
+      WHERE pair_lo = LEAST($1::uuid, $2::uuid) AND pair_hi = GREATEST($1::uuid, $2::uuid) AND status = 'active' RETURNING id`,
+    [blocker, blocked],
+  );
+  return r.rows[0] ? Number(r.rows[0].id) : null;
 }
 
 /** Locks the two accounts in id order (no deadlock when both act at once), then the bond. */
@@ -139,13 +237,19 @@ async function lockPair(c, bondId) {
   return bondRow(c, bondId, true);
 }
 
-/** Inside a gift's transaction: coins spent on a bonded partner raise the bond. */
+/**
+ * Inside a gift's transaction: coins spent on a bonded partner raise the bond, and today is a gift day (no drop
+ * tonight). The bond's row is written once. A level it reaches is told a moment later, after the commit (bond-life.mjs).
+ */
 export async function addBondCoins(c, sender, recipient, total) {
-  await c.query(`UPDATE bonds SET gift_coins = gift_coins + $3 WHERE pair_lo = LEAST($1::uuid, $2::uuid) AND pair_hi = GREATEST($1::uuid, $2::uuid) AND status = 'active'`, [
-    sender,
-    recipient,
-    total,
-  ]);
+  const r = await c.query(
+    `UPDATE bonds SET gift_coins = gift_coins + $3, gift_day = ${TODAY},
+            level = ${levelSql('greatest(0, (gift_coins + $3) / 100 + talk_points - points_lost)', '$4')}
+      WHERE pair_lo = LEAST($1::uuid, $2::uuid) AND pair_hi = GREATEST($1::uuid, $2::uuid) AND status = 'active'
+      RETURNING id, level <> level_said AS news`,
+    [sender, recipient, total, bondNumbers().levels],
+  );
+  if (r.rows[0]?.news) levelsSoon(Number(r.rows[0].id));
 }
 
 /** After a direct message: an answer to the other's last message is 1 point (10 a day, Turkey's calendar). */
@@ -159,20 +263,43 @@ export async function bondTalk(sender, recipient, messageId) {
   if (prev.rows[0]?.sender !== recipient) return;
   const daily = live().bondTalkDaily;
   if (!(daily > 0)) return;
-  await db.query(
+  // Talk points never stop the nightly drop (gift_day stays).
+  const r = await db.query(
     `UPDATE bonds SET talk_points = talk_points + 1,
             talk_today = CASE WHEN talk_day = (now() AT TIME ZONE 'Europe/Istanbul')::date THEN talk_today + 1 ELSE 1 END,
-            talk_day = (now() AT TIME ZONE 'Europe/Istanbul')::date
-      WHERE id = $1 AND (talk_day IS DISTINCT FROM (now() AT TIME ZONE 'Europe/Istanbul')::date OR talk_today < $2)`,
-    [bond.rows[0].id, daily],
+            talk_day = (now() AT TIME ZONE 'Europe/Istanbul')::date,
+            level = ${levelSql('greatest(0, gift_coins / 100 + talk_points + 1 - points_lost)', '$3')}
+      WHERE id = $1 AND status = 'active' AND (talk_day IS DISTINCT FROM (now() AT TIME ZONE 'Europe/Istanbul')::date OR talk_today < $2)
+      RETURNING level <> level_said AS news`,
+    [bond.rows[0].id, daily, bondNumbers().levels],
   );
+  if (r.rows[0]?.news) levelsSoon(Number(bond.rows[0].id));
 }
 
 /**
- * Requests nobody answered in time (Canlı ayarlar bond_answer_days, fixed on each when sent) (or whose recipient deleted the account) go back to the requester; bonds
- * with a deleted account end. Returns how many changed.
+ * Requests nobody answered in time (Canlı ayarlar bond_answer_days, fixed on each when sent) (or whose recipient
+ * deleted the account) go back to the requester; bonds with a deleted account end; then the nightly drop and the quiet
+ * end (once a Türkiye day), the warnings before it, and the notices nobody got yet (bond-life.mjs). Returns how many
+ * requests and bonds ended here.
  */
+let sweeping = false;
 export async function sweepBonds() {
+  if (sweeping) return 0;
+  sweeping = true;
+  try {
+    const n = await expireBonds();
+    await runBondDecay();
+    // Each in pages until none is left: a night's drops and ends can leave tens of thousands to tell, and a page
+    // per sweep (5 minutes) would tell the last of them hours later.
+    while ((await warnQuietBonds()) >= 500);
+    while ((await tellStatus()) >= 200);
+    while ((await tellLevels()) >= 200);
+    return n;
+  } finally {
+    sweeping = false;
+  }
+}
+async function expireBonds() {
   const due = await db.query(
     `SELECT x.id FROM bonds x JOIN users ub ON ub.id = x.b
       WHERE x.status = 'pending' AND (x.expires_at <= now() OR ub.deleted_at IS NOT NULL) ORDER BY x.id LIMIT 200`,
@@ -187,7 +314,7 @@ export async function sweepBonds() {
     });
   }
   const gone = await db.query(
-    `UPDATE bonds x SET status = 'ended', ended_at = now() FROM users u
+    `UPDATE bonds x SET status = 'ended', ended_at = now(), end_reason = 'gone' FROM users u
       WHERE x.status = 'active' AND u.id IN (x.a, x.b) AND u.deleted_at IS NOT NULL RETURNING x.id`,
   );
   return n + gone.rowCount;
@@ -198,7 +325,9 @@ export function startBondSweep() {
   if (timer) return;
   const run = () => sweepBonds().catch((e) => console.error('bond sweep', e.message));
   const every = Number(env.BOND_SWEEP_MS);
-  timer = setInterval(run, Number.isFinite(every) && every >= 100 ? every : 10 * 60_000);
+  // Every 5 minutes by default: the nightly drop is worked out soon after Türkiye's midnight (a gift sent before it
+  // counts as the day before's, as Koruma's), and a store refund's void is told within minutes.
+  timer = setInterval(run, Number.isFinite(every) && every >= 100 ? every : 5 * 60_000);
   timer.unref();
   run();
 }
@@ -209,7 +338,7 @@ export function stopBondSweep() {
 
 export const bondRoutes = {
   async 'GET /api/bonds/info'() {
-    return { kinds: Object.entries(KINDS).map(([id, k]) => ({ id, ...k, gift: bondGift(id).name, price: bondGift(id).price, max: maxOf(id) })), levels: LEVELS, rewards: REWARDS };
+    return { kinds: Object.entries(KINDS).map(([id, k]) => ({ id, ...k, gift: bondGift(id).name, price: bondGift(id).price, max: maxOf(id) })), levels: bondNumbers().levels, rewards: REWARDS };
   },
 
   async 'GET /api/bonds'(req, url) {
@@ -223,23 +352,29 @@ export const bondRoutes = {
     }
     // Hidden from others: a viewer still sees their own bond with this person (and so no "Bağ kur"), nothing else.
     const onlyMine = who !== me.id && hidden;
+    // 50 a page (bonds are practically unlimited now): Çift first, then the most points. An older app reads the first.
+    const offset = int(Number(url.searchParams.get('offset') ?? 0), 0, 1_000_000) ?? 0;
     const r = await db.query(
-      `${SELECT} WHERE x.status = 'active' AND (x.a = $1 OR x.b = $1) AND ua.deleted_at IS NULL AND ub.deleted_at IS NULL
+      `${SELECT.replace('SELECT x.*', `SELECT x.*, ${QUIET}, count(*) OVER () AS total`)}
+        WHERE x.status = 'active' AND (x.a = $1 OR x.b = $1) AND ua.deleted_at IS NULL AND ub.deleted_at IS NULL
           AND (NOT $2 OR $3 IN (x.a, x.b))
-        ORDER BY (x.kind = 'cift') DESC, x.gift_coins DESC, x.accepted_at LIMIT 50`,
-      [who, onlyMine, me.id],
+        ORDER BY (x.kind = 'cift') DESC, ${scoreSql('x.')} DESC, x.accepted_at, x.id LIMIT ${PAGE} OFFSET $4`,
+      [who, onlyMine, me.id, offset],
     );
-    return { hidden, bonds: r.rows.map((b) => out(b, who)) };
+    const n = bondNumbers();
+    const total = Number(r.rows[0]?.total ?? 0);
+    const real = realPoints(url);
+    return { hidden, bonds: r.rows.map((b) => out(b, who, { n, viewer: me.id, real })), total, next: offset + r.rowCount < total ? offset + r.rowCount : null };
   },
 
-  async 'GET /api/bonds/requests'(req) {
+  async 'GET /api/bonds/requests'(req, url) {
     const me = await auth(req);
     const r = await db.query(`${SELECT} WHERE x.status = 'pending' AND (x.a = $1 OR x.b = $1) AND x.expires_at > now() ORDER BY x.id DESC LIMIT 50`, [me.id]);
-    const rows = r.rows.map((b) => out(b, me.id));
+    const rows = r.rows.map((b) => out(b, me.id, { real: realPoints(url) }));
     return { incoming: rows.filter((b) => !b.requester), outgoing: rows.filter((b) => b.requester) };
   },
 
-  async 'POST /api/bonds/request'(req) {
+  async 'POST /api/bonds/request'(req, url) {
     const me = await auth(req);
     limit(`bondreq:${me.id}`, 10, 'Çok fazla istek, biraz bekle');
     const b = await readJson(req);
@@ -260,10 +395,20 @@ export const bondRoutes = {
       gift = bondGift(kind);
       checkShownPrice(gift, shown);
       const set = live();
-      const open = await c.query(`SELECT status FROM bonds WHERE pair_lo = LEAST($1::uuid, $2::uuid) AND pair_hi = GREATEST($1::uuid, $2::uuid) AND status IN ('pending', 'active')`, [me.id, to]);
-      if (open.rowCount) throw new HttpError(409, open.rows[0].status === 'active' ? 'Bu kişiyle zaten bir bağın var' : 'Bu kişiyle bekleyen bir bağ isteği var');
+      const open = await c.query(`SELECT status, kind FROM bonds WHERE pair_lo = LEAST($1::uuid, $2::uuid) AND pair_hi = GREATEST($1::uuid, $2::uuid) AND status IN ('pending', 'active')`, [me.id, to]);
+      if (open.rows[0]?.status === 'pending') throw new HttpError(409, 'Bu kişiyle bekleyen bir bağ isteği var');
+      if (open.rowCount) {
+        // One bond per pair. The same kind again is a gift now (POST /api/gifts/send); an older app (it sends no price)
+        // can't send it so, and is told to update.
+        const have = open.rows[0].kind;
+        const again = have === kind && shown === null ? '. Bağ hediyesini yeniden göndermek için uygulamayı güncelle' : '';
+        throw Object.assign(new HttpError(409, `Aranızda ${KINDS[have].label} bağı var${again}`), { extra: { code: 'bond_active', kind: have } });
+      }
+      // A bond that ended by itself (no gift for days) or with a block (unblocked since) leaves no wait; one that a
+      // person ended does.
       const recent = await c.query(
-        `SELECT 1 FROM bonds WHERE pair_lo = LEAST($1::uuid, $2::uuid) AND pair_hi = GREATEST($1::uuid, $2::uuid) AND status = 'ended' AND ended_at > now() - make_interval(days => $3::int)`,
+        `SELECT 1 FROM bonds WHERE pair_lo = LEAST($1::uuid, $2::uuid) AND pair_hi = GREATEST($1::uuid, $2::uuid) AND status = 'ended'
+            AND coalesce(end_reason, '') NOT IN ('idle', 'block') AND ended_at > now() - make_interval(days => $3::int)`,
         [me.id, to, set.bondCooldownDays],
       );
       if (recent.rowCount) throw new HttpError(409, `Bu kişiyle bağın yakın zamanda bitti; ${set.bondCooldownDays} gün sonra yeniden kurabilirsin`);
@@ -282,15 +427,16 @@ export const bondRoutes = {
     const row = await db.query('SELECT id FROM bonds WHERE a = $1 AND ref = $2', [me.id, b.ref]);
     // A copy of the same request raced another request to the same person: nothing was taken.
     if (!row.rowCount) throw new HttpError(409, 'Bu kişiyle bekleyen bir bağ isteği var');
-    const bond = await view(Number(row.rows[0].id), me.id);
+    const bond = await view(Number(row.rows[0].id), me.id, realPoints(url));
     if (!res.replay) notify([to], { title: 'Bağ isteği', body: `${me.name} seninle ${k.label} bağı kurmak istiyor`, data: { type: 'bond', id: bond.id } });
+    if (!res.replay) await tellStatus(bond.id);
     // From a room's Aile ve Dost shelf: the room sees the gift go, best effort.
     const room = res.replay ? null : voiceRoom(b.room);
     if (room) void roomPacket(`oda-${room}`, { type: 'gift', giftId: `bag-${kind}`, count: 1, from: me.id, to, eventId: ROOM_EVENT_BASE + bond.id }).catch(() => {});
     return { ...res, bond };
   },
 
-  async 'POST /api/bonds/respond'(req) {
+  async 'POST /api/bonds/respond'(req, url) {
     const me = await auth(req);
     const body = await readJson(req);
     const id = int(body.id, 1, Number.MAX_SAFE_INTEGER);
@@ -329,10 +475,13 @@ export const bondRoutes = {
       const giftEvent = Number(g.rows[0].id);
       await giftDiamonds(c, { sender: b.a, recipient: b.b, parts: b.held_lots, total, label: `${k.gift} (${k.label} bağı)`, ref, giftEvent });
       await recordIncome(c, b.b, 'gift', `gift:${giftEvent}`, total);
-      await c.query(`UPDATE bonds SET status = 'active', accepted_at = now(), gift_coins = held_coins WHERE id = $1`, [b.id]);
+      // The accept day is a gift day (no drop tonight); the level it starts at is no news.
+      const level = levelOf(Math.floor(total / 100), bondNumbers().levels);
+      await c.query(`UPDATE bonds SET status = 'active', accepted_at = now(), gift_coins = held_coins, gift_day = ${TODAY}, level = $2, level_said = $2 WHERE id = $1`, [b.id, level]);
       return 'active';
     });
-    const bond = await view(id, me.id);
+    await tellStatus(id);
+    const bond = await view(id, me.id, realPoints(url));
     if (result === 'expired') throw new HttpError(410, 'İsteğin süresi doldu, jeton gönderene döndü');
     notify([bond.partner.id], {
       title: result === 'active' ? 'Bağ kuruldu' : 'Bağ isteği',
@@ -342,7 +491,7 @@ export const bondRoutes = {
     return { bond };
   },
 
-  async 'POST /api/bonds/withdraw'(req) {
+  async 'POST /api/bonds/withdraw'(req, url) {
     const me = await auth(req);
     const id = int((await readJson(req)).id, 1, Number.MAX_SAFE_INTEGER);
     if (id === null) throw new HttpError(400, 'Geçersiz bağ');
@@ -352,26 +501,32 @@ export const bondRoutes = {
       if (b.status !== 'pending') throw new HttpError(409, 'Bu istek artık geçerli değil');
       await refund(c, b, 'withdrawn', `Bağ isteği iadesi: ${KINDS[b.kind].label} (geri alındı)`);
     });
-    return { bond: await view(id, me.id) };
+    await tellStatus(id);
+    return { bond: await view(id, me.id, realPoints(url)) };
   },
 
-  async 'POST /api/bonds/end'(req) {
+  async 'POST /api/bonds/end'(req, url) {
     const me = await auth(req);
     const id = int((await readJson(req)).id, 1, Number.MAX_SAFE_INTEGER);
     if (id === null) throw new HttpError(400, 'Geçersiz bağ');
-    const r = await db.query(`UPDATE bonds SET status = 'ended', ended_at = now(), ended_by = $2 WHERE id = $1 AND status = 'active' AND (a = $2 OR b = $2) RETURNING id`, [id, me.id]);
-    if (!r.rowCount) {
-      const b = await bondRow(db, id);
+    // The two accounts first, then the bond, as a gift between them locks them (lockPair): ended_by is a key to
+    // users, so writing it checks my row, which a gift between us holds while it waits for this bond's row.
+    await tx(async (c) => {
+      const b = await lockPair(c, id);
       if (b.a !== me.id && b.b !== me.id) throw new HttpError(403, 'Bu bağ senin değil');
-      throw new HttpError(409, 'Bu bağ zaten bitmiş');
-    }
-    const bond = await view(id, me.id);
+      if (b.status !== 'active') throw new HttpError(409, 'Bu bağ zaten bitmiş');
+      await c.query(`UPDATE bonds SET status = 'ended', ended_at = now(), ended_by = $2 WHERE id = $1`, [id, me.id]);
+    });
+    await tellStatus(id);
+    const bond = await view(id, me.id, realPoints(url));
     notify([bond.partner.id], { title: 'Bağ bitti', body: `${me.name} ${bond.label} bağını bitirdi`, data: { type: 'bond', id } });
     return { bond };
   },
 
-  // Room effects (mic line, joint entrance, chat bubble): the active bonds of the people in a room, with their
-  // partners anywhere. A bond either side hid is left out, unless I am in it.
+  // Room effects: the mic mark and the joint entrance need both people in the room, so every active bond between two
+  // of them; the chat bubble (Lv10) has the partner anywhere, so each one's best such bond (Çift first, then the
+  // highest), looked up per person (its Lv10+ bonds only, bonds_top_a / _b). Nothing is cut off, however many bonds
+  // each has. A bond either side hid is left out, unless I am in it.
   async 'POST /api/bonds/among'(req) {
     const me = await auth(req);
     limit(`bondamong:${me.id}`, 60);
@@ -379,14 +534,34 @@ export const bondRoutes = {
     if (!Array.isArray(body.ids)) throw new HttpError(400, 'Geçersiz liste');
     const ids = [...new Set(body.ids)].slice(0, AMONG_MAX).map((x) => userId(x, 'kişi'));
     if (!ids.length) return { bonds: [] };
-    const r = await db.query(
-      `SELECT x.a, x.b, x.kind, x.gift_coins, x.talk_points FROM bonds x JOIN users ua ON ua.id = x.a JOIN users ub ON ub.id = x.b
-        WHERE x.status = 'active' AND (x.a = ANY($1::uuid[]) OR x.b = ANY($1::uuid[])) AND ua.deleted_at IS NULL AND ub.deleted_at IS NULL
-          AND ((NOT ua.bonds_hidden AND NOT ub.bonds_hidden) OR $2 IN (x.a, x.b))
-        LIMIT 500`,
+    const SEEN = `ua.deleted_at IS NULL AND ub.deleted_at IS NULL AND ((NOT ua.bonds_hidden AND NOT ub.bonds_hidden) OR $2 IN (x.a, x.b))`;
+    const pairs = await db.query(
+      `SELECT x.id, x.a, x.b, x.kind, x.gift_coins, x.talk_points, x.points_lost
+         FROM bonds x JOIN users ua ON ua.id = x.a JOIN users ub ON ub.id = x.b
+        WHERE x.status = 'active' AND x.a = ANY($1::uuid[]) AND x.b = ANY($1::uuid[]) AND ${SEEN}`,
       [ids, me.id],
     );
-    return { bonds: r.rows.map((b) => ({ a: b.a, b: b.b, kind: b.kind, level: levelOf(scoreOf(b)) })) };
+    // The stored level (kept with every write, bond-life.mjs) finds the candidates; the points decide below.
+    const ACTIVE_TOP = `status = 'active' AND level >= ${BUBBLE}`;
+    const top = await db.query(
+      `SELECT t.* FROM unnest($1::uuid[]) p(id)
+        CROSS JOIN LATERAL (
+          SELECT x.id, x.a, x.b, x.kind, x.gift_coins, x.talk_points, x.points_lost
+            FROM (SELECT * FROM bonds WHERE a = p.id AND ${ACTIVE_TOP} UNION ALL SELECT * FROM bonds WHERE b = p.id AND ${ACTIVE_TOP}) x
+            JOIN users ua ON ua.id = x.a JOIN users ub ON ub.id = x.b
+           WHERE ${SEEN}
+           ORDER BY (x.kind = 'cift') DESC, x.level DESC, x.id LIMIT 1) t`,
+      [ids, me.id],
+    );
+    const levels = bondNumbers().levels;
+    const seen = new Set();
+    const bonds = [];
+    for (const b of [...pairs.rows, ...top.rows]) {
+      if (seen.has(b.id)) continue;
+      seen.add(b.id);
+      bonds.push({ a: b.a, b: b.b, kind: b.kind, level: levelOf(scoreOf(b), levels) });
+    }
+    return { bonds };
   },
 
   async 'POST /api/bonds/privacy'(req) {

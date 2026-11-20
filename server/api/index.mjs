@@ -68,6 +68,7 @@ import { FX_PATH, sendFx } from './fx.mjs';
 import { jetonRoutes } from './jeton.mjs';
 import { liveRoutes } from './live.mjs';
 import { luckyRoutes } from './lucky.mjs';
+import { refreshLuckyArt, sendLuckyFx, startLuckyArt, stopLuckyArt } from './lucky-art.mjs';
 import { economyRoutes, grantInTx } from './economy.mjs';
 import { levelRewardRoutes } from './level-rewards.mjs';
 import { taskRewardRoutes } from './task-rewards.mjs';
@@ -112,6 +113,7 @@ import { roomContribRoutes } from './room-contrib.mjs';
 import { roomRocketRoutes, sendRocketFx, startRocketSweep, stopRocketSweep } from './room-rocket.mjs';
 import { roomDecorRoutes, startDecorSweep, stopDecorSweep } from './room-decor.mjs';
 import { bossSeatRoutes, startBossSweep, stopBossSweep } from './boss-seat.mjs';
+import { startRoomXpSweep, stopRoomXpSweep } from './room-xp-add.mjs';
 import { startStaffSweep, stopStaffSweep } from './room-autoclose.mjs';
 import { TEST_DAILY, charmPoints, creditCoins, giftCoins, playCoinsToday, spendDiamonds, walletRoutes as walletInfoRoutes } from './wallet.mjs';
 import { whatsappRoutes } from './whatsapp.mjs';
@@ -120,6 +122,7 @@ import { withdrawRoutes } from './withdraw.mjs';
 import { refundSyncRoutes, startRefundSync, stopRefundSync } from './refunds.mjs';
 import { refreshOwnSubscription, startVipRecheck, stopVipRecheck, vipRoutes } from './vip.mjs';
 import { referralRoutes } from './referrals.mjs';
+import { markRoutes } from './profile-marks.mjs';
 
 const PORT = Number(env.API_PORT ?? 7890);
 const TEST_TOPUP = env.ALLOW_TEST_TOPUP === '1';
@@ -322,6 +325,7 @@ const routes = {
   ...levelRoutes,
   ...shopRoutes,
   ...guardRoutes,
+  ...markRoutes,
   ...backpackRoutes,
   ...pkRoutes,
   ...crossPkRoutes,
@@ -448,6 +452,7 @@ const server = http.createServer(async (req, res) => {
       if (name.startsWith('g/')) await sendCustomFx(req, res, name.slice(2));
       else if (name.startsWith('s/')) await sendShopFx(req, res, name.slice(2));
       else if (name.startsWith('r/')) await sendRocketFx(req, res, name.slice(2));
+      else if (name.startsWith('l/')) await sendLuckyFx(req, res, name.slice(2));
       else if (name.startsWith('art/')) sendArt(req, res, name.slice(4));
       else sendFx(req, res, name);
     } catch (e) {
@@ -524,6 +529,7 @@ function shutdown(signal) {
   stopDecorSweep();
   stopEventSweep();
   stopBossSweep();
+  stopRoomXpSweep();
   stopStaffSweep();
   stopCustomGifts();
   stopEmoji();
@@ -531,6 +537,7 @@ function shutdown(signal) {
   stopLevelDecay();
   stopGuardSweep();
   stopShopItems();
+  stopLuckyArt();
   server.close();
   const started = Date.now();
   const wait = setInterval(async () => {
@@ -549,6 +556,7 @@ await refreshCustomGifts();
 await refreshEmoji();
 await refreshLevels();
 await refreshShopItems();
+await refreshLuckyArt();
 // A live Yörünge round the last process left in the air: its fuel goes back before anyone can play again.
 await recoverRocket();
 server.listen(PORT, '127.0.0.1', () => console.log(`api on 127.0.0.1:${PORT} version ${VERSION}${TEST_TOPUP ? ' (test top-up on)' : ''}`));
@@ -568,6 +576,7 @@ startRocketSweep();
 startDecorSweep();
 startEventSweep();
 startBossSweep();
+startRoomXpSweep();
 startStaffSweep();
 startCustomGifts();
 startEmoji();
@@ -575,4 +584,5 @@ startLevels();
 startLevelDecay();
 startGuardSweep();
 startShopItems();
+startLuckyArt();
 startSeatColorSweep();

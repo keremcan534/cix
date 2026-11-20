@@ -20,17 +20,19 @@ import { useSettings } from '@/store';
 import { fonts, makeStyles, useTheme } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
 import { Art } from '@/components/Art';
-import { FadeImage } from '@/components/photo';
+import { FadeImage, useImageRetry } from '@/components/photo';
 import { RollingNumber } from '@/components/fx/rolling-number';
+import { MarkLayer } from '@/components/profile-mark';
 
 export function Avatar({ uri, size = 44, online, ring, name }: { uri?: string; size?: number; online?: boolean; ring?: boolean; name?: string }) {
   const { colors, semantic, gradient } = useTheme();
-  // A photo that can't be loaded counts as none (no blank disc); a new address is tried again.
-  const [failed, setFailed] = useState<string>();
+  // A photo that can't be loaded counts as none (no blank disc) while it waits to be tried again (components/photo
+  // useImageRetry), and for good after the last try; a new address starts over.
+  const img = useImageRetry(uri);
   // No photo (sample people carry none): a tinted disc with the name's initial, or a person glyph.
   const face = (style: object) =>
-    uri && uri !== failed ? (
-      <FadeImage source={{ uri }} style={style} onError={() => setFailed(uri)} />
+    uri && img.show ? (
+      <FadeImage key={img.key} source={{ uri }} style={style} onError={img.onError} />
     ) : (
       <View style={[style, { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.cardAlt }]}>
         {name?.trim() ? (
@@ -272,9 +274,9 @@ export function Header({ title, right, onBack }: { title: string; right?: ReactN
 /** The photo, or the person glyph Avatar shows when there is none (new users have no photo yet). */
 function FaceImage({ uri, size, style }: { uri?: string; size: number; style: object }) {
   const { colors, semantic } = useTheme();
-  // A photo that can't be loaded counts as none, as in Avatar.
-  const [failed, setFailed] = useState<string>();
-  if (uri && uri !== failed) return <FadeImage source={{ uri }} style={style} onError={() => setFailed(uri)} />;
+  // A photo that can't be loaded counts as none while it waits to be tried again, as in Avatar.
+  const img = useImageRetry(uri);
+  if (uri && img.show) return <FadeImage key={img.key} source={{ uri }} style={style} onError={img.onError} />;
   return (
     <View style={[style, { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.cardAlt }]}>
       <Ionicons name="person" size={Math.round(size * 0.5)} color={semantic.actionText} />
@@ -286,16 +288,19 @@ function FaceImage({ uri, size, style }: { uri?: string; size: number; style: ob
 // Memoized: props are plain values and settings come from their own context, so rows re-render only when they change.
 export const FramedAvatar = memo(FramedAvatarBase);
 // `room`: a room seat's cell around the avatar (lib/seat-cell): the frame keeps inside it, off the name and the next seats.
-function FramedAvatarBase({ uri, size = 44, vipLevel = 0, frameId, online, artScale, room }: { uri: string; size?: number; vipLevel?: number; frameId?: string; online?: boolean; /** How far illustrated frames may spread (see ArtFrame). */ artScale?: number; room?: SeatRoom }) {
+// `markUid`: whose Profil izleri to draw on the photo (components/profile-mark), under the frame's ring.
+function FramedAvatarBase({ uri, size = 44, vipLevel = 0, frameId, online, artScale, room, markUid }: { uri: string; size?: number; vipLevel?: number; frameId?: string; online?: boolean; /** How far illustrated frames may spread (see ArtFrame). */ artScale?: number; room?: SeatRoom; markUid?: string }) {
   const settings = useSettings();
   const { colors } = useTheme();
   const tier = vipTier(vipLevel);
   const frame = cosmeticById(frameId);
   const art = frameArtOf(frame?.id);
+  const mark = markUid ? <MarkLayer uid={markUid} size={size} /> : null;
   if (art) {
     return (
       <ArtFrame art={art} size={size} still={settings.reduceMotion} maxScale={artScale} room={room}>
         <FaceImage uri={uri} size={size} style={{ width: '100%', height: '100%' }} />
+        {mark}
       </ArtFrame>
     );
   }
@@ -304,6 +309,7 @@ function FramedAvatarBase({ uri, size = 44, vipLevel = 0, frameId, online, artSc
       <View style={{ width: size, height: size }}>
         <AnimatedFrame fx={frame.fx as FrameFx} size={size} still={settings.reduceMotion} headroom={room?.top}>
           <FaceImage uri={uri} size={size} style={{ width: '100%', height: '100%' }} />
+          {mark}
         </AnimatedFrame>
         {tier && <Art name={tier.art} size={size * 0.38} style={{ position: 'absolute', top: -size * 0.14, right: -size * 0.07 }} />}
       </View>
@@ -311,11 +317,20 @@ function FramedAvatarBase({ uri, size = 44, vipLevel = 0, frameId, online, artSc
   }
   // A purchased frame overrides the VIP frame color; the VIP badge emoji stays.
   const frameColors = frame?.color ?? tier?.color;
-  if (!frameColors) return <Avatar uri={uri} size={size} online={online} />;
+  if (!frameColors)
+    return mark ? (
+      <View style={{ width: size, height: size }}>
+        <Avatar uri={uri} size={size} online={online} />
+        {mark}
+      </View>
+    ) : (
+      <Avatar uri={uri} size={size} online={online} />
+    );
   return (
     <View style={{ width: size, height: size }}>
       <LinearGradient colors={frameColors} style={{ width: size, height: size, borderRadius: size / 2, padding: 3 }}>
         <FaceImage uri={uri} size={size} style={{ flex: 1, borderRadius: size / 2, borderWidth: 2, borderColor: colors.bg }} />
+        {mark && <View style={{ position: 'absolute', left: 5, top: 5, right: 5, bottom: 5 }}>{mark}</View>}
       </LinearGradient>
       {tier ? (
         <Art name={tier.art} size={size * 0.38} style={{ position: 'absolute', top: -size * 0.14, right: -size * 0.07 }} />

@@ -32,7 +32,7 @@ Gece düşüşü, eşik ve liste sayıları Canlı ayarlar › **Koruma**'dan de
 
 ## Eski APK'lar
 
-Kart eski uygulamalarda sıradan bir hediye olarak "İkili" rafında görünür ve gönderilebilir: Koruma yine başlar ve puan
+Kart eski uygulamalarda sıradan bir hediye olarak "İkili" rafında (bugünkü adıyla Çift) görünür ve gönderilebilir: Koruma yine başlar ve puan
 yine sayılır. Eski uygulamada Benim Koruma sayfası, profildeki Koruma alanı ve kurallar yoktur.
 
 ## Veri

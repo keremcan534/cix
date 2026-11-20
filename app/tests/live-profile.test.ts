@@ -159,6 +159,21 @@ describe('Başkasının profili: gerçek sayılar', () => {
     assert.deepEqual(shown(), { agency: null, family: null });
   });
 
+  test('"Şu an odada": sunucunun söylediği oda; bozuk cevap, eski sunucu ve kendi profilim oda göstermez', async () => {
+    const { loadPublicProfile } = await profile();
+    const id = 'bbbbbbbb-0000-4000-8000-000000000005';
+    const roomId = '11111111-2222-4333-8444-555555555555';
+    const user = { id, name: 'Artemis', username: null, gender: null, age: null, city: null, bio: '', interests: [], avatarUrl: null, followers: 0, following: 0, isFollowing: false, blockedByMe: false };
+    let room: unknown = { id: roomId, title: 'Gece Sohbeti', locked: true };
+    route = (s) => (s.path.startsWith(`/api/user?id=${id}`) ? { body: { user, room } } : { status: 404 });
+    assert.deepEqual((await loadPublicProfile(id)).room, { id: roomId, title: 'Gece Sohbeti', locked: true });
+    assert.equal((await loadPublicProfile(id, true)).room, undefined, 'kendi profilimde kendi odam ayrıca gösterilir');
+    room = { id: 'r1', title: 'Demo' };
+    assert.equal((await loadPublicProfile(id)).room, undefined, 'bozuk cevap');
+    room = undefined;
+    assert.equal((await loadPublicProfile(id)).room, undefined, 'eski sunucu');
+  });
+
   test('takip sunucuya gider ve cevap sunucunun takip durumudur', async () => {
     const { followOnServer } = await profile();
     route = (s) => (s.path === '/api/follow' ? { body: { following: false } } : { status: 404 });

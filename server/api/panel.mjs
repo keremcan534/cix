@@ -102,6 +102,10 @@ export const PANEL_ROUTES = new Set([
   'POST /api/admin/rocket/config',
   'POST /api/admin/rocket/video',
   'POST /api/admin/lucky/config',
+  // A Şanslı package's icon and video (lucky-art.mjs), a link fetched for them; uploads as a gift's (gifticon, giftvideo, giftsource).
+  'POST /api/admin/lucky/art',
+  'POST /api/admin/lucky/art/remove',
+  'POST /api/admin/lucky/fetch',
   // Canlı ayarlar (live-settings.mjs).
   'GET /api/admin/live-settings',
   'POST /api/admin/live-settings',
@@ -118,6 +122,9 @@ export const PANEL_ROUTES = new Set([
   'GET /api/admin/lookup',
   'POST /api/admin/users/delete',
   'POST /api/admin/users/room-level',
+  // Profil izleri (profile-marks.mjs): a person's marks, and taking the ones showing off (an offensive one, a complaint).
+  'GET /api/admin/marks',
+  'POST /api/admin/marks/clear',
   'POST /api/admin/ban',
   'POST /api/admin/referrals/revoke',
   // Şikâyetler (admin.mjs) and a reported room's own pictures (room-decor.mjs).

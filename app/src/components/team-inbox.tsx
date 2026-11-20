@@ -41,6 +41,7 @@ const CATEGORY: Record<string, { icon: keyof typeof Ionicons.glyphMap; color: st
   bonus: { icon: 'gift', color: '#16A34A', label: 'Bonus' },
   performance: { icon: 'warning', color: '#EA580C', label: 'Uyarı' },
   quota: { icon: 'notifications', color: '#64748B', label: 'Bilgi' },
+  bond: { icon: 'link', color: '#DB2777', label: 'Bağlar' },
 };
 
 const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();

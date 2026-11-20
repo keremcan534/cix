@@ -8,6 +8,7 @@
 import { useSyncExternalStore } from 'react';
 
 import { createSimulatedEngine, type AudioEngine, type AudioRoute } from '@/lib/audio-engine';
+import { wantVia } from '@/lib/follow-room';
 import { isOnline } from '@/lib/room-presence';
 
 export type SessionStatus = 'connecting' | 'connected' | 'reconnecting' | 'disconnected' | 'ended';
@@ -212,6 +213,8 @@ function start(roomId: string, info: { title: string; cover: string; via?: strin
     everConnected: false,
     miniHidden: false,
   };
+  // Came following someone from their profile: this visit's first voice token names them (lib/follow-room).
+  wantVia(roomId, info.via);
   engine.connect(roomId);
   emit({ session, switchTo: null, recovery: null });
   persist({ roomId, title: info.title });

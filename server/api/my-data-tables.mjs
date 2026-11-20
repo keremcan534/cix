@@ -16,12 +16,14 @@ export const EXPORTED = [
   'backpack_items', 'backpack_moves', 'referral_codes', 'referrals', 'casino_rounds', 'room_decor',
   'events', 'event_reservations', 'event_participants', 'event_reminders_sent', 'event_reminder_optout',
   'agency_assistants', 'agency_assistant_ledger', 'level_drops', 'level_offsets', 'guards', 'guard_settings',
-  'message_holds', 'auto_templates', 'auto_quota', 'auto_sends',
+  'message_holds', 'auto_templates', 'auto_quota', 'auto_sends', 'profile_marks',
 ];
 
 /** Tables that point at an account but are not that person's to receive, with the reason. */
 export const NOT_EXPORTED = {
   admin_permissions: 'staff access settings',
+  // No foreign key (so the test doesn't ask), listed all the same: it names an owner.
+  room_xp_pending: 'room XP of a gift on its way to the owner (milliseconds; room-xp-add.mjs): the total is users.room_xp, in the copy',
   family_cooldowns: 'the date a rule lets someone join another family again; the families they were in are in family_members',
   audit_events: 'staff action log (who on the staff did what)',
   event_log: 'an event’s change log (staff review decisions); the person’s own events are in events',

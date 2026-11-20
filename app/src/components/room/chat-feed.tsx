@@ -8,14 +8,17 @@
 // all the room below it; Büyüt brings the mics back to their size and the chat to the size it had.
 // While typing, the keyboard takes its room from the chat alone (lib/room-split): the last lines stay in sight between
 // the Balkon bar and the field, with no handle and no tabs, and the mics above never move.
+// A line that names me (@bahset) and went by unseen gets a chip at the chat's top: a tap goes to it and lights it up
+// (lib/mention-chip, Güncelleme 7 madde 2).
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { Animated, FlatList, PanResponder, Pressable, StyleSheet, View, useWindowDimensions, type ListRenderItem } from 'react-native';
+import { Animated, AppState, FlatList, PanResponder, Pressable, StyleSheet, View, useWindowDimensions, type ListRenderItem, type ListViewToken } from 'react-native';
 
 import { Text } from '@/components/text';
 import { filterFeed, type FeedMsg, type FeedTab } from '@/lib/chat-feed';
+import { FLASH_MS, chipLabel, mentionChip, type MentionMark } from '@/lib/mention-chip';
 import { CHAT_DEFAULT, CHAT_MAX, CHAT_MIN, clampChatShare, getChatShare, isLargeChat, setChatShare, toggledChatShare } from '@/lib/room-chat-size';
-import { colors, semantic } from '@/theme';
+import { colors, fonts, semantic } from '@/theme';
 
 const TABS: [FeedTab, string][] = [
   ['all', 'Tümü'],
@@ -29,6 +32,8 @@ const EMPTY: Record<FeedTab, string> = {
 };
 /** Distance from the newest message (px) under which the list keeps following new events. */
 const FOLLOW_PX = 60;
+/** How long an unseen mention is off screen before its chip shows. */
+const CHIP_WAIT_MS = 700;
 
 export function ChatFeed({
   messages,
@@ -42,6 +47,9 @@ export function ChatFeed({
   onTouch,
   hidden,
   sideRoom = 0,
+  mentions = NO_MENTIONS,
+  onMentionsSeen,
+  attended = true,
 }: {
   messages: FeedMsg[];
   /** filter for the Tümü tab only (personal message settings) */
@@ -63,8 +71,58 @@ export function ChatFeed({
   hidden?: boolean;
   /** Room kept free on the right for a floating button over the chat, so no message runs under it. */
   sideRoom?: number;
+  /** Lines that name me (@bahset) not seen yet, oldest first (lib/mention-chip): the chip goes to them. */
+  mentions?: readonly MentionMark[];
+  /** These lines were seen: on screen while the chat could be read, or jumped to. */
+  onMentionsSeen?: (ids: string[]) => void;
+  /** The chat can be read now (the room in front, no sheet over it): only then does a line on screen count as seen. */
+  attended?: boolean;
 }) {
   const [tab, setTab] = useState<FeedTab>('all');
+  // @bahset: the lines the open tab shows now, and a jump to one of them (lib/mention-chip).
+  const [onScreen, setOnScreen] = useState<ReadonlySet<string>>(NO_IDS);
+  const [jump, setJump] = useState<{ id: string; n: number } | null>(null);
+  const seenTold = useRef(onMentionsSeen);
+  useEffect(() => {
+    seenTold.current = onMentionsSeen;
+  });
+  // The open list tells which lines it shows; the chat draws again for it only while a mention waits (not on every
+  // scroll of a room where nobody wrote my name).
+  const shownNow = useRef<ReadonlySet<string>>(NO_IDS);
+  const waiting = mentions.length > 0;
+  const waitingRef = useRef(waiting);
+  const tellOnScreen = useCallback((ids: ReadonlySet<string>) => {
+    shownNow.current = ids;
+    if (waitingRef.current) setOnScreen(ids);
+  }, []);
+  useEffect(() => {
+    waitingRef.current = waiting;
+    if (waiting) setOnScreen(shownNow.current);
+  }, [waiting]);
+  const appActive = useAppActive();
+  const reading = attended && appActive && !hidden;
+  useEffect(() => {
+    if (!reading) return;
+    const seen = mentions.filter((m) => onScreen.has(m.id)).map((m) => m.id);
+    if (seen.length) seenTold.current?.(seen);
+  }, [reading, mentions, onScreen]);
+  // A line that just came in is on screen a moment later (the list tells once it is drawn): the chip waits that long,
+  // so it never flickers for a mention read as it arrives.
+  const want = fill || hidden ? null : mentionChip(mentions, onScreen);
+  const wantKey = want ? `${want.to}:${want.count}` : '';
+  const [settled, setSettled] = useState('');
+  useEffect(() => {
+    if (!wantKey) return;
+    const t = setTimeout(() => setSettled(wantKey), CHIP_WAIT_MS);
+    return () => clearTimeout(t);
+  }, [wantKey]);
+  const chip = want && settled === wantKey ? want : null;
+  const goToMention = (to: string) => {
+    // A chat line is in Tümü and Sohbet, never in Hediyeler.
+    if (tab === 'gifts') setTab('all');
+    setJump((j) => ({ id: to, n: (j?.n ?? 0) + 1 }));
+    seenTold.current?.([to]);
+  };
   const height = useChatHeight(screenHeight);
   // Large (Küçült): the chat grows into whatever the mic strip leaves; otherwise it keeps its chosen height.
   const [large, setLarge] = useState(() => isLargeChat(height.share));
@@ -109,11 +167,62 @@ export function ChatFeed({
           <FoldTab height={height} />
         </View>
       )}
-      {TABS.map(([k]) => (
-        <FeedList key={k} data={data[k]} active={tab === k} empty={EMPTY[k]} renderItem={fill && renderTyping ? renderTyping : renderItem} tight={fill} sideRoom={sideRoom} />
-      ))}
+      <View style={s.lists}>
+        {TABS.map(([k]) => (
+          <FeedList
+            key={k}
+            data={data[k]}
+            active={tab === k}
+            empty={EMPTY[k]}
+            renderItem={fill && renderTyping ? renderTyping : renderItem}
+            tight={fill}
+            sideRoom={sideRoom}
+            onScreen={tellOnScreen}
+            jump={tab === k ? jump : null}
+          />
+        ))}
+        {chip && (
+          <Pressable
+            onPress={() => goToMention(chip.to)}
+            hitSlop={6}
+            style={s.mention}
+            accessibilityRole="button"
+            accessibilityLabel={`${chipLabel(chip.count)}. Mesaja git`}
+          >
+            <Text style={s.mentionAt}>@</Text>
+            <Text style={s.mentionText} numberOfLines={1}>
+              {chipLabel(chip.count)}
+            </Text>
+            <Ionicons name="arrow-up" size={13} color="#1B1405" />
+          </Pressable>
+        )}
+      </View>
     </Animated.View>
   );
+}
+
+const NO_MENTIONS: readonly MentionMark[] = [];
+const NO_IDS: ReadonlySet<string> = new Set();
+
+/** The line a jump went to: lit up in gold, fading out (lib/mention-chip FLASH_MS). */
+function Flash() {
+  const [o] = useState(() => new Animated.Value(1));
+  useEffect(() => {
+    const a = Animated.timing(o, { toValue: 0, delay: FLASH_MS / 2, duration: FLASH_MS / 2, useNativeDriver: true });
+    a.start();
+    return () => a.stop();
+  }, [o]);
+  return <Animated.View pointerEvents="none" style={[s.flash, { opacity: o }]} />;
+}
+
+/** Whether the app is in front (a line on screen while it is in the background was not seen). */
+function useAppActive() {
+  const [active, setActive] = useState(() => AppState.currentState !== 'background' && AppState.currentState !== 'inactive');
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (st) => setActive(st === 'active'));
+    return () => sub.remove();
+  }, []);
+  return active;
 }
 
 /** The chat's height as an animated value, so dragging moves it without drawing the room again. One per chat. */
@@ -223,14 +332,82 @@ function FoldTab({ height }: { height: ChatHeight }) {
   );
 }
 
-function FeedList({ data, active, empty, renderItem, tight, sideRoom }: { data: FeedMsg[]; active: boolean; empty: string; renderItem: ListRenderItem<FeedMsg>; tight: boolean; sideRoom: number }) {
+/** A line counts as on screen when at least half of it shows. */
+const VIEWABLE = { itemVisiblePercentThreshold: 50 };
+
+function FeedList({
+  data,
+  active,
+  empty,
+  renderItem,
+  tight,
+  sideRoom,
+  onScreen,
+  jump,
+}: {
+  data: FeedMsg[];
+  active: boolean;
+  empty: string;
+  renderItem: ListRenderItem<FeedMsg>;
+  tight: boolean;
+  sideRoom: number;
+  /** The open tab's list says which lines it shows (by id), whenever that changes. */
+  onScreen: (ids: ReadonlySet<string>) => void;
+  /** Scroll to this line and light it up (a new `n` each time). */
+  jump: { id: string; n: number } | null;
+}) {
   const ref = useRef<FlatList<FeedMsg>>(null);
   const [away, setAway] = useState(false);
   const [unread, setUnread] = useState(0);
   const [newest, setNewest] = useState(data[0]?.id);
+  // The lines on screen (FlatList's viewability; its callback must stay the same function), told while this tab is open.
+  const shown = useRef<ReadonlySet<string>>(NO_IDS);
+  const live = useRef({ active, onScreen, data });
+  useEffect(() => {
+    live.current = { active, onScreen, data };
+  });
+  const [onViewable] = useState(() => ({ viewableItems }: { viewableItems: ListViewToken[] }) => {
+    shown.current = new Set(viewableItems.map((v) => v.key));
+    if (live.current.active) live.current.onScreen(shown.current);
+  });
+  useEffect(() => {
+    if (active) live.current.onScreen(data.length ? shown.current : NO_IDS);
+    // Only as the tab opens; the viewability callback tells the rest.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active]);
+  // A jump (the @bahset chip): scroll the line to the middle and light it up. The list has no fixed row heights, so a
+  // line far up may need a rough scroll first (onScrollToIndexFailed), then the exact one.
+  const [flash, setFlash] = useState<string | null>(null);
+  const jumped = useRef(0);
+  const tries = useRef(0);
+  useEffect(() => {
+    if (!jump || !active || jump.n === jumped.current) return;
+    jumped.current = jump.n;
+    const index = live.current.data.findIndex((m) => m.id === jump.id);
+    if (index < 0) return;
+    tries.current = 0;
+    setFlash(jump.id);
+    // After the tab has been drawn (the chip may have just opened Tümü).
+    const go = setTimeout(() => ref.current?.scrollToIndex({ index, viewPosition: 0.5, animated: true }), 60);
+    return () => clearTimeout(go);
+  }, [jump, active]);
+  useEffect(() => {
+    if (!flash) return;
+    const off = setTimeout(() => setFlash(null), FLASH_MS + 400);
+    return () => clearTimeout(off);
+  }, [flash]);
   // Only the newest lines, which pass the floating button, keep clear of it; the older ones use the whole width. Inside
   // its cell this margin stays on the right: Android turns both the inverted list and each cell around (scale -1).
-  const drawRow = useCallback<ListRenderItem<FeedMsg>>((p) => <View style={p.index < 3 && sideRoom ? { marginRight: sideRoom } : undefined}>{renderItem(p)}</View>, [renderItem, sideRoom]);
+  const drawRow = useCallback<ListRenderItem<FeedMsg>>(
+    (p) => (
+      <View style={p.index < 3 && sideRoom ? { marginRight: sideRoom } : undefined}>
+        {/* Behind the line, so its words stay sharp. */}
+        {p.item.id === flash && <Flash />}
+        {renderItem(p)}
+      </View>
+    ),
+    [renderItem, sideRoom, flash],
+  );
   if (data[0]?.id !== newest) {
     // Derived transition: count what arrived while the reader was scrolled up.
     const before = data.findIndex((m) => m.id === newest);
@@ -252,6 +429,15 @@ function FeedList({ data, active, empty, renderItem, tight, sideRoom }: { data: 
           initialNumToRender={16}
           windowSize={9}
           scrollEventThrottle={100}
+          extraData={flash}
+          viewabilityConfig={VIEWABLE}
+          onViewableItemsChanged={onViewable}
+          onScrollToIndexFailed={(info) => {
+            // Not laid out yet: a rough jump by the average line height, then the exact one (a few times at most).
+            if (++tries.current > 3) return;
+            ref.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: false });
+            setTimeout(() => ref.current?.scrollToIndex({ index: info.index, viewPosition: 0.5, animated: true }), 120);
+          }}
           maintainVisibleContentPosition={{ minIndexForVisible: 0, autoscrollToTopThreshold: FOLLOW_PX }}
           onScroll={(e) => {
             const isAway = e.nativeEvent.contentOffset.y > FOLLOW_PX;
@@ -296,4 +482,24 @@ const s = StyleSheet.create({
   empty: { color: colors.textDim, fontSize: 13, textAlign: 'center', marginTop: 8 },
   pill: { position: 'absolute', alignSelf: 'center', bottom: 8, backgroundColor: semantic.action, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7 },
   pillText: { color: semantic.actionInk, fontWeight: '900', fontSize: 13 },
+  lists: { flex: 1, minHeight: 0 },
+  // @bahset: the chip at the chat's top (gold, as the note and the "senden bahsetti" tag), and the lit line.
+  mention: {
+    position: 'absolute',
+    top: 6,
+    alignSelf: 'center',
+    maxWidth: '86%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.gold,
+    borderRadius: 999,
+    paddingLeft: 4,
+    paddingRight: 10,
+    paddingVertical: 4,
+    boxShadow: '0 2px 10px rgba(0,0,0,0.35)',
+  },
+  mentionAt: { width: 20, height: 20, borderRadius: 10, overflow: 'hidden', textAlign: 'center', lineHeight: 20, backgroundColor: '#1B1405', color: colors.gold, fontFamily: fonts.displayBold, fontSize: 12 },
+  mentionText: { color: '#1B1405', fontFamily: fonts.displayBold, fontSize: 13, flexShrink: 1 },
+  flash: { position: 'absolute', left: -4, right: -4, top: -2, bottom: -2, borderRadius: 12, backgroundColor: 'rgba(246,189,96,0.28)', borderWidth: 1, borderColor: 'rgba(246,189,96,0.7)' },
 });

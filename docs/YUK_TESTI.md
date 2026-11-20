@@ -110,6 +110,26 @@ bir dolu oda ya da daha fazla kullanıcı, uygulamayla birlikte sesi de bozar (y
    - Önceden bu süre dolduğu anda gelen yüzlerce isteğin her biri ses sunucusuna ayrı ayrı soruyordu. Artık hepsi aynı
      okumayı paylaşıyor.
 
+## Bir odanın hediyeleri (20 Kasım 2026, Güncelleme 7 incelemesi)
+
+Güncelleme 7'nin ilk halinde odadaki her ücretli hediye, oda sahibinin hesap satırını en başta kilitliyordu (oda XP'si
+için). Bu, aynı odadaki hediyelerin baştan sona birbirini beklemesi demekti; sahibin kendi oda işleri (anket, mikrofon
+daveti, müzik, yasak, PK) de hediyeleri bekliyor, bazen "Sunucu hatası" (kilitlenme) veriyordu. Düzeltmede oda XP'si
+hediye bittikten hemen sonra ayrı bir küçük adımla sahibe ekleniyor (`room-xp-add.mjs`); hediye sahibin satırına hiç
+dokunmuyor.
+
+Ölçüm (`room-gifts.mjs`): bir odada 30 kişi, her biri başka birine 15'er hediye, hepsi aynı anda (450 hediye), API tek
+çekirdekte, 4 tur:
+
+| Sürüm | Saniyede hediye | Gecikme (yarısı / 100'de 95'i) |
+| --- | --- | --- |
+| Güncelleme 7'den önce (c15bf45) | 215–259 | 106–129 ms / 164–200 ms |
+| Güncelleme 7'nin ilk hali (sahip kilidi) | 103–122 | 228–278 ms / 335–378 ms |
+| Düzeltilmiş | 185–288 | 100–130 ms / 124–196 ms (bir turda tek seferlik 732 ms) |
+
+Yani dolu bir odanın hediye kapasitesi yeniden eskisi kadar. Odadaki hediyelerin hâlâ sırayla geçtiği kısım (Patron
+koltuğu ve oda roketi satırları) Güncelleme 7'den önceki gibi.
+
 ## Sonra: büyürken
 
 - **Ses sunucusuna koruma sınırı (Claude, makine büyüyünce):**
@@ -143,6 +163,7 @@ ve sunucuyu bilerek doldurur.
 | `build-tools.sh` | Canlıdakiyle aynı sürüm LiveKit'i ve yükü veren `lk` aracını kurar. Go ve ffmpeg gerekir. `lk`'nin içindeki örnek ses dosyaları gerçek ses olmadığı için yerlerine konuşma gibi ses koyar. |
 | `livekit-load.py` | Oda başına N konuşan ve M dinleyen oluşturur. Ses sunucusunun işlemci ve bellek kullanımını, her dinleyiciye ulaşan sesi ve kaybı yazar. |
 | `api-load.mjs` | Sanal kullanıcılarla API'yi kademe kademe yükler. Her kademede gecikmeyi, hataları ve API ile veritabanının işlemci kullanımını yazar. `--burst` ile odanın aynı anda yeniden okunmasını da dener. |
+| `room-gifts.mjs` | Tek bir odada çok kişinin aynı anda hediye göndermesi: `--senders` kişi, her biri başka birine `--gifts` hediye, `--rounds` tur. Her turun süresini, saniyede kaç hediye geçtiğini, gecikmeyi ve hataları yazar. Odadaki hediye yolunu değiştiren her işten sonra, önceki sürümle karşılaştırarak çalıştırılır. |
 
 Örnek (sunucu çekirdek 0'da, yükü veren araçlar 1–3'te):
 
@@ -154,4 +175,7 @@ LK=./tools/lk LIVEKIT_API_KEY=yuk LIVEKIT_API_SECRET=<secret> python3 server/inf
 # API: ALLOW_DEV_AUTH=1 ALLOW_TEST_TOPUP=1, hız sınırları yüksek (RATE_IP, RATE_AUTH, RATE_ALL), çekirdek 0'da
 taskset -c 1-3 node server/infra/loadtest/api-load.mjs --base http://127.0.0.1:7890 --stages 250,500,750,1000 \
   --seconds 45 --burst 200 --api-pid <API süreci>
+
+# Bir odanın hediyeleri (aynı API, TEST_TOPUP_DAILY yüksek)
+taskset -c 1-3 node server/infra/loadtest/room-gifts.mjs --base http://127.0.0.1:7890 --senders 30 --gifts 15 --rounds 4
 ```

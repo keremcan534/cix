@@ -19,6 +19,10 @@
 // optional.
 // An event sent to a friend (event: an approved Etkinlik Merkezi event, events.mjs) carries the event: new apps draw
 // it as the event's card ({ event: { id, title, startsAt } }), older ones only show the text, which says it in words.
+// A gift sent from the chat (gifts.mjs, place chat) is a line the server writes with the gift: it carries
+// { gift: { id, count } } (GIFT_LINE), from which new apps draw the gift's card and play its animation once; older ones
+// show its text. Only the server can write such a line, so a typed "Hediye gönderdi: …" (the look of one, a scam
+// lure) is refused (fakeGiftLine).
 import { HttpError, REF, auth, blockedBetween, contactError, countRefusal, db, env, int, limit, publicText, readJson, tx, userId } from './core.mjs';
 import { noteAutoReply, quickAfter, quickReplyOf, takeQuota } from './auto-chat.mjs';
 import { live } from './live-settings.mjs';
@@ -50,14 +54,32 @@ const out = (m, me = null) => ({
   readAt: m.read_at,
   // Only on an event's message, so the others read as before.
   ...(m.event_id ? { event: { id: Number(m.event_id), title: m.event_title ?? null, startsAt: m.event_starts_at ?? null } } : {}),
+  // Only on a gift's line (GIFT_LINE): the gift and how many.
+  ...(m.gift_id ? { gift: { id: m.gift_id, count: Number(m.gift_count) } } : {}),
   // Only on an automatic message or a quick reply (auto-chat.mjs): new apps label it, older ones show the text.
   ...(m.source && m.source !== 'manual' ? { source: m.source } : {}),
   // A paid message waiting for its answer (message-holds.mjs): its reward to the streamer, its fee to the payer.
   ...(me ? holdView(m, me) : {}),
 });
-/** A message row with its event's title and start, and its hold (out). */
-const WITH_EVENT = `SELECT m.*, e.title AS event_title, e.starts_at AS event_starts_at, ${HOLD_COLUMNS}
-  FROM messages m LEFT JOIN events e ON e.id = m.event_id LEFT JOIN message_holds hd ON hd.message_id = m.id`;
+/**
+ * The gift a message is the line of (gifts.mjs writes it in the gift's own transaction, ref `gift:<the gift's ref>`;
+ * `gift-` before Nov 2026): the same sender, that ref and the same moment. A phone's ref can't hold ':' (core.mjs REF),
+ * and a message a phone took a `gift-` ref for beforehand was written earlier than the gift, so it never matches.
+ */
+const GIFT_LINE = (m) =>
+  `LEFT JOIN gift_events ge ON ge.sender = ${m}.sender AND left(${m}.ref, 5) IN ('gift:', 'gift-') AND ge.ref = substr(${m}.ref, 6) AND ge.created_at = ${m}.created_at`;
+/** A message row with its event's title and start, its gift (GIFT_LINE), and its hold (out). */
+const WITH_EVENT = `SELECT m.*, e.title AS event_title, e.starts_at AS event_starts_at, ge.gift_id, ge.count AS gift_count, ${HOLD_COLUMNS}
+  FROM messages m LEFT JOIN events e ON e.id = m.event_id ${GIFT_LINE('m')} LEFT JOIN message_holds hd ON hd.message_id = m.id`;
+/**
+ * Text that looks like a gift's line ("Hediye gönderdi: Aslan"): only the server writes those, with the gift. Read
+ * past case, spaces, invisible characters and leading symbols, so "🎁 HEDİYE  gönderdi :" is the same.
+ */
+export function fakeGiftLine(text) {
+  const t = String(text ?? '').normalize('NFKC').replace(/[\p{Cf}]/gu, '').toLocaleLowerCase('tr-TR');
+  return /^[^\p{L}\p{N}]*hed[iı]ye\s*g[öo]nderd[iı]\s*[:：\-–—→>]/u.test(t);
+}
+export const FAKE_GIFT_LINE = 'Hediye satırını yalnızca gerçek bir hediye yazar. Hediye göndermek için sohbetteki hediye düğmesini kullan.';
 /** The text a photo without words carries (the conversation list and the notification show it). */
 export const PHOTO_TEXT = 'Fotoğraf';
 
@@ -119,6 +141,8 @@ export const messageRoutes = {
       : image && (b.text === undefined || b.text === null || String(b.text).trim() === '')
         ? PHOTO_TEXT
         : await publicText(b.text, 1, 1000, 'Mesaj', me, 'dm', 'text');
+    // The look of a gift's line, typed (a fake gift to lure someone): nothing is stored or charged.
+    if (!quickNo && fakeGiftLine(body)) throw Object.assign(new HttpError(400, FAKE_GIFT_LINE), { extra: { code: 'fake_gift' } });
     const source = quickNo ? 'quick_reply' : 'manual';
     const peer = await db.query('SELECT 1 FROM users WHERE id = $1 AND deleted_at IS NULL', [to]);
     if (!peer.rowCount) throw new HttpError(404, 'Kullanıcı bulunamadı');
@@ -234,7 +258,7 @@ export const messageRoutes = {
     const me = await auth(req);
     const r = await db.query(
       // The newest message with each person (from the sender and recipient indexes), the 200 latest talks.
-      `SELECT l.peer, m.*, u.name AS peer_name, u.avatar_url AS peer_avatar, ev.title AS event_title, ev.starts_at AS event_starts_at,
+      `SELECT l.peer, m.*, u.name AS peer_name, u.avatar_url AS peer_avatar, ev.title AS event_title, ev.starts_at AS event_starts_at, ge.gift_id, ge.count AS gift_count,
               (SELECT count(*) FROM messages x WHERE x.recipient = $1 AND x.sender = l.peer AND x.read_at IS NULL) AS unread
          FROM (SELECT peer, max(id) AS id FROM (
                  SELECT recipient AS peer, id FROM messages WHERE sender = $1
@@ -244,6 +268,7 @@ export const messageRoutes = {
          JOIN messages m ON m.id = l.id
          JOIN users u ON u.id = l.peer
          LEFT JOIN events ev ON ev.id = m.event_id
+         ${GIFT_LINE('m')}
         ORDER BY m.id DESC`,
       [me.id],
     );

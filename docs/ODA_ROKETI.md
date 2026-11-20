@@ -47,7 +47,7 @@ Oyun Salonu'ndaki Yörünge ("patlamadan önce çık") ayrı bir oyundur; deği�
 
 ## Telefonda (yeni APK)
 
-- Odanın adının altında roket düğmesi: dolan seviye ve yüzdesi (ör. "Lv.2 57,5%").
+- Odanın adının altında roket düğmesi: dolan seviye ve yüzdesi, araya nokta konarak ve yüzde işareti önde (ör. "Lv.2 · %57,5"; Güncelleme 7, madde 5a: eski "Lv.2 57,5%" yazısı "Lv.257,5%" gibi okunuyordu). Beşi de kalkınca "Lv.5 ✓".
 - Dokununca roket penceresi açılır:
   - Lv.1–5 sekmeleri, roket ve doluluk çubuğu.
   - Ödüller ve kaç kişiye.
@@ -55,6 +55,11 @@ Oyun Salonu'ndaki Yörünge ("patlamadan önce çık") ayrı bir oyundur; deği�
   - Son kalkışın kazananları.
   - "Hediye göndererek roketi doldur" düğmesi hediye panelini açar.
 - Kalkışta roket ekranda yükselir, sonra kazananlar yazılır ("Tebrikler! … kazandın").
+  - Gösteri, hediye efektleriyle aynı sıraya girer (Güncelleme 7, madde 5b; `src/lib/rocket-stage.ts`, `tests/rocket-stage.test.ts`): ekrandaki hediye ve sırada bekleyen hediyeler (roketi dolduran hediye de) bitince roket kalkar; roketten sonra gönderilen hediyeler roketi bekler. İki büyük efekt hiçbir zaman aynı anda oynamaz, iki ses üst üste binmez.
+  - Sunucunun kalkış haberi gösteriye 1,5 saniye geç girer: roketi dolduran hediye (gönderenin kendi telefonunda gönderim cevabıyla sıraya giren hediye de) önce sıraya girsin diye.
+  - Kazananlar, kalkış beklerken ya da oynarken gelirse hemen roketin ardından yazılır; araya başka hediye girmez.
+  - Roket uzun bir hediye kuyruğunda düşmez (sıra kısaltılırken atılan hep hediyelerdir); ama en çok yaklaşık 24 saniye bekleyebilir. Bu sırada düğme bir sonraki seviyeyi göstermeye başlayabilir; kazananın bildirimi ve SimilarClub Sistem notu da gösteriden önce gelebilir. Ödüller sunucuda kalkış anında dağıtılır, yalnız gösteri bekler.
+  - Oda küçültülmüşken gelen kalkışın gösterisi oynamaz (hediyelerinki gibi).
   - Efektler kapalıysa gösteri olmaz.
   - "Hareketi azalt" açıksa yalnız yazı çıkar.
 - Roketin resmi şimdilik Roket hediyesinin resmi; her seviyenin rengi farklı. Beş seviyenin kendi resmi çizilecek ([`GORSEL_URETIM_LISTESI.md`](GORSEL_URETIM_LISTESI.md) §20).
@@ -63,6 +68,7 @@ Oyun Salonu'ndaki Yörünge ("patlamadan önce çık") ayrı bir oyundur; deği�
 
 - Roketi göstermez.
 - Odada gönderdikleri hediyeler roketi doldurur; kazandıkları ödül hesaplarına geçer.
+- Roketi gösteren ama Güncelleme 7'den önceki APK'lar: düğmede eski yazı ("Lv.2 57,5%") kalır, kalkış gösterisi o an oynayan hediye efektinin üstüne biner. Yeni APK ile düzelir.
 
 ## Hukuk
 

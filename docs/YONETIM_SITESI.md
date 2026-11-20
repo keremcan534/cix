@@ -12,7 +12,7 @@ gibi.
 | Kullanıcılar | Kullanıcılar ve güvenlik › Kullanıcılar | app.users |
 | Canlı ayarlar | Ayarlar › Canlı ayarlar | app.settings |
 | Hediyeler, Emojiler | Hediye ve mağaza › Hediyeler, Emojiler | app.gifts, app.emojis |
-| Şanslı hediyeler | Hediye ve mağaza › Şanslı hediye ayarı | app.lucky |
+| Şanslı hediyeler (paketler, olasılıklar, yeni paket; paketin ikonu ve videosu: `lucky/art`, `lucky/art/remove`, `lucky/fetch`, panel sayfası yapılacak) | Hediye ve mağaza › Şanslı hediye ayarı | app.lucky |
 | Oyun Salonu | Rapor ve maliyet › Oyun Salonu ve durum | app.reports |
 | Etkinlikler, Duyurular | Duyuru ve etkinlik › Etkinlikler, Duyurular | app.events, app.notices |
 | Para çekme | Para › Para çekme | app.withdrawals |

@@ -13,7 +13,7 @@ Bunlar olmadan ilgili mühendislik işi bitemez. Sıra, yayına etkisine göre.
 
 | # | Ne | Neden gerekli | Durum |
 |---|---|---|---|
-| 1 | **Şans ve para kararları:** Uğurlu hediye, Oyun Salonu oyunları, Jeton Noktası, para çekme ve ajans/davet komisyonları ilk sürümde olacak mı? | Satın alınan jetonla şans çekilişi ve nakde dönen kazanç; mağazalar bunu gerçek paralı kumar sayar, Türkiye'de lisans gerekir. Önerimiz: ilk sürümde kapalı. Hukuk görüşü alınmalı. | ⛔ |
+| 1 | **Şans ve para kararları:** Uğurlu hediye, Oyun Salonu oyunları, Jeton Noktası, para çekme ve ajans/davet komisyonları ilk sürümde olacak mı? | Satın alınan jetonla şans çekilişi ve nakde dönen kazanç; mağazalar bunu gerçek paralı kumar sayar, Türkiye'de lisans gerekir. Önerimiz: ilk sürümde kapalı. Hukuk görüşü alınmalı. **19 Kasım 2026, sahip kararı:** hukuk görüşü beklenmeden Şanslı hediye genişletildi (panelden yeni paket, paketlere ikon ve video; [`LUCKY_HEDIYE.md`](LUCKY_HEDIYE.md)). Soru hâlâ açık ve risk büyüdü; yayından önce avukat görüşü şart, gerekirse paketler panelden kapatılır. | ⛔ |
 | 2 | **Alan adı** | Sunucu adresi, web sürümü, paylaşım bağlantıları, destek e-postası, gizlilik politikası adresi. Şu an geçici `sslip.io` adresi kullanılıyor. | ⛔ |
 | 3 | **Apple Developer** (şirket adına) ve **Google Play Console** (şirket adına) hesapları | Mağazaya yükleme, uygulama içi satın alma, Apple ile giriş. Bireysel Play hesaplarında üretime çıkmadan önce kapalı test şartı olabilir; şirket hesabı önerilir. | ⛔ |
 | 4 | **Expo hesabı** (EAS) | Mağaza derlemesi, gerçek imza, telefonda gerçek ses için development build, push bildirimleri, uzaktan güncelleme. Ücretsiz planla başlanabilir. | ⛔ |

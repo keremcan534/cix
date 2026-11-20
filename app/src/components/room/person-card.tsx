@@ -1,31 +1,38 @@
 // The person card in a room: tapping someone on a mic, on the balcony list or in the chat opens it from the bottom,
-// a card of its own, drawn with the designer's picture set (components/person-card-art, person-showcase): their photo
-// in their own shop frame, name with their Yankı level
-// and the heart between us, gender and age, their mic and room role, agency and Aile, interests, the three walls
-// (İlişki Duvarı, Hediye Duvarı, Koruma: each opens that part of their profile), followers, and what I can do: send a
-// gift, mention them in the chat (@bahset), follow, message, open the full profile. Room staff get "Yönet" for their
-// actions on them. Live mode: the follow state, the counts, the levels and the heart are the server's
-// (lib/live/profile, lib/live/one-on-one), as on the profile screen; their frame is the one the room read
-// (lib/live/looks).
+// a card of its own, drawn with the designer's picture set (components/person-card-art, person-showcase; the client's
+// picture in Güncelleme 7): their photo in their own shop frame, name with their Yankı level on the crowned pill, gender
+// and age, their Cömertlik level, VIP level and the heart between us, their profile ID (tap: copied) and country, their
+// mic and room role between laurels, agency and Aile, interests, the three walls (İlişki Duvarı, Hediye Duvarı,
+// Koruma: each opens that part of their profile), followers and their medals (tap: the profile's Onur tab), and what I
+// can do: send a gift, mention them in the chat (@bahset), follow, message, open the full profile. Room staff get
+// "Yönet" for their actions on them. Live mode: the follow state, the counts, the levels (a level a VIP hides stays
+// hidden), the country, the medals and the heart are the server's (lib/live/profile with `card`, lib/live/one-on-one),
+// as on the profile screen; their frame, VIP level and special ID are the ones the room read (lib/live/looks), else
+// the profile answer's.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 
 import { Text } from '@/components/text';
+import { Art } from '@/components/Art';
 import { HeartBadge } from '@/components/heart-level';
 import { heartOf, usePair } from '@/components/one-on-one-bar';
 import { GenderChip } from '@/components/profile-badges';
 import { CardArt, CardPanel } from '@/components/person-card-art';
 import { ActionTiles, ClubPills, InterestRow, LevelPill, ManageRow, SHOW, WallLinks, type WallKey } from '@/components/person-showcase';
 import { useSheetBottom } from '@/components/room/parts';
-import { FramedAvatar, VipBadge } from '@/components/ui';
+import { FramedAvatar, VipBadge, VipTitle, WealthBadge } from '@/components/ui';
 import { userById, type User } from '@/data/mock';
-import { wealthCharmOf } from '@/data/profile';
+import { medalsOf, wealthCharmOf } from '@/data/profile';
+import { countryArt } from '@/data/rooms-ui';
+import { COUNTRIES } from '@/data/social-ui';
 import { showAlert } from '@/lib/alert';
+import { copyText } from '@/lib/clipboard';
 import { liveMode, message, toServer } from '@/lib/live';
 import { lookOf } from '@/lib/live/looks';
 import { followOnServer, loadPublicProfile } from '@/lib/live/profile';
+import { countryCodeOf, medalsFrom, shownPublicId, type CardLook } from '@/lib/person-card';
 import { useSheetMax } from '@/lib/sheet-space';
 import { useApp } from '@/store';
 import { SCRIM } from '@/theme';
@@ -33,6 +40,24 @@ import { SCRIM } from '@/theme';
 const fmt = (n: number) => n.toLocaleString('tr-TR');
 /** The profile tab each wall opens (the Koruma banner sits on the profile's first tab). */
 const WALL_TAB: Record<WallKey, string> = { iliski: 'iliski', hediye: 'onur', koruma: 'profil' };
+/** The most medals the card shows; all of them are on the profile's Onur tab. */
+const MEDALS_SHOWN = 6;
+
+/** What the card read from the server for this person (GET /api/user with `card`). */
+type CardRead = {
+  id: string;
+  followers: number;
+  isFollowing: boolean;
+  /** Null: not sent, or a level they hide (a VIP right). */
+  wealth: number | null;
+  charm: number | null;
+  /** My own card: which of my levels others don't see now. */
+  hidden?: { wealth: boolean; charm: boolean };
+  country: string | null;
+  /** Undefined: an older server, which sends none. */
+  medals?: string[];
+  look: CardLook | null;
+};
 
 /** A woman's age on the set's pink pill; every other case is the app's usual chip. */
 function AgePill({ user }: { user: User }) {
@@ -61,12 +86,13 @@ export type PersonCardProps = {
 };
 
 export function PersonCard({ uid, note, onClose, onGift, onMention, onReport, onManage }: PersonCardProps) {
-  const { following, toggleFollow, takeServerSocial, blocked, equipped, vipLevel, charmLevel } = useApp();
+  const { following, toggleFollow, takeServerSocial, blocked, equipped, vipLevel, charmLevel, wealthLevel } = useApp();
   const u = userById(uid);
   const isMe = uid === 'me';
-  const serverId = liveMode() ? toServer(uid) : null;
-  // Live mode: the server's counts and Yankı level for this person (null until read; a level they hide stays null).
-  const [counts, setCounts] = useState<{ id: string; followers: number; isFollowing: boolean; charm: number | null } | null>(null);
+  const live = liveMode();
+  const serverId = live ? toServer(uid) : null;
+  // Live mode: what the server says of this person (null until read).
+  const [counts, setCounts] = useState<CardRead | null>(null);
   const [busy, setBusy] = useState(false);
   // The heart between us (the demo: its sample heart), beside their name once it has a level.
   const { pair } = usePair(uid, !!serverId && !isMe);
@@ -74,22 +100,45 @@ export function PersonCard({ uid, note, onClose, onGift, onMention, onReport, on
   useEffect(() => {
     if (!serverId) return;
     let on = true;
-    loadPublicProfile(serverId).then(
-      (c) => on && setCounts({ id: serverId, followers: c.followers, isFollowing: c.isFollowing, charm: c.levels?.charm ?? null }),
+    loadPublicProfile(serverId, isMe, false, true).then(
+      (c) =>
+        on &&
+        setCounts({
+          id: serverId,
+          followers: c.followers,
+          isFollowing: c.isFollowing,
+          wealth: c.levels?.wealth ?? null,
+          charm: c.levels?.charm ?? null,
+          ...(c.levelsHidden && { hidden: c.levelsHidden }),
+          country: countryCodeOf(c.extras?.country),
+          ...(c.medals && { medals: c.medals }),
+          look: c.look ?? null,
+        }),
       () => {},
     );
     return () => {
       on = false;
     };
-  }, [serverId]);
+  }, [serverId, isMe]);
   const mine = counts && counts.id === serverId ? counts : null;
   const isFollowing = mine ? mine.isFollowing : following.has(uid);
   const isBlocked = blocked.has(uid);
-  const charm = isMe ? charmLevel : serverId ? (mine?.charm ?? null) : wealthCharmOf(uid).charm;
-  // Their own shop frame: mine from the store, someone else's as the room read it (none until read).
-  const look = !isMe && serverId ? lookOf(serverId) : undefined;
-  const frameId = isMe ? equipped.frame : (look?.frame ?? undefined);
-  const vip = isMe ? vipLevel : (look?.vipLevel ?? 0);
+  // Cömertlik and Yankı: mine from the store (a level I hide from others is hidden here too, as they see it), someone
+  // else's from the server (null until read or while they hide it), the demo's sample levels.
+  const demo = wealthCharmOf(uid);
+  const wealth = isMe ? (mine?.hidden?.wealth ? null : wealthLevel) : serverId ? (mine?.wealth ?? null) : demo.wealth;
+  const charm = isMe ? (mine?.hidden?.charm ? null : charmLevel) : serverId ? (mine?.charm ?? null) : demo.charm;
+  // Their own shop look: mine from the store; someone else's as the room read it (it hears changes at once), else as
+  // their profile answer had it (none until read).
+  const theirs: CardLook | undefined = isMe ? undefined : ((serverId ? lookOf(serverId) : undefined) ?? mine?.look ?? undefined);
+  const frameId = isMe ? equipped.frame : (theirs?.frame ?? undefined);
+  const vip = isMe ? vipLevel : (theirs?.vipLevel ?? 0);
+  // Their profile ID (a special ID they wear, else their own number) and country, as their profile shows them.
+  const shownId = shownPublicId(live, u, serverId, isMe ? equipped.specialId : theirs?.specialId);
+  const countryCode = serverId ? (mine?.country ?? null) : (u.country ?? 'TR');
+  const country = countryCode ? COUNTRIES.find((c) => c.code === countryCode && c.code !== 'ALL') : undefined;
+  // Their medals: the server's (an older server sends none), the demo's sample ones.
+  const medals = (serverId ? medalsFrom(mine?.medals) : medalsOf(uid)).slice(0, MEDALS_SHOWN);
   const paddingBottom = useSheetBottom(18);
   // It stops at the room's Balkon line (lib/sheet-space): who they are scrolls, the buttons stay in sight. The card
   // floats over the navigation bar, so that padding comes off; a busy room on a short phone still leaves it 380 to
@@ -121,9 +170,13 @@ export function PersonCard({ uid, note, onClose, onGift, onMention, onReport, on
       setBusy(false);
     }
   };
-  const openWall = (w: WallKey) => {
+  const openTab = (tab: string) => {
     onClose();
-    router.push({ pathname: '/kullanici/[id]', params: { id: uid, tab: WALL_TAB[w] } });
+    router.push({ pathname: '/kullanici/[id]', params: { id: uid, tab } });
+  };
+  const openWall = (w: WallKey) => openTab(WALL_TAB[w]);
+  const copyId = () => {
+    if (shownId.id) void copyText(shownId.id, 'ID');
   };
 
   return (
@@ -133,20 +186,41 @@ export function PersonCard({ uid, note, onClose, onGift, onMention, onReport, on
         <CardPanel style={[s.sheet, { maxHeight }]}>
           <View style={s.head}>
             <View style={s.avatar}>
-              <FramedAvatar uri={u.avatar} size={78} vipLevel={vip} frameId={frameId ?? undefined} artScale={1.6} />
+              <FramedAvatar uri={u.avatar} size={78} vipLevel={vip} frameId={frameId ?? undefined} artScale={1.6} markUid={uid} />
             </View>
             <View style={s.who}>
+              {/* The name with their Yankı level on the crowned pill beside it, as in the design; a long name shrinks first. */}
               <View style={[s.row, { paddingRight: 26 }]}>
                 <Text style={s.name} numberOfLines={1}>
                   {u.name}
                 </Text>
+                {charm !== null && <LevelPill level={charm} />}
               </View>
               <View style={[s.row, { flexWrap: 'wrap' }]}>
                 <AgePill user={u} />
-                {charm !== null && <LevelPill level={charm} />}
-                {u.vip && <VipBadge />}
+                {wealth !== null && <WealthBadge level={wealth} />}
+                {vip > 0 ? <VipTitle level={vip} /> : u.vip && <VipBadge />}
                 {heart && heart.level > 0 && <HeartBadge level={heart.level} />}
               </View>
+              {(!!shownId.id || !!country) && (
+                <View style={[s.row, { flexWrap: 'wrap' }]}>
+                  {!!shownId.id && (
+                    <Pressable style={s.idPill} onPress={copyId} hitSlop={6} accessibilityRole="button" accessibilityLabel={`ID ${shownId.id}, kopyala`}>
+                      <Text style={[s.idText, shownId.special && s.idSpecial]} numberOfLines={1}>
+                        ID {shownId.id}
+                        {shownId.special ? ' ✦' : ''}
+                      </Text>
+                      <Ionicons name="copy-outline" size={11} color={SHOW.dim} />
+                    </Pressable>
+                  )}
+                  {country && (
+                    <View style={s.flag} accessibilityLabel={country.name}>
+                      <Art name={countryArt(country.code)} size={15} />
+                      <Text style={s.flagText}>{country.code}</Text>
+                    </View>
+                  )}
+                </View>
+              )}
               {!!note && (
                 <View style={s.row}>
                   <CardArt name="defne-sol" h={20} />
@@ -163,10 +237,36 @@ export function PersonCard({ uid, note, onClose, onGift, onMention, onReport, on
             <ClubPills user={u} onOpen={onClose} />
             <InterestRow interests={u.interests} />
             <WallLinks onOpen={openWall} />
-            {mine && (
-              <Text style={s.dim}>
-                <Text style={s.strong}>{fmt(mine.followers)}</Text> takipçi
-              </Text>
+            {(mine || medals.length > 0) && (
+              <View style={s.followRow}>
+                {mine ? (
+                  <Text style={s.dim}>
+                    <Text style={s.strong}>{fmt(mine.followers)}</Text> takipçi
+                  </Text>
+                ) : (
+                  <View />
+                )}
+                {medals.length > 0 && (
+                  <Pressable
+                    style={s.medals}
+                    onPress={() => openTab('onur')}
+                    hitSlop={6}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Madalyalar: ${medals.map((m) => m.name).join(', ')}`}
+                  >
+                    {medals.map((m) =>
+                      m.art ? (
+                        <Art key={m.id} name={m.art} size={24} />
+                      ) : (
+                        <Text key={m.id} style={s.medalEmoji}>
+                          {m.emoji}
+                        </Text>
+                      ),
+                    )}
+                    <CardArt name="ok" h={9} />
+                  </Pressable>
+                )}
+              </View>
             )}
           </ScrollView>
 
@@ -174,7 +274,7 @@ export function PersonCard({ uid, note, onClose, onGift, onMention, onReport, on
             tiles={[
               { art: 'hediye', label: 'Hediye', onPress: act(() => onGift(uid)) },
               { art: 'bahset', label: 'Bahset', onPress: act(() => onMention(uid)) },
-              { art: 'takip', label: isFollowing ? 'Takipte' : 'Takip et', on: isFollowing, disabled: busy, onPress: () => void follow() },
+              { art: 'takip', label: isFollowing ? 'Takiptesin' : 'Takip et', on: isFollowing, disabled: busy, onPress: () => void follow() },
               { art: 'sohbet', label: 'Mesaj', onPress: act(() => router.push(`/sohbet/${uid}`)) },
             ]}
           />
@@ -211,4 +311,12 @@ const s = StyleSheet.create({
   close: { position: 'absolute', right: 4, top: 4, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   dim: { color: SHOW.dim, fontSize: 14 },
   strong: { color: SHOW.text, fontWeight: '800' },
+  idPill: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1, minHeight: 22, paddingHorizontal: 8, borderRadius: 11, backgroundColor: SHOW.tile, borderWidth: 1, borderColor: SHOW.line },
+  idText: { color: SHOW.dim, fontSize: 12, fontWeight: '700', flexShrink: 1 },
+  idSpecial: { color: SHOW.gold },
+  flag: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  flagText: { color: SHOW.dim, fontSize: 12, fontWeight: '700' },
+  followRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, minHeight: 28 },
+  medals: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1, minHeight: 32 },
+  medalEmoji: { fontSize: 18 },
 });

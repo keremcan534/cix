@@ -2,12 +2,14 @@
 // every live line that asks for wins (GET /api/live?wins=1) with what its banner shows, the sender's name and photo
 // only when the send says `named`; never to the winner's own lines, to anyone in a block with them, nor to an older
 // app's line; once per send (a replay is not a new win); and only from the live setting's floor up (0: every win).
+// The photo goes out at the address phones load it (core.mjs filesOut), not the storage's own (Güncelleme 7, item 1).
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { rnd, startApi } from './harness.mjs';
 
-const h = startApi({ LIVE_BEAT_MS: '200' });
+const CDN = 'https://cdn.example.com';
+const h = startApi({ LIVE_BEAT_MS: '200', S3_PUBLIC_URL: CDN, PUBLIC_URL: 'self' });
 const { call, signUp } = h;
 const ok = async (p, what = '') => {
   const [st, j] = await p;
@@ -85,8 +87,10 @@ describe('Şanslı kazancı bütün odalara', () => {
     const owner = await signUp('Oda Sahibi');
     const room = (await ok(call('POST', '/api/rooms', { title: `Şans Odası ${rnd(2)}` }, owner.session), 'oda')).room;
     const winner = await player('Kazanan', 5000);
-    const photo = `https://cdn.example.com/avatar/${winner.user.id}/${rnd(6)}.jpg`;
-    await ok(call('PATCH', '/api/me', { avatarUrl: photo }, winner.session), 'fotoğraf');
+    const key = `avatar/${winner.user.id}/${rnd(6)}.jpg`;
+    await ok(call('PATCH', '/api/me', { avatarUrl: `${CDN}/${key}` }, winner.session), 'fotoğraf');
+    // What every phone loads: this server's address for the stored file (some networks can't reach the storage's).
+    const photo = `${h.base}/api/media/f/${key}`;
     const to = await signUp('Alan');
     const watcher = await signUp('İzleyen');
     const older = await signUp('Eski Uygulama');
@@ -117,6 +121,9 @@ describe('Şanslı kazancı bütün odalara', () => {
     assert.deepEqual(await own.winsSoFar(), [], 'kazananın telefonu kendisi gösterdi');
     assert.deepEqual(await blocked.winsSoFar(), [], 'engelleyene gitmez');
     assert.deepEqual(await old.winsSoFar(), [], 'kazançları istemeyen hatta gitmez');
+    // Yönetim › Şanslı hediye's lists show the sender with their photo, at the same address.
+    const [, adm] = await call('GET', '/api/admin/lucky', null, admin.session);
+    assert.deepEqual(adm.recent.find((s) => s.id === sent.send.id)?.sender, { id: winner.user.id, name: 'Kazanan', avatarUrl: photo });
 
     // The same request again (a lost answer): no second win.
     const again = await ok(call('POST', '/api/lucky/send', { giftId: 'lk1', to: [to.user.id], count: 1, room: room.id, ref, named: true }, winner.session), 'tekrar');

@@ -1,11 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Dimensions, Easing, Image, Pressable, StyleSheet, View, useWindowDimensions, type HostInstance } from 'react-native';
+import { Animated, Dimensions, Easing, Image, Pressable, StyleSheet, View, type HostInstance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { MAX_FONT_SCALE, Text } from '@/components/text';
+import { Text } from '@/components/text';
 import { Avatar, FramedAvatar, VerifiedBadge } from '@/components/ui';
+import { MarkLayer } from '@/components/profile-mark';
 import { GiftArt, giftArtOf, giftSource } from '@/components/GiftArt';
 import { EmojiText, ReactionArt, StickerArt, isAnimatedSticker, messagePreview, stickersOf } from '@/components/ReactionArt';
 import { cosmeticById } from '@/data/catalog';
@@ -24,7 +25,7 @@ import { Photo } from '@/components/photo';
 import { RoleIcon, type StaffMark } from '@/components/room/role-mark';
 import { VOICE_RING, VoiceWave } from '@/components/room/voice-wave';
 import { frameArtOf } from '@/components/fx/frame-art';
-import { BondBubble, BondChip, BondLink } from '@/components/room/room-bonds';
+import { BondBubble, BondChip, BondKnot, BondLine } from '@/components/room/room-bonds';
 import type { RoomBond } from '@/data/bonds';
 import { PK_LINE, nameLine, nameSize } from '@/lib/seat-fit';
 import { ringReach, seatRoom } from '@/lib/seat-cell';
@@ -71,6 +72,7 @@ export function Seat({
   invitee,
   similarity,
   bondLink,
+  bondKnot,
   mini,
   enterDelay,
   onPress,
@@ -124,8 +126,13 @@ export function Seat({
   invitee?: string;
   /** How much this person has in common with you (lib/similarity), read out with the seat; not on your own seat. */
   similarity?: number;
-  /** Lv4 bond with the person on the next seat of the row: a line to their avatar (`gap`: the row's gap). */
+  /**
+   * Lv4 bond with the person on the next seat of the row: a line to their avatar (`gap`: the row's gap), drawn behind
+   * this seat's face and frame (lib/bond-link).
+   */
   bondLink?: { bond: RoomBond; gap: number } | null;
+  /** Lv4 bond with the person on the seat before this one: the line's knot, drawn over both faces' frames. */
+  bondKnot?: { bond: RoomBond; gap: number } | null;
   /** Küçült: a small avatar (no frame) over the mic's number, in the room's mic strip; nothing else under it. */
   mini?: boolean;
   /** Entering the room the mics come in one after another, like a wave: this seat's wait (ms). */
@@ -199,6 +206,8 @@ export function Seat({
       accessibilityLabel={label}
       style={[styles.seat, slotWidth ? { width: slotWidth } : host ? (compact ? { width: 96 } : styles.hostSeat) : { width: '20%' }, layer !== undefined && { zIndex: layer }]}
     >
+      {/* First, so this face's frame and the next seat (drawn after this one) cover its two ends (lib/bond-link). */}
+      {user && bondLink && !mini && <BondLine bond={bondLink.bond} size={size} gap={bondLink.gap} />}
       <Animated.View
         style={[
           styles.seatBody,
@@ -210,10 +219,12 @@ export function Seat({
               The owners' call (güncelleme 5, "dalgalar çerçeveyi kesiyor"): the ring never covers a frame. */}
           {speaking && <VoiceWave wave={wave} size={size} color={voice} level={level} still={still} reach={ringReach(size, room)} />}
           {user && !mini && (vipLevel > 0 || frameId) ? (
-            <FramedAvatar uri={user.avatar} size={size} vipLevel={vipLevel} frameId={frameId} room={room} />
+            <FramedAvatar uri={user.avatar} size={size} vipLevel={vipLevel} frameId={frameId} room={room} markUid={userId ?? undefined} />
           ) : user ? (
             <>
               <Photo uri={user.avatar} kind="face" style={{ width: size, height: size, borderRadius: size / 2 }} />
+              {/* Profil izleri: on the photo, under the host's gold frame (components/profile-mark). */}
+              {!mini && <MarkLayer uid={userId} size={size} />}
               {hostFrame !== undefined && (
                 <Image
                   source={hostFrame}
@@ -271,7 +282,8 @@ export function Seat({
         {/* The points line is kept under every name, PK or not (lib/seat-fit PK_LINE): a PK starting moves nothing. */}
         {!mini && <View style={styles.pkLine}>{user && pkPoints !== undefined && <PkPoints value={pkPoints} still={still} width={slotWidth} />}</View>}
       </Animated.View>
-      {user && bondLink && !mini && <BondLink bond={bondLink.bond} size={size} gap={bondLink.gap} />}
+      {/* Last, so the knot of the line from the seat before is over both frames (lib/bond-link). */}
+      {user && bondKnot && !mini && <BondKnot bond={bondKnot.bond} size={size} gap={bondKnot.gap} />}
     </Pressable>
   );
 }
@@ -282,18 +294,17 @@ const BIG_PK_GIFT = 1_000;
 const CAPSULE_PAD = 3;
 /**
  * PK points under a seat (lib/pk pkPillBox): a pill of one fixed width for the seat, with the score always in its short
- * form (61.99k, 1.25m; fewer decimals where the seat is narrow), the gift icon where there is room for it. However big
- * the score gets the pill keeps its size and the seats stay where they are; the text shrinks rather than ever being
- * cut. When the value grows, the pill bumps once and a small "+N" rises and fades (≈0.5 s, native driver only).
- * Several gifts in a row just restart it, so a burst stays cheap.
+ * form (61.9k, 1.25m; fewer decimals where the seat is narrow), the gift icon where there is room for it. However big
+ * the score gets the pill keeps its size and the seats stay where they are. The number is one fixed, readable size
+ * (lib/pk PK_TEXT) on every phone: not grown by the phone's text size, never shrunk to fit (Android shrank it to a few
+ * px on some phones: Güncelleme 7, madde 13). When the value grows, the pill bumps once and a small "+N" rises and
+ * fades (≈0.5 s, native driver only). Several gifts in a row just restart it, so a burst stays cheap.
  */
 export function PkPoints({ value, still, width = 64 }: { value: number; still?: boolean; width?: number }) {
   const [shown, setShown] = useState(value);
   const [delta, setDelta] = useState<{ n: number; key: number } | null>(null);
   const [v] = useState(() => new Animated.Value(1));
-  // The phone's text size grows the number too (up to MAX_FONT_SCALE): the form is picked for the size it is drawn at.
-  const scale = Math.min(useWindowDimensions().fontScale || 1, MAX_FONT_SCALE);
-  const box = pkPillBox(width, scale);
+  const box = pkPillBox(width);
   if (value !== shown) {
     // Derived transition: remember the increase for the "+N" bubble.
     setShown(value);
@@ -316,8 +327,9 @@ export function PkPoints({ value, still, width = 64 }: { value: number; still?: 
         ]}
       >
         {box.icon && <Icon3D name="gift" size={box.size} />}
-        {/* The short form already fits the pill; the shrink is only a margin, so the number stays readable. */}
-        <RollingNumber value={value} duration={500} format={(n) => pkPointsText(n, box.chars)} shrink={0.9} style={[styles.pkText, { fontSize: box.size, lineHeight: box.size + 2 }]} />
+        {/* The short form already fits the pill at this size: one line, never shrunk, not scaled by the phone's text
+            size; its line as tall as the pill's inside, so nothing pushes it smaller. */}
+        <RollingNumber value={value} duration={500} format={(n) => pkPointsText(n, box.chars)} numberOfLines={1} maxFontSizeMultiplier={1} style={[styles.pkText, { fontSize: box.size, lineHeight: box.height - 2 }]} />
       </Animated.View>
       {delta && !still && (
         <Animated.Text

@@ -115,7 +115,7 @@ export default function GameCenter() {
                 <View style={{ flex: 1, gap: 4 }}>
                   <Text style={s.wheelTag}>YENİ · JACKPOT</Text>
                   <Text style={s.wheelName}>Rüzgâr Gülü</Text>
-                  <Text style={s.wheelDim}>Klasik, Yüksek, Zirve · ×1, ×10, ×50 çevir · her dilim kazandırır</Text>
+                  <Text style={s.wheelDim}>Klasik, Yüksek, Zirve · ×1, ×10, ×50 çevir · 12 dilimli çark</Text>
                   <View style={{ alignSelf: 'flex-start', marginTop: 4 }}>
                     <GlossButton label="Çevir" tone="money" small />
                   </View>

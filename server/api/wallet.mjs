@@ -246,7 +246,7 @@ export const walletRoutes = {
     const u = await auth(req);
     const s = await diamondState(db, u.id);
     const r = await db.query(
-      `SELECT d.id, d.amount, d.channel, d.unlock_at, d.created_at, d.sender, s.name AS sender_name, g.gift_id, g.count
+      `SELECT d.id, d.amount, d.channel, d.unlock_at, d.created_at, d.sender, s.name AS sender_name, s.avatar_url AS sender_avatar, g.gift_id, g.count
          FROM diamond_locks d LEFT JOIN users s ON s.id = d.sender LEFT JOIN gift_events g ON g.id = d.gift_event
         WHERE d.user_id = $1 AND d.status = 'active' AND d.unlock_at > now()
         ORDER BY d.unlock_at, d.id LIMIT 100`,
@@ -262,7 +262,7 @@ export const walletRoutes = {
         channelLabel: CHANNELS[x.channel]?.label ?? 'Karışık',
         unlockAt: x.unlock_at,
         createdAt: x.created_at,
-        from: x.sender ? { id: x.sender, name: x.sender_name } : null,
+        from: x.sender ? { id: x.sender, name: x.sender_name, avatarUrl: x.sender_avatar ?? null } : null,
         gift: x.gift_id ? { id: x.gift_id, count: x.count } : null,
       })),
     };
@@ -326,7 +326,7 @@ export const walletRoutes = {
     const u = await auth(req);
     const by = await db.query('SELECT channel, sum(remaining) AS remaining FROM coin_lots WHERE user_id = $1 AND remaining > 0 GROUP BY channel ORDER BY 2 DESC', [u.id]);
     const lots = await db.query(
-      `SELECT l.id, l.channel, l.amount, l.remaining, l.lock_hours, l.created_at, l.transfer_id, l.source_user, s.name AS source_name, p.platform, p.product_id
+      `SELECT l.id, l.channel, l.amount, l.remaining, l.lock_hours, l.created_at, l.transfer_id, l.source_user, s.name AS source_name, s.avatar_url AS source_avatar, p.platform, p.product_id
          FROM coin_lots l LEFT JOIN users s ON s.id = l.source_user LEFT JOIN purchases p ON p.id = l.purchase_id
         WHERE l.user_id = $1 ORDER BY l.id DESC LIMIT 50`,
       [u.id],
@@ -343,7 +343,7 @@ export const walletRoutes = {
         lockDays: days(x.lock_hours),
         createdAt: x.created_at,
         transfer: x.transfer_id === null ? null : Number(x.transfer_id),
-        from: x.source_user ? { id: x.source_user, name: x.source_name } : null,
+        from: x.source_user ? { id: x.source_user, name: x.source_name, avatarUrl: x.source_avatar ?? null } : null,
         product: x.product_id ?? null,
       })),
     };

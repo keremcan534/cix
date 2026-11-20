@@ -175,10 +175,10 @@ describe('Aile ve Dost rafı', () => {
     }
   });
 
-  test('bağ hediyesi sıradan hediye olarak gönderilemez, bağ isteği olarak gider', async () => {
+  test('bağ hediyesi bağı olmayana sıradan hediye olarak gitmez (bond_needed), bağ isteği olarak gider', async () => {
     const [a, b] = [await person('Gönderen', 'Erkek'), await person('Alan', 'Kadın')];
     await h.credit(a.user.id, 5000, { channel: 'google' });
-    await refused(call('POST', '/api/gifts/send', { to: b.user.id, giftId: 'bag-kardes', count: 1, ref: ref() }, a.session), 400);
+    assert.equal((await refused(call('POST', '/api/gifts/send', { to: b.user.id, giftId: 'bag-kardes', count: 1, ref: ref() }, a.session), 409)).code, 'bond_needed');
     const r = await ok(call('POST', '/api/bonds/request', { to: b.user.id, kind: 'kardes', ref: ref(), room: 'oda-00000000-0000-4000-8000-000000000000' }, a.session));
     assert.equal(r.bond.status, 'pending');
     assert.equal(r.user.coins, 4000);

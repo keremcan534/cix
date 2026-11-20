@@ -16,6 +16,7 @@ import { noteRefusal } from '@/lib/sanctions';
 import { liveMode, message, myServerId, rememberUser, toLocal, toServer } from '@/lib/live';
 import { onLine } from '@/lib/live/live-line';
 import { forgetAutoChat, noteThread } from '@/lib/live/auto-chat';
+import { forgetGiftFx } from '@/lib/live/gift-fx-seen';
 import { isServerId } from '@/data/mock';
 
 const SEEN_KEY = 'similarclub:dm-seen';
@@ -62,6 +63,7 @@ export function forgetSeen() {
   readTimers.forEach(clearTimeout);
   readTimers.clear();
   forgetAutoChat();
+  forgetGiftFx();
   void AsyncStorage.multiRemove([SEEN_KEY, HIDDEN_KEY]).catch(() => {});
 }
 
@@ -175,10 +177,11 @@ export function useLiveThread(userId: string, app: Inbox) {
     };
     tick();
     const t = setInterval(tick, THREAD_MS);
-    // The live line: a message from this person, or my messages read by them, shows at once.
+    // The live line: a message or a gift from this person (a gift from the chat is a line in it), or my messages
+    // read by them, shows at once.
     const peer = toServer(userId);
     const off = onLine((e) => {
-      if ((e.type === 'message' || e.type === 'message_read') && e.from === peer) tick();
+      if ((e.type === 'message' || e.type === 'message_read' || e.type === 'gift') && e.from === peer) tick();
     });
     const closed = peer ? markChatOpen(peer) : undefined;
     return () => {

@@ -66,10 +66,14 @@ export function bossOf(r, now = Date.now()) {
  */
 export async function bossGift(c, { roomId, sender, coins }) {
   if (!roomId || !(coins > 0)) return [];
+  // FOR NO KEY UPDATE: only the seat's columns change, so a room action's foreign-key check on the room (a poll, a mic
+  // invite) never waits for a gift, nor a gift for it. The room's level counts the XP gifts hold for the owner that
+  // isn't on users.room_xp yet, this one's included (room-xp-add.mjs).
   const r = (
     await c.query(
-      `SELECT r.rules, r.boss_id, r.boss_since, r.boss_until, r.boss_spent, u.room_xp, now() AS now
-         FROM rooms r JOIN users u ON u.id = r.owner WHERE r.id = $1 AND r.closed_at IS NULL FOR UPDATE OF r`,
+      `SELECT r.rules, r.boss_id, r.boss_since, r.boss_until, r.boss_spent, now() AS now,
+              u.room_xp + coalesce((SELECT sum(p.xp) FROM room_xp_pending p WHERE p.owner = r.owner), 0) AS room_xp
+         FROM rooms r JOIN users u ON u.id = r.owner WHERE r.id = $1 AND r.closed_at IS NULL FOR NO KEY UPDATE OF r`,
       [roomId],
     )
   ).rows[0];

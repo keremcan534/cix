@@ -19,6 +19,14 @@ modunda olması, hata takibi olmaması ve kırık kodun birleşmeden önce yakal
   şans oyunundan gerçek paraya giden bir yol var. Google Play bunu "gerçek paralı kumar" sayar (lisans ve onay ister);
   Türkiye'de de lisans gerekir. Kodda varsayılan olarak **açık** (Cömertlik Lv.2 ve 18 yaş şartıyla). Panelin "Şanslı
   hediye ayarı" sayfasından paket paket kapatılabiliyor.
+- **Şanslı hediye genişledi (19 Kasım 2026, sahip kararı, hukuk riski açık):** Sahipler avukat görüşünü beklemeden
+  panelden **yeni Şanslı paketi** eklenmesini (en çok 20 paket; her birinin adı, emojisi, fiyatı, olasılık tablosu,
+  açık/kapalı) ve her pakete **ikon ve video** verilmesini istedi; yapıldı (Güncelleme 7 madde 10,
+  [`LUCKY_HEDIYE.md`](LUCKY_HEDIYE.md)). Yeni oyun türü yok, kazanç yine normal jeton. Bu, satın alınan jetonla oynanan
+  ve nakde dönebilen şans özelliğini **genişletir**: daha çok paket, daha çekici gösterim. Aşağıdaki öneri ve avukat
+  sorusu aynen geçerli; karar ve risk sahiplerindir. Yayından önce avukat görüşü alınmalı, gerekirse paketler panelden
+  kapatılır. Oyun ekranlarında kasa payı ya da kazanç tutarı yazmaz (Güncelleme 7 madde 6); yalnız nasıl oynanır ve
+  olasılık tablosu.
 - **Oyun Salonu** kazancı ayrı oyun jetonuna gidiyor (`casino.mjs`, `game_coins`), bu daha güvenli. Ama bahis satın
   alınan jetonla da yapılabiliyor. Varsayılan olarak yalnız yöneticilere açık. Kasım 2026'da Yörünge canlı ve çok
   oyunculu oldu (`rocket-live.mjs`, herkes aynı roketi izler): aynı anahtarın arkasında, ama kasa payı canlı ayardan
@@ -163,6 +171,52 @@ modunda olması, hata takibi olmaması ve kırık kodun birleşmeden önce yakal
 3. **Uçtan uca testler ve gece kontrolü** (Sonra).
 4. Sizden gelecek hesaplar geldikçe: Sentry, analitik, push, görsel moderasyon bağlantıları.
 
+## Bağlar, Güncelleme 7 (19 Kasım 2026, sahiplerin kararları)
+
+Ayrıntı: [`BAGLAR.md`](BAGLAR.md). Bağ hediyesi bağı olana normal hediye olarak tekrar gider, puan hediyesiz gecelerde düşer, 30 gün hediyesiz bağ biter, Aile ve Kanka bağları pratikte sınırsız (1000), her bağ değişikliği SimilarClub Sistem'e yazılır.
+
+- **Eski APK'lara duyuru (siz: bir metin):** eski APK'nın Bağlar kuralları yazısı uygulamanın içinde ve hâlâ "Puan düşmez" diyor; sunucu ise artık puan düşürüyor ve bağı bitirebiliyor. Bir duyuru (Canlı ayarlar › Duyuru ya da Similar Ekibi) önerilir: "Bağ puanları artık hediyesiz gecelerde düşüyor; 30 gün hediye gitmeyen bağ kendiliğinden bitiyor. Bağ hediyesini tekrar göndermek için uygulamayı güncelleyin." Kurulu bağların sayacı güncellemenin yapıldığı gün başlar: ilk bitiş en erken 30 gün sonra.
+- **Taciz kanalı (moderasyon):** sınırsız bağ, çok kişiye istek atmayı kolaylaştırır. Sınırlayanlar: her istek jetonu bekletir, aynı anda en çok 10 bekleyen istek, dakikada 10 istek, engel. Şikâyet gelirse Canlı ayarlar › Bağlar'dan sınır düşürülür.
+- **Para:** bağ hediyesinin tekrarı her hediye gibi `gifts/send`'den gider (fiyat ekrandaki, istek kimliği, kilit sırası aynı). Yazılırken, aynı anda bağ bitirme ve hediye testinde eski bir kilitlenme bulundu ve düzeltildi: bağı bitirme hesap kilitlerini almadan bağ satırını yazıyordu, hediye ise hesapları kilitleyip bağ satırını bekliyordu (Kasım dersiyle aynı: `ended_by` hesap satırını denetler). Artık bitirme de önce iki hesabı, sonra bağı kilitler. Para karıştırma testine bağ hediyesi ve bitirme eklendi.
+- **Bağ Yüzüğü (Çift) panelden gizlenemez:** rafta değil (katalogda `bag-cift` yok), tekrarı yalnız profildeki düğmeden ve uygulamanın fiyatıyla gider. Gizlemek ya da fiyatını değiştirmek gerekirse önce rafa eklenmeli (iki tarafta derlenmiş katalog değişikliği, yeni APK).
+- **Yük:** gece işi her etkin bağ satırına günde bir kez yazar (500'erli, hesap kilidi yok); oda listesi `among` artık kesilmeden, kişi başına endeksle okur; profil 50'şer sayfalanır. Bağ sayısı yüz binleri geçerse gece işinin süresi `bond drop:` kaydından izlenmeli. Yük testi bu sürümle tekrarlanmadı.
+
+## Şanslı hediye: yeni paket, ikon ve video (19 Kasım 2026, sahip kararı)
+
+Hukuk riski Kritik §1'de. Bu işte ayrıca:
+
+- **Gösterilen fiyat ve olasılık (kapandı, yeni APK):** Şanslı gönderimi önce ekranda görülen fiyatı ve ayar sürümünü
+  taşımıyordu: yönetici sayfa açıkken fiyatı ya da olasılıkları değiştirirse kişi görmediği fiyatla ödüyor, görmediği
+  oranlarla çekiliyordu (Google Play "önceden göster" şartı). Yeni APK ikisini de gönderir; değiştiyse 409 ve jeton
+  düşmez. **Eski APK'lar için açık kalıyor** (iki alanı göndermezler): yeni APK dağıtılınca Canlı ayarlar › Zorunlu sürüm
+  yükseltilmeli; o zamana kadar paketin fiyatını ve olasılıklarını yoğun saatlerde değiştirmemek iyi olur.
+- **Ayar kayıtları denetime (kapandı):** Şanslı ayarı kayıtları artık `audit_events`'te önceki ve sonraki haliyle ve
+  panel kullanıcısının adıyla.
+- **İki kilitlenme (kapandı, para testi buldu):** Şanslı gönderimi rastgele para testine eklenince iki gerçek hata çıktı:
+  odada gönderilen hediye ve Şanslı hediye oda sahibinin hesabını sıra dışı kilitliyordu; Şanslı gönderimi aynı jeton
+  partisine iki kez yazdığı için o partinin satın alımını ve Jeton Noktası'nı da bekliyordu. Kullanıcı "sunucu hatası"
+  görüyordu, para kaymıyordu (işlem geri alınıyordu). Artık bunlar baştan, sırayla kilitleniyor (`server/api/send-locks.mjs`).
+- **Panel sayfası (Claude, sonra):** "Yeni paket" formu, %100'e tamamlanan olasılık düzenleyici ve ikon/video yükleme
+  finans paneli deposunda yapılmadı; uçlar `PANEL_ROUTES`'ta hazır.
+- **Yük:** videolar öteki hediye videoları gibi API sunucusundan iner (CDN yok, "Medya dağıtımı"); yalnız satıştaki
+  paketlerin videosu ve yalnız yeni APK'ya listelenir.
+
+## Profil izleri: taciz riski (19 Kasım 2026)
+
+Kutlama rafındaki 💩 Kaka, alıcının profil fotoğrafına herkesin göreceği bir "pislik" bırakır; temizlemek için başkasının
+1.999 jetonluk 💧 Su göndermesi gerekir ([`PROFIL_IZLERI.md`](PROFIL_IZLERI.md)).
+
+- **Mağaza riski (siz: karar):** herkese görünen aşağılayıcı bir işaret birini küçük düşürmek için kullanılabilir; Google
+  Play'in **Zorbalık ve taciz** politikası buna bakar, en çok kadın yayıncılara karşı. "Utancını başkası parayla
+  temizlesin" düzeni manipülatif bir ödeme biçimi gibi de görülebilir. İnceleme sorarsa aşağıdaki önlemler gösterilir.
+- **Önlemler (yapıldı):** kişi Ayarlar › Gizlilik'ten tek dokunuşla kapatır (izi de hemen gider, ona Kaka jeton düşmeden
+  reddedilir); iz 24 saatte kendiliğinden gider; engelleme hem yeni izi önler hem bırakılanı kaldırır; yönetim
+  (`POST /api/admin/marks/clear`, denetim kaydıyla) izi kaldırır; Canlı ayarlar › Profil izleri › süre 0 bütün özelliği
+  kapatır. Uygulamada "temizlemek için harca" diyen bir yönlendirme yok.
+- **Açık kalanlar:** eski APK kullanan kişi Gizlilik'te seçeneği göremez (sunucu yine de uyar; yeni APK dağıtılınca
+  Zorunlu sürüm yükseltilmeli). Panelde iz kaldırma sayfası henüz yok (sunucu uçları hazır, panel deposunun işi); o
+  zamana kadar şikâyet gelirse Canlı ayarla özellik kapatılabilir. Şikâyet akışında "profil izi" diye ayrı bir sebep yok.
+
 ## Mesaj bildirimi varsayılanı (18 Kasım 2026, sahip kararı)
 
 Mesajlar'daki "Yalnızca samimi kişilerden bildirim al" seçeneği herkeste açık başlar. Bu yüzden karşılıklı takipleşmeyen ve aralarında kalp seviyesi olmayan birinin mesajı telefona bildirim düşürmez. Yayıncılar, ilk kez yazıp ücret ödeyen kişinin mesajını uygulamayı açınca görür; yayıncı geliri düşerse ilk bakılacak yer burasıdır. Eski APK bu seçeneği göstermediği için eski APK kullanan kişi kapatamaz. Varsayılan `server/api/privacy.mjs` ve `migrations/095_contact_prefs.sql` içindedir.
@@ -178,3 +232,30 @@ Mesajlar'daki "Yalnızca samimi kişilerden bildirim al" seçeneği herkeste aç
 - **Panel sayfası (Claude, sonra):** Canlı ayarlar kendiliğinden görünüyor. Rapor (yayıncı ve ajans performansı, hazır cevap kullanımı, şüpheli ikililer, bildirim kayıtları) için sunucu uçları `PANEL_ROUTES`'ta hazır; panel deposunda sayfası ve `APP_ROUTES` izni yapılmadı.
 - **Yük:** eşleştirme dakikada bir, en çok 100 yayıncı ve 500 aday erkekle çalışır; ücretli mesaj başına bir satır daha yazılır. Yük testi bu sürümle tekrarlanmadı; canlı kullanıcı artınca `server/infra/loadtest/` ile denenmeli.
 
+
+## Global hediye (19 Kasım 2026, Güncelleme 7 madde 12)
+
+Yöneticinin "Global" işaretlediği pahalı hediye (en az 300.000 jeton) gönderilince gönderenin ülkesindeki bütün odalarda
+adlarıyla duyurulur ([`HEDIYE_YONETIMI.md`](HEDIYE_YONETIMI.md) › Global hediye).
+
+- **Moderasyon (siz: bilin):** gönderenin ve alıcının adı bütün platformda görünür; alıcı buna onay vermedi. Biri bunu
+  birini herkesin önünde rahatsız etmek için kullanabilir (alıcının adı herkese gider). Önlemler: adlar zaten iletişim
+  filtresinden geçmiş; yeni uygulamada herkes Gizlilik › "Adım genel duyurularda görünmesin" ile kendi adını
+  gizleyebilir (gönderen de alıcı da, ayrı ayrı); engelleşen kişiler birbirinin duyurusunu görmez. Kötüye kullanılırsa
+  hediyenin işareti panelden kaldırılır.
+  - **Eski APK kullananlar adlarını gizleyemez** (düğme onlarda yok), alıcı da. Karar sizin: öneri, alıcının adını,
+    uygulaması bu düğmeyi bilen bir sürüme geçene kadar varsayılan olarak gizlemek ya da global hediyeyi herkes yeni
+    sürüme geçene kadar işaretlememek.
+  - Kasım 2026 incelemesinde düzeltildi: yalnız **odada** gönderilen global hediye duyurulur (birebir sohbet, profil,
+    aile sohbeti ve Anlar'dan gönderilen duyurulmaz); özel ya da şifreli odanın, dinlenen odanın, "Bulunduğum odayı
+    göster"i kapalı ya da adını gizlemiş birinin odası duyuruda adlandırılmaz.
+- **Hukuk:** Şanslı paketleri hiçbir zaman global olamaz (şans oyunu tanıtılmaz; Şanslı gönderimi bu yoldan geçmez).
+  Bu sınır gevşetilirse Kritik 1'deki soruya dahil edin.
+- **Yük:** her duyuru açık her hatta bir kısa yazı (ucuz); 10 saniyede en çok bir duyuru. Hediyenin videosu başka
+  odalarda **oynamaz ve indirilmez** (1 çekirdekli sunucu, CDN yok: binlerce telefon aynı videoyu çekmesin).
+- **Tek süreç (sonra):** duyuru sırası ve canlı hatlar tek API sürecinin belleğinde. Birden fazla API sürecine
+  geçilirken ortak kanal (Postgres LISTEN/NOTIFY ya da Redis) ve tek sıra kurulmalı; yoksa her süreç yalnız kendi
+  hatlarına duyurur ve aralık süreç başına sayılır.
+- **Eski APK'lar:** duyuruyu görmez; gönderildiği odada normal hediye görür.
+- **Panel (Claude, sonra):** Hediyeler formundaki "Global" kutusu panel deposunda yapılmadı; sunucu ucu hazır
+  (`global` alanı, `globalMinPrice`).

@@ -17,12 +17,17 @@ bekleme süresi.
 | Grup | Ayar | Varsayılan |
 | --- | --- | --- |
 | Bağlar | Çift bağı: kişi başına en fazla | 1 |
-| Bağlar | Aile bağları (Kardeş, Bacı, Ağabey, Abla, Yenge, Enişte): türü başına en fazla | 3 |
-| Bağlar | Kanka bağı: kişi başına en fazla | 5 |
+| Bağlar | Aile bağları (Kardeş, Bacı, Ağabey, Abla, Yenge, Enişte): türü başına en fazla | 1000 (Güncelleme 7'den önce 3) |
+| Bağlar | Kanka bağı: kişi başına en fazla | 1000 (Güncelleme 7'den önce 5) |
 | Bağlar | Bekleyen istek: en fazla | 10 |
 | Bağlar | İsteğe cevap süresi | 3 gün |
 | Bağlar | Bağ bitince bekleme | 7 gün |
 | Bağlar | Sohbetten günlük bağ puanı: en fazla | 10 |
+| Bağlar | Hediyesiz gece düşen puan (`bond_drop_pct`) | %10 |
+| Bağlar | Hediyesiz gece en az düşen puan (`bond_drop_flat`) | 10 puan |
+| Bağlar | Hediyesiz kalan bağ biter (`bond_idle_end_days`; 0: hiç bitmez) | 30 gün |
+| Bağlar | Bitmeden önce uyarı (`bond_idle_warn_days`; 0: uyarı yok) | 3 gün |
+| Bağlar | Seviye basamakları (`bond_levels`, Lv1–Lv20, 20 sayı, ilki 0; değişikliği iki kez sorar) | 0, 10, 30, 60, 100, 200, 400, 700, 1200, 2000, 3000, 4500, 6500, 9000, 12000, 16000, 21000, 27000, 35000, 45000 |
 | Koruma | Yüzde düşüş: bu puandan itibaren | 5.000 |
 | Koruma | Yüzde düşüş | %10 |
 | Koruma | Sabit düşüş | 1.000 puan |
@@ -39,7 +44,9 @@ bekleme süresi.
 - **Şanslı çanta listeleri** virgülle yazılır (`1000, 5000`), en çok 6 seçenek. Jeton çantası en çok **50.000 jeton**:
   çanta şansla dağıtılır, daha büyüğü sizin kararınız (`DENETIM.md`, şans özellikleri).
 - **Değişiklik sonrakinden başlar:** kurulmuş bağ, bekleyen istek (cevap süresi), konmuş eşik ve atılmış çanta kendi
-  değeriyle sürer.
+  değeriyle sürer. Gece düşüşü ve bitiş sayıları bir sonraki geceden geçerlidir. Seviye basamakları değişince herkesin
+  seviyesi yeni basamaklarla hesaplanır; seviyesi değişen bağın iki tarafına ilk hediyesinde ya da gece işinde
+  SimilarClub Sistem bildirimi gider (Güncelleme 7, [`BAGLAR.md`](BAGLAR.md)).
 - **Eski APK'lar:** sunucu yeni kuralı uygular. Çanta seçeneklerini eski APK da sunucudan alır, doğru gösterir.
   Bağlar ve Koruma yazılarındaki sayıları (3 gün, %10…) eski APK kendi içinden yazar; yeni APK katalogdan
   (`/api/catalog` `guard`, `bonds`) okur.
@@ -48,9 +55,9 @@ bekleme süresi.
 
 | Grup | Ayar | Varsayılan |
 | --- | --- | --- |
-| Aile görevleri | Her görevin puanı (sohbete mesaj, odada kalma, yeni üyeye hediye, yoklama, odada hediye, İkili hediyesi, sohbette hediye) | 1, 1, 3, 1, 2, 2, 2 |
+| Aile görevleri | Her görevin puanı (sohbete mesaj, odada kalma, yeni üyeye hediye, yoklama, odada hediye, Çift hediyesi, sohbette hediye) | 1, 1, 3, 1, 2, 2, 2 |
 | Aile görevleri | Aile odasında kalma: hedef | 15 dakika |
-| Aile görevleri | Hediye görevleri: kaç jetonda bir puan (odada, İkili, sohbette) | 500, 350, 400 |
+| Aile görevleri | Hediye görevleri: kaç jetonda bir puan (odada, Çift, sohbette) | 500, 350, 400 |
 | Aile sandıkları | Her sandığın haftalık hedefi (Ahşap, Yeşil, Mavi, Kırmızı) | 10.000, 25.000, 50.000, 80.000 |
 | Aile sandıkları | Her sandığın ödül jetonu | 20, 50, 50, 100 |
 | Aile sandıkları | Sandık için en az katkı | 1 |
@@ -88,8 +95,34 @@ bekleme süresi.
 - **Panelde değişmeyenler:** profil listeleri (burç, etiket, dil, ülke) ve profil formunun sınırları: uygulama
   bunları kendi içinden gösterir, yeni seçenek eski APK'da seçilemez; ayrı bir iş ister.
 
+## Profil izleri (19 Kasım)
+
+| Grup | Ayar | Varsayılan |
+| --- | --- | --- |
+| Profil izleri | Profil izi süresi (saat) | 24 saat |
+
+Kaka gibi iz bırakan bir hediyenin izi alıcının profil fotoğrafında bu kadar kalır (izi temizleyen hediye gelirse daha
+önce gider); en çok 168 saat. Hediyenin panelde kendi süresi varsa o geçer. Konmuş izlerin bitişi değişmez. **0: profil
+izleri kapalı**: Kaka ve Su düz hediye olur, hiçbir iz görünmez (acil durdurma). Hangi hediyenin iz bıraktığı ya da
+temizlediği Hediyeler sayfasında, hediyenin kendi ayarıdır. Ayrıntı: [`PROFIL_IZLERI.md`](PROFIL_IZLERI.md).
+
 ## Ajans statüsü (19 Kasım)
 
 Aday ajans / aktif ajans kuralının sayıları (20 yayıncı, 10 × 10 USD kazanan, 20 altında adaya düşme, aylık 5 yeni
 yayıncı, şart tutmazsa 5 puan düşüş, 90 gün pasif yayıncı) Canlı ayarlar › **Ajans statüsü**'nde. Ayrıntı:
 [`AJANS_STATUSU.md`](AJANS_STATUSU.md).
+
+## Global hediye (19 Kasım, Güncelleme 7 madde 12)
+
+| Grup | Ayar | Varsayılan |
+| --- | --- | --- |
+| Global hediye | Global hediye: en düşük fiyat | 300.000 jeton |
+| Global hediye | Global hediye: iki duyuru arası (saniye) | 10 |
+
+- **En düşük fiyat:** Hediyeler'de "Global" kutusu yalnız bu fiyattan itibaren işaretlenir. Yükseltirseniz altında kalan
+  global hediyeler duyurulmaz (işaretleri durur, fiyat sınıra çıkınca yine duyurulur). İki katından fazla artış ya da
+  yarıya düşüş ikinci onay ister.
+- **Aralık:** bütün odalara en çok bu kadar saniyede bir duyuru gider; beklerken aynı kişinin aynı kişiye aynı hediyesi
+  tek duyuruda toplanır (×3). 0: beklemeden.
+- **Eski APK'lar:** duyuruyu hiç almaz; yalnız yeni APK gösterir. Ayrıntı: [`HEDIYE_YONETIMI.md`](HEDIYE_YONETIMI.md) ›
+  Global hediye.

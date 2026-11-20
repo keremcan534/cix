@@ -1,5 +1,5 @@
 // Aile, the rest of it on the server: the daily tasks (worked out from what members really did: the family chat, the
-// family room, gifts to new members, in the family room, İkili gifts to members, gifts from the family chat, the
+// family room, gifts to new members, in the family room, Çift gifts to members, gifts from the family chat, the
 // daily check-in),
 // the weekly milestone chests, the family room, the week's ranking and highlights, active members, the Uyum Köşesi
 // pairs and the weekly bonus estimate.

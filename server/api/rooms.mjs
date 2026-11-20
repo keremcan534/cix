@@ -626,8 +626,12 @@ export const roomRoutes = {
     const me = await auth(req);
     const room = await roomRow(url.searchParams.get('room'));
     if (room.owner !== me.id && !(await isAdmin(room.id, me.id))) throw new HttpError(403, 'Bu işlem için oda yetkisi gerekli');
-    const r = await db.query(`${SANCTION_SELECT} JOIN users t ON t.id = s.user_id WHERE s.room_id = $1 AND ${LIVE_SANCTION} ORDER BY s.id DESC`.replace('SELECT s.*', 'SELECT t.name AS user_name, s.*'), [room.id]);
-    return { mutes: r.rows.map((s) => ({ ...sanctionView(s), userId: s.user_id, userName: s.user_name })) };
+    const r = await db.query(
+      `${SANCTION_SELECT} JOIN users t ON t.id = s.user_id WHERE s.room_id = $1 AND ${LIVE_SANCTION} ORDER BY s.id DESC`.replace('SELECT s.*', 'SELECT t.name AS user_name, t.avatar_url AS user_avatar, s.*'),
+      [room.id],
+    );
+    // userAvatar (Güncelleme 7, item 1): the list shows faces; an older app reads only the fields it knows.
+    return { mutes: r.rows.map((s) => ({ ...sanctionView(s), userId: s.user_id, userName: s.user_name, userAvatar: s.user_avatar ?? null })) };
   },
 
   /** Who runs the room: everyone sees the admins (role badges); only the owner and admins see who is kept out. */
@@ -635,18 +639,26 @@ export const roomRoutes = {
     const me = await auth(req);
     const room = await roomRow(url.searchParams.get('room'));
     const admins = await db.query(
-      'SELECT u.id, u.name, a.super FROM room_admins a JOIN users u ON u.id = a.user_id WHERE a.room_id = $1 AND u.deleted_at IS NULL ORDER BY a.super DESC, u.name, u.id',
+      'SELECT u.id, u.name, u.avatar_url, a.super FROM room_admins a JOIN users u ON u.id = a.user_id WHERE a.room_id = $1 AND u.deleted_at IS NULL ORDER BY a.super DESC, u.name, u.id',
       [room.id],
     );
-    const djs = await db.query('SELECT u.id, u.name FROM room_djs d JOIN users u ON u.id = d.user_id WHERE d.room_id = $1 AND u.deleted_at IS NULL ORDER BY d.created_at, u.id', [room.id]);
+    const djs = await db.query(
+      'SELECT u.id, u.name, u.avatar_url FROM room_djs d JOIN users u ON u.id = d.user_id WHERE d.room_id = $1 AND u.deleted_at IS NULL ORDER BY d.created_at, u.id',
+      [room.id],
+    );
     const staff = room.owner === me.id || admins.rows.some((a) => a.id === me.id);
-    const result = { owner: room.owner, admins: admins.rows.map((a) => ({ id: a.id, name: a.name, super: a.super })), djs: djs.rows.map((d) => ({ id: d.id, name: d.name })) };
+    // avatarUrl (Güncelleme 7, item 1): Oda ayarları shows these lists with faces; an older app reads id and name.
+    const result = {
+      owner: room.owner,
+      admins: admins.rows.map((a) => ({ id: a.id, name: a.name, avatarUrl: a.avatar_url ?? null, super: a.super })),
+      djs: djs.rows.map((d) => ({ id: d.id, name: d.name, avatarUrl: d.avatar_url ?? null })),
+    };
     if (!staff) return result;
     const bans = await db.query(
-      'SELECT b.user_id, u.name, b.until FROM room_bans b JOIN users u ON u.id = b.user_id WHERE b.room_id = $1 AND (b.until IS NULL OR b.until > now()) ORDER BY b.created_at DESC LIMIT 200',
+      'SELECT b.user_id, u.name, u.avatar_url, b.until FROM room_bans b JOIN users u ON u.id = b.user_id WHERE b.room_id = $1 AND (b.until IS NULL OR b.until > now()) ORDER BY b.created_at DESC LIMIT 200',
       [room.id],
     );
-    return { ...result, bans: bans.rows.map((x) => ({ userId: x.user_id, name: x.name, until: x.until })) };
+    return { ...result, bans: bans.rows.map((x) => ({ userId: x.user_id, name: x.name, avatarUrl: x.avatar_url ?? null, until: x.until })) };
   },
 
   /**

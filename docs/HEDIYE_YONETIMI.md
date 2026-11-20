@@ -23,6 +23,13 @@ yeniden okur (uygulama açıkken bir iki dakika içinde; açılışta hemen). He
 Fiyatı her zaman sunucu belirler; gönderim, Şanslı çanta, PK puanı, oda seviyesi, bağlar, kalp seviyesi, ajans geliri
 derlenmiş hediyelerdeki gibi işler.
 
+**Şanslı paketleri (Güncelleme 7 madde 10):** Şanslı hediye paketlerinin ikonu ve videosu da aynı yükleme, kontrol ve
+çevirme yolundan geçer (`server/api/lucky-art.mjs`: `checkIcon`, `videoOf`, aynı çevirme sırası, bağlantıdan dosya), ama
+bu listede değildir: ayrı tabloda (`lucky_art`) durur, Hediyeler panelinde ve kataloğun hediyelerinde görünmez ve
+`/api/gifts/send` ile gönderilemez. Paketlerin fiyatı, olasılıkları ve yeni paket eklemek Şanslı hediye ayarı
+sayfasındadır ([`LUCKY_HEDIYE.md`](LUCKY_HEDIYE.md)). Bir dosya hem bir hediyede hem bir pakette kullanılıyorsa
+birinden kaldırılınca öbürü için kalır.
+
 **Eski APK'lar:** katalogda bilmedikleri hediyeyi göstermez (yalnız derlenmiş listeyi süzerler), odada gelen bilinmeyen
 hediyeyi sessizce atlar, videosunu indirmez (adresi `/api/fx/g/…`, onların süzgecinden geçmez). Yeni hediyeleri bu
 özelliği taşıyan APK'dan (bu değişikliğin preview-N'i) itibaren her telefon görür; derlenmiş hediyeler aynen çalışır.
@@ -33,7 +40,7 @@ hediyeyi sessizce atlar, videosunu indirmez (adresi `/api/fx/g/…`, onların s�
 | --- | --- |
 | Kim yapar | Yalnız yönetici hesabı (`role = admin`); her işlem `audit_events`'e yazılır (kim, ne, önce/sonra, IP) |
 | Fiyat | 1 – 1.000.000 jeton, tam sayı; değişiklik yeni gönderimlerden itibaren geçer, geçmiş gönderim kendi fiyatıyla kalır |
-| Raf | Popüler, İkili, Kutlama, Özel (Özel'de en düşük VIP 1–10) |
+| Raf | Popüler, Çift, Kutlama, Özel (Özel'de en düşük VIP 1–10). Çift rafının adı Kasım 2026'ya kadar İkili'ydi; eski APK'lar hâlâ "İkili" yazar |
 | Sıra | Yöneticinin hediyeleri kendi rafının başında, paneldeki sırayla; yeni eklenen en başa |
 | Ad | 2–24 karakter; aynı adda iki hediye olmaz (derlenmişlerle de) |
 | İkon | PNG ya da WebP, saydam, kare (en çok 1:1,25), 128–4096 px (önerilen 512 × 512), en çok 10 MB. Telefonlar hediye panelinin bütün ikonlarını indirir: 1024 px'ten ya da 1 MB'tan büyük ikonu sunucu kaydederken küçültür (en çok 1024 px ve 1 MB, saydam PNG, `tools/icon-fit.py`); yüklenen büyük dosya silinir |
@@ -47,7 +54,7 @@ hediyeyi sessizce atlar, videosunu indirmez (adresi `/api/fx/g/…`, onların s�
 | Bağlantıdan dosya | Finans panelinde her dosyanın yanında "ya da bağlantı yapıştır": sunucu dosyayı bir kez indirir, yüklenmiş gibi denetler ve kendisi sunar (aşağıda **Bağlantıdan dosya**) |
 | Raftan kaldırma | Panelde kalır, kataloğda görünmez, gönderilemez; tekrar rafa konabilir |
 
-## Uygulamanın kendi hediyeleri (hazır 65 hediye)
+## Uygulamanın kendi hediyeleri (hazır 75 hediye)
 
 Uygulamayla gelen hediyeler (Gül, Roket, Sevimli Panda, Pırlanta Yüzük…, `server/api/catalog.mjs` `GIFT_ROWS`) de
 panelden değişir; geliştiriciye ya da uygulama güncellemesine gerek yoktur. Finans panelinin **Uygulama › Hediyeler**
@@ -86,6 +93,24 @@ değerleri (`original`), neyin değiştirildiği (`changed`) ve son 30 günde ka
 
 Saklama: `custom_gifts` tablosunda uygulama hediyesinin kimliğiyle bir satır (`builtin`, 069); her boş sütun
 "uygulamadaki gibi" demektir, satır hiç silinmez (katalog sürümü yalnız artar).
+
+## Profil izi (Kaka ve Su)
+
+Her hediyenin bir **Profil izi** ayarı var (101, [`PROFIL_IZLERI.md`](PROFIL_IZLERI.md)): yok, **bırakır** (izin türü ve
+isteğe bağlı süre, 1–168 saat; boşsa Canlı ayarlar › Profil izleri'ndeki süre) ya da **temizler** (izin türü). Gönderirken
+`mark: {role: 'leave'|'clean', kind, hours?}` ya da `mark: null`; listede her hediyenin `mark`'ı gelir, uygulamanın
+hediyesinde `original.mark` ve değiştirildiyse `changed` içinde `mark`; "Orijinale dön" `mark` alanını da geri alır.
+
+- Uygulamanın kendi iki hediyesi: **💩 Kaka** (`k1`, 999 jeton, Kutlama) `kaka` izi bırakır; **💧 Su** (`k2`, 1.999
+  jeton, Kutlama) `kaka` izini temizler. Kaka'nın kuralı kaldırılırsa (`mark: null`) düz hediye olur.
+- **Kural:** bir izi temizleyen hediye, o izi bırakan her hediyeden pahalı olmalı. Kaydı bozan değişiklik (fiyat, kural,
+  geri alma) reddedilir: "Su izi temizlediği için onu bırakan hediyelerden pahalı olmalı: Kaka 999 jeton, bu 999 jeton."
+- Panelde başka bir çift yapılabilir (ör. `camur`: Çamur bırakır, Hortum temizler). Uygulamada resmi olan tür şimdilik
+  yalnız `kaka`; başka bir türde fotoğrafta yalnız hediyenin küçük resmi görünür.
+- Eski APK'da Kaka ve Su hiç görünmez (uygulamanın içinde yoklar); yöneticinin eklediği iz hediyesi eski APK'da düz bir
+  hediye gibi görünür, iz yine sunucuda yazılır.
+- **Panel tarafı (finans paneli deposu, sonra):** hediye formuna "Profil izi" alanı; Kullanıcılar sayfasına kişinin izleri
+  ve "İzi kaldır" (`GET /api/admin/marks`, `POST /api/admin/marks/clear`).
 
 ## Yöneticinin adımları
 
@@ -140,6 +165,45 @@ vardır: dosyayı kendi sitenize (ör. GoDaddy hostingde `/hediyeler/` klasörü
 - Uygulamadaki Yönetim › Hediyeler formunda bağlantı alanı yok (yeni APK gerektirir); sunucu ucu (`/api/admin/gifts/fetch`)
   hazır.
 
+## Global hediye (Güncelleme 7, madde 12)
+
+Çok pahalı bir hediye "Global" işaretlenirse biri onu **bir odada** birine gönderdiğinde, gönderenin ülkesindeki **bütün
+odalarda** üstte bir bant ve odanın sohbetinde bir satır çıkar: "Kaan → Artemis’e 🚀 Roket gönderdi · Gece Sohbeti
+odasında".
+Sunucu: `server/api/global-gifts.mjs` (kurallar `global-gift-rules.mjs`, tablo sütunu `102_global_gifts.sql`), uygulama:
+`app/src/lib/global-gift-core.ts`, `app/src/lib/tr-dative.ts`, `app/src/lib/live/global-gift.ts`,
+`app/src/components/fx/global-gift-banner.tsx`.
+
+**Sahiplerin kararları ve nasıl çalıştığı:**
+
+| Konu | Karar |
+| --- | --- |
+| Kim işaretler | Yönetici, Hediyeler formunda **Global** kutusu (`global: true`); hem yöneticinin hediyelerinde hem uygulamanın kendi hediyelerinde. Her değişiklik denetimde önce/sonra ile (`gift.create`, `gift.update`, `gift.reset`). Finans panelindeki kutu sonraki iş; sunucu ucu hazır |
+| En düşük fiyat | Canlı ayarlar › Global hediye › "en düşük fiyat" (`global_gift_min_price`, **300.000 jeton**). Altında kutu işaretlenemez (400). Global bir hediyenin fiyatı bu sınırın altına indirilemez; önce kutu kaldırılır. Sınır sonradan yükseltilirse altında kalan hediyenin işareti durur ama duyurulmaz |
+| Nereden | Yalnız **odada** gönderilen (odanın hediye panelinde Global sekmesi ve rozeti var). Birebir sohbetten, profilden, aile sohbetinden ya da Anlar'dan gönderilen global hediye normal hediye gibi gider, **duyurulmaz**: oradaki hediye panelinde Global rozeti ve uyarı yok, iki kişi arasındaki bir hediye ülkeye duyurulmaz (Kasım 2026 incelemesi) |
+| Oda adı | Banttaki "· Gece Sohbeti odasında" yalnız herkesin girebileceği açık bir odada yazar. Oda **özel** (yalnız üyeler) ya da **şifreliyse**, dinlenmedeyse, gönderen ya da alıcı Gizlilik › **"Bulunduğum odayı göster"**i kapattıysa ya da adını gizlediyse duyuru oda adı olmadan gider ("Gizli Buluşma" adlı özel bir odada iki kişinin birlikte olduğu ülkeye duyurulmasın; "Kaan'ın odası" gibi bir oda adı gizlenen adı ele vermesin). Profildeki "Şu an odada" ile aynı kural |
+| Hiçbir zaman | Bağ hediyeleri (bağ isteği ya da bağı olana bağ puanı olarak gider), Koruma Kartı, Şanslı paketleri (şans oyunu tanıtılmaz; Şanslı gönderimi bu yoldan geçmez), profil izi bırakan ya da temizleyen hediyeler (Kaka, Su ve yöneticinin iz kurallı hediyeleri: alıcıyı bütün ülkenin önünde küçük düşürür; kutu ile iz kuralı birlikte kaydedilemez, [`PROFIL_IZLERI.md`](PROFIL_IZLERI.md)). Çantam'dan bedava gönderim de duyurulmaz |
+| Ülke | Gönderenin profilindeki ülke (`profile_extras.country`); ülkesi boş olan **TR** sayılır. Duyuruyu profil ülkesi aynı olanlar görür (bugün neredeyse herkes TR) |
+| Aralık | En çok **10 saniyede bir** duyuru (`global_gift_gap_seconds`, 0: beklemeden). Beklerken aynı kişinin aynı kişiye aynı hediyesi tek duyuruda toplanır (×3). En çok 20 duyuru bekler, 3 dakikadan eskisi atlanır |
+| Görünüm | Bant (odanın üstündeki kazanç bandı sırasında, ~4,5 saniye) + o odanın sohbetinde bir satır. Hediyenin tam ekran videosu **yalnız gönderildiği odada** oynar; başka odalardaki telefonlar videoyu indirmez |
+| İsim | Ayarlar › Gizlilik › "Adım genel duyurularda görünmesin" (`globalHideName`, ilk başta kapalı): açıksa o kişi (gönderen de alıcı da) "Bir kullanıcı" yazar, fotoğrafı, kimliği ve oda adı gitmez. Bu düğme yalnız yeni uygulamada var: **eski APK kullananlar adlarını gizleyemez** (alıcı da). Engelleşen kişiler birbirinin duyurusunu görmez (gönderenle ya da alıcıyla engeli olan) |
+| Ek | Türkçe yönelme eki: Artemis’e, Ayşe’ye, Ali’ye, Bora’ya, Umut’a, Kemal’e. Sonu okunamayan adda (rakam, emoji, yabancı yazım) ek tahmin edilmez: "Kaan34 kişisine" |
+| Banda dokunma | O odaya gider (oda ekranı mevcut odadan çıkmadan önce sorar; yasak, kara liste ve özel oda kuralları her zamanki gibi). Oda adı olmayan duyuruda dokununca bant yalnız kapanır. Sunucu artık özel ya da şifreli odayı hiç adlandırmadığı için `locked` hep `false` gider |
+| Hediye paneli | Yeni uygulamada **Global** sekmesi ve hediye kutusunda "Global" rozeti. Global ayrı bir raf değil: hediye yöneticinin seçtiği rafta da durur, eski APK onu orada normal hediye olarak gösterir |
+
+**Eski APK'lar:** canlı hattı `?global=1` ile açmazlar, bu yüzden duyuruyu hiç almazlar (bilmedikleri bir olayı "her şeyi
+yeniden oku" sayarlardı). Gönderildiği odada eski APK normal bir hediye görür. Eski APK'dan odada gönderilen global
+hediye yeni uygulamalara duyurulur. Katalogdaki `global: true` alanını eski APK görmezden gelir.
+
+**Sınır (sonra):** duyuru sırası ve canlı hatlar tek API sürecinin belleğinde. Birden fazla API sürecine geçilince
+ortak bir kanal (Postgres LISTEN/NOTIFY ya da Redis) ve tek bir sıra gerekir ([`DENETIM.md`](DENETIM.md)).
+
+**Testler:** `server/api/test/global-gifts.test.mjs` (en düşük fiyat, bağ / Koruma / Şanslı reddi, denetim, katalog,
+sınır yükselince; yeni hat alır, eski hat almaz, başka ülke, engeller, tekrar gönderim, gizli ad, fotoğraf ve ikon
+adresi; oda dışı gönderim duyurulmaz; şifreli, özel ve dinlenen odada ve "Bulunduğum odayı göster" kapalıyken oda adı
+gitmez; aralık ve ×N toplama; Şanslı duyurulmaz), `app/tests/global-gift.test.ts` (yönelme eki, olayın
+okunması, bozuk olay, cümle, engel, katalog işaretleri, bant sırası).
+
 ## Telefona nasıl gider
 
 - `GET /api/catalog` `gifts`: yöneticinin rafta olan hediyeleri **önce**, `custom: true`, `emoji` ve `icon` (bu sunucunun
@@ -147,6 +211,7 @@ vardır: dosyayı kendi sitenize (ör. GoDaddy hostingde `/hediyeler/` klasörü
   (`giftById`: odadaki duyuru, kombo, Gelir, Çantam), ikonunu çizer (`GiftArt`).
 - `fx`: videoları `{kind: 'gift', id, url: '/api/fx/g/<id>.mp4?v=<sürüm>', bytes, ms}`; telefon klibi bir kez indirip
   saklar (`g-<id>-<sürüm>.mp4`), sürüm değişince yenisini alır, listeden çıkanı siler. İnmemişse çizimli efekt oynar.
+- `global: true` (yalnız global hediyelerde): yeni uygulamanın Global sekmesi ve rozeti; eski uygulama görmezden gelir.
 - `v` (katalog ve `/api/config`): canlı ayarların sürümü + yöneticinin hediyelerinin sürümü (`custom_gifts.rev`).
   Bir değişiklik olunca telefonlar kataloğu yeniden okur. Odada bilmediği bir hediye gelirse telefon kataloğu hemen
   yeniden okur ve hediyeyi o zaman çizer.
@@ -161,7 +226,8 @@ vardır: dosyayı kendi sitenize (ör. GoDaddy hostingde `/hediyeler/` klasörü
   numpy, Pillow) ile çevrilir, denetlenir, depoya konur, hediye yeni videoya geçer, kaynak silinir. Depo ya da yeniden
   başlatma yüzünden yarıda kalan iş birkaç kez daha denenir; dosyanın kendisinden kaynaklanan hata bir kez söylenir.
   Docker imajı `ffmpeg python3 py3-numpy py3-pillow` kurar. Ayar: `FFMPEG`, `FFPROBE`, `PYTHON` (programların yolu),
-  `CUSTOM_GIFTS_POLL_MS` (başka bir sürecin değişikliğini okuma aralığı, varsayılan 5000).
+  `CUSTOM_GIFTS_POLL_MS` (başka bir sürecin değişikliğini okuma aralığı, varsayılan 5000), `LUCKY_ART_POLL_MS` (aynısı
+  Şanslı paketlerinin ikon ve videoları için; yoksa `CUSTOM_GIFTS_POLL_MS`).
 - Gönderim yolları sunucu fiyatıyla: `POST /api/gifts/send` (oda, profil, sohbet, aile, Anlar), Şanslı çanta
   (`lucky-bags.mjs`). Çantam (ödül hediyeleri) yalnız derlenmiş hediyeleri tutar; mağaza (`economy.mjs`) hediye satmaz.
 

@@ -10,7 +10,7 @@ export const GIFTS_PAUSED: ReadonlySet<string> = new Set([
   'g1', 'g2', 'g3', 'g4', 'g5', 'g7', 'g8', 'h1', 'h3', 'h4', 'h5', 'h6', 'h7', 'h8', 'h9', 'h10', 'h11',
   // Kutlama: thrown at a seat by the plain flight, no animation of their own
   'p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p9', 'p10',
-  // İkili
+  // Çift
   'c1', 'c2', 'c4', 'c5', 'c7', 'c9', 'c10', 'c11', 'c12',
   // Özel
   'v1', 'v2', 'v3', 'v4', 'v5',

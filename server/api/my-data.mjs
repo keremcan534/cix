@@ -6,7 +6,7 @@
 // Every table that holds my personal data is read here, in one read-only snapshot: profile and sign-in, sessions and
 // devices, follows and blocks, the direct messages I sent and received, Anlar, gifts sent and received, Çantam, the wallet
 // (ledger, coin lots, diamond locks, purchases, VIP subscriptions, Jeton Noktası transfers, withdrawals, shop items, level drops, paid 1v1 minutes),
-// games, rooms, Etkinlik Merkezi (my events, places and the reminders sent to me), family, bonds, agency, visits, reports I made, sanctions on me and my appeals, support tickets, the
+// games, rooms, Etkinlik Merkezi (my events, places and the reminders sent to me), family, bonds, profile marks, agency, visits, reports I made, sanctions on me and my appeals, support tickets, the
 // spending limit and Similar Ekibi notices written to me.
 // Other people appear only as I already see them in the app: their id and name where I deal with them (a message, a
 // gift, a follow). Never what is private to them or to the staff: who blocked or reported me, who visited my profile
@@ -21,6 +21,7 @@ import { spendLimitOf } from './spend-limit.mjs';
 import { ticketsOf } from './support.mjs';
 import { referralDataOf } from './referrals.mjs';
 import { guardsOfUser } from './guards.mjs';
+import { marksDataOf } from './profile-marks.mjs';
 
 export const EXPORT_HOURS = 24;
 
@@ -458,7 +459,7 @@ export async function exportOf(c, uid) {
   };
 
   const bonds = await all(
-    `SELECT b.*, o.name AS other_name, o.id AS other FROM bonds b JOIN users o ON o.id = CASE WHEN b.a = $1 THEN b.b ELSE b.a END
+    `SELECT b.*, b.gift_day::text AS gift_day_text, o.name AS other_name, o.id AS other FROM bonds b JOIN users o ON o.id = CASE WHEN b.a = $1 THEN b.b ELSE b.a END
       WHERE b.a = $1 OR b.b = $1 ORDER BY b.id`,
     (x) => ({
       id: num(x.id),
@@ -468,6 +469,13 @@ export async function exportOf(c, uid) {
       with: person(x.other, x.other_name),
       giftCoins: num(x.gift_coins),
       talkPoints: x.talk_points,
+      // What the nightly drop took, the level of the last write, the last day either sent the other a gift, and why
+      // it ended when no one ended it by hand (idle, gone; a request: refund) (bond-life.mjs, migrations 099 and 104).
+      // 'block' only to the one who blocked: the other is never told of a block (to them it ended, as by the other).
+      pointsLost: num(x.points_lost),
+      level: x.level,
+      giftDay: x.gift_day_text ?? null,
+      endReason: x.end_reason === 'block' && x.ended_by !== uid ? null : (x.end_reason ?? null),
       createdAt: x.created_at,
       acceptedAt: x.accepted_at,
       endedAt: x.ended_at,
@@ -585,7 +593,7 @@ export async function exportOf(c, uid) {
     album: await all('SELECT url, created_at FROM profile_photos WHERE user_id = $1 ORDER BY id', (x) => ({ url: x.url, at: x.created_at })),
   };
   const privacy = {
-    settings: (await all('SELECT profile_public, show_online, show_last_seen, show_current_room, dm_from, calls_from, invites_from, voice_calls, video_calls, message_push, push_close_only, auto_receive, auto_opener, auto_opener_seen, auto_send, updated_at FROM privacy_settings WHERE user_id = $1'))[0] ?? null,
+    settings: (await all('SELECT profile_public, show_online, show_last_seen, show_current_room, dm_from, calls_from, invites_from, voice_calls, video_calls, message_push, push_close_only, auto_receive, auto_opener, auto_opener_seen, auto_send, profile_marks, global_hide_name, updated_at FROM privacy_settings WHERE user_id = $1'))[0] ?? null,
     callHistoryClearedAt: (await all('SELECT cleared_at FROM call_history_cleared WHERE user_id = $1'))[0]?.cleared_at ?? null,
   };
   // Otomatik mesaj (auto-chat.mjs, message-holds.mjs): my own templates, the rights I used, the automatic messages
@@ -649,6 +657,8 @@ export async function exportOf(c, uid) {
     family,
     bonds,
     guard,
+    // Profil izleri (profile-marks.mjs): the marks left on my photo (who, when, how it came off) and the ones I left.
+    profileMarks: await marksDataOf(c, uid),
     agency,
     visits,
     profileMore,

@@ -29,11 +29,16 @@ import { useEffect, useRef, useSyncExternalStore } from 'react';
 
 import { isSeatColorId, type SeatColorId } from '@/data/seat-colors';
 import type { Look } from '@/lib/live/looks';
+import { parseLuckyIcon } from '@/lib/lucky-art';
 import type { BossNews } from '@/lib/patron-seat';
 import { parseMove, type Move } from '@/lib/room-moves';
+import { parseMarkNews, type MarkNews } from '@/lib/profile-marks';
 
-/** `joinedAt`: when they came into the room, on the voice server's clock (ms; 0 or missing: not known). */
-export type LivePeer = { identity: string; name: string; seat: number | null; speaking: boolean; micOn: boolean; joinedAt?: number };
+/**
+ * `joinedAt`: when they came into the room, on the voice server's clock (ms; 0 or missing: not known). `via`: whom
+ * they came following (their voice token's attribute, server-checked; lib/follow-room).
+ */
+export type LivePeer = { identity: string; name: string; seat: number | null; speaking: boolean; micOn: boolean; joinedAt?: number; via?: string };
 /** What one phone may send the others: a chat line, an emoji or sticker over its own seat, a free Hareketli. */
 export type PeerSignal =
   | { t: 'chat'; text: string }
@@ -46,14 +51,18 @@ export type PeerSignal =
   | { t: 'qpick'; id: string };
 /** A paid Hareketli the server announced (server/api/room-fx.mjs): `eventId` its room_animations row. */
 export type FxSignal = { t: 'fx'; animationId: string; eventId: number };
-/** A gift the server announced: `from` and `to` are server user ids, `eventId` its gift_events row. */
-export type GiftSignal = { t: 'gift'; giftId: string; count: number; to: string[]; eventId: number };
+/**
+ * A gift the server announced: `from` and `to` are server user ids, `eventId` its gift_events row; `mark` what it did to
+ * the receiver's profile photo (Profil izleri, lib/profile-marks), when it left or cleaned a mark.
+ */
+export type GiftSignal = { t: 'gift'; giftId: string; count: number; to: string[]; eventId: number; mark?: MarkNews };
 /**
  * An Şanslı send the server announced (server/api/lucky.mjs): `count` of the package to each of `to`; `best` the
  * highest multiplier drawn and `bigWin` its reward when the room is told about it (0 otherwise). The name and
  * emoji come along, so a phone that never opened the Şanslı shelf still draws it.
  */
-export type LuckySignal = { t: 'lucky'; giftId: string; name: string; emoji: string; count: number; to: string[]; eventId: number; best: number; bigWin: number };
+/** `icon`: the package's own picture from the panel (null: none; absent from an older server); `price`: its price now. */
+export type LuckySignal = { t: 'lucky'; giftId: string; name: string; emoji: string; count: number; to: string[]; eventId: number; best: number; bigWin: number; icon?: string | null; price?: number };
 export type RoomSignal = PeerSignal | GiftSignal | LuckySignal | FxSignal;
 
 /** `send` is false when the voice connection isn't up and nothing went out. */
@@ -139,7 +148,14 @@ export function reportPeers(roomId: string | null, peers: LivePeer[], meSpeaking
     snap.meJoinedAt === meJoinedAt &&
     snap.peers.length === peers.length &&
     snap.peers.every(
-      (p, i) => p.identity === peers[i].identity && p.seat === peers[i].seat && p.speaking === peers[i].speaking && p.micOn === peers[i].micOn && p.name === peers[i].name && p.joinedAt === peers[i].joinedAt,
+      (p, i) =>
+        p.identity === peers[i].identity &&
+        p.seat === peers[i].seat &&
+        p.speaking === peers[i].speaking &&
+        p.micOn === peers[i].micOn &&
+        p.name === peers[i].name &&
+        p.joinedAt === peers[i].joinedAt &&
+        p.via === peers[i].via,
     );
   if (same) return;
   // The locks belong to the room: a new list of people keeps them, another room starts without.
@@ -322,17 +338,18 @@ export function parseServerFx(raw: unknown): { from: string; msg: FxSignal } | n
   return { from: m.from, msg: { t: 'fx', animationId: m.animationId, eventId: m.eventId as number } };
 }
 
-/** The server's gift packet: `{ type: 'gift', giftId, count, from, to, eventId }` (server/api/gifts.mjs). */
+/** The server's gift packet: `{ type: 'gift', giftId, count, from, to, eventId, mark? }` (server/api/gifts.mjs). */
 export function parseServerGift(raw: unknown): { from: string; msg: GiftSignal } | null {
   if (!raw || typeof raw !== 'object') return null;
   const m = raw as Record<string, unknown>;
   if (m.type !== 'gift' || typeof m.giftId !== 'string' || typeof m.from !== 'string' || typeof m.to !== 'string' || !m.from || !m.to) return null;
   if (!Number.isInteger(m.count) || (m.count as number) <= 0 || (m.count as number) > 10_000) return null;
   if (!Number.isSafeInteger(m.eventId) || (m.eventId as number) <= 0) return null;
-  return { from: m.from, msg: { t: 'gift', giftId: m.giftId.slice(0, 32), count: m.count as number, to: [m.to], eventId: m.eventId as number } };
+  const mark = parseMarkNews(m.mark);
+  return { from: m.from, msg: { t: 'gift', giftId: m.giftId.slice(0, 32), count: m.count as number, to: [m.to], eventId: m.eventId as number, ...(mark && { mark }) } };
 }
 
-/** The server's Şanslı packet: `{ type: 'lucky', giftId, name, emoji, count, from, to: [ids], eventIds, best, bigWin }`. */
+/** The server's Şanslı packet: `{ type: 'lucky', giftId, name, emoji, count, from, to: [ids], eventIds, best, bigWin, icon?, price? }`. */
 export function parseServerLucky(raw: unknown): { from: string; msg: LuckySignal } | null {
   if (!raw || typeof raw !== 'object') return null;
   const m = raw as Record<string, unknown>;
@@ -345,7 +362,20 @@ export function parseServerLucky(raw: unknown): { from: string; msg: LuckySignal
   const n = (v: unknown) => (Number.isSafeInteger(v) && (v as number) >= 0 ? (v as number) : 0);
   return {
     from: m.from,
-    msg: { t: 'lucky', giftId: m.giftId.slice(0, 32), name: m.name.slice(0, 30), emoji: m.emoji.slice(0, 8), count: m.count as number, to: m.to as string[], eventId: ids[0] as number, best: n(m.best), bigWin: n(m.bigWin) },
+    msg: {
+      t: 'lucky',
+      giftId: m.giftId.slice(0, 32),
+      name: m.name.slice(0, 30),
+      emoji: m.emoji.slice(0, 8),
+      count: m.count as number,
+      to: m.to as string[],
+      eventId: ids[0] as number,
+      best: n(m.best),
+      bigWin: n(m.bigWin),
+      // Newer servers' (lucky-art.mjs): a malformed icon is none; a price only when it is one.
+      ...('icon' in m ? { icon: parseLuckyIcon(m.icon) } : {}),
+      ...(n(m.price) > 0 ? { price: n(m.price) } : {}),
+    },
   };
 }
 

@@ -116,7 +116,7 @@ Kod: `app/src/components/room/gift-sheet.tsx` (oda ekranından açılır; eski `
 4. **Bilgi hiyerarşisi.**
    - Başlık satırı: "Hediye gönder", sessiz hediye seviyesi, bakiye çipi (cüzdana gider), kapat.
    - **Kime:** "Herkes (n)" çipi + isimli avatar çipleri (çoklu seçim, seçilende onay işareti).
-   - **Raflar:** Popüler · Eğlenceli · İkili · Özel · ★ Favoriler · Çantam (adet). Altında rafı açıklayan tek nötr satır ve görünür **Fiyat** sıralama düğmesi (varsayılan → ucuzdan → pahalıdan).
+   - **Raflar:** Popüler · Eğlenceli · Çift · Özel · ★ Favoriler · Çantam (3B çanta simgesi, adet rozeti). Altında rafı açıklayan tek nötr satır ve görünür **Fiyat** sıralama düğmesi (varsayılan → ucuzdan → pahalıdan).
    - **Izgara:** 4 sütun; görsel, ad, fiyat. En fazla bir köşe rozeti (3D / ♪). Kilitli hediyede fiyat yerine "🔒 VIP n".
    - **Özet:** hediye, `fiyat × adet × kişi`, yakınlık (ikili hediyelerde), sağda **Toplam**.
    - **Bildirim satırı:** kalan bakiye / eksik tutar / onay uyarısı / kilit nedeni / çanta kaynağı.

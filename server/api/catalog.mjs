@@ -46,6 +46,9 @@ const GIFT_ROWS = [
   ['p8', 'Terlik At', '🩴', 1_299, 'gameplay'],
   ['p9', 'Konfeti Topu', '🎊', 1_999, 'gameplay'],
   ['p10', 'Aşk Oku', '💘', 2_399, 'gameplay'],
+  // Profil izleri (profile-mark-rules.mjs APP_MARKS): Kaka leaves a mark on the receiver's profile photo, Su cleans it.
+  ['k1', 'Kaka', '💩', 999, 'gameplay'],
+  ['k2', 'Su', '💧', 1_999, 'gameplay'],
   ['c1', 'Can Dostum', '💞', 5_000, 'couple'],
   ['c2', 'Dilek Kavanozu', '🫙', 8_999, 'couple'],
   ['c3', 'Masal Kalesi', '🏯', 99_999, 'couple'],

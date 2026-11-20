@@ -1,5 +1,6 @@
 // Many people moving money at once, in random order (docs/PARA_DENETIMI.md): top-ups, purchases, gifts, Çevir,
-// bonds, Şanslı çanta, paid messages waiting for the streamer's answer (answers, quick replies, time running out), the shop, Oyun Salonu (Canlı Yörünge's fuel and escapes too), Jeton Noktası sales and diamond
+// bonds (requests, answers, bond gifts again in and out of the room, ends, the nightly end, blocks), the room owner's
+// polls beside the room's gifts, Şanslı çanta, Şanslı hediye (a stale sheet's price and version too), paid messages waiting for the streamer's answer (answers, quick replies, time running out), the shop, Oyun Salonu (Canlı Yörünge's fuel and escapes too), Jeton Noktası sales and diamond
 // sales, store refunds, with some
 // requests sent twice at the same moment. Whatever the order, no request may fail with a server error, and the
 // harness's money checks after this file (money-check.mjs) must find every coin and diamond where the ledger says.
@@ -10,7 +11,7 @@ import { rnd, startApi } from './harness.mjs';
 
 // Locks of 0 days: gifted diamonds can leave at once, so Çevir and diamond sales run on them too.
 // Canlı Yörünge's rounds run fast: a 0,4 s window and a climb of e^(3t).
-const h = startApi({ BOND_SWEEP_MS: '200', BAG_SWEEP_MS: '200', HOLD_SWEEP_MS: '200', AUTO_CHAT_SWEEP_MS: '0', LOCK_DAYS_STORE: '0', LOCK_DAYS_JETON: '0', TEST_TOPUP_DAILY: '100000000', AGENCY_JOBS: '0', ROCKET_BET_MS: '400', ROCKET_IGNITE_MS: '0', ROCKET_PAUSE_MS: '100', ROCKET_RATE: '3' });
+const h = startApi({ BOND_SWEEP_MS: '200', BAG_SWEEP_MS: '200', ROOM_XP_SWEEP_MS: '200', HOLD_SWEEP_MS: '200', AUTO_CHAT_SWEEP_MS: '0', LOCK_DAYS_STORE: '0', LOCK_DAYS_JETON: '0', TEST_TOPUP_DAILY: '100000000', AGENCY_JOBS: '0', ROCKET_BET_MS: '400', ROCKET_IGNITE_MS: '0', ROCKET_PAUSE_MS: '100', ROCKET_RATE: '3' });
 const { call, signUp } = h;
 const q = async (sql, args) => (await h.sql.query(sql, args)).rows;
 const ok = async (p, what) => {
@@ -41,7 +42,8 @@ describe('Para: aynı anda rastgele işlemler', () => {
     for (const p of people) await ok(call('POST', '/api/wallet/test-topup', { amount: 10000, ref: rnd(6) }, p.session), 'yükleme');
     const room = (await ok(call('POST', '/api/rooms', { title: `Para ${rnd(2)}` }, people[0].session), 'oda')).room.id;
     // The shelf's gifts anyone may send (most are paused or for VIPs): Roket 1.999, and the like.
-    const gifts = (await ok(call('GET', '/api/catalog?gifts=2'), 'katalog')).gifts.filter((g) => !g.minSvip && g.price <= 3000);
+    // Kaka and Su too (marks=1): a profile mark written, ended or cleaned in the gift's transaction (profile-marks.mjs).
+    const gifts = (await ok(call('GET', '/api/catalog?gifts=2&marks=1'), 'katalog')).gifts.filter((g) => !g.minSvip && g.price <= 3000);
     assert.ok(gifts.length >= 1);
     const shop = [['fr-neon', 150], ['en-sparkle', 200], ['fr-silver', 800]];
     const other = (u) => {
@@ -50,7 +52,15 @@ describe('Para: aynı anda rastgele işlemler', () => {
         if (x !== u) return x;
       }
     };
+    // Şanslı hediye is for adults (lucky.mjs); Cömertlik Lv.2 comes with what they spend here.
+    await h.sql.query("UPDATE users SET birth_date = '1990-01-01' WHERE id = ANY($1::uuid[])", [people.map((x) => x.user.id)]);
+    /** What Şanslı sheets showed (GET /api/lucky): its version and the packages' prices; an older one is a sheet left open. */
+    const luckySeen = [];
     const bondIds = async () => (await q("SELECT id FROM bonds WHERE status = 'pending'")).map((r) => Number(r.id));
+    // Bond gifts again (bonds.mjs): an ordinary gift between two who have that bond, at the price the shelf shows.
+    const bondPrice = Object.fromEntries((await ok(call('GET', '/api/catalog?gifts=2&family=1'), 'katalog')).gifts.filter((g) => g.id.startsWith('bag-')).map((g) => [g.id, g.price]));
+    const activeBond = async () => (await q("SELECT id, a, b, kind FROM bonds WHERE status = 'active' ORDER BY random() LIMIT 1"))[0];
+    const personOf = (id) => people.find((p) => p.user.id === id);
     const bagIds = async () => (await q("SELECT id FROM lucky_bags WHERE status = 'open'")).map((r) => Number(r.id));
 
     /** One random request: [label, method, path, body, session], built when it runs. */
@@ -59,8 +69,12 @@ describe('Para: aynı anda rastgele işlemler', () => {
       [6, async (u) => ['satın alma', 'POST', '/api/wallet/purchase', { platform: 'test', productId: pick(['coins_1000', 'coins_5000']), transactionId: rnd(8) }, u.session]],
       [16, async (u) => {
         const g = pick(gifts);
-        return ['hediye', 'POST', '/api/gifts/send', { to: other(u).user.id, giftId: g.id, count: 1, price: g.price, place: pick(['profile', 'chat']), ref: rnd(6) }, u.session];
+        // Half in the room: its coins are the owner's room XP, added after the gift commits (room-xp-add.mjs).
+        const where = random() < 0.5 ? { room } : { place: pick(['profile', 'chat']) };
+        return ['hediye', 'POST', '/api/gifts/send', { to: other(u).user.id, giftId: g.id, count: 1, price: g.price, ...where, ref: rnd(6) }, u.session];
       }],
+      // Profil izleri: refusing marks (a Kaka to them is refused, their marks come off in a transaction of their own).
+      [2, async (u) => ['iz tercihi', 'PATCH', '/api/me/privacy', { profileMarks: random() < 0.5 }, u.session]],
       [6, async (u) => ['test hediyesi', 'POST', '/api/wallet/gift', { to: other(u).user.id, amount: 1 + Math.floor(random() * 500), ref: rnd(6) }, u.session]],
       [8, async (u) => ['çevir', 'POST', '/api/wallet/exchange', { diamonds: pick([100, 500, 1000]), ref: rnd(6) }, u.session]],
       [5, async (u) => ['bağ isteği', 'POST', '/api/bonds/request', { to: other(u).user.id, kind: pick(['kardes', 'kanka']), ref: rnd(6) }, u.session]],
@@ -71,6 +85,36 @@ describe('Para: aynı anda rastgele işlemler', () => {
       [3, async (u) => {
         const id = pick(await bondIds());
         return id ? ['bağ geri alma', 'POST', '/api/bonds/withdraw', { id }, u.session] : null;
+      }],
+      // Either side of an active bond sends its bond gift again (sometimes the wrong kind, refused), half of them in
+      // the room (the bond's row held FOR SHARE beside the room's); now and then one ends it, racing the gifts.
+      [5, async () => {
+        const x = await activeBond();
+        if (!x) return null;
+        const [from, to] = random() < 0.5 ? [x.a, x.b] : [x.b, x.a];
+        const giftId = random() < 0.9 ? `bag-${x.kind}` : x.kind === 'kanka' ? 'bag-kardes' : 'bag-kanka';
+        const where = random() < 0.5 ? { room } : {};
+        return ['bağ hediyesi', 'POST', '/api/gifts/send', { to, giftId, count: pick([1, 5, 10]), price: bondPrice[giftId], ...where, ref: rnd(6) }, personOf(from).session];
+      }],
+      // A bond nobody gifted for 40 days: the 200 ms sweep ends it (bond-life.mjs runBondDecay) while bond gifts and
+      // ends race it. Not a wallet table: the bond's own days.
+      [2, async () => {
+        await q("UPDATE bonds SET gift_day = gift_day - 40, decayed_on = NULL WHERE id = (SELECT id FROM bonds WHERE status = 'active' ORDER BY random() LIMIT 1)");
+        return null;
+      }],
+      // The room's owner opens or closes a poll while the room's gifts go on: rows that point at the room and at the
+      // owner, whose foreign-key checks must never wait for a gift (send-locks.mjs, boss-seat.mjs bossGift).
+      [3, async () => {
+        const [open] = await q('SELECT id FROM room_polls WHERE room_id = $1 AND closed_at IS NULL AND ends_at > now()', [room]);
+        return open
+          ? ['anket kapatma', 'POST', '/api/rooms/poll/close', { id: Number(open.id) }, people[0].session]
+          : ['anket', 'POST', '/api/rooms/poll', { room, question: pick(['Bu akşam ne dinleyelim?', 'Kim kazanır?']), options: ['Bir', 'İki'], seconds: 300, live: true }, people[0].session];
+      }],
+      // A block between two people (a bond between them ends, told to nobody: bonds.mjs endBondOnBlock), then lifted.
+      [2, async (u) => ['engel', 'POST', '/api/block', { to: other(u).user.id, block: random() < 0.6 }, u.session]],
+      [1, async () => {
+        const x = await activeBond();
+        return x ? ['bağ bitirme', 'POST', '/api/bonds/end', { id: Number(x.id) }, personOf(random() < 0.5 ? x.a : x.b).session] : null;
       }],
       [4, async (u) => ['çanta', 'POST', '/api/lucky-bags', { room, kind: 'coins', amount: 1000, packets: 5, followersOnly: false, delay: 0, ref: rnd(6) }, u.session]],
       [6, async (u) => {
@@ -91,6 +135,22 @@ describe('Para: aynı anda rastgele işlemler', () => {
         return ['mağaza', 'POST', '/api/shop/buy', { sku, price, ref: rnd(6) }, u.session];
       }],
       [6, async (u) => ['oyun', 'POST', '/api/casino/play', { game: 'jackpot', bet: 250, ref: rnd(8) }, u.session]],
+      // Şanslı hediye at what a sheet showed (price and settings' version), now and then a stale one while the admin
+      // re-prices a package: refused (409) with nothing moved, never a server error (Güncelleme 7 madde 10).
+      [5, async (u) => {
+        const [, cur] = await call('GET', '/api/lucky', null, u.session);
+        if (cur?.version) luckySeen.push({ version: cur.version, price: Object.fromEntries(cur.gifts.map((g) => [g.id, g.price])) });
+        const view = random() < 0.3 ? pick(luckySeen) : luckySeen[luckySeen.length - 1];
+        const giftId = pick(['lk1', 'lk2']);
+        return view ? ['şanslı', 'POST', '/api/lucky/send', { giftId, to: [other(u).user.id], count: pick([1, 10]), room, price: view.price[giftId], version: view.version, ref: rnd(8) }, u.session] : null;
+      }],
+      [1, async () => {
+        const [, cur] = await call('GET', '/api/admin/lucky', null, admin.session);
+        const config = structuredClone(cur.config);
+        const g = config.gifts.find((x) => x.id === 'lk2');
+        g.price = g.price === 100 ? 120 : 100;
+        return ['şanslı ayarı', 'POST', '/api/admin/lucky/config', { config, version: cur.version }, admin.session];
+      }],
       // Canlı Yörünge: fuel into the open round, an escape from the one in the air (the screen's read finds the round).
       [4, async (u) => {
         const round = (await call('GET', '/api/casino/rocket', null, u.session))[1]?.round?.id;
@@ -160,6 +220,16 @@ describe('Para: aynı anda rastgele işlemler', () => {
     assert.deepEqual([Number(open.bags), Number(open.bonds)], [0, 0], 'bekleyen çanta ve bağ kalmadı');
     // Enough of each kind actually went through for the run to mean something.
     for (const label of ['hediye', 'çevir', 'mağaza', 'oyun', 'satın alma', 'mesaj']) assert.ok((seen.get(`${label} 200`) ?? 0) > 0, `${label} hiç geçmedi (${summary})`);
-    console.log(`para karıştırma: tohum ${startSeed}; ${summary}`);
+    // Room XP: every coin of every gift and Şanslı share sent in the room reached its owner, once (room-xp-add.mjs).
+    // A Şanslı çanta's gifts (ref bag:…) were never room XP.
+    const [xp] = await q(
+      `SELECT (SELECT room_xp FROM users WHERE id = $1) AS xp,
+              (SELECT coalesce(sum(total), 0) FROM gift_events WHERE room IN ($2, 'oda-' || $2) AND ref NOT LIKE 'bag:%') AS sent,
+              (SELECT count(*) FROM room_xp_pending) AS waiting`,
+      [people[0].user.id, room],
+    );
+    assert.deepEqual([Number(xp.xp), Number(xp.waiting)], [Number(xp.sent), 0], 'oda XP\'si eksiksiz ve bir kez');
+    const [idle] = await q("SELECT count(*) AS n FROM bonds WHERE end_reason = 'idle'");
+    console.log(`para karıştırma: tohum ${startSeed}; ${summary}; kendiliğinden biten bağ: ${idle.n}; oda XP: ${xp.xp}`);
   });
 });

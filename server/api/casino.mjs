@@ -57,7 +57,8 @@ const RATE = 90;
 const RETENTION_DAYS = 180;
 export const DAY_START = `(date_trunc('day', now() AT TIME ZONE 'Europe/Istanbul') AT TIME ZONE 'Europe/Istanbul')`;
 const fmt = (n) => n.toLocaleString('tr-TR');
-export const POOL_LOW = 'Ödül havuzu şu an bu bahsin en yüksek ödülünü karşılayamıyor. Daha küçük bir bahisle dene; jetonun düşülmedi.';
+/** The prize pool can't cover this bet's top prize. Players are told no house details (the owners, Güncelleme 7). */
+export const POOL_LOW = 'Bu bahis şu an alınamıyor. Daha küçük bir bahisle dene; jetonun düşülmedi.';
 
 /** A game's daily ceiling per person, in coins played; 0 is none. */
 export const dailyOf = (g, s = live()) => s.casinoDailyRounds * topStake(g);

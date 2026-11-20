@@ -20,14 +20,14 @@ import { ThemeScope, makeStyles, useTheme } from '@/theme';
 
 const CP_GIFTS = CP_GIFT_IDS.map((id) => GIFTS.find((g) => g.id === id)).filter((g): g is Gift => !!g);
 
-// A live build shows the family's real bonds and sends İkili gifts to members (components/family-center-live).
+// A live build shows the family's real bonds and sends Çift gifts to members (components/family-center-live).
 export default function IliskiMeydani() {
   return liveMode() ? <LiveFamilyPairs /> : <DemoIliski />;
 }
 
 function DemoIliski() {
   const { familyId, spendCoins } = useApp();
-  // Only the İkili gifts the server still offers (Canlı ayarlar can hide a gift); all of them if it hid every one,
+  // Only the Çift gifts the server still offers (Canlı ayarlar can hide a gift); all of them if it hid every one,
   // so the sheet never opens empty (these sends are local, the server never refuses them).
   const cpGifts = visibleGifts(CP_GIFTS, useLiveCatalog());
   const { colors, semantic } = useTheme();
@@ -43,7 +43,7 @@ function DemoIliski() {
   const sendGift = (g: Gift) => {
     if (!giftTo) return;
     const u = userById(giftTo);
-    const paid = payKabileGift(g.price, `İkili hediyesi: ${g.name} → ${u.name}`, spendCoins);
+    const paid = payKabileGift(g.price, `Çift hediyesi: ${g.name} → ${u.name}`, spendCoins);
     if (paid === 'off') return;
     if (paid === 'coins') {
       showAlert('Yetersiz jeton', 'Hediye göndermek için jeton yükle.', [
@@ -67,7 +67,7 @@ function DemoIliski() {
             onPress={() =>
               showAlert(
                 'Uyum Köşesi',
-                'İkili ve dost sıralaması, bu hafta birbirine gönderilen İkili hediyelerinden gelen yakınlık puanına göre yapılır. Dostlar aynı ailedeyse aile avantajlarından da yararlanır.',
+                'İkili ve dost sıralaması, bu hafta birbirine gönderilen Çift hediyelerinden gelen yakınlık puanına göre yapılır. Dostlar aynı ailedeyse aile avantajlarından da yararlanır.',
               )
             }>
             <Text style={{ color: colors.text, fontSize: 18, fontWeight: '800' }}>?</Text>
@@ -114,9 +114,9 @@ function DemoIliski() {
 
         {family ? (
           <Card style={{ gap: 8 }}>
-            <Text style={styles.sectionTitle}>Aile üyelerine İkili hediyesi gönder</Text>
-            <Text style={styles.dim}>İkili hediyeleri yakınlık puanı kazandırır. Görevler&apos;de her 350 🪙 için +2 katkı puanı (sınırsız).</Text>
-            <GradientButton title="İkili hediyesi gönder" icon="heart" onPress={() => setPickTo(true)} />
+            <Text style={styles.sectionTitle}>Aile üyelerine Çift hediyesi gönder</Text>
+            <Text style={styles.dim}>Çift hediyeleri yakınlık puanı kazandırır. Görevler&apos;de her 350 🪙 için +2 katkı puanı (sınırsız).</Text>
+            <GradientButton title="Çift hediyesi gönder" icon="heart" onPress={() => setPickTo(true)} />
             <Pressable onPress={() => router.push(KABILE_ROUTES.merkez)} style={{ alignItems: 'center', padding: 4 }}>
               <Text style={{ color: semantic.tonalText, fontWeight: '700' }}>Görevler&apos;e git ›</Text>
             </Pressable>
@@ -134,7 +134,7 @@ function DemoIliski() {
       />
       <ActionSheet
         visible={!!giftTo}
-        title={giftTo ? `${userById(giftTo).name} · İkili hediyesi` : ''}
+        title={giftTo ? `${userById(giftTo).name} · Çift hediyesi` : ''}
         onClose={() => setGiftTo(null)}
         options={cpGifts.map((g) => ({ label: `${g.emoji} ${g.name} · ${g.price.toLocaleString('tr-TR')} 🪙`, onPress: () => sendGift(g) }))}
       />

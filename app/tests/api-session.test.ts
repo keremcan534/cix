@@ -191,3 +191,22 @@ describe('Şifreli oda', () => {
     assert.deepEqual(seen[1].body, { title: 'Gece', announcement: 'Merhaba', roomType: 'free', password: 'gizli12' });
   });
 });
+
+describe('Takip ederek gelen', () => {
+  test('ziyaretin ilk ses anahtarı takip edileni söyler; yeniden bağlanma söylemez, şifre de gider', async () => {
+    store.set('similarclub:api-session', 'S9');
+    route = (s) => (s.path.startsWith('/token') ? { body: { token: 'tok', via: null } } : { body: {} });
+    const api = await startApp();
+    const { wantVia } = await import('@/lib/follow-room');
+    const pw = await roomPasswords();
+    const id = '11111111-2222-3333-4444-555555555556';
+    const via = 'aaaaaaaa-0000-4000-8000-0000000000a1';
+    pw.setRoomPassword(id, 'dogru1');
+    wantVia(id, via);
+    assert.equal(await api.voiceToken(`oda-${id}`), 'tok');
+    assert.equal(seen.at(-1)!.path, `/token?room=oda-${id}&password=dogru1&via=${via}`);
+    await api.voiceToken(`oda-${id}`);
+    assert.equal(seen.at(-1)!.path, `/token?room=oda-${id}&password=dogru1`, 'yeniden bağlanma yeni giriş değil');
+    pw.forgetRoomPasswords();
+  });
+});

@@ -17,6 +17,18 @@ Yapılış sırası: 1) Çantam, Çarşı ve ortak ödül yolu, 2) seviye ve VIP
 
 - **Çarşı** (önceki adı Mağaza): sekmeler Çerçeveler, Giriş efektleri, Sohbet balonları, Ses dalgaları… Binek sekmesi
   kalktı; binekler Giriş efektleri sekmesinde, "Binek" yazısıyla.
+- **Çerçeve önizlemesi** (Güncelleme 7, `app/src/components/frame-preview.tsx`): Çerçeveler sekmesinde kartın
+  "Önizle" düğmesi ya da çerçevenin resmi bir sayfa açar; çerçeve kişinin kendi fotoğrafıyla üç şekilde görünür:
+  - **büyük**: hareketli çerçeve oynar ("Hareketi azalt" ve "Düşük veri modu" açıkken durur, odadaki gibi);
+  - **odada mikrofonda**: odanın kendi ölçüleriyle (bu telefonda on mikrofonlu dolu bir odanın koltuğu, koltuğun
+    hücresi; `lib/frame-preview`, `lib/seat-cell`), adı koyu kapsülde, yanında boş koltuklar. Geniş bir çerçeve
+    koltukta küçülür; burada da öyle görünür, yani başkalarının mikrofonda göreceği budur;
+  - **profilde**: profil başlığındaki boyda.
+
+  Uygulamanın çerçeveleri, panelden eklenenler (`frameArtOf`), çizimle yapılanlar ve renk halkaları odadaki aynı yoldan
+  (`FramedAvatar`) çizilir; VIP rozeti de görünür. Altındaki düğme Çarşı'nınki: fiyat (onay sorulur, gösterilen fiyat
+  gider), Kullan / Çıkar ya da VIP kilidi. Önizleme hiçbir şey satın almaz, takmaz, sunucuya bir şey göndermez. Eski
+  APK'lar kartın küçük resmini gösterir.
 - **Çantam** (Profil › Çantam): sekmeler **Hediyeler**, **Çerçeveler**, **Giriş efektleri** (binekler dahil),
   **Sohbet balonları**, **Ses dalgaları**. Her eşyada:
   - ne kadar kaldığı: "Kalıcı", "12 gün kaldı", "Bugün bitiyor";
@@ -24,8 +36,8 @@ Yapılış sırası: 1) Çantam, Çarşı ve ortak ödül yolu, 2) seviye ve VIP
     "Görev ödülü";
   - **Kullan** / **Çıkar**: Çarşı'dakiyle aynı yere takılır.
 
-  Hediyeler sekmesi görev ve ödüllerden gelen ücretsiz hediyelerdir; bir odada hediye panelinin Çantam rafından
-  gönderilir. Boş sekmede "Çarşı'ya git" düğmesi çıkar.
+  Hediyeler sekmesi görev ve ödüllerden gelen ücretsiz hediyelerdir; bir odada hediye panelindeki çanta simgesinden
+  (3B çanta, üstünde kaç çeşit hediye olduğu yazar) gönderilir. Eski APK'larda bu raf hâlâ "Çantam" yazısıyla görünür. Boş sekmede "Çarşı'ya git" düğmesi çıkar.
 - Çantam sunucudan okunur: girişte ve Çantam her açıldığında. Önceden uygulama sahip olunan eşyaları yalnız kendi
   telefonunda tutuyordu; başka telefonda alınan ya da yetkilinin verdiği eşya görünmüyordu. Artık sunucudaki her eşya
   telefonun listesine de eklenir; Çarşı ve odalar onları tanır.

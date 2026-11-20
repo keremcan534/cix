@@ -3,10 +3,11 @@
 // to a tinted disc with a person glyph, a cover to one of the app's own sea scenes, picked steadily from `seed`
 // so the same room keeps the same picture.
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Animated, Image, Platform, StyleSheet, View, type ImageProps, type ImageStyle, type StyleProp } from 'react-native';
 
 import { SCENES } from '@/components/fx/scenes';
+import { failedTry, freshTry, retryAfter, showsImage, type ImageTry } from '@/lib/image-retry';
 import { useSettings } from '@/store';
 import { useTheme } from '@/theme';
 
@@ -29,6 +30,25 @@ export function FadeImage({ style, onLoadEnd, ...rest }: Omit<ImageProps, 'style
   );
 }
 
+/**
+ * A network picture that failed is tried again (lib/image-retry: after 3 s, then 20 s) before its fallback stays; a
+ * new address starts over. `show`: draw the picture now (else the fallback); `key` mounts it again for a retry.
+ */
+export function useImageRetry(uri: string | undefined) {
+  const [t, setT] = useState<ImageTry>(() => freshTry(uri));
+  const cur = t.uri === uri ? t : freshTry(uri);
+  useEffect(() => {
+    if (!cur.waiting) return;
+    const ms = retryAfter(cur.fails);
+    if (ms === null) return;
+    const fails = cur.fails;
+    const timer = setTimeout(() => setT((p) => (p.uri === uri && p.fails === fails ? { ...p, waiting: false } : p)), ms);
+    return () => clearTimeout(timer);
+  }, [uri, cur.waiting, cur.fails]);
+  // The key changes only for a retry: a new address keeps the picture mounted, as before.
+  return { show: showsImage(t, uri), key: `try-${cur.fails}`, onError: () => setT((p) => failedTry(p, uri)) };
+}
+
 const COVERS = Object.values(SCENES).map((s) => s.photo);
 const FILL = { width: '100%', height: '100%' } as const;
 
@@ -42,16 +62,17 @@ type Props = Omit<ImageProps, 'source' | 'style'> & { uri?: string; kind: 'face'
 
 export function Photo({ uri, kind, seed, style, onError, ...rest }: Props) {
   const { colors, semantic } = useTheme();
-  // The address that failed to load: that one shows the fallback, a new address is tried again.
-  const [failed, setFailed] = useState<string>();
-  if (uri && uri !== failed) {
+  // An address that failed to load shows the fallback while it waits for its next try, and for good after the last.
+  const img = useImageRetry(uri);
+  if (uri && img.show) {
     return (
       <FadeImage
+        key={img.key}
         source={{ uri }}
         style={style}
         {...rest}
         onError={(e) => {
-          setFailed(uri);
+          img.onError();
           onError?.(e);
         }}
       />

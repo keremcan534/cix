@@ -164,6 +164,7 @@ Mesajlar'daki **Similar Ekibi** büyütüldü. Şartnamenin "aynı işlev varsa 
 | 🎁 Bonus | Alan | Hoş geldin jetonu, davet ödülü, ilk alım ve kampanya hediyesi, görev ödülü, aile sandığı |
 | ⚠️ Performans uyarısı | Yayıncı | Yukarıdaki kurala göre |
 | 🔔 Hak bitti | Yayıncı | Otomatik mesaj ya da hazır cevap hakkı bitince, günde bir kez |
+| 🔗 Bağlar | Bağın tarafları | İstek (alana), kabul (ikisine), ret, süre dolması ve satın alma iadesiyle iptal (isteyene, iade edilen jetonla), geri çekme (alana), bitirme (diğer tarafa), seviye yükselme ya da düşme (ikisine), hediyesiz bağın bitiş uyarısı ve kendiliğinden bitişi (ikisine). Gece düşen puan için ayrı bildirim yok. Dokununca kendi Bağlar sekmesi açılır. Push yalnız istek, kabul, ret ve bitirmede, eskisi gibi ([`BAGLAR.md`](BAGLAR.md)) |
 
 Kurallar:
 
