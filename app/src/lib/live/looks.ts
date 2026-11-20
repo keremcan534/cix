@@ -36,8 +36,14 @@ export type Look = {
   avatarUrl?: string | null;
   /** Profil izleri on their photo (lib/profile-marks parseMarks reads it); an older server sends none. */
   marks?: unknown;
-  /** They refuse profile marks (Gizlilik): the gift sheet doesn't send them a gift that leaves one. */
+  /**
+   * A gift that leaves a profile mark would be refused from me (Gizlilik: nobody, or only the people they follow and
+   * not me): the gift sheet doesn't send it to them. GET /api/looks answers it for me; a room's look packet (heard by
+   * everyone there) only for nobody.
+   */
   noMarks?: boolean;
+  /** Who may leave a mark on them (Kimler profilime iz bırakabilir); an older server sends none. */
+  marksFrom?: 'everyone' | 'following' | 'nobody';
 };
 const TTL = 120_000;
 /** How long after a failed read it is tried again (first, second retry); after that the 30-second ask for missing faces. */
@@ -73,9 +79,24 @@ const keep = (id: string, look: Look, at = Date.now()) => {
 /** The look of a server account, if read (undefined: not yet). */
 export const lookOf = (serverId: string | null | undefined): Look | undefined => (serverId ? store.get(serverId)?.look : undefined);
 
-/** A look the server sent into the room as it changed (lib/live/room-bus onServerLook). */
+/**
+ * A look the server sent into the room as it changed (lib/live/room-bus onServerLook). It is everyone's, so its noMarks
+ * says nobody only: while they still let only the people they follow, the refusal my own read found for me stays.
+ */
 export function putLook(serverId: string, look: Look) {
-  keep(serverId, look);
+  const had = store.get(serverId)?.look;
+  keep(serverId, had?.noMarks && !look.noMarks && look.marksFrom === 'following' && had.marksFrom === 'following' ? { ...look, noMarks: true } : look);
+  emit();
+}
+
+/**
+ * A send that the server refused because of their Gizlilik (403 marks_off / marks_following): the sheet greys the mark
+ * gifts for them at once, until their look is read again.
+ */
+export function noteMarksRefused(serverId: string, code: 'marks_off' | 'marks_following') {
+  const had = store.get(serverId);
+  if (!had) return;
+  store.set(serverId, { ...had, look: { ...had.look, noMarks: true, marksFrom: code === 'marks_off' ? 'nobody' : 'following' } });
   emit();
 }
 

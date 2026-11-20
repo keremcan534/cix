@@ -374,13 +374,14 @@ export const GIFTS: Gift[] = [
   { id: 'p5', name: 'Su Kovası', emoji: '🪣', price: 500, cat: 'gameplay' },
   { id: 'p6', name: 'Pasta At', emoji: '🥧', price: 777, cat: 'gameplay' },
   { id: 'p7', name: 'Yumurta At', emoji: '🥚', price: 1_299, cat: 'gameplay' },
-  { id: 'p8', name: 'Terlik At', emoji: '🩴', price: 1_299, cat: 'gameplay' },
+  { id: 'p8', name: 'Terlik Geldi!', emoji: '🩴', price: 1_299, cat: 'gameplay' },
   { id: 'p9', name: 'Konfeti Topu', emoji: '🎊', price: 1_999, cat: 'gameplay', badge: '3D' },
   { id: 'p10', name: 'Aşk Oku', emoji: '💘', price: 2_399, cat: 'gameplay', badge: '3D' },
-  // Profil izleri (server/api/profile-mark-rules.mjs, lib/profile-marks): Kaka leaves a mark on the receiver's profile
-  // photo for a while, Su (dearer) cleans it. Only a phone that asks for them (catalog marks=1) is offered them.
-  { id: 'k1', name: 'Kaka', emoji: '💩', price: 999, cat: 'gameplay' },
-  { id: 'k2', name: 'Su', emoji: '💧', price: 1_999, cat: 'gameplay' },
+  // Profil izleri (server/api/profile-mark-rules.mjs, lib/profile-marks): Kaka Şakası leaves Kaka İzi on the receiver's
+  // profile photo for a while, Temizlik Suyu (dearer) cleans it. Only a phone that asks for them (catalog marks=1) is
+  // offered them. Terlik Geldi! (p8) leaves Kırık Cam once staff give it the rule in the panel.
+  { id: 'k1', name: 'Kaka Şakası', emoji: '💩', price: 999, cat: 'gameplay' },
+  { id: 'k2', name: 'Temizlik Suyu', emoji: '💧', price: 1_999, cat: 'gameplay' },
   // --- Çift ❤ (intimacy +2%) ---
   couple('c1', 'Can Dostum', '💞', 5_000),
   couple('c2', 'Dilek Kavanozu', '🫙', 8_999),

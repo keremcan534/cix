@@ -38,7 +38,7 @@ import { Icon3D } from '@/components/Icon3D';
 import { GiftArt, MUSIC_BADGE } from '@/components/GiftArt';
 import { RollingNumber } from '@/components/fx/rolling-number';
 import { useRoomSheetSpace, useSheetMax } from '@/lib/sheet-space';
-import { marksShelfNote, refusesMarks } from '@/lib/live/marks-live';
+import { marksRefusalOf, marksShelfNote, refusesMarks } from '@/lib/live/marks-live';
 import { refusalLine, refusingMarks } from '@/lib/profile-marks';
 
 type Shelf = GiftCat | 'lucky' | 'fav' | 'bag' | 'global';
@@ -50,7 +50,8 @@ const SHELVES: { key: Shelf; label: string; icon?: keyof typeof Ionicons.glyphMa
   { key: 'lucky', label: 'Şanslı', icon: 'leaf' },
   { key: 'couple', label: 'Çift' },
   { key: 'family', label: 'Aile ve Dost' },
-  { key: 'gameplay', label: 'Kutlama' },
+  // Muzip (the owners' name, 20 Nov 2026; Kutlama before): the id stays, an older app keeps its own name.
+  { key: 'gameplay', label: 'Muzip' },
   { key: 'privilege', label: 'Özel' },
   { key: 'fav', label: 'Favoriler', icon: 'star' },
   // Drawn as the 3D bag with its count (the label is for screen readers).
@@ -63,7 +64,7 @@ const SHELF_NOTE: Record<Shelf, string> = {
   hot: 'En çok gönderilen hediyeler.',
   // How it is played and where its odds are, nothing about what can be won (the owners, Güncelleme 7).
   lucky: `Her gönderimde bir çekiliş yapılır; olasılıklar aşağıda. Ödül garanti değildir. Alıcıya ve PK puanına hediye değerinin ${pct(LUCKY_RECIPIENT_SHARE)}’si yazılır.`,
-  // While a gift here leaves a profile mark (Kaka), the note says so instead (lib/live/marks-live marksShelfNote).
+  // While gifts here leave a profile mark (Kaka Şakası, Terlik Geldi!), the note says so instead (lib/live/marks-live marksShelfNote).
   gameplay: 'Atılan hediye alıcının koltuğuna düşer. Fiyat sabit, sürpriz ödül yok.',
   couple: 'Sevdiğine özel hediyeler.',
   family: 'Koruma Kartı koruyucu yapar. Bağ hediyesi istek olur, kabul edilmezse jeton döner; bağın varsa puan getirir.',
@@ -216,7 +217,7 @@ export function GiftSheet({
   const lg = lucky.config.gifts.find((x) => x.id === luckyId) ?? lucky.config.gifts[0];
   const isLucky = shelf === 'lucky' && !!lg;
   const list = shelfGifts(shown, shelf, sort, favs, bag, inBag, catalog);
-  const kutlamaNote = shelf === 'gameplay' ? marksShelfNote() : null;
+  const muzipNote = shelf === 'gameplay' ? marksShelfNote() : null;
   // A pick from Çantam may be a gift off the shelf for now (Kalp from the call task).
   const gift = (sel.bag ? inBag : shown).find((g) => g.id === sel.id) ?? shown[0];
   // An empty shelf (bag, favorites, no Lucky packages) keeps the last pick in state; never send it from here.
@@ -230,7 +231,8 @@ export function GiftSheet({
   const bondAgain = bondMode?.mode === 'again';
   const bondGift = !isLucky && !fromBag && isBondGift(gift.id) && !bondAgain;
   const sendCount = bondGift ? 1 : count;
-  // Profil izleri: a gift that leaves a mark doesn't go to someone who refuses marks (Gizlilik); the others still get it.
+  // Profil izleri: a gift that leaves a mark doesn't go to someone who takes none from me (Gizlilik: nobody, or only
+  // the people they follow); the others still get it, each paid apart.
   const refusing = isLucky ? [] : refusingMarks(giftMarkOf(gift.id), targets, refusesMarks);
   const sendTo = refusing.length ? targets.filter((id) => !refusing.includes(id)) : targets;
   const total = isLucky ? lg.price * count * targets.length : (fromBag ? 0 : gift.price) * sendCount * sendTo.length;
@@ -330,7 +332,7 @@ export function GiftSheet({
     : bondMode?.mode === 'other' && bondMode.bond
       ? { tone: 'lock' as const, text: `Aranızda ${BOND_KINDS[bondMode.bond.kind].label} bağı var; bir kişiyle tek bağ kurulur.`, cta: 'Gönderilemez', disabled: true }
     : refusing.length === targets.length
-      ? { tone: 'lock' as const, text: refusalLine(gift, refusing, (id) => userById(id).name, targets.length), cta: 'Gönderilemez', disabled: true }
+      ? { tone: 'lock' as const, text: refusalLine(gift, refusing, (id) => userById(id).name, targets.length, marksRefusalOf), cta: 'Gönderilemez', disabled: true }
     : locked
       ? { tone: 'lock' as const, text: `VIP ${gift.minSvip} ve üzerine özel (sen VIP ${svipLevel}).`, cta: 'VIP ayrıcalıklarını gör', variant: 'tonal' as const, onPress: goVip }
       : bagShort
@@ -344,7 +346,7 @@ export function GiftSheet({
             : bondAgain
               ? { tone: 'bond' as const, text: `+${fmt(bondPointsOf(total))} bağ puanı · Kalan: ${fmt(coins - total)} jeton`, cta: `Gönder · ${fmt(total)}`, variant: 'money' as const }
             : refusing.length
-              ? { tone: 'warn' as const, text: refusalLine(gift, refusing, (id) => userById(id).name, targets.length), cta: `Gönder · ${fmt(total)}`, variant: 'money' as const }
+              ? { tone: 'warn' as const, text: refusalLine(gift, refusing, (id) => userById(id).name, targets.length, marksRefusalOf), cta: `Gönder · ${fmt(total)}`, variant: 'money' as const }
             : { tone: 'info' as const, text: `Kalan: ${fmt(coins - total)} jeton`, cta: `Gönder · ${fmt(total)}`, variant: 'money' as const };
 
   const sortBtn =
@@ -465,7 +467,7 @@ export function GiftSheet({
         {!compact && shelf !== 'lucky' && (
         <View style={g.noteRow}>
           <Text style={[g.dim, { flex: 1 }]} numberOfLines={2}>
-            {shelf === 'family' || shelf === 'global' || (shelf === 'gameplay' && kutlamaNote) ? '' : shelf === 'privilege' ? `${SHELF_NOTE.privilege} Senin seviyen: VIP ${svipLevel}.` : shelf === 'bag' && live ? LIVE_BAG_NOTE : SHELF_NOTE[shelf]}
+            {shelf === 'family' || shelf === 'global' || (shelf === 'gameplay' && muzipNote) ? '' : shelf === 'privilege' ? `${SHELF_NOTE.privilege} Senin seviyen: VIP ${svipLevel}.` : shelf === 'bag' && live ? LIVE_BAG_NOTE : SHELF_NOTE[shelf]}
           </Text>
           {sortBtn}
         </View>
@@ -476,8 +478,8 @@ export function GiftSheet({
         <ScrollView key={shelf} ref={gridRef} style={compact ? g.gridFill : g.gridScroll} contentContainerStyle={g.grid}>
           {/* Şanslı's disclaimer, the bond gifts' refund rule and Global's announcement: always in full, atop their shelf. */}
           {(shelf === 'lucky' || shelf === 'family' || shelf === 'global') && <Text style={[g.dim, g.shelfNote]}>{SHELF_NOTE[shelf]}</Text>}
-          {/* Kutlama with a gift that leaves a profile mark: what it does, what cleans it, that anyone may refuse it. */}
-          {shelf === 'gameplay' && kutlamaNote && <Text style={[g.dim, g.shelfNote]}>{kutlamaNote}</Text>}
+          {/* Muzip with gifts that leave a profile mark: what they do, what cleans them, that anyone chooses who marks them. */}
+          {shelf === 'gameplay' && muzipNote && <Text style={[g.dim, g.shelfNote]}>{muzipNote}</Text>}
           {isLucky ? (
             <LuckyShelf
               gifts={lucky.config.gifts}

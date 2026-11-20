@@ -22,7 +22,7 @@ import { giftById, liveRules, noteLiveRate, rateChangedMessage, refreshLiveCatal
 import { forgetRoomPasswords } from '@/lib/live/room-password';
 import { forgetRoomFollows, putRoomFollow } from '@/lib/room-follow';
 import { replyOrder, unsureRefs } from '@/lib/live/requests';
-import { setLooksSelf } from '@/lib/live/looks';
+import { noteMarksRefused, setLooksSelf } from '@/lib/live/looks';
 import { applyMarkNews } from '@/lib/mark-store';
 import { parseMarkNews } from '@/lib/profile-marks';
 
@@ -194,9 +194,13 @@ export async function liveGift(to: string, giftId: string, count: number, room?:
     return r;
   } catch (e) {
     if (e instanceof api.ApiError && e.status === 409 && (e.data.code === 'price_changed' || e.data.code === 'update_required')) void refreshLiveCatalog();
+    // Profil izleri: they don't take a mark from me (Gizlilik); nothing moved, and the sheet greys it for them now.
+    if (e instanceof api.ApiError && e.status === 403 && (e.data.code === 'marks_off' || e.data.code === 'marks_following')) noteMarksRefused(id, e.data.code);
     throw e;
   }
 }
+/** A send refused because the receiver takes no mark from me (their Gizlilik): nothing moved, the others may still get theirs. */
+export const isMarkRefusal = (e: unknown) => e instanceof api.ApiError && e.status === 403 && (e.data.code === 'marks_off' || e.data.code === 'marks_following');
 
 /** A paid Hareketli in a server room, at the server's price; the server tells the room (server/api/room-fx.mjs). */
 export async function liveRoomAnimation(room: string, animationId: string) {

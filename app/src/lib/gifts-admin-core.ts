@@ -48,7 +48,7 @@ export type VideoSpec = { url: string; kind: 'stacked' | 'source'; fill?: number
 export type GiftFields = { name: string; price: number; cat: GiftCat; minSvip: number; emoji: string; enabled: boolean; icon: string; video: VideoSpec | null };
 
 
-export const CAT_LABEL: Record<GiftCat, string> = { hot: 'Popüler', couple: 'Çift', family: 'Aile ve Dost', gameplay: 'Kutlama', privilege: 'Özel' };
+export const CAT_LABEL: Record<GiftCat, string> = { hot: 'Popüler', couple: 'Çift', family: 'Aile ve Dost', gameplay: 'Muzip', privilege: 'Özel' };
 export const CATS: GiftCat[] = ['hot', 'couple', 'family', 'gameplay', 'privilege'];
 export const FILL_LABEL: Record<string, string> = { '0.45': 'Küçük', '0.6': 'Orta', '0.8': 'Büyük', '1': 'Tam ekran' };
 

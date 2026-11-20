@@ -81,6 +81,8 @@ export type Settings = {
   pushCloseOnly: boolean;
   /** Profil izleri: others may leave a mark on my photo (Gizlilik's "Profilime iz bırakılmasın" is its opposite). */
   profileMarks: boolean;
+  /** Profil izleri: who may leave one ("Kimler profilime iz bırakabilir"; nobody = profileMarks off). */
+  marksFrom: 'everyone' | 'following' | 'nobody';
   /** Gizlilik › "Adım genel duyurularda görünmesin" (Global hediye; kept on the server in a live build). */
   globalHideName: boolean;
   profilePublic: boolean;
@@ -528,6 +530,8 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       messagePush: true,
       pushCloseOnly: true,
       profileMarks: true,
+      // The owners' default (20 Nov 2026): only the people I follow.
+      marksFrom: 'following',
       globalHideName: false,
       profilePublic: true,
       notifySocial: true,

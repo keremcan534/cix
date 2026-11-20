@@ -6,6 +6,7 @@
 // Nothing here removes a background: the editor says so before anything is picked.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as DocumentPicker from 'expo-document-picker';
+import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Modal, Pressable, View } from 'react-native';
 
@@ -154,6 +155,8 @@ export function GiftsAdminSection() {
           <>
             {!d.storage && <Notice tone="danger" icon="cloud-offline-outline" text="Sunucuda dosya deposu açık değil: ikon ve video yüklenemez, yeni hediye eklenemez." />}
             <Button title="Yeni hediye" icon="add" disabled={!d.storage} onPress={() => setDraft(draftOf(null))} />
+            {/* Muzip hediyeler: each mark kind on a photo at the app's real sizes, with this phone's drawing (app/iz-onizleme). */}
+            <Button title="İz türlerini önizle" icon="sparkles-outline" variant="tonal" onPress={() => router.push('/iz-onizleme')} />
             <Filters value={shelf} options={[['all', 'Tümü'], ...CATS.map((c) => [c, CAT_LABEL[c]] as [GiftCat, string])]} onChange={setShelf} />
             {!d.gifts.length && <Text style={s.hint}>Henüz eklenmiş hediye yok. “Yeni hediye” ile ilkini ekle.</Text>}
             {d.gifts

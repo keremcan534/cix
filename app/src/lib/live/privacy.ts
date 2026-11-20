@@ -19,8 +19,11 @@ onAccountChange(() => sync.reset());
 /** Reads my choices from the server into the store (`put`: the store's setSetting). */
 export async function loadPrivacy(put: Put) {
   if (!liveMode()) return;
-  const shown = sync.loaded(await api.myPrivacy());
+  const p = await api.myPrivacy();
+  const shown = sync.loaded(p);
   for (const k of PRIVACY_KEYS) if (shown[k] !== undefined) put(k, shown[k] as Settings[typeof k]);
+  // A server before "Kimler profilime iz bırakabilir": its switch alone (on: everyone could).
+  if (p.marksFrom === undefined && shown.profileMarks !== undefined) put('marksFrom', shown.profileMarks ? 'everyone' : 'nobody');
 }
 
 /** The setter Ayarlar uses for these choices: live, shown at once and saved on the server; the demo, the store only. */
@@ -31,9 +34,18 @@ export function usePrivacySetter() {
     setSetting(k, v);
     if (!liveMode()) return;
     const id = sync.begin(k);
+    // Profil izleri: the switch and "Kimler profilime iz bırakabilir" are one setting (nobody = off): the other moves too.
+    if (k === 'marksFrom') setSetting('profileMarks', v !== 'nobody');
+    if (k === 'profileMarks' && v === false) setSetting('marksFrom', 'nobody');
     api
       .updatePrivacy({ [k]: v })
-      .then((p) => sync.saved(k, id, p))
+      .then((p) => {
+        sync.saved(k, id, p);
+        if ((k === 'marksFrom' || k === 'profileMarks') && p.marksFrom !== undefined && p.profileMarks !== undefined) {
+          setSetting('marksFrom', p.marksFrom);
+          setSetting('profileMarks', p.profileMarks);
+        }
+      })
       .catch((e) => {
         const back = sync.failed(k, id, before as api.ServerPrivacy[K]);
         if (back === undefined) return;

@@ -1112,6 +1112,8 @@ export type ServerPrivacy = {
   pushCloseOnly: boolean;
   /** Profil izleri (server/api/profile-marks.mjs): others may leave a mark on my photo; an older server sends none. */
   profileMarks?: boolean;
+  /** Who may (Kimler profilime iz bırakabilir): nobody is profileMarks off; a server before it sends none. */
+  marksFrom?: 'everyone' | 'following' | 'nobody';
   /** Gizlilik › "Adım genel duyurularda görünmesin": global gifts I send or receive name me "Bir kullanıcı". An older
    *  server doesn't say. */
   globalHideName?: boolean;

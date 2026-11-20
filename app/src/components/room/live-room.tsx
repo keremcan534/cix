@@ -103,7 +103,7 @@ import { GATES, nobleInfo } from '@/data/status';
 import { LUCKY_RECIPIENT_SHARE, RULES, luckyHostDiamonds, pct } from '@/data/rules';
 import { BOT_LINES, GIFTS, ME, USERS, isServerId, roomById, serverRoomCode, userById, type Gift } from '@/data/mock';
 import * as api from '@/lib/api';
-import { isLiveRoom, isLockedRoom, liveGift, liveMode, liveRoomAnimation, message as errorText, myServerId, putRoomAnswer, refreshServerRoom, rememberUser, toLocal, toServer, updateServerRoom } from '@/lib/live';
+import { isLiveRoom, isLockedRoom, isMarkRefusal, liveGift, liveMode, liveRoomAnimation, message as errorText, myServerId, putRoomAnswer, refreshServerRoom, rememberUser, toLocal, toServer, updateServerRoom } from '@/lib/live';
 import { liveBackpackGift } from '@/lib/live/backpack';
 import { giftById, liveBossMinLevel, liveMemberLimit, refreshLiveCatalog } from '@/lib/live/catalog-live';
 import { liveSticker } from '@/lib/live/emoji-live';
@@ -2840,6 +2840,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     const gift = fromBag ? (giftById(sheetGift.id) ?? sheetGift) : sheetGift;
     const sent: string[] = [];
     let error: string | null = null;
+    // Profil izleri: someone who takes no mark from me (their Gizlilik, found only now) refuses theirs alone, with
+    // nothing moved; the others still get theirs, each paid apart.
+    const refused: string[] = [];
     for (const uid of toIds) {
       // The daily limit holds here too (the balance is the server's to check); each answer counts toward it.
       const limited = fromBag ? null : spendBlock(gift.price * count);
@@ -2855,12 +2858,19 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         // A bond gift sent again whose bond is gone meanwhile: offered as a bond request (room-bonds).
         if (!sent.length && bondGiftRefused(e, gift, uid, userById(uid).name, sendBondGift)) return 0;
         error = errorText(e);
+        if (isMarkRefusal(e)) {
+          refused.push(uid);
+          continue;
+        }
         break;
       }
     }
+    // More than one refused the mark: one line for them all.
+    if (refused.length > 1 && refused.length === toIds.length - sent.length) error = `${refused.length} kişi senden iz kabul etmiyor; onlara gitmedi, jeton düşmedi.`;
     if (!sent.length) {
       errorHaptic();
-      if (fromBag) showAlert('Hediye gönderilemedi', error ?? 'Gönderilemedi.');
+      // Nobody takes the mark: no coins are missing, so no wallet button.
+      if (fromBag || (refused.length && refused.length === toIds.length)) showAlert('Hediye gönderilemedi', error ?? 'Gönderilemedi.');
       else
         showAlert('Hediye gönderilemedi', error ?? 'Gönderilemedi.', [
           { text: 'Tamam', style: 'cancel' },
