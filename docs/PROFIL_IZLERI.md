@@ -109,11 +109,12 @@ Uymayan resim kaydedilmez, nedeni Türkçe yazılır.
   telefonlara 512 piksel ve 300 KB'a küçültülmüşü gider.
 - Kare, 256–2048 piksel (512 × 512 önerilir). Telefonlar en çok 512 piksel ve 300 KB alır; büyüğü sunucu küçültür.
 - Hareketsiz: hareketli PNG ya da WebP olmaz.
-- **Gerçek saydamlık:** pikselin en az %30'u tam saydam olmalı (alfa 0). "Saydam" yazan ama her yeri dolu kare
-  reddedilir.
-- **Yüz açık kalmalı:** ortadaki dairenin (kenardan merkeze yolun %60'ı) en çok %20'si dolu olabilir. Uygulamanın
-  Kaka İzi'nde bu %14, Kırık Cam'ın geçici resminde %0.
-- Arka plan silme yapılmaz. Resim hazır saydam gelmeli.
+- Saydamlık kanalı olmalı (alfa kanalı olan PNG ya da WebP). Resim **yüzü kapatabilir**: buzun bütün fotoğrafı
+  kaplaması gibi (müşterinin isteği, 20 Kasım 2026). Telefon resmi fotoğrafın dairesine kırpar, çerçeve üstüne gelir;
+  çerçeve gibi kenarda kalan bir iz, çerçevesi olan birinde görünmüyordu. 20 Kasım'a kadar en az %30'u tam saydam
+  olmalı ve ortadaki yüz dairesinin en çok %20'si dolu olabilirdi; sunucu bu iki payı hâlâ ölçer, panel gösterir ama
+  reddetmez.
+- Arka plan silme yapılmaz.
 
 Resim değişince eski dosya silinir. Telefonlar yeni adresi katalogla alır. Bir telefonda resim açılamazsa uygulama
 bir alttakini çizer: kendi resmi, o da yoksa rozet.

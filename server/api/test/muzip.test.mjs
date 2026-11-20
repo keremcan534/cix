@@ -153,18 +153,12 @@ describe('Muzip hediyeler', () => {
     await ok(adminPost('/api/admin/mark-kinds/delete', { kind: 'boya' }), 'yine sil');
   });
 
-  test('İz resmi: gerçek saydamlık, yüz açık, kare, hareketsiz, boyut ve tür denetlenir; büyüğü 512 piksele iner', async () => {
+  test('İz resmi: saydamlık kanalı, kare, hareketsiz, boyut ve tür denetlenir; yüzü kapatabilir; büyüğü 512 piksele iner', async () => {
     const art = (body, type = 'image/png') => upload(admin, 'markart', body, type);
     await ok(adminPost('/api/admin/mark-kinds', { kind: 'resim-deneme', name: 'Resim Deneme' }), 'tür');
     const set = (url) => adminPost('/api/admin/mark-kinds/update', { kind: 'resim-deneme', art: url });
-    // A square opaque everywhere (an alpha channel that says nothing is transparent).
-    await refused(set(await art(rgbaPng(512, 512, () => 255))), 400, /^İz resminin en az %30'u tam saydam \(alfa 0\) olmalı, bunda %0:/);
-    // Faintly visible all over: not alpha 0.
-    await refused(set(await art(rgbaPng(512, 512, () => 3))), 400, /tam saydam/);
     // No alpha channel at all.
     await refused(set(await art(rgbaPng(512, 512, () => 255, { alpha: false }))), 400, /saydamlık yok/);
-    // The face covered: a disc in the middle, the edge transparent.
-    await refused(set(await art(rgbaPng(512, 512, (x, y) => (Math.hypot(x - 255.5, y - 255.5) < 170 ? 255 : 0)))), 400, /yüzü kapatıyor: ortadaki dairenin en çok %20'si dolu olabilir, bunda %\d+\./);
     // Moving (an animated PNG's header).
     await refused(set(await art(rgbaPng(512, 512, ringAlpha(512), { apng: true }))), 400, /hareketsiz/);
     // Not square, too small, too big.
@@ -219,6 +213,18 @@ describe('Muzip hediyeler', () => {
     const small = await art(rgbaPng(512, 512, ringAlpha(512)));
     assert.equal((await ok(set(small), '512')).kind.art.url, small);
     await refused(adminPost('/api/admin/mark-kinds', { kind: 'resim-iki', name: 'Resim İki', art: small }), 400, /türünde kullanılıyor/);
+    // Over the whole photo, face included (the client's choice, 20 Nov 2026: ice over the face), and faint all over:
+    // kept, with what the checker measured.
+    const cover = await art(rgbaPng(512, 512, (x, y) => (Math.hypot(x - 255.5, y - 255.5) < 250 ? 235 : 0)));
+    const covered = await ok(set(cover), 'yüzü kapatan iz');
+    assert.equal(covered.kind.art.url, cover);
+    assert.ok(covered.kind.art.stats.face > 0.9 && covered.kind.art.stats.clear < 0.3, JSON.stringify(covered.kind.art.stats));
+    assert.equal((await ok(set(await art(rgbaPng(512, 512, () => 3))), 'soluk iz')).kind.art.checked, true);
+    // The panel's own check takes these limits: they let a covering picture through.
+    const lim = (await ok(call('GET', '/api/admin/mark-kinds', undefined, admin.session), 'sınırlar')).limits;
+    assert.equal(lim.clearMin, 0);
+    assert.equal(lim.faceMax, 1);
+    assert.equal(lim.bytes, 10 * 1024 * 1024);
     assert.equal((await ok(set(null), 'resim kalkar')).kind.art, null);
     assert.equal((await catalog('?gifts=2&marks=2')).marks.kinds['resim-deneme'].art, undefined);
     await ok(adminPost('/api/admin/mark-kinds/delete', { kind: 'resim-deneme' }), 'sil');
