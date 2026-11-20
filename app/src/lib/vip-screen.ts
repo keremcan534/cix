@@ -9,6 +9,12 @@ export const HERO_COUNT = 10;
 /** The hero picture of a level: 1…10 (a level past 10 reuses 10; 0, a negative or a broken number: 1). */
 export const heroFor = (level: number) => (Number.isFinite(level) ? Math.min(HERO_COUNT, Math.max(1, Math.floor(level))) : 1);
 
+/**
+ * The level's badge on the hero, where the design's winged ring was (the client, 20 Nov 2026), in source px of the
+ * 812 px box: the ring's middle, a little smaller than the ring with its crown so it clears the border.
+ */
+export const HERO_BADGE = { left: 438, top: 56, size: 280 } as const;
+
 /** The design's hero box (vip_hero slice, source px): the card with its outer glow margin. */
 export const HERO_BOX = { w: 812, h: 404 } as const;
 /** Where the hero picture (804×391, the card cut at its gold border) sits in that box, as fractions of it. */
@@ -327,3 +333,79 @@ export const perkTextRoom = (panelW: number) => {
 export const compareCellA11y = (v: string | boolean) => (typeof v === 'boolean' ? (v ? 'var' : 'yok') : v);
 /** A comparison row, read as one: "Seviyeleri gizle: abone olmayan yok, abone var". */
 export const compareRowA11y = (name: string, free: string | boolean, sub: string | boolean) => `${name}: abone olmayan ${compareCellA11y(free)}, abone ${compareCellA11y(sub)}`;
+
+// --- The picked level's colours (the client, 20 Nov 2026: "match the main screens to the VIP badge's colour") -------
+/** A level's colours as the VIP set has them (components/vip/level-art card): the bubble's inner tones and its rim's. */
+export type LevelColors = { inner: readonly [string, string]; rim: readonly [string, string] };
+/**
+ * Each VIP level's badge colour: the median of the badge shield's saturated, non-gold pixels (scripts/vip-hero-assets.py
+ * prints them; the heroes are recoloured to the same). The page, the cards and the panel take it.
+ */
+export const BADGE_COLORS: Record<number, string> = {
+  1: '#011a49',
+  2: '#01164b',
+  3: '#034603',
+  4: '#021177',
+  5: '#630600',
+  6: '#510200',
+  7: '#49025e',
+  8: '#011e56',
+  9: '#4a025c',
+  10: '#620400',
+};
+/** The VIP tab drawn in a level's colours: the page, the rights' cards and the points panel. */
+export type VipTint = {
+  page: readonly [string, string, string, string];
+  pageTop: string;
+  rim: readonly [string, string, string, string];
+  glass: readonly [string, string, string, string];
+  corner: string;
+  glow: string;
+  infoRim: readonly [string, string, string, string, string];
+  info: readonly [string, string, string, string, string, string];
+  infoSide: readonly [string, string, string];
+};
+
+const rgbOf = (hex: string): [number, number, number] | null => {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex);
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+};
+/** `a` moved `t` (0…1) of the way to `b`, as #rrggbb; `a` itself when either isn't #rrggbb. */
+export function mixHex(a: string, b: string, t: number): string {
+  const x = rgbOf(a);
+  const y = rgbOf(b);
+  if (!x || !y) return a;
+  const k = Math.max(0, Math.min(1, t));
+  return `#${x.map((v, i) => Math.round(v + (y[i] - v) * k).toString(16).padStart(2, '0')).join('')}`;
+}
+/** `hex` with alpha `a`, as rgba(). */
+export function alphaHex(hex: string, a: number): string {
+  const x = rgbOf(hex) ?? [0, 0, 0];
+  return `rgba(${x[0]},${x[1]},${x[2]},${a})`;
+}
+
+/**
+ * The VIP tab in a level's colours: the page a deep shade of the level's colour, the cards' glass and the points
+ * panel in it (lighter at the top, as the design's purple), their rims in the level's rim tones. Null (the design's
+ * purple) without colours or with a broken one.
+ */
+export function vipTint(c: LevelColors | null | undefined): VipTint | null {
+  if (!c || ![...c.inner, ...c.rim].every((h) => rgbOf(h))) return null;
+  const base = c.inner[1];
+  const [rimTop, rimLow] = c.rim;
+  const dark = (t: number) => mixHex(base, '#000000', t);
+  const light = (t: number) => mixHex(base, '#ffffff', t);
+  return {
+    page: [dark(0.62), dark(0.78), dark(0.8), dark(0.66)],
+    pageTop: alphaHex(light(0.3), 0.12),
+    rim: [rimTop, mixHex(rimTop, base, 0.45), mixHex(rimLow, base, 0.5), rimLow],
+    glass: [light(0.14), base, dark(0.3), dark(0.5)],
+    corner: alphaHex(light(0.2), 0.6),
+    glow: light(0.5),
+    infoRim: [rimTop, mixHex(rimTop, base, 0.3), mixHex(rimLow, base, 0.45), mixHex(rimLow, base, 0.3), rimLow],
+    info: [light(0.18), light(0.06), dark(0.25), dark(0.45), dark(0.45), dark(0.3)],
+    infoSide: [alphaHex(light(0.25), 0), alphaHex(light(0.25), 0.45), alphaHex(light(0.35), 0.8)],
+  };
+}
