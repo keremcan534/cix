@@ -240,9 +240,15 @@ adlarıyla duyurulur ([`HEDIYE_YONETIMI.md`](HEDIYE_YONETIMI.md) › Global hedi
 
 - **Moderasyon (siz: bilin):** gönderenin ve alıcının adı bütün platformda görünür; alıcı buna onay vermedi. Biri bunu
   birini herkesin önünde rahatsız etmek için kullanabilir (alıcının adı herkese gider). Önlemler: adlar zaten iletişim
-  filtresinden geçmiş; herkes Gizlilik › "Adım genel duyurularda görünmesin" ile kendi adını gizleyebilir (gönderen de
-  alıcı da, ayrı ayrı); engelleşen kişiler birbirinin duyurusunu görmez. Kötüye kullanılırsa hediyenin işareti panelden
-  kaldırılır.
+  filtresinden geçmiş; yeni uygulamada herkes Gizlilik › "Adım genel duyurularda görünmesin" ile kendi adını
+  gizleyebilir (gönderen de alıcı da, ayrı ayrı); engelleşen kişiler birbirinin duyurusunu görmez. Kötüye kullanılırsa
+  hediyenin işareti panelden kaldırılır.
+  - **Eski APK kullananlar adlarını gizleyemez** (düğme onlarda yok), alıcı da. Karar sizin: öneri, alıcının adını,
+    uygulaması bu düğmeyi bilen bir sürüme geçene kadar varsayılan olarak gizlemek ya da global hediyeyi herkes yeni
+    sürüme geçene kadar işaretlememek.
+  - Kasım 2026 incelemesinde düzeltildi: yalnız **odada** gönderilen global hediye duyurulur (birebir sohbet, profil,
+    aile sohbeti ve Anlar'dan gönderilen duyurulmaz); özel ya da şifreli odanın, dinlenen odanın, "Bulunduğum odayı
+    göster"i kapalı ya da adını gizlemiş birinin odası duyuruda adlandırılmaz.
 - **Hukuk:** Şanslı paketleri hiçbir zaman global olamaz (şans oyunu tanıtılmaz; Şanslı gönderimi bu yoldan geçmez).
   Bu sınır gevşetilirse Kritik 1'deki soruya dahil edin.
 - **Yük:** her duyuru açık her hatta bir kısa yazı (ucuz); 10 saniyede en çok bir duyuru. Hediyenin videosu başka

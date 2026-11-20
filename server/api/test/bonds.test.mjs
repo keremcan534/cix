@@ -273,17 +273,97 @@ describe('Bağlar: yeniden bağ hediyesi, düşüş, bildirimler', () => {
     } finally {
       await setLive({ gifts_hidden: null });
     }
-    assert.equal((await call('POST', '/api/block', { to: b.user.id }, a.session))[1].blocked, true);
-    assert.equal((await send(a.session, b.user.id, 'bag-kanka', 1, 500))[0], 403);
-    assert.equal((await me2(a.session)).coins, coins, 'hiçbir retde jeton düşmez');
     // An older app asks for a bond it already has: told to update. A newer one hears the kind, with a code.
-    await call('POST', '/api/block', { to: b.user.id, block: false }, a.session);
     const [old, o] = await ask(a.session, b.user.id, 'kanka');
     assert.equal(old, 409);
     assert.match(o.error, /^Aranızda Kanka bağı var\. Bağ hediyesini yeniden göndermek için uygulamayı güncelle$/);
     const [now, n] = await call('POST', '/api/bonds/request', { to: b.user.id, kind: 'kanka', ref: rnd(6), price: 500 }, a.session);
     assert.equal(now, 409);
     assert.deepEqual([n.error, n.code, n.kind], ['Aranızda Kanka bağı var', 'bond_active', 'kanka']);
+    // A block: refused (and the bond is over: see the block test below).
+    assert.equal((await call('POST', '/api/block', { to: b.user.id }, a.session))[1].blocked, true);
+    assert.equal((await send(a.session, b.user.id, 'bag-kanka', 1, 500))[0], 403);
+    assert.equal((await me2(a.session)).coins, coins, 'hiçbir retde jeton düşmez');
+  });
+
+  test('engel bağı bitirir: kimseye bildirim yok, odada işaret yok, sessiz gün bildirimi yok; engel kalkınca beklemeden yeniden kurulur', async () => {
+    const { a, b, id } = await bonded('kanka');
+    // Lv.5 (100 points), as the level column has it.
+    await h.sql.query('UPDATE bonds SET talk_points = 100, level = 5, level_said = 5 WHERE id = $1', [id]);
+    await until(async () => (await row(id)).decayed_on, 'ilk gece');
+    const before = [(await notes(a.user.id)).length, (await notes(b.user.id)).length];
+    assert.equal((await call('POST', '/api/block', { to: b.user.id }, a.session))[1].blocked, true);
+    const r = await row(id);
+    assert.deepEqual([r.status, r.end_reason, r.ended_by, r.told_status], ['ended', 'block', a.user.id, 'ended']);
+    // The nights and the quiet warning would have named the other: an ended bond gets neither.
+    const day = async (d) => (await h.sql.query(`SELECT ((now() AT TIME ZONE 'Europe/Istanbul')::date + $1::int)::text AS d`, [d])).rows[0].d;
+    await h.sql.query('UPDATE bonds SET gift_day = $2::date, decayed_on = NULL WHERE id = $1', [id, await day(-28)]);
+    await wait(1000);
+    assert.deepEqual([(await notes(a.user.id)).length, (await notes(b.user.id)).length], before, 'ikisine de yeni bildirim yok');
+    assert.equal((await row(id)).points_lost, '0', 'biten bağ gece puan kaybetmez');
+    // The blocked person's room effects and profile: no bond.
+    assert.deepEqual((await call('POST', '/api/bonds/among', { ids: [a.user.id, b.user.id] }, b.session))[1].bonds, []);
+    assert.equal((await call('GET', `/api/bonds`, null, b.session))[1].bonds.length, 0);
+    // Unblocked: a new request at once (no 7 days as after an end someone chose).
+    await call('POST', '/api/block', { to: b.user.id, block: false }, a.session);
+    await topUp(b.session, 1000);
+    const [again, j] = await ask(b.session, a.user.id, 'kanka');
+    assert.equal(again, 200, `engelden sonra bekleme yok: ${j.error}`);
+  });
+
+  test("başkasının bağlarında sessiz günler gelmez; kendi bağımda gelir", async () => {
+    const { a, b } = await bonded('kanka');
+    const c = await signUp('Meraklı');
+    const [, other] = await call('GET', `/api/bonds?user=${a.user.id}`, null, c.session);
+    assert.deepEqual(other.bonds.map((x) => [x.quietDays, x.endsInDays]), [[null, null]]);
+    const [, own] = await call('GET', '/api/bonds', null, a.session);
+    assert.equal(typeof own.bonds[0].quietDays, 'number');
+    assert.equal(typeof own.bonds[0].endsInDays, 'number');
+    // The bond's other end, looking at my list: their own bond with me, so they see it.
+    const [, partner] = await call('GET', `/api/bonds?user=${a.user.id}`, null, b.session);
+    assert.equal(typeof partner.bonds[0].quietDays, 'number');
+  });
+
+  test('Lv11 ve üstü: lv=20 diyen uygulama gerçek puanı alır; eski APK çubuğu seviyenin içindeki ilerlemeyle çizilir', async () => {
+    const { a, b, id } = await bonded('kanka');
+    // Kanka's 500-coin bond gift is 5 points; 3.195 talk points more: 3.200, Lv11 (3.000), next 4.500.
+    await h.sql.query('UPDATE bonds SET talk_points = 3195, level = 11, level_said = 11 WHERE id = $1', [id]);
+    const pick = (j) => [j.score, j.level, j.nextLevelAt];
+    // The f9671d9 APK: its bar is (score - its Lv11 step, 0) / (nextLevelAt - 0) = 200 / 1.500 (13 %, the real
+    // progress), its text "200 / 1500 puan · Lv.12 için 1300 puan".
+    assert.deepEqual(pick((await call('GET', '/api/bonds', null, a.session))[1].bonds[0]), [200, 11, 1500]);
+    assert.deepEqual(pick((await call('GET', `/api/bonds?user=${a.user.id}`, null, b.session))[1].bonds[0]), [200, 11, 1500]);
+    // The app since Lv20 (lv=20): the points as they are.
+    assert.deepEqual(pick((await call('GET', '/api/bonds?lv=20', null, a.session))[1].bonds[0]), [3200, 11, 4500]);
+    assert.deepEqual(pick((await call('GET', `/api/bonds?user=${a.user.id}&lv=20`, null, b.session))[1].bonds[0]), [3200, 11, 4500]);
+    // Lv20 (45.000): no next step, the points as they are for both ("en yüksek seviye").
+    await h.sql.query('UPDATE bonds SET talk_points = 49995 WHERE id = $1', [id]);
+    assert.deepEqual(pick((await call('GET', '/api/bonds', null, a.session))[1].bonds[0]), [50000, 20, null]);
+    // Up to Lv10 nothing moves for either.
+    await h.sql.query('UPDATE bonds SET talk_points = 95 WHERE id = $1', [id]);
+    assert.deepEqual(pick((await call('GET', '/api/bonds', null, a.session))[1].bonds[0]), [100, 5, 200]);
+    assert.deepEqual(pick((await call('GET', '/api/bonds?lv=20', null, a.session))[1].bonds[0]), [100, 5, 200]);
+    // A route's own answer (the end, here) the same way.
+    await h.sql.query('UPDATE bonds SET talk_points = 3195 WHERE id = $1', [id]);
+    const [st, ended] = await call('POST', '/api/bonds/end?lv=20', { id }, a.session);
+    assert.equal(st, 200, ended.error);
+    assert.deepEqual(pick(ended.bond), [3200, 11, 4500]);
+  });
+
+  test('veri kopyası bağın kaybettiği puanı, seviyesini, son hediye gününü ve bitiş nedenini verir; engellenen engeli görmez', async () => {
+    const { a, b, id } = await bonded('kanka');
+    await h.sql.query('UPDATE bonds SET points_lost = 3 WHERE id = $1', [id]);
+    assert.equal((await call('POST', '/api/block', { to: a.user.id }, b.session))[1].blocked, true);
+    const today = (await h.sql.query(`SELECT ((now() AT TIME ZONE 'Europe/Istanbul')::date)::text AS d`)).rows[0].d;
+    const copy = async (s) => {
+      const [st, j] = await call('GET', '/api/me/export', null, s);
+      assert.equal(st, 200, j.error);
+      return j.bonds.find((x) => x.id === id);
+    };
+    const mine = await copy(b.session);
+    assert.deepEqual([mine.status, mine.pointsLost, mine.level, mine.giftDay, mine.endReason], ['ended', 3, 1, today, 'block']);
+    const theirs = await copy(a.session);
+    assert.deepEqual([theirs.status, theirs.pointsLost, theirs.giftDay, theirs.endReason], ['ended', 3, today, null], 'engellenen engeli görmez');
   });
 
   test('aynı anda iki gönderim ve bitirme: kilitlenme yok, puan yalnız geçen hediyelerden', async () => {

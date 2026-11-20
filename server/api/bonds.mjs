@@ -17,6 +17,11 @@
 //   POST /api/gifts/send     { giftId: 'bag-<kind>', … } (gifts.mjs)                    (a bond gift to someone I have that bond with:
 //                                                                                        an ordinary gift that adds bond points)
 //
+// `?lv=20` on every route above that answers bonds (the app since Lv20 sends it): `score` and `nextLevelAt` are the
+// bond's points and the next level's. Without it (the f9671d9 APK) they are moved so that APK's bar, drawn from its
+// own ten compiled steps (0 past Lv10), shows the real progress within the level; its text still says how many points
+// the next level needs (oldAppPoints).
+//
 // Price: the bond gift's (bag-<kind>) as Yönetim › Hediyeler set it (custom-gifts.mjs builtinGift; bond-rules.mjs KINDS
 // is the app's own). A newer app sends the price it showed: another one now is a 409 price_changed and nothing moves.
 // An older app sends none and shows the compiled price: while the panel's price differs it gets 409 update_required.
@@ -39,7 +44,7 @@ import { live } from './live-settings.mjs';
 import { notify } from './push.mjs';
 import { giftDiamonds, spendCoins } from './wallet.mjs';
 import { builtinGift, checkShownPrice } from './custom-gifts.mjs';
-import { KINDS, LEVELS, REWARDS, levelOf, rewardLevel, scoreOf } from './bond-rules.mjs';
+import { KINDS, LEVELS, REWARDS, levelOf, oldAppPoints, rewardLevel, scoreOf } from './bond-rules.mjs';
 import { bondNumbers, levelSql, levelsSoon, runBondDecay, scoreSql, tellLevels, tellStatus, warnQuietBonds } from './bond-life.mjs';
 
 export { KINDS, LEVELS, REWARDS, levelOf, scoreOf };
@@ -118,12 +123,20 @@ const SELECT = `SELECT x.*, ua.name AS a_name, ua.avatar_url AS a_avatar, ub.nam
 const TODAY = "(now() AT TIME ZONE 'Europe/Istanbul')::date";
 const QUIET = `${TODAY} - x.gift_day AS quiet`;
 
-/** A bond as `me` sees it: the other person is the partner. `levels`: the steps now (bondNumbers). */
-function out(b, me, n = bondNumbers()) {
+/** Whether the app asked for the real points (?lv=20). */
+const realPoints = (url) => url?.searchParams.get('lv') === '20';
+
+/**
+ * A bond as `me` sees it: the other person is the partner. `n`: Bağlar's numbers now (bondNumbers). `viewer`: who
+ * asked (another person's list: GET /api/bonds?user=); the quiet days, which tell when the two last sent each other a
+ * gift (a chat's or a profile's too), only go to one of the two. `real`: the app sent ?lv=20 (else oldAppPoints).
+ */
+function out(b, me, { n = bondNumbers(), viewer = me, real = false } = {}) {
   const mine = b.a === me;
   const score = scoreOf(b);
   const level = levelOf(score, n.levels);
-  const quiet = b.status === 'active' && b.quiet !== null && b.quiet !== undefined ? Number(b.quiet) : null;
+  const points = real ? { score, nextLevelAt: n.levels[level] ?? null } : oldAppPoints(score, level, n.levels);
+  const quiet = b.status === 'active' && b.quiet !== null && b.quiet !== undefined && (viewer === b.a || viewer === b.b) ? Number(b.quiet) : null;
   return {
     id: Number(b.id),
     kind: b.kind,
@@ -132,9 +145,9 @@ function out(b, me, n = bondNumbers()) {
     requester: mine,
     partner: mine ? { id: b.b, name: b.b_name, avatarUrl: b.b_avatar ?? null } : { id: b.a, name: b.a_name, avatarUrl: b.a_avatar ?? null },
     price: Number(b.held_coins),
-    score,
+    score: points.score,
     level,
-    nextLevelAt: n.levels[level] ?? null,
+    nextLevelAt: points.nextLevelAt,
     createdAt: b.created_at,
     expiresAt: b.expires_at,
     since: b.accepted_at,
@@ -150,7 +163,7 @@ async function bondRow(c, id, lock = false) {
   if (!r.rowCount) throw new HttpError(404, 'Bağ bulunamadı');
   return r.rows[0];
 }
-const view = async (id, me) => out((await db.query(`${SELECT.replace('SELECT x.*', `SELECT x.*, ${QUIET}`)} WHERE x.id = $1`, [id])).rows[0], me);
+const view = async (id, me, real = false) => out((await db.query(`${SELECT.replace('SELECT x.*', `SELECT x.*, ${QUIET}`)} WHERE x.id = $1`, [id])).rows[0], me, { real });
 
 /** Active bonds of `kind` someone has, plus (for the requester) their own pending requests of it. */
 async function countKind(c, user, kind, withPending) {
@@ -201,6 +214,22 @@ export async function voidRefundedBonds(c, lotIds) {
   return gone;
 }
 
+/**
+ * Inside POST /api/block's transaction (social.mjs), after its blocks row: the two's active bond ends (end_reason
+ * 'block', ended_by the blocker), told to nobody (a block is never told, and the blocker's own notice would name the
+ * other) and with no wait before a new bond once they unblock each other. A pending request stays: it can't be
+ * accepted while they block, and goes back to its sender when its days run out. ended_by's key check needs the
+ * blocker's row, which the blocks row's own check holds already: nothing more is waited for. → the bond's id or null.
+ */
+export async function endBondOnBlock(c, blocker, blocked) {
+  const r = await c.query(
+    `UPDATE bonds SET status = 'ended', ended_at = now(), ended_by = $1, end_reason = 'block', told_status = 'ended'
+      WHERE pair_lo = LEAST($1::uuid, $2::uuid) AND pair_hi = GREATEST($1::uuid, $2::uuid) AND status = 'active' RETURNING id`,
+    [blocker, blocked],
+  );
+  return r.rows[0] ? Number(r.rows[0].id) : null;
+}
+
 /** Locks the two accounts in id order (no deadlock when both act at once), then the bond. */
 async function lockPair(c, bondId) {
   const peek = await bondRow(c, bondId);
@@ -217,10 +246,10 @@ export async function addBondCoins(c, sender, recipient, total) {
     `UPDATE bonds SET gift_coins = gift_coins + $3, gift_day = ${TODAY},
             level = ${levelSql('greatest(0, (gift_coins + $3) / 100 + talk_points - points_lost)', '$4')}
       WHERE pair_lo = LEAST($1::uuid, $2::uuid) AND pair_hi = GREATEST($1::uuid, $2::uuid) AND status = 'active'
-      RETURNING level <> level_said AS news`,
+      RETURNING id, level <> level_said AS news`,
     [sender, recipient, total, bondNumbers().levels],
   );
-  if (r.rows[0]?.news) levelsSoon();
+  if (r.rows[0]?.news) levelsSoon(Number(r.rows[0].id));
 }
 
 /** After a direct message: an answer to the other's last message is 1 point (10 a day, Turkey's calendar). */
@@ -244,7 +273,7 @@ export async function bondTalk(sender, recipient, messageId) {
       RETURNING level <> level_said AS news`,
     [bond.rows[0].id, daily, bondNumbers().levels],
   );
-  if (r.rows[0]?.news) levelsSoon();
+  if (r.rows[0]?.news) levelsSoon(Number(bond.rows[0].id));
 }
 
 /**
@@ -260,9 +289,11 @@ export async function sweepBonds() {
   try {
     const n = await expireBonds();
     await runBondDecay();
-    await warnQuietBonds();
-    await tellStatus();
-    await tellLevels();
+    // Each in pages until none is left: a night's drops and ends can leave tens of thousands to tell, and a page
+    // per sweep (5 minutes) would tell the last of them hours later.
+    while ((await warnQuietBonds()) >= 500);
+    while ((await tellStatus()) >= 200);
+    while ((await tellLevels()) >= 200);
     return n;
   } finally {
     sweeping = false;
@@ -332,17 +363,18 @@ export const bondRoutes = {
     );
     const n = bondNumbers();
     const total = Number(r.rows[0]?.total ?? 0);
-    return { hidden, bonds: r.rows.map((b) => out(b, who, n)), total, next: offset + r.rowCount < total ? offset + r.rowCount : null };
+    const real = realPoints(url);
+    return { hidden, bonds: r.rows.map((b) => out(b, who, { n, viewer: me.id, real })), total, next: offset + r.rowCount < total ? offset + r.rowCount : null };
   },
 
-  async 'GET /api/bonds/requests'(req) {
+  async 'GET /api/bonds/requests'(req, url) {
     const me = await auth(req);
     const r = await db.query(`${SELECT} WHERE x.status = 'pending' AND (x.a = $1 OR x.b = $1) AND x.expires_at > now() ORDER BY x.id DESC LIMIT 50`, [me.id]);
-    const rows = r.rows.map((b) => out(b, me.id));
+    const rows = r.rows.map((b) => out(b, me.id, { real: realPoints(url) }));
     return { incoming: rows.filter((b) => !b.requester), outgoing: rows.filter((b) => b.requester) };
   },
 
-  async 'POST /api/bonds/request'(req) {
+  async 'POST /api/bonds/request'(req, url) {
     const me = await auth(req);
     limit(`bondreq:${me.id}`, 10, 'Çok fazla istek, biraz bekle');
     const b = await readJson(req);
@@ -372,10 +404,11 @@ export const bondRoutes = {
         const again = have === kind && shown === null ? '. Bağ hediyesini yeniden göndermek için uygulamayı güncelle' : '';
         throw Object.assign(new HttpError(409, `Aranızda ${KINDS[have].label} bağı var${again}`), { extra: { code: 'bond_active', kind: have } });
       }
-      // A bond that ended by itself (no gift for days) leaves no wait; one that a person ended does.
+      // A bond that ended by itself (no gift for days) or with a block (unblocked since) leaves no wait; one that a
+      // person ended does.
       const recent = await c.query(
         `SELECT 1 FROM bonds WHERE pair_lo = LEAST($1::uuid, $2::uuid) AND pair_hi = GREATEST($1::uuid, $2::uuid) AND status = 'ended'
-            AND end_reason IS DISTINCT FROM 'idle' AND ended_at > now() - make_interval(days => $3::int)`,
+            AND coalesce(end_reason, '') NOT IN ('idle', 'block') AND ended_at > now() - make_interval(days => $3::int)`,
         [me.id, to, set.bondCooldownDays],
       );
       if (recent.rowCount) throw new HttpError(409, `Bu kişiyle bağın yakın zamanda bitti; ${set.bondCooldownDays} gün sonra yeniden kurabilirsin`);
@@ -394,7 +427,7 @@ export const bondRoutes = {
     const row = await db.query('SELECT id FROM bonds WHERE a = $1 AND ref = $2', [me.id, b.ref]);
     // A copy of the same request raced another request to the same person: nothing was taken.
     if (!row.rowCount) throw new HttpError(409, 'Bu kişiyle bekleyen bir bağ isteği var');
-    const bond = await view(Number(row.rows[0].id), me.id);
+    const bond = await view(Number(row.rows[0].id), me.id, realPoints(url));
     if (!res.replay) notify([to], { title: 'Bağ isteği', body: `${me.name} seninle ${k.label} bağı kurmak istiyor`, data: { type: 'bond', id: bond.id } });
     if (!res.replay) await tellStatus(bond.id);
     // From a room's Aile ve Dost shelf: the room sees the gift go, best effort.
@@ -403,7 +436,7 @@ export const bondRoutes = {
     return { ...res, bond };
   },
 
-  async 'POST /api/bonds/respond'(req) {
+  async 'POST /api/bonds/respond'(req, url) {
     const me = await auth(req);
     const body = await readJson(req);
     const id = int(body.id, 1, Number.MAX_SAFE_INTEGER);
@@ -448,7 +481,7 @@ export const bondRoutes = {
       return 'active';
     });
     await tellStatus(id);
-    const bond = await view(id, me.id);
+    const bond = await view(id, me.id, realPoints(url));
     if (result === 'expired') throw new HttpError(410, 'İsteğin süresi doldu, jeton gönderene döndü');
     notify([bond.partner.id], {
       title: result === 'active' ? 'Bağ kuruldu' : 'Bağ isteği',
@@ -458,7 +491,7 @@ export const bondRoutes = {
     return { bond };
   },
 
-  async 'POST /api/bonds/withdraw'(req) {
+  async 'POST /api/bonds/withdraw'(req, url) {
     const me = await auth(req);
     const id = int((await readJson(req)).id, 1, Number.MAX_SAFE_INTEGER);
     if (id === null) throw new HttpError(400, 'Geçersiz bağ');
@@ -469,10 +502,10 @@ export const bondRoutes = {
       await refund(c, b, 'withdrawn', `Bağ isteği iadesi: ${KINDS[b.kind].label} (geri alındı)`);
     });
     await tellStatus(id);
-    return { bond: await view(id, me.id) };
+    return { bond: await view(id, me.id, realPoints(url)) };
   },
 
-  async 'POST /api/bonds/end'(req) {
+  async 'POST /api/bonds/end'(req, url) {
     const me = await auth(req);
     const id = int((await readJson(req)).id, 1, Number.MAX_SAFE_INTEGER);
     if (id === null) throw new HttpError(400, 'Geçersiz bağ');
@@ -485,7 +518,7 @@ export const bondRoutes = {
       await c.query(`UPDATE bonds SET status = 'ended', ended_at = now(), ended_by = $2 WHERE id = $1`, [id, me.id]);
     });
     await tellStatus(id);
-    const bond = await view(id, me.id);
+    const bond = await view(id, me.id, realPoints(url));
     notify([bond.partner.id], { title: 'Bağ bitti', body: `${me.name} ${bond.label} bağını bitirdi`, data: { type: 'bond', id } });
     return { bond };
   },

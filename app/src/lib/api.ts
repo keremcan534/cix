@@ -979,18 +979,23 @@ export type ServerBond = {
   /** Güncelleme 7 (an older server sends none): days since the last gift either way, days before a quiet bond ends. */
   quietDays?: number | null; endsInDays?: number | null;
 };
+/**
+ * `lv=20` on every bond route: the server sends a bond's real points and next step (the bar is drawn from the
+ * server's 20 steps, levelFloor). Without it the server moves them for the f9671d9 APK's ten compiled steps.
+ */
+const BOND_LV = 'lv=20';
 /** 50 a page from `offset`; `next`: the next page's offset (null at the end; an older server sends none). */
 export const bonds = (user?: string, offset = 0) => {
-  const q = [user ? `user=${encodeURIComponent(user)}` : '', offset > 0 ? `offset=${offset}` : ''].filter(Boolean).join('&');
-  return call<{ hidden: boolean; bonds: ServerBond[]; total?: number; next?: number | null }>('GET', `/api/bonds${q ? `?${q}` : ''}`);
+  const q = [user ? `user=${encodeURIComponent(user)}` : '', offset > 0 ? `offset=${offset}` : '', BOND_LV].filter(Boolean).join('&');
+  return call<{ hidden: boolean; bonds: ServerBond[]; total?: number; next?: number | null }>('GET', `/api/bonds?${q}`);
 };
-export const bondRequests = () => call<{ incoming: ServerBond[]; outgoing: ServerBond[] }>('GET', '/api/bonds/requests');
+export const bondRequests = () => call<{ incoming: ServerBond[]; outgoing: ServerBond[] }>('GET', `/api/bonds/requests?${BOND_LV}`);
 /** `price`: the bond gift's price this phone showed; another one now is a 409 price_changed and nothing is taken. */
 export const requestBond = (to: string, kind: string, ref = newRef(), room?: string, price?: number) =>
-  call<{ user: ServerUser; replay: boolean; bond: ServerBond }>('POST', '/api/bonds/request', { to, kind, ref, ...(room ? { room } : {}), ...(price !== undefined ? { price } : {}) });
-export const respondBond = (id: number, accept: boolean) => call<{ bond: ServerBond }>('POST', '/api/bonds/respond', { id, accept }).then((r) => r.bond);
-export const withdrawBond = (id: number) => call<{ bond: ServerBond }>('POST', '/api/bonds/withdraw', { id }).then((r) => r.bond);
-export const endBond = (id: number) => call<{ bond: ServerBond }>('POST', '/api/bonds/end', { id }).then((r) => r.bond);
+  call<{ user: ServerUser; replay: boolean; bond: ServerBond }>('POST', `/api/bonds/request?${BOND_LV}`, { to, kind, ref, ...(room ? { room } : {}), ...(price !== undefined ? { price } : {}) });
+export const respondBond = (id: number, accept: boolean) => call<{ bond: ServerBond }>('POST', `/api/bonds/respond?${BOND_LV}`, { id, accept }).then((r) => r.bond);
+export const withdrawBond = (id: number) => call<{ bond: ServerBond }>('POST', `/api/bonds/withdraw?${BOND_LV}`, { id }).then((r) => r.bond);
+export const endBond = (id: number) => call<{ bond: ServerBond }>('POST', `/api/bonds/end?${BOND_LV}`, { id }).then((r) => r.bond);
 export const bondsAmong = (ids: string[]) => call<{ bonds: { a: string; b: string; kind: string; level: number }[] }>('POST', '/api/bonds/among', { ids }).then((r) => r.bonds);
 export const setBondsHidden =(hidden: boolean) => call<{ hidden: boolean }>('POST', '/api/bonds/privacy', { hidden }).then((r) => r.hidden);
 

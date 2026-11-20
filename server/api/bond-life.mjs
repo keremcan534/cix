@@ -49,22 +49,33 @@ const label = (kind) => KINDS[kind]?.label ?? 'Bağ';
 
 // --- Telling of a change -----------------------------------------------------------------------------------------
 let soon = null;
-/** A gift or a reply may have moved a bond's level: tell it a moment later (after its transaction), best effort. */
-export function levelsSoon() {
+const soonIds = new Set();
+/**
+ * A gift or a reply may have moved bond `id`'s level: tell it a moment later (after its transaction), best effort,
+ * before any older news the sweep still has to tell (a night's drops can leave tens of thousands).
+ */
+export function levelsSoon(id = null) {
+  if (Number.isSafeInteger(id)) soonIds.add(id);
   if (soon) return;
   soon = setTimeout(() => {
     soon = null;
-    void tellLevels().catch((e) => console.error('bond levels', e.message));
+    const ids = [...soonIds];
+    soonIds.clear();
+    void tellLevels(ids.length ? ids : null).catch((e) => console.error('bond levels', e.message));
   }, 1500);
   soon.unref?.();
 }
 
-/** The level changes nobody was told of yet: both people hear it, then it is marked (a crash between sends nothing twice). */
-export async function tellLevels() {
+/**
+ * The level changes nobody was told of yet (`only`: just those bonds, else up to 200 by id): both people hear it, then
+ * it is marked (a crash between sends nothing twice). → how many bonds were told.
+ */
+export async function tellLevels(only = null) {
   const r = await db.query(
     `SELECT x.id, x.a, x.b, x.kind, x.level, x.level_said, x.level_seq, ua.name AS a_name, ub.name AS b_name
        FROM bonds x JOIN users ua ON ua.id = x.a JOIN users ub ON ub.id = x.b
-      WHERE x.status = 'active' AND x.level <> x.level_said ORDER BY x.id LIMIT 200`,
+      WHERE x.status = 'active' AND x.level <> x.level_said ${only ? 'AND x.id = ANY($1::bigint[])' : ''} ORDER BY x.id LIMIT 200`,
+    only ? [only] : [],
   );
   for (const b of r.rows) {
     const up = b.level > b.level_said;
@@ -132,6 +143,8 @@ function statusNotices(b) {
         const lines = (p) => [`${p.name} ile ${k} bağınız, ${fmt(b.quiet ?? 0)} gün boyunca ikinizden hiç hediye gitmediği için kendiliğinden bitti.`, 'Jeton iadesi yok. İsterseniz hemen yeniden bağ kurabilirsiniz.'];
         return [one(b.a, B, 'idle-end', 'Bağ bitti', lines(B)), one(b.b, A, 'idle-end', 'Bağ bitti', lines(A))];
       }
+      // A block ends the bond without a word to either (the blocked person is never told; the blocker chose it).
+      if (b.end_reason === 'block') return [];
       if (b.end_reason === 'gone') {
         const out = [];
         if (!b.a_gone) out.push(one(b.a, B, 'end', 'Bağ bitti', [`${B.name} hesabını kapattığı için ${k} bağınız bitti.`]));
@@ -182,11 +195,15 @@ export async function runBondDecay() {
   const k = bondNumbers();
   let dropped = 0;
   let ended = 0;
+  // Batches walk forward by id (keyset): each starts after the last one's highest id, so none reads again the rows
+  // the batches before it worked out (a filter alone made the night's cost grow with the square of the bonds). A row
+  // a gift held (skipped) is worked out by the next sweep, which starts from the beginning.
+  let last = 0;
   for (;;) {
     const r = await db.query(
       `WITH due AS (
          SELECT id, ${scoreSql()} AS s, ${TODAY} - gift_day AS quiet
-           FROM bonds WHERE status = 'active' AND (decayed_on IS NULL OR decayed_on < ${TODAY})
+           FROM bonds WHERE status = 'active' AND (decayed_on IS NULL OR decayed_on < ${TODAY}) AND id > $5::bigint
           ORDER BY id LIMIT ${BATCH} FOR UPDATE SKIP LOCKED),
        calc AS (
          SELECT id, s, coalesce($3::int > 0 AND quiet > $3::int, false) AS idle,
@@ -199,12 +216,13 @@ export async function runBondDecay() {
               ended_at = CASE WHEN c.idle THEN now() ELSE x.ended_at END,
               end_reason = CASE WHEN c.idle THEN 'idle' ELSE x.end_reason END
          FROM calc c WHERE x.id = c.id
-       RETURNING c.idle, c.cut`,
-      [k.dropPct, k.dropFlat, k.idleEndDays, k.levels],
+       RETURNING x.id, c.idle, c.cut`,
+      [k.dropPct, k.dropFlat, k.idleEndDays, k.levels, last],
     );
     for (const x of r.rows) {
       if (x.idle) ended++;
       else if (Number(x.cut) > 0) dropped++;
+      last = Math.max(last, Number(x.id));
     }
     if (r.rowCount < BATCH) break;
   }

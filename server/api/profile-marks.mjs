@@ -44,8 +44,8 @@ export function cleanEmojiOf(kind, s = live()) {
 }
 
 /**
- * Inside a gift's transaction (gifts.mjs), after both people's users rows are locked FOR UPDATE and the gift's row is
- * written (`eventId`), before any coin moves: what `gift` does to `to`'s profile. A gift that leaves a mark on someone
+ * Inside a gift's transaction (gifts.mjs), after both people's users rows are locked (send-locks.mjs) and the gift's
+ * row is written (`eventId`), before any coin moves: what `gift` does to `to`'s profile. A gift that leaves a mark on someone
  * who refuses marks is refused here (403 marks_off: the transaction rolls back, nothing moved). Each row is written
  * once: a leave ends the kind's showing mark (expires now) and adds its own; a clean takes the kind's showing mark off
  * (none: a plain gift). Null when nothing changed; else what the room's packet and the answer carry.

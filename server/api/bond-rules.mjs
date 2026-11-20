@@ -44,6 +44,20 @@ export const tierOf = (level) => Math.min(Math.ceil(MAX_LEVEL / TIER_SIZE), Math
  */
 export const DECAY = { dropPct: 10, dropFlat: 10, idleEndDays: 30, idleWarnDays: 3 };
 
+/** The steps the f9671d9 APK has compiled (its BOND_LEVELS: Lv1 … Lv10); past Lv10 it takes 0 as the level's start. */
+const OLD_APP_STEPS = [0, 10, 30, 60, 100, 200, 400, 700, 1200, 2000];
+/**
+ * `score` and `nextLevelAt` for an app that doesn't send ?lv=20 (bonds.mjs). Its bar is (score - its step) /
+ * (nextLevelAt - its step), with its step OLD_APP_STEPS[level - 1] ?? 0, and its text "score / nextLevelAt puan · Lv.N
+ * için nextLevelAt - score puan". Both are moved by the same amount, so the bar is the real progress within the level
+ * and the points still needed stay true; where its step is the level's real start (Lv1–10 with the default steps)
+ * nothing moves. At the top level (no next) the points go as they are ("en yüksek seviye").
+ */
+export function oldAppPoints(score, level, levels) {
+  const next = levels[level] ?? null;
+  const shift = (OLD_APP_STEPS[level - 1] ?? 0) - (levels[level - 1] ?? 0);
+  return next === null || shift === 0 ? { score, nextLevelAt: next } : { score: score + shift, nextLevelAt: next + shift };
+}
 /** The level of `score` points with the steps `levels` (Lv1 at 0). */
 export const levelOf = (score, levels = LEVELS) => levels.reduce((lv, need, i) => (score >= need ? i + 1 : lv), 1);
 /** A bond's points: every 100 coins the two gave each other, their talk points, less what the nights took (never below 0). */

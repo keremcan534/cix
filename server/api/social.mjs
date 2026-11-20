@@ -32,6 +32,7 @@ import { cityDistance } from './city-coords.mjs';
 import { eraseDecor } from './room-decor.mjs';
 import { shownRoomOf } from './presence-room.mjs';
 import { clearMarks, eraseMarks, profileMarksOf } from './profile-marks.mjs';
+import { endBondOnBlock } from './bonds.mjs';
 
 /** The interests the app offers (app/src/data/mock.ts INTERESTS). */
 export const INTERESTS = ['🎤 Karaoke', '🎮 Oyun', '💬 Sohbet', '⚽ Spor', '✈️ Seyahat', '🎬 Film', '💃 Dans', '📚 Kitap', '🎧 Müzik', '☕ Kahve'];
@@ -467,7 +468,7 @@ export const socialRoutes = {
     return followList(await auth(req), url, 'followers');
   },
 
-  /** Blocking also ends follows both ways; the other person is not told. */
+  /** Blocking also ends follows both ways and a bond between us; the other person is not told. */
   async 'POST /api/block'(req) {
     const me = await auth(req);
     const b = await readJson(req);
@@ -483,6 +484,8 @@ export const socialRoutes = {
       await c.query('DELETE FROM follows WHERE (follower = $1 AND followee = $2) OR (follower = $2 AND followee = $1)', [me.id, to]);
       // Following each other's room ends with it too (room-follow.mjs).
       await c.query('DELETE FROM room_follows WHERE (owner_id = $1 AND user_id = $2) OR (owner_id = $2 AND user_id = $1)', [me.id, to]);
+      // So does a bond between us, told to nobody (bonds.mjs).
+      await endBondOnBlock(c, me.id, to);
     });
     // Profil izleri: a mark the blocked person left on me comes off (its own transaction, my row locked first).
     await clearMarks(me.id, { how: 'block', by: me.id, from: to });

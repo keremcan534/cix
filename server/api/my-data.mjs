@@ -459,7 +459,7 @@ export async function exportOf(c, uid) {
   };
 
   const bonds = await all(
-    `SELECT b.*, o.name AS other_name, o.id AS other FROM bonds b JOIN users o ON o.id = CASE WHEN b.a = $1 THEN b.b ELSE b.a END
+    `SELECT b.*, b.gift_day::text AS gift_day_text, o.name AS other_name, o.id AS other FROM bonds b JOIN users o ON o.id = CASE WHEN b.a = $1 THEN b.b ELSE b.a END
       WHERE b.a = $1 OR b.b = $1 ORDER BY b.id`,
     (x) => ({
       id: num(x.id),
@@ -469,6 +469,13 @@ export async function exportOf(c, uid) {
       with: person(x.other, x.other_name),
       giftCoins: num(x.gift_coins),
       talkPoints: x.talk_points,
+      // What the nightly drop took, the level of the last write, the last day either sent the other a gift, and why
+      // it ended when no one ended it by hand (idle, gone; a request: refund) (bond-life.mjs, migrations 099 and 104).
+      // 'block' only to the one who blocked: the other is never told of a block (to them it ended, as by the other).
+      pointsLost: num(x.points_lost),
+      level: x.level,
+      giftDay: x.gift_day_text ?? null,
+      endReason: x.end_reason === 'block' && x.ended_by !== uid ? null : (x.end_reason ?? null),
       createdAt: x.created_at,
       acceptedAt: x.accepted_at,
       endedAt: x.ended_at,

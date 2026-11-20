@@ -40,12 +40,12 @@ import { notify } from './push.mjs';
 import { purchaseOptions } from './purchases.mjs';
 import { giftCoins } from './wallet.mjs';
 import { announceRoom, roomService } from './live.mjs';
-import { roomLevel } from './rooms.mjs';
 import { announceBoss, bossGift } from './boss-seat.mjs';
 import { GUARD_CARD, guardRules, guardStarted, startGuard } from './guards.mjs';
 import { fuelRocket, launchRockets, rocketFx, rocketVideosRev } from './room-rocket.mjs';
 import { luckyArtRev, luckyFx } from './lucky-art.mjs';
 import { lockSendAccounts } from './send-locks.mjs';
+import { addHeldRoomXp, holdRoomXp } from './room-xp-add.mjs';
 import { announceMarks, markGift, markPushBody, marksInfo, withMarks } from './profile-marks.mjs';
 import { announceGlobalGift } from './global-gifts.mjs';
 
@@ -194,9 +194,10 @@ export const giftRoutes = {
     let guardNew = false;
     let rocket = null;
     let mark = null;
+    let xpOwner = null;
     const out = await once(u.id, 'coin', b.ref, async (c) => {
-      // Both rows and the room owner's (room XP below) in id order, so two gifts at once can't deadlock (send-locks.mjs).
-      if (!(await lockSendAccounts(c, [u.id, to], liveKitRoom(room)?.slice(4)))) throw new HttpError(404, 'Alıcı bulunamadı');
+      // Both rows in id order, so two gifts at once can't deadlock (send-locks.mjs).
+      if (!(await lockSendAccounts(c, [u.id, to]))) throw new HttpError(404, 'Alıcı bulunamadı');
       await claimRef(c, u.id, 'coin', b.ref);
       // After the ref check: a retry of a gift that went through before the hide gets its replay, not a 400.
       if (s.giftsHidden.has(gift.id)) throw new HttpError(400, 'Bu hediye artık yok');
@@ -238,11 +239,12 @@ export const giftRoutes = {
       await addBondCoins(c, u.id, to, total);
       // Oda içi PK (pk.mjs): scores for the recipient while a PK runs in this room; never fails the gift.
       if (room) await scorePkGift(c, { room, eventId, sender: u.id, recipient: to, coins: total });
-      // Room level (rooms.mjs roomLevel): the coins count as XP for the owner of the open server room.
+      // Room level (rooms.mjs roomLevel): the coins count as XP for the owner of the open server room, held here and
+      // added once this commits (room-xp-add.mjs: the owner's row is never locked by a gift).
       const roomId = liveKitRoom(room)?.slice(4);
+      xpOwner = null;
       if (roomId) {
-        const x = await c.query('UPDATE users SET room_xp = room_xp + $2 WHERE id = (SELECT owner FROM rooms WHERE id = $1 AND closed_at IS NULL) RETURNING room_xp', [roomId, total]);
-        if (x.rowCount && roomLevel(Number(x.rows[0].room_xp)) > roomLevel(Number(x.rows[0].room_xp) - total)) levelUp = true;
+        xpOwner = await holdRoomXp(c, roomId, eventId, total);
         // Patron koltuğu (boss-seat.mjs): this send may sit its sender down, extend their sitting or take the seat.
         boss = await bossGift(c, { roomId, sender: u.id, coins: total });
         // Oda roketi (room-rocket.mjs): the coins fill today's rocket; a level it fills launches once this commits.
@@ -254,6 +256,8 @@ export const giftRoutes = {
     // once() keys on (sender, coin, ref), which spends, bonds and Jeton Noktası share: only a gift of this ref is
     // this gift's replay. Another feature's ref is refused, so a success always means the gift went.
     if (out.replay && !(await db.query('SELECT 1 FROM gift_events WHERE sender = $1 AND ref = $2', [u.id, b.ref])).rowCount) throw new HttpError(409, 'Geçersiz istek kimliği');
+    // The room XP it held reaches the owner (before the answer, so a room read after it has the new level).
+    if (!out.replay && xpOwner) levelUp = await addHeldRoomXp(xpOwner, [eventId]);
     // In a room the recipient sees it on stage; elsewhere (profile, chat) they get a notification.
     const lkRoom = liveKitRoom(room);
     if (!out.replay && eventId !== null && lkRoom) announceGift(lkRoom, { giftId: gift.id, count, from: u.id, to, eventId, ...(mark && { mark }) });
@@ -267,8 +271,9 @@ export const giftRoutes = {
     if (!out.replay && lkRoom && rocket) void launchRockets(lkRoom.slice(4), rocket);
     if (!out.replay && !room) notify([to], { title: 'Hediye geldi', body: markPushBody(mark, u.name) ?? `${u.name} sana ${label} gönderdi`, data: { type: 'gift', from: u.id } });
     if (!out.replay && guardNew) guardStarted(u, to);
-    // Global hediye (global-gifts.mjs): every room of the sender's country hears of it, paced (not awaited).
-    if (!out.replay && eventId !== null && gift.global) void announceGlobalGift({ sender: u.id, to, gift, count, eventId, roomId: lkRoom?.slice(4) ?? null });
+    // Global hediye (global-gifts.mjs): sent in a server room, every room of the sender's country hears of it, paced
+    // (not awaited). A send from a chat, a profile, the family chat or Anlar stays between the two.
+    if (!out.replay && eventId !== null && gift.global && lkRoom) void announceGlobalGift({ sender: u.id, to, gift, count, eventId, roomId: lkRoom.slice(4) });
     if (!out.replay) return { ...out, total, ...(mark && { mark }) };
     // A replay reports what that ref sent, not this body's gift and count (0: the ref was no gift).
     const sent = (await db.query('SELECT total FROM gift_events WHERE sender = $1 AND ref = $2', [u.id, b.ref])).rows[0];

@@ -167,8 +167,9 @@ vardır: dosyayı kendi sitenize (ör. GoDaddy hostingde `/hediyeler/` klasörü
 
 ## Global hediye (Güncelleme 7, madde 12)
 
-Çok pahalı bir hediye "Global" işaretlenirse biri onu birine gönderdiğinde, gönderenin ülkesindeki **bütün odalarda**
-üstte bir bant ve odanın sohbetinde bir satır çıkar: "Kaan → Artemis’e 🚀 Roket gönderdi · Gece Sohbeti odasında".
+Çok pahalı bir hediye "Global" işaretlenirse biri onu **bir odada** birine gönderdiğinde, gönderenin ülkesindeki **bütün
+odalarda** üstte bir bant ve odanın sohbetinde bir satır çıkar: "Kaan → Artemis’e 🚀 Roket gönderdi · Gece Sohbeti
+odasında".
 Sunucu: `server/api/global-gifts.mjs` (kurallar `global-gift-rules.mjs`, tablo sütunu `102_global_gifts.sql`), uygulama:
 `app/src/lib/global-gift-core.ts`, `app/src/lib/tr-dative.ts`, `app/src/lib/live/global-gift.ts`,
 `app/src/components/fx/global-gift-banner.tsx`.
@@ -179,25 +180,28 @@ Sunucu: `server/api/global-gifts.mjs` (kurallar `global-gift-rules.mjs`, tablo s
 | --- | --- |
 | Kim işaretler | Yönetici, Hediyeler formunda **Global** kutusu (`global: true`); hem yöneticinin hediyelerinde hem uygulamanın kendi hediyelerinde. Her değişiklik denetimde önce/sonra ile (`gift.create`, `gift.update`, `gift.reset`). Finans panelindeki kutu sonraki iş; sunucu ucu hazır |
 | En düşük fiyat | Canlı ayarlar › Global hediye › "en düşük fiyat" (`global_gift_min_price`, **300.000 jeton**). Altında kutu işaretlenemez (400). Global bir hediyenin fiyatı bu sınırın altına indirilemez; önce kutu kaldırılır. Sınır sonradan yükseltilirse altında kalan hediyenin işareti durur ama duyurulmaz |
+| Nereden | Yalnız **odada** gönderilen (odanın hediye panelinde Global sekmesi ve rozeti var). Birebir sohbetten, profilden, aile sohbetinden ya da Anlar'dan gönderilen global hediye normal hediye gibi gider, **duyurulmaz**: oradaki hediye panelinde Global rozeti ve uyarı yok, iki kişi arasındaki bir hediye ülkeye duyurulmaz (Kasım 2026 incelemesi) |
+| Oda adı | Banttaki "· Gece Sohbeti odasında" yalnız herkesin girebileceği açık bir odada yazar. Oda **özel** (yalnız üyeler) ya da **şifreliyse**, dinlenmedeyse, gönderen ya da alıcı Gizlilik › **"Bulunduğum odayı göster"**i kapattıysa ya da adını gizlediyse duyuru oda adı olmadan gider ("Gizli Buluşma" adlı özel bir odada iki kişinin birlikte olduğu ülkeye duyurulmasın; "Kaan'ın odası" gibi bir oda adı gizlenen adı ele vermesin). Profildeki "Şu an odada" ile aynı kural |
 | Hiçbir zaman | Bağ hediyeleri (bağ isteği ya da bağı olana bağ puanı olarak gider), Koruma Kartı, Şanslı paketleri (şans oyunu tanıtılmaz; Şanslı gönderimi bu yoldan geçmez), profil izi bırakan ya da temizleyen hediyeler (Kaka, Su ve yöneticinin iz kurallı hediyeleri: alıcıyı bütün ülkenin önünde küçük düşürür; kutu ile iz kuralı birlikte kaydedilemez, [`PROFIL_IZLERI.md`](PROFIL_IZLERI.md)). Çantam'dan bedava gönderim de duyurulmaz |
 | Ülke | Gönderenin profilindeki ülke (`profile_extras.country`); ülkesi boş olan **TR** sayılır. Duyuruyu profil ülkesi aynı olanlar görür (bugün neredeyse herkes TR) |
 | Aralık | En çok **10 saniyede bir** duyuru (`global_gift_gap_seconds`, 0: beklemeden). Beklerken aynı kişinin aynı kişiye aynı hediyesi tek duyuruda toplanır (×3). En çok 20 duyuru bekler, 3 dakikadan eskisi atlanır |
 | Görünüm | Bant (odanın üstündeki kazanç bandı sırasında, ~4,5 saniye) + o odanın sohbetinde bir satır. Hediyenin tam ekran videosu **yalnız gönderildiği odada** oynar; başka odalardaki telefonlar videoyu indirmez |
-| İsim | Ayarlar › Gizlilik › "Adım genel duyurularda görünmesin" (`globalHideName`): açıksa o kişi (gönderen de alıcı da) "Bir kullanıcı" yazar, fotoğrafı ve kimliği gitmez. Engelleşen kişiler birbirinin duyurusunu görmez (gönderenle ya da alıcıyla engeli olan) |
+| İsim | Ayarlar › Gizlilik › "Adım genel duyurularda görünmesin" (`globalHideName`, ilk başta kapalı): açıksa o kişi (gönderen de alıcı da) "Bir kullanıcı" yazar, fotoğrafı, kimliği ve oda adı gitmez. Bu düğme yalnız yeni uygulamada var: **eski APK kullananlar adlarını gizleyemez** (alıcı da). Engelleşen kişiler birbirinin duyurusunu görmez (gönderenle ya da alıcıyla engeli olan) |
 | Ek | Türkçe yönelme eki: Artemis’e, Ayşe’ye, Ali’ye, Bora’ya, Umut’a, Kemal’e. Sonu okunamayan adda (rakam, emoji, yabancı yazım) ek tahmin edilmez: "Kaan34 kişisine" |
-| Banda dokunma | O odaya gider (oda ekranı mevcut odadan çıkmadan önce sorar; yasak, kara liste ve özel oda kuralları her zamanki gibi). Kilitli ya da şifreli odada bant "kilitli oda" yazar, dokununca yalnız kapanır |
+| Banda dokunma | O odaya gider (oda ekranı mevcut odadan çıkmadan önce sorar; yasak, kara liste ve özel oda kuralları her zamanki gibi). Oda adı olmayan duyuruda dokununca bant yalnız kapanır. Sunucu artık özel ya da şifreli odayı hiç adlandırmadığı için `locked` hep `false` gider |
 | Hediye paneli | Yeni uygulamada **Global** sekmesi ve hediye kutusunda "Global" rozeti. Global ayrı bir raf değil: hediye yöneticinin seçtiği rafta da durur, eski APK onu orada normal hediye olarak gösterir |
 
 **Eski APK'lar:** canlı hattı `?global=1` ile açmazlar, bu yüzden duyuruyu hiç almazlar (bilmedikleri bir olayı "her şeyi
-yeniden oku" sayarlardı). Gönderildiği odada eski APK normal bir hediye görür. Eski APK'dan gönderilen global hediye
-yeni uygulamalara duyurulur. Katalogdaki `global: true` alanını eski APK görmezden gelir.
+yeniden oku" sayarlardı). Gönderildiği odada eski APK normal bir hediye görür. Eski APK'dan odada gönderilen global
+hediye yeni uygulamalara duyurulur. Katalogdaki `global: true` alanını eski APK görmezden gelir.
 
 **Sınır (sonra):** duyuru sırası ve canlı hatlar tek API sürecinin belleğinde. Birden fazla API sürecine geçilince
 ortak bir kanal (Postgres LISTEN/NOTIFY ya da Redis) ve tek bir sıra gerekir ([`DENETIM.md`](DENETIM.md)).
 
 **Testler:** `server/api/test/global-gifts.test.mjs` (en düşük fiyat, bağ / Koruma / Şanslı reddi, denetim, katalog,
 sınır yükselince; yeni hat alır, eski hat almaz, başka ülke, engeller, tekrar gönderim, gizli ad, fotoğraf ve ikon
-adresi, kilitli oda; aralık ve ×N toplama; Şanslı duyurulmaz), `app/tests/global-gift.test.ts` (yönelme eki, olayın
+adresi; oda dışı gönderim duyurulmaz; şifreli, özel ve dinlenen odada ve "Bulunduğum odayı göster" kapalıyken oda adı
+gitmez; aralık ve ×N toplama; Şanslı duyurulmaz), `app/tests/global-gift.test.ts` (yönelme eki, olayın
 okunması, bozuk olay, cümle, engel, katalog işaretleri, bant sırası).
 
 ## Telefona nasıl gider

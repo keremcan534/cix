@@ -30,7 +30,7 @@ const refused = async (p, code, re) => {
   return j;
 };
 
-let admin, ali, ayse, dinleyen;
+let admin, ali, ayse, dinleyen, room;
 const update = (body) => call('POST', '/api/admin/gifts/update', body, admin.session);
 const panelGift = async (id) => (await ok(call('GET', '/api/admin/gifts?builtin=1', null, admin.session), 'panel')).gifts.find((g) => g.id === id);
 const catalogGift = async (id) => (await ok(call('GET', '/api/catalog?gifts=2&family=1&marks=1'), 'katalog')).gifts.find((g) => g.id === id);
@@ -83,6 +83,8 @@ describe('Hediye özellikleri birlikte', () => {
     ayse = await h.signUp('Ayşe Alan');
     dinleyen = await h.signUp('Deniz Dinleyen');
     await h.credit(ali.user.id, 1_000_000);
+    // Only a send in a server room is announced (global-gifts.mjs): the sends below that could be go in Ayşe's room.
+    room = (await ok(call('POST', '/api/rooms', { title: 'Karışım Odası' }, ayse.session), 'oda')).room.id;
     // The minimum Global price low enough for Su (1.999), and no wait between two announcements.
     await setLive({ global_gift_min_price: 1000, global_gift_gap_seconds: 0 });
   });
@@ -140,12 +142,12 @@ describe('Hediye özellikleri birlikte', () => {
     try {
       await l.globals();
       // Kaka, then Su: the mark comes and goes as always; no announcement.
-      assert.equal((await ok(send(ali, ayse, 'k1', 999), 'kaka')).mark.role, 'leave');
-      assert.equal((await ok(send(ali, ayse, 'k2', 1999), 'su')).mark.role, 'clean');
+      assert.equal((await ok(send(ali, ayse, 'k1', 999, { room }), 'kaka')).mark.role, 'leave');
+      assert.equal((await ok(send(ali, ayse, 'k2', 1999, { room }), 'su')).mark.role, 'clean');
       // A global gift right after, as the control: only it is announced.
       await ok(update({ id: 'c6', global: true }), 'c6 global');
       await sleep(300);
-      const c6 = await ok(send(ali, ayse, 'c6', 699_999), 'c6');
+      const c6 = await ok(send(ali, ayse, 'c6', 699_999, { room }), 'c6');
       assert.equal(c6.mark, undefined);
       for (const end = Date.now() + 3000; Date.now() < end; await sleep(100)) {
         const got = await l.globals();
@@ -171,7 +173,7 @@ describe('Hediye özellikleri birlikte', () => {
     const l = await line(dinleyen.session);
     try {
       await l.globals();
-      const r = await ok(send(ali, ayse, 'bag-kanka', 500), 'tekrar bağ hediyesi');
+      const r = await ok(send(ali, ayse, 'bag-kanka', 500, { room }), 'tekrar bağ hediyesi');
       assert.equal(r.mark, undefined);
       const after = (await q("SELECT gift_coins FROM bonds WHERE status = 'active' AND kind = 'kanka'"))[0];
       assert.equal(Number(after.gift_coins) - Number(before.gift_coins), 500);

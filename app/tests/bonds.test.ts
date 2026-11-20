@@ -3,6 +3,8 @@
 // If one side changes without the other, the app would show a price the server doesn't charge.
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 import { BOND_KINDS, BOND_LEVELS, BOND_REWARDS, JOINT_WINDOW_MS, bondLevel, bondDays, bubbleBondOf, demoBondsOf, demoRoomBonds, jointEntries, micLinkOf, nextLevelAt, topBond, type RoomBond } from '@/data/bonds';
 // Plain JavaScript module of the server; TypeScript reads it through allowJs.
@@ -24,6 +26,38 @@ describe('Bağlar uygulamada sunucuyla aynı', () => {
     assert.equal(nextLevelAt(10), 3000, 'Lv20’ye kadar');
     assert.equal(nextLevelAt(20), null);
     assert.equal(BOND_LEVELS.length, 20);
+  });
+});
+
+describe('Bağlar: Lv20 puanları ve eski APK', () => {
+  test('uygulama her bağ isteğinde lv=20 der: sunucu gerçek puanı ve sonraki basamağı verir', () => {
+    const src = readFileSync(resolve(import.meta.dirname, '../src/lib/api.ts'), 'utf8');
+    const calls = [...src.matchAll(/'(GET|POST)', [`'](\/api\/bonds[^'`]*)/g)].map((m) => ({ route: `${m[1]} ${m[2].replace(/\?.*$/, '')}`, path: m[2] }));
+    assert.deepEqual(calls.map((c) => c.route).sort(), ['GET /api/bonds', 'GET /api/bonds/requests', 'POST /api/bonds/among', 'POST /api/bonds/end', 'POST /api/bonds/privacy', 'POST /api/bonds/request', 'POST /api/bonds/respond', 'POST /api/bonds/withdraw']);
+    assert.match(src, /const BOND_LV = 'lv=20';/);
+    // among and privacy answer no points; every other one asks for the real ones (the list's query is built with it).
+    for (const c of calls) {
+      if (/\/(among|privacy)$/.test(c.route)) continue;
+      if (c.path === '/api/bonds?${q}') assert.match(src, /offset > 0 \? `offset=\$\{offset\}` : '', BOND_LV\]/);
+      else assert.ok(c.path.endsWith('?${BOND_LV}'), c.path);
+    }
+  });
+  test('eski APK’nin çubuğu (kendi 10 basamağıyla) seviyenin içindeki gerçek ilerlemeyi gösterir', () => {
+    // The f9671d9 APK: from = its BOND_LEVELS[level - 1] ?? 0; bar = (score - from) / (nextLevelAt - from).
+    const OLD = [0, 10, 30, 60, 100, 200, 400, 700, 1200, 2000];
+    const oldBar = (score: number, level: number, next: number | null) => (next ? (score - (OLD[level - 1] ?? 0)) / (next - (OLD[level - 1] ?? 0)) : 1);
+    for (const score of [0, 15, 1999, 2000, 2999, 3000, 3200, 12_345, 44_999, 45_000, 99_999]) {
+      const level = server.levelOf(score);
+      const next = server.LEVELS[level] ?? null;
+      const shown = server.oldAppPoints(score, level, server.LEVELS);
+      const real = next ? (score - server.LEVELS[level - 1]) / (next - server.LEVELS[level - 1]) : 1;
+      assert.ok(Math.abs(oldBar(shown.score, level, shown.nextLevelAt) - real) < 1e-9, `puan ${score}`);
+      // Its text: the points still needed for the next level stay true; up to Lv10 nothing moves.
+      if (next) assert.equal(shown.nextLevelAt! - shown.score, next - score);
+      if (level <= 10) assert.deepEqual(shown, { score, nextLevelAt: next });
+    }
+    // Lv11, 3.200 points (the review's case): 13 %, not 71 %; the text says 200 / 1.500, Lv.12 için 1.300.
+    assert.deepEqual(server.oldAppPoints(3200, 11, server.LEVELS), { score: 200, nextLevelAt: 1500 });
   });
 });
 

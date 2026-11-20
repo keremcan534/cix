@@ -1,8 +1,9 @@
 // Global hediye (global-gifts.mjs, 102) against a real Postgres and a stand-in bucket: the admins mark a gift global
 // from Canlı ayarlar' minimum price on (never a bond gift, Koruma Kartı or a Şanslı package), every change audited;
-// the catalog says global: true (an older app ignores it). A paid send of one goes, once, to every live line opened
-// with ?global=1 whose owner is of the sender's country and in no block with the sender or the receiver; an older
-// app's line never gets it. A person can hide their name ("Bir kullanıcı"). At most one announcement every
+// the catalog says global: true (an older app ignores it). A paid send of one in a server room goes, once, to every
+// live line opened with ?global=1 whose owner is of the sender's country and in no block with the sender or the
+// receiver; an older app's line never gets it, a send outside a room is never told, and a room anyone couldn't see the
+// two in (private, password, resting, "Bulunduğum odayı göster" off, a hidden name) isn't named. A person can hide their name ("Bir kullanıcı"). At most one announcement every
 // global_gift_gap_seconds; the same send while one waits adds to it (×N).
 import { before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -209,10 +210,13 @@ describe('Global hediye', () => {
     const hidden = await w.next('global_gift');
     assert.equal(hidden.gift.id, 'c6', 'global olmayan duyurulmadı');
     assert.deepEqual([hidden.from.name, hidden.to], ['Kaan', { id: null, name: null }]);
+    // A hidden name hides the room too (its title, "Kaan'ın odası", would name them).
+    assert.equal(hidden.room, null, 'alıcı adını gizleyince oda da yazmaz');
+    await ok(call('PATCH', '/api/me/privacy', { globalHideName: false }, artemis.session), 'alıcı gösterir');
     await ok(call('PATCH', '/api/me/privacy', { globalHideName: true }, kaan.session), 'gönderen gizler');
-    await ok(send(rnd(), { room: undefined }), 'gönderen gizli, oda dışında');
+    await ok(send(rnd()), 'gönderen gizli');
     const anon = await w.next('global_gift');
-    assert.deepEqual([anon.from, anon.room], [{ id: null, name: null, avatar: null }, null]);
+    assert.deepEqual([anon.from, anon.to.name, anon.room], [{ id: null, name: null, avatar: null }, 'Artemis', null]);
 
     // The sender in Germany: Germany hears it, Turkey doesn't.
     await ok(call('PATCH', '/api/me/extras', { country: 'DE' }, kaan.session), 'gönderen ülke');
@@ -234,13 +238,50 @@ describe('Global hediye', () => {
     assert.equal(pic.from.avatar, served(photo));
     assert.deepEqual(pic.gift, { id: big.id, name: 'Gece Yıldızı', emoji: '🌟', icon: served(big.icon) });
 
-    // A password room: the banner says it is locked (the phones don't offer to go in).
+    // A password room: announced, but the room isn't named (a closed door, as the profile's "Şu an odada" keeps it).
     await q('UPDATE users SET room_xp = 600 WHERE id = $1', [kaan.user.id]);
     const locked = (await ok(call('POST', '/api/rooms', { title: 'Kilitli', password: '1234' }, kaan.session), 'şifreli oda')).room;
     await ok(send(rnd(), { room: locked.id }), 'şifreli odada');
-    assert.deepEqual((await w.next('global_gift')).room, { id: locked.id, title: 'Kilitli', locked: true });
+    const shut = await w.next('global_gift');
+    assert.deepEqual([shut.from.name, shut.to.name, shut.room], ['Kaan', 'Artemis', null]);
 
     for (const l of [w, old, de, b1, b2, own]) l.close();
+  });
+
+  test('oda dışı gönderim duyurulmaz; özel oda ve "Bulunduğum odayı göster" kapalıysa oda adı gitmez', async () => {
+    // (The gap is 0 since the test before.)
+    const kaan = await h.signUp('Kaan Özel');
+    const artemis = await h.signUp('Artemis Özel');
+    await h.credit(kaan.user.id, 15_000_000);
+    await q('UPDATE users SET room_xp = 600 WHERE id = $1', [kaan.user.id]);
+    const w = await open((await h.signUp('Yabancı')).session);
+    const gift = (extra) => ok(call('POST', '/api/gifts/send', { to: artemis.user.id, giftId: 'c6', count: 1, price: 699_999, ref: rnd(), ...extra }, kaan.session), 'gönder');
+    // A one-to-one chat, a profile, Anlar and an older app's send with no place: the gift goes, nobody hears.
+    for (const place of ['chat', 'profile', 'moment']) await gift({ place });
+    await gift({});
+    assert.deepEqual(await w.globalsSoFar(), [], 'oda dışında duyuru yok');
+    // A room for its members only: told, the room not named.
+    const secret = (await ok(call('POST', '/api/rooms', { title: 'Gizli Bulusma' }, artemis.session), 'oda')).room;
+    await q("UPDATE rooms SET room_type = 'private' WHERE id = $1", [secret.id]);
+    await gift({ room: secret.id });
+    const a = await w.next('global_gift');
+    assert.deepEqual([a.from.name, a.to.name, a.room], ['Kaan Özel', 'Artemis Özel', null]);
+    // An open room: named, until either of the two turns off "Bulunduğum odayı göster".
+    const plain = (await ok(call('POST', '/api/rooms', { title: 'Açık Oda' }, kaan.session), 'oda')).room;
+    await gift({ room: plain.id });
+    assert.deepEqual((await w.next('global_gift')).room, { id: plain.id, title: 'Açık Oda', locked: false });
+    for (const who of [artemis, kaan]) {
+      await ok(call('PATCH', '/api/me/privacy', { showCurrentRoom: false }, who.session), 'odamı gösterme');
+      await gift({ room: plain.id });
+      assert.equal((await w.next('global_gift')).room, null, `${who.user.name}: oda adı gitmez`);
+      await ok(call('PATCH', '/api/me/privacy', { showCurrentRoom: true }, who.session), 'odamı göster');
+    }
+    // A resting room (room-autoclose.mjs): not named either.
+    await q('UPDATE rooms SET paused_at = now() WHERE id = $1', [plain.id]);
+    await gift({ room: plain.id });
+    assert.equal((await w.next('global_gift')).room, null, 'dinlenen oda');
+    assert.deepEqual(await w.globalsSoFar(), []);
+    w.close();
   });
 
   test('aralık: en çok belirli saniyede bir; beklerken aynı gönderim ×N toplanır', async () => {
@@ -250,7 +291,8 @@ describe('Global hediye', () => {
     const c = await h.signUp('Cem');
     for (const p of [a, c]) await h.credit(p.user.id, 5_000_000);
     const w = await open((await h.signUp('Bekleyen')).session);
-    const send = (who, ref) => ok(call('POST', '/api/gifts/send', { to: b.user.id, giftId: 'c6', count: 1, price: 699_999, ref }, who.session), 'gönder');
+    const room = (await ok(call('POST', '/api/rooms', { title: `Aralık ${rnd().slice(0, 4)}` }, b.session), 'oda')).room.id;
+    const send = (who, ref) => ok(call('POST', '/api/gifts/send', { to: b.user.id, giftId: 'c6', count: 1, price: 699_999, room, ref }, who.session), 'gönder');
     // The previous test's last announcement may still hold the gap: the first goes once it has passed.
     await sleep(2100);
     const first = rnd();
@@ -280,10 +322,11 @@ describe('Global hediye', () => {
     for (const [sku, price] of [['fr-silver', 800], ['en-sparkle', 200]]) await ok(call('POST', '/api/shop/buy', { sku, price, ref: rnd() }, p.session), sku);
     const to = await h.signUp('Şanslı Alan');
     const w = await open((await h.signUp('Şanslı İzleyen')).session);
-    await ok(call('POST', '/api/lucky/send', { giftId: 'lk4', to: [to.user.id], count: 1, ref: rnd() }, p.session), 'şanslı');
+    const room = (await ok(call('POST', '/api/rooms', { title: `Şanslı ${rnd().slice(0, 4)}` }, to.session), 'oda')).room.id;
+    await ok(call('POST', '/api/lucky/send', { giftId: 'lk4', to: [to.user.id], count: 1, room, ref: rnd() }, p.session), 'şanslı');
     // A global send after it is the next event: the Şanslı one put nothing before it.
     const ref = rnd();
-    await ok(call('POST', '/api/gifts/send', { to: to.user.id, giftId: 'c6', count: 1, price: 699_999, ref }, p.session), 'global');
+    await ok(call('POST', '/api/gifts/send', { to: to.user.id, giftId: 'c6', count: 1, price: 699_999, room, ref }, p.session), 'global');
     const e = await w.next('global_gift');
     assert.equal(e.id, await eventOf(p.user.id, ref));
     assert.deepEqual(await w.globalsSoFar(), []);

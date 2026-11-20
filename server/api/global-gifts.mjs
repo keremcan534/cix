@@ -15,8 +15,15 @@
 // it would take an unknown event for "read everything again") whose owner's profile country (profile_extras.country,
 // none counts as TR) is the sender's, and who isn't in a block either way with the sender or the receiver. Each of
 // the two may choose in Gizlilik "Adım genel duyurularda görünmesin" (privacy.mjs globalHideName): then no id, name or
-// photo goes out for them (the phones write "Bir kullanıcı"). Only a paid send (POST /api/gifts/send) is announced,
-// never a replay of one; Çantam's free gifts aren't (backpack.mjs).
+// photo goes out for them (the phones write "Bir kullanıcı"). Only a paid send (POST /api/gifts/send) in an open
+// server room is announced, never a replay of one; a send from a one-to-one chat, a profile, the family chat or Anlar
+// is a gift between two people and stays between them (only the room's gift sheet shows the Global badge and shelf;
+// the review of Güncelleme 7). Çantam's free gifts aren't announced (backpack.mjs).
+//
+// Which room it names: the room only when anyone could see that the two are in it. Not a room for its members only
+// (room_type 'private') or one with a password, not a resting room, and not when the sender or the receiver turned
+// off "Bulunduğum odayı göster" (presence-room.mjs shownRoomOf's rules, less those that depend on who looks) or hid
+// their name (a room's title, "Kaan'ın odası", would name them). Then `room` is null: the banner names no room.
 //
 // Pacing: at most one announcement every global_gift_gap_seconds (10 s). While one waits, the same sender's sends of
 // the same gift to the same person add to it (×N). At most PENDING_MAX wait; one that waited STALE_MS is dropped. The
@@ -24,7 +31,8 @@
 // (Postgres LISTEN/NOTIFY or Redis) and one queue (docs/DENETIM.md).
 //
 // The event: { type: 'global_gift', id (the first send's gift_events id), from { id, name, avatar }, to { id, name },
-//   gift { id, name, emoji, icon }, count, room { id, title, locked } | null (sent outside a server room) }
+//   gift { id, name, emoji, icon }, count, room { id, title, locked: false } | null (a room it may not name, above) }.
+//   `locked` stays for the phones that read it: a room that would be locked is never named any more.
 import { BOND_GIFTS } from './catalog.mjs';
 import { HttpError, db, filesOut } from './core.mjs';
 import { GUARD_CARD } from './guard-rules.mjs';
@@ -76,27 +84,33 @@ let busy = false;
 
 /**
  * A paid send of a global gift (gifts.mjs, after its transaction and never on a replay): `sender` and `to` user ids,
- * `gift` as giftOf gives it (with its icon), `roomId` the server room it was sent in (null: a chat or a profile).
- * Queued for the next free moment (pacing). Best effort and never throws: the send is done and paid by now.
+ * `gift` as giftOf gives it (with its icon), `roomId` the server room it was sent in (null: a chat or a profile, never
+ * announced). Queued for the next free moment (pacing). Best effort and never throws: the send is done and paid by now.
  */
 export async function announceGlobalGift({ sender, to, gift, count, eventId, roomId = null }) {
+  if (!roomId) return;
   try {
     // As Postgres writes them, so the merge key and the lookups below match.
     sender = String(sender).toLowerCase();
     to = String(to).toLowerCase();
     const [people, room] = await Promise.all([
       db.query(
-        `SELECT u.id, u.name, u.avatar_url, coalesce(p.global_hide_name, false) AS hide, coalesce(x.country, 'TR') AS country
+        `SELECT u.id, u.name, u.avatar_url, coalesce(p.global_hide_name, false) AS hide, coalesce(p.show_current_room, true) AS shows_room,
+                coalesce(x.country, 'TR') AS country
            FROM users u LEFT JOIN privacy_settings p ON p.user_id = u.id LEFT JOIN profile_extras x ON x.user_id = u.id
           WHERE u.id = ANY($1::uuid[])`,
         [[sender, to]],
       ),
-      roomId ? db.query("SELECT id, title, password_hash IS NOT NULL OR room_type = 'private' AS locked FROM rooms WHERE id = $1 AND closed_at IS NULL", [roomId]) : null,
+      db.query(
+        "SELECT id, title, password_hash IS NULL AND room_type <> 'private' AND paused_at IS NULL AS open FROM rooms WHERE id = $1 AND closed_at IS NULL",
+        [roomId],
+      ),
     ]);
     const a = people.rows.find((x) => x.id === sender);
     const b = people.rows.find((x) => x.id === to);
-    if (!a || !b) return;
-    const r = room?.rows[0];
+    const r = room.rows[0];
+    if (!a || !b || !r) return;
+    const named = r.open === true && a.shows_room && b.shows_room && !a.hide && !b.hide;
     queue({
       key: `${sender}:${to}:${gift.id}`,
       at: Date.now(),
@@ -110,7 +124,7 @@ export async function announceGlobalGift({ sender, to, gift, count, eventId, roo
         to: b.hide ? { id: null, name: null } : { id: b.id, name: clip(b.name, 60) },
         gift: { id: gift.id, name: clip(gift.name, 40), emoji: clip(gift.emoji, 16), icon: clip(gift.icon, 600) },
         count,
-        room: r ? { id: r.id, title: clip(r.title, 80), locked: r.locked === true } : null,
+        room: named ? { id: r.id, title: clip(r.title, 80), locked: false } : null,
       },
     });
   } catch (e) {

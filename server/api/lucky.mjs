@@ -41,11 +41,11 @@ import { lineWin } from './live-line.mjs';
 import { live } from './live-settings.mjs';
 import { panelDetail } from './panel.mjs';
 import { scorePkGift } from './pk.mjs';
-import { roomLevel } from './rooms.mjs';
 import { announceBoss, bossGift } from './boss-seat.mjs';
 import { fuelRocket, launchRockets } from './room-rocket.mjs';
 import { audit } from './sanctions.mjs';
 import { lockSendAccounts } from './send-locks.mjs';
+import { addHeldRoomXp, holdRoomXp } from './room-xp-add.mjs';
 import { creditCoins, giftCoins, spendCoins } from './wallet.mjs';
 import { casinoNeed, wealthPoints } from './wheel.mjs';
 
@@ -177,13 +177,14 @@ export const luckyRoutes = {
     let events = [];
     let boss = [];
     let rocket = null;
+    let xpOwner = null;
     let announceFrom = DEFAULT_CONFIG.announceFrom;
     let gift;
     try {
       row = await tx(async (c) => {
-        // Every account this send touches (the room owner's too: room XP below; and what the sender's coin lots point
-        // at, since a lot is written twice here), locked in id order so two sends at once can't deadlock (send-locks.mjs).
-        if (!(await lockSendAccounts(c, [me.id, ...to], liveKitRoom(room)?.slice(4), { rewrites: true }))) throw new HttpError(404, 'Alıcı bulunamadı');
+        // Every account this send touches (and what the sender's coin lots point at, since a lot is written twice
+        // here), locked in id order so two sends at once can't deadlock (send-locks.mjs).
+        if (!(await lockSendAccounts(c, [me.id, ...to], { rewrites: true }))) throw new HttpError(404, 'Alıcı bulunamadı');
         if ((await c.query('SELECT 1 FROM lucky_sends WHERE user_id = $1 AND ref = $2', [me.id, ref])).rowCount) throw Object.assign(new Error('replay'), { code: '23505' });
         const cur = await current(c);
         announceFrom = cur.config.announceFrom;
@@ -197,6 +198,7 @@ export const luckyRoutes = {
         const label = `${gift.name}${count > 1 ? ` ×${count}` : ''} (Şanslı)`;
         const roomId = liveKitRoom(room)?.slice(4);
         events = [];
+        xpOwner = null;
         for (const [i, rid] of to.entries()) {
           const gref = `${lref}-${i}`;
           const g = await c.query('INSERT INTO gift_events (sender, recipient, gift_id, count, unit_price, total, room, ref) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id', [
@@ -215,10 +217,8 @@ export const luckyRoutes = {
           await giftCoins(c, { sender: me.id, recipient: rid, total: share, label, ref: gref, giftEvent: eventId });
           await addBondCoins(c, me.id, rid, share);
           if (room) await scorePkGift(c, { room, eventId, sender: me.id, recipient: rid, coins: share });
-          if (roomId) {
-            const x = await c.query('UPDATE users SET room_xp = room_xp + $2 WHERE id = (SELECT owner FROM rooms WHERE id = $1 AND closed_at IS NULL) RETURNING room_xp', [roomId, share]);
-            if (x.rowCount && roomLevel(Number(x.rows[0].room_xp)) > roomLevel(Number(x.rows[0].room_xp) - share)) levelUp = true;
-          }
+          // Room level: each share is the owner's room XP, added once this commits (room-xp-add.mjs).
+          if (roomId) xpOwner = (await holdRoomXp(c, roomId, eventId, share)) ?? xpOwner;
           // The same source ref as a plain gift, so the agency job's backfill from gift_events never counts it twice.
           await recordIncome(c, rid, 'lucky_gift', `gift:${eventId}`, share);
         }
@@ -248,6 +248,8 @@ export const luckyRoutes = {
       if (!again) throw new HttpError(409, 'Geçersiz istek kimliği');
       return answer(again, true);
     }
+    // The room XP it held reaches the owner (before the answer, so a room read after it has the new level).
+    if (xpOwner) levelUp = await addHeldRoomXp(xpOwner, events.map((x) => x.eventId));
     // Announced to the room's voice connection once paid, so no phone can fake a gift or a win.
     const lkRoom = liveKitRoom(room);
     if (lkRoom) {
