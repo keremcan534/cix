@@ -161,7 +161,9 @@ yapar (`server/api/test/muzip.test.mjs`, "kodsuz üçüncü çift").
      kare olmaz.
    - iki hediyenin **ikonu:** 512 × 512 saydam PNG.
    - isteğe bağlı **gönderim animasyonları:** SVGA 2.x, 3–5 sn; temizleme 2–4 sn.
-2. **İz türünü ekleyin:** Panel › Uygulama › Hediyeler › **İz türleri** › Yeni tür.
+2. **İz türünü ekleyin:** Panel › Uygulama › Hediyeler sayfasının üstündeki **İz türleri** sekmesi › Yeni tür.
+   Ya da doğrudan hediye formunda, "İz türü" seçiminin yanındaki **+ Yeni iz türü** düğmesiyle; kaydedince tür
+   hediyede seçili gelir, formda yazdıklarınız durur. Seçili türün resmi yoksa formda **Resim yükle** çıkar.
    - Anahtar `camur`, ad "Çamur".
    - İz resmini yükleyin. Kontrolden geçmezse nedeni yazar: "İz resmi yüzü kapatıyor: …" ya da "İz resminin en az
      %30'u tam saydam olmalı…".
@@ -185,7 +187,8 @@ yapar (`server/api/test/muzip.test.mjs`, "kodsuz üçüncü çift").
 Kırık Cam türü kurulumla gelir (`kirik-cam`). Uygulamanın içinde geçici bir kırık cam resmi var. Kendi resminizi
 yükleyince o kullanılır.
 
-1. **Gerçek resim (isteğe bağlı, sonra da olur):** İz türleri › Kırık Cam › iz resmini yükleyin. Hazır geçici dosya:
+1. **Gerçek resim (isteğe bağlı, sonra da olur):** İz türleri sekmesi › Kırık Cam › Düzenle › iz resmini yükleyin
+   (ya da Terlik Geldi!'nin formunda tür Kırık Cam seçiliyken **Resim yükle**). Hazır geçici dosya:
    `docs/gorseller/muzip/kirik-cam-512.png`.
 2. **Terlik Geldi! (`p8`):** Hediyeler › uygulamanın hediyeleri › Terlik Geldi! › Düzenle.
    - **Rafa koy** (bugün rafta değil).
