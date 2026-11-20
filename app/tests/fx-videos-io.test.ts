@@ -66,6 +66,11 @@ describe('hediye videoları telefonda', () => {
     await tick();
     assert.deepEqual(asked, []);
 
+    // The person card's look (fxMediaKept) never fetches: only what is already on the phone.
+    assert.equal(fx.fxMediaKept('entry', 'dragon'), null);
+    await tick();
+    assert.deepEqual(asked, [], 'kişi kartı indirmez');
+
     // The first gift that needs it plays drawn and starts the download; the next one plays the clip.
     assert.equal(fx.fxMedia('gift', 'g6'), null);
     await until(() => fx.fxMedia('gift', 'g6') !== null, 'roket insin');
@@ -75,6 +80,8 @@ describe('hediye videoları telefonda', () => {
     assert.equal(media.uri, `file://${root}/fx/roket-0123456789ab.mp4`);
     assert.ok(fs.readFileSync(path.join(dir, 'roket-0123456789ab.mp4')).equals(server.get(roket.url)!));
     assert.equal(fx.fxMedia('gift', 'yok'), null, 'listede olmayan hediye');
+    assert.deepEqual(fx.fxMediaKept('gift', 'g6'), media, 'telefondaki klip kartta da oynar');
+    assert.equal(fx.fxMediaKept('gift', 'h13'), null);
 
     // Fetching ahead: the rest come one by one.
     fx.setFxVideos([roket, ayicik, ejderha], { prefetch: true });

@@ -10,7 +10,7 @@ import { Animated, Easing, StyleSheet, View, type LayoutChangeEvent, type TextSt
 
 import { Text } from '@/components/text';
 import type { EntryFx } from '@/components/fx/entry';
-import { fxMedia, setFxVideos, type FxMedia } from '@/lib/fx-videos';
+import { fxMedia, fxMediaKept, setFxVideos, type FxMedia } from '@/lib/fx-videos';
 import { fxSafetyMs } from '@/lib/fx-videos-core';
 import { plateLayout, plateText, type Plate } from '@/lib/shop-live-core';
 import { useLiveCatalog } from '@/lib/live/catalog-live';
@@ -27,6 +27,9 @@ export const entryVideoOf = (fx?: EntryFx): FxMedia | null => (alphaVideoAvailab
 /** An entry show's clip: the team's own (Yönetim › Mağaza, fx entry <id>) or the app's entry effect's. */
 export const entryClipOf = (show: { fx?: EntryFx; clip?: string }): FxMedia | null =>
   alphaVideoAvailable ? (show.clip ? fxMedia('entry', show.clip) : show.fx ? fxMedia('entry', show.fx) : null) : null;
+/** The same clip only when it is already on the phone: never starts a download (the person card's entry box). */
+export const entryClipKept = (show: { fx?: EntryFx; clip?: string }): FxMedia | null =>
+  alphaVideoAvailable ? (show.clip ? fxMediaKept('entry', show.clip) : show.fx ? fxMediaKept('entry', show.fx) : null) : null;
 
 /** How long the name takes to come in and to go (a plate's `anim`; `none`: at once). */
 const PLATE_IN_MS = 350;

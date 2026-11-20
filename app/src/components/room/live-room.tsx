@@ -57,6 +57,7 @@ import { PersonCard } from '@/components/room/person-card';
 import { insertMention, mentionPicks, mentionQuery, mentions, stripMentions } from '@/lib/room-mention';
 import { addMention, mentionsIn, seenMentions, type MentionMark } from '@/lib/mention-chip';
 import { EntryEffect, type EntryFx, type EntryShow } from '@/components/fx/entry';
+import { entryShowOfPlan } from '@/components/fx/entry-show';
 import { storeArtOf } from '@/components/StoreArt';
 import { ROOM_ICON_ART } from '@/components/RoomArt';
 import { gameArtOf, gameHueOf } from '@/components/GameArt';
@@ -265,20 +266,7 @@ const MY_ENTRY_DELAY_MS = 1000;
 const BOT_ENTRY_FX: EntryFx[] = ['dragon', 'vip'];
 const NO_BONDS: RoomBond[] = [];
 /** Someone's entry show in a server room, from their own shop look (lib/room-entrance entryPlanOf); null: none. */
-function entryShowOf(look: Look | undefined, name: string, avatar: string): EntryShow | null {
-  const plan = entryPlanOf(look);
-  if (!plan) return null;
-  return {
-    name,
-    avatar,
-    fx: plan.fx,
-    ...(plan.clip ? { clip: plan.clip, plate: plan.plate ?? null } : {}),
-    ride: plan.ride,
-    rideArt: storeArtOf(plan.rideId),
-    colors: plan.tint === undefined ? undefined : (plan.tint ?? gradient),
-    badge: plan.badge,
-  };
-}
+const entryShowOf = (look: Look | undefined, name: string, avatar: string): EntryShow | null => entryShowOfPlan(entryPlanOf(look), name, avatar);
 // What another phone may put over its seat: a sticker of a known pack, or a standard emoji an older app's panel had
 // (no free text, no unknown art).
 const SEAT_EMOJI = new Set(STANDARD_EMOJI.flatMap((g) => g.emojis));
