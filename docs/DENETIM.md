@@ -234,6 +234,11 @@ Suyu, Cam Tamiri) gönderince gider ([`PROFIL_IZLERI.md`](PROFIL_IZLERI.md)).
   - Hiçbir ekranda "temizlemek için harca" yok.
 - **Değişen (sizin kararınız):** "Profilime iz bırakılmasın" artık **profildeki izi kaldırmaz**, yalnız yenisini
   engeller.
+- **Değişen (müşterinin isteği, 20 Kasım 2026): iz yüzü kapatabilir.** Panelden yüklenen iz resmi artık bütün
+  fotoğrafı, yüzü de kaplayabilir (buz gibi). Önceden fotoğrafın görünmesi şarttı (en az %30 saydam, yüzün en çok
+  %20'si dolu). Taciz riski büyür: birinin yüzü iz süresince (24 saate kadar) tamamen kapanabilir ve kişi bunu
+  ücretsiz kaldıramaz. Azaltanlar aynı: varsayılan "Yalnız takip ettiklerim", engelleme izi hemen kaldırır, yönetim
+  kaldırır. Mağaza incelemesi sorarsa ilk istenecek yine tek dokunuşla ücretsiz kaldırma.
 - **Sıklık sınırı yok (sizin kararınız):** Aynı kişi aynı kişiye art arda iz bırakabilir. Taciz şikâyeti gelirse ilk
   bakılacak önlem bu. Panelde "bu kişinin bıraktığı izler" görünümü ve şikâyette "profil izi" sebebi de yok, sonraki
   iş.

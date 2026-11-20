@@ -144,9 +144,11 @@ ve Terlik Geldi! de dahil.
 
 İz resmi yüklenirken sunucu piksel piksel denetler:
 
-- kare, 256–2048 piksel, en çok 2 MB, hareketsiz;
-- en az %30'u tam saydam;
-- ortadaki yüz dairesinin en çok %20'si dolu.
+- kare, 256–2048 piksel, en çok 10 MB (telefonlara 512 piksel ve 300 KB'a küçültülmüşü gider), hareketsiz;
+- saydamlık kanalı olan PNG ya da WebP.
+
+Resim yüzü kapatabilir (ör. bütün fotoğrafı kaplayan buz; müşterinin isteği, 20 Kasım 2026). Telefon onu fotoğrafın
+dairesine kırpar.
 
 Uymayanı nedeniyle reddeder. Büyüğü 512 piksele küçültür. Her değişiklik denetim kaydıdır (`markkind.create`,
 `markkind.update`, `markkind.delete`; önce ve sonra). Bir türü kullanan hediye varken tür silinemez.
@@ -157,14 +159,14 @@ Uymayanı nedeniyle reddeder. Büyüğü 512 piksele küçültür. Her değişik
 yapar (`server/api/test/muzip.test.mjs`, "kodsuz üçüncü çift").
 
 1. **Resimleri hazırlayın.** Ekipten:
-   - **iz resmi:** 512 × 512 saydam PNG. Çizim kenarlarda, ortası (yüz) boş, boş yerler tam saydam (alfa 0). Büyük opak
-     kare olmaz.
+   - **iz resmi:** 512 × 512 saydam PNG. Çizim bütün fotoğrafı kaplayabilir (yüz dahil); telefon dairenin dışını
+     keser.
    - iki hediyenin **ikonu:** 512 × 512 saydam PNG.
    - isteğe bağlı **gönderim animasyonları:** SVGA 2.x, 3–5 sn; temizleme 2–4 sn.
 2. **İz türünü ekleyin:** Panel › Uygulama › Hediyeler › **İz türleri** › Yeni tür.
    - Anahtar `camur`, ad "Çamur".
-   - İz resmini yükleyin. Kontrolden geçmezse nedeni yazar: "İz resmi yüzü kapatıyor: …" ya da "İz resminin en az
-     %30'u tam saydam olmalı…".
+   - İz resmini yükleyin. Kontrolden geçmezse nedeni yazar (ör. "İz resmi kare olmalı…", "İz resminde saydamlık
+     yok…").
    - İsterseniz süre verin (ör. 60 dakika).
    - Önizlemede örnek fotoğraf üstünde bakın.
 3. **İz bırakan hediyeyi ekleyin:** Hediyeler › Yeni hediye.

@@ -138,13 +138,14 @@ export const marksAllow = (rule, followed) => rule === 'everyone' || (rule === '
 
 // --- A kind's overlay picture (mark-kinds.mjs, tools/mark-art-check.py) -------------------------------------------
 /**
- * What an uploaded overlay must be: a still, square PNG or WebP of 256–2048 px, at most 2 MB; phones get it at most
- * 512 px and 300 KB (made smaller here when it is bigger). Over the round photo it must leave the photo seen: at
- * least 30 % of its pixels fully transparent (alpha 0), and at most 20 % of the face (the middle circle, 30 % of the
- * side from the centre) more than half opaque. Kaka İzi, drawn by the app's scripts/mark-art.py: 50 % and 14 %.
+ * What an uploaded overlay must be: a still, square PNG or WebP of 256–2048 px with an alpha channel, at most 10 MB;
+ * phones get it at most 512 px and 300 KB (made smaller here when it is bigger). It may cover the whole photo, face
+ * included (the client's choice, 20 Nov 2026: ice over the face; a ring-like mark hid under a frame). Until then at
+ * least 30 % had to be fully transparent and at most 20 % of the face circle opaque. The checker still measures both
+ * (`stats`, shown in the panel); clearMin 0 and faceMax 1 are what the panel's own check (web/mark-kinds.js
+ * artProblem, which takes these limits) lets through: everything.
  */
-export const MARK_ART = Object.freeze({ minPx: 256, maxPx: 2048, servePx: 512, serveBytes: 300 * 1024, clearMin: 0.3, faceMax: 0.2, faceRadius: 0.3 });
-const pct = (x) => `%${Math.round(x * 100)}`;
+export const MARK_ART = Object.freeze({ minPx: 256, maxPx: 2048, servePx: 512, serveBytes: 300 * 1024, clearMin: 0, faceMax: 1, faceRadius: 0.3 });
 // The third-person possessive ending after a whole number as it is read aloud ("%30'u", "%20'si", "%40'ı", "%14'ü"):
 // the last spoken word decides (bir, iki, üç…; on, yirmi, otuz…; yüz; bin). The panel's web/mark-kinds.js has the same.
 const UNIT_END = ['', 'i', 'si', 'ü', 'ü', 'i', 'sı', 'si', 'i', 'u'];
@@ -156,8 +157,6 @@ export function possessiveEnd(n) {
   if (v % 100) return TEN_END[(v / 10) % 10];
   return v % 1000 ? 'ü' : 'i';
 }
-/** A share as a percentage with its possessive ending: "%30'u", "%20'si". */
-const pctOf = (x) => `${pct(x)}'${possessiveEnd(Math.round(x * 100))}`;
 /**
  * Why an overlay can't be used, from its header (`info`, custom-gifts.mjs imageInfo) and what the checker measured
  * (`stats`: { width, height, frames, clear, face }), as the Turkish sentence the panel shows; null when it can.
@@ -169,12 +168,5 @@ export function markArtProblem(info, stats) {
   if (Math.abs(w - h) > Math.max(2, w * 0.02)) return `İz resmi kare olmalı (bu ${w} × ${h}); 512 × 512 önerilir`;
   if (w < MARK_ART.minPx || w > MARK_ART.maxPx) return `İz resmi ${MARK_ART.minPx}–${MARK_ART.maxPx} piksel olmalı (bu ${w} × ${h}); 512 × 512 önerilir`;
   if (!info.alpha) return 'İz resminde saydamlık yok: arka planı tam saydam (alfa 0) bir PNG ya da WebP yükleyin';
-  if (!stats) return null;
-  if (stats.clear < MARK_ART.clearMin) {
-    return `İz resminin en az ${pctOf(MARK_ART.clearMin)} tam saydam (alfa 0) olmalı, bunda ${pct(stats.clear)}: fotoğraf görünmez kalır. Arka planı silinmiş, kenarlarda çizim olan bir resim yükleyin`;
-  }
-  if (stats.face > MARK_ART.faceMax) {
-    return `İz resmi yüzü kapatıyor: ortadaki dairenin en çok ${pctOf(MARK_ART.faceMax)} dolu olabilir, bunda ${pct(stats.face)}. Çizimi kenarlara alın, ortayı boş bırakın`;
-  }
   return null;
 }
