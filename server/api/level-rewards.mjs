@@ -33,6 +33,8 @@ async function rules(q = db) {
   return cache.rules;
 }
 const forget = () => (cache = { at: 0, rules: [] });
+/** The rules read again at the next claim (vip-set.mjs, after it adds its rewards). */
+export const forgetLevelRewards = forget;
 
 /**
  * Gives `uid` every reward of a level they have now and haven't been given (`vip`: their VIP level, which the

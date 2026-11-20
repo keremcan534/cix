@@ -161,6 +161,37 @@ export const rightArtKey = (r: Pick<ShownRight, 'art'>): RightArtKey | null => (
  */
 export const artGlows = (key: RightArtKey | null) => key !== 'frame';
 
+// --- VIP seti: each level's own pictures (components/vip/level-art, the client's "vip 1-10lvl sistem") ---------------
+/** The set draws VIP 1–10; a level past the last shows the last one's. */
+export const LEVEL_ART_TOP = 10;
+/** The set's level a VIP level shows (1–10), or null for none (0, a negative or a broken number). */
+export const levelArtFor = (level: number): number | null => (Number.isFinite(level) && level >= 1 ? Math.min(LEVEL_ART_TOP, Math.floor(level)) : null);
+export type LevelPicKind = 'badge' | 'frame' | 'bubble' | 'entry';
+/** A right as the VIP list shows it; `set`: the level's picture of the set it draws instead of its one picture. */
+export type ListRight = ShownRight & { set?: LevelPicKind };
+/**
+ * The set's two rights the list adds after the server's: each level's chat bubble and entry effect, which reaching it
+ * puts in Çantam (server vip-set.mjs, a Seviye ödülü per level). The badge and frame rights are the server's own.
+ */
+export const VIP_SET_RIGHTS: readonly ListRight[] = [
+  { name: 'Sohbet balonu', emoji: '💬', art: 'ayricalik-genel-sohbet-balonu', level: 1, set: 'bubble' },
+  { name: 'Giriş efekti', emoji: '✨', art: 'ayricalik-giris-efekti', level: 1, set: 'entry' },
+];
+/** The VIP list: the server's rights (the badge and frame ones drawing the level's own picture), then the set's two. */
+export function withSetRights(rights: readonly ShownRight[]): ListRight[] {
+  const own: ListRight[] = rights.map((r) => {
+    const key = rightArtKey(r);
+    return key === 'badge' || key === 'frame' ? { ...r, set: key } : r;
+  });
+  return [...own, ...VIP_SET_RIGHTS.filter((x) => !own.some((r) => r.set === x.set || r.name === x.name))];
+}
+/** What a tap on a right says: when it opens, and for a picture of the set that it comes to Çantam. */
+export function rightNote(r: ListRight, open: boolean, levelName: string, opensAt: string): string {
+  if (!open) return `${opensAt} ile açılır.`;
+  if (r.set === 'frame' || r.set === 'bubble' || r.set === 'entry') return `${levelName} ile kullanabilirsin. Bu seviyenin ${r.name.toLocaleLowerCase('tr')} Çantam'a gelir; oradan takabilirsin.`;
+  return `${levelName} ile kullanabilirsin.`;
+}
+
 /** How many of the rights a level has. */
 export const rightsOpen = (rights: readonly Pick<ShownRight, 'level'>[], level: number) => rights.filter((r) => r.level <= level).length;
 

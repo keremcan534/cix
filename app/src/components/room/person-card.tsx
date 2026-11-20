@@ -213,7 +213,7 @@ export function PersonCard({ uid, note, onClose, onGift, onMention, onReport, on
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={s.backdrop} onPress={onClose} accessibilityLabel="Kapat" />
       <View style={[s.float, { paddingBottom }]}>
-        <CardPanel style={[s.sheet, { maxHeight }]}>
+        <CardPanel style={[s.sheet, { maxHeight }]} vip={vip}>
           <View style={[s.head, boxed && s.headBoxed]}>
             <View style={s.avatar}>
               <FramedAvatar uri={u.avatar} size={78} vipLevel={vip} frameId={frameId ?? undefined} artScale={1.6} markUid={uid} />

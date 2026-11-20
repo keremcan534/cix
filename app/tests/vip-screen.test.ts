@@ -459,3 +459,32 @@ describe('Abonelik sekmesi', () => {
     assert.ok(perkTextRoom(286) > 150);
   });
 });
+
+describe('VIP seti: her seviyenin kendi resimleri', () => {
+  test('VIP 1–10 kendi resmini çizer; üstü 10’unkini, 0 ve bozuk sayı hiçbirini', async () => {
+    const { levelArtFor } = await import('@/lib/vip-screen');
+    assert.equal(levelArtFor(1), 1);
+    assert.equal(levelArtFor(7.9), 7);
+    assert.equal(levelArtFor(10), 10);
+    assert.equal(levelArtFor(14), 10);
+    assert.equal(levelArtFor(0), null);
+    assert.equal(levelArtFor(-3), null);
+    assert.equal(levelArtFor(Number.NaN), null);
+  });
+
+  test('liste: rozet ve çerçeve seviyenin resmiyle, sohbet balonu ve giriş efekti sonda bir kez', async () => {
+    const { withSetRights, rightNote } = await import('@/lib/vip-screen');
+    const list = withSetRights(vipRightsOf(null));
+    assert.equal(list.find((r) => r.art === 'ayricalik-svip-rozeti')?.set, 'badge');
+    assert.equal(list.find((r) => r.art === 'ayricalik-profil-cercevesi')?.set, 'frame');
+    assert.deepEqual(list.slice(-2).map((r) => [r.name, r.set, r.level]), [['Sohbet balonu', 'bubble', 1], ['Giriş efekti', 'entry', 1]]);
+    assert.equal(list.length, vipRightsOf(null).length + 2);
+    // Run again over its own output: nothing doubles.
+    assert.equal(withSetRights(list).length, list.length);
+    const bubble = list.find((r) => r.set === 'bubble')!;
+    assert.match(rightNote(bubble, true, 'VIP 4', 'VIP 1'), /VIP 4 ile kullanabilirsin\. Bu seviyenin sohbet balonu Çantam'a gelir/);
+    assert.equal(rightNote(bubble, false, 'VIP 4', 'VIP 1'), 'VIP 1 ile açılır.');
+    const other = list.find((r) => !r.set)!;
+    assert.equal(rightNote(other, true, 'VIP 4', 'VIP 1'), 'VIP 4 ile kullanabilirsin.');
+  });
+});

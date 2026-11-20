@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { memo, useState, type ReactNode } from 'react';
-import { Pressable, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Image, Pressable, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { LuxeFace, luxeMinWidth, type LuxeFaceName } from '@/components/luxe-face';
 import { Text } from '@/components/text';
@@ -23,6 +23,8 @@ import { Art } from '@/components/Art';
 import { FadeImage, useImageRetry } from '@/components/photo';
 import { RollingNumber } from '@/components/fx/rolling-number';
 import { MarkLayer } from '@/components/profile-mark';
+import { VIP_LEVEL_ART } from '@/components/vip/level-art';
+import { LEVEL_ART_TOP, levelArtFor } from '@/lib/vip-screen';
 
 export function Avatar({ uri, size = 44, online, ring, name }: { uri?: string; size?: number; online?: boolean; ring?: boolean; name?: string }) {
   const { colors, semantic, gradient } = useTheme();
@@ -390,9 +392,15 @@ export function LevelChips({ wealth, charm, hideWealth, hideCharm, size = 'sm' }
   );
 }
 
+/** The level badge's size in the name rows (profile, person card): the shield's "VIP n" still reads. */
+const VIP_BADGE_SIZE = 30;
+
 export function VipTitle({ level }: { level: number }) {
   const styles = useStyles();
   const tier = vipTier(level);
+  // VIP seti: the level's own badge (components/vip/level-art), its "VIP n" drawn in it; the chip for any other level.
+  const set = level <= LEVEL_ART_TOP ? levelArtFor(level) : null;
+  if (set) return <Image source={VIP_LEVEL_ART[set].badge.source} style={{ width: VIP_BADGE_SIZE, height: VIP_BADGE_SIZE }} resizeMode="contain" accessibilityLabel={`VIP ${set}`} />;
   if (!tier) return null;
   return (
     <LinearGradient colors={tier.color} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.vip, { flexDirection: 'row', alignItems: 'center', gap: 2, paddingLeft: 2 }]}>
