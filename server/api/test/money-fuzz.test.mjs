@@ -41,10 +41,16 @@ describe('Para: aynı anda rastgele işlemler', () => {
     await ok(call('POST', '/api/admin/jeton/wholesale', { bank: bank.user.id, coins: 500_000, paymentRef: 'DEKONT-1', ref: rnd(6) }, admin.session), 'toptan');
     for (const p of people) await ok(call('POST', '/api/wallet/test-topup', { amount: 10000, ref: rnd(6) }, p.session), 'yükleme');
     const room = (await ok(call('POST', '/api/rooms', { title: `Para ${rnd(2)}` }, people[0].session), 'oda')).room.id;
+    // Muzip hediyeler: Terlik Geldi! leaves Kırık Cam and Konfeti Topu cleans it (the panel's rules), beside Kaka Şakası
+    // and Temizlik Suyu: two kinds, so a mark of one takes the other's place ('replaced') while cleans race them.
+    await ok(call('POST', '/api/admin/gifts/update', { id: 'p8', enabled: true, mark: { role: 'leave', kind: 'kirik-cam', minutes: 60 } }, admin.session), 'terlik');
+    await ok(call('POST', '/api/admin/gifts/update', { id: 'p9', enabled: true, mark: { role: 'clean', kind: 'kirik-cam' } }, admin.session), 'cam tamiri');
     // The shelf's gifts anyone may send (most are paused or for VIPs): Roket 1.999, and the like.
-    // Kaka and Su too (marks=1): a profile mark written, ended or cleaned in the gift's transaction (profile-marks.mjs).
-    const gifts = (await ok(call('GET', '/api/catalog?gifts=2&marks=1'), 'katalog')).gifts.filter((g) => !g.minSvip && g.price <= 3000);
+    // The mark gifts too (marks=2): a profile mark written, ended, replaced or cleaned in the gift's transaction
+    // (profile-marks.mjs), refused before any coin moves when the receiver's Gizlilik doesn't let the sender.
+    const gifts = (await ok(call('GET', '/api/catalog?gifts=2&marks=1&marks=2'), 'katalog')).gifts.filter((g) => !g.minSvip && g.price <= 3000);
     assert.ok(gifts.length >= 1);
+    assert.ok(['k1', 'k2', 'p8', 'p9'].every((id) => gifts.some((g) => g.id === id && g.mark)), 'iz hediyeleri karışımda');
     const shop = [['fr-neon', 150], ['en-sparkle', 200], ['fr-silver', 800]];
     const other = (u) => {
       for (;;) {
@@ -73,8 +79,10 @@ describe('Para: aynı anda rastgele işlemler', () => {
         const where = random() < 0.5 ? { room } : { place: pick(['profile', 'chat']) };
         return ['hediye', 'POST', '/api/gifts/send', { to: other(u).user.id, giftId: g.id, count: 1, price: g.price, ...where, ref: rnd(6) }, u.session];
       }],
-      // Profil izleri: refusing marks (a Kaka to them is refused, their marks come off in a transaction of their own).
-      [2, async (u) => ['iz tercihi', 'PATCH', '/api/me/privacy', { profileMarks: random() < 0.5 }, u.session]],
+      // Profil izleri: who may mark me (everyone, the people I follow, nobody; the older switch too), and follows that
+      // decide it, racing the marks.
+      [2, async (u) => ['iz tercihi', 'PATCH', '/api/me/privacy', random() < 0.3 ? { profileMarks: random() < 0.5 } : { marksFrom: pick(['everyone', 'following', 'nobody']) }, u.session]],
+      [2, async (u) => ['takip', 'POST', '/api/follow', { to: other(u).user.id, follow: random() < 0.7 }, u.session]],
       [6, async (u) => ['test hediyesi', 'POST', '/api/wallet/gift', { to: other(u).user.id, amount: 1 + Math.floor(random() * 500), ref: rnd(6) }, u.session]],
       [8, async (u) => ['çevir', 'POST', '/api/wallet/exchange', { diamonds: pick([100, 500, 1000]), ref: rnd(6) }, u.session]],
       [5, async (u) => ['bağ isteği', 'POST', '/api/bonds/request', { to: other(u).user.id, kind: pick(['kardes', 'kanka']), ref: rnd(6) }, u.session]],

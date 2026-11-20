@@ -1,7 +1,7 @@
 // Photo and video uploads go straight from the phone to S3-compatible storage (Cloudflare R2, Backblaze B2,
 // AWS S3…); the API only hands out a short-lived signed address, so big files never pass through it.
 //
-//   POST /api/media/upload-url { kind: 'avatar' | 'moment' | 'dm' | 'album' | 'notice' | 'music' | 'ticket' | 'roombg' | 'roomcover' | 'eventcover' | 'gifticon' | 'giftvideo' | 'giftsource' | 'stickerart', contentType, size } → { uploadUrl, headers, publicUrl, expiresIn }
+//   POST /api/media/upload-url { kind: 'avatar' | 'moment' | 'dm' | 'album' | 'notice' | 'music' | 'ticket' | 'roombg' | 'roomcover' | 'eventcover' | 'gifticon' | 'giftvideo' | 'giftsource' | 'stickerart' | 'shopframe' | 'markart', contentType, size } → { uploadUrl, headers, publicUrl, expiresIn }
 //
 // The app PUTs the file to uploadUrl with exactly `headers` (type and size are signed, so a different file
 // is refused by the storage), then saves publicUrl (e.g. PATCH /api/me { avatarUrl }).
@@ -68,6 +68,9 @@ const KINDS = {
   // Yönetim › Mağaza (shop-items.mjs), admins only: a profile frame's picture, a transparent PNG or WebP drawn around
   // the photo. An entry effect's video comes as a gift video does (giftvideo, giftsource).
   shopframe: { types: ['image/png', 'image/webp'], max: 10 * 1024 * 1024, admin: true },
+  // Hediyeler › İz türleri (mark-kinds.mjs), admins only: a profile mark kind's overlay, a still transparent PNG or WebP
+  // drawn over the photo (checked there pixel by pixel, made at most 512 px for phones).
+  markart: { types: ['image/png', 'image/webp'], max: 2 * 1024 * 1024, admin: true },
 };
 /** The largest file of a kind, in bytes; of one type of it when that type has its own (custom-gifts.mjs shows them). */
 export const kindMax = (kind, type) => KINDS[kind]?.typeMax?.[type] ?? KINDS[kind]?.max ?? 0;
@@ -150,7 +153,7 @@ const signed = (method, key, query = {}) =>
     expires: 60,
     query,
   });
-const FILE_KEY = /^(avatar|moment|dm|album|notice|music|ticket|roombg|roomcover|eventcover|gifticon|giftvideo|giftsource|stickerart|shopframe)\/[0-9a-f-]{36}\/[A-Za-z0-9._-]{1,80}$/;
+const FILE_KEY = /^(avatar|moment|dm|album|notice|music|ticket|roombg|roomcover|eventcover|gifticon|giftvideo|giftsource|stickerart|shopframe|markart)\/[0-9a-f-]{36}\/[A-Za-z0-9._-]{1,80}$/;
 
 /** The storage key of one of our files from its public address (kind/<uploader>/<name>), else null. With
  *  `owner`, only a file that person uploaded. */

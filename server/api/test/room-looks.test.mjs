@@ -67,7 +67,12 @@ describe('Odada görünüm değişince', () => {
     assert.equal(bought.user, u.user.id);
     assert.equal(bought.look.frame, 'fr-silver', 'alınınca giyilir');
     const read = (await ok(call('GET', `/api/looks?ids=${u.user.id}`, null, other.session), 'görünüm')).looks[u.user.id];
-    assert.deepEqual(bought.look, read);
+    // Profil izleri: the read says for its reader whether a mark from them would be refused (they don't follow Bakan:
+    // the default lets only the people they follow); the packet, heard by everyone, says it only for nobody.
+    const { noMarks, ...same } = read;
+    assert.equal(noMarks, true);
+    assert.equal(bought.look.noMarks, undefined);
+    assert.deepEqual(bought.look, same);
     assert.ok('avatarUrl' in read, 'fotoğraf da görünümde');
 
     mark = lkCalls.length;

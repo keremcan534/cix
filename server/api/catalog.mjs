@@ -43,12 +43,14 @@ const GIFT_ROWS = [
   ['p5', 'Su Kovası', '🪣', 500, 'gameplay'],
   ['p6', 'Pasta At', '🥧', 777, 'gameplay'],
   ['p7', 'Yumurta At', '🥚', 1_299, 'gameplay'],
-  ['p8', 'Terlik At', '🩴', 1_299, 'gameplay'],
+  // Muzip hediyeler (docs/PROFIL_IZLERI.md): the pilot that leaves Kırık Cam once staff give it the rule in the panel.
+  ['p8', 'Terlik Geldi!', '🩴', 1_299, 'gameplay'],
   ['p9', 'Konfeti Topu', '🎊', 1_999, 'gameplay'],
   ['p10', 'Aşk Oku', '💘', 2_399, 'gameplay'],
-  // Profil izleri (profile-mark-rules.mjs APP_MARKS): Kaka leaves a mark on the receiver's profile photo, Su cleans it.
-  ['k1', 'Kaka', '💩', 999, 'gameplay'],
-  ['k2', 'Su', '💧', 1_999, 'gameplay'],
+  // Profil izleri (profile-mark-rules.mjs APP_MARKS): Kaka Şakası leaves Kaka İzi on the receiver's profile photo,
+  // Temizlik Suyu cleans it (the owners' names, 20 Nov 2026; the ids stay).
+  ['k1', 'Kaka Şakası', '💩', 999, 'gameplay'],
+  ['k2', 'Temizlik Suyu', '💧', 1_999, 'gameplay'],
   ['c1', 'Can Dostum', '💞', 5_000, 'couple'],
   ['c2', 'Dilek Kavanozu', '🫙', 8_999, 'couple'],
   ['c3', 'Masal Kalesi', '🏯', 99_999, 'couple'],

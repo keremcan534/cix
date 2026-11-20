@@ -125,6 +125,11 @@ export const PANEL_ROUTES = new Set([
   // Profil izleri (profile-marks.mjs): a person's marks, and taking the ones showing off (an offensive one, a complaint).
   'GET /api/admin/marks',
   'POST /api/admin/marks/clear',
+  // Muzip hediyeler's İz türleri (mark-kinds.mjs): the kinds of mark, their overlay (upload kind markart), minutes, on/off.
+  'GET /api/admin/mark-kinds',
+  'POST /api/admin/mark-kinds',
+  'POST /api/admin/mark-kinds/update',
+  'POST /api/admin/mark-kinds/delete',
   'POST /api/admin/ban',
   'POST /api/admin/referrals/revoke',
   // Şikâyetler (admin.mjs) and a reported room's own pictures (room-decor.mjs).

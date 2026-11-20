@@ -10,7 +10,7 @@
 // followList: mine only; only the numbers are on a profile).
 //
 // The keys: profilePublic, showOnline, showLastSeen, showCurrentRoom (true or false), dmFrom (everyone | following |
-// mutual), callsFrom and invitesFrom (everyone | following | nobody), and Mesajlar's preferences voiceCalls, videoCalls,
+// mutual), callsFrom, invitesFrom and marksFrom (everyone | following | nobody), and Mesajlar's preferences voiceCalls, videoCalls,
 // messagePush and pushCloseOnly (true or false, all on at first). "following" means people the owner follows.
 // Where each one bites:
 //   - profilePublic off: someone I don't follow sees my name, photo and username, not my age, city, bio or interests
@@ -27,14 +27,18 @@
 //   - invitesFrom: inviteRefusal / mayInvite, for room and mic invites.
 //   - autoReceive, autoOpener, autoOpenerSeen, autoSend: Otomatik mesaj (auto-chat.mjs). autoOpenerSeen can only be
 //     turned on (the app says it showed what a conversation start in my name is).
-//   - profileMarks off ("Profilime iz bırakılmasın"): a gift that leaves a profile mark is refused before any coin moves,
-//     and the marks I have come off at once (profile-marks.mjs). On at first.
+//   - marksFrom ("Kimler profilime iz bırakabilir", profile-marks.mjs): who may send me a gift that leaves a profile
+//     mark; anyone else's is refused before any coin moves. "following" (the people I follow) at first, the owners'
+//     decision (20 Nov 2026), also for everyone who never chose, older apps included. profileMarks ("Profilime iz
+//     bırakılmasın", the switch older apps still have) is the same setting seen as on/off: off is marksFrom nobody,
+//     on again is the people I follow (the default). Either blocks new marks only: the ones I have stay till
+//     their time ends or someone cleans them (the owners' decision; before 105 turning it off took them off).
 //   - globalHideName on ("Adım genel duyurularda görünmesin", off at first): a global gift I send or receive is
 //     announced without my id, name and photo ("Bir kullanıcı", global-gifts.mjs).
 // A block either way refuses all three. The other person is never told which setting refused them beyond the
 // reason the demo shows ("… yalnızca takip ettiği kişilerden mesaj alıyor").
 import { HttpError, auth, db, limit, readJson } from './core.mjs';
-import { clearMarks } from './profile-marks.mjs';
+import { MARKS_FROM, MARKS_FROM_DEFAULT } from './profile-mark-rules.mjs';
 
 export const PRIVACY_DEFAULTS = Object.freeze({
   profilePublic: true,
@@ -55,8 +59,9 @@ export const PRIVACY_DEFAULTS = Object.freeze({
   autoOpener: true,
   autoOpenerSeen: false,
   autoSend: true,
-  // Profil izleri (profile-marks.mjs): others may leave a mark on my photo.
+  // Profil izleri (profile-marks.mjs): who may leave a mark on my photo (profileMarks false: nobody).
   profileMarks: true,
+  marksFrom: MARKS_FROM_DEFAULT,
   globalHideName: false,
 });
 const COLUMN = {
@@ -76,9 +81,10 @@ const COLUMN = {
   autoOpenerSeen: 'auto_opener_seen',
   autoSend: 'auto_send',
   profileMarks: 'profile_marks',
+  marksFrom: 'marks_from',
   globalHideName: 'global_hide_name',
 };
-const CHOICES = { dmFrom: ['everyone', 'following', 'mutual'], callsFrom: ['everyone', 'following', 'nobody'], invitesFrom: ['everyone', 'following', 'nobody'] };
+const CHOICES = { dmFrom: ['everyone', 'following', 'mutual'], callsFrom: ['everyone', 'following', 'nobody'], invitesFrom: ['everyone', 'following', 'nobody'], marksFrom: MARKS_FROM };
 /** A session seen this recently is online (as Keşfet has always counted it). */
 export const ONLINE_MS = 5 * 60_000;
 
@@ -233,6 +239,11 @@ function patchOf(b) {
     set[COLUMN[k]] = v;
   }
   if (!Object.keys(set).length) throw new HttpError(400, 'Değişecek ayar yok');
+  // Profil izleri: marksFrom and the older switch are one setting (nobody = off).
+  if ('marks_from' in set && 'profile_marks' in set && (set.marks_from === 'nobody') !== (set.profile_marks === false)) {
+    throw new HttpError(400, 'Profil izi ayarları birbirini tutmuyor: "Kimse" seçiliyse "Profilime iz bırakılmasın" da açık olmalı');
+  }
+  if ('marks_from' in set) set.profile_marks = set.marks_from !== 'nobody';
   return set;
 }
 const ALL_DEFAULT = Object.entries(COLUMN)
@@ -251,15 +262,20 @@ export const privacyRoutes = {
     limit(`privacy:${me.id}`, 30, 'Çok sık değiştiriyorsun, biraz bekle');
     const set = patchOf(await readJson(req));
     const cols = Object.keys(set);
+    // "Profilime iz bırakılmasın" from an app that has only the switch: off is nobody; on is the default (the people
+    // I follow) after nobody, and leaves everyone or following as they are.
+    const marksOnly = 'profile_marks' in set && !('marks_from' in set);
+    const ins = marksOnly ? [...cols, 'marks_from'] : cols;
+    const upd = cols.map((c) => `${c} = EXCLUDED.${c}`);
+    if (marksOnly) upd.push(set.profile_marks ? `marks_from = CASE WHEN privacy_settings.marks_from = 'nobody' THEN '${MARKS_FROM_DEFAULT}' ELSE privacy_settings.marks_from END` : "marks_from = 'nobody'");
     await db.query(
-      `INSERT INTO privacy_settings (user_id, ${cols.join(', ')}) VALUES ($1, ${cols.map((_, i) => `$${i + 2}`).join(', ')})
-       ON CONFLICT (user_id) DO UPDATE SET ${cols.map((c) => `${c} = EXCLUDED.${c}`).join(', ')}, updated_at = now()`,
-      [me.id, ...cols.map((c) => set[c])],
+      `INSERT INTO privacy_settings (user_id, ${ins.join(', ')}) VALUES ($1, ${ins.map((_, i) => `$${i + 2}`).join(', ')})
+       ON CONFLICT (user_id) DO UPDATE SET ${upd.join(', ')}, updated_at = now()`,
+      [me.id, ...cols.map((c) => set[c]), ...(marksOnly ? [set.profile_marks ? MARKS_FROM_DEFAULT : 'nobody'] : [])],
     );
     // Back to every default: nothing to keep.
     await db.query(`DELETE FROM privacy_settings WHERE user_id = $1 AND ${ALL_DEFAULT}`, [me.id]);
-    // "Profilime iz bırakılmasın": the marks I have come off now too.
-    if (set.profile_marks === false) await clearMarks(me.id, { how: 'self', by: me.id });
+    // Profil izleri: the choice blocks new marks only; the ones I have stay (the owners' decision, 20 Nov 2026).
     return { privacy: await privacyOf(db, me.id) };
   },
 

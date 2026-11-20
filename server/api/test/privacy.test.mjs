@@ -82,8 +82,9 @@ describe('Gizlilik ayarları', () => {
       autoOpener: true,
       autoOpenerSeen: false,
       autoSend: true,
-      // Profil izleri (profile-marks.mjs): others may leave a mark until I say no.
+      // Profil izleri (profile-marks.mjs): the people I follow may leave a mark (the owners' default, 20 Nov 2026).
       profileMarks: true,
+      marksFrom: 'following',
       // Global hediye (global-gifts.mjs): my name shows until I hide it.
       globalHideName: false,
     });

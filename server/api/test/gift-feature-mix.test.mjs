@@ -85,6 +85,8 @@ describe('Hediye özellikleri birlikte', () => {
     await h.credit(ali.user.id, 1_000_000);
     // Only a send in a server room is announced (global-gifts.mjs): the sends below that could be go in Ayşe's room.
     room = (await ok(call('POST', '/api/rooms', { title: 'Karışım Odası' }, ayse.session), 'oda')).room.id;
+    // Ayşe lets everyone mark her (the default is only the people she follows; test/muzip.test.mjs).
+    await ok(call('PATCH', '/api/me/privacy', { marksFrom: 'everyone' }, ayse.session), 'herkes iz bırakabilir');
     // The minimum Global price low enough for Su (1.999), and no wait between two announcements.
     await setLive({ global_gift_min_price: 1000, global_gift_gap_seconds: 0 });
   });
@@ -105,16 +107,16 @@ describe('Hediye özellikleri birlikte', () => {
     assert.equal(c6.global, true);
     assert.equal(c6.mark, null);
     // Taking Global off makes the mark possible; then Global is refused again.
-    await ok(update({ id: 'c6', global: false, mark: { role: 'leave', kind: 'camur' } }), 'c6 iz bırakır');
+    await ok(update({ id: 'c6', global: false, mark: { role: 'leave', kind: 'kirik-cam' } }), 'c6 iz bırakır');
     await refused(update({ id: 'c6', global: true }), 400, /global olamaz/);
     await ok(call('POST', '/api/admin/gifts/reset', { id: 'c6', fields: ['mark', 'global'] }, admin.session), 'c6 geri');
     // An admin's new gift with both: refused, no row.
     const art = await icon();
-    await refused(call('POST', '/api/admin/gifts', { name: 'Çamur Topu', price: 1500, cat: 'gameplay', icon: art, global: true, mark: { role: 'leave', kind: 'camur' } }, admin.session), 400, /global olamaz/);
+    await refused(call('POST', '/api/admin/gifts', { name: 'Çamur Topu', price: 1500, cat: 'gameplay', icon: art, global: true, mark: { role: 'leave', kind: 'kirik-cam' } }, admin.session), 400, /global olamaz/);
     assert.equal((await q("SELECT count(*)::int AS n FROM custom_gifts WHERE name = 'Çamur Topu'"))[0].n, 0);
     // One of the two alone is fine.
     const mine = (await ok(call('POST', '/api/admin/gifts', { name: 'Çamur Topu', price: 1500, cat: 'gameplay', icon: art, global: true }, admin.session), 'yalnız global')).gift;
-    await refused(update({ id: mine.id, mark: { role: 'leave', kind: 'camur' } }), 400, /global olamaz/);
+    await refused(update({ id: mine.id, mark: { role: 'leave', kind: 'kirik-cam' } }), 400, /global olamaz/);
     await ok(call('POST', '/api/admin/gifts/delete', { id: mine.id }, admin.session), 'sil');
     for (const id of ['k1', 'k2']) await ok(call('POST', '/api/admin/gifts/reset', { id }, admin.session), `${id} geri`);
   });

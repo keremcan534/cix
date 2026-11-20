@@ -6,7 +6,11 @@
 // sender is a real account with real ledger rows. A URL other than this machine also needs --yes. Rate limits
 // (RATE_ALL, RATE_AUTH) must be high: every request comes from this one address.
 //
-//   node room-gifts.mjs --base http://127.0.0.1:7890 [--senders 30] [--gifts 15] [--rounds 3] [--yes]
+// --gift <id> sends that gift instead of the first cheap one, e.g. k1 (Kaka Şakası, a profile mark: the mark is
+// written in the gift's transaction, docs/PROFIL_IZLERI.md). Each recipient then follows their sender first, so the
+// default "Kimler profilime iz bırakabilir: Yalnız takip ettiklerim" lets the mark through (an older server ignores it).
+//
+//   node room-gifts.mjs --base http://127.0.0.1:7890 [--senders 30] [--gifts 15] [--rounds 3] [--gift k1] [--yes]
 const args = Object.fromEntries(
   process.argv
     .slice(2)
@@ -48,8 +52,8 @@ const owner = await person('Oda Sahibi');
 const [rs, rj] = await call('POST', '/api/rooms', owner.session, { title: `Hediye yükü ${rnd(4)}` });
 if (rs !== 200) throw new Error(`oda ${rs}: ${rj.error}`);
 const room = rj.room.id;
-const [, cat] = await call('GET', '/api/catalog?gifts=2', null);
-const gift = (cat.gifts ?? []).find((g) => !g.minSvip && g.price <= 3000 && !g.global && !g.id.startsWith('bag-'));
+const [, cat] = await call('GET', '/api/catalog?gifts=2&marks=1&marks=2', null);
+const gift = (cat.gifts ?? []).find((g) => (typeof args.gift === 'string' ? g.id === args.gift : !g.minSvip && g.price <= 3000 && !g.global && !g.id.startsWith('bag-') && !g.mark));
 if (!gift) throw new Error('gönderilecek hediye yok');
 const senders = [];
 const recipients = [];
@@ -62,7 +66,10 @@ for (let i = 0; i < SENDERS; i++) {
     if (ts !== 200) throw new Error(`jeton ${ts}: ${tj.error}`);
   }
   senders.push(s);
-  recipients.push(await person(`Alan ${i}`));
+  const r = await person(`Alan ${i}`);
+  // A mark gift: the recipient follows its sender (who may mark me: people I follow, by default).
+  if (gift.mark) await call('POST', '/api/follow', r.session, { to: s.id });
+  recipients.push(r);
 }
 console.log(`Bir oda, ${SENDERS} gönderen × ${GIFTS} hediye (${gift.name}, ${gift.price} jeton), her biri başka birine; ${ROUNDS} tur`);
 for (let round = 1; round <= ROUNDS; round++) {
