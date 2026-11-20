@@ -86,6 +86,9 @@ const GIFT_ROWS = [
   ['v10', 'Lüks Yat', '🛥️', 399_999, 'privilege', 8],
   ['v11', 'Altın Tavus', '🦚', 299_999, 'privilege', 8],
   ['v12', 'Atlıkarınca Gecesi', '🎠', 699_999, 'privilege', 9],
+  // Çift's bond gift (bond-rules.mjs KINDS.cift), on the Aile ve Dost shelf with the others (the owners, 20 Nov 2026;
+  // before, only the profile's "Bağ kur" sent it). Last, so no other gift's default order (custom-gifts.mjs APP_SORT) moves.
+  ['bag-cift', 'Bağ Yüzüğü', '💍', 5_000, 'family'],
 ];
 
 /**

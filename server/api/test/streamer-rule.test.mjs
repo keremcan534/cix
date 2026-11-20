@@ -156,7 +156,7 @@ describe('aileden ayrılan yayıncı 90 gün başka aileye giremez', () => {
 });
 
 describe('Aile ve Dost rafı', () => {
-  const BONDS = ['bag-kardes', 'bag-baci', 'bag-agabey', 'bag-abla', 'bag-yenge', 'bag-enishte', 'bag-kanka'];
+  const BONDS = ['bag-kardes', 'bag-baci', 'bag-agabey', 'bag-abla', 'bag-yenge', 'bag-enishte', 'bag-kanka', 'bag-cift'];
 
   test('yeni uygulama rafı görür; eski uygulama bağ hediyesini görmez, Koruma Kartı İkili rafında kalır', async () => {
     const fresh = (await ok(call('GET', '/api/catalog?gifts=2&family=1'))).gifts;
@@ -169,7 +169,7 @@ describe('Aile ve Dost rafı', () => {
   test('fiyatlar Bağlar kuralıyla aynı', async () => {
     const { KINDS } = (await ok(call('GET', '/api/bonds/info'))).kinds ? { KINDS: (await ok(call('GET', '/api/bonds/info'))).kinds } : {};
     const fresh = (await ok(call('GET', '/api/catalog?gifts=2&family=1'))).gifts;
-    for (const k of KINDS.filter((x) => x.id !== 'cift')) {
+    for (const k of KINDS) {
       const g = fresh.find((x) => x.id === `bag-${k.id}`);
       assert.deepEqual([g.name, g.price], [k.gift, k.price], k.id);
     }
@@ -224,6 +224,28 @@ describe('Aile ve Dost rafı', () => {
     await refused(call('POST', '/api/admin/gifts/update', { id: 'bag-kanka', cat: 'hot' }, admin.session), 400, /rafında/);
     const g = await ok(call('POST', '/api/admin/gifts/update', { id: 'bag-kanka', name: 'Kanka Madalyası' }, admin.session));
     assert.equal(g.gift.name, 'Kanka Madalyası');
+  });
+
+  test('Bağ Yüzüğü Aile ve Dost rafında: yeni uygulama görür, eski görmez; panelde fiyatı ve adı değişir, rafı değişmez; profilden ve raftan aynı istek', async () => {
+    const fresh = (await ok(call('GET', '/api/catalog?gifts=2&family=1'))).gifts;
+    assert.deepEqual(['name', 'price', 'cat'].map((k) => fresh.find((g) => g.id === 'bag-cift')?.[k]), ['Bağ Yüzüğü', 5000, 'family']);
+    for (const q of ['/api/catalog?gifts=2', '/api/catalog']) assert.equal((await ok(call('GET', q))).gifts.some((g) => g.id === 'bag-cift'), false, q);
+    // Panel: it is listed with the other bond gifts and stays on their shelf.
+    for (const cat of ['couple', 'hot']) await refused(call('POST', '/api/admin/gifts/update', { id: 'bag-cift', cat }, admin.session), 400, /Aile ve Dost rafında/);
+    assert.ok((await ok(call('GET', '/api/admin/gifts?builtin=1', null, admin.session))).gifts.some((g) => g.id === 'bag-cift' && g.cat === 'family'));
+    await ok(call('POST', '/api/admin/gifts/update', { id: 'bag-cift', name: 'Sevgili Yüzüğü', price: 6000 }, admin.session));
+    try {
+      const info = (await ok(call('GET', '/api/bonds/info'))).kinds.find((k) => k.id === 'cift');
+      assert.deepEqual([info.gift, info.price], ['Sevgili Yüzüğü', 6000]);
+      // The shelf and the profile's "Bağ kur" are the same request: 6000 held, at the price the phone showed.
+      const [a, b] = [await person('Yüzük Veren', 'Erkek'), await person('Yüzük Alan', 'Kadın')];
+      await h.credit(a.user.id, 7000, { channel: 'google' });
+      assert.equal((await refused(call('POST', '/api/gifts/send', { to: b.user.id, giftId: 'bag-cift', count: 1, price: 6000, ref: ref() }, a.session), 409)).code, 'bond_needed');
+      const r = await ok(call('POST', '/api/bonds/request', { to: b.user.id, kind: 'cift', price: 6000, ref: ref(), room: 'oda-00000000-0000-4000-8000-000000000000' }, a.session));
+      assert.deepEqual([r.bond.status, r.bond.price, r.user.coins], ['pending', 6000, 1000]);
+    } finally {
+      await ok(call('POST', '/api/admin/gifts/reset', { id: 'bag-cift', fields: ['name', 'price'] }, admin.session));
+    }
   });
 });
 

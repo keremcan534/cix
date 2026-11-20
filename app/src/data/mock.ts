@@ -419,6 +419,8 @@ export const GIFTS: Gift[] = [
   { id: 'v10', name: 'Lüks Yat', emoji: '🛥️', price: 399_999, cat: 'privilege', minSvip: 8, badge: 'music' },
   { id: 'v11', name: 'Altın Tavus', emoji: '🦚', price: 299_999, cat: 'privilege', minSvip: 8 },
   { id: 'v12', name: 'Atlıkarınca Gecesi', emoji: '🎠', price: 699_999, cat: 'privilege', minSvip: 9, badge: 'music' },
+  // Çift's bond gift (data/bonds BOND_KINDS.cift), on the Aile ve Dost shelf: sent, a bond request. Last, as on the server.
+  { id: 'bag-cift', name: 'Bağ Yüzüğü', emoji: '💍', price: 5_000, cat: 'family' },
 ];
 
 export const COIN_PACKS = [

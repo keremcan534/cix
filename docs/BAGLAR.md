@@ -4,7 +4,15 @@
 
 Sekmede iki bölüm var: **Çift** ve **Aile ve Dost** (diğer yedi tür). Aile ve Dost boşken yedi tür resmi ve fiyatıyla görünür; başkasının profilinde birine dokununca fiyat bir kez sorulur ve istek gider. Doluyken bağların üstünde türlerin adları yazar. Sohbetteki **kalp** başka bir şeydir: iki kişinin yakınlığı, hediye ve sohbetle dolar, sessiz kalınca düşer (`one-on-one.mjs`, [`SUNUCU.md`](SUNUCU.md)).
 
-Odadaki hediye panelinde **Aile ve Dost** rafı var: Koruma Kartı ve yedi bağ hediyesi. Bu raftan gönderilen bağ hediyesi, aranızda bağ yoksa bağ isteğidir: jeton bekletilir, kabul edilince bağ kurulur, reddedilirse geri döner; tek kişiye, birer birer gider. Aranızda **o türde bir bağ varsa** normal hediye olarak gider (aşağıda **Bağ hediyesi yeniden**). Panelde Hediyeler › Aile ve Dost rafından adı, ikonu, videosu ve fiyatı değişir (aşağıda **Fiyat panelden**). Eski APK'lar bu rafı görmez; Koruma Kartı onlarda İkili rafında kalır.
+Odadaki hediye panelinde **Aile ve Dost** rafı var: Koruma Kartı ve sekiz bağ hediyesi (20 Kasım 2026'dan beri Bağ Yüzüğü de; aşağıda **Bağ Yüzüğü rafta**). Bu raftan gönderilen bağ hediyesi, aranızda bağ yoksa bağ isteğidir: jeton bekletilir, kabul edilince bağ kurulur, reddedilirse geri döner; tek kişiye, birer birer gider. Aranızda **o türde bir bağ varsa** normal hediye olarak gider (aşağıda **Bağ hediyesi yeniden**). Panelde Hediyeler › Aile ve Dost rafından adı, ikonu, videosu ve fiyatı değişir (aşağıda **Fiyat panelden**). Eski APK'lar bu rafı görmez; Koruma Kartı onlarda İkili rafında kalır.
+
+## Bağ Yüzüğü rafta (20 Kasım 2026)
+
+Müşteri: "İlişki başlatma hediyesi nerede? Panelde yok, Aile ve Dost'ta dursun, ben güncellerim." Çift bağının hediyesi Bağ Yüzüğü (`bag-cift`, 5.000 jeton) eskiden yalnız profilden "Bağ kur › Çift" ile gidiyordu; uygulamanın hediye listesinde satırı yoktu, bu yüzden panelde görünmüyordu.
+
+- Panelde **Hediyeler › Aile ve Dost**'ta diğer yedi bağ hediyesinin yanında (sonda; sürükleyip yeri değiştirilebilir). Adı, ikonu, videosu ve fiyatı oradan değişir; profildeki "Bağ kur" ve Bağlar sekmesi de panelin adını ve fiyatını kullanır. Rafı değişmez (Aile ve Dost'ta kalır).
+- Odadaki hediye panelinde **Aile ve Dost** rafında. Aranızda bağ yoksa Çift bağı isteği olarak gider (jeton bekletilir, kabul edilince ilişki kurulur, reddedilirse döner); Çift bağınız varsa normal hediye olarak gidip bağ puanı getirir; başka türde bağınız varsa gönderilemez. Çift kişi başına yine 1.
+- Yeni uygulama yüzüğün kendi resmini çizer. Bu sürümden önceki APK'lar bağ hediyelerini tanıyorsa rafta 💍 ya da panelin ikonuyla görebilir ve aynı kurallarla gönderir; Aile ve Dost rafı olmayan çok eski APK'lar hiç görmez. Profilden "Bağ kur" hepsinde çalışır.
 
 ## Güncelleme 7 (19 Kasım 2026): bağ hediyesi yeniden, seviye düşüşü, Lv20, işaretler, Sistem bildirimleri
 
@@ -14,7 +22,7 @@ Müşterinin isteği: "Bağları olan kişilere aynı hediyeler tekrardan atılm
   - Aranızda bağ yoksa: 409 `bond_needed` ("Aranızda Kanka bağı yok: bu hediye önce bağ isteği olarak gider"); yeni uygulama bunu bağ isteği olarak göndermeyi önerir.
   - Aranızda **başka türde** bağ varsa: 409 `bond_kind` "Aranızda Kanka bağı var". İki kişi arasında yine tek bağ olur.
   - Bağın etkin olduğu, hediyenin istek kimliği (ref) kaydedildikten sonra, iki hesap kilitliyken bağ satırı `FOR SHARE` ile denetlenir: aynı anda gelen bitirme hediyeyi bekler, hediyenin puanı gerçekten var olan bağa yazılır; aynı isteğin tekrarı yine tekrar cevabını alır.
-  - Uygulamada: odanın Aile ve Dost rafında bağın olan kişiyi seçince adet seçilebilir ve altta "+5 bağ puanı" yazar. Başka türde bağın olan kişiye "Aranızda Kanka bağı var" yazar, gönderilemez. Profilin Bağlar sekmesinde her bağın altında **Bağ hediyesi gönder** düğmesi var (adet seçilir: ×1 … ×100, puanıyla). Bağ Yüzüğü (Çift) rafta yok; Çift bağına yeniden yalnız bu düğmeyle gönderilir.
+  - Uygulamada: odanın Aile ve Dost rafında bağın olan kişiyi seçince adet seçilebilir ve altta "+5 bağ puanı" yazar. Başka türde bağın olan kişiye "Aranızda Kanka bağı var" yazar, gönderilemez. Profilin Bağlar sekmesinde her bağın altında **Bağ hediyesi gönder** düğmesi var (adet seçilir: ×1 … ×100, puanıyla). Bağ Yüzüğü (Çift) 20 Kasım 2026'dan beri rafta da var (aşağıda).
   - **Eski APK:** bağ hediyesini her zaman istek olarak gönderir. Bağı olan kişiye gönderirse 409 "Aranızda Kanka bağı var. Bağ hediyesini yeniden göndermek için uygulamayı güncelle" görür, jeton düşmez. Bağı olan iki kişinin normal hediyeleri eski APK'da da puan getirir.
 - **Sınırsız bağ:** Aile türleri (Kardeş, Bacı, Ağabey, Abla, Yenge, Enişte) ve Kanka için kişi başına en fazla **1000** (pratikte sınırsız, panelden düşürülebilir). Çift yine **1** (panelden 5'e kadar). Bekleyen istek yine en fazla **10**: her istek jetonunu bekletir.
   - Profilde bağlar 50'şer gelir, altta "+N bağ daha" (`GET /api/bonds?offset=`). Eski APK ilk 50'yi görür.

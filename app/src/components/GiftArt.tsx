@@ -70,6 +70,7 @@ const ART: Record<string, Art> = {
   'bag-yenge': { sm: require('../../assets/bonds/bag-yenge.png'), lg: require('../../assets/bonds/bag-yenge.png') },
   'bag-enishte': { sm: require('../../assets/bonds/bag-enishte.png'), lg: require('../../assets/bonds/bag-enishte.png') },
   'bag-kanka': { sm: require('../../assets/bonds/bag-kanka.png'), lg: require('../../assets/bonds/bag-kanka.png') },
+  'bag-cift': { sm: require('../../assets/bonds/bag-cift.png'), lg: require('../../assets/bonds/bag-cift.png') },
   c4: { sm: require('../../assets/gifts/192/hediye-ask-mektubu.png'), lg: require('../../assets/gifts/512/hediye-ask-mektubu.png') },
   c5: { sm: require('../../assets/gifts/192/hediye-sevgi-tatlisi.png'), lg: require('../../assets/gifts/512/hediye-sevgi-tatlisi.png') },
   c6: { sm: require('../../assets/gifts/192/hediye-yildiz-faytonu.png'), lg: require('../../assets/gifts/512/hediye-yildiz-faytonu.png') },
