@@ -22,7 +22,7 @@ import { loadPublicProfile } from '@/lib/live/profile';
 import { buyVip, openPlaySubscriptions, openVipShop, useVipShop } from '@/lib/live/vip';
 import { vipProductOf } from '@/lib/live/vip-core';
 import { featureOff } from '@/lib/remote-control';
-import { SUB_BUY_TITLE, defaultPlanDays, demoBuyText, rightsOpen, startIndex, subStatusText, testBuyText } from '@/lib/vip-screen';
+import { SUB_BUY_TITLE, defaultPlanDays, demoBuyText, rightNote, rightsOpen, startIndex, subStatusText, testBuyText, withSetRights } from '@/lib/vip-screen';
 import { VipHeroCarousel } from '@/components/vip/vip-hero';
 import { RightsGrid, RightsHeading, VipPointsInfo } from '@/components/vip/vip-rights';
 import { PrivilegeTopBar, VipSubTabs } from '@/components/vip/vip-tabs';
@@ -111,7 +111,8 @@ function Svip() {
   // VIP levels and rights as Seviye ve VIP ayarları have them (the app's own until the server says).
   const levels = useLevels();
   const list = vipLevelsOf(levels);
-  const rights = vipRightsOf(levels);
+  // VIP seti: the level's own badge and frame on their cards, and its chat bubble and entry effect added.
+  const rights = withSetRights(vipRightsOf(levels));
   const decay = decayLineOf(levels, 'vip');
   const nameOf = (level: number) => list.find((x) => x.level === level)?.name ?? `VIP ${level}`;
   const { width, fontScale } = useWindowDimensions();
@@ -145,7 +146,7 @@ function Svip() {
         level={lv.level}
         width={contentW}
         fontScale={fontScale}
-        onPress={(r, on) => showAlert(r.name, on ? `${lv.name} ile kullanabilirsin.` : `${nameOf(r.level)} ile açılır.`)}
+        onPress={(r, on) => showAlert(r.name, rightNote(r, on, lv.name, nameOf(r.level)))}
       />
       <VipPointsInfo decay={decay} width={contentW} />
     </ScrollView>

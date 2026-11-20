@@ -11,5 +11,7 @@ COPY tools ./tools
 COPY migrations ./migrations
 COPY fx ./fx
 COPY art ./art
+# VIP seti (vip-set.mjs): the VIP 1-10 frames, bubbles and entry effects added to the shop once.
+COPY vip-set ./vip-set
 USER node
 CMD ["node", "index.mjs"]

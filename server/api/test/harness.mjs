@@ -65,6 +65,8 @@ export function startApi(extraEnv = {}, { moneyCheck = true } = {}) {
       SHOP_PAUSED: '',
       // The Abonelik's renewal check (vip.mjs) runs on its own only where a test sets it.
       VIP_RECHECK_MIN: '0',
+      // The VIP set's 30 bag items (vip-set.mjs) are added only where a test turns it on (test/vip-set.test.mjs).
+      VIP_SET: '0',
       ...extraEnv,
     };
     // PUBLIC_URL 'self': the address phones open stored files at is this API's own (core.mjs servedFiles).

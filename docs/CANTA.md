@@ -60,6 +60,8 @@ Bütün kaynaklar aynı yoldan verir (`economy.mjs` `grantReward`):
 
 Panelde **Seviye ve VIP › Seviye ve görev ödülleri** (yetki: `app.levels`, Seviyeler ve VIP ile aynı).
 
+VIP 1–10'un hazır ödülleri (her seviyenin çerçevesi, balonu ve giriş efekti) sunucu tarafından bir kez eklendi: [`VIP_SETI.md`](VIP_SETI.md).
+
 - Bir ödül: seviye sistemi (VIP, Cömertlik ya da Yankı), seviye, eşya ve isteğe bağlı gün (boş: eşyanın Çarşı'daki
   süresi; Çarşı'da süresiz olan eşyaya gün verilmez). Bir seviyeye birden çok eşya konabilir.
 - **Ne zaman verilir:** kişinin çantası okununca (uygulamayı açınca, Çantam'ı açınca). O seviyede ya da üstünde olan

@@ -1,7 +1,11 @@
 // The person card's pictures (app/assets/person-card, the designer's set): each drawn at its own shape. What changes
 // size is built from slices, so round corners and glowing ends keep their shape on every phone and with every name.
 import { useState, type ReactNode } from 'react';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Image, StyleSheet, View, type ImageSourcePropType, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
+
+import { VIP_LEVEL_ART } from '@/components/vip/level-art';
+import { levelArtFor } from '@/lib/vip-screen';
 
 const ART = {
   iliski: [require('../../assets/person-card/iliski.png'), 1.737],
@@ -48,8 +52,30 @@ const PANEL = {
   cap: 1 / 0.1574,
 };
 
+/** A VIP card's corners and rim (the bubble designs' gold or silver edge). */
+const VIP_CARD_RADIUS = 26;
+const VIP_CARD_RIM = 2.5;
+
 /** The card's panel: the corners keep their shape, the strip between them grows with what is on the card. */
-export function CardPanel({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
+export function CardPanel({ children, style, vip = 0 }: { children: ReactNode; style?: StyleProp<ViewStyle>; vip?: number }) {
+  // VIP seti ("kişi kartı"): a VIP 1–10 card wears its level's bubble colours, inside left to right and the rim's
+  // tones top to bottom (components/vip/level-art), in place of the designer's panel.
+  const set = levelArtFor(vip);
+  const look = set ? VIP_LEVEL_ART[set].card : null;
+  if (look)
+    return (
+      <View style={style}>
+        <LinearGradient colors={look.rim} style={[StyleSheet.absoluteFill, { borderRadius: VIP_CARD_RADIUS }]} pointerEvents="none">
+          <LinearGradient
+            colors={look.inner}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={{ flex: 1, margin: VIP_CARD_RIM, borderRadius: VIP_CARD_RADIUS - VIP_CARD_RIM }}
+          />
+        </LinearGradient>
+        {children}
+      </View>
+    );
   return (
     <View style={style}>
       <View style={StyleSheet.absoluteFill} pointerEvents="none">

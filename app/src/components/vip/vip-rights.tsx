@@ -6,10 +6,10 @@ import { Image, Pressable, StyleSheet, View } from 'react-native';
 
 import { Art } from '@/components/Art';
 import { Text } from '@/components/text';
-import type { ShownRight } from '@/data/status';
-import { artGlows, artScaleFor, cardMetrics, gridColumns, lowerCrownFits, rightArtKey, wideSpaces } from '@/lib/vip-screen';
+import { artGlows, artScaleFor, cardMetrics, gridColumns, levelArtFor, lowerCrownFits, rightArtKey, wideSpaces, type ListRight } from '@/lib/vip-screen';
 import { DECO, LOWER_GLOW, PX, RIGHT_ART, SOFT_GLOW } from './assets';
 import { GoldText } from './gold-text';
+import { VIP_LEVEL_ART } from './level-art';
 
 const HEADING_BANDS = ['#fcefc0', '#f4dfa6', '#eed495', '#eacc8d'] as const;
 const HEADING_STOPS = [0.36, 0.47, 0.58, 1] as const;
@@ -37,12 +37,12 @@ export function RightsGrid({
   fontScale,
   onPress,
 }: {
-  rights: ShownRight[];
-  /** The level picked in the carousel: its rights are open, the rest locked. */
+  rights: ListRight[];
+  /** The level picked in the carousel: its rights are open, the rest locked; the set's pictures are its own. */
   level: number;
   width: number;
   fontScale: number;
-  onPress: (r: ShownRight, open: boolean) => void;
+  onPress: (r: ListRight, open: boolean) => void;
 }) {
   const cols = gridColumns(width, fontScale);
   const m = cardMetrics(width, cols, fontScale);
@@ -69,7 +69,7 @@ export function RightsGrid({
       )}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: m.gap, rowGap: m.rowGap }}>
         {rights.map((r) => (
-          <RightCard key={r.name} right={r} open={r.level <= level} m={m} onPress={() => onPress(r, r.level <= level)} />
+          <RightCard key={r.name} right={r} level={level} open={r.level <= level} m={m} onPress={() => onPress(r, r.level <= level)} />
         ))}
       </View>
       {/* The design's crown in the last row's empty cells, its cut bottom edge under the panel's rim. */}
@@ -82,12 +82,16 @@ export function RightsGrid({
 
 type Metrics = ReturnType<typeof cardMetrics>;
 
-function RightCard({ right, open, m, onPress }: { right: ShownRight; open: boolean; m: Metrics; onPress: () => void }) {
+function RightCard({ right, level, open, m, onPress }: { right: ListRight; level: number; open: boolean; m: Metrics; onPress: () => void }) {
   const key = rightArtKey(right);
-  const art = key ? RIGHT_ART[key] : null;
+  // VIP seti: the picked level's own badge, frame, bubble or entry effect picture, fitted to the picture's box.
+  const setLevel = right.set ? levelArtFor(level) : null;
+  const pic = right.set && setLevel ? VIP_LEVEL_ART[setLevel]?.[right.set] : null;
+  const art = pic ? null : key ? RIGHT_ART[key] : null;
   const k = artScaleFor(m.cardW);
   const radius = 14.5;
-  const glow = artGlows(key);
+  const glow = artGlows(right.set === 'frame' ? 'frame' : key);
+  const picFit = pic ? Math.min((m.cardW - 10) / pic.w, (m.artH - 4) / pic.h) : 0;
   return (
     <Pressable
       onPress={onPress}
@@ -122,7 +126,9 @@ function RightCard({ right, open, m, onPress }: { right: ShownRight; open: boole
           <View style={[s.artBox, { marginTop: m.artTop, height: m.artH }, !open && { opacity: 0.38 }]}>
             {/* The warm light behind the picture, as in the design (not inside the frame's empty ring). */}
             {glow && <Image source={SOFT_GLOW} resizeMode="stretch" style={[s.artGlow, { height: m.artH + 12 }]} />}
-            {art ? (
+            {pic ? (
+              <Image source={pic.source} style={{ width: pic.w * picFit, height: pic.h * picFit }} resizeMode="contain" />
+            ) : art ? (
               <Image source={art.source} style={{ width: Math.min(art.w * k, m.cardW - 8), height: Math.min(art.h * k, m.artH) }} resizeMode="contain" />
             ) : right.art ? (
               <Art name={right.art} size={Math.min(m.artH - 6, m.cardW * 0.55)} />
