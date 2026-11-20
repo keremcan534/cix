@@ -171,7 +171,13 @@ describe('Muzip hediyeler', () => {
     await refused(set(await art(rgbaPng(512, 400, ringAlpha(512)))), 400, /kare olmalı \(bu 512 × 400\)/);
     await refused(set(await art(rgbaPng(128, 128, ringAlpha(128)))), 400, /256–2048 piksel/);
     await refused(set(await art(rgbaPng(2100, 2100, ringAlpha(2100)))), 400, /256–2048 piksel/);
-    await refused(call('POST', '/api/media/upload-url', { kind: 'markart', contentType: 'image/png', size: 3 * 1024 * 1024 }, admin.session), 400, /en fazla 2 MB/);
+    await refused(call('POST', '/api/media/upload-url', { kind: 'markart', contentType: 'image/png', size: 11 * 1024 * 1024 }, admin.session), 400, /en fazla 10 MB/);
+    // A designer's large PNG (over the old 2 MB) gets its address.
+    {
+      const [st, j] = await call('POST', '/api/media/upload-url', { kind: 'markart', contentType: 'image/png', size: 3 * 1024 * 1024 }, admin.session);
+      assert.equal(st, 200, j.error);
+      assert.ok(j.uploadUrl);
+    }
     // Not a PNG or WebP: refused when the address is asked for, and a JPEG sent as a PNG when it is saved.
     await refused(call('POST', '/api/media/upload-url', { kind: 'markart', contentType: 'image/jpeg', size: 1000 }, admin.session), 400);
     await refused(set(await art(Buffer.from([0xff, 0xd8, 0xff, 0xe0, ...Buffer.alloc(200)]))), 400, /PNG ya da WebP/);

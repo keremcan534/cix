@@ -105,7 +105,8 @@ silinmez, gizlenir; eski izler ve kayıtlar adını korur.
 **İz resmi kuralları:** Sunucu resmi yükleme anında piksel piksel denetler (`server/api/tools/mark-art-check.py`).
 Uymayan resim kaydedilmez, nedeni Türkçe yazılır.
 
-- PNG ya da WebP; dosyanın ilk baytlarına bakılır, uzantıya ya da beyana değil. En çok 2 MB.
+- PNG ya da WebP; dosyanın ilk baytlarına bakılır, uzantıya ya da beyana değil. En çok 10 MB (20 Kasım 2026'ya kadar 2 MB);
+  telefonlara 512 piksel ve 300 KB'a küçültülmüşü gider.
 - Kare, 256–2048 piksel (512 × 512 önerilir). Telefonlar en çok 512 piksel ve 300 KB alır; büyüğü sunucu küçültür.
 - Hareketsiz: hareketli PNG ya da WebP olmaz.
 - **Gerçek saydamlık:** pikselin en az %30'u tam saydam olmalı (alfa 0). "Saydam" yazan ama her yeri dolu kare

@@ -69,8 +69,9 @@ const KINDS = {
   // the photo. An entry effect's video comes as a gift video does (giftvideo, giftsource).
   shopframe: { types: ['image/png', 'image/webp'], max: 10 * 1024 * 1024, admin: true },
   // Hediyeler › İz türleri (mark-kinds.mjs), admins only: a profile mark kind's overlay, a still transparent PNG or WebP
-  // drawn over the photo (checked there pixel by pixel, made at most 512 px for phones).
-  markart: { types: ['image/png', 'image/webp'], max: 2 * 1024 * 1024, admin: true },
+  // drawn over the photo (checked there pixel by pixel, made at most 512 px and 300 KB for phones). Up to 10 MB, as a
+  // gift icon: the owners' designers hand over large PNGs (2 MB was too little, 20 Nov 2026), and phones never get it.
+  markart: { types: ['image/png', 'image/webp'], max: 10 * 1024 * 1024, admin: true },
 };
 /** The largest file of a kind, in bytes; of one type of it when that type has its own (custom-gifts.mjs shows them). */
 export const kindMax = (kind, type) => KINDS[kind]?.typeMax?.[type] ?? KINDS[kind]?.max ?? 0;

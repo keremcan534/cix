@@ -138,7 +138,7 @@ export const marksAllow = (rule, followed) => rule === 'everyone' || (rule === '
 
 // --- A kind's overlay picture (mark-kinds.mjs, tools/mark-art-check.py) -------------------------------------------
 /**
- * What an uploaded overlay must be: a still, square PNG or WebP of 256–2048 px, at most 2 MB; phones get it at most
+ * What an uploaded overlay must be: a still, square PNG or WebP of 256–2048 px, at most 10 MB; phones get it at most
  * 512 px and 300 KB (made smaller here when it is bigger). Over the round photo it must leave the photo seen: at
  * least 30 % of its pixels fully transparent (alpha 0), and at most 20 % of the face (the middle circle, 30 % of the
  * side from the centre) more than half opaque. Kaka İzi, drawn by the app's scripts/mark-art.py: 50 % and 14 %.

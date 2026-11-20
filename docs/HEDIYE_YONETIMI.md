@@ -144,7 +144,7 @@ ve Terlik Geldi! de dahil.
 
 İz resmi yüklenirken sunucu piksel piksel denetler:
 
-- kare, 256–2048 piksel, en çok 2 MB, hareketsiz;
+- kare, 256–2048 piksel, en çok 10 MB (telefonlara 512 piksel ve 300 KB'a küçültülmüşü gider), hareketsiz;
 - en az %30'u tam saydam;
 - ortadaki yüz dairesinin en çok %20'si dolu.
 
