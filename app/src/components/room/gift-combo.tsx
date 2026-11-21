@@ -50,18 +50,21 @@ export function GiftCombo({
     expire.current = onExpire;
   }, [onExpire]);
 
+  // The wheel turns on its own at one steady speed while it is open (owners, 21 Nov 2026: restarting the turn on every
+  // tap made it look like it stuttered); a tap only gives it a soft pop and restarts the line.
+  useEffect(() => {
+    const turn = Animated.loop(Animated.timing(spin, { toValue: 1, duration: 2400, easing: Easing.linear, useNativeDriver: true }));
+    turn.start();
+    return () => turn.stop();
+  }, [spin]);
   useEffect(() => {
     p.setValue(0);
-    spin.setValue(0);
-    pop.setValue(1.25);
+    pop.setValue(1.1);
     const line = Animated.timing(p, { toValue: 1, duration: COMBO_MS, easing: Easing.linear, useNativeDriver: true });
-    Animated.parallel([
-      Animated.timing(spin, { toValue: 1, duration: 600, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-      Animated.spring(pop, { toValue: 1, friction: 4, useNativeDriver: true }),
-    ]).start();
+    Animated.spring(pop, { toValue: 1, friction: 7, tension: 140, useNativeDriver: true }).start();
     line.start(({ finished }) => finished && expire.current());
     return () => line.stop();
-  }, [restartKey, p, spin, pop]);
+  }, [restartKey, p, pop]);
 
   // The line: two clipped half-rings. The right half fills during the first half of the time, the left after.
   const rightRot = p.interpolate({ inputRange: [0, 0.5, 1], outputRange: ['0deg', '180deg', '180deg'] });

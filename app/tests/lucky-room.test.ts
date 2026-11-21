@@ -28,9 +28,11 @@ describe('Şanslı hediyeler odada', () => {
       assert.match(body(f), /luckyStrip\(/, f);
     }
   });
-  test('ödül çıkmayınca kart yok; ayar kapalıyken hediyenin kendisi görünmez', () => {
+  test('kazanç kartı yok, kazanç üstte kısa şeritle; ayar kapalıyken hediyenin kendisi görünmez', () => {
     const mine = body('showLuckySend');
-    assert.match(mine, /if \(reward > 0\) setLuckyFx\(/);
+    // No result card at all (21 Nov 2026): the win's short banner at the top says it.
+    assert.doesNotMatch(room, /LuckyResult|setLuckyFx/);
+    assert.match(room, /<WinBanner top=\{insets\.top \+ 50\}/);
     assert.match(mine, /if \(settings\.luckyFx\) flyGift\(/);
     assert.match(body('showLuckyFrom'), /if \(settings\.luckyFx\) \{/);
     assert.match(src('store.tsx'), /luckyFx: true,/);

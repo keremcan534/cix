@@ -50,7 +50,6 @@ import { RoomFollowHeart } from '@/components/room/members';
 import { BossSeat, BossSeatSheet, RoomInfoSheet, RoomSettingsScreen, type BossPick, type GiftLogRow, type SettingsSection } from '@/components/room/owner';
 import { GiftSheet } from '@/components/room/gift-sheet';
 import { GiftCombo } from '@/components/room/gift-combo';
-import { LuckyResult } from '@/components/room/lucky-result';
 import { LuckyStrips, type LuckyStrip } from '@/components/room/lucky-banner';
 import { LuckyBagCard, LuckyBagFloat, LuckyBagRain, LuckyBagSheet, bagWhat, type BagOutcome } from '@/components/room/lucky-bag';
 import { SeatMenu, type Rect, type SeatMenuItem } from '@/components/room/seat-menu';
@@ -66,7 +65,7 @@ import { Art, artSource } from '@/components/Art';
 import { AnimLayer, type FullscreenAnim } from '@/components/fx/anim-layer';
 import { AnimPlay } from '@/components/fx/anim-player';
 import { WinBanner } from '@/components/fx/win-banner';
-import { GiftFlights, type Flight, type Point } from '@/components/fx/gift-flight';
+import { GiftBursts, GiftFlights, type Burst, type Flight, type Point } from '@/components/fx/gift-flight';
 import { GiftShowFx } from '@/components/fx/gift-show';
 import { GiftVideoFx, PlateName, VideoFx, entryClipOf, entryVideoOf, giftVideoOf } from '@/components/fx/video-fx';
 import { giftShowOf, type GiftShow } from '@/data/gift-shows';
@@ -141,7 +140,7 @@ import { entranceView, entryPlanOf } from '@/lib/room-entrance';
 import { followLine, followedHere } from '@/lib/follow-room';
 import { getLucky, luckyGift, luckyPkPoints, sendLuckyBatch, type LuckyRecord } from '@/lib/lucky';
 import { liveLuckySend, refreshLucky } from '@/lib/live/lucky';
-import { luckyVideoPending, noteLuckyIcon } from '@/lib/lucky-art';
+import { noteLuckyIcon } from '@/lib/lucky-art';
 import { getPk, joinRoomPk, markPkSeen, modeLabel, pkPointsFor, recordGift, reportMismatch, teamOf, usePk } from '@/lib/pk';
 import {
   KICK_BAN_MIN,
@@ -667,7 +666,6 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     setFxStage((s) => stageRocket(s, news, { at, held, key }, (r) => r, (p) => (p.kind === 'rocket' ? p : null)));
   };
   // My Şanslı send's result card; `after`: the package whose video plays first (the card waits for it, lib/lucky-art).
-  const [luckyFx, setLuckyFx] = useState<{ records: LuckyRecord[]; after: string | null } | null>(null);
   // Şanslı hediyelerin şeritleri (components/room/lucky-banner): one per send, shown once the send (a wheel's repeats
   // too) has been quiet for a moment.
   const [luckyStrips, setLuckyStrips] = useState<LuckyStrip[]>([]);
@@ -710,6 +708,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     else seatViews.delete(uid);
   };
   const [flights, setFlights] = useState<Flight[]>([]);
+  // The show in the middle before a send's copies fly to the seats (components/fx/gift-flight GiftBursts).
+  const [bursts, setBursts] = useState<Burst[]>([]);
+  const burstSeq = useRef(0);
   const win = useWindowDimensions();
   const listeners = view.total;
   const [peak, setPeak] = useState(view.total);
@@ -1740,6 +1741,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // copies leave one after another.
   const flyGift = (emoji: string, count: number, toIds: string[], from: Point, giftId?: string, hold = 0) => {
     if (!visibleRef.current || settings.effectsOff || !settings.giftFx || settings.reduceMotion) return;
+    // A send from the middle opens with its show there: the gift big, its copies swirling out, a golden glow.
+    // A gift with a full-screen video or show of its own has that as its show instead.
+    if (hold && !(giftId && (giftVideoOf(giftId) || giftShowOf(giftId)))) setBursts((b) => [...b.slice(-3), { key: `b${++burstSeq.current}`, emoji, giftId, at: from, copies: toIds.length, count, ms: hold }]);
     toIds.forEach((uid, i) =>
       seatViews.get(uid)?.measureInWindow((x, y, w, h) => {
         if (!w) return;
@@ -1750,7 +1754,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   };
   /** Where a sent gift shows first and flies out from: the middle of the screen (Güncelleme 8: every gift, Şanslı too). */
   const giftMiddle = (): Point => ({ x: win.width / 2, y: win.height * 0.42 });
-  const GIFT_HOLD_MS = 520;
+  const GIFT_HOLD_MS = 950;
   // Other people on mic send seat emoji now and then (quiet when effects are off).
   const botReactions = !real && !settings.effectsOff && visible;
   useEffect(() => {
@@ -3056,8 +3060,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     }
     // The package's video first, when it has one and effects are on; the result card comes once it is over, and only
     // for a win ("Bu sefer ödül çıkmadı" no more, Güncelleme 8).
-    const video = settings.luckyFx && showFx(first.price) && visibleRef.current && playLuckyFx({ id: first.giftId, name: first.giftName, emoji: first.emoji, price: first.price }, 'me', sentTo, count);
-    if (reward > 0) setLuckyFx({ records, after: video ? first.giftId : null });
+    // No result card in the middle any more (owners, 21 Nov 2026: the win's banner at the top says it).
+    if (settings.luckyFx && showFx(first.price) && visibleRef.current) playLuckyFx({ id: first.giftId, name: first.giftName, emoji: first.emoji, price: first.price }, 'me', sentTo, count);
     // Some gifts didn't go (the balance ran out): the wheel stops; else it counts this send.
     if (error) stopCombo(spec);
     else countCombo(spec, viaWheel);
@@ -3582,8 +3586,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       setPkSetup(false);
       setMoving(null);
       setFlights([]);
+      setBursts([]);
       setFxStage(emptyStage<StagePlay>());
-      setLuckyFx(null);
       setCombo(null);
       setEntries(emptyEntryLine());
       if (game) setGameMin(true);
@@ -4597,6 +4601,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           <Text style={styles.moveText}>{userById(moving).name} için boş bir koltuğa dokun · iptal için buraya dokun</Text>
         </Pressable>
       )}
+      {bursts.length > 0 && <GiftBursts bursts={bursts} onDone={(k) => setBursts((b) => b.filter((x) => x.key !== k))} />}
       {flights.length > 0 && <GiftFlights flights={flights} onDone={(k) => setFlights((f) => f.filter((x) => x.key !== k))} />}
       {gamePanel}
       {game && gameMin && (
@@ -4636,11 +4641,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         />
       )}
       {visible && luckyStrips.length > 0 && <LuckyStrips strips={luckyStrips} onDone={(k) => setLuckyStrips((l) => l.filter((x) => x.key !== k))} />}
-      {luckyFx && !(luckyFx.after && luckyVideoPending(fxStage, luckyFx.after)) && (
-        <LuckyResult key={luckyFx.records[0].txId} records={luckyFx.records} still={settings.effectsOff || settings.reduceMotion} onDone={() => setLuckyFx(null)} />
-      )}
-      {/* Platform-wide win announcements (every room shows every win). */}
-      {visible && !promptUp && <WinBanner top={typing && bagRain ? insets.top + 176 : noticeTop + (entries.now && !entryMedia ? 66 : 0)} still={settings.reduceMotion} />}
+      {/* Platform-wide win announcements (every room shows every win): a short pill at the very top, under the room's
+          own bar (owners, 21 Nov 2026), clear of the seats and the entry banners. */}
+      {visible && !promptUp && <WinBanner top={insets.top + 50} still={settings.reduceMotion} />}
       {entries.now &&
         (entryMedia ? (
           // A video entry (Ejderha): the name banner over the full-screen clip, which ends the turn; the team's own
