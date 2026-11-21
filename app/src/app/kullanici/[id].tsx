@@ -821,24 +821,18 @@ export default function UserProfile() {
               <GuardWall people={guardPeople} mine={myGuard} off={guardArea.off} onPress={openGuard} onOpen={openPerson} />
               <GiftWall top={wallTop} lit={wallLit} total={wallAll?.length ?? null} received={giftCount} onPress={() => pickTab('onur')} />
 
-              {/* The bio, and under it the interests (the first four; all of them are in Vitrin › Kişisel Profil). */}
+              {/* The bio, and under it the interests in the same small type (the first four; all of them are in Vitrin › Kişisel Profil). */}
               {(isMe || !!user.bio || aboutInterests.length > 0) && (
                 <InfoCard
                   icon="chatbubble-ellipses-outline"
                   tone="soft"
                   title="Hakkımda"
                   text={user.bio || (isMe ? 'Kendini birkaç kelimeyle anlat…' : undefined)}
+                  more={aboutInterests.length > 0 ? aboutInterests.map((x) => `${x.emoji} ${x.label}`.trim()).join('  ') : undefined}
                   quiet={!user.bio}
                   label={[user.bio ? `Hakkımda: ${user.bio}` : 'Hakkımda', aboutInterests.length > 0 ? `İlgi alanları: ${aboutInterests.map((x) => x.label).join(', ')}` : ''].filter(Boolean).join('. ')}
-                  onPress={isMe ? openEdit : undefined}>
-                  {aboutInterests.length > 0 && (
-                    <View style={styles.aboutChips}>
-                      {aboutInterests.map((x) => (
-                        <PChip key={x.label} emoji={x.emoji} label={x.label} />
-                      ))}
-                    </View>
-                  )}
-                </InfoCard>
+                  onPress={isMe ? openEdit : undefined}
+                />
               )}
               {/* Live mode: their slogan from the server; mine, when I have none, is an invitation to write one (no sample). */}
               {(extras.slogan || (isMe && (!live || counts?.extras !== undefined))) && (
@@ -1765,7 +1759,6 @@ const useStyles = makeStyles(({ colors, semantic, lift, dark, edge }) => ({
   statusOn: { color: colors.text, fontWeight: '700' },
   dot: { width: 9, height: 9, borderRadius: 5 },
   reviewNote: { color: colors.gold, fontSize: 12, fontWeight: '700' },
-  aboutChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   badges: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: 6, rowGap: 6 },
   staffChip: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 25, borderRadius: 13, paddingHorizontal: 10, backgroundColor: '#B91C1C' },
   staffText: { color: '#fff', fontSize: 13, fontWeight: '800' },

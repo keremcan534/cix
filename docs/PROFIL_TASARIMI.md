@@ -14,7 +14,7 @@ sunucudan, demoda örnek kişilerden).
   seviyesi, VIP, Yönetici / Moderatör, mavi tik, **Çift Lv.N** bağ rozeti), "Şu an odada". Sekmeler hemen altında;
   aşağı kaydırınca en üstte kalır. Üst çubukta SimilarClub logosu.
 - **Profil:** Takipçi · Takip · Arkadaş · Hediye; kendi profilinde **Profili Düzenle** ve **Paylaş**; Profilini
-  tamamla; İlişki Duvarı, Koruma ve Hediye Duvarı; Hakkımda (biyografi ve altında ilk dört ilgi alanı; 21 Kasım'dan beri adın altında değil), Arkadaşlık Sloganı, Doğrulama, Temel Bilgiler; kendi
+  tamamla; İlişki Duvarı, Koruma ve Hediye Duvarı; Hakkımda (biyografi ve altında aynı küçük yazıyla ilk dört ilgi alanı; 21 Kasım'dan beri adın altında değil), Arkadaşlık Sloganı, Doğrulama, Temel Bilgiler; kendi
   profilinde "Yalnızca sen görürsün" kartı (jeton, elmas, VIP bitişi, puanlar); başkasının profilinde ortak noktalar ve
   hayran kulübü.
 - **Anlar:** eskisi gibi kişinin paylaşımları (paket bu sekme için tasarım vermedi), yeni kartlarla.
