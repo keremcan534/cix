@@ -1,7 +1,7 @@
 // Photo and video uploads go straight from the phone to S3-compatible storage (Cloudflare R2, Backblaze B2,
 // AWS S3…); the API only hands out a short-lived signed address, so big files never pass through it.
 //
-//   POST /api/media/upload-url { kind: 'avatar' | 'moment' | 'dm' | 'album' | 'notice' | 'music' | 'ticket' | 'roombg' | 'roomcover' | 'eventcover' | 'gifticon' | 'giftvideo' | 'giftsource' | 'stickerart' | 'shopframe' | 'markart', contentType, size } → { uploadUrl, headers, publicUrl, expiresIn }
+//   POST /api/media/upload-url { kind: 'avatar' | 'moment' | 'dm' | 'album' | 'notice' | 'evidence' | 'music' | 'ticket' | 'roombg' | 'roomcover' | 'eventcover' | 'gifticon' | 'giftvideo' | 'giftsource' | 'stickerart' | 'shopframe' | 'markart', contentType, size } → { uploadUrl, headers, publicUrl, expiresIn }
 //
 // The app PUTs the file to uploadUrl with exactly `headers` (type and size are signed, so a different file
 // is refused by the storage), then saves publicUrl (e.g. PATCH /api/me { avatarUrl }).
@@ -44,6 +44,9 @@ const KINDS = {
   // A profile album photo (profiles.mjs, at most ALBUM_MAX each), shrunk on the phone like a moment's.
   album: { types: ['image/jpeg', 'image/png', 'image/webp', 'image/heic'], max: 8 * 1024 * 1024 },
   notice: { types: ['image/jpeg', 'image/png', 'image/webp'], max: 5 * 1024 * 1024, admin: true },
+  // A sanction's screenshot (sanctions.mjs evidence, kind screenshot): staff pick the file in the panel (owners,
+  // 21 Nov 2026: "kanıta ekran görüntüsü nasıl eklenecek?"). The evidence keeps its address.
+  evidence: { types: ['image/jpeg', 'image/png', 'image/webp'], max: 8 * 1024 * 1024, admin: true },
   // Evidence on a support ticket (support.mjs): a screenshot, a receipt.
   ticket: { types: ['image/jpeg', 'image/png', 'image/webp', 'image/heic'], max: 8 * 1024 * 1024 },
   music: { types: Object.keys(AUDIO), max: 20 * 1024 * 1024, may: mayKeepMusic, refused: 'Müzik kütüphanesi oda sahibi, yönetici ve DJ’ler için' },
@@ -154,7 +157,7 @@ const signed = (method, key, query = {}) =>
     expires: 60,
     query,
   });
-const FILE_KEY = /^(avatar|moment|dm|album|notice|music|ticket|roombg|roomcover|eventcover|gifticon|giftvideo|giftsource|stickerart|shopframe|markart)\/[0-9a-f-]{36}\/[A-Za-z0-9._-]{1,80}$/;
+const FILE_KEY = /^(avatar|moment|dm|album|notice|evidence|music|ticket|roombg|roomcover|eventcover|gifticon|giftvideo|giftsource|stickerart|shopframe|markart)\/[0-9a-f-]{36}\/[A-Za-z0-9._-]{1,80}$/;
 
 /** The storage key of one of our files from its public address (kind/<uploader>/<name>), else null. With
  *  `owner`, only a file that person uploaded. */

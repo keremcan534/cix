@@ -120,6 +120,7 @@ describe('Kullanılmayan dosyalar depodan silinir', () => {
     const other = await signUp('Kalan');
     const mine = ['avatar', 'moment', 'dm', 'music'].map((k) => file(k, gone.user.id));
     const notice = file('notice', gone.user.id);
+    const shot = file('evidence', gone.user.id);
     const evidence = file('moment', gone.user.id);
     const theirs = file('dm', other.user.id);
     // A decision about someone else points at one of the deleted person's files.
@@ -129,6 +130,7 @@ describe('Kullanılmayan dosyalar depodan silinir', () => {
     await settle(mine.map((f) => f.key));
     for (const f of mine) assert.equal(stored.has(f.key), false, `${f.key} silindi`);
     assert.equal(stored.has(notice.key), true, 'duyuru resmi şirketin');
+    assert.equal(stored.has(shot.key), true, 'yaptırım kanıtının ekran görüntüsü kalır');
     assert.equal(stored.has(evidence.key), true, 'kanıt dosyası kalır');
     assert.equal(stored.has(theirs.key), true, 'başkasının dosyası duruyor');
     assert.ok(asked.some((x) => x.startsWith('GET /media')), 'kişinin klasörleri listelendi');
@@ -200,6 +202,21 @@ describe('Kullanılmayan dosyalar depodan silinir', () => {
     assert.equal(stored.has(page.key), false, 'yanlış türdeki dosya silindi');
     // A phone that couldn't name the type: the size still holds, the photo goes.
     await ok(call('PATCH', '/api/me', { avatarUrl: file('avatar', a.user.id, { size: 500, type: 'application/octet-stream' }).url }, a.session), 'türü adsız fotoğraf');
+  });
+
+  test('yaptırım kanıtı ekran görüntüsü: yalnız yönetici yükler, resim, en fazla 8 MB; dosya adresiyle kanıt olur', async () => {
+    const admin = await signUp('Kanıt Yöneticisi');
+    await q("UPDATE users SET role = 'admin' WHERE id = $1", [admin.user.id]);
+    const user = await signUp('Kanıt Kişisi');
+    assert.equal((await call('POST', '/api/media/upload-url', { kind: 'evidence', contentType: 'image/png', size: 1000 }, user.session))[0], 403);
+    assert.equal((await call('POST', '/api/media/upload-url', { kind: 'evidence', contentType: 'video/mp4', size: 1000 }, admin.session))[0], 400);
+    assert.equal((await call('POST', '/api/media/upload-url', { kind: 'evidence', contentType: 'image/png', size: 9 * 1024 * 1024 }, admin.session))[0], 400);
+    const up = await ok(call('POST', '/api/media/upload-url', { kind: 'evidence', contentType: 'image/png', size: 2 * 1024 * 1024 }, admin.session), 'kanıt yükleme adresi');
+    assert.match(up.publicUrl, new RegExp(`/evidence/${admin.user.id}/`));
+    const r = await ok(call('POST', '/api/admin/sanctions', { user: user.user.id, type: 'mute_global_text', reason: 'spam', minutes: 60, description: 'Reklam', evidence: [{ kind: 'screenshot', content: up.publicUrl }] }, admin.session), 'kanıtlı yaptırım');
+    const [ev] = (await q('SELECT kind, content FROM moderation_evidence WHERE sanction_id = $1', [r.sanctions[0].id])).rows;
+    assert.equal(ev.kind, 'screenshot');
+    assert.match(ev.content, /\/evidence\//);
   });
 
   test('Anlar ve sohbet için video ya da çok büyük dosya istenmez', async () => {
