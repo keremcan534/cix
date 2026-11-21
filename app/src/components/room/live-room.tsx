@@ -101,9 +101,11 @@ import { COSMETICS, MUSIC_CATALOG, STANDARD_EMOJI, adminCapacity, cosmeticById, 
 import { FAMILIES, INCOMING_GIFT_POOL, vipTier } from '@/data/economy';
 import { GATES, nobleInfo } from '@/data/status';
 import { LUCKY_RECIPIENT_SHARE, RULES, luckyHostDiamonds, pct } from '@/data/rules';
-import { BOT_LINES, GIFTS, ME, USERS, isServerId, roomById, serverRoomCode, userById, type Gift } from '@/data/mock';
+import { BOT_LINES, GIFTS, ME, ROOMS, USERS, isServerId, roomById, serverRoomCode, userById, type Gift } from '@/data/mock';
+import { swipeRoom } from '@/lib/room-picks';
+import { roomPassword } from '@/lib/live/room-password';
 import * as api from '@/lib/api';
-import { isLiveRoom, isLockedRoom, isMarkRefusal, liveGift, liveMode, liveRoomAnimation, message as errorText, myServerId, putRoomAnswer, refreshServerRoom, rememberUser, toLocal, toServer, updateServerRoom } from '@/lib/live';
+import { isLiveRoom, isLockedRoom, isMarkRefusal, liveGift, liveMode, liveRoomAnimation, message as errorText, myServerId, putRoomAnswer, refreshServerRoom, rememberUser, toLocal, toServer, updateServerRoom, useServerRoomList } from '@/lib/live';
 import { liveBackpackGift } from '@/lib/live/backpack';
 import { giftById, liveBossMinLevel, liveMemberLimit, refreshLiveCatalog } from '@/lib/live/catalog-live';
 import { liveSticker } from '@/lib/live/emoji-live';
@@ -180,7 +182,7 @@ import { kindOf, mergeFeed, type FeedMsg } from '@/lib/chat-feed';
 import { blockedFeature } from '@/lib/remote-control';
 import { ALL_FEATURES, applyServerStage, applyServerVideo, changeLayout, layoutById, modeById, seedStage, setClassicCapacity, setStageInfo, slotStates, stagePermission, useStages, type PlaybackState, type StageInfo } from '@/lib/room-modes';
 import { shareVideo, videoPlayback } from '@/lib/live/room-video';
-import { MIC_BLOCK_LABEL, endRoom, getSession, micBlock, micSending, reportRoomState, setMicWant, setPlaybackVolume, setRoomCamera, setRoomSound, useRoomSession, type MicBlock } from '@/lib/room-session';
+import { MIC_BLOCK_LABEL, endRoom, getSession, micBlock, micSending, reportRoomState, setLeaving, setMicWant, setPlaybackVolume, setRoomCamera, setRoomSound, useRoomSession, type MicBlock } from '@/lib/room-session';
 import { shareLink } from '@/lib/links';
 import { balconyOnly, canInviteFollowers, defaultMicQueue, followerCount, knownFollowers, roomInviteText, seatAccess } from '@/lib/room-invites';
 import { demoJoinMode, membershipOf, roomPeopleCount, type Membership } from '@/lib/room-follow';
@@ -3628,6 +3630,31 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // move or resize a single mic; a cross-room PK's board is added to the stage like any board and the chat gives way.
   const fitOpts: FitOpts = { boss: bossOn };
   const plan = layout ? layoutPlan(layout.layoutSchema, win.width, theme === 'pk') : null;
+  // --- Odalar arası kaydırma (owners, 21 Nov 2026): up on the stage, the next open room; down, the one before -----
+  const serverRooms = useServerRoomList();
+  const switchRoom = (dir: 1 | -1) => {
+    const live = liveMode();
+    const next = swipeRoom(live ? serverRooms : ROOMS, { current: id, blocked, needsPassword: (r) => (live ? isLockedRoom(r.id) && !roomPassword(r.id) : !!r.password) }, dir);
+    if (!next) {
+      tapHaptic();
+      return addMsg({ system: true, text: dir === 1 ? 'Sırada başka açık oda yok.' : 'Bundan önce açık oda yok.' });
+    }
+    const go = () => {
+      tapHaptic();
+      // As "Şu an popüler" in the leave sheet: this room ends as a switch does (mic off, voice closed, membership
+      // left); the route is held while it goes, then shows the other room in its place.
+      setLeaving(true);
+      endRoom('switched');
+      setTimeout(() => router.replace({ pathname: '/oda/[id]', params: { id: next.id } }), 0);
+    };
+    // On a mic, or running the room: a swipe never takes them out unasked.
+    if (amSeated || canManage)
+      return showAlert('Başka odaya geçilsin mi?', `"${next.title}" odasına geçersen ${amSeated ? 'mikrofonu bırakırsın ve ' : ''}bu odadan çıkarsın.`, [
+        { text: 'Vazgeç', style: 'cancel' },
+        { text: 'Geç', onPress: go },
+      ]);
+    go();
+  };
   const stageFit = strip || teamPk ? null : (h: number, like?: Fitted) => (layout && plan ? fitLayout(layout.layoutSchema, plan, h, fitOpts, like) : fitGrid(allSeats.length, win.width, h, fitOpts, like));
   // The strip's mics: a tenth of the row each, so ten fit and fewer stay together on the left.
   const stripW = Math.floor((Math.min(win.width, 640) - 16) / 10);
@@ -3909,6 +3936,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             typing={typing}
             guess={Math.round(win.height * 0.34)}
             onTouchStart={emojiOpen ? () => setEmojiOpen(false) : undefined}
+            onSwipe={typing || emojiOpen ? undefined : switchRoom}
             top={
               <>
                 {musicEnabled && <MusicBar music={shownMusic} canControl={canControlMusic} onOpen={() => setPanel('music')} onToggle={music$.toggle} onClose={music$.close} />}
