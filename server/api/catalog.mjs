@@ -143,6 +143,20 @@ export const PACKS = [
   { id: 'p9', coins: 1_000_000, tl: 23_599.99 },
 ].map((p) => ({ firstBonus: 0, ...p, productId: `coins_${p.coins}` }));
 export const PACK_BY_PRODUCT = new Map(PACKS.map((p) => [p.productId, p]));
+/**
+ * Jeton paketleri as the panel set them up (Canlı ayarlar › pack_setup, owners, 22 Nov 2026): each pack keeps its
+ * store product and its coins (Play Console sells `coins_<coins>`), and gets `extra` coins on every purchase, its own
+ * first-purchase gift (`firstBonus`) and its place in the list (`order`). `setup` null or a pack missing from it: the
+ * compiled values. The packs come out in their order (ties: the compiled order).
+ */
+export function packsSetUp(setup) {
+  return PACKS.map((p, i) => {
+    const x = setup?.[p.id];
+    return { ...p, firstBonus: x?.first ?? p.firstBonus, extra: x?.extra ?? 0, order: x?.order ?? i + 1, i };
+  })
+    .sort((a, b) => a.order - b.order || a.i - b.i)
+    .map(({ i, ...p }) => p);
+}
 
 /**
  * Abonelik (vip.mjs): the VIP subscription plans, store subscriptions priced in TRY that renew on their own. The

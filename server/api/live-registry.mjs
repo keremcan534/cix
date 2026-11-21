@@ -12,7 +12,7 @@
 // Values: null always means "back to the default". A set (features_off, gifts_hidden, shop_hidden, packs_hidden, rewards_off) is kept in
 // its options' order, and an empty set is stored as null. Money rules: the exchange rate moves at most ±10 % per
 // save, withdrawal limits can only go down from today's values.
-import { EXCHANGE, GIFTS, PACKS, SHOP, WITHDRAW, exchangeCoins } from './catalog.mjs';
+import { EXCHANGE, GIFTS, PACKS, SHOP, WITHDRAW, exchangeCoins, packsSetUp } from './catalog.mjs';
 import { DAILY_ROUNDS as CASINO_DAILY_ROUNDS, GAMES as CASINO_GAMES, STAKES as CASINO_STAKES } from './casino-rules.mjs';
 import { REMINDER_KINDS, REMINDER_LABEL } from './event-rules.mjs';
 import { CHEST_MIN_CONTRIBUTION, FAMILY_CHESTS, FAMILY_TASKS, FAMILY_THEMES } from './family-rules.mjs';
@@ -99,6 +99,7 @@ export function defaultsOf(e = process.env) {
     gifts_hidden: [],
     shop_hidden: [],
     packs_hidden: [],
+    pack_setup: null,
     exchange_usd_try: EXCHANGE.usdTry,
     withdraw_max_diamonds: WITHDRAW.maxDiamonds,
     withdraw_weekly_diamonds: WITHDRAW.weeklyDiamonds,
@@ -922,6 +923,38 @@ export const REGISTRY = {
       return out.join(' ') || 'Görünür bir etkisi yok.';
     },
   },
+  pack_setup: {
+    field: 'packSetup',
+    group: 'Hediyeler ve paketler',
+    label: 'Jeton paketleri',
+    help: 'Her paketin ek jetonu (her alımda paketin üstüne), ilk alım hediyesi ve listedeki sırası. Paketin kendi jetonu ve fiyatı Google Play ürününe bağlıdır, buradan değişmez. Ek jeton ve hediye ayrı tutulur; satın alma iade edilirse geri alınır. Eski uygulamalar ek jetonu göstermez ama verilir.',
+    type: 'packs',
+    bounds: { packs: PACKS.map((p) => ({ id: p.id, coins: p.coins, firstBonus: p.firstBonus, tl: p.tl, label: packName(p.id) })), maxShare: 1, bigShare: 0.5 },
+    parse(v) {
+      if (!v || typeof v !== 'object' || Array.isArray(v)) bad('Paket ayarı eksik');
+      const out = {};
+      const orders = new Set();
+      for (const [id, x] of Object.entries(v)) {
+        const p = PACKS.find((q) => q.id === id);
+        if (!p) bad(`Bilinmeyen paket: ${String(id).slice(0, 20)}`);
+        if (!x || typeof x !== 'object' || Array.isArray(x)) bad(`${packName(id)}: ayar eksik`);
+        const extra = wholeOf(x.extra ?? 0, { min: 0, max: p.coins, step: 1 }, `${packName(id)} ek jetonu`);
+        const first = x.first === null || x.first === undefined ? null : wholeOf(x.first, { min: 0, max: p.coins, step: 1 }, `${packName(id)} ilk alım hediyesi`);
+        const order = wholeOf(x.order, { min: 1, max: PACKS.length, step: 1 }, `${packName(id)} sırası`);
+        if (orders.has(order)) bad(`İki paket aynı sırada olamaz (${order})`);
+        orders.add(order);
+        out[id] = { extra, first, order };
+      }
+      if (Object.keys(out).length !== PACKS.length) bad('Her paketin ayarı gönderilmeli');
+      return out;
+    },
+    big: (before, after) => !!after && Object.entries(after).some(([id, x]) => x.extra > PACKS.find((p) => p.id === id).coins * REGISTRY.pack_setup.bounds.bigShare),
+    impact(before, after) {
+      if (!after) return 'Paketler uygulamanın kendi değerlerine döner: ek jeton yok, ilk alım hediyeleri ve sıra varsayılan.';
+      const lines = packsSetUp(after).map((p) => `${packName(p.id)}${p.extra ? ` +${fmt(p.extra)} ek` : ''}${p.firstBonus ? ` (ilk alımda +${fmt(p.firstBonus)})` : ''}`);
+      return `Sıra: ${lines.join(', ')}. Ödemesi alınmış ama henüz yüklenmemiş satın almalar yüklenirken yeni ek jetonu alır.`;
+    },
+  },
   exchange_usd_try: {
     field: 'usdTry',
     group: 'Çevirme kuru',
@@ -1250,6 +1283,7 @@ export function snapshotOf(rows = [], e = process.env, { v = 0 } = {}) {
     giftsHidden: readOnlySet(val('gifts_hidden')),
     shopHidden: readOnlySet(val('shop_hidden')),
     packsHidden: readOnlySet(val('packs_hidden')),
+    packSetup: val('pack_setup') && Object.freeze({ ...val('pack_setup') }),
     campaign: campaign && Object.freeze({ ...campaign }),
     usdTry: val('exchange_usd_try'),
     withdrawMax: val('withdraw_max_diamonds'),

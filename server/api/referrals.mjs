@@ -33,7 +33,7 @@ import { bonusNotice } from './system-notices.mjs';
 import crypto from 'node:crypto';
 
 import { HttpError, UUID, auth, blockedBetween, clientIp, db, limit, liveBan, move, readJson, text, tx, userId } from './core.mjs';
-import { PACKS } from './catalog.mjs';
+import { packsSetUp } from './catalog.mjs';
 import { live } from './live-settings.mjs';
 import { notify } from './push.mjs';
 import { creditCoins } from './wallet.mjs';
@@ -249,7 +249,7 @@ export const referralRoutes = {
       welcome: { coins: got.rowCount ? Number(got.rows[0].amount) : 0, on: !s.rewardsOff.has('welcome'), amount: s.welcomeCoins },
       firstBonus: {
         on: firstOn,
-        packs: firstOn ? PACKS.filter((p) => p.firstBonus > 0 && !bought.has(p.productId) && !s.packsHidden.has(p.id)).map((p) => ({ productId: p.productId, bonus: p.firstBonus })) : [],
+        packs: firstOn ? packsSetUp(s.packSetup).filter((p) => p.firstBonus > 0 && !bought.has(p.productId) && !s.packsHidden.has(p.id)).map((p) => ({ productId: p.productId, bonus: p.firstBonus })) : [],
       },
       invite: { on: !s.rewardsOff.has('invite'), coins: s.inviteCoins, canEnter: (await mineOf(db, me)).canEnter },
     };

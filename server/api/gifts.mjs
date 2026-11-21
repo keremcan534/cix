@@ -27,7 +27,7 @@
 import { recordIncome } from './agency-lib.mjs';
 import { addBondCoins, bondCatalog, bondGiftOf, checkBondGift } from './bonds.mjs';
 import { HttpError, auth, blockedBetween, claimRef, db, env, int, once, readJson, userId } from './core.mjs';
-import { EXCHANGE, GIFT_COUNTS, PACKS, VIP_SUBS } from './catalog.mjs';
+import { EXCHANGE, GIFT_COUNTS, VIP_SUBS, packsSetUp } from './catalog.mjs';
 import { docsNow, levelsPayload, levelsRev, svipLevel, vipItemNeed } from './levels.mjs';
 import { shopCatalog, shopFx, shopItemsRev } from './shop-items.mjs';
 import { catalogGifts, checkShownPrice, customGiftsRev, giftFx, giftOf, replacedClips } from './custom-gifts.mjs';
@@ -137,7 +137,9 @@ export const giftRoutes = {
       gifts: withMarks(catalogGifts({ app2, hidden: s.giftsHidden, family }), marks, s),
       ...(app2 ? { giftsFormat: 2 } : {}),
       counts: GIFT_COUNTS,
-      packs: PACKS.filter((p) => !s.packsHidden.has(p.id)).map(({ id, productId, coins, firstBonus }) => ({ id, productId, coins, firstBonus })),
+      // In the panel's order, with its first-purchase gifts; `extra` (coins on every purchase) for a newer app, which an
+      // older one ignores (it still gets them).
+      packs: packsSetUp(s.packSetup).filter((p) => !s.packsHidden.has(p.id)).map(({ id, productId, coins, firstBonus, extra }) => ({ id, productId, coins, firstBonus, extra })),
       // Abonelik's store products (vip.mjs), sold through the same stores as the packs (`purchases`).
       // Every store product, shown or not (an older app shows its own plans and buys by product; which are shown and
       // their words are in `levels.sub`).

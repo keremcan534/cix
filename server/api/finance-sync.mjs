@@ -23,6 +23,7 @@
 //
 // Ledger → panel:
 //   store purchase (Google/Apple)  → purchase (pack list price, TRY) [+ bonus_grant for the first-buy gift]
+//                                    [+ bonus_grant `purchase-<id>-ek` for the pack's extra coins, campaign paket_ek_jeton]
 //                                    [+ bonus_grant `purchase-<id>-kampanya` for the campaign's coins, with the
 //                                    campaign's ref kampanya_YYYYMMDD_<percent>; its 'kampanya' lot is in the
 //                                    same ledger row, so it is not sent again]
@@ -81,6 +82,8 @@ export function eventsOf(r) {
       const out = [];
       if (pack) out.push({ type: 'purchase', idempotency_key: `purchase-${d.purchase}`, occurred_at: at, user_ref: r.user_id, channel: store, amount: money(pack.tl), currency: 'TRY', coins: Number(r.p_coins), product_ref: r.product_id });
       if (Number(r.p_bonus) > 0) out.push({ type: 'bonus_grant', idempotency_key: `purchase-${d.purchase}-bonus`, occurred_at: at, user_ref: r.user_id, coins: Number(r.p_bonus), campaign_ref: 'ilk_alim_hediyesi' });
+      // A pack's extra coins (Canlı ayarlar › Jeton paketleri), a gift like the first-purchase one.
+      if (Number(r.p_extra) > 0) out.push({ type: 'bonus_grant', idempotency_key: `purchase-${d.purchase}-ek`, occurred_at: at, user_ref: r.user_id, coins: Number(r.p_extra), campaign_ref: 'paket_ek_jeton' });
       if (Number(r.p_campaign_bonus) > 0)
         out.push({ type: 'bonus_grant', idempotency_key: `purchase-${d.purchase}-kampanya`, occurred_at: at, user_ref: r.user_id, coins: Number(r.p_campaign_bonus), campaign_ref: r.p_campaign_ref ?? 'kampanya' });
       return out;
@@ -157,7 +160,7 @@ export async function syncOnce() {
     await db.query(
       `SELECT l.id, l.user_id, l.currency, l.amount, l.reason, l.ref, l.counterparty, l.channel, l.detail, l.created_at,
               p.platform, p.product_id, p.coins AS p_coins, p.bonus AS p_bonus, p.sandbox AS p_sandbox,
-              p.campaign_bonus AS p_campaign_bonus, p.campaign_ref AS p_campaign_ref, g.gift_id, g.room AS gift_room
+              p.campaign_bonus AS p_campaign_bonus, p.campaign_ref AS p_campaign_ref, p.extra AS p_extra, g.gift_id, g.room AS gift_room
          FROM ledger l
          LEFT JOIN purchases p ON p.id = (l.detail->>'purchase')::bigint
          LEFT JOIN gift_events g ON g.id = (l.detail->>'gift')::bigint

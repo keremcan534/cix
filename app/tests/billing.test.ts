@@ -447,3 +447,20 @@ describe('Satın alma akışı', () => {
     assert.deepEqual(s.late, [{ kind: 'done', coins: 1000, bonus: 0, replay: false }]);
   });
 });
+
+describe('Jeton paketleri: panelin ek jetonu', () => {
+  test('sunucunun yazdığı ek jeton paketle gelir; bozuk ya da sıfır olan hiç yazılmaz', () => {
+    const cat = parseCatalog({
+      packs: [
+        { productId: 'coins_5000', coins: 5000, firstBonus: 1000, extra: 500 },
+        { productId: 'coins_1000', coins: 1000, firstBonus: 0, extra: 'çok' },
+        { productId: 'coins_10000', coins: 10000, firstBonus: 0, extra: 0 },
+      ],
+    });
+    assert.deepEqual(cat.packs, [
+      { productId: 'coins_5000', coins: 5000, firstBonus: 1000, extra: 500 },
+      { productId: 'coins_1000', coins: 1000, firstBonus: 0 },
+      { productId: 'coins_10000', coins: 10000, firstBonus: 0 },
+    ]);
+  });
+});
