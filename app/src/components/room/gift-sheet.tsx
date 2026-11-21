@@ -16,7 +16,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState, type ComponentRef } from 'react';
-import { Image, Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Image, Modal, PanResponder, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
@@ -102,6 +102,20 @@ const levelOf = (spent: number) => LEVEL_XP.filter((x) => spent >= x).length;
 const isLocked = (g: Gift, svip: number) => (g.minSvip ?? 0) > svip;
 
 /** `shown`: the gifts the server still offers (giftShelf); `inBag`: what the backpack may send (bagGifts). */
+/** The gift grid's sideways swipe: made once, it calls the latest handler. Up and down stays the grid's scroll. */
+class ShelfSwipe {
+  private on?: (dir: 1 | -1) => void;
+  set(on: (dir: 1 | -1) => void) {
+    this.on = on;
+  }
+  readonly pan = PanResponder.create({
+    onMoveShouldSetPanResponderCapture: (_, g) => Math.abs(g.dx) > 18 && Math.abs(g.dx) > Math.abs(g.dy) * 2,
+    onPanResponderRelease: (_, g) => {
+      if (Math.abs(g.dx) > 60 || Math.abs(g.vx) > 0.5) this.on?.(g.dx < 0 ? 1 : -1);
+    },
+  });
+}
+
 function shelfGifts(shown: Gift[], shelf: Shelf, sort: PriceSort, favs: Set<string>, bag: Record<string, number>, inBag: Gift[], catalog: LiveCatalog | null) {
   if (shelf === 'lucky') return [];
   if (shelf === 'fav') return shown.filter((g) => favs.has(g.id));
@@ -251,6 +265,17 @@ export function GiftSheet({
   const prevXp = LEVEL_XP[level - 1] ?? 0;
   const progress = nextXp === undefined ? 1 : Math.min(1, (spentTotal - prevXp) / (nextXp - prevXp));
 
+  // The shelves in sight (one with no gift on it isn't shown), in their order.
+  const shelvesShown = SHELVES.filter((s) =>
+    s.key === 'lucky' ? luckyShelf : s.key === 'global' ? shown.some((g) => isGlobalGift(g.id, catalog)) : !CATEGORY_SHELVES.has(s.key) || shown.some((g) => (g.cat ?? 'hot') === s.key),
+  );
+  // The picked shelf's tab is kept in sight in its bar (after a swipe, it may be one off the screen).
+  const shelfBarRef = useRef<ComponentRef<typeof ScrollView>>(null);
+  const shelfAt = useRef<Partial<Record<Shelf, number>>>({});
+  useEffect(() => {
+    const x = shelfAt.current[shelf];
+    if (x !== undefined) shelfBarRef.current?.scrollTo({ x: Math.max(0, x - 60), animated: true });
+  }, [shelf]);
   const pickShelf = (s: Shelf) => {
     tapHaptic();
     setShelf(s);
@@ -258,6 +283,14 @@ export function GiftSheet({
     const keep = l.some((g) => g.id === sel.id) && sel.bag === (s === 'bag');
     if (!keep && l[0]) setSel({ id: l[0].id, bag: s === 'bag' });
   };
+  // Sideways over the gifts: the shelf after this one (a swipe to the left) or before it, as a tap on its tab would.
+  const stepShelf = (dir: 1 | -1) => {
+    const at = shelvesShown.findIndex((s) => s.key === shelf);
+    const next = shelvesShown[at + dir];
+    if (at >= 0 && next) pickShelf(next.key);
+  };
+  const [swipe] = useState(() => new ShelfSwipe());
+  useEffect(() => swipe.set(stepShelf));
   const toggleFav = (id: string) => {
     tapHaptic();
     const next = new Set(favs);
@@ -439,16 +472,14 @@ export function GiftSheet({
 
         {/* What: shelves (compact: the price sort at their end, as the shelf notes are left out) */}
         <View style={g.shelfBar}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={g.shelves}>
-          {SHELVES.filter((s) =>
-            s.key === 'lucky' ? luckyShelf : s.key === 'global' ? shown.some((g) => isGlobalGift(g.id, catalog)) : !CATEGORY_SHELVES.has(s.key) || shown.some((g) => (g.cat ?? 'hot') === s.key),
-          ).map((s) => {
+        <ScrollView ref={shelfBarRef} horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={g.shelves}>
+          {shelvesShown.map((s) => {
             const on = shelf === s.key;
             const n = s.key === 'bag' ? Object.values(bag).filter((x) => x > 0).length : 0;
             // Çantam is the app's 3D bag alone, its count on a badge; the word stays for screen readers.
             if (s.key === 'bag')
               return (
-                <Pressable key={s.key} onPress={() => pickShelf(s.key)} hitSlop={{ top: 4, bottom: 4 }} style={[g.shelf, g.shelfIcon, on && g.shelfOn]} accessibilityRole="tab" accessibilityState={{ selected: on }} accessibilityLabel={n ? `${s.label}, ${n} çeşit hediye` : s.label}>
+                <Pressable key={s.key} onLayout={(e) => (shelfAt.current[s.key] = e.nativeEvent.layout.x)} onPress={() => pickShelf(s.key)} hitSlop={{ top: 4, bottom: 4 }} style={[g.shelf, g.shelfIcon, on && g.shelfOn]} accessibilityRole="tab" accessibilityState={{ selected: on }} accessibilityLabel={n ? `${s.label}, ${n} çeşit hediye` : s.label}>
                   <Icon3D name="bag" size={24} />
                   {n > 0 && (
                     <View style={g.shelfBadge}>
@@ -460,7 +491,7 @@ export function GiftSheet({
                 </Pressable>
               );
             return (
-              <Pressable key={s.key} onPress={() => pickShelf(s.key)} hitSlop={{ top: 4, bottom: 4 }} style={[g.shelf, on && g.shelfOn]} accessibilityRole="tab" accessibilityState={{ selected: on }}>
+              <Pressable key={s.key} onLayout={(e) => (shelfAt.current[s.key] = e.nativeEvent.layout.x)} onPress={() => pickShelf(s.key)} hitSlop={{ top: 4, bottom: 4 }} style={[g.shelf, on && g.shelfOn]} accessibilityRole="tab" accessibilityState={{ selected: on }}>
                 {s.icon && <Ionicons name={s.icon} size={14} color={on ? '#fff' : colors.textDim} />}
                 <Text style={[g.shelfText, on && { color: '#fff' }]}>{s.label}</Text>
               </Pressable>
@@ -481,7 +512,9 @@ export function GiftSheet({
 
         {/* What: grid */}
         {/* Keyed by shelf: each shelf opens at its top, not at the previous shelf's scroll offset. */}
-        <ScrollView key={shelf} ref={gridRef} style={compact ? g.gridFill : g.gridScroll} contentContainerStyle={g.grid}>
+        <ScrollView key={shelf} ref={gridRef} style={compact ? g.gridFill : g.gridScroll}>
+          {/* A swipe left or right over the gifts: the next or the previous shelf (owners, 21 Nov 2026). */}
+          <View style={g.grid} {...swipe.pan.panHandlers}>
           {/* Şanslı's disclaimer, the bond gifts' refund rule and Global's announcement: always in full, atop their shelf. */}
           {(shelf === 'lucky' || shelf === 'family' || shelf === 'global') && <Text style={[g.dim, g.shelfNote]}>{SHELF_NOTE[shelf]}</Text>}
           {/* Muzip with gifts that leave a profile mark: what they do, what cleans them, that anyone chooses who marks them. */}
@@ -535,6 +568,7 @@ export function GiftSheet({
               />
             ))
           )}
+          </View>
         </ScrollView>
 
         {/* How much + one action */}
