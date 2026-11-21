@@ -8,7 +8,7 @@ Müşterinin paketi (20 Kasım): "vip 1-10lvl sistem". İçinde her VIP seviyesi
 | Profil çerçeveleri | VIP sayfasında "Profil çerçevesi" kartı seçilen seviyenin çerçevesini gösterir. |
 | Hareketli çerçeveler | Her seviyenin hareketli çerçevesi o seviyeye gelenin **Çantam**'ına gelir. |
 | Sohbet balonu | VIP sayfasına "Sohbet balonu" kartı eklendi, seçilen seviyenin balonunu gösterir. Balon o seviyeye gelenin **Çantam**'ına gelir. |
-| Kişi kartı | VIP 1–10 olan kişinin kartı kendi seviyesinin balon renkleriyle çizilir: içi balonun iç rengi (soldan sağa), kenarı balonun kenar rengi. Balonun konuşma ucu kullanılmadı. Çok açık iç renkler (ör. VIP 5'in altın sarısı) beyaz yazı okunsun diye aynı tonda koyulaştırıldı. |
+| Kişi kartı | **21 Kasım paketiyle değişti:** her kişinin kartı aynı mor kart; üst kenarına kişinin VIP seviyesinin süsü oturur (VIP 0 = VIP olmayan herkes: pembe ince süs; VIP 1 buz kristali … VIP 10 alevli taç). Seviye sunucudaki gerçek VIP seviyesidir (Rütbe sayılmaz). Süs sadece görseldir, dokunmayı engellemez, hak vermez. Süsler paketteki örnek görselden kesildi (`app/assets/vip/card-topper`); tasarımcıdan yüksek çözünürlüklü, şeffaf zeminli halleri gelince aynı adlarla değiştirilir. |
 | Giriş efekti | Her seviyenin giriş efekti o seviyeye gelenin **Çantam**'ına gelir. Odaya girenin adı efektin üst kısmında, yumuşak koyu bir bandın üstünde yazar. |
 | Giriş efekti resimleri | VIP sayfasına "Giriş efekti" kartı eklendi, seçilen seviyenin resmini gösterir. Aynı resim mağazada efektin ikonu olarak da kullanılır. |
 

@@ -47,6 +47,7 @@ export function startApi(extraEnv = {}, { moneyCheck = true } = {}) {
       ALLOW_TEST_TOPUP: '1',
       RATE_AUTH: '100000',
       RATE_ALL: '100000',
+      RATE_SEND: '100000',
       LOG_REQUESTS: '0',
       // Boards read fresh after each gift (gifts.mjs keeps them RANKINGS_CACHE_MS); test/rankings-cache.test.mjs keeps them.
       RANKINGS_CACHE_MS: '0',

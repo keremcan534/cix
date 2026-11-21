@@ -101,9 +101,11 @@ import { COSMETICS, MUSIC_CATALOG, STANDARD_EMOJI, adminCapacity, cosmeticById, 
 import { FAMILIES, INCOMING_GIFT_POOL, vipTier } from '@/data/economy';
 import { GATES, nobleInfo } from '@/data/status';
 import { LUCKY_RECIPIENT_SHARE, RULES, luckyHostDiamonds, pct } from '@/data/rules';
-import { BOT_LINES, GIFTS, ME, USERS, isServerId, roomById, serverRoomCode, userById, type Gift } from '@/data/mock';
+import { BOT_LINES, GIFTS, ME, ROOMS, USERS, isServerId, roomById, serverRoomCode, userById, type Gift } from '@/data/mock';
+import { swipeRoom } from '@/lib/room-picks';
+import { roomPassword } from '@/lib/live/room-password';
 import * as api from '@/lib/api';
-import { isLiveRoom, isLockedRoom, isMarkRefusal, liveGift, liveMode, liveRoomAnimation, message as errorText, myServerId, putRoomAnswer, refreshServerRoom, rememberUser, toLocal, toServer, updateServerRoom } from '@/lib/live';
+import { isLiveRoom, isLockedRoom, isMarkRefusal, liveGift, liveMode, liveRoomAnimation, message as errorText, myServerId, putRoomAnswer, refreshServerRoom, rememberUser, toLocal, toServer, updateServerRoom, useServerRoomList } from '@/lib/live';
 import { liveBackpackGift } from '@/lib/live/backpack';
 import { giftById, liveBossMinLevel, liveMemberLimit, refreshLiveCatalog } from '@/lib/live/catalog-live';
 import { liveSticker } from '@/lib/live/emoji-live';
@@ -180,7 +182,7 @@ import { kindOf, mergeFeed, type FeedMsg } from '@/lib/chat-feed';
 import { blockedFeature } from '@/lib/remote-control';
 import { ALL_FEATURES, applyServerStage, applyServerVideo, changeLayout, layoutById, modeById, seedStage, setClassicCapacity, setStageInfo, slotStates, stagePermission, useStages, type PlaybackState, type StageInfo } from '@/lib/room-modes';
 import { shareVideo, videoPlayback } from '@/lib/live/room-video';
-import { MIC_BLOCK_LABEL, endRoom, getSession, micBlock, micSending, reportRoomState, setMicWant, setPlaybackVolume, setRoomCamera, setRoomSound, useRoomSession, type MicBlock } from '@/lib/room-session';
+import { MIC_BLOCK_LABEL, endRoom, getSession, micBlock, micSending, reportRoomState, setLeaving, setMicWant, setPlaybackVolume, setRoomCamera, setRoomSound, useRoomSession, type MicBlock } from '@/lib/room-session';
 import { shareLink } from '@/lib/links';
 import { balconyOnly, canInviteFollowers, defaultMicQueue, followerCount, knownFollowers, roomInviteText, seatAccess } from '@/lib/room-invites';
 import { demoJoinMode, membershipOf, roomPeopleCount, type Membership } from '@/lib/room-follow';
@@ -245,6 +247,8 @@ type ComboSpec = { lucky: boolean; giftId: string; to: string[]; each: number };
 const sameCombo = (a: ComboSpec, b: ComboSpec) => a.lucky === b.lucky && a.giftId === b.giftId && a.each === b.each && a.to.join() === b.to.join();
 /** Taps on the wheel while its send is on the way wait for it; past this many more, a tap is not kept. */
 const COMBO_MORE = 10;
+/** Şanslı combo taps one request can carry (server/api/lucky.mjs MAX_TIMES). */
+const LUCKY_TIMES_MAX = 50;
 /** SimilarClub's own community rules, the first line of the chat on every entry (my screen only): short and plain. */
 const ROOM_RULES_NOTICE = 'Müstehcen, şiddet, kumar ve yasa dışı içerik yasak. Görürsen kişinin kartından şikâyet et.';
 /** Arrival time of a room event (called from handlers and effects, never while rendering). */
@@ -2974,7 +2978,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // Server room: the server takes the price, gives each recipient their 20 % as diamonds, draws and pays the rewards
   // in game coins, then tells the room (server/api/lucky.mjs). Offline demo: lib/lucky plays it on this phone.
   // `viaWheel`: a repeat from the wheel (its stored list). True (or resolves true) when every gift went out.
-  const sendLuckyGift = (giftId: string, picked: string[], count = 1, viaWheel = false): boolean | Promise<boolean> => {
+  /** `times`: combo taps sent together (the wheel's taps made while the last send was on its way), count × times each. */
+  const sendLuckyGift = (giftId: string, picked: string[], count = 1, viaWheel = false, times = 1): boolean | Promise<boolean> => {
     setGiftOpen(false);
     const spec: ComboSpec = { lucky: true, giftId, to: picked, each: count };
     if (offlineBlocked()) return false;
@@ -2990,10 +2995,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       showAlert('Şanslı hediye gönderilemedi', 'Seçtiğin kişiler artık odada değil.');
       return false;
     }
-    if (real) return deliverLiveLucky(spec, toIds, viaWheel);
+    if (real) return deliverLiveLucky(spec, toIds, viaWheel, times);
     // One wallet charge (and at most one reward and one refund row) for the whole send; each gift still draws apart.
     const { records, error } = sendLuckyBatch(
-      { userId: 'me', userAge: app.me.age, roomId: id, giftId, to: toIds.map((t) => ({ id: t, name: userById(t).name })), count },
+      { userId: 'me', userAge: app.me.age, roomId: id, giftId, to: toIds.map((t) => ({ id: t, name: userById(t).name })), count: count * times },
       { spend: spendCoins, credit: addCoins, blocked: spendBlock },
     );
     if (!records.length) {
@@ -3006,14 +3011,14 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     records.forEach((r) => scorePk(r.txId, 'me', r.toId, r.giftId, luckyPkPoints(r)));
     const spent = records.reduce((n, r) => n + r.price, 0);
     if (!isOwn) addFanPoints(hostId, Math.ceil(spent / 10), `Hediye gönderdin (${spent} jeton)`);
-    showLuckySend(records, toIds, count, error, spec, viaWheel);
+    showLuckySend(records, toIds, count * times, error, spec, viaWheel, times);
     return !error;
   };
-  const deliverLiveLucky = async (spec: ComboSpec, toIds: string[], viaWheel: boolean) => {
+  const deliverLiveLucky = async (spec: ComboSpec, toIds: string[], viaWheel: boolean, times = 1) => {
     const { giftId, each: count } = spec;
     const g = luckyGift(giftId);
     // The daily limit holds here too (the balance is the server's to check).
-    const limited = g ? spendBlock(g.price * count * toIds.length) : null;
+    const limited = g ? spendBlock(g.price * count * times * toIds.length) : null;
     if (limited && limited !== 'Yetersiz bakiye.') {
       errorHaptic();
       stopCombo(spec);
@@ -3022,8 +3027,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     }
     try {
       // A win is announced in every room; with my name only when I let it (Ayarlar › Gizlilik).
-      const { records } = await liveLuckySend(giftId, toIds, count, id, settings.luckyAnnounce);
-      if (records.length) showLuckySend(records, toIds, count, null, spec, viaWheel);
+      const { records } = await liveLuckySend(giftId, toIds, count, id, settings.luckyAnnounce, times);
+      if (records.length) showLuckySend(records, toIds, count * times, null, spec, viaWheel, times);
       return records.length > 0;
     } catch (e) {
       errorHaptic();
@@ -3036,7 +3041,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     }
   };
   /** What a Lucky send I made shows: the gift lines, the flight, the results and the win news. */
-  const showLuckySend = (records: LuckyRecord[], toIds: string[], count: number, error: string | null, spec: ComboSpec, viaWheel: boolean) => {
+  const showLuckySend = (records: LuckyRecord[], toIds: string[], count: number, error: string | null, spec: ComboSpec, viaWheel: boolean, times = 1) => {
     const first = records[0];
     const spent = records.reduce((n, r) => n + r.price, 0);
     const reward = records.reduce((n, r) => n + r.reward, 0);
@@ -3064,7 +3069,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     if (settings.luckyFx && showFx(first.price) && visibleRef.current) playLuckyFx({ id: first.giftId, name: first.giftName, emoji: first.emoji, price: first.price }, 'me', sentTo, count);
     // Some gifts didn't go (the balance ran out): the wheel stops; else it counts this send.
     if (error) stopCombo(spec);
-    else countCombo(spec, viaWheel);
+    else countCombo(spec, viaWheel, times);
   };
 
   // --- The repeat wheel (components/room/gift-combo) ------------------------------------------------------------
@@ -3076,20 +3081,22 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   /** A send of `spec` while the wheel is up for it: the wheel counts it (no chat line of its own). */
   const comboRepeat = (spec: ComboSpec) => !!comboRef.current && sameCombo(comboRef.current, spec);
   /** A send of `spec` reached everyone: the wheel counts it and its line starts again; one from the sheet opens it. */
-  const countCombo = (spec: ComboSpec, viaWheel: boolean) => {
+  const countCombo = (spec: ComboSpec, viaWheel: boolean, taps = 1) => {
     const at = nowMs();
-    setCombo((c) => (c && sameCombo(c, spec) ? { ...c, count: c.count + 1, key: at } : viaWheel ? c : { ...spec, count: 1, key: at }));
+    setCombo((c) => (c && sameCombo(c, spec) ? { ...c, count: c.count + taps, key: at } : viaWheel ? c : { ...spec, count: taps, key: at }));
   };
   /** A send of `spec` failed or reached only some: its wheel goes (the usual message already said why). */
   const stopCombo = (spec: ComboSpec) => setCombo((c) => (c && sameCombo(c, spec) ? null : c));
   // Taps go out one after another: one while the last send is on its way waits for it (server rooms), so the count
-  // follows what really went out and a failed send stops the wheel with a single message.
+  // follows what really went out and a failed send stops the wheel with a single message. Şanslı taps made meanwhile
+  // go out together as one request (`times`), however fast the taps: one request per answer, never one per tap
+  // (owners, 21 Nov 2026: a fast combo ran into "Çok fazla istek" and stopped the wheel).
   const comboTaps = useRef({ busy: false, more: 0 });
   const tapCombo = () => {
     if (!combo) return;
     const q = comboTaps.current;
     if (q.busy) {
-      q.more = Math.min(q.more + 1, COMBO_MORE);
+      q.more = Math.min(q.more + 1, combo.lucky ? LUCKY_TIMES_MAX : COMBO_MORE);
       return;
     }
     void runCombo({ lucky: combo.lucky, giftId: combo.giftId, to: combo.to, each: combo.each });
@@ -3098,11 +3105,14 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     const q = comboTaps.current;
     q.busy = true;
     try {
+      let times = 1;
       for (;;) {
-        const ok = await (spec.lucky ? sendLuckyGift(spec.giftId, spec.to, spec.each, true) : giftAgain(spec));
+        const ok = await (spec.lucky ? sendLuckyGift(spec.giftId, spec.to, spec.each, true, times) : giftAgain(spec));
         const c = comboRef.current;
         if (!ok || !q.more || !c || !sameCombo(c, spec)) break;
-        q.more -= 1;
+        // Şanslı: every tap made meanwhile in the next request; a plain gift: the next tap.
+        times = spec.lucky ? q.more : 1;
+        q.more -= times;
       }
     } finally {
       q.busy = false;
@@ -3620,6 +3630,31 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // move or resize a single mic; a cross-room PK's board is added to the stage like any board and the chat gives way.
   const fitOpts: FitOpts = { boss: bossOn };
   const plan = layout ? layoutPlan(layout.layoutSchema, win.width, theme === 'pk') : null;
+  // --- Odalar arası kaydırma (owners, 21 Nov 2026): up on the stage, the next open room; down, the one before -----
+  const serverRooms = useServerRoomList();
+  const switchRoom = (dir: 1 | -1) => {
+    const live = liveMode();
+    const next = swipeRoom(live ? serverRooms : ROOMS, { current: id, blocked, needsPassword: (r) => (live ? isLockedRoom(r.id) && !roomPassword(r.id) : !!r.password) }, dir);
+    if (!next) {
+      tapHaptic();
+      return addMsg({ system: true, text: dir === 1 ? 'Sırada başka açık oda yok.' : 'Bundan önce açık oda yok.' });
+    }
+    const go = () => {
+      tapHaptic();
+      // As "Şu an popüler" in the leave sheet: this room ends as a switch does (mic off, voice closed, membership
+      // left); the route is held while it goes, then shows the other room in its place.
+      setLeaving(true);
+      endRoom('switched');
+      setTimeout(() => router.replace({ pathname: '/oda/[id]', params: { id: next.id } }), 0);
+    };
+    // On a mic, or running the room: a swipe never takes them out unasked.
+    if (amSeated || canManage)
+      return showAlert('Başka odaya geçilsin mi?', `"${next.title}" odasına geçersen ${amSeated ? 'mikrofonu bırakırsın ve ' : ''}bu odadan çıkarsın.`, [
+        { text: 'Vazgeç', style: 'cancel' },
+        { text: 'Geç', onPress: go },
+      ]);
+    go();
+  };
   const stageFit = strip || teamPk ? null : (h: number, like?: Fitted) => (layout && plan ? fitLayout(layout.layoutSchema, plan, h, fitOpts, like) : fitGrid(allSeats.length, win.width, h, fitOpts, like));
   // The strip's mics: a tenth of the row each, so ten fit and fewer stay together on the left.
   const stripW = Math.floor((Math.min(win.width, 640) - 16) / 10);
@@ -3901,6 +3936,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             typing={typing}
             guess={Math.round(win.height * 0.34)}
             onTouchStart={emojiOpen ? () => setEmojiOpen(false) : undefined}
+            onSwipe={typing || emojiOpen ? undefined : switchRoom}
             top={
               <>
                 {musicEnabled && <MusicBar music={shownMusic} canControl={canControlMusic} onOpen={() => setPanel('music')} onToggle={music$.toggle} onClose={music$.close} />}

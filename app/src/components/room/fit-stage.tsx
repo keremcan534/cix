@@ -11,7 +11,7 @@
 // sheet's), the emoji panel, a note over the controls or the chat itself can't shrink it, cut it or move it. The
 // emoji panel (`overlay`) lies over the chat, under the Balkon bar, never over it.
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { LayoutAnimation, ScrollView, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
+import { LayoutAnimation, PanResponder, ScrollView, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
 
 import { STAGE_PAD, fitMics, stageHeight } from '@/lib/room-split';
 import { BOARD_GAP, STAGE_HEADROOM as HEADROOM, easedChange, type Fitted } from '@/lib/seat-fit';
@@ -19,11 +19,32 @@ import { useSettings } from '@/store';
 
 /** A real change of the mics' sizes (a banner came or went, another layout) glides into place. */
 const GLIDE = { duration: 260, update: { type: LayoutAnimation.Types.easeInEaseOut } };
+/** A swipe on the stage: points moved before it is one (more up or down than sideways), and to count on release (or
+ *  a quick flick). */
+const SWIPE_START = 18;
+const SWIPE_GO = 70;
+const SWIPE_FLING = 0.6;
 
 // The stage reaches HEADROOM up into the header's lower padding (lib/seat-fit STAGE_HEADROOM): with no board over the
 // mics, the first row's frames have it above them (their crowns rise above the seat and would be cut by the scroll
 // view's edge). A board covers it, so BOARD_GAP is left under the boards instead: the first row has the same room
 // either way (lib/stage-rows firstRowRoom).
+
+/** The stage's swipe: made once; it calls the latest handler, and only while the stage doesn't scroll. */
+class StageSwipe {
+  private on?: (dir: 1 | -1) => void;
+  private free = true;
+  set(on: ((dir: 1 | -1) => void) | undefined, free: boolean) {
+    this.on = on;
+    this.free = free;
+  }
+  readonly pan = PanResponder.create({
+    onMoveShouldSetPanResponderCapture: (_, g) => !!this.on && this.free && Math.abs(g.dy) > SWIPE_START && Math.abs(g.dy) > Math.abs(g.dx) * 2,
+    onPanResponderRelease: (_, g) => {
+      if (Math.abs(g.dy) > SWIPE_GO || Math.abs(g.vy) > SWIPE_FLING) this.on?.(g.dy < 0 ? 1 : -1);
+    },
+  });
+}
 
 const chatInFlow: ViewStyle = { flex: 1, minHeight: 0 };
 /** Three of the chat's short typing lines (17 px each) over the lower mics. */
@@ -46,6 +67,7 @@ export function FitStage({
   typing = false,
   onLine,
   onTouchStart,
+  onSwipe,
 }: {
   /**
    * Sizes the mics for a height; with `like`, in its columns and with faces at most its size. Null: they aren't
@@ -83,6 +105,11 @@ export function FitStage({
   /** The Balkon line: the stage and the Balkon bar's height, from this part's top. */
   onLine?: (px: number) => void;
   onTouchStart?: () => void;
+  /**
+   * A clear up or down swipe on the stage (1: up, -1: down): another room (owners, 21 Nov 2026). Only while the stage
+   * doesn't scroll (its mics fit); a tap on a mic is still a tap, and the chat scrolls as before.
+   */
+  onSwipe?: (dir: 1 | -1) => void;
 }) {
   // This part as laid out (for the first frames), the stage as drawn, the Balkon bar, the boards, the mics as drawn,
   // the chat's basis.
@@ -124,12 +151,16 @@ export function FitStage({
   // Typing on a short phone: the keyboard leaves the chat no line under the Balkon bar. The mics don't move, so the
   // chat's last lines lie over their lower part, and nothing of the stage shows through the field's buttons.
   const squeezed = typing && own > 0 && own - line < 60;
+  // The swipe: read through a ref, so the responder made once always calls the latest handler.
+  const [swipe] = useState(() => new StageSwipe());
+  useEffect(() => swipe.set(onSwipe, !scrolls));
   useEffect(() => {
     if (line > 0) onLine?.(line);
   }, [line, onLine]);
   return (
     <View style={[{ flex: 1 }, squeezed && { overflow: 'hidden' }]} onLayout={measure(setOwn)}>
-      <ScrollView style={style} onLayout={measure(setStageH)} onTouchStart={onTouchStart} contentContainerStyle={{ paddingTop: HEADROOM, paddingBottom: STAGE_PAD, flexGrow: 1 }} showsVerticalScrollIndicator={scrolls} persistentScrollbar={scrolls} alwaysBounceVertical={false}>
+      <ScrollView style={style} onLayout={measure(setStageH)} onTouchStart={onTouchStart} scrollEnabled={scrolls || !onSwipe} contentContainerStyle={{ paddingTop: HEADROOM, paddingBottom: STAGE_PAD, flexGrow: 1 }} showsVerticalScrollIndicator={scrolls} persistentScrollbar={scrolls} alwaysBounceVertical={false}>
+        <View style={{ flexGrow: 1 }} {...swipe.pan.panHandlers}>
         <View onLayout={measure(setTopH)}>
           {top}
           {pkTop}
@@ -138,6 +169,7 @@ export function FitStage({
         {/* Centred when the stage is taller than they are; measured as they are, not as the room around them. */}
         <View style={{ flexGrow: 1, justifyContent: 'center' }}>
           <View onLayout={measure(setDrawn)}>{seatsNode}</View>
+        </View>
         </View>
       </ScrollView>
       <View onLayout={measure(setBar)}>{balcony}</View>
