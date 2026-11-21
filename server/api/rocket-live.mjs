@@ -554,7 +554,7 @@ export const rocketRoutes = {
         const lref = `casino:${ref}`;
         if (fromGame) await move(c, me.id, 'game', -fromGame, what, lref);
         // "Uygulama içi:" makes it a coin_spend for the finance panel, like the other coin games.
-        if (fromCoins) await spendCoins(c, me.id, fromCoins, `Uygulama içi: ${what}`, lref);
+        if (fromCoins) await spendCoins(c, me.id, fromCoins, `Uygulama içi: ${what}`, lref, null, { detail: { game: GAME.id } });
         const ins = await c.query(
           `INSERT INTO casino_rounds (user_id, ref, game, bet, from_game, place, detail, outcome, live_round, auto)
            VALUES ($1, $2, 'rocket', $3, $4, $5, $6, $7, $8, $9) RETURNING *`,

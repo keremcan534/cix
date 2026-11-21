@@ -164,6 +164,8 @@ export const PANEL_ROUTES = new Set([
   // Ajans merkezi (agency-admin.mjs): the network's tree and list, applications, status, rate, tier, parent, a
   // streamer's agency, transfers and transition commission, performance runs, reports, the commission simulator.
   'GET /api/admin/agency/tree',
+  // The finance panel's Ajans / BD / Yayıncı lists come from here (read only).
+  'GET /api/admin/agency/finance-roster',
   'GET /api/admin/agency/overview',
   'GET /api/admin/agency/list',
   'POST /api/admin/agency/create',

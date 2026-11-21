@@ -109,7 +109,8 @@ export function eventsOf(r) {
 
   // A shop buy (economy.mjs): the item is the catalog sku.
   if (typeof d.sku === 'string') return [{ ...base, type: 'coin_spend', user_ref: r.user_id, coins: -amount, item_ref: d.sku }];
-  if (r.reason.startsWith('Uygulama içi:')) return [{ ...base, type: 'coin_spend', user_ref: r.user_id, coins: -amount, item_ref: r.reason.slice(13).trim().slice(0, 100) }];
+  // A coin game's round: the game's id (the panel's catalog counts a game's uses by it); older rows, the text.
+  if (r.reason.startsWith('Uygulama içi:')) return [{ ...base, type: 'coin_spend', user_ref: r.user_id, coins: -amount, item_ref: typeof d.game === 'string' ? d.game.slice(0, 100) : r.reason.slice(13).trim().slice(0, 100) }];
   if (r.reason.startsWith('İade') && d.purchase && store) return [refundOf(d.purchase, at)];
   const sink = sinkOf(r.reason, d);
   if (sink) return [{ ...base, type: 'coin_spend', user_ref: r.user_id, coins: -amount, item_ref: sink }];

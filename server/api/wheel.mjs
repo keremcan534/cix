@@ -174,7 +174,7 @@ export const wheelRoutes = {
         const what = `Rüzgâr Gülü · tur (${t.label} ×${count})`;
         if (fromGame) await move(c, me.id, 'game', -fromGame, what, lref);
         // "Uygulama içi:" makes it a coin_spend for the finance panel, like the other coin games.
-        if (fromCoins) await spendCoins(c, me.id, fromCoins, `Uygulama içi: ${what}`, lref);
+        if (fromCoins) await spendCoins(c, me.id, fromCoins, `Uygulama içi: ${what}`, lref, null, { detail: { game: 'ruzgar-gulu' } });
 
         const fund = (await funds(c, tier))[tier];
         const r = playSpins(tier, count, fund, () => crypto.randomInt(0, WEIGHT_TOTAL));

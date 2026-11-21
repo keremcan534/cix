@@ -492,6 +492,15 @@ describe('Askı, personel, BD, ödemeler, raporlar', () => {
     const ov = ok(await admin.get('/api/admin/agency/overview'));
     assert.equal(ov.tops, 2);
     assert.equal(ov.subs, 1);
+    // The finance panel's lists: every agency with its code and rate, its upper agency, every streamer with their agency.
+    const roster = ok(await admin.get('/api/admin/agency/finance-roster'));
+    const ra = Object.fromEntries(roster.agencies.map((a) => [a.id, a]));
+    assert.equal(ra[S.id].parentId, T.id);
+    assert.ok(ra[T.id].code && ra[T.id].rate > 0);
+    assert.equal(roster.streamers.filter((m) => m.agencyId === S.id).length, 1);
+    assert.equal(roster.streamers.filter((m) => m.agencyId === T.id).length, byId[T.id].streamers);
+    assert.ok(roster.topRate > 0);
+    refused(await sOwner.get('/api/admin/agency/finance-roster'), 403, 'finans listesi');
   });
 
   test('[Ş1-15] personel izinleri esnek; BD yalnız sorumlu olduğu ajansları görür, BD komisyonu havuzdan ayrı', async () => {
