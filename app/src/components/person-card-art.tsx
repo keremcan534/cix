@@ -1,11 +1,8 @@
 // The person card's pictures (app/assets/person-card, the designer's set): each drawn at its own shape. What changes
 // size is built from slices, so round corners and glowing ends keep their shape on every phone and with every name.
 import { useState, type ReactNode } from 'react';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Image, StyleSheet, View, type ImageSourcePropType, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
 
-import { VIP_LEVEL_ART } from '@/components/vip/level-art';
-import { levelArtFor } from '@/lib/vip-screen';
 
 const ART = {
   iliski: [require('../../assets/person-card/iliski.png'), 1.737],
@@ -52,30 +49,39 @@ const PANEL = {
   cap: 1 / 0.1574,
 };
 
-/** A VIP card's corners and rim (the bubble designs' gold or silver edge). */
-const VIP_CARD_RADIUS = 26;
-const VIP_CARD_RIM = 2.5;
+/**
+ * VIP 0–10 kişi kartı (the owners' package, 21 Nov 2026: "aynı düzen, farklı VIP üst süslemeleri"): every card is
+ * the designer's purple panel, and its top edge wears its VIP level's ornament (VIP 0, everyone without VIP: the pink
+ * one; 1 ice crystal … 10 flame crown). The ornaments were cut from the package's mockup (assets/vip/card-topper,
+ * cleaned of the mockup's stray lines): drawn over the panel's top edge, never catching a tap.
+ */
+export const CARD_TOPPERS = [
+  { src: require('../../assets/vip/card-topper/topper-0.png'), ratio: 632 / 48 },
+  { src: require('../../assets/vip/card-topper/topper-1.png'), ratio: 612 / 84 },
+  { src: require('../../assets/vip/card-topper/topper-2.png'), ratio: 634 / 80 },
+  { src: require('../../assets/vip/card-topper/topper-3.png'), ratio: 644 / 88 },
+  { src: require('../../assets/vip/card-topper/topper-4.png'), ratio: 636 / 64 },
+  { src: require('../../assets/vip/card-topper/topper-5.png'), ratio: 614 / 78 },
+  { src: require('../../assets/vip/card-topper/topper-6.png'), ratio: 636 / 88 },
+  { src: require('../../assets/vip/card-topper/topper-7.png'), ratio: 646 / 66 },
+  { src: require('../../assets/vip/card-topper/topper-8.png'), ratio: 684 / 98 },
+  { src: require('../../assets/vip/card-topper/topper-9.png'), ratio: 678 / 70 },
+  { src: require('../../assets/vip/card-topper/topper-10.png'), ratio: 672 / 90 },
+] as const;
+/** The ornament for a VIP level (above 10: VIP 10's; below 0 or unknown: VIP 0's). */
+export const cardTopperOf = (vip: number | null | undefined) => CARD_TOPPERS[Math.min(10, Math.max(0, Math.floor(Number(vip) || 0)))];
 
-/** The card's panel: the corners keep their shape, the strip between them grows with what is on the card. */
+/** The card's panel: the corners keep their shape, the strip between them grows with what is on the card; its VIP
+ *  level's ornament on its top edge. */
 export function CardPanel({ children, style, vip = 0 }: { children: ReactNode; style?: StyleProp<ViewStyle>; vip?: number }) {
-  // VIP seti ("kişi kartı"): a VIP 1–10 card wears its level's bubble colours, inside left to right and the rim's
-  // tones top to bottom (components/vip/level-art), in place of the designer's panel.
-  const set = levelArtFor(vip);
-  const look = set ? VIP_LEVEL_ART[set].card : null;
-  if (look)
-    return (
-      <View style={style}>
-        <LinearGradient colors={look.rim} style={[StyleSheet.absoluteFill, { borderRadius: VIP_CARD_RADIUS }]} pointerEvents="none">
-          <LinearGradient
-            colors={look.inner}
-            start={{ x: 0, y: 0.5 }}
-            end={{ x: 1, y: 0.5 }}
-            style={{ flex: 1, margin: VIP_CARD_RIM, borderRadius: VIP_CARD_RADIUS - VIP_CARD_RIM }}
-          />
-        </LinearGradient>
-        {children}
-      </View>
-    );
+  const top = cardTopperOf(vip);
+  // The ornament's drawn height comes from its measured width; a little over half of it sits above the card.
+  const [wide, setWide] = useState(0);
+  const onTopperLayout = (e: LayoutChangeEvent) => {
+    const next = Math.round(e.nativeEvent.layout.width);
+    if (next > 0 && next !== wide) setWide(next);
+  };
+  const tall = wide / top.ratio;
   return (
     <View style={style}>
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -85,9 +91,17 @@ export function CardPanel({ children, style, vip = 0 }: { children: ReactNode; s
         <Image source={PANEL.bottom} style={{ width: '100%', height: undefined, aspectRatio: PANEL.cap }} resizeMode="stretch" />
       </View>
       {children}
+      {/* Over the panel's top edge, a little wider than the card, half of it above the card: decoration only. */}
+      <View style={[s.topper, { top: -Math.round(tall * 0.52), opacity: wide ? 1 : 0 }]} onLayout={onTopperLayout} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+        <Image source={top.src} style={{ width: '100%', height: tall || 1 }} resizeMode="contain" />
+      </View>
     </View>
   );
 }
+
+const s = StyleSheet.create({
+  topper: { position: 'absolute', top: 0, left: '-3%', right: '-3%' },
+});
 
 const PILLS = {
   kulup: [require('../../assets/person-card/kulup-dugme-sol.png'), require('../../assets/person-card/kulup-dugme-orta.png'), require('../../assets/person-card/kulup-dugme-sag.png')],
