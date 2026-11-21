@@ -503,8 +503,10 @@ describe('Bağlar: yeniden bağ hediyesi, düşüş, bildirimler', () => {
     // Nothing twice: every ref once per person.
     const dup = await h.sql.query("SELECT target, ref, count(*)::int AS n FROM team_notices WHERE category = 'bond' GROUP BY 1, 2 HAVING count(*) > 1");
     assert.deepEqual(dup.rows, []);
-    const told = await h.sql.query('SELECT count(*)::int AS n FROM bonds WHERE told_status IS DISTINCT FROM status');
-    assert.equal(told.rows[0].n, 0, 'her durum anlatıldı');
+    // Every state is told, a moment after its change commits (the notices go after the transaction, bond-life.mjs):
+    // waited for, not read at once.
+    const untold = async () => (await h.sql.query('SELECT count(*)::int AS n FROM bonds WHERE told_status IS DISTINCT FROM status')).rows[0].n;
+    await until(async () => (await untold()) === 0, 'her durum anlatıldı');
   });
 
   test('profilde bağlar sayfa sayfa; odada çok bağı olan birinin yanındaki bağ kaybolmaz', async () => {
