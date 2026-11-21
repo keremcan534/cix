@@ -25,7 +25,7 @@ import { privacyOf } from './privacy.mjs';
 import { roomEntered } from './referrals.mjs';
 import { eventJoined, eventRoomFinished } from './events.mjs';
 import { connectionEnded, roomEnded, sessionsEnded, trackPublished, trackUnpublished } from './media-minutes.mjs';
-import { leftVoiceRoom, mayStay, voiceAccess, voiceRoomStarted } from './rooms.mjs';
+import { leftVoiceRoom, mayStay, refreshRoomMetaSoon, voiceAccess, voiceRoomStarted } from './rooms.mjs';
 import { voiceGrant } from './sanctions.mjs';
 
 export const [LK_KEY, LK_SECRET] = (env.LIVEKIT_KEYS ?? '').split(/:\s*/);
@@ -341,6 +341,8 @@ export const liveRoutes = {
     const video = { room, roomJoin: true, canPublish: g.canPublish, canPublishSources: ['microphone', 'camera'], canSubscribe: true, canPublishData: g.canPublishData, canUpdateOwnMetadata: true };
     const via = await followedVia(room, u, url.searchParams.get('via'));
     const token = liveKitJwt({ sub: u.id, name: u.name, video, ...(via && { attributes: { via } }) }, TOKEN_TTL);
+    // The room's metadata (seat color, locked mics, layout, queue) written again for whoever joins (rooms.mjs).
+    refreshRoomMetaSoon(room);
     return { token, ttl: TOKEN_TTL, canPublish: g.canPublish, canChat: g.canPublishData, via };
   },
 

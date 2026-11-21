@@ -23,7 +23,7 @@ const lk = http.createServer((req, res) => {
 await new Promise((r) => lk.listen(LK_PORT, '127.0.0.1', r));
 after(() => new Promise((r) => (lk.closeAllConnections?.(), lk.close(r))));
 
-const h = startApi({ LIVEKIT_API_URL: `http://127.0.0.1:${LK_PORT}`, SEAT_COLOR_SWEEP_MS: '200', SHOP_ITEMS_POLL_MS: '200' });
+const h = startApi({ LIVEKIT_API_URL: `http://127.0.0.1:${LK_PORT}`, SEAT_COLOR_SWEEP_MS: '200', SHOP_ITEMS_POLL_MS: '200', ROOM_META_JOIN_DELAY_MS: '100', ROOM_META_REFRESH_MS: '1500' });
 const { call, signUp } = h;
 const q = (s, p) => h.sql.query(s, p);
 const ok = async (p, what) => {
@@ -188,5 +188,28 @@ describe('Koltuk rengi', () => {
     assert.ok(audit.includes('shop.create') && audit.includes('shop.update'));
     await ok(shop('/reset', { id: 'pembe' }), 'orijinaline dön');
     assert.deepEqual((await seats()).find((x) => x.sku === 'pembe'), { sku: 'pembe', kind: 'seat', name: 'Açık Pembe', price: PINK, days: null, minVip: 0, builtin: true, look: { color: SEAT_COLORS.get('pembe').color } });
+  });
+
+  test('odaya giren olunca metadata yeniden yazılır: kaçmış bir yazım koltukları gümüş bırakmaz (oda başına seyrek)', async () => {
+    const owner = await signUp('Kaçan Metadata');
+    await credit(owner, PINK + 500);
+    const room = await roomOf(owner, 'Kaçan');
+    await ok(call('POST', '/api/rooms/seat-color', { room, color: 'pembe', price: PINK, ref: rnd(6) }, owner.session), 'pembe');
+    // As if LiveKit missed every write so far: none of this room's.
+    for (let i = lkCalls.length - 1; i >= 0; i--) if (lkCalls[i].body.room === `oda-${room}`) lkCalls.splice(i, 1);
+    const writes = () => lkCalls.filter((x) => x.method === 'UpdateRoomMetadata' && x.body.room === `oda-${room}`).length;
+    const guest = await signUp('Giren');
+    assert.equal(await status(call('GET', `/token?room=oda-${room}`, null, guest.session)), 200);
+    await sleep(400);
+    assert.equal(writes(), 1);
+    assert.equal(lastMeta(room).seatColor, 'pembe');
+    // Many joins at once: one write a room per interval, not one per person.
+    for (let i = 0; i < 5; i++) assert.equal(await status(call('GET', `/token?room=oda-${room}`, null, owner.session)), 200);
+    await sleep(400);
+    assert.equal(writes(), 1);
+    await sleep(1300);
+    assert.equal(await status(call('GET', `/token?room=oda-${room}`, null, guest.session)), 200);
+    await sleep(400);
+    assert.equal(writes(), 2);
   });
 });

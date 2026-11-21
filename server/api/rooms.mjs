@@ -206,6 +206,26 @@ export async function pushRoomMeta(roomId) {
     return false;
   }
 }
+/**
+ * Someone was given a voice token for the room: its metadata is written again a moment later, at most once per
+ * META_REFRESH_MS a room (owners, 21 Nov 2026: a room that had bought Turkuaz showed its seats silver until the layout
+ * changed). The metadata is otherwise written only when the room starts (the room_started webhook) and when something
+ * in it changes; one write LiveKit missed (a webhook late or lost, LiveKit busy) left every phone joining after it with
+ * the default seat color, no locked mics and no queue until the next change. Not awaited; pushRoomMeta never throws.
+ */
+const META_REFRESH_MS = Number(env.ROOM_META_REFRESH_MS ?? 30_000);
+const META_JOIN_DELAY_MS = Number(env.ROOM_META_JOIN_DELAY_MS ?? 2_000);
+const metaWritten = new Map();
+export function refreshRoomMetaSoon(name) {
+  const m = ROOM_NAME.exec(name);
+  if (!m) return;
+  const now = Date.now();
+  if (now - (metaWritten.get(m[1]) ?? 0) < META_REFRESH_MS) return;
+  if (metaWritten.size > 5000) metaWritten.clear();
+  metaWritten.set(m[1], now);
+  // After the joiner's connect, so the first one in finds the LiveKit room there to write to.
+  setTimeout(() => void pushRoomMeta(m[1]), META_JOIN_DELAY_MS).unref();
+}
 /** Someone left the voice room: off its mic queue. */
 export async function leftVoiceRoom(name, identity) {
   const m = ROOM_NAME.exec(name);
