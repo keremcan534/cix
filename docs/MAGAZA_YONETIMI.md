@@ -8,6 +8,14 @@ Sahibin isteği (17 Kasım, koltuk rengi): koltuk rengi kendi kendine değişmes
 
 Çıkartma paketleri zaten panelde: **Uygulama › Emojiler** ([`EMOJI_YONETIMI.md`](EMOJI_YONETIMI.md)).
 
+
+## Süre paketleri (Güncelleme 8, 21 Kasım 2026)
+
+- Panelde **Mağaza**'da bir ürünü düzenlerken ana sürenin (ör. 30 gün) yanına **en fazla 3 süre paketi** eklenir (ör. 7 ve 15 gün), her biri kendi fiyatıyla. Süresiz üründe ve koltuk renklerinde paket olmaz.
+- Yeni uygulama Çarşı'da ürün kartında süreleri gösterir (7g · 15g · 30g); seçilen sürenin fiyatıyla satın alır. Sunucu gösterilen süreyi ve fiyatı denetler; değiştiyse jeton düşmez.
+- **Eski APK'lar** paketleri görmez, ana süreyi ana fiyatla satmaya devam eder.
+- Uygulamanın kendi ürünlerinde de olur; **Orijinale dön** paketleri de kaldırır.
+- Teknik: `shop-items.mjs` (`plansOf`), `110_shop_plans.sql`, katalog `shop.items[].plans`, alım `POST /api/shop/buy {days}`; test `test/shop-plans.test.mjs`.
 ## Panelde: Hediye ve mağaza › Mağaza
 
 Beş sekme var: **Giriş efektleri**, **Çerçeveler**, **Sohbet balonları**, **Ses dalgaları** ve **Koltuk renkleri**.

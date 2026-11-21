@@ -7,6 +7,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+import { parsePlans } from '@/lib/shop-live-core';
+
 const src = (p: string) => readFileSync(resolve(import.meta.dirname, '../src', p), 'utf8');
 const room = src('components/room/live-room.tsx');
 const body = (name: string) => {
@@ -33,5 +35,25 @@ describe('Şanslı hediyeler odada', () => {
     assert.match(body('showLuckyFrom'), /if \(settings\.luckyFx\) \{/);
     assert.match(src('store.tsx'), /luckyFx: true,/);
     assert.match(src('components/room/community.tsx'), /k="luckyFx"[^/]*Şanslı hediyeleri göster/);
+  });
+});
+
+// Çarşı süre paketleri (Güncelleme 8, madde 6; lib/shop-live-core parsePlans): the catalog's other durations, read
+// defensively.
+describe('Çarşı süre paketleri', () => {
+  test('geçerli paketler günlerine göre; bozuk, tekrar ve ana süre dışarıda; en çok 3', () => {
+    assert.deepEqual(
+      parsePlans([{ days: 30, price: 900 }, { days: 7, price: 300 }, { days: 7, price: 1 }, { days: 15, price: 0 }, { days: 'x', price: 5 }], 15),
+      [
+        { days: 7, price: 300 },
+        { days: 30, price: 900 },
+      ],
+    );
+    assert.equal(parsePlans([{ days: 3, price: 1 }, { days: 4, price: 1 }, { days: 5, price: 1 }, { days: 6, price: 1 }], 30).length, 3);
+  });
+  test('Çarşı seçilen sürenin fiyatıyla alır', () => {
+    const shop = src('app/magaza.tsx');
+    assert.match(shop, /buyCosmetic\(c\.id, o\.days \?\? undefined\)/);
+    assert.match(src('store.tsx'), /const item = plan \? \{ \.\.\.listed, price: plan\.price, days: plan\.days \} : listed;/);
   });
 });

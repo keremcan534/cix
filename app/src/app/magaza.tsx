@@ -60,6 +60,11 @@ export default function StoreScreen() {
 
   // The item's button: wear or take off what I own, the VIP lock, or its price (buy, with the confirmation). The same in
   // the frame preview's sheet; `onLock`: the sheet closes before the VIP page opens.
+  // Süre paketleri (Güncelleme 8): an item with other durations shows them as chips; the price and the buy follow the
+  // one picked (its main term until another is picked).
+  const [picked, setPicked] = useState<Record<string, number>>({});
+  const durationsOf = (c: Cosmetic) => (c.days && c.plans?.length ? [{ days: c.days, price: c.price }, ...c.plans].sort((a, b) => a.days - b.days) : null);
+  const chosenOf = (c: Cosmetic) => durationsOf(c)?.find((o) => o.days === picked[c.id]) ?? { days: c.days, price: c.price };
   const cta = (c: Cosmetic, onLock?: () => void) => {
     const isEquipped = equipped[c.kind] === c.id;
     if (inventory.has(c.id))
@@ -82,7 +87,7 @@ export default function StoreScreen() {
       );
     return (
       <PressableScale hitSlop={7} onPress={() => buy(c)}>
-        <GlossButton label={c.price.toLocaleString('tr-TR')} small icon={<Icon3D name="coin" size={16} />} />
+        <GlossButton label={chosenOf(c).price.toLocaleString('tr-TR')} small icon={<Icon3D name="coin" size={16} />} />
       </PressableScale>
     );
   };
@@ -90,12 +95,13 @@ export default function StoreScreen() {
   const framePreview = frameShown ? (shopCosmetics().find((c) => c.id === frameShown && c.kind === 'frame') ?? null) : null;
 
   const buy = (c: Cosmetic) => {
-    showAlert(`${c.emoji} ${c.name}`, `Fiyat: ${c.price.toLocaleString('tr-TR')} jeton · Süre: ${c.days ? `${c.days} gün` : 'kalıcı'}`, [
+    const o = chosenOf(c);
+    showAlert(`${c.emoji} ${c.name}`, `Fiyat: ${o.price.toLocaleString('tr-TR')} jeton · Süre: ${o.days ? `${o.days} gün` : 'kalıcı'}`, [
       { text: 'Vazgeç', style: 'cancel' },
       {
         text: 'Satın al',
         onPress: () => {
-          const err = buyCosmetic(c.id);
+          const err = buyCosmetic(c.id, o.days ?? undefined);
           if (err) showAlert('Satın alınamadı', err);
         },
       },
@@ -192,11 +198,24 @@ export default function StoreScreen() {
                     </Pressable>
                   )}
                   <Text style={styles.name}>{c.name}</Text>
-                  <Text style={styles.meta}>
-                    {c.kind === 'ride' ? 'Binek · ' : ''}
-                    {c.days ? `${c.days} gün` : 'Kalıcı'}
-                    {c.minVip ? ` · VIP ${c.minVip}+` : ''}
-                  </Text>
+                  {durationsOf(c) && !inventory.has(c.id) ? (
+                    <View style={styles.durations} accessibilityRole="radiogroup" accessibilityLabel="Süre">
+                      {durationsOf(c)!.map((o) => {
+                        const on = o.days === chosenOf(c).days;
+                        return (
+                          <Pressable key={o.days} onPress={() => setPicked((m) => ({ ...m, [c.id]: o.days }))} hitSlop={4} style={[styles.duration, on && styles.durationOn]} accessibilityRole="radio" accessibilityState={{ selected: on }} accessibilityLabel={`${o.days} gün, ${o.price.toLocaleString('tr-TR')} jeton`}>
+                            <Text style={[styles.durationText, on && styles.durationTextOn]}>{o.days}g</Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  ) : (
+                    <Text style={styles.meta}>
+                      {c.kind === 'ride' ? 'Binek · ' : ''}
+                      {c.days ? `${c.days} gün` : 'Kalıcı'}
+                      {c.minVip ? ` · VIP ${c.minVip}+` : ''}
+                    </Text>
+                  )}
                   {/* Pinned to the card bottom so prices line up when a name wraps to two lines. */}
                   <View style={styles.cta}>{cta(c)}</View>
                 </Shelf>
@@ -222,6 +241,11 @@ const useStyles = makeStyles((t) => ({
   previewSlot: { height: 104, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center' },
   previewBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, height: 30, borderRadius: 999, backgroundColor: t.dark ? 'rgba(255,95,162,0.18)' : 'rgba(208,46,120,0.11)' },
   previewText: { color: t.colors.primaryText, fontWeight: '700', fontSize: 12 },
+  durations: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 4 },
+  duration: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 999, borderWidth: 1, borderColor: t.dark ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.15)' },
+  durationOn: { backgroundColor: t.colors.primaryText, borderColor: t.colors.primaryText },
+  durationText: { color: t.colors.textDim, fontSize: 11, fontWeight: '700' },
+  durationTextOn: { color: '#fff' },
   tabTrack: { marginHorizontal: 16, marginBottom: 12, borderRadius: 999, overflow: 'hidden', ...glassChipOf(t) },
   tab: { paddingHorizontal: 13, paddingVertical: 9, borderRadius: 999 },
   tabActive: { backgroundColor: t.semantic.action, boxShadow: '0 3px 12px rgba(255,95,162,0.4)' },

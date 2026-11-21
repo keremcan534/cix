@@ -490,8 +490,15 @@ export const economyRoutes = {
     const b = await readJson(req);
     const sold = sellable(b.sku);
     if (!sold) throw new HttpError(400, 'Bu ürün artık satışta değil');
-    // A Rütbe package (7, 30 or 90 days, Seviye ayarları): the one of the days the phone showed.
-    const item = sold.kind === 'noble' && Number.isSafeInteger(b.days) && b.days > 0 ? nobleItem(SHOP.get(b.sku), b.days) : sold;
+    // A Rütbe package (7, 30 or 90 days, Seviye ayarları) or a shop item's other duration (Yönetim › Mağaza,
+    // Güncelleme 8): the one of the days the phone showed; any other days get the main term (and a 409 below).
+    const plan = sold.kind !== 'noble' && Number.isSafeInteger(b.days) && b.days > 0 && b.days !== sold.days ? sold.plans?.find((p) => p.days === b.days) : undefined;
+    const item =
+      sold.kind === 'noble' && Number.isSafeInteger(b.days) && b.days > 0
+        ? nobleItem(SHOP.get(b.sku), b.days)
+        : plan
+          ? Object.freeze({ ...sold, price: plan.price, days: plan.days })
+          : sold;
     // The days the phone showed (0: for good), or none sent: it showed the compiled row (a Rütbe tier, one of the
     // app's own frames or entry effects), which must still be what is sold.
     const base = compiledOf(item);

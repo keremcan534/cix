@@ -10,6 +10,8 @@ export type Cosmetic = {
   emoji: string;
   price: number;
   days: number | null; // null = permanent
+  /** Its other durations, each with its own price (Yönetim › Mağaza, Güncelleme 8); none: only `days`. */
+  plans?: readonly { days: number; price: number }[];
   color?: readonly [string, string];
   minVip?: number;
   /** Code-drawn animation (components/fx): frame styles and entry styles. */
