@@ -421,11 +421,12 @@ export function ShowcaseStrip({ top }: { top: WallGift[] }) {
 
 // --- Info ----------------------------------------------------------------------------------------------------
 
-/** A card with an icon, a title and its text (Hakkımda, Arkadaşlık Sloganı, Doğrulama). */
-export function InfoCard({ icon, tone, title, text, onPress, quiet, label }: { icon: IconName; tone: Tone; title: string; text: string; onPress?: () => void; quiet?: boolean; label?: string }) {
+/** A card with an icon, a title and its text (Hakkımda, Arkadaşlık Sloganı, Doğrulama); `children` sit under it (Hakkımda's interests). */
+export function InfoCard({ icon, tone, title, text, onPress, quiet, label, children }: { icon: IconName; tone: Tone; title: string; text?: string; onPress?: () => void; quiet?: boolean; label?: string; children?: ReactNode }) {
   return (
-    <PCard onPress={onPress} label={label ?? `${title}: ${text}`} style={tone === 'blue' ? s.blueCard : undefined}>
-      <CardHead icon={icon} tone={tone} title={title} chevron={!!onPress} sub={<Text style={[s.infoText, quiet && s.infoQuiet]}>{text}</Text>} />
+    <PCard onPress={onPress} label={label ?? (text ? `${title}: ${text}` : title)} style={[tone === 'blue' ? s.blueCard : undefined, children ? { gap: 12 } : undefined]}>
+      <CardHead icon={icon} tone={tone} title={title} chevron={!!onPress} sub={text ? <Text style={[s.infoText, quiet && s.infoQuiet]}>{text}</Text> : undefined} />
+      {children}
     </PCard>
   );
 }
