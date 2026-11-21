@@ -211,6 +211,40 @@ describe('Rütbe', () => {
     assert.equal(daysUntil(e.noble.until), 60);
   });
 
+  // Paketler (21 Nov 2026): 7, 30 and 90 days, each at its own price (levels.mjs nobleDefaultPlans until the panel
+  // sets them); the phone sends the days it showed. An older app (no days) buys the 30-day term as before.
+  test('7, 30 ve 90 günlük paketler kendi fiyatıyla; aynı kademe uzar; en çok 365 gün; eski uygulama 30 gün alır', async () => {
+    // levels.mjs nobleDefaultPlans for a 30-day term of 15.000 (not imported: the module loads the API's settings).
+    const round = (n) => Math.max(100, Math.round(n / 100) * 100);
+    const plans = [{ days: 7, price: round((15_000 * 7) / 30 / 0.91) }, { days: 90, price: round(15_000 * 3 * 0.95) }];
+    const week = plans.find((p) => p.days === 7);
+    const three = plans.find((p) => p.days === 90);
+    assert.ok(week.price < 15_000 && three.price > 15_000 * 2, 'paket fiyatları');
+    const u = await person('Paketli Şövalye', 500_000);
+    const shopBuy = (days, price, ref = rnd(6)) => call('POST', '/api/shop/buy', { sku: 'noble-1', price, days, ref }, u.session);
+    let e = (await ok(shopBuy(7, week.price))).economy;
+    assert.equal(e.noble.tier, 1);
+    assert.equal(daysUntil(e.noble.until), 7);
+    assert.equal(await coins(u), 500_000 - week.price);
+    e = (await ok(shopBuy(90, three.price))).economy;
+    assert.equal(daysUntil(e.noble.until), 97, 'aynı kademe süresine eklenir');
+    // The 7-day package at the 30-day price, or a package that isn't sold: nothing moves.
+    const before = await coins(u);
+    const [st1, j1] = await shopBuy(7, 1);
+    assert.deepEqual([st1, j1.code], [409, 'price_changed']);
+    const [st2, j2] = await shopBuy(45, 15_000);
+    assert.deepEqual([st2, j2.code], [409, 'price_changed']);
+    assert.equal(await coins(u), before);
+    // An older app: no days, the compiled 30-day term at its compiled price.
+    e = (await ok(buy(u.session, 'noble-1', 15_000))).economy;
+    assert.equal(daysUntil(e.noble.until), 127);
+    // At most 365 days ahead: three more 90-day packages would pass it.
+    await ok(shopBuy(90, three.price));
+    await ok(shopBuy(90, three.price));
+    const [st3, j3] = await shopBuy(90, three.price);
+    assert.deepEqual([st3, j3.code], [409, 'too_far']);
+  });
+
   test('süresi bitmiş rütbe sayılmaz', async () => {
     const u = await person('Eski Gemici');
     await insertRow(u, 'noble-1', 'noble', -40, -10, 1);

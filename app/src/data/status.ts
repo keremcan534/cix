@@ -35,28 +35,67 @@ export const SVIP_RIGHTS: { name: string; emoji: string; group: RightGroup; art?
 ];
 
 // --- Rütbe (noble): bought with coins for 30 days -------------------------------------
+// Rütbe (21 Nov 2026, the owners' sample screens): five tiers bought with coins for a term (7, 30 or 90 days); the
+// same tier again adds its days (at most 365 ahead), a higher one runs beside a lower one. `price` is the 30-day term
+// (the one older apps buy, server/api/catalog.mjs), NOBLE_PLANS the other packages until Seviye ayarları say.
 export const NOBLE_TIERS = [
-  { tier: 1, name: 'Çavuş', emoji: '🛡️', art: 'asil-1-sovalye' as ArtName, price: 15_000, rights: 4, colors: ['#94A3B8', '#334155'] as [string, string] },
-  { tier: 2, name: 'Yüzbaşı', emoji: '🗡️', art: 'asil-2-vikont' as ArtName, price: 60_000, rights: 6, colors: ['#2DD4BF', '#0F766E'] as [string, string] },
-  { tier: 3, name: 'Binbaşı', emoji: '⚔️', art: 'asil-3-kont' as ArtName, price: 150_000, rights: 8, colors: ['#60A5FA', '#1D4ED8'] as [string, string] },
-  { tier: 4, name: 'Albay', emoji: '🏹', art: 'asil-4-markiz' as ArtName, price: 400_000, rights: 10, colors: ['#F472B6', '#BE123C'] as [string, string] },
-  { tier: 5, name: 'Paşa', emoji: '🦁', art: 'asil-5-duk' as ArtName, price: 1_000_000, rights: 12, colors: ['#FCD34D', '#B45309'] as [string, string] },
+  { tier: 1, name: 'Şövalye', emoji: '🛡️', art: 'asil-1-sovalye' as ArtName, price: 15_000, rights: 10, colors: ['#94A3B8', '#334155'] as [string, string] },
+  { tier: 2, name: 'Vikont', emoji: '🗡️', art: 'asil-2-vikont' as ArtName, price: 60_000, rights: 16, colors: ['#2DD4BF', '#0F766E'] as [string, string] },
+  { tier: 3, name: 'Kont', emoji: '⚔️', art: 'asil-3-kont' as ArtName, price: 150_000, rights: 20, colors: ['#60A5FA', '#1D4ED8'] as [string, string] },
+  { tier: 4, name: 'Markiz', emoji: '🏹', art: 'asil-4-markiz' as ArtName, price: 400_000, rights: 25, colors: ['#F472B6', '#BE123C'] as [string, string] },
+  { tier: 5, name: 'Dük', emoji: '🦁', art: 'asil-5-duk' as ArtName, price: 1_000_000, rights: 28, colors: ['#FCD34D', '#B45309'] as [string, string] },
 ];
 export const NOBLE_DAYS = 30;
-/** Ordered so that tier n has the first `rights` entries; GATES below read rights by name. */
-export const NOBLE_RIGHTS: { name: string; emoji: string; art?: ArtName; soon?: boolean }[] = [
-  { name: 'Rütbe Nişanı', emoji: '🏅', art: 'ayricalik-asil-madalyasi' },
-  { name: 'Rütbe etiketi', emoji: '🔖', art: 'ayricalik-asil-etiketi', soon: true },
-  { name: 'Oda kilitleme', emoji: '🔒', art: 'ayricalik-oda-kilitleme' },
-  { name: 'Giriş karşılaması', emoji: '🌟', art: 'ayricalik-giris-ekrani' },
-  { name: 'Profil çerçevesi', emoji: '🖼️', art: 'ayricalik-profil-cercevesi' },
-  { name: 'Sohbet balonu', emoji: '💬', art: 'ayricalik-sohbet-balonu', soon: true },
-  { name: 'Odada ayrılmış koltuk', emoji: '🛋️', art: 'ayricalik-asil-koltugu', soon: true },
+/** A round price in coins (server/api/levels.mjs roundPrice). */
+const roundPrice = (n: number) => {
+  const step = n >= 100_000 ? 1000 : 100;
+  return Math.max(step, Math.round(n / step) * step);
+};
+/**
+ * A tier's packages besides its 30-day term (server/api/levels.mjs nobleDefaultPlans): a week at its share plus about
+ * 10%, three months about 14% off the week's rate.
+ */
+export const nobleDefaultPlans = (price: number, days = NOBLE_DAYS): { days: number; price: number }[] =>
+  days === 30
+    ? [
+        { days: 7, price: roundPrice((price * 7) / 30 / 0.91) },
+        { days: 90, price: roundPrice(price * 3 * 0.95) },
+      ]
+    : [];
+/**
+ * Every Rütbe right, in the page's order, so that tier n has the first NOBLE_TIERS[n].rights of them. `perk`: the
+ * server's key for one the app really gives (Seviye ayarları may move or close it); the others are `soon`: the page
+ * shows them faded with "Yakında" and doesn't count them (owners' decision, 21 Nov 2026).
+ */
+export const NOBLE_RIGHTS: { name: string; emoji: string; art?: ArtName; perk?: string; soon?: boolean }[] = [
+  { name: 'Jeton hediye et', emoji: '💗', art: 'ayricalik-jeton-hediye-et', soon: true },
+  { name: 'VIP listesi', emoji: '👑', art: 'ayricalik-vip-listesi', soon: true },
   { name: 'Binekler', emoji: '🚘', art: 'ayricalik-araclar', soon: true },
+  { name: 'Rütbe nişanı', emoji: '🏅', art: 'ayricalik-asil-madalyasi', perk: 'badge' },
+  { name: 'Rütbe etiketi', emoji: '🔖', art: 'ayricalik-asil-etiketi', soon: true },
+  { name: 'Profil çerçevesi', emoji: '🖼️', art: 'ayricalik-profil-cercevesi', perk: 'frame' },
+  { name: 'Giriş ekranı', emoji: '🌟', art: 'ayricalik-giris-ekrani', perk: 'entry_greeting' },
+  { name: 'Oda kilitleme', emoji: '🔒', art: 'ayricalik-oda-kilitleme', perk: 'room_password' },
+  { name: 'Seviyeleri gizle', emoji: '🙈', art: 'ayricalik-gizemli-kisi-kimligi', perk: 'hide_levels' },
+  { name: 'Odada rütbe koltuğu', emoji: '🛋️', art: 'ayricalik-asil-koltugu', soon: true },
+  { name: 'Özel arka plan', emoji: '🏞️', art: 'ayricalik-ozel-arka-plan', soon: true },
+  { name: 'Özel hediyeler', emoji: '🎁', art: 'ayricalik-ozel-hediyeler', soon: true },
+  { name: 'Sohbet balonu', emoji: '💬', art: 'ayricalik-sohbet-balonu', soon: true },
+  { name: 'Profil kartı çerçevesi', emoji: '🪪', art: 'ayricalik-profil-kart-cercevesi', soon: true },
+  { name: 'Oda kartı', emoji: '🖼️', art: 'ayricalik-bilgi-karti-cercevesi', soon: true },
+  { name: 'Oda kenarlığı', emoji: '🔲', art: 'ayricalik-oda-profil-arka-plani', soon: true },
+  { name: 'Özel emoji paketleri', emoji: '😊', soon: true },
+  { name: 'Hareketli oda kapağı', emoji: '✨', art: 'ayricalik-ozel-oda-kapagi', soon: true },
+  { name: 'Renkli kullanıcı adı', emoji: '🌈', art: 'ayricalik-diy-unvani', soon: true },
+  { name: 'Sessiz ziyaret', emoji: '🥷', art: 'ayricalik-gizli-ziyaret', perk: 'silent_visit' },
+  { name: 'Dolu odaya girme', emoji: '🚪', art: 'ayricalik-tam-dolu-odalar', soon: true },
+  { name: 'Çevrimiçi gizlilik', emoji: '🫥', soon: true },
+  { name: 'Ülke dolaşımı', emoji: '🌍', soon: true },
+  { name: 'Sıralamada gizemli kimlik', emoji: '🕵️', art: 'ayricalik-gizemli-kisi-kimligi', soon: true },
   { name: 'Gizli oda girişi', emoji: '👻', art: 'ayricalik-gizli-oda-girisi', soon: true },
-  { name: 'Arkadaşına jeton gönder', emoji: '💗', art: 'ayricalik-jeton-hediye-et', soon: true },
-  { name: 'Sıralamada gizli kalma', emoji: '🕵️', art: 'ayricalik-gizemli-kisi-kimligi', soon: true },
-  { name: 'Aile içinde görünmezlik', emoji: '🎭', art: 'ayricalik-klan-gizliligi', soon: true },
+  { name: 'Yayın engelleme', emoji: '🔇', soon: true },
+  { name: 'Aile gizliliği', emoji: '🎭', art: 'ayricalik-klan-gizliligi', soon: true },
+  { name: 'Metin çevirisi', emoji: '🔤', art: 'ayricalik-metin-cevirisi', soon: true },
 ];
 export const nobleInfo = (tier: number) => NOBLE_TIERS.find((t) => t.tier === tier);
 
@@ -80,13 +119,17 @@ export const SVIP_SHOWN: ShownRight[] = [
 ]
   .map(({ name, emoji, art, level }) => ({ name, emoji, art, level }))
   .sort((a, b) => a.level - b.level);
-/** Where a Rütbe gives a right earlier than its place in the list says (its VIP ring: from Çavuş). */
-const NOBLE_FROM: Record<string, number> = { 'Profil çerçevesi': 1 };
-/** Rütbe rights to show, by the tier they open at. */
-export const NOBLE_SHOWN: ShownRight[] = NOBLE_RIGHTS.map((r, i) => ({ name: r.name, emoji: r.emoji, art: r.art, level: NOBLE_FROM[r.name] ?? NOBLE_TIERS.find((t) => t.rights > i)?.tier ?? 99, soon: r.soon }))
-  .filter((r) => !r.soon)
-  .map(({ name, emoji, art, level }) => ({ name, emoji, art, level }))
-  .sort((a, b) => a.level - b.level);
+/** A Rütbe right as its page shows it: the tier it opens at, and `soon` for one not built yet. */
+export type NobleRight = ShownRight & { perk?: string; soon?: boolean };
+/** Every Rütbe right by its place in the list (tier n: the first NOBLE_TIERS[n].rights). */
+export const NOBLE_SHOWN: NobleRight[] = NOBLE_RIGHTS.map((r, i) => ({
+  name: r.name,
+  emoji: r.emoji,
+  ...(r.art ? { art: r.art } : {}),
+  level: NOBLE_TIERS.find((t) => t.rights > i)?.tier ?? NOBLE_TIERS.length,
+  ...(r.perk ? { perk: r.perk } : {}),
+  ...(r.soon ? { soon: true } : {}),
+}));
 export const hasNobleRight = (tier: number, name: string) => {
   const t = nobleInfo(tier);
   return !!t && NOBLE_RIGHTS.findIndex((r) => r.name === name) < t.rights;

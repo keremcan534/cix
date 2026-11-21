@@ -16,6 +16,7 @@ import {
   curvePerkFrom,
   decayLineOf,
   nobleChanged,
+  nobleRightsCount,
   nobleRightsOf,
   nobleTiersOf,
   parseLiveLevels,
@@ -123,7 +124,8 @@ describe('Seviye ve VIP ayarları: okuma', () => {
     assert.deepEqual([svipLevelFor(l, 999_999), svipLevelFor(l, 3_500_000), svipLevelFor(l, 99e9)], [0, 3, 12]);
     // Unknown keys (not built in this app) are left out; the list follows the server's levels.
     assert.deepEqual(vipRightsOf(l).map((r) => [r.name, r.level]), [['VIP rozeti', 1], ['Sessiz ziyaret', 3]]);
-    assert.deepEqual(nobleTiersOf(l)[1], { ...NOBLE_TIERS[1], name: 'Kaptan', price: 70_000, days: 15 });
+    // A 15-day main term: no other packages until staff set them.
+    assert.deepEqual(nobleTiersOf(l)[1], { ...NOBLE_TIERS[1], name: 'Kaptan', price: 70_000, days: 15, plans: [{ days: 15, price: 70_000, was: 70_000, save: 0 }] });
     assert.deepEqual([nobleChanged(l, 1), nobleChanged(l, 2)], [false, true]);
     assert.equal(wealthLevelFor(l, wealth[10]), 10);
     const tiers = tiersOf(l, 'wealth');
@@ -172,5 +174,40 @@ describe('Seviye ve VIP ayarları: okuma', () => {
     delete older.levels;
     assert.equal(parseSavedLiveCatalog(JSON.stringify(older))!.fetchedAt, 0, 'yeni APK hemen yeniden okur');
     assert.equal(parseLiveCatalog({ gifts: [] }).levels, null, 'eski sunucu');
+  });
+});
+
+// Rütbe (21 Nov 2026, the owners' sample screens): 7, 30 and 90-day packages, the longer cheaper a day, and every right
+// in the page's order, the ones not built yet as "Yakında" (not counted).
+describe('Rütbe paketleri ve hakları', () => {
+  test('uygulamanın paketleri: 7, 30, 90 gün; uzun paket günde daha ucuz; indirim haftalığa göre', () => {
+    const t = nobleTiersOf(null)[0];
+    assert.equal(t.name, 'Şövalye');
+    assert.deepEqual(t.plans.map((p) => p.days), [7, 30, 90]);
+    const [week, month, three] = t.plans;
+    assert.equal(month.price, t.price, 'ana süre 30 gün');
+    assert.ok(week.price / 7 > month.price / 30 && month.price / 30 > three.price / 90, 'uzun paket günde ucuz');
+    assert.equal(week.save, 0);
+    // Round prices move it a point or two.
+    assert.ok(month.save >= 6 && month.save <= 11, `ay %${month.save}`);
+    assert.ok(three.save >= 11 && three.save <= 16, `üç ay %${three.save}`);
+    assert.equal(three.was, Math.round((week.price / 7) * 90));
+  });
+  test('sunucunun paketleri: kendi fiyatlarıyla; bozuk olan dışarıda', () => {
+    const raw = { noble: { levels: NOBLE_TIERS.map((t) => ({ level: t.tier, name: t.name, price: t.price, days: 30, plans: [{ days: 7, price: 5000 }, { days: 'x', price: 1 }] })), perks: [] } };
+    const t = nobleTiersOf(parseLiveLevels(raw))[0];
+    assert.deepEqual(t.plans.map((p) => [p.days, p.price]), [[7, 5000], [30, NOBLE_TIERS[0].price]]);
+  });
+  test('haklar: hepsi sırasıyla; yapılmayan "Yakında" ve sayılmaz; sunucunun kapattığı hak çıkar, açtığı seviyesine gider', () => {
+    const all = nobleRightsOf(null);
+    assert.equal(all.length, NOBLE_TIERS.at(-1)!.rights);
+    assert.ok(all.some((r) => r.soon) && all.some((r) => !r.soon));
+    assert.deepEqual(nobleRightsCount(all, 5), { have: all.filter((r) => !r.soon).length, all: all.length });
+    assert.ok(nobleRightsCount(all, 1).have < nobleRightsCount(all, 5).have);
+    const raw = { noble: { levels: NOBLE_TIERS.map((t) => ({ level: t.tier, name: t.name, price: t.price, days: 30 })), perks: [{ key: 'badge', from: 1 }, { key: 'silent_visit', from: 5 }] } };
+    const live = nobleRightsOf(parseLiveLevels(raw));
+    assert.equal(live.find((r) => r.perk === 'silent_visit')?.level, 5);
+    assert.equal(live.some((r) => r.perk === 'frame'), false, 'kapalı hak gösterilmez');
+    assert.equal(live.filter((r) => r.soon).length, all.filter((r) => r.soon).length);
   });
 });

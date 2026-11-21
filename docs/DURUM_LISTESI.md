@@ -90,6 +90,7 @@ Son güncelleme: preview-96 sonrası (Küçült, çanta yağmuru, @bahset düzel
 
 ## Seviye ve VIP ayarları (yeni APK)
 
+- **Rütbe yenilendi (yeni APK, 21 Kasım; [`SEVIYE_AYARLARI.md`](SEVIYE_AYARLARI.md)):** Şövalye … Dük; jetonla 7/30/90 gün paketleri, aynı kademe süreyi uzatır; 28 hak, yapılmayanlar "Yakında"; Rütbe artık VIP seviyesi vermez. Eski APK eski adları ve tek paketi (30 gün) gösterir.
 - **Çalışıyor (yeni APK):** VIP, Rütbe, Cömertlik, Yankı ve Abonelik finans panelinden (Seviye ve VIP › Seviyeler ve VIP) ayarlanıyor; telefon ayarı katalogla alıyor.
   - VIP sayfası: seviye adları, puanları ve hangi hakkın hangi seviyede açıldığı.
   - Abonelik: hangi paket görünür, etiketi, uygulamada yazan fiyat.

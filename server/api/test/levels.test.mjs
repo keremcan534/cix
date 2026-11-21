@@ -112,6 +112,11 @@ describe('Seviye ayarları: okuma ve eski uygulamalar', () => {
     await bad('noble', (d) => d.levels.pop(), /5 kademe/);
     await bad('noble', (d) => (d.levels[0].price = 0), /fiyat/);
     await bad('noble', (d) => (d.levels[0].days = 0), /süre/);
+    // Rütbe packages (21 Nov 2026): at most two besides the main term, none twice, each priced.
+    await bad('noble', (d) => (d.levels[0].plans = [{ days: 7, price: 1 }, { days: 14, price: 1 }, { days: 90, price: 1 }]), /en fazla 2 paket/);
+    await bad('noble', (d) => (d.levels[0].plans = [{ days: 30, price: 100 }]), /iki kez/);
+    await bad('noble', (d) => (d.levels[0].plans = [{ days: 7, price: 0 }]), /fiyatı/);
+    await bad('noble', (d) => (d.levels[0].plans = [{ days: 400, price: 100 }]), /paket süresi/);
     await bad('sub', (d) => d.plans.forEach((p) => (p.visible = false)), /En az bir/);
     await bad('sub', (d) => (d.plans[0].was = d.plans[0].tl), /üstü çizili/);
     await bad('sub', (d) => d.plans.pop(), /Her abonelik paketi/);
