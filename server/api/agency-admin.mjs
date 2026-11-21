@@ -277,6 +277,40 @@ export const agencyAdminRoutes = {
     return { ...r, base30: n(r.base30), commission30: d4(r.commission30), bd30: d4(r.bd30), payouts_open: d4(r.payouts_open), usd: { base30: usdOf(r.base30), commission30: usdOf(r.commission30) }, poolCap: x.s.pool_cap };
   },
 
+  /**
+   * The finance panel's Ajans / BD / Yayıncı lists, taken from here (owners, 22 Nov 2026: they were typed in by hand
+   * there, and a streamer the panel didn't know stayed "unmatched"): every agency with its code, status, upper agency,
+   * BD and its commission rate now; every BD with an agency; every streamer in an agency now. Read only.
+   */
+  async 'GET /api/admin/agency/finance-roster'(req) {
+    const x = await center(db, req, 'agencies.view');
+    const [agencies, bds, streamers] = await Promise.all([
+      db.query(
+        `SELECT a.*, b.bd_id FROM agencies a LEFT JOIN bd_assignments b ON b.agency_id = a.id AND b.ended_at IS NULL
+          WHERE a.status IN ('approved', 'suspended', 'closed') ORDER BY a.level, a.name LIMIT 5000`,
+      ),
+      db.query(
+        `SELECT DISTINCT u.id, u.name, u.public_no FROM bd_assignments b JOIN users u ON u.id = b.bd_id WHERE b.ended_at IS NULL AND u.deleted_at IS NULL ORDER BY u.name LIMIT 5000`,
+      ),
+      db.query(
+        `SELECT m.streamer_id, m.agency_id, u.name, u.public_no FROM agency_streamers m JOIN users u ON u.id = m.streamer_id
+          WHERE m.ended_at IS NULL AND u.deleted_at IS NULL ORDER BY m.joined_at LIMIT 50000`,
+      ),
+    ]);
+    const out = [];
+    for (const a of agencies.rows) {
+      const rv = a.status === 'closed' ? null : await rateView(db, a, x.s);
+      out.push({ id: a.id, code: a.code, name: a.name, status: a.status, parentId: a.parent_id, bd: a.bd_id ?? null, rate: rv?.rate ?? null });
+    }
+    return {
+      agencies: out,
+      bds: bds.rows.map((u) => ({ id: u.id, name: u.name, publicNo: u.public_no === null ? null : String(u.public_no) })),
+      streamers: streamers.rows.map((m) => ({ id: m.streamer_id, name: m.name, publicNo: m.public_no === null ? null : String(m.public_no), agencyId: m.agency_id })),
+      topRate: x.s.top_rate,
+      poolCap: x.s.pool_cap,
+    };
+  },
+
   async 'GET /api/admin/agency/list'(req, url) {
     const x = await center(db, req, 'agencies.view');
     const q = url.searchParams;

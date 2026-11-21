@@ -9,8 +9,9 @@
 // every purchase that wasn't consumed, so those are verified again too (an "already owned" pack, a pending
 // payment that completed later). Only after the server's answer is the purchase finished as consumable here.
 
-/** A pack from the server's catalog (GET /api/catalog). */
-export type CatalogPack = { productId: string; coins: number; firstBonus: number };
+/** A pack from the server's catalog (GET /api/catalog). `extra`: coins on top of every purchase of it (the panel's
+ *  Jeton paketleri; 0 from an older server). */
+export type CatalogPack = { productId: string; coins: number; firstBonus: number; extra?: number };
 /** The catalog as the wallet needs it. `android` is null when the server doesn't say (an older server). */
 export type ShopCatalog = { packs: CatalogPack[]; testTopup: boolean; android: boolean | null };
 
@@ -123,7 +124,14 @@ export function parseCatalog(raw: unknown): ShopCatalog {
   const packs = (Array.isArray(r.packs) ? r.packs : []).flatMap((p): CatalogPack[] => {
     const x = (p ?? {}) as Record<string, unknown>;
     return typeof x.productId === 'string' && COIN_PRODUCT.test(x.productId) && Number.isFinite(x.coins)
-      ? [{ productId: x.productId, coins: Number(x.coins), firstBonus: Number.isFinite(x.firstBonus) ? Number(x.firstBonus) : 0 }]
+      ? [
+          {
+            productId: x.productId,
+            coins: Number(x.coins),
+            firstBonus: Number.isFinite(x.firstBonus) ? Number(x.firstBonus) : 0,
+            ...(Number.isSafeInteger(x.extra) && (x.extra as number) > 0 ? { extra: x.extra as number } : {}),
+          },
+        ]
       : [];
   });
   const opts = r.purchases && typeof r.purchases === 'object' ? (r.purchases as Record<string, unknown>) : null;

@@ -256,6 +256,7 @@ export default function WalletScreen() {
                       key={p.productId}
                       coins={p.coins}
                       bonus={first || undefined}
+                      extra={p.extra || undefined}
                       first={first > 0}
                       price={p.price}
                       busy={processing === p.productId}
@@ -321,9 +322,12 @@ function PackTile({
   busy,
   onPress,
   campaign,
+  extra,
 }: {
   coins: number;
   bonus?: number;
+  /** The pack's extra coins on every purchase (the panel's Jeton paketleri). */
+  extra?: number;
   first?: boolean;
   price: string;
   busy: boolean;
@@ -336,12 +340,12 @@ function PackTile({
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${coins.toLocaleString('tr-TR')} jeton${first && bonus ? `, artı ${bonus.toLocaleString('tr-TR')} ilk alım hediyesi` : ''}${campaign?.extra ? `, artı ${campaign.extra.toLocaleString('tr-TR')} kampanya jetonu` : ''}, ${price}`}
+      accessibilityLabel={`${coins.toLocaleString('tr-TR')} jeton${first && bonus ? `, artı ${bonus.toLocaleString('tr-TR')} ilk alım hediyesi` : ''}${extra ? `, artı ${extra.toLocaleString('tr-TR')} ek jeton` : ''}${campaign?.extra ? `, artı ${campaign.extra.toLocaleString('tr-TR')} kampanya jetonu` : ''}, ${price}`}
       style={{ width: '31.3%', margin: '1%' }}
     >
       <LinearGradient
         colors={first ? ['rgba(246,189,96,0.30)', dark ? 'rgba(22,37,60,0.96)' : 'rgba(255,255,255,0.96)'] : [colors.cardAlt, colors.card]}
-        style={[styles.pack, (first || !!campaign?.extra) && styles.packFirst, busy && { opacity: 0.5 }]}
+        style={[styles.pack, (first || !!campaign?.extra || !!extra) && styles.packFirst, busy && { opacity: 0.5 }]}
       >
         {/* The same slot on every tile, tag or not, so the coins of a row line up. */}
         <View style={styles.tagSlot}>
@@ -357,15 +361,21 @@ function PackTile({
                 +%{campaign.percent} kampanya
               </Text>
             </View>
+          ) : extra ? (
+            <View style={styles.firstTag}>
+              <Text style={styles.firstTagText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                Ek jetonlu
+              </Text>
+            </View>
           ) : null}
         </View>
         <Icon3D name="coin" size={40} />
         <Text style={styles.packCoins} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
           {coins.toLocaleString('tr-TR')}
         </Text>
-        {bonus || campaign?.extra ? (
+        {bonus || campaign?.extra || extra ? (
           <Text style={styles.packBonus} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
-            +{((bonus ?? 0) + (campaign?.extra ?? 0)).toLocaleString('tr-TR')}
+            +{((bonus ?? 0) + (extra ?? 0) + (campaign?.extra ?? 0)).toLocaleString('tr-TR')}
           </Text>
         ) : (
           <View style={{ height: 18 }} />

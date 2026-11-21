@@ -6,7 +6,10 @@
 //   GET  /api/jeton/transfers                                               → { rows }   (own, sent and received)
 //   GET  /api/jeton/buyers                                                  (Jeton Noktası) → { buyers }
 //   POST /api/admin/jeton/bank      { user, enabled }                       (admin) → { role }
-//   POST /api/admin/jeton/wholesale { bank, coins, paymentRef, note?, ref } (admin) → { user, replay, transfer }
+//   POST /api/admin/jeton/wholesale { bank, coins, paymentRef, note?, priceTl?, ref } (admin) → { user, replay, transfer }
+//   GET  /api/admin/jeton/loads?bank=                                       (admin) → { loads, banks, rateTl }
+//   POST /api/admin/jeton/load      { bank, to, coins, valueTl, paymentRef?, note?, ref } (admin) → { replay, transfer }
+//   POST /api/admin/jeton/reverse   { transfer, reason? }                          (admin) → { coins, spent, transfer }
 //   POST /api/admin/purchases/refund { purchase }                           (admin) → { coins, diamonds, unrecoveredDiamonds }
 //   GET  /api/admin/wallet/audit?user=                                      (admin) → everything about one account's money
 //
@@ -36,6 +39,31 @@ const TRANSFER_MAX = 100_000_000;
 const DIAMONDS_MAX = 1_000_000_000;
 const optional = (v, max, field) => (v === undefined || v === null || v === '' ? '' : text(v, 1, max, field));
 const n = (v) => (v === null || v === undefined ? null : Number(v));
+/** A TL amount as given (at most 2 decimals, 0 – 1 billion). */
+const tlOf = (v, field) => {
+  const x = typeof v === 'string' ? Number(v.replace(',', '.')) : v;
+  if (typeof x !== 'number' || !Number.isFinite(x) || x < 0 || x > 1e9 || Math.round(x * 100) !== x * 100) throw new HttpError(400, `${field} 0 ile 1.000.000.000 TL arasında, en çok 2 ondalık olmalı`);
+  return x;
+};
+/** Management's coin loads the panel lists (newest first), each with its take-back if it has one. */
+const LOADS_SELECT = `SELECT t.*, r.name AS to_name, b.name AS bank_name, x.id AS back_id, x.coins AS back_coins, x.created_at AS back_at, x.actor AS back_actor,
+       coalesce((SELECT sum(remaining) FROM coin_lots l WHERE l.transfer_id = t.id AND l.user_id = t.to_user), 0) AS unspent
+  FROM coin_transfers t JOIN users r ON r.id = t.to_user LEFT JOIN users b ON b.id = t.from_user LEFT JOIN coin_transfers x ON x.reverses = t.id
+ WHERE t.kind = 'admin_load'`;
+const loadOf = (t) => ({
+  id: Number(t.id),
+  bank: { id: t.from_user, name: t.bank_name ?? null },
+  to: { id: t.to_user, name: t.to_name ?? null },
+  coins: Number(t.coins),
+  valueTl: n(t.value_tl),
+  paymentRef: t.payment_ref,
+  note: t.note,
+  actor: t.actor,
+  createdAt: t.created_at,
+  // What is left of it in the person's account now (nothing once taken back).
+  unspent: t.back_id ? 0 : Number(t.unspent),
+  reversed: t.back_id ? { id: Number(t.back_id), coins: Number(t.back_coins), at: t.back_at, actor: t.back_actor } : null,
+});
 
 async function admin(req) {
   const u = await auth(req);
@@ -335,7 +363,9 @@ export const jetonRoutes = {
     if (!coins) throw new HttpError(400, 'Geçersiz jeton miktarı');
     const paymentRef = text(b.paymentRef, 1, 100, 'Ödeme referansı');
     const note = optional(b.note, 200, 'Not');
-    const priceTl = wholesaleTl(coins);
+    // What management books for these coins: the price it gives (Yönetim jeton yüklemesi, the panel's "üretim"), or
+    // the wholesale formula's.
+    const priceTl = b.priceTl === undefined || b.priceTl === null || b.priceTl === '' ? wholesaleTl(coins) : tlOf(b.priceTl, 'Toptan fiyat');
     const ip = clientIp(req);
     const out = await once(bank, 'coin', b.ref, async (c) => {
       const rows = await lockUsers(c, [bank]);
@@ -350,6 +380,104 @@ export const jetonRoutes = {
       await audit(c, a.id, 'jeton.wholesale', bank, { transfer, coins, priceTl, paymentRef }, ip);
     });
     return { ...out, transfer: await findTransfer(a.id, b.ref) };
+  },
+
+  /**
+   * Yönetim jeton yüklemesi (owners, 22 Nov 2026): management's loads, its Jeton Noktası accounts with their stock, and
+   * the TL value of 1,000 coins at the wholesale formula (the panel starts its calculator from it).
+   */
+  async 'GET /api/admin/jeton/loads'(req, url) {
+    await admin(req);
+    const bank = url.searchParams.get('bank');
+    const [loads, banks] = await Promise.all([
+      db.query(`${LOADS_SELECT}${bank && /^[0-9a-f-]{36}$/.test(bank) ? ' AND t.from_user = $1' : ''} ORDER BY t.id DESC LIMIT 200`, bank && /^[0-9a-f-]{36}$/.test(bank) ? [bank] : []),
+      db.query("SELECT id, name, public_no, coins FROM users WHERE role = 'coins_bank' AND deleted_at IS NULL ORDER BY name"),
+    ]);
+    return {
+      loads: loads.rows.map(loadOf),
+      banks: banks.rows.map((x) => ({ id: x.id, name: x.name, publicNo: x.public_no === null ? null : String(x.public_no), coins: Number(x.coins) })),
+      rateTl: wholesaleTl(1000),
+    };
+  },
+
+  /**
+   * Management passes coins from its own Jeton Noktası account to a person who paid it (the panel's Süper yönetici:
+   * the panel holds who may). As a Jeton Noktası sale, from the bank's stock (it must have them), the person's coins
+   * a 'jeton_noktasi' lot that refunds follow; booked with what the person paid (valueTl) and the receipt.
+   */
+  async 'POST /api/admin/jeton/load'(req) {
+    const a = await admin(req);
+    const b = await readJson(req);
+    const bank = userId(b.bank, 'Jeton Noktası');
+    const to = userId(b.to, 'alıcı');
+    if (to === bank) throw new HttpError(400, 'Jeton Noktası kendine yükleyemez');
+    const coins = int(b.coins, 1, TRANSFER_MAX);
+    if (!coins) throw new HttpError(400, 'Geçersiz jeton miktarı');
+    const valueTl = tlOf(b.valueTl, 'Ödenen tutar');
+    const paymentRef = optional(b.paymentRef, 100, 'Ödeme referansı');
+    const note = optional(b.note, 200, 'Not');
+    const ip = clientIp(req);
+    const out = await once(bank, 'coin', b.ref, async (c) => {
+      const rows = await lockUsers(c, [bank, to]);
+      if (rows.get(bank)?.role !== 'coins_bank') throw new HttpError(404, 'Jeton Noktası bulunamadı');
+      if (!rows.has(to)) throw new HttpError(404, 'Alıcı bulunamadı');
+      await claimRef(c, bank, 'coin', b.ref);
+      const transfer = await insertTransfer(
+        c,
+        "INSERT INTO coin_transfers (kind, from_user, to_user, coins, value_tl, payment_ref, note, actor, ip, ref) VALUES ('admin_load', $1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id",
+        [bank, to, coins, valueTl, paymentRef, note, a.id, ip, b.ref],
+      );
+      const detail = { transfer, valueTl, ...(paymentRef && { paymentRef }) };
+      const parts = await spendCoins(c, bank, coins, 'Yönetim jeton yüklemesi', b.ref, to, { actor: a.id, detail, capped: false });
+      const portions = parts.map((p) => ({ channel: 'jeton_noktasi', amount: p.amount, lockHours: p.lockHours, transferId: transfer, sourceLot: p.lot, sourceUser: bank }));
+      await creditCoins(c, to, portions, 'Jeton yüklemesi (yönetim)', `${b.ref}-in`, bank, { actor: a.id, detail });
+      await audit(c, a.id, 'jeton.admin_load', to, { transfer, bank, coins, valueTl, paymentRef }, ip);
+    });
+    const t = await db.query(`${LOADS_SELECT} AND t.from_user = $1 AND t.ref = $2`, [bank, b.ref]);
+    return { replay: out.replay, transfer: t.rowCount ? loadOf(t.rows[0]) : null };
+  },
+
+  /**
+   * A wrong load taken back (management only): the coins of that load still unspent in the person's account go back
+   * to the bank; what they spent already stays spent (said in the answer). Once per load.
+   */
+  async 'POST /api/admin/jeton/reverse'(req) {
+    const a = await admin(req);
+    const b = await readJson(req);
+    const id = int(b.transfer, 1, Number.MAX_SAFE_INTEGER);
+    if (!id) throw new HttpError(400, 'Geçersiz yükleme');
+    // Why (the panel asks): kept on the take-back's row and in the audit.
+    const reason = optional(b.reason, 150, 'Neden');
+    const ip = clientIp(req);
+    return tx(async (c) => {
+      const load = (await c.query("SELECT * FROM coin_transfers WHERE id = $1 AND kind = 'admin_load'", [id])).rows[0];
+      if (!load) throw new HttpError(404, 'Yönetim yüklemesi bulunamadı');
+      await lockUsers(c, [load.from_user, load.to_user]);
+      if ((await c.query('SELECT 1 FROM coin_transfers WHERE reverses = $1', [id])).rowCount) throw new HttpError(409, 'Bu yükleme zaten geri alındı');
+      const lots = (await c.query('SELECT id, channel, remaining FROM coin_lots WHERE transfer_id = $1 AND user_id = $2 AND remaining > 0 ORDER BY id', [id, load.to_user])).rows;
+      let balance = Number((await c.query('SELECT coins FROM users WHERE id = $1', [load.to_user])).rows[0].coins);
+      const taken = [];
+      for (const l of lots) {
+        const take = Math.min(Number(l.remaining), balance);
+        if (take <= 0) break;
+        await c.query('UPDATE coin_lots SET remaining = remaining - $2 WHERE id = $1', [l.id, take]);
+        taken.push({ lot: Number(l.id), channel: l.channel, amount: take });
+        balance -= take;
+      }
+      const coins = taken.reduce((s, x) => s + x.amount, 0);
+      if (!coins) throw new HttpError(409, 'Bu yüklemenin jetonlarının hepsi harcanmış; geri alınacak jeton yok');
+      const back = await insertTransfer(
+        c,
+        "INSERT INTO coin_transfers (kind, from_user, to_user, coins, value_tl, note, actor, ip, ref, reverses) VALUES ('admin_reverse', $1, $2, $3, NULL, $4, $5, $6, $7, $8) RETURNING id",
+        [load.to_user, load.from_user, coins, `#${id} yüklemesi geri alındı${reason ? `: ${reason}` : ''}`.slice(0, 200), a.id, ip, `geri:${id}`, id],
+      );
+      const detail = { transfer: back, reverses: id };
+      // Server refs (':'): no phone can take them first.
+      await move(c, load.to_user, 'coin', -coins, 'Yanlış jeton yüklemesi geri alındı', `jeton-geri:${id}`, load.from_user, { channel: 'jeton_noktasi', actor: a.id, detail: { ...detail, lots: taken } });
+      await creditCoins(c, load.from_user, [{ channel: 'toptan', amount: coins, transferId: back }], 'Geri alınan yönetim yüklemesi', `jeton-geri:${id}-in`, load.to_user, { actor: a.id, detail });
+      await audit(c, a.id, 'jeton.admin_reverse', load.to_user, { load: id, transfer: back, coins, spent: Number(load.coins) - coins, reason }, ip);
+      return { coins, spent: Number(load.coins) - coins, transfer: Number(back) };
+    });
   },
 
   /**

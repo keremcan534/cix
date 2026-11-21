@@ -173,6 +173,12 @@ describe('Para: aynı anda rastgele işlemler', () => {
       }],
       [4, async (u) => ['jeton noktası satışı', 'POST', '/api/jeton/transfer', { to: u.user.id, coins: pick([500, 1500]), paymentRef: 'HAVALE-1', ref: rnd(6) }, bank.session]],
       [4, async (u) => ['elmas bozdurma', 'POST', '/api/jeton/sell-diamonds', { bank: bank.user.id, diamonds: pick([500, 1000]), ref: rnd(6) }, u.session]],
+      // Yönetim jeton yüklemesi: management's bank to a person, and a load taken back while they spend it.
+      [3, async (u) => ['yönetim yüklemesi', 'POST', '/api/admin/jeton/load', { bank: bank.user.id, to: u.user.id, coins: pick([500, 1500]), valueTl: 25, ref: rnd(6) }, admin.session]],
+      [2, async () => {
+        const t = pick(await q("SELECT id FROM coin_transfers WHERE kind = 'admin_load'"));
+        return t ? ['yükleme geri alma', 'POST', '/api/admin/jeton/reverse', { transfer: Number(t.id) }, admin.session] : null;
+      }],
       [3, async () => {
         const p = pick(await q("SELECT id FROM purchases WHERE status <> 'refunded'"));
         return p ? ['iade', 'POST', '/api/admin/purchases/refund', { purchase: Number(p.id) }, admin.session] : null;

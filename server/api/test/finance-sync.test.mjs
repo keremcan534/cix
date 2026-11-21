@@ -172,6 +172,25 @@ describe('Defter satırı → panel olayı', () => {
     assert.deepEqual(dia.map((e) => [e.type, e.idempotency_key]), [['refund', 'refund-42']]);
   });
 
+  test('oyun turu oyunun kimliğiyle gider (panel kullanımını sayar); paketin ek jetonu ayrı hediye; yönetim yüklemesi gönderilmez', () => {
+    const [g] = eventsOf(row({ currency: 'coin', amount: -500, reason: 'Uygulama içi: Gece Yarısı Çarkı · tur (500)', detail: { game: 'slot' } }));
+    assert.deepEqual([g.type, g.item_ref, g.coins], ['coin_spend', 'slot', 500]);
+    const [old] = eventsOf(row({ currency: 'coin', amount: -500, reason: 'Uygulama içi: Gece Yarısı Çarkı · tur (500)' }));
+    assert.equal(old.item_ref, 'Gece Yarısı Çarkı · tur (500)');
+    const buy = eventsOf(row({ currency: 'coin', amount: 5500, channel: 'mixed', detail: { purchase: 43 }, platform: 'android', product_id: 'coins_5000', p_coins: 5000, p_bonus: 0, p_extra: 500 }));
+    assert.deepEqual(buy.map((e) => [e.type, e.idempotency_key, e.campaign_ref ?? e.channel, e.coins]), [
+      ['purchase', 'purchase-43', 'google', 5000],
+      ['bonus_grant', 'purchase-43-ek', 'paket_ek_jeton', 500],
+    ]);
+    for (const x of [
+      { amount: -1000, reason: 'Yönetim jeton yüklemesi', channel: 'toptan', detail: { transfer: 1, valueTl: 50 } },
+      { amount: 1000, reason: 'Jeton yüklemesi (yönetim)', channel: 'jeton_noktasi', detail: { transfer: 1, valueTl: 50 } },
+      { amount: -1000, reason: 'Yanlış jeton yüklemesi geri alındı', channel: 'jeton_noktasi', detail: { transfer: 2, reverses: 1 } },
+      { amount: 1000, reason: 'Geri alınan yönetim yüklemesi', channel: 'toptan', detail: { transfer: 2, reverses: 1 } },
+    ])
+      assert.deepEqual(eventsOf(row({ currency: 'coin', ...x })), [], x.reason);
+  });
+
   test('toptan alım satıştır; Jeton Noktası → kullanıcı aktarımı ve elmas düşüşleri gönderilmez', () => {
     const [w] = eventsOf(row({ currency: 'coin', amount: 100000, channel: 'toptan', detail: { priceTl: 2350.5 } }));
     assert.deepEqual([w.type, w.channel, w.amount, w.coins], ['purchase', 'jeton_noktasi', '2350.50', 100000]);

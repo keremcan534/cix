@@ -37,6 +37,7 @@ susturma için `403 {code: 'muted', sanction, serverNow}`.
 ## Kanıt zorunlu (Güncelleme 8, 21 Kasım 2026)
 
 - Panelden ya da uygulamanın Yönetim ekranından verilen her yaptırıma **kanıt** eklenir: ekran görüntüsü bağlantısı, bağlantı, mesaj metni ya da not. Bir şikâyetten verilen yaptırımda şikâyetin kendisi kanıt sayılır.
+- Ekran görüntüsü panelde **Göz at** ile dosya olarak seçilir (PNG, JPEG ya da WebP, en çok 8 MB). Dosya uygulamanın deposuna `evidence` türüyle yüklenir, kanıt dosyanın adresini tutar. Kanıtı veren hesap silinse de dosya silinmez. Panelde kanıt sayısının yanındaki **Gör** düğmesi kanıtları açar; ekran görüntüsü resim olarak görünür.
 - **Süper yönetici** (panelde Süper yönetici rolü; uygulamada yönetici hesabı) kanıtsız da verebilir; yaptırım hemen başlar.
 - Başka biri kanıt eklemeden verirse yaptırım **başlamaz**, "Onay bekleyenler"e "Kanıtsız · Süper yönetici onaylar" olarak düşer. Onu yalnız bir Süper yönetici onaylar ya da reddeder; süre onaylandığı an başlar.
 - Kanıtsız olmak yetkiyi genişletmez: kişinin rolünün veremediği yaptırımı kanıtsız da öneremez.

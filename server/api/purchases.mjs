@@ -37,7 +37,7 @@ import { bonusNotice } from './system-notices.mjs';
 import crypto from 'node:crypto';
 
 import { HttpError, auth, db, env, readJson, selfUser, sha, tx } from './core.mjs';
-import { PACK_BY_PRODUCT } from './catalog.mjs';
+import { PACK_BY_PRODUCT, packsSetUp } from './catalog.mjs';
 import { campaignBonus, campaignRef } from './live-registry.mjs';
 import { campaignAt, live } from './live-settings.mjs';
 import { TEST_DAILY, creditCoins, playCoinsToday } from './wallet.mjs';
@@ -181,15 +181,18 @@ async function credit(u, platform, pack, transactionId, play, purchaseTime) {
   };
   const out = await tx(async (c) => {
     await c.query('SELECT 1 FROM users WHERE id = $1 FOR UPDATE', [u.id]);
-    const prev = (await c.query('SELECT user_id, coins, bonus, campaign_bonus FROM purchases WHERE platform = $1 AND transaction_id = $2', [platform, transactionId])).rows[0];
+    const prev = (await c.query('SELECT user_id, coins, bonus, campaign_bonus, extra FROM purchases WHERE platform = $1 AND transaction_id = $2', [platform, transactionId])).rows[0];
     if (prev) {
       if (prev.user_id !== u.id) throw new HttpError(409, 'Bu satın alma başka bir hesapta kullanıldı');
-      return { replay: true, coins: Number(prev.coins), bonus: Number(prev.bonus), campaignBonus: Number(prev.campaign_bonus) };
+      return { replay: true, coins: Number(prev.coins), bonus: Number(prev.bonus), campaignBonus: Number(prev.campaign_bonus), extra: Number(prev.extra) };
     }
     const first = !(await c.query('SELECT 1 FROM purchases WHERE user_id = $1 AND product_id = $2', [u.id, pack.productId])).rowCount;
     // The first-purchase gift can be switched off live (rewards_off, referrals.mjs GET /api/rewards tells the app);
     // the switch as it is when the purchase is verified.
-    const bonus = first && !live().rewardsOff.has('first_purchase') ? pack.firstBonus : 0;
+    // The pack as the panel set it up when the purchase is verified (Canlı ayarlar › Jeton paketleri).
+    const setUp = packsSetUp(live().packSetup).find((p) => p.id === pack.id);
+    const bonus = first && !live().rewardsOff.has('first_purchase') ? setUp.firstBonus : 0;
+    const extra = setUp.extra;
     const sandbox = play && platform !== 'test';
     // The campaign set at the purchase time and running then: one ended since still pays (however late the verify),
     // one set later doesn't. No usable purchase time: no campaign.
@@ -197,21 +200,22 @@ async function credit(u, platform, pack, transactionId, play, purchaseTime) {
     const campaign = sandbox || at === null ? null : await campaignAt(c, at);
     const kampanya = campaign ? campaignBonus(pack.coins, campaign, at) : 0;
     // Play coins share one daily cap with test top-ups (index.mjs), so test purchases can't mint more.
-    if (play && (await playCoinsToday(c, u.id)) + pack.coins + bonus + kampanya > TEST_DAILY) throw new HttpError(429, `Günlük test yükleme sınırı: ${TEST_DAILY.toLocaleString('tr-TR')} jeton`);
+    if (play && (await playCoinsToday(c, u.id)) + pack.coins + bonus + extra + kampanya > TEST_DAILY) throw new HttpError(429, `Günlük test yükleme sınırı: ${TEST_DAILY.toLocaleString('tr-TR')} jeton`);
     const p = await c.query(
-      'INSERT INTO purchases (user_id, platform, product_id, transaction_id, coins, bonus, sandbox, campaign_bonus, campaign_ref) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id',
-      [u.id, platform, pack.productId, transactionId, pack.coins, bonus, sandbox, kampanya, kampanya ? campaignRef(campaign) : null],
+      'INSERT INTO purchases (user_id, platform, product_id, transaction_id, coins, bonus, sandbox, campaign_bonus, campaign_ref, extra) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id',
+      [u.id, platform, pack.productId, transactionId, pack.coins, bonus, sandbox, kampanya, kampanya ? campaignRef(campaign) : null, extra],
     );
     const purchaseId = Number(p.rows[0].id);
-    const gifts = [bonus && `+${bonus} ilk alım hediyesi`, kampanya && `+${kampanya} kampanya`].filter(Boolean);
-    // Up to three lots, all with the store lock (wallet.mjs): the store's coins, the first-purchase gift and
-    // the campaign's.
+    const gifts = [bonus && `+${bonus} ilk alım hediyesi`, extra && `+${extra} ek jeton`, kampanya && `+${kampanya} kampanya`].filter(Boolean);
+    // Up to four lots, all with the store lock (wallet.mjs): the store's coins, the first-purchase gift, the pack's
+    // extra coins and the campaign's. The extra coins are a gift like the first-purchase one (channel bonus).
     await creditCoins(
       c,
       u.id,
       [
         { channel: play ? 'test' : STORE_CHANNEL[platform], amount: pack.coins, purchaseId },
         { channel: 'bonus', amount: bonus, purchaseId },
+        { channel: 'bonus', amount: extra, purchaseId },
         { channel: 'kampanya', amount: kampanya, purchaseId },
       ],
       gifts.length ? `Jeton satın alma (${gifts.join(', ')})` : 'Jeton satın alma',
@@ -221,12 +225,12 @@ async function credit(u, platform, pack, transactionId, play, purchaseTime) {
     );
     // SVIP points are for coins someone paid for: the pack only, not the first-purchase or campaign gift.
     if (!sandbox) await c.query('UPDATE users SET svip_xp = svip_xp + $2 WHERE id = $1', [u.id, pack.coins]);
-    return { replay: false, coins: pack.coins, bonus, campaignBonus: kampanya };
+    return { replay: false, coins: pack.coins, bonus, campaignBonus: kampanya, extra };
   }).catch(taken);
   // SimilarClub Sistem: the gifts on top of the pack (first purchase, campaign), once the coins are committed.
-  if (!out.replay && (out.bonus || out.campaignBonus)) {
-    const parts = [out.bonus && `${out.bonus.toLocaleString('tr-TR')} jeton ilk alım hediyesi`, out.campaignBonus && `${out.campaignBonus.toLocaleString('tr-TR')} jeton kampanya hediyesi`].filter(Boolean);
-    void bonusNotice({ target: u.id, ref, origin: out.bonus ? 'İlk alım hediyesi' : 'Kampanya', what: parts.join(' ve '), detail: [`Satın aldığın paket: ${out.coins.toLocaleString('tr-TR')} jeton.`], data: { coins: out.coins, bonus: out.bonus, campaignBonus: out.campaignBonus } });
+  if (!out.replay && (out.bonus || out.campaignBonus || out.extra)) {
+    const parts = [out.bonus && `${out.bonus.toLocaleString('tr-TR')} jeton ilk alım hediyesi`, out.extra && `${out.extra.toLocaleString('tr-TR')} ek jeton`, out.campaignBonus && `${out.campaignBonus.toLocaleString('tr-TR')} jeton kampanya hediyesi`].filter(Boolean);
+    void bonusNotice({ target: u.id, ref, origin: out.bonus ? 'İlk alım hediyesi' : out.extra ? 'Paket ek jetonu' : 'Kampanya', what: parts.join(' ve '), detail: [`Satın aldığın paket: ${out.coins.toLocaleString('tr-TR')} jeton.`], data: { coins: out.coins, bonus: out.bonus, campaignBonus: out.campaignBonus, extra: out.extra } });
   }
   return out;
 }

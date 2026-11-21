@@ -164,6 +164,8 @@ export const PANEL_ROUTES = new Set([
   // Ajans merkezi (agency-admin.mjs): the network's tree and list, applications, status, rate, tier, parent, a
   // streamer's agency, transfers and transition commission, performance runs, reports, the commission simulator.
   'GET /api/admin/agency/tree',
+  // The finance panel's Ajans / BD / Yayıncı lists come from here (read only).
+  'GET /api/admin/agency/finance-roster',
   'GET /api/admin/agency/overview',
   'GET /api/admin/agency/list',
   'POST /api/admin/agency/create',
@@ -229,6 +231,10 @@ export const PANEL_ROUTES = new Set([
   // Jeton Noktası (jeton.mjs): turning an account into a bank or back, selling a bank its stock.
   'POST /api/admin/jeton/bank',
   'POST /api/admin/jeton/wholesale',
+  // Yönetim jeton yüklemesi: management's loads to people and taking a wrong one back (the panel's Süper yönetici).
+  'GET /api/admin/jeton/loads',
+  'POST /api/admin/jeton/load',
+  'POST /api/admin/jeton/reverse',
 ]);
 
 const clean = (v, max) => (typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, max) : '');

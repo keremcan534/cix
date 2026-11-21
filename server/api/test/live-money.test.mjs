@@ -193,6 +193,35 @@ describe('Canlı ayarlar para uçlarında', () => {
     assert.equal((await catalog()).packs.length, PACKS.length);
   });
 
+  test('jeton paketleri: ek jeton, ilk alım hediyesi ve sıra panelden; ek jeton her alımda verilir, iadede geri alınır', async () => {
+    // p2 first, p1 second, the rest as they were.
+    const setup = Object.fromEntries(PACKS.map((p, i) => [p.id, { extra: 0, first: null, order: i + 1 }]));
+    setup.p2 = { extra: 500, first: 1_000, order: 1 };
+    setup.p1 = { extra: 0, first: null, order: 2 };
+    await setLive({ pack_setup: setup });
+    const cat = await catalog();
+    assert.equal(cat.packs[0].id, 'p2');
+    assert.deepEqual([cat.packs[0].extra, cat.packs[0].firstBonus], [500, 1_000]);
+    assert.equal(cat.packs.at(-1).id, 'p9');
+    const u = await h.signUp('Ek jetonlu');
+    const first = await ok(call('POST', '/api/wallet/purchase', { platform: 'test', productId: 'coins_5000', transactionId: rnd(8) }, u.session));
+    assert.deepEqual([first.coins, first.bonus, first.extra], [5_000, 1_000, 500]);
+    const second = await ok(call('POST', '/api/wallet/purchase', { platform: 'test', productId: 'coins_5000', transactionId: rnd(8) }, u.session));
+    assert.deepEqual([second.coins, second.bonus, second.extra], [5_000, 0, 500]);
+    assert.equal((await balance(u.user.id)).coins, 5_000 + 1_000 + 500 + 5_000 + 500);
+    // Refused: an unknown pack, a gift bigger than the pack, two packs in one place, a pack left out.
+    for (const bad of [{ ...setup, zz: { extra: 0, order: 1 } }, { ...setup, p2: { extra: 5_001, first: null, order: 1 } }, { ...setup, p3: { ...setup.p3, order: 1 } }, Object.fromEntries(Object.entries(setup).slice(1))]) {
+      const view = await ok(call('GET', SETTINGS, null, admin.session));
+      const [st] = await call('POST', SETTINGS, { changes: { pack_setup: bad }, reason: 'deneme', baseV: view.v, confirm: true }, admin.session);
+      assert.equal(st, 400);
+    }
+    await setLive({ pack_setup: null });
+    const back = await catalog();
+    assert.equal(back.packs[0].id, 'p1');
+    assert.equal(back.packs[1].firstBonus, PACKS[1].firstBonus);
+    assert.equal(back.packs[0].extra, 0);
+  });
+
   test('para çekme sınırları düşünce kurallar yeni değerleri gösterir, üstü 400; önceki talep yine tekrar olarak döner', async () => {
     const fan = await h.signUp('Çekim hayranı');
     const host = await h.signUp('Çekim yayıncısı');

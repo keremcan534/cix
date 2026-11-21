@@ -264,7 +264,8 @@ export const casinoRoutes = {
         const what = `${g.name} · tur (${fmt(bet)})`;
         if (fromGame) await move(c, me.id, 'game', -fromGame, what, lref);
         // "Uygulama içi:" makes it a coin_spend for the finance panel, like the other coin games.
-        if (fromCoins) await spendCoins(c, me.id, fromCoins, `Uygulama içi: ${what}`, lref);
+        // detail.game: the game's id, which the finance panel counts its uses by (Oyun, hediye, emoji ve PK maliyeti).
+        if (fromCoins) await spendCoins(c, me.id, fromCoins, `Uygulama içi: ${what}`, lref, null, { detail: { game: g.id } });
         const house = houseShare(bet);
         pool += bet - house;
 
