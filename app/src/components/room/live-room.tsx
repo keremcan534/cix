@@ -245,6 +245,8 @@ type ComboSpec = { lucky: boolean; giftId: string; to: string[]; each: number };
 const sameCombo = (a: ComboSpec, b: ComboSpec) => a.lucky === b.lucky && a.giftId === b.giftId && a.each === b.each && a.to.join() === b.to.join();
 /** Taps on the wheel while its send is on the way wait for it; past this many more, a tap is not kept. */
 const COMBO_MORE = 10;
+/** Şanslı combo taps one request can carry (server/api/lucky.mjs MAX_TIMES). */
+const LUCKY_TIMES_MAX = 50;
 /** SimilarClub's own community rules, the first line of the chat on every entry (my screen only): short and plain. */
 const ROOM_RULES_NOTICE = 'Müstehcen, şiddet, kumar ve yasa dışı içerik yasak. Görürsen kişinin kartından şikâyet et.';
 /** Arrival time of a room event (called from handlers and effects, never while rendering). */
@@ -2974,7 +2976,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // Server room: the server takes the price, gives each recipient their 20 % as diamonds, draws and pays the rewards
   // in game coins, then tells the room (server/api/lucky.mjs). Offline demo: lib/lucky plays it on this phone.
   // `viaWheel`: a repeat from the wheel (its stored list). True (or resolves true) when every gift went out.
-  const sendLuckyGift = (giftId: string, picked: string[], count = 1, viaWheel = false): boolean | Promise<boolean> => {
+  /** `times`: combo taps sent together (the wheel's taps made while the last send was on its way), count × times each. */
+  const sendLuckyGift = (giftId: string, picked: string[], count = 1, viaWheel = false, times = 1): boolean | Promise<boolean> => {
     setGiftOpen(false);
     const spec: ComboSpec = { lucky: true, giftId, to: picked, each: count };
     if (offlineBlocked()) return false;
@@ -2990,10 +2993,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       showAlert('Şanslı hediye gönderilemedi', 'Seçtiğin kişiler artık odada değil.');
       return false;
     }
-    if (real) return deliverLiveLucky(spec, toIds, viaWheel);
+    if (real) return deliverLiveLucky(spec, toIds, viaWheel, times);
     // One wallet charge (and at most one reward and one refund row) for the whole send; each gift still draws apart.
     const { records, error } = sendLuckyBatch(
-      { userId: 'me', userAge: app.me.age, roomId: id, giftId, to: toIds.map((t) => ({ id: t, name: userById(t).name })), count },
+      { userId: 'me', userAge: app.me.age, roomId: id, giftId, to: toIds.map((t) => ({ id: t, name: userById(t).name })), count: count * times },
       { spend: spendCoins, credit: addCoins, blocked: spendBlock },
     );
     if (!records.length) {
@@ -3006,14 +3009,14 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     records.forEach((r) => scorePk(r.txId, 'me', r.toId, r.giftId, luckyPkPoints(r)));
     const spent = records.reduce((n, r) => n + r.price, 0);
     if (!isOwn) addFanPoints(hostId, Math.ceil(spent / 10), `Hediye gönderdin (${spent} jeton)`);
-    showLuckySend(records, toIds, count, error, spec, viaWheel);
+    showLuckySend(records, toIds, count * times, error, spec, viaWheel, times);
     return !error;
   };
-  const deliverLiveLucky = async (spec: ComboSpec, toIds: string[], viaWheel: boolean) => {
+  const deliverLiveLucky = async (spec: ComboSpec, toIds: string[], viaWheel: boolean, times = 1) => {
     const { giftId, each: count } = spec;
     const g = luckyGift(giftId);
     // The daily limit holds here too (the balance is the server's to check).
-    const limited = g ? spendBlock(g.price * count * toIds.length) : null;
+    const limited = g ? spendBlock(g.price * count * times * toIds.length) : null;
     if (limited && limited !== 'Yetersiz bakiye.') {
       errorHaptic();
       stopCombo(spec);
@@ -3022,8 +3025,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     }
     try {
       // A win is announced in every room; with my name only when I let it (Ayarlar › Gizlilik).
-      const { records } = await liveLuckySend(giftId, toIds, count, id, settings.luckyAnnounce);
-      if (records.length) showLuckySend(records, toIds, count, null, spec, viaWheel);
+      const { records } = await liveLuckySend(giftId, toIds, count, id, settings.luckyAnnounce, times);
+      if (records.length) showLuckySend(records, toIds, count * times, null, spec, viaWheel, times);
       return records.length > 0;
     } catch (e) {
       errorHaptic();
@@ -3036,7 +3039,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     }
   };
   /** What a Lucky send I made shows: the gift lines, the flight, the results and the win news. */
-  const showLuckySend = (records: LuckyRecord[], toIds: string[], count: number, error: string | null, spec: ComboSpec, viaWheel: boolean) => {
+  const showLuckySend = (records: LuckyRecord[], toIds: string[], count: number, error: string | null, spec: ComboSpec, viaWheel: boolean, times = 1) => {
     const first = records[0];
     const spent = records.reduce((n, r) => n + r.price, 0);
     const reward = records.reduce((n, r) => n + r.reward, 0);
@@ -3064,7 +3067,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     if (settings.luckyFx && showFx(first.price) && visibleRef.current) playLuckyFx({ id: first.giftId, name: first.giftName, emoji: first.emoji, price: first.price }, 'me', sentTo, count);
     // Some gifts didn't go (the balance ran out): the wheel stops; else it counts this send.
     if (error) stopCombo(spec);
-    else countCombo(spec, viaWheel);
+    else countCombo(spec, viaWheel, times);
   };
 
   // --- The repeat wheel (components/room/gift-combo) ------------------------------------------------------------
@@ -3076,20 +3079,22 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   /** A send of `spec` while the wheel is up for it: the wheel counts it (no chat line of its own). */
   const comboRepeat = (spec: ComboSpec) => !!comboRef.current && sameCombo(comboRef.current, spec);
   /** A send of `spec` reached everyone: the wheel counts it and its line starts again; one from the sheet opens it. */
-  const countCombo = (spec: ComboSpec, viaWheel: boolean) => {
+  const countCombo = (spec: ComboSpec, viaWheel: boolean, taps = 1) => {
     const at = nowMs();
-    setCombo((c) => (c && sameCombo(c, spec) ? { ...c, count: c.count + 1, key: at } : viaWheel ? c : { ...spec, count: 1, key: at }));
+    setCombo((c) => (c && sameCombo(c, spec) ? { ...c, count: c.count + taps, key: at } : viaWheel ? c : { ...spec, count: taps, key: at }));
   };
   /** A send of `spec` failed or reached only some: its wheel goes (the usual message already said why). */
   const stopCombo = (spec: ComboSpec) => setCombo((c) => (c && sameCombo(c, spec) ? null : c));
   // Taps go out one after another: one while the last send is on its way waits for it (server rooms), so the count
-  // follows what really went out and a failed send stops the wheel with a single message.
+  // follows what really went out and a failed send stops the wheel with a single message. Şanslı taps made meanwhile
+  // go out together as one request (`times`), however fast the taps: one request per answer, never one per tap
+  // (owners, 21 Nov 2026: a fast combo ran into "Çok fazla istek" and stopped the wheel).
   const comboTaps = useRef({ busy: false, more: 0 });
   const tapCombo = () => {
     if (!combo) return;
     const q = comboTaps.current;
     if (q.busy) {
-      q.more = Math.min(q.more + 1, COMBO_MORE);
+      q.more = Math.min(q.more + 1, combo.lucky ? LUCKY_TIMES_MAX : COMBO_MORE);
       return;
     }
     void runCombo({ lucky: combo.lucky, giftId: combo.giftId, to: combo.to, each: combo.each });
@@ -3098,11 +3103,14 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     const q = comboTaps.current;
     q.busy = true;
     try {
+      let times = 1;
       for (;;) {
-        const ok = await (spec.lucky ? sendLuckyGift(spec.giftId, spec.to, spec.each, true) : giftAgain(spec));
+        const ok = await (spec.lucky ? sendLuckyGift(spec.giftId, spec.to, spec.each, true, times) : giftAgain(spec));
         const c = comboRef.current;
         if (!ok || !q.more || !c || !sameCombo(c, spec)) break;
-        q.more -= 1;
+        // Şanslı: every tap made meanwhile in the next request; a plain gift: the next tap.
+        times = spec.lucky ? q.more : 1;
+        q.more -= times;
       }
     } finally {
       q.busy = false;

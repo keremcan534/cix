@@ -4,7 +4,7 @@
 //                                                               allowed, minAge, gameCoins, mine }
 //        each gift also { open, since, icon, fx }: since, the version its price and odds are as now from; icon and fx,
 //        its own picture and video from the panel (lucky-art.mjs; null: none)
-//   POST /api/lucky/send { giftId, to: [ids], count, room?, ref, named?, price?, version? } → { send, user, replay }
+//   POST /api/lucky/send { giftId, to: [ids], count, times?, room?, ref, named?, price?, version? } → { send, user, replay }
 //        price / version: what a newer app showed (the package's price, GET /api/lucky's version): a moved value is a
 //        409 price_changed / odds_changed and nothing moves (lucky-rules.mjs checkShownLucky); an older app sends none
 //   GET  /api/admin/lucky                                    → { config, version, updatedAt, stats, recent, winners,
@@ -51,6 +51,12 @@ import { casinoNeed, wealthPoints } from './wheel.mjs';
 
 /** People one send can go to (everyone on the mics of the biggest room, with room to spare). */
 const MAX_TO = 20;
+/**
+ * Combo taps one request can carry (`times`, a newer app: the taps made while the last send was on its way go out
+ * together, as count × times gifts each), and the most gifts one send draws in all. Older apps send none (1).
+ */
+const MAX_TIMES = 50;
+const MAX_DRAWS = 5000;
 const DAY_START = `(date_trunc('day', now() AT TIME ZONE 'Europe/Istanbul') AT TIME ZONE 'Europe/Istanbul')`;
 
 /** The packages in force: the admins' saved ones, or the built-in ones until the first save. */
@@ -145,7 +151,8 @@ export const luckyRoutes = {
 
   async 'POST /api/lucky/send'(req) {
     const me = await auth(req);
-    limit(`lucky:${me.id}`, 60, 'Çok hızlı gönderiyorsun, biraz bekle');
+    // Wide enough for a fast combo (a newer app also puts the taps made meanwhile in one request, `times`).
+    limit(`lucky:${me.id}`, 600, 'Çok hızlı gönderiyorsun, biraz bekle');
     const b = await readJson(req);
     if (!REF.test(b.ref ?? '') || b.ref.length > 60) throw new HttpError(400, 'Geçersiz istek kimliği');
     if (typeof b.giftId !== 'string' || b.giftId.length > 30) throw new HttpError(400, 'Hediye bulunamadı');
@@ -154,9 +161,13 @@ export const luckyRoutes = {
     const to = b.to.map((x) => userId(x, 'alıcı'));
     if (new Set(to).size !== to.length) throw new HttpError(400, 'Geçersiz alıcı');
     if (to.includes(me.id)) throw new HttpError(400, 'Kendine Şanslı hediye gönderemezsin');
+    const times = b.times === undefined || b.times === null ? 1 : b.times;
+    if (!Number.isInteger(times) || times < 1 || times > MAX_TIMES || b.count * times * to.length > MAX_DRAWS) throw new HttpError(400, 'Geçersiz tekrar sayısı');
     const room = b.room === undefined || b.room === null ? null : String(b.room);
     if (room !== null && !ROOM.test(room)) throw new HttpError(400, 'Geçersiz oda');
-    const { ref, count } = b;
+    const { ref } = b;
+    // Every gift of the send: the chosen count, as many times as the combo was tapped.
+    const count = b.count * times;
     // What a newer app showed (checked once the send is known not to be a replay).
     const shown = shownOf(b);
     // The ledger's idempotency key (user, currency, ref) is shared by every wallet feature: these rows carry

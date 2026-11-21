@@ -58,17 +58,18 @@ export async function refreshLucky() {
  * balance, closed package, daily limit). The same send tried again after a lost answer is played once. `named`: a
  * win goes to every room with my name and photo (else as "Bir kullanıcı").
  */
-export async function liveLuckySend(giftId: string, toIds: string[], count: number, roomId: string, named = false) {
+export async function liveLuckySend(giftId: string, toIds: string[], count: number, roomId: string, named = false, times = 1) {
   const to = toIds.map(toServer);
   if (to.some((x) => !x)) throw new Error('Bu kişiye Şanslı hediye gönderilemez.');
   const ids = to as string[];
   const g = known.get(giftId);
   // What the sheet showed: the package's price and the settings' version they came with (lib/lucky's copy).
   const shown = luckyShown(luckyGift(giftId), getLucky().config.version);
-  const r = await once(`lucky:${giftId}:${ids.join(',')}:${count}:${roomId}`, (ref) => api.luckySend(giftId, ids, count, roomId, ref, named, shown));
+  // `times` combo taps in one request: count × times gifts to each (server/api/lucky.mjs).
+  const r = await once(`lucky:${giftId}:${ids.join(',')}:${count}x${times}:${roomId}`, (ref) => api.luckySend(giftId, ids, count, roomId, ref, named, shown, times));
   // Two rows, the price and the reward, so the whole price counts as spending (store SERVER_TAKES).
   const won = r.send.payout;
-  const what = `${g?.name ?? giftId} ×${count * ids.length}`;
+  const what = `${g?.name ?? giftId} ×${count * times * ids.length}`;
   if (won > 0) applyServerUser({ user: { ...r.user, coins: r.user.coins - won } }, `Şanslı hediye: ${what}`);
   applyServerUser(r, won > 0 ? `Şanslı ödülü: ${what}` : `Şanslı hediye: ${what}`);
   const list = records(r.send, known, Date.now());
