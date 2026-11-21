@@ -3,12 +3,16 @@
 // Lv11–15 gold, Lv16–20 a bright diamond ring with a sparkle), and a small "Lv" label under it. The same mark is drawn
 // between the two faces on the profile's Bağlar row, between two seats on the mics, and (small, without the label) in
 // the badge by the name.
+//
+// Staff may design a kind's mark level by level in the panel (Bağ işaretleri, lib/bond-looks): then its moving picture
+// (else its still one) is drawn instead of the ring, `size` times as big around the same centre, with the same label.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/text';
 import { BOND_KINDS, bondTier, tierLook, type BondKind } from '@/data/bonds';
+import { bondLookOf, useLiveCatalog } from '@/lib/live/catalog-live';
 
 /** Bond gift pictures (docs/BAGLAR.md "Görsel listesi", app/assets/bonds). A kind without one keeps its sign. */
 export const BOND_ART: Partial<Record<BondKind, number>> = {
@@ -30,6 +34,9 @@ export const markLabelSize = (size: number) => Math.max(9, Math.min(13, Math.rou
  * box, so the box stays a circle to place). Not touchable and hidden from screen readers (its row or seat says it).
  */
 export function BondMark({ kind, level, size, label = true }: { kind: BondKind; level: number; size: number; label?: boolean }) {
+  const catalog = useLiveCatalog();
+  const design = bondLookOf(kind, level, catalog);
+  const picture = design?.motion ?? design?.art;
   const look = tierLook(kind, bondTier(level));
   const ring = Math.max(1.5, Math.round(size * look.width * 2) / 2);
   const inner = size - ring * 2;
@@ -37,21 +44,25 @@ export function BondMark({ kind, level, size, label = true }: { kind: BondKind; 
   const font = markLabelSize(size);
   return (
     <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={{ width: size, height: size }}>
-      <LinearGradient
-        colors={look.ring}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[{ width: size, height: size, borderRadius: size / 2, padding: ring }, look.glow > 0 && { boxShadow: `0 0 ${look.glow}px ${look.glowColor}` }]}
-      >
-        <View style={[st.inner, { borderRadius: inner / 2 }]}>
-          {art ? (
-            <Image source={art} style={{ width: inner * 0.84, height: inner * 0.84 }} resizeMode="contain" accessibilityIgnoresInvertColors />
-          ) : (
-            <Ionicons name={BOND_KINDS[kind].icon} size={Math.round(inner * 0.55)} color="#fff" />
-          )}
-        </View>
-      </LinearGradient>
-      {look.sparkle && <Text style={[st.sparkle, { fontSize: Math.max(8, Math.round(size * 0.28)), top: -size * 0.08, right: -size * 0.06 }]} maxFontSizeMultiplier={1}>✦</Text>}
+      {design && picture ? (
+        <DesignedMark uri={picture.url} size={size} scale={design.size} />
+      ) : (
+        <LinearGradient
+          colors={look.ring}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[{ width: size, height: size, borderRadius: size / 2, padding: ring }, look.glow > 0 && { boxShadow: `0 0 ${look.glow}px ${look.glowColor}` }]}
+        >
+          <View style={[st.inner, { borderRadius: inner / 2 }]}>
+            {art ? (
+              <Image source={art} style={{ width: inner * 0.84, height: inner * 0.84 }} resizeMode="contain" accessibilityIgnoresInvertColors />
+            ) : (
+              <Ionicons name={BOND_KINDS[kind].icon} size={Math.round(inner * 0.55)} color="#fff" />
+            )}
+          </View>
+        </LinearGradient>
+      )}
+      {!design && look.sparkle && <Text style={[st.sparkle, { fontSize: Math.max(8, Math.round(size * 0.28)), top: -size * 0.08, right: -size * 0.06 }]} maxFontSizeMultiplier={1}>✦</Text>}
       {label && (
         <View style={[st.label, { bottom: -Math.round(font * 0.9), borderColor: look.ring[1] }]}>
           <Text style={[st.labelText, { fontSize: font, lineHeight: font + 2 }]} numberOfLines={1} maxFontSizeMultiplier={1}>
@@ -61,6 +72,13 @@ export function BondMark({ kind, level, size, label = true }: { kind: BondKind; 
       )}
     </View>
   );
+}
+
+/** A design from the panel, drawn `scale` times as big as the mark around its centre (it may reach past the box). */
+function DesignedMark({ uri, size, scale }: { uri: string; size: number; scale: number }) {
+  const side = Math.round(size * scale);
+  const off = (size - side) / 2;
+  return <Image source={{ uri }} style={{ position: 'absolute', left: off, top: off, width: side, height: side }} resizeMode="contain" accessibilityIgnoresInvertColors />;
 }
 
 const st = StyleSheet.create({

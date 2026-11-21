@@ -6,6 +6,24 @@ Sekmede iki bölüm var: **Çift** ve **Aile ve Dost** (diğer yedi tür). Aile 
 
 Odadaki hediye panelinde **Aile ve Dost** rafı var: Koruma Kartı ve sekiz bağ hediyesi (20 Kasım 2026'dan beri Bağ Yüzüğü de; aşağıda **Bağ Yüzüğü rafta**). Bu raftan gönderilen bağ hediyesi, aranızda bağ yoksa bağ isteğidir: jeton bekletilir, kabul edilince bağ kurulur, reddedilirse geri döner; tek kişiye, birer birer gider. Aranızda **o türde bir bağ varsa** normal hediye olarak gider (aşağıda **Bağ hediyesi yeniden**). Panelde Hediyeler › Aile ve Dost rafından adı, ikonu, videosu ve fiyatı değişir (aşağıda **Fiyat panelden**). Eski APK'lar bu rafı görmez; Koruma Kartı onlarda İkili rafında kalır.
 
+## Panelden bağ işaretleri (21 Kasım 2026)
+
+Müşteri: "Bağların seviyeleri ilerledikçe koltukta oturan bağ sahipleri arasında kalp gibi duygusal efektler var; bunları yönetim panelinde seviye seviye görelim, her seviyeye özgü ikon, SVGA ve hareketli görsel girebilelim."
+
+- Panelde **Uygulama › Hediyeler › Bağ işaretleri** sekmesi (yetki: Hediyeler). Üstte sekiz bağ türü, altta seçilen türün **20 seviyesi**. Her satırda o seviyede şu an ne göründüğü yazar: kendi tasarımı, bir alttaki seviyenin devam eden tasarımı ya da uygulamanın kendi işareti (hangi halka olduğu).
+- Bir seviyeye **Tasarım yükle**:
+  - **Durağan resim:** saydam, kare PNG ya da WebP (64–1024 px). 512 px'ten ya da 512 KB'tan büyüğü sunucuda küçültülür.
+  - **Hareketli hali:** saydam, kare, hareketli WebP (64–512 px, en çok 3 MB) ya da **SVGA**. SVGA'yı uygulamanın sunucusu hareketli WebP'ye ve durağan resme çevirir (mağaza çerçevelerinde olduğu gibi). Yalnız hareketli hal yüklenirse ilk karesi durağan resim olur.
+  - **Boyut:** uygulamanın kendi işaretinin 1–3 katı. Kalp, ışık gibi çevreye taşan efektler için büyütülür; resim iki koltuğun ortasına oturur.
+  - Pencerede iki örnek koltuğun arasında koyu ve açık zeminde önizleme var.
+- **Seviye seviye devam:** bir seviyeye yüklenen tasarım, kendi tasarımı olan bir üst seviyeye kadar sürer. Örneğin Çift Lv1, Lv6, Lv11 ve Lv16'ya tasarım yüklenirse Lv1–5 ilkini, Lv6–10 ikincisini gösterir. İlk tasarımın altındaki seviyelerde (ya da hiç tasarım yoksa) uygulama kendi işaretini çizer (türün resmi, beş seviyede bir değişen halka; yukarıda **İşaretler**).
+- **Kaldır:** o seviyenin tasarımı kalkar; seviye yine bir alttakini ya da uygulamanın kendi işaretini gösterir. Başka seviyenin kullanmadığı dosyalar depodan silinir.
+- **Nerede görünür:** mikrofonda yan yana oturan bağlı iki kişinin arasında ve profilin Bağlar satırında, işaretin olduğu her yerde. Hareketli hali varsa telefon onu, yoksa durağan resmi çizer; altındaki "Lv" etiketi kalır.
+- Değişiklik uygulama güncellemesi olmadan telefonlara gider (katalog yeniden okunur, en geç birkaç dakika).
+- **Eski APK'lar** tasarımları görmez, kendi işaretini çizmeye devam eder. Görünmesi için yeni APK gerekir.
+- Her kayıt `audit_events`'e yazılır (`bondlook.save`, `bondlook.clear`, `bondlook.svga`: önceki ve sonraki hali, paneldeki kişi).
+- Teknik: sunucu `server/api/bond-looks.mjs`, tablo `migrations/107_bond_looks.sql` (satır silinmez, boşaltılır), katalog `GET /api/catalog?bondlooks=1` → `bondLooks`; uygulama `src/lib/bond-looks.ts`, `src/components/bond-mark.tsx`; panel `web/pages/app-bond-looks.js`, `web/bond-looks.js`. Testler: `test/bond-looks.test.mjs`, `tests/bond-looks.test.ts`, panelde `tests/app-admin.test.ts` ve `tests/panel-forms.test.ts`.
+
 ## Bağ Yüzüğü rafta (20 Kasım 2026)
 
 Müşteri: "İlişki başlatma hediyesi nerede? Panelde yok, Aile ve Dost'ta dursun, ben güncellerim." Çift bağının hediyesi Bağ Yüzüğü (`bag-cift`, 5.000 jeton) eskiden yalnız profilden "Bağ kur › Çift" ile gidiyordu; uygulamanın hediye listesinde satırı yoktu, bu yüzden panelde görünmüyordu.

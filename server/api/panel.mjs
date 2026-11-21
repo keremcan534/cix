@@ -130,6 +130,11 @@ export const PANEL_ROUTES = new Set([
   'POST /api/admin/mark-kinds',
   'POST /api/admin/mark-kinds/update',
   'POST /api/admin/mark-kinds/delete',
+  // Bağ işaretleri (bond-looks.mjs): each bond kind's mark level by level (uploads shopframe, giftsource for an SVGA).
+  'GET /api/admin/bond-looks',
+  'POST /api/admin/bond-looks/save',
+  'POST /api/admin/bond-looks/clear',
+  'POST /api/admin/bond-looks/svga',
   'POST /api/admin/ban',
   'POST /api/admin/referrals/revoke',
   // Şikâyetler (admin.mjs) and a reported room's own pictures (room-decor.mjs).

@@ -36,6 +36,7 @@ import { BOND_KINDS, BOND_LEVELS, type BondKind, type BondKindInfo } from '@/dat
 import { GIFTS_PAUSED } from '@/data/gifts-paused';
 import { GIFTS, isBondGift, type Gift, type GiftCat } from '@/data/mock';
 import { RULES, type Rules } from '@/data/rules';
+import { bondLookAt, parseBondLooks, type BondLook, type BondLooks } from '@/lib/bond-looks';
 import { selfExchangeRate } from '@/lib/coins-bank';
 import { parseLiveEmoji, type LiveEmoji } from '@/lib/emoji-live-core';
 import { parseLiveLevels, type LiveLevels } from '@/lib/levels-live-core';
@@ -100,6 +101,8 @@ export type LiveCatalog = {
   /** Profil izleri (marks=1, marks=2): on or off, the hours, which gift leaves or cleans a mark, the kinds (their
    *  names, overlay pictures, minutes); null from an older server. */
   marks: MarkRules | null;
+  /** Bağ işaretleri as staff designed them level by level (bondlooks=1); absent from an older server or with none: the app's own marks. */
+  bondLooks?: BondLooks;
   /** The gifts the server marks global (Global hediye, lib/global-gift-core); absent when none. */
   global?: string[];
 };
@@ -286,10 +289,15 @@ export function parseLiveCatalog(raw: unknown): LiveCatalog {
     familyThemes: parseFamilyThemes(r.family),
     rooms: parseRoomNumbers(r.rooms),
     marks: parseMarkRules(r.marks, r.gifts),
+    ...looksOf(r.bondLooks),
     ...globalOf(parseGlobalIds(r.gifts)),
   };
 }
 const globalOf = (ids: string[]) => (ids.length ? { global: ids } : {});
+const looksOf = (raw: unknown) => {
+  const looks = parseBondLooks(raw);
+  return looks ? { bondLooks: looks } : {};
+};
 
 type Saved = LiveCatalog & { fetchedAt: number };
 /** The copy kept on the phone ({v, giftIds, packs, campaign, usdTry, fetchedAt}); null when broken. */
@@ -325,6 +333,7 @@ export function parseSavedLiveCatalog(raw: string | null): { catalog: LiveCatalo
       familyThemes: parseFamilyThemes({ themes: r.familyThemes }),
       rooms: parseRoomNumbers(r.rooms),
       marks: parseMarkRules(r.marks),
+      ...looksOf(r.bondLooks),
       ...globalOf(parseGlobalIds(Array.isArray(r.global) ? r.global.map((id) => ({ id, global: true })) : null)),
     },
     // A copy an older app saved counts as old: the next poll reads the catalog again. One from before the videos were
@@ -434,6 +443,9 @@ export function bondKindOf(kind: BondKind, c: LiveCatalog | null = current): Bon
 /** Bağlar's level steps now: the catalog's (Canlı ayarlar) or the app's own. */
 export const bondLevelsNow = (c: LiveCatalog | null = current): readonly number[] => c?.bonds?.levels ?? BOND_LEVELS;
 /** Whether the server marks this gift global (Global hediye): the gift panel's Global shelf and the tile's badge. */
+/** The design a `kind` bond at `level` shows (lib/bond-looks bondLookAt); null: the app's own mark. */
+export const bondLookOf = (kind: BondKind, level: number, c: LiveCatalog | null = current): BondLook | null => bondLookAt(c?.bondLooks, kind, level);
+
 export const isGlobalGift = (id: string, c: LiveCatalog | null = current) => !!c?.global?.includes(id);
 
 /** Every gift this phone can draw, the app's own as they are now and the admins' listed (the profile's gift wall). */
@@ -538,7 +550,8 @@ export function fetchLiveCatalog(): Promise<unknown> {
       // family=1: this app has the Aile ve Dost shelf. lucky=1: it plays the Şanslı packages' videos (lucky-art.mjs).
       // marks=1&marks=2: Profil izleri with the kinds and minutes (Muzip hediyeler); a server before kinds reads the
       // first and answers as for the G7 app (hours, no kinds: the app's own pictures and the gifts' badges).
-      const res = await fetch(`${BASE}/api/catalog?gifts=2&family=1&emoji=1&levels=1&shop=1&lucky=1&marks=1&marks=2`, { signal: ctrl.signal });
+      // bondlooks=1: Bağ işaretleri as staff designed them (server/api/bond-looks.mjs).
+      const res = await fetch(`${BASE}/api/catalog?gifts=2&family=1&emoji=1&levels=1&shop=1&lucky=1&marks=1&marks=2&bondlooks=1`, { signal: ctrl.signal });
       if (!res.ok) throw new Error(`Sunucu hatası (${res.status})`);
       const body: unknown = await res.json();
       fetchedAt = Date.now();

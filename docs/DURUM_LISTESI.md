@@ -137,6 +137,7 @@ Son güncelleme: preview-96 sonrası (Küçült, çanta yağmuru, @bahset düzel
   - **Sınırsız bağ (sunucu):** Aile türleri ve Kanka kişi başına 1000, Çift 1, bekleyen istek 10.
   - **SimilarClub Sistem'de bağ bildirimleri (sunucu, eski APK'da Duyuru kartı):** her değişiklik bir kez; push'a dokununca yeni APK Bağlar sekmesini açar (eskiden boş Bildirimler).
   - **Bağı bitir (yeni APK):** her satırda görünür düğme; bekleme süresi panelden.
+  - **Panelden bağ işaretleri (yeni APK, 21 Kasım; [`BAGLAR.md`](BAGLAR.md)):** panelde Hediyeler › Bağ işaretleri: her bağ türünün 20 seviyesine durağan resim, hareketli WebP ya da SVGA ve boyut. Yeni APK odada ve profilde tasarımı çizer (tasarım bir üst tasarıma kadar sürer); eski APK kendi işaretini çizer. Telefonda denenmeli: hareketli WebP'nin odada oynaması ve büyük boyutun yüzlere taşması.
   - Telefonda denenmeli: odadaki işaretin büyüklüğü ve "Lv" etiketinin okunması küçük ekranlı telefonlarda.
 - **Maske (görüntülü arama ve eşleşme, kadınlar, Android):** kendi küçük görüntüsünün altındaki **Maske** düğmesi sırayla Kapalı → Göz maskesi → Mozaik yüz → Emoji yüz yapar. Güzellik düğmesi de oraya taşındı. Seçim telefonda kalır, bir sonraki aramada da açık başlar.
   - Yüzü telefon bulur (saniyede 5 kez). Yüz bulunamazsa (yüz çevrik, karanlık, ekrandan çıkmış) görüntünün tamamı iri karelere bölünür; bir hata olursa siyah gider. Yüz hiçbir zaman maskesiz gitmez.
