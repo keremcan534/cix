@@ -314,8 +314,12 @@ const highest = (levels, points) => {
 };
 /** VIP (SVIP) level of these purchase points. */
 export const svipLevel = (xp, docs = snap.docs) => highest(docs.vip.levels, Number(xp) || 0);
-/** The VIP level the app shows (frames, shop gates): the higher of the SVIP level and three per Rütbe tier, at most 15. */
-export const vipLevelOf = (svipXp, nobleTier, docs = snap.docs) => Math.min(15, Math.max(svipLevel(svipXp, docs), (nobleTier ?? 0) * 3));
+/**
+ * The VIP level the app shows (frames, shop gates): the person's own VIP level, by purchase points. Rütbe is a system of
+ * its own (its own badge and rights, levels.mjs noble) and adds nothing to it (owners' decision, 21 Nov 2026: before,
+ * three VIP levels per Rütbe tier made Paşa show "VIP 15"). `nobleTier` is kept for the callers and ignored.
+ */
+export const vipLevelOf = (svipXp, nobleTier, docs = snap.docs) => svipLevel(svipXp, docs);
 export const wealthLevel = (points, docs = snap.docs) => highest(docs.wealth.levels, Number(points) || 0);
 export const charmLevel = (points, docs = snap.docs) => highest(docs.charm.levels, Number(points) || 0);
 /** The points `level` starts at in `system` (vip, wealth, charm); 0 below the first. */

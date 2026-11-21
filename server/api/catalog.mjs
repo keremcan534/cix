@@ -269,7 +269,8 @@ export const FREE_MICFX = ['an-mic-wave'];
 /** A timed term may not end further ahead than this. */
 export const MAX_AHEAD_DAYS = 365;
 /** VIP level as the app shows it (store.tsx) by the compiled values; the server's is levels.mjs vipLevelOf. */
-export const vipLevelOf = (svipXp, nobleTier) => Math.min(15, Math.max(svipLevel(Number(svipXp) || 0), (nobleTier ?? 0) * 3));
+// Rütbe adds nothing to it (levels.mjs vipLevelOf, 21 Nov 2026); `nobleTier` is kept for the callers.
+export const vipLevelOf = (svipXp, nobleTier) => svipLevel(Number(svipXp) || 0);
 /** The history line of a shop charge. Never 'Uygulama içi:' (the old apps' free-text spends). */
 export function labelOf(item) {
   if (item.kind === 'sticker') return `Çıkartma paketi: ${item.name}`;

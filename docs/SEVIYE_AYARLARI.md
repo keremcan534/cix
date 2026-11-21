@@ -1,6 +1,8 @@
 # Seviye ve VIP ayarları (tasarım)
 
 Sahibin kararı (17 Kasım): VIP, Rütbe, Cömertlik, Yankı ve Abonelik'in bütün ayarları finans panelinden yapılır.
+
+**Rütbe VIP değildir (21 Kasım):** kartlarda, profilde ve mağaza kapılarında görünen VIP seviyesi yalnız kişinin kendi VIP'idir (yüklediği jetonla, 1–10; Abonelik VIP 1 sayılır). Eskiden Rütbenin her kademesi 3 VIP sayılıyordu: Paşa (5. kademe) "VIP 15" görünüyordu, VIP sayfası ise 10'a kadar. Rütbe kendi rozeti ve kendi haklarıyla ayrı bir sistem; kararla birlikte Rütbe alanların VIP'ten gelen hakları (VIP seviyesine bağlı çerçeve, mağaza ürünleri) gider, Rütbenin kendi hakları (bu sayfadaki tabloda "Rütbe" yazanlar) kalır. Rütbe ekranları ve sistemi müşterinin örnek ekranlarına göre yeniden düzenlenecek. Eski APK'lar kendi hesabında eski kuralla gösterebilir; başkasının VIP'ini sunucudan aldığı için doğru görür.
 - Seviye eşikleri.
 - Seviye adları.
 - Hangi seviyede hangi hakkın açıldığı.

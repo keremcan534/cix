@@ -647,7 +647,9 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   // the compiled tables.
   const levels = useLevels();
   const svipLevel = svipLevelFor(levels, svipXp);
-  const vipLevel = Math.min(15, Math.max(svipLevel, nobleTier * 3, vipDaysLeft > 0 ? 1 : 0));
+  // The person's own VIP (Abonelik counts as VIP 1); Rütbe is a system of its own and adds nothing (21 Nov 2026: three
+  // levels per tier made Paşa "VIP 15", past the VIP screen's 10).
+  const vipLevel = Math.max(svipLevel, vipDaysLeft > 0 ? 1 : 0);
   const [agencyId, setAgencyId] = useState<string | null>(s.agencyId ?? null);
   const [agencyRole, setAgencyRole] = useState<AgencyRole | null>(s.agencyRole ?? null);
   const [pendingAgency, setPendingAgency] = useState<string | null>(null);

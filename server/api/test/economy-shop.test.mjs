@@ -187,12 +187,13 @@ describe('Mağaza alımı', () => {
 });
 
 describe('Rütbe', () => {
-  test('2 sonra 3 birlikte işler; vipLevel = max(SVIP, kademe × 3)', async () => {
+  // Rütbe is a system of its own: it adds nothing to the VIP level (21 Nov 2026; before, three levels per tier).
+  test('2 sonra 3 birlikte işler; Rütbe VIP seviyesine eklenmez', async () => {
     const u = await person('Kaptan Adayı', 210_000);
     await ok(buy(u.session, 'noble-2', 60_000));
     const e = (await ok(buy(u.session, 'noble-3', 150_000))).economy;
     assert.equal(e.noble.tier, 3);
-    assert.equal(e.vipLevel, 9);
+    assert.equal(e.vipLevel, 0, 'Rütbe VIP getirmez');
     assert.deepEqual(e.items.filter((x) => x.kind === 'noble').map((x) => x.sku).sort(), ['noble-2', 'noble-3']);
     await h.sql.query('UPDATE users SET svip_xp = $2 WHERE id = $1', [u.user.id, SVIP_XP[9]]);
     assert.equal((await economy(u.session)).vipLevel, 10);

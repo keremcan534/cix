@@ -41,7 +41,8 @@ describe('test sunucusu: yönetici her şeyin en üstünde', () => {
     assert.deepEqual(await ranks(admin), [{ sku: 'noble-5', price: '0', source: 'admin' }]);
     const eco = await ok(call('GET', '/api/economy', null, admin.session));
     assert.equal(eco.noble.tier, 5);
-    assert.equal(eco.vipLevel, 15);
+    // Its own VIP (SVIP 10); Rütbe adds nothing to it.
+    assert.equal(eco.vipLevel, 10);
     const seen = (await ok(call('GET', `/api/user?id=${admin.user.id}`, null, member.session))).user;
     assert.deepEqual(seen.levels, { wealth: WEALTH_XP.length - 1, charm: CHARM_XP.length - 1 });
     const health = await ok(call('GET', '/api/health'));
