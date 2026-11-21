@@ -34,6 +34,15 @@ susturma için `403 {code: 'muted', sanction, serverNow}`.
 - **Süper yönetici** (`admin`): hepsi; ömür boyu ban, kademeler, yetki verme, itiraz kararları.
 - Ek yetkiler `admin_permissions` tablosuyla kişiye özel verilebilir (panel: Yaptırımlar → Yetkiler).
 
+## Kanıt zorunlu (Güncelleme 8, 21 Kasım 2026)
+
+- Panelden ya da uygulamanın Yönetim ekranından verilen her yaptırıma **kanıt** eklenir: ekran görüntüsü bağlantısı, bağlantı, mesaj metni ya da not. Bir şikâyetten verilen yaptırımda şikâyetin kendisi kanıt sayılır.
+- **Süper yönetici** (panelde Süper yönetici rolü; uygulamada yönetici hesabı) kanıtsız da verebilir; yaptırım hemen başlar.
+- Başka biri kanıt eklemeden verirse yaptırım **başlamaz**, "Onay bekleyenler"e "Kanıtsız · Süper yönetici onaylar" olarak düşer. Onu yalnız bir Süper yönetici onaylar ya da reddeder; süre onaylandığı an başlar.
+- Kanıtsız olmak yetkiyi genişletmez: kişinin rolünün veremediği yaptırımı kanıtsız da öneremez.
+- Odadaki yetkililerin oda içi susturmaları ve otomatik susturmalar bu kuralın dışında.
+- Teknik: `sanctions.mjs` (`isSuper`, `needs_super`), `109_sanction_proof.sql` (ekran görüntüsü kanıt türü de), test `test/panel.test.mjs`.
+
 ## Otomatik susturma
 
 İletişim filtresi (docs/SUNUCU.md, "İletişim filtresi") bir metni her reddettiğinde `contact_refusals`'a bir satır
