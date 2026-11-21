@@ -1853,7 +1853,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         logGift(u.id, hostId, g, 1);
         addMsg({ id: `gift:${tx}`, system: true, text: `🎁 ${u.name} → ${userById(hostId).name} ${g.emoji} ${g.name}`, gift: { fromId: u.id, toIds: [hostId], emoji: g.emoji, name: g.name, count: 1, giftId: g.id } });
         scorePk(tx, u.id, hostId, g.id, g.price);
-        flyGift(g.emoji, 1, [hostId], { x: 36, y: win.height * 0.72 }, g.id);
+        flyGift(g.emoji, 1, [hostId], giftMiddle(), g.id, GIFT_HOLD_MS);
       } else {
         addMsg({ userId: u.id, text: pick(BOT_LINES) });
       }
@@ -1879,7 +1879,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         gainXp(lk.price);
         addContrib(from.id, lk.price);
         logGift(from.id, 'me', { id: lk.id, name: lk.name, emoji: lk.emoji, price: lk.price }, 1);
-        flyGift(lk.emoji, 1, ['me'], { x: 36, y: win.height * 0.72 }, lk.id);
+        flyGift(lk.emoji, 1, ['me'], giftMiddle(), lk.id, GIFT_HOLD_MS);
         addMsg({ id: `gift:${tx}`, system: true, text: `🍀 ${from.name} sana ${lk.emoji} ${lk.name} (Şanslı) gönderdi! (+${earned} 💎 · değerin ${pct(LUCKY_RECIPIENT_SHARE)}’si)`, gift: { fromId: from.id, toIds: ['me'], emoji: lk.emoji, name: lk.name, count: 1, lucky: true, giftId: lk.id } });
         scorePk(tx, from.id, 'me', lk.id, luckyPkPoints(lk));
         return;
@@ -1892,7 +1892,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       gainXp(gift.price);
       addContrib(from.id, gift.price);
       logGift(from.id, 'me', gift, 1);
-      flyGift(gift.emoji, 1, ['me'], { x: 36, y: win.height * 0.72 }, gift.id);
+      flyGift(gift.emoji, 1, ['me'], giftMiddle(), gift.id, GIFT_HOLD_MS);
       if (gift.price >= 50 && showFx(gift.price) && visibleRef.current) playGiftFx(gift, from.id, ['me'], 1);
       addMsg({ id: `gift:${tx}`, system: true, text: `🎁 ${from.name} sana ${gift.emoji} ${gift.name} gönderdi! (+${gift.price} 💎)`, gift: { fromId: from.id, toIds: ['me'], emoji: gift.emoji, name: gift.name, count: 1, giftId: gift.id } });
       scorePk(tx, from.id, 'me', gift.id, gift.price);
@@ -2764,7 +2764,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     if (!isOwn) addFanPoints(hostId, Math.ceil(total / 10), `Hediye gönderdin (${total} jeton)`);
     if (showFx(gift.price)) playGiftFx(gift, 'me', delivered.map((r) => r.userId), count);
     // From the gift button (bottom right) to each recipient's seat.
-    flyGift(gift.emoji, count, delivered.map((r) => r.userId), { x: win.width - 60, y: win.height - 48 }, gift.id);
+    flyGift(gift.emoji, count, delivered.map((r) => r.userId), giftMiddle(), gift.id, GIFT_HOLD_MS);
     const sendId = msgId();
     delivered.forEach((r) => scorePk(`GT-${sendId}-${r.userId}`, 'me', r.userId, gift.id, each));
     const all = delivered.length === toIds.length;
