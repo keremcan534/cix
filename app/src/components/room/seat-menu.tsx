@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
 import { colors } from '@/theme';
+import { GlyphIcon } from '@/components/UiIcon';
 
 export type SeatMenuItem = { key: string; label: string; icon: keyof typeof Ionicons.glyphMap; onPress: () => void; destructive?: boolean; dividerBefore?: boolean };
 export type Rect = { x: number; y: number; w: number; h: number };
@@ -54,7 +55,7 @@ export function SeatMenu({ anchor, title, items, onClose }: { anchor: Rect | nul
                 accessibilityRole="button"
                 accessibilityLabel={it.label}
               >
-                <Ionicons name={it.icon} size={18} color={it.destructive ? '#FF7A82' : colors.text} />
+                <GlyphIcon name={it.icon} size={18} color={it.destructive ? '#FF7A82' : colors.text} />
                 <Text style={[s.label, it.destructive && { color: '#FF7A82' }]} numberOfLines={1}>
                   {it.label}
                 </Text>

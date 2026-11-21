@@ -4,6 +4,15 @@ Bu liste tasarımcıya verilmek için hazırlandı (21 Kasım 2026, ana dal `ccr
 
 Eski üretim listesi `docs/GORSEL_URETIM_LISTESI.md` teslim kaydıdır. Bu dosya ise bugünkü kodda neyin hâlâ resimsiz olduğunu gösterir.
 
+## 21 Kasım güncellemesi: teslim edilen ilk set bağlandı
+
+Tasarımcıdan gelen üç dosya uygulamaya kondu. İlgili satırlar tablolarda **✅** ile işaretli (36 satır):
+- **Oda simgeleri (16 adet, `app/assets/icons/ui`):** mikrofon açık/kapalı, kum saati, emoji, menü (üç nokta), profil, kilit, kilit açık, çıkış, yer değiştir, kulaklık, yasak, şikâyet, kamera açık/kapalı, ayarlar. `components/UiIcon.tsx` bu Ionicons adlarını kendiliğinden 3D resme çeviriyor. Bağlandığı yerler: koltuk menüsü, Balkon kişi işlemleri, alt çubuk (menü, emoji, mikrofon, sıradayken kum saati), oda üst çubuğundaki ayarlar, açılır menüler (ActionSheet: şikâyet, engelle, sil…), görüntülü/sesli arama düğmeleri, Ben menüsündeki Ayarlar ve Çıkış, hediye panelinde dinleyici etiketi (🎧 yerine kulaklık).
+- **Jeton paketleri (9 adet, `app/assets/store/jeton-paketi-1…9.png`):** Cüzdan › Jeton yükle ızgarası, paketin büyüklüğüne göre tek jetondan hazine sandığına.
+- **Ben ekranı arka planı (`app/assets/bg/sahne-ben.jpg`):** yalnız açık (pembe) temada; koyu tema düz kalır.
+
+Sayılar ve öncelik sırası bu güncellemeden önceki durumu gösterir; işaretli satırlar artık eksik değil.
+
 ## Nasıl okunur
 
 Bir öğe şu durumlardan birindeyse "ikonu yok" sayıldı. "Şu an ne gösteriliyor" sütunu hangisi olduğunu söyler:
@@ -303,7 +312,7 @@ Toplam: 5
 ### Para ürünleri (mağaza/VIP bağlamı)
 | Öğe | Nerede görünüyor | Şu an ne gösteriliyor | Kaynak |
 |---|---|---|---|
-| Jeton paketleri p1–p9 (1.000 … 1.000.000 jeton), mağazanın canlı paketleri ve test paketleri | Cüzdan › Jeton yükle ızgarası | yedek ikon (hepsinde aynı 3D `coin`, pakete özel resim yok) | `app/src/app/cuzdan.tsx:362`, `app/src/data/status.ts:183-193` |
+| Jeton paketleri p1–p9 (1.000 … 1.000.000 jeton), mağazanın canlı paketleri ve test paketleri | Cüzdan › Jeton yükle ızgarası | yedek ikon (hepsinde aynı 3D `coin`, pakete özel resim yok) → **✅ 9 ayrı paket resmi (21 Kasım)** | `app/src/app/cuzdan.tsx:362`, `app/src/data/status.ts:183-193` |
 Toplam: 1
 
 Not: Elmas → jeton Çevir (`components/exchange-sheet.tsx:101,135,145`) 3D `diamond`/`coin` ile resimli. Abonelik plan kartları tasarımın taç resimleriyle (`assets/vip/sub`).
@@ -445,7 +454,7 @@ Toplam: 8
 | Bildirimler | Profil sekmesi menüsü | Ionicons "notifications-outline" | `app/src/app/(tabs)/profil.tsx:50` |
 | Müşteri hizmetleri | Profil sekmesi menüsü | Ionicons "headset-outline" | `app/src/app/(tabs)/profil.tsx:59` |
 | Güvenlik Merkezi | Profil sekmesi menüsü | Ionicons "shield-checkmark-outline" | `app/src/app/(tabs)/profil.tsx:60` |
-| Ayarlar | Profil sekmesi menüsü | Ionicons "settings-outline" | `app/src/app/(tabs)/profil.tsx:61` |
+| Ayarlar | Profil sekmesi menüsü | Ionicons "settings-outline" → **✅ 3D simge (21 Kasım)** | `app/src/app/(tabs)/profil.tsx:61` |
 | Kimlik Doğrulamam | Profil sekmesi menüsü | Ionicons "checkmark-circle-outline" | `app/src/app/(tabs)/profil.tsx:115` |
 | Etkinliklerim | Profil sekmesi menüsü | Ionicons "calendar-outline" | `app/src/app/(tabs)/profil.tsx:122` |
 
@@ -1214,16 +1223,16 @@ Toplam: 13 (1 satır başka bölümde sayıldı)
 | Öğe | Nerede görünüyor | Şu an ne gösteriliyor | Kaynak |
 |---|---|---|---|
 | Şifreli oda işareti | Üst çubuk, oda adının önü | Ionicons "lock-closed" | `app/src/components/room/live-room.tsx:3842` |
-| Oda ayarları | Üst çubuk | Ionicons "settings-outline" | `app/src/components/room/live-room.tsx:3882` |
+| Oda ayarları | Üst çubuk | Ionicons "settings-outline" → **✅ 3D simge (21 Kasım)** | `app/src/components/room/live-room.tsx:3882` |
 | Bire bir görüşmedesin bandı | Sahnenin üstü | Ionicons "call" | `app/src/components/room/live-room.tsx:3910` |
-| Menü | Alt çubuk | Ionicons "ellipsis-horizontal" (Not: oda menüsünü açan ana düğme) | `app/src/components/room/live-room.tsx:4042`, `parts.tsx:651` |
-| Emoji | Alt çubuk, yazı alanının içi | Ionicons "happy-outline" | `app/src/components/room/live-room.tsx:4054` |
+| Menü | Alt çubuk | Ionicons "ellipsis-horizontal" (Not: oda menüsünü açan ana düğme) → **✅ 3D simge (21 Kasım)** | `app/src/components/room/live-room.tsx:4042`, `parts.tsx:651` |
+| Emoji | Alt çubuk, yazı alanının içi | Ionicons "happy-outline" → **✅ 3D simge (21 Kasım)** | `app/src/components/room/live-room.tsx:4054` |
 | Sorular (Soru-cevap odası) | Alt çubuk | Ionicons "help" (Not: `ROOM_ICON_ART.questions` var) | `app/src/components/room/live-room.tsx:4082` |
 | Mesajlar | Alt çubuk | Ionicons "chatbubble-ellipses" (Not: 3D "chat" var) | `app/src/components/room/live-room.tsx:4083` |
-| Mikrofon AÇIK | Alt çubuk mikrofon düğmesi | Ionicons "mic" (Not: 3D "mic" var) | `app/src/components/room/parts.tsx:663` |
-| Mikrofon KAPALI | Alt çubuk mikrofon düğmesi | Ionicons "mic-off" | `app/src/components/room/parts.tsx:664` |
+| Mikrofon AÇIK | Alt çubuk mikrofon düğmesi | Ionicons "mic" (Not: 3D "mic" var) → **✅ 3D simge (21 Kasım)** | `app/src/components/room/parts.tsx:663` |
+| Mikrofon KAPALI | Alt çubuk mikrofon düğmesi | Ionicons "mic-off" → **✅ 3D simge (21 Kasım)** | `app/src/components/room/parts.tsx:664` |
 | EL KALDIR | Alt çubuk (koltukta değilken) | Ionicons "hand-left" (Not: Art "oda-konusmaci-kuyrugu-el-kaldir" var) | `app/src/components/room/parts.tsx:665` |
-| SIRADA | Alt çubuk (kuyruktayken) | Ionicons "hourglass" | `app/src/components/room/parts.tsx:666` |
+| SIRADA | Alt çubuk (kuyruktayken) | Ionicons "hourglass" → **✅ 3D simge (21 Kasım)** | `app/src/components/room/parts.tsx:666` |
 | DURAKLADI (ses gitmiyor) | Alt çubuk | Ionicons "mic-outline" | `app/src/components/room/parts.tsx:667` |
 | Oda sesi açık | Alt çubuk | Ionicons "volume-high" (Not: `ROOM_ICON_ART.sound` var) | `app/src/components/room/parts.tsx:725` |
 | Oda sesi kapalı | Alt çubuk | Ionicons "volume-mute" (Not: `ROOM_ICON_ART.soundOff` dosyası var ama hiç kullanılmıyor) | `app/src/components/room/parts.tsx:725`, `app/src/components/RoomArt.tsx:67` |
@@ -1235,45 +1244,45 @@ Hepsi `app/src/components/room/seat-menu.tsx:57` ile Ionicons olarak çiziliyor.
 
 | Öğe | Nerede görünüyor | Şu an ne gösteriliyor | Kaynak |
 |---|---|---|---|
-| Profilim | Kendi koltuğum | Ionicons "person-circle-outline" | `app/src/components/room/live-room.tsx:2418` |
-| Kamerayı aç | Kendi koltuğum (kamera izinli) | Ionicons "videocam-outline" | `app/src/components/room/live-room.tsx:2419` |
-| Kamerayı kapat | Kendi koltuğum | Ionicons "videocam-off-outline" | `app/src/components/room/live-room.tsx:2419` |
+| Profilim | Kendi koltuğum | Ionicons "person-circle-outline" → **✅ 3D simge (21 Kasım)** | `app/src/components/room/live-room.tsx:2418` |
+| Kamerayı aç | Kendi koltuğum (kamera izinli) | Ionicons "videocam-outline" → **✅ 3D simge (21 Kasım)** | `app/src/components/room/live-room.tsx:2419` |
+| Kamerayı kapat | Kendi koltuğum | Ionicons "videocam-off-outline" → **✅ 3D simge (21 Kasım)** | `app/src/components/room/live-room.tsx:2419` |
 | Koltuktan in | Kendi koltuğum | Ionicons "arrow-down-circle-outline" | `app/src/components/room/live-room.tsx:2420` |
-| Profil | Başkasının koltuğu | Ionicons "person-circle-outline" | `app/src/components/room/live-room.tsx:2430` |
+| Profil | Başkasının koltuğu | Ionicons "person-circle-outline" → **✅ 3D simge (21 Kasım)** | `app/src/components/room/live-room.tsx:2430` |
 | Mikrodan at | Başkasının koltuğu (yönetici) | Ionicons "arrow-down-circle-outline" | `app/src/components/room/live-room.tsx:2437` |
-| Mikrofonu kilitle (kişiyi indirip) | Başkasının koltuğu | Ionicons "lock-closed-outline" | `app/src/components/room/live-room.tsx:2457` |
-| Odadan at | Başkasının koltuğu | Ionicons "exit-outline" | `app/src/components/room/live-room.tsx:2474` |
-| Koltuk değiştir | Başkasının koltuğu | Ionicons "swap-horizontal-outline" | `app/src/components/room/live-room.tsx:2478` |
-| Mikrofonunu aç | Başkasının koltuğu | Ionicons "mic-outline" | `app/src/components/room/live-room.tsx:2487` |
-| Mikrofonunu sustur | Başkasının koltuğu | Ionicons "mic-off-outline" | `app/src/components/room/live-room.tsx:2487` |
-| Süreli sustur | Başkasının koltuğu | Ionicons "timer-outline" | `app/src/components/room/live-room.tsx:2500` |
+| Mikrofonu kilitle (kişiyi indirip) | Başkasının koltuğu | Ionicons "lock-closed-outline" → **✅ 3D simge (21 Kasım)** | `app/src/components/room/live-room.tsx:2457` |
+| Odadan at | Başkasının koltuğu | Ionicons "exit-outline" → **✅ 3D simge (21 Kasım)** | `app/src/components/room/live-room.tsx:2474` |
+| Koltuk değiştir | Başkasının koltuğu | Ionicons "swap-horizontal-outline" → **✅ 3D simge (21 Kasım)** | `app/src/components/room/live-room.tsx:2478` |
+| Mikrofonunu aç | Başkasının koltuğu | Ionicons "mic-outline" → **✅ 3D simge (21 Kasım)** | `app/src/components/room/live-room.tsx:2487` |
+| Mikrofonunu sustur | Başkasının koltuğu | Ionicons "mic-off-outline" → **✅ 3D simge (21 Kasım)** | `app/src/components/room/live-room.tsx:2487` |
+| Süreli sustur | Başkasının koltuğu | Ionicons "timer-outline" → **✅ 3D simge (21 Kasım)** | `app/src/components/room/live-room.tsx:2500` |
 | Hediye gönder | Başkasının koltuğu | Ionicons "gift-outline" (Not: 3D "gift" var) | `app/src/components/room/live-room.tsx:2503` |
 | Mesaj gönder | Başkasının koltuğu | Ionicons "chatbubble-outline" (Not: 3D "chat" var) | `app/src/components/room/live-room.tsx:2504` |
 | Yönetici yap / Yöneticilikten al | Başkasının koltuğu (sahip) | Ionicons "shield-half-outline" | `app/src/components/room/live-room.tsx:2512` |
 | Süper Yönetici yap / al | Başkasının koltuğu (sahip) | Ionicons "star-half-outline" | `app/src/components/room/live-room.tsx:2537` |
 | DJ yap / DJ'likten al | Başkasının koltuğu (sahip) | Ionicons "musical-notes-outline" | `app/src/components/room/live-room.tsx:2556` |
-| Kara listeye ekle | Başkasının koltuğu | Ionicons "ban-outline" | `app/src/components/room/live-room.tsx:2564` |
-| Yetkin yok (üst rol) | Başkasının koltuğu | Ionicons "lock-closed-outline" | `app/src/components/room/live-room.tsx:2590` |
+| Kara listeye ekle | Başkasının koltuğu | Ionicons "ban-outline" → **✅ 3D simge (21 Kasım)** | `app/src/components/room/live-room.tsx:2564` |
+| Yetkin yok (üst rol) | Başkasının koltuğu | Ionicons "lock-closed-outline" → **✅ 3D simge (21 Kasım)** | `app/src/components/room/live-room.tsx:2590` |
 | Davet et | Boş koltuk | Ionicons "person-add-outline" | `app/src/components/room/live-room.tsx:2614` |
 | Bu koltuğa geç | Boş koltuk | Ionicons "enter-outline" | `app/src/components/room/live-room.tsx:2621` |
-| Mikrofonu kilitle | Boş koltuk | Ionicons "lock-closed-outline" | `app/src/components/room/live-room.tsx:2622` |
-| Kilidi aç | Kilitli koltuk | Ionicons "lock-open-outline" | `app/src/components/room/live-room.tsx:2622` |
+| Mikrofonu kilitle | Boş koltuk | Ionicons "lock-closed-outline" → **✅ 3D simge (21 Kasım)** | `app/src/components/room/live-room.tsx:2622` |
+| Kilidi aç | Kilitli koltuk | Ionicons "lock-open-outline" → **✅ 3D simge (21 Kasım)** | `app/src/components/room/live-room.tsx:2622` |
 | Oda sohbeti (yazılı) | Süreli sustur › "ne susturulsun?" | Ionicons "chatbubble-outline" | `app/src/components/room/room-mute.tsx:66` |
-| Mikrofon (sesli) | Süreli sustur › "ne susturulsun?" | Ionicons "mic-off-outline" | `app/src/components/room/room-mute.tsx:67` |
+| Mikrofon (sesli) | Süreli sustur › "ne susturulsun?" | Ionicons "mic-off-outline" → **✅ 3D simge (21 Kasım)** | `app/src/components/room/room-mute.tsx:67` |
 
 Toplam: 25
 
 ### Balkon (odadakiler listesi) kişi işlemleri
 | Öğe | Nerede görünüyor | Şu an ne gösteriliyor | Kaynak |
 |---|---|---|---|
-| Mikrofona davet et | Balkon › kişi satırı açılınca | Ionicons "mic-outline" | `app/src/components/room/balcony.tsx:226` |
-| Mikrofonunu aç | Balkon › kişi | Ionicons "mic-outline" | `app/src/components/room/balcony.tsx:228` |
-| Mikrofonunu sustur | Balkon › kişi | Ionicons "mic-off-outline" | `app/src/components/room/balcony.tsx:228` |
-| Profil | Balkon › kişi | Ionicons "person-circle-outline" | `app/src/components/room/balcony.tsx:230` |
+| Mikrofona davet et | Balkon › kişi satırı açılınca | Ionicons "mic-outline" → **✅ 3D simge (21 Kasım)** | `app/src/components/room/balcony.tsx:226` |
+| Mikrofonunu aç | Balkon › kişi | Ionicons "mic-outline" → **✅ 3D simge (21 Kasım)** | `app/src/components/room/balcony.tsx:228` |
+| Mikrofonunu sustur | Balkon › kişi | Ionicons "mic-off-outline" → **✅ 3D simge (21 Kasım)** | `app/src/components/room/balcony.tsx:228` |
+| Profil | Balkon › kişi | Ionicons "person-circle-outline" → **✅ 3D simge (21 Kasım)** | `app/src/components/room/balcony.tsx:230` |
 | Hediye gönder | Balkon › kişi | Ionicons "gift-outline" (Not: 3D "gift" var) | `app/src/components/room/balcony.tsx:231` |
-| Odadan çıkar | Balkon › kişi | Ionicons "exit-outline" | `app/src/components/room/balcony.tsx:232` |
-| Engelle / Engeli kaldır | Balkon › kişi | Ionicons "ban-outline" | `app/src/components/room/balcony.tsx:233` |
-| Şikâyet et | Balkon › kişi | Ionicons "flag-outline" | `app/src/components/room/balcony.tsx:234` |
+| Odadan çıkar | Balkon › kişi | Ionicons "exit-outline" → **✅ 3D simge (21 Kasım)** | `app/src/components/room/balcony.tsx:232` |
+| Engelle / Engeli kaldır | Balkon › kişi | Ionicons "ban-outline" → **✅ 3D simge (21 Kasım)** | `app/src/components/room/balcony.tsx:233` |
+| Şikâyet et | Balkon › kişi | Ionicons "flag-outline" → **✅ 3D simge (21 Kasım)** | `app/src/components/room/balcony.tsx:234` |
 
 Toplam: 8
 
@@ -1678,15 +1687,15 @@ Toplam: 14
 | Öğe | Nerede görünüyor | Şu an ne gösteriliyor | Kaynak |
 |---|---|---|---|
 | Şikâyet et / engelle düğmesi | Görüşme ekranı üstü | Ionicons "shield-checkmark-outline" | `app/src/components/call-stage.tsx:106` |
-| Şikâyet et | Görüşme menüsü | Ionicons "flag-outline" | `app/src/components/call-stage.tsx:116` |
-| Engelle | Görüşme menüsü | Ionicons "ban-outline" | `app/src/components/call-stage.tsx:117` |
+| Şikâyet et | Görüşme menüsü | Ionicons "flag-outline" → **✅ 3D simge (21 Kasım)** | `app/src/components/call-stage.tsx:116` |
+| Engelle | Görüşme menüsü | Ionicons "ban-outline" → **✅ 3D simge (21 Kasım)** | `app/src/components/call-stage.tsx:117` |
 | Güzellik | Görüşme araçları | Ionicons "sparkles" | `app/src/components/call-stage.tsx:230` |
 | Maske | Görüşme araçları | Ionicons "glasses" | `app/src/components/call-stage.tsx:231` |
 | Kamera kapalı (kendi önizleme) | Görüntülü görüşme | Ionicons "videocam-off" | `app/src/components/call-stage.tsx:241` |
-| Mikrofonu kapat | Görüşme kontrolleri | Ionicons "mic" | `app/src/components/call-stage.tsx:277` |
-| Mikrofonu aç | Görüşme kontrolleri | Ionicons "mic-off" | `app/src/components/call-stage.tsx:277` |
-| Kamerayı kapat | Görüşme kontrolleri | Ionicons "videocam" | `app/src/components/call-stage.tsx:278` |
-| Kamerayı aç | Görüşme kontrolleri | Ionicons "videocam-off" | `app/src/components/call-stage.tsx:278` |
+| Mikrofonu kapat | Görüşme kontrolleri | Ionicons "mic" → **✅ 3D simge (21 Kasım)** | `app/src/components/call-stage.tsx:277` |
+| Mikrofonu aç | Görüşme kontrolleri | Ionicons "mic-off" → **✅ 3D simge (21 Kasım)** | `app/src/components/call-stage.tsx:277` |
+| Kamerayı kapat | Görüşme kontrolleri | Ionicons "videocam" → **✅ 3D simge (21 Kasım)** | `app/src/components/call-stage.tsx:278` |
+| Kamerayı aç | Görüşme kontrolleri | Ionicons "videocam-off" → **✅ 3D simge (21 Kasım)** | `app/src/components/call-stage.tsx:278` |
 | Kamerayı çevir | Görüşme kontrolleri | Ionicons "camera-reverse" | `app/src/components/call-stage.tsx:279` |
 | Hediye gönder | Görüşme kontrolleri | Ionicons "gift" (Not: 3D "gift" var) | `app/src/components/call-stage.tsx:280` |
 | Görüşmeyi bitir | Görüşme kontrolleri | Ionicons "call" (döndürülmüş) | `app/src/components/call-stage.tsx:283` |

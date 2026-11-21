@@ -41,6 +41,7 @@ import { useRoomSheetSpace, useSheetMax } from '@/lib/sheet-space';
 import { marksRefusalOf, marksShelfNote, photoMarksOf, refusesMarks } from '@/lib/live/marks-live';
 import { keepingMarks, keptLine, refusalLine, refusingMarks } from '@/lib/profile-marks';
 import { serverNow } from '@/lib/sanction-time';
+import { UiIcon } from '@/components/UiIcon';
 
 type Shelf = GiftCat | 'lucky' | 'fav' | 'bag' | 'global';
 type PriceSort = 'default' | 'asc' | 'desc';
@@ -430,7 +431,7 @@ export function GiftSheet({
                   <PersonPick key={id} uri={userById(id).avatar} tag={String(seat)} on={targets.includes(id)} label={`${seat}. mikrofon, ${userById(id).name}`} onPress={() => togglePerson(id)} />
                 ))}
                 {pickedListeners.map((id) => (
-                  <PersonPick key={id} uri={userById(id).avatar} tag="🎧" on label={`Dinleyici, ${userById(id).name}`} onPress={() => togglePerson(id)} />
+                  <PersonPick key={id} uri={userById(id).avatar} listener on label={`Dinleyici, ${userById(id).name}`} onPress={() => togglePerson(id)} />
                 ))}
               </ScrollView>
             </View>
@@ -621,14 +622,14 @@ export function GiftSheet({
 }
 
 /** One person in the recipient row: avatar and seat number only (the name is in the accessibility label). */
-function PersonPick({ uri, tag, on, label, onPress }: { uri: string; tag: string; on: boolean; label: string; onPress: () => void }) {
+function PersonPick({ uri, tag, listener, on, label, onPress }: { uri: string; tag?: string; listener?: boolean; on: boolean; label: string; onPress: () => void }) {
   return (
     <Pressable onPress={onPress} style={g.pick} accessibilityRole="checkbox" accessibilityState={{ checked: on }} accessibilityLabel={label} hitSlop={4}>
       <View style={[g.pickRing, on && g.pickRingOn]}>
         <Avatar uri={uri} size={36} />
       </View>
       <View style={[g.pickTag, on && g.pickTagOn]}>
-        <Text style={[g.pickTagText, on && { color: semantic.actionInk }]}>{tag}</Text>
+        {listener ? <UiIcon name="headphones" size={15} /> : <Text style={[g.pickTagText, on && { color: semantic.actionInk }]}>{tag}</Text>}
       </View>
     </Pressable>
   );

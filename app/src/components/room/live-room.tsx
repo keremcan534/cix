@@ -198,6 +198,7 @@ import { MuteBanner, useStopped } from '@/components/sanction-screen';
 import { refreshSanctions, showSanction } from '@/lib/sanctions';
 import { demoMarkGift, useMarkLines } from '@/lib/live/marks-live';
 import { keptAfterLine, parseMarkNote } from '@/lib/profile-marks';
+import { GlyphIcon } from '@/components/UiIcon';
 
 // Short: the rules are the chat's first line already (ROOM_RULES_NOTICE), the bot doesn't repeat them.
 const BOT_TIPS = ['Mikrofona geçmek için boş bir koltuğa dokun.', 'Hediyeler oda seviyesini yükseltir.'];
@@ -3879,7 +3880,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             )}
             {(isOwn || !!liveSettings) && (
               <Pressable onPress={() => setPanel('settings')} accessibilityLabel="Oda ayarları" hitSlop={HEAD_SLOP}>
-                <Ionicons name="settings-outline" size={20} color="#fff" />
+                <GlyphIcon name="settings-outline" size={20} color="#fff" />
               </Pressable>
             )}
             <Pressable onPress={closeRoomScreen} hitSlop={10} accessibilityRole="button" accessibilityLabel="Odayı kapat: küçült veya odadan çık">
@@ -4051,7 +4052,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                 accessibilityLabel={amSeated ? 'Emoji gönder' : 'Emoji ekle'}
                 hitSlop={8}
               >
-                <Ionicons name={emojiOpen ? 'close-circle' : 'happy-outline'} size={narrowBar ? 22 : 24} color={colors.textDim} />
+                <GlyphIcon name={emojiOpen ? 'close-circle' : 'happy-outline'} size={narrowBar ? 22 : 24} color={colors.textDim} scale={1.15} />
               </Pressable>
               <TextInput
                 ref={inputRef}

@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/components/text';
 import { useSheetMax } from '@/lib/sheet-space';
 import { SCRIM, makeStyles, useTheme } from '@/theme';
+import { GlyphIcon } from '@/components/UiIcon';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 /** `icon` is an Ionicons glyph. When any option has one, the sheet becomes a left-aligned list with an icon column. */
@@ -44,7 +45,7 @@ export function ActionSheet({ visible, title, titleArt, options, onClose }: { vi
               }}
             >
               {listed && (
-                <View style={styles.iconBox}>{o.icon && <Ionicons name={o.icon} size={20} color={o.destructive ? semantic.danger : colors.text} />}</View>
+                <View style={styles.iconBox}>{o.icon && <GlyphIcon name={o.icon} size={20} color={o.destructive ? semantic.danger : colors.text} />}</View>
               )}
               <Text style={[styles.optionText, listed && styles.listedText, o.destructive && { color: semantic.danger }]}>{o.label}</Text>
             </Pressable>

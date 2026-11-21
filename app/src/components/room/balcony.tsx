@@ -16,6 +16,7 @@ import type { MicInvite, RoomLive, RoomView } from '@/lib/room-presence';
 import { useSheetMax } from '@/lib/sheet-space';
 import { SCRIM, colors, edge, semantic } from '@/theme';
 import { Photo } from '@/components/photo';
+import { GlyphIcon } from '@/components/UiIcon';
 
 const fmt = (n: number) => n.toLocaleString('tr-TR');
 const nameOf = (uid: string) => (uid === 'me' ? 'Sen' : userById(uid).name);
@@ -247,7 +248,7 @@ export function ParticipantsSheet({
 function Action({ icon, label, onPress, danger, disabled }: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void; danger?: boolean; disabled?: boolean }) {
   return (
     <Pressable onPress={onPress} disabled={disabled} style={[s.action, danger && s.actionDanger, disabled && { opacity: 0.45 }]} accessibilityRole="button" accessibilityLabel={label} aria-disabled={disabled}>
-      <Ionicons name={icon} size={15} color={danger ? '#FF9AA1' : colors.text} />
+      <GlyphIcon name={icon} size={15} color={danger ? '#FF9AA1' : colors.text} />
       <Text style={[s.actionText, danger && { color: '#FF9AA1' }]}>{label}</Text>
     </Pressable>
   );

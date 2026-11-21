@@ -37,6 +37,7 @@ import { BounceBadge } from '@/components/fx/bounce-badge';
 import { AssetView } from '@/components/fx/anim-player';
 import { ShopBubble } from '@/components/fx/shop-bubble';
 import type { Asset } from '@/data/animations';
+import { GlyphIcon } from '@/components/UiIcon';
 
 export type ChatMsg = FeedMsg;
 export type RoomRole = 'owner' | 'admin' | 'member';
@@ -648,7 +649,7 @@ export function RoundBtn({
           </View>
         ) : (
           <View style={[styles.round, styles.glassRound]}>
-            <Ionicons name={icon} size={22} color="#fff" />
+            <GlyphIcon name={icon} size={22} color="#fff" scale={1.2} />
           </View>
         )}
       </Animated.View>
@@ -692,7 +693,7 @@ export function MicBtn({ state, queuePos, caption: captionOverride, hint, onPres
       <Animated.View style={{ transform: [{ scale: press.scale }] }}>
         <View style={[styles.round, { backgroundColor: look.bg, borderWidth: 1, borderColor: look.edge === 'transparent' ? 'rgba(255,255,255,0.12)' : look.edge }, state === 'on' && styles.micGlowOn, state === 'hand' && styles.micGlowHand]}>
           <Gloss strength={0.32} />
-          <Ionicons name={look.icon} size={22} color={look.fg} />
+          <GlyphIcon name={look.icon} size={22} color={look.fg} scale={1.2} plain={state === 'held'} />
         </View>
         {caption && (
           <View style={styles.tagWrap} pointerEvents="none">

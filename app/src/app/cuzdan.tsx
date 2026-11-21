@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { FlatList, Pressable, ScrollView, View } from 'react-native';
+import { FlatList, Image, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { LoadError } from '@/components/load-error';
@@ -14,7 +14,7 @@ import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 import { SCENES } from '@/components/fx/scenes';
 import { Backdrop } from '@/components/fx/surface';
-import { Icon3D } from '@/components/Icon3D';
+import { coinPackArtOf } from '@/components/StoreArt';
 import { IS_DEMO } from '@/lib/build';
 import { liveMode, liveTopup, message, refreshWallet, TEST_PACKS } from '@/lib/live';
 import { LEDGER_PAGE, useLiveLedger } from '@/lib/live/earnings';
@@ -359,7 +359,7 @@ function PackTile({
             </View>
           ) : null}
         </View>
-        <Icon3D name="coin" size={40} />
+        <Image source={coinPackArtOf(coins)} style={{ width: 48, height: 48, marginVertical: -4 }} resizeMode="contain" accessibilityIgnoresInvertColors />
         <Text style={styles.packCoins} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
           {coins.toLocaleString('tr-TR')}
         </Text>
