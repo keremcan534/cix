@@ -635,6 +635,10 @@ export default function UserProfile() {
   const hasBasics = !live || publicId !== null || !!user.username || showsGender || !!country || (isMe && !!birthday) || !!user.joinedAt || !!extras.relationship || !!extras.education;
   // The interests in Hakkımda (the first four); all of them are in Vitrin › Kişisel Profil.
   const aboutInterests = (user.interests ?? []).slice(0, 4).map(splitInterest);
+  // A bio that only names interests ("🎧 Müzik 🎮 Oyun") says what the interests line says: one line is enough.
+  const bioWords = (user.bio ?? '').toLocaleLowerCase('tr-TR').match(/[\p{L}\p{N}]+/gu) ?? [];
+  const interestWords = new Set(aboutInterests.flatMap((x) => x.label.toLocaleLowerCase('tr-TR').match(/[\p{L}\p{N}]+/gu) ?? []));
+  const aboutBio = user.bio && aboutInterests.length > 0 && bioWords.length > 0 && bioWords.every((w) => interestWords.has(w)) ? '' : (user.bio ?? '');
   // A purchased frame (mine, or theirs in a live build) reaches past the photo.
   const framed = isMe ? !!equipped.frame : !!look?.frame;
 
@@ -827,10 +831,10 @@ export default function UserProfile() {
                   icon="chatbubble-ellipses-outline"
                   tone="soft"
                   title="Hakkımda"
-                  text={user.bio || (isMe ? 'Kendini birkaç kelimeyle anlat…' : undefined)}
+                  text={aboutBio || (isMe && aboutInterests.length === 0 ? 'Kendini birkaç kelimeyle anlat…' : undefined)}
                   more={aboutInterests.length > 0 ? aboutInterests.map((x) => `${x.emoji} ${x.label}`.trim()).join('  ') : undefined}
-                  quiet={!user.bio}
-                  label={[user.bio ? `Hakkımda: ${user.bio}` : 'Hakkımda', aboutInterests.length > 0 ? `İlgi alanları: ${aboutInterests.map((x) => x.label).join(', ')}` : ''].filter(Boolean).join('. ')}
+                  quiet={!aboutBio}
+                  label={[aboutBio ? `Hakkımda: ${aboutBio}` : 'Hakkımda', aboutInterests.length > 0 ? `İlgi alanları: ${aboutInterests.map((x) => x.label).join(', ')}` : ''].filter(Boolean).join('. ')}
                   onPress={isMe ? openEdit : undefined}
                 />
               )}
