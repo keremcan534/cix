@@ -229,6 +229,10 @@ export const PANEL_ROUTES = new Set([
   // Jeton Noktası (jeton.mjs): turning an account into a bank or back, selling a bank its stock.
   'POST /api/admin/jeton/bank',
   'POST /api/admin/jeton/wholesale',
+  // Yönetim jeton yüklemesi: management's loads to people and taking a wrong one back (the panel's Süper yönetici).
+  'GET /api/admin/jeton/loads',
+  'POST /api/admin/jeton/load',
+  'POST /api/admin/jeton/reverse',
 ]);
 
 const clean = (v, max) => (typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, max) : '');
