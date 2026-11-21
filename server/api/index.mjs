@@ -162,6 +162,15 @@ const RATE_FILES = Number(env.RATE_FILES ?? 3000);
 const LOG = env.LOG_REQUESTS !== '0';
 /** Paths without the limit: LiveKit's signed webhooks and the uptime check. */
 const UNLIMITED = new Set(['/api/livekit/webhook', '/api/health']);
+/**
+ * Gift sends have their own, wider budget (owners, 21 Nov 2026: a fast combo in a busy room ran into "Çok fazla
+ * istek" and stopped the wheel). They don't use up the session's budget for the room's reads, and the room's reads
+ * don't stop a send. Each route still has its own per-person limit (lucky.mjs), and a newer app sends a burst of
+ * combo taps as one request (lucky.mjs `times`).
+ */
+const SEND_PATHS = new Set(['/api/gifts/send', '/api/lucky/send']);
+const RATE_SEND = Number(env.RATE_SEND ?? 600);
+const RATE_SEND_IP = Number(env.RATE_SEND_IP ?? Math.max(RATE_SEND * 5, 3000));
 
 // --- Test server: admins at the top of everything (test-admin.mjs) ------------------------------------------------
 const ADMIN_COINS_MIN = 5_000_000;
@@ -394,9 +403,10 @@ const routes = {
 function limited(req, path, ip) {
   if (UNLIMITED.has(path)) return false;
   if (path.startsWith('/api/auth/')) return !allow(`ip-auth:${ip}`, RATE_AUTH);
-  if (!allow(`ip:${ip}`, RATE_IP)) return true;
+  const send = SEND_PATHS.has(path);
+  if (!allow(send ? `ip-send:${ip}` : `ip:${ip}`, send ? RATE_SEND_IP : RATE_IP)) return true;
   const bearer = /^Bearer (\S{20,200})$/.exec(req.headers.authorization ?? '');
-  return !!bearer && !allow(`s:${sha(bearer[1]).slice(0, 24)}`, RATE_ALL);
+  return !!bearer && !allow(`${send ? 'send' : 's'}:${sha(bearer[1]).slice(0, 24)}`, send ? RATE_SEND : RATE_ALL);
 }
 
 let inFlight = 0;

@@ -1035,8 +1035,9 @@ export const lucky = () => call<ServerLucky>('GET', '/api/lucky');
  * package's price this phone showed and the settings' version it read them at: a moved one is a 409 price_changed /
  * odds_changed and nothing moves (server/api/lucky-rules.mjs checkShownLucky).
  */
-export const luckySend = (giftId: string, to: string[], count: number, room?: string, ref = newRef(), named = false, shown?: { price: number; version: number }) =>
-  call<{ send: ServerLuckySend; user: ServerUser; replay: boolean }>('POST', '/api/lucky/send', { giftId, to, count, room, ref, named, ...shown });
+/** `times`: combo taps carried by this one request (server/api/lucky.mjs), count × times gifts to each. */
+export const luckySend = (giftId: string, to: string[], count: number, room?: string, ref = newRef(), named = false, shown?: { price: number; version: number }, times = 1) =>
+  call<{ send: ServerLuckySend; user: ServerUser; replay: boolean }>('POST', '/api/lucky/send', { giftId, to, count, room, ref, named, ...shown, ...(times > 1 ? { times } : {}) });
 export type ServerLuckyConfig = { gifts: ServerLuckyGift[]; dailyPayoutLimit: number; announceFrom: number };
 export type ServerLuckyStats = { sends: number; spent: number; paid: number; shared: number };
 export type ServerLuckyAdminSend = ServerLuckySend & { sender: { id: string; name: string } };
