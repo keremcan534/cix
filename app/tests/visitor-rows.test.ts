@@ -3,9 +3,11 @@
 // nothing that names the visitor; the notice of a visit names them only with it.
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 import type { User } from '@/data/mock';
-import { demoVisitorRows, hiddenVisitorRows, hideVisitorRows, liveVisitorRows, visitNotice } from '@/lib/visitor-rows';
+import { demoVisitorRows, hiddenVisitorRows, hideVisitorRows, liveVisitorRows, newestVisitMark, visitNotice, visitorsUnseen } from '@/lib/visitor-rows';
 
 describe('Profil ziyaretçileri', () => {
   test('sunucudan gelenler: ad, kaç kez, ne zaman', () => {
@@ -62,5 +64,31 @@ describe('Profil ziyaretçileri', () => {
     const blind = visitNotice(null);
     assert.equal(blind.href, '/(tabs)/profil?ziyaretciler=1');
     assert.match(blind.body, /^Biri profiline baktı/);
+  });
+});
+
+// Ben's red dot (lib/visitors-seen, 21 Nov 2026: it stayed lit after the list was looked at): lit while the newest
+// visit isn't the one last looked at.
+describe('Ziyaretçiler noktası', () => {
+  test('en yeni ziyaretin saati işaret olur; demoda sayı; kimse yoksa yok', () => {
+    assert.equal(newestVisitMark(['2026-11-20T10:00:00Z', '2026-11-21T08:30:00Z', 'bozuk', '2026-11-19T23:00:00Z'], 3), '2026-11-21T08:30:00Z');
+    assert.equal(newestVisitMark([], 4), 'n:4');
+    assert.equal(newestVisitMark([], 0), null);
+    assert.equal(newestVisitMark([], null), null);
+  });
+  test('bakılınca söner, yeni biri gelince yeniden yanar', () => {
+    const first = newestVisitMark(['2026-11-21T08:30:00Z'], 1);
+    assert.equal(visitorsUnseen(first, undefined), true, 'hiç bakılmadı');
+    assert.equal(visitorsUnseen(first, first), false, 'bakıldı');
+    const next = newestVisitMark(['2026-11-21T08:30:00Z', '2026-11-21T09:00:00Z'], 2);
+    assert.equal(visitorsUnseen(next, first), true, 'yeni ziyaret');
+    assert.equal(visitorsUnseen(null, first), false, 'ziyaret yok');
+  });
+  test('liste açılınca görüldü sayılır (Ben ve Mesajlar aynı listeyi açar)', () => {
+    const sheet = readFileSync(resolve(import.meta.dirname, '../src/components/visitors-sheet.tsx'), 'utf8');
+    assert.match(sheet, /if \(visible\) markVisitorsSeen\(newest \?\? null\)/);
+    const ben = readFileSync(resolve(import.meta.dirname, '../src/app/(tabs)/profil.tsx'), 'utf8');
+    assert.match(ben, /dot=\{unseenVisits\}/);
+    assert.match(ben, /newest=\{visitors\.newest\}/);
   });
 });

@@ -51,3 +51,25 @@ export const demoVisitorRows = (list: ProfileVisitor[], blocked: ReadonlySet<str
       const u = person(v.userId);
       return { id: u.id, name: u.age > 0 ? `${u.name}, ${u.age}` : u.name, avatar: u.avatar, online: u.online, visits: v.count, when: v.time, ...(u.city ? { place: u.city } : {}) };
     });
+
+// --- Ben's red dot (lib/visitors-seen) ---------------------------------------------------------------------
+/**
+ * The newest visit's mark in `times` (ISO times; the latest wins), or the count when there are no times (the demo).
+ * Null when nobody came.
+ */
+export function newestVisitMark(times: readonly string[], count: number | null): string | null {
+  let best: string | null = null;
+  let bestAt = -Infinity;
+  for (const t of times) {
+    const at = Date.parse(t);
+    if (Number.isFinite(at) && at > bestAt) {
+      bestAt = at;
+      best = t;
+    }
+  }
+  if (best) return best;
+  return count && count > 0 ? `n:${count}` : null;
+}
+
+/** Whether the dot is lit: a visit is there and it isn't the one I last looked at. */
+export const visitorsUnseen = (newest: string | null, lastSeen: string | null | undefined) => newest !== null && newest !== lastSeen;

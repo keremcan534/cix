@@ -19,7 +19,8 @@ import { PROFILE_VISITORS } from '@/data/messages-ui';
 import { userById } from '@/data/mock';
 import { liveMode } from '@/lib/live';
 import { refreshVisitors, useVisitors } from '@/lib/live/visitors';
-import { demoVisitorRows, hiddenVisitorRows, hideVisitorRows, liveVisitorRows, type VisitorRow } from '@/lib/visitor-rows';
+import { demoVisitorRows, hiddenVisitorRows, hideVisitorRows, liveVisitorRows, newestVisitMark, type VisitorRow } from '@/lib/visitor-rows';
+import { markVisitorsSeen } from '@/lib/visitors-seen';
 import { useApp } from '@/store';
 import { SCRIM, makeStyles, useTheme } from '@/theme';
 
@@ -29,7 +30,8 @@ import { SCRIM, makeStyles, useTheme } from '@/theme';
  * subscription (it names visitors only then; the list is read again when the subscription starts or ends), the demo
  * follows its own Abonelik.
  */
-export function useProfileVisitors(): { count: number | null; rows: VisitorRow[]; unlocked: boolean } {
+/** `newest`: the newest visit's mark (lib/visitors-seen: its time; the count in the demo), null when nobody came. */
+export function useProfileVisitors(): { count: number | null; rows: VisitorRow[]; unlocked: boolean; newest: string | null } {
   const { blocked, vipDays } = useApp();
   const server = useVisitors();
   const subscribed = vipDays > 0;
@@ -41,11 +43,12 @@ export function useProfileVisitors(): { count: number | null; rows: VisitorRow[]
   }, [subscribed]);
   if (liveMode()) {
     const list = server?.visitors ?? null;
-    return { count: server?.count ?? null, rows: list ? liveVisitorRows(list) : hiddenVisitorRows(server?.hidden ?? []), unlocked: !!list };
+    const times = (list ?? server?.hidden ?? []).map((v) => v.lastAt);
+    return { count: server?.count ?? null, rows: list ? liveVisitorRows(list) : hiddenVisitorRows(server?.hidden ?? []), unlocked: !!list, newest: newestVisitMark(times, server?.count ?? null) };
   }
   const rows = demoVisitorRows(PROFILE_VISITORS, blocked, userById);
   const unlocked = vipDays > 0;
-  return { count: rows.length, rows: unlocked ? rows : hideVisitorRows(rows), unlocked };
+  return { count: rows.length, rows: unlocked ? rows : hideVisitorRows(rows), unlocked, newest: newestVisitMark([], rows.length) };
 }
 
 /** Where "Abone ol" leads: the Abonelik tab of VIP. */
@@ -55,7 +58,11 @@ const openSubscription = () => router.push({ pathname: '/vip', params: { tab: 'v
  * `count`: how many came (the server lists only the newest 100 of them); the rows' own number without it.
  * `unlocked` false: the rows are blurred and the sheet offers the Abonelik.
  */
-export function VisitorsSheet({ visible, rows, count, unlocked = true, onClose }: { visible: boolean; rows: VisitorRow[]; count?: number | null; unlocked?: boolean; onClose: () => void }) {
+export function VisitorsSheet({ visible, rows, count, unlocked = true, newest, onClose }: { visible: boolean; rows: VisitorRow[]; count?: number | null; unlocked?: boolean; newest?: string | null; onClose: () => void }) {
+  // Looking at the list puts Ben's dot out until someone new comes (lib/visitors-seen).
+  useEffect(() => {
+    if (visible) markVisitorsSeen(newest ?? null);
+  }, [visible, newest]);
   const { colors } = useTheme();
   const s = useStyles();
   // Android draws the modal edge to edge: the last row stays above the navigation bar.
