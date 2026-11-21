@@ -481,6 +481,10 @@ export const socialRoutes = {
     }
     await liveUser(to);
     await tx(async (c) => {
+      // Both accounts first, in id order, as the bond and gift routes lock them (bonds.mjs lockPair): the blocks row's
+      // foreign keys would otherwise take them one by one in blocker-then-blocked order and could wait on a bond
+      // answer holding the other one (a deadlock the concurrent money test found, 21 Nov 2026).
+      await c.query('SELECT id FROM users WHERE id = ANY($1::uuid[]) ORDER BY id FOR UPDATE', [[me.id, to]]);
       await c.query('INSERT INTO blocks (blocker, blocked) VALUES ($1, $2) ON CONFLICT DO NOTHING', [me.id, to]);
       await c.query('DELETE FROM follows WHERE (follower = $1 AND followee = $2) OR (follower = $2 AND followee = $1)', [me.id, to]);
       // Following each other's room ends with it too (room-follow.mjs).
