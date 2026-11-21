@@ -32,6 +32,7 @@ import { splitTies, tiesOf, type TieSide } from '@/lib/follow-ties';
 import { myCompletion, rowVisible, type MenuFlags } from '@/lib/me-view';
 import { OwnMarkNote } from '@/components/profile-mark';
 import { useMyMarks } from '@/lib/live/marks-live';
+import { useVisitorsUnseen } from '@/lib/visitors-seen';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 type OneWay = Exclude<TieSide, 'friends'>;
@@ -86,6 +87,8 @@ export default function ProfileScreen() {
     return demoTies[side].map(({ id }) => { const u = userById(id); return { id: u.id, name: u.name, avatarUrl: u.avatar || null }; });
   };
   const visitors = useProfileVisitors();
+  // The dot is lit until the visitors are looked at, and again when someone new comes (lib/visitors-seen).
+  const unseenVisits = useVisitorsUnseen(visitors.newest);
   // A visit notice (lib/push-target, lib/live/sync) opens the visitors here; the mark is taken off so the next one does too.
   const { ziyaretciler } = useLocalSearchParams<{ ziyaretciler?: string }>();
   const [visitorsOpen, setVisitorsOpen] = useState(!!ziyaretciler);
@@ -169,7 +172,7 @@ export default function ProfileScreen() {
           <Stat n={followingCount} label="Takip" onPress={() => setList('following')} />
           <Stat n={friendCount} label="Arkadaşlar" onPress={() => router.push({ pathname: '/(tabs)/mesajlar', params: { tab: 'friends' } })} />
           {/* Open to everyone: without the Abonelik the visits show blurred (components/visitors-sheet). */}
-          <Stat n={visitors.count} label="Ziyaretçiler" dot={(visitors.count ?? 0) > 0} onPress={() => setVisitorsOpen(true)} />
+          <Stat n={visitors.count} label="Ziyaretçiler" dot={unseenVisits} onPress={() => setVisitorsOpen(true)} />
         </View>
 
         <View style={styles.card}>
@@ -309,7 +312,7 @@ export default function ProfileScreen() {
         </Pressable>
       </ScrollView>
       <FollowListSheet visible={list !== null} {...MY_LISTS[list ?? 'followers']} load={() => loadList(list ?? 'followers')} onClose={() => setList(null)} />
-      <VisitorsSheet visible={visitorsOpen} rows={visitors.rows} count={visitors.count} unlocked={visitors.unlocked} onClose={() => setVisitorsOpen(false)} />
+      <VisitorsSheet visible={visitorsOpen} rows={visitors.rows} count={visitors.count} unlocked={visitors.unlocked} newest={visitors.newest} onClose={() => setVisitorsOpen(false)} />
     </SafeAreaView>
   );
 }

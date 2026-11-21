@@ -251,11 +251,13 @@ const SHOP_ROWS = [
   ['an-mic-neon', 'micfx', 'Neon Halka', 500, null, 0],
   ['an-mic-stars', 'micfx', 'Dönen Yıldızlar', 800, null, 0],
   ['an-mic-notes', 'micfx', 'Müzik Notaları', 600, null, 0],
-  ['noble-1', 'noble', 'Çavuş', 15_000, 30, 0],
-  ['noble-2', 'noble', 'Yüzbaşı', 60_000, 30, 0],
-  ['noble-3', 'noble', 'Binbaşı', 150_000, 30, 0],
-  ['noble-4', 'noble', 'Albay', 400_000, 30, 0],
-  ['noble-5', 'noble', 'Paşa', 1_000_000, 30, 0],
+  // Rütbe's tiers (21 Nov 2026, the owners' sample screens: Şövalye … Dük; before, Çavuş … Paşa). The 30-day term an
+  // older app buys; Seviye ayarları add the 7- and 90-day packages (levels.mjs nobleDefaultPlans).
+  ['noble-1', 'noble', 'Şövalye', 15_000, 30, 0],
+  ['noble-2', 'noble', 'Vikont', 60_000, 30, 0],
+  ['noble-3', 'noble', 'Kont', 150_000, 30, 0],
+  ['noble-4', 'noble', 'Markiz', 400_000, 30, 0],
+  ['noble-5', 'noble', 'Dük', 1_000_000, 30, 0],
 ];
 export const SHOP = new Map(
   SHOP_ROWS.map(([sku, kind, name, price, days, minVip]) => [sku, Object.freeze({ sku, kind, name, price, days, minVip, tier: kind === 'noble' ? Number(sku.slice(6)) : null })]),
@@ -269,7 +271,8 @@ export const FREE_MICFX = ['an-mic-wave'];
 /** A timed term may not end further ahead than this. */
 export const MAX_AHEAD_DAYS = 365;
 /** VIP level as the app shows it (store.tsx) by the compiled values; the server's is levels.mjs vipLevelOf. */
-export const vipLevelOf = (svipXp, nobleTier) => Math.min(15, Math.max(svipLevel(Number(svipXp) || 0), (nobleTier ?? 0) * 3));
+// Rütbe adds nothing to it (levels.mjs vipLevelOf, 21 Nov 2026); `nobleTier` is kept for the callers.
+export const vipLevelOf = (svipXp, nobleTier) => svipLevel(Number(svipXp) || 0);
 /** The history line of a shop charge. Never 'Uygulama içi:' (the old apps' free-text spends). */
 export function labelOf(item) {
   if (item.kind === 'sticker') return `Çıkartma paketi: ${item.name}`;

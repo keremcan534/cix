@@ -21,7 +21,7 @@ import { CATEGORIES } from './contact-filter.mjs';
 import { withSignIn } from './auth.mjs';
 import { notify } from './push.mjs';
 import { autoFromReports } from './sanctions.mjs';
-import { announceLook, looksOf, revokeAllForDelete } from './economy.mjs';
+import { announceLook, looksOf, revokeAllForDelete, statusOf } from './economy.mjs';
 import { hasPerk } from './levels.mjs';
 import { familyOf, leaveFamily } from './families.mjs';
 import { dropFromQueues } from './music.mjs';
@@ -92,7 +92,7 @@ export const seesVisitors = (user) => hasPerk('visitors', { svipXp: user.svip_xp
  */
 async function recordVisit(owner, me) {
   // "Sessiz ziyaret" (silent visit): where Seviye ayarları give it (VIP 7 until the panel moves it) no trace is left.
-  if (hasPerk('silent_visit', { svipXp: me.svip_xp })) return;
+  if (hasPerk('silent_visit', { svipXp: me.svip_xp, nobleTier: (await statusOf(db, me.id)).noble?.tier })) return;
   const r = await db.query(
     `INSERT INTO profile_visits (owner_id, visitor_id, notified_at) VALUES ($1, $2, now())
      ON CONFLICT (owner_id, visitor_id) DO UPDATE SET

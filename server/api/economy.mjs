@@ -417,7 +417,19 @@ const PREFIX = [
   ['Rütbe: ', ['noble']],
 ];
 /** Rütbe names before the rename (app versions up to preview-89 still send them in the spend reason). */
-const OLD_NOBLE = { Gemici: 'noble-1', Dümenci: 'noble-2', Lostromo: 'noble-3', Amiral: 'noble-4', 'Kaptan-ı Derya': 'noble-5' };
+const OLD_NOBLE = {
+  Gemici: 'noble-1',
+  Dümenci: 'noble-2',
+  Lostromo: 'noble-3',
+  Amiral: 'noble-4',
+  'Kaptan-ı Derya': 'noble-5',
+  // The names until 21 Nov 2026 (APKs before Şövalye … Dük still send them).
+  Çavuş: 'noble-1',
+  Yüzbaşı: 'noble-2',
+  Binbaşı: 'noble-3',
+  Albay: 'noble-4',
+  Paşa: 'noble-5',
+};
 /** Shop item names before the rename away from sea names (older apps still send them in the spend reason). */
 const OLD_SHOP = { 'Ses Dalgası': 'fr-neon', 'Melek Kalp · Mercan': 'fr-wing-coral' };
 /** The catalog row an old app's spend reason names ("Mağaza: Ses Halkası", "Rütbe: Yüzbaşı (30 gün)"), or null. */
@@ -476,8 +488,10 @@ export const economyRoutes = {
     const u = await auth(req);
     limit(`buy:${u.id}`, 30);
     const b = await readJson(req);
-    const item = sellable(b.sku);
-    if (!item) throw new HttpError(400, 'Bu ürün artık satışta değil');
+    const sold = sellable(b.sku);
+    if (!sold) throw new HttpError(400, 'Bu ürün artık satışta değil');
+    // A Rütbe package (7, 30 or 90 days, Seviye ayarları): the one of the days the phone showed.
+    const item = sold.kind === 'noble' && Number.isSafeInteger(b.days) && b.days > 0 ? nobleItem(SHOP.get(b.sku), b.days) : sold;
     // The days the phone showed (0: for good), or none sent: it showed the compiled row (a Rütbe tier, one of the
     // app's own frames or entry effects), which must still be what is sold.
     const base = compiledOf(item);

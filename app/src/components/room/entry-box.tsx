@@ -42,7 +42,9 @@ export function EntryBox({ plan, name, avatar, w, h }: { plan: EntryPlan; name: 
   const what = entryBoxShow(plan, { reduceMotion, lowData, effectsOff: effectsOff || !entryFx, clipKept: !!media && failed !== media.uri });
   if (!show || !what) return null;
   return (
-    <View style={[s.box, { width: w, height: h }]} pointerEvents="none" accessible accessibilityLabel={`Giriş efekti${show.badge ? `, ${show.badge}` : ''}`}>
+    // A clip stands on the card by itself, with no box around it (owners, 21 Nov 2026: "the frame shouldn't show"); the
+    // drawn banner keeps its box.
+    <View style={[what.kind === 'video' && media ? s.bare : s.box, { width: w, height: h }]} pointerEvents="none" accessible accessibilityLabel={`Giriş efekti${show.badge ? `, ${show.badge}` : ''}`}>
       {what.kind === 'video' && media ? (
         <LoopClip key={media.uri} media={media} plate={what.plate} show={show} w={w} h={h} onFail={() => setFailed(media.uri)} />
       ) : (
@@ -64,8 +66,8 @@ const colorsOf = (show: EntryShow) => {
  */
 function LoopClip({ media, plate, show, w, h, onFail }: { media: FxMedia; plate: Plate | null; show: EntryShow; w: number; h: number; onFail: () => void }) {
   const wide = w >= h * 1.6;
-  // Inside the box's 1-point border.
-  const fit = clipStage(w - 2, h - 2);
+  // The whole place: no box around a clip.
+  const fit = clipStage(w, h);
   const stage = wide ? { ...fit, left: 12 } : fit;
   const [round, setRound] = useState(0);
   const [ready, setReady] = useState(false);
@@ -80,7 +82,6 @@ function LoopClip({ media, plate, show, w, h, onFail }: { media: FxMedia; plate:
   }, [ready, round, media.ms]);
   return (
     <>
-      <LinearGradient colors={colorsOf(show)} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFill, { opacity: 0.35 }]} />
       <View style={{ position: 'absolute', left: stage.left, top: stage.top, width: stage.w, height: stage.h }}>
         <AlphaVideoView
           source={media.uri}
@@ -249,6 +250,7 @@ function MiniBanner({ show, w, h, still }: { show: EntryShow; w: number; h: numb
 
 const s = StyleSheet.create({
   box: { borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,57,196,0.5)', backgroundColor: 'rgba(255,255,255,0.06)' },
+  bare: { overflow: 'hidden' },
   sheen: { position: 'absolute', left: 0, right: 0, top: 0, height: '45%' },
   shade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '50%' },
   sweep: { position: 'absolute', top: -30, bottom: -30, left: 0, width: 34 },

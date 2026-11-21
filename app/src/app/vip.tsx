@@ -6,7 +6,7 @@ import { Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions 
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
-import { decayLineOf, nobleRightsOf, nobleTiersOf, subPlansOf, subRightsOf, vipLevelsOf, vipRightsOf } from '@/lib/levels-live-core';
+import { decayLineOf, subPlansOf, subRightsOf, vipLevelsOf, vipRightsOf } from '@/lib/levels-live-core';
 import { useLevels } from '@/lib/live/levels-live';
 import { goBack } from '@/lib/nav';
 import { showAlert } from '@/lib/alert';
@@ -15,7 +15,6 @@ import { useApp } from '@/store';
 import { ThemeScope, makeStyles, useTheme } from '@/theme';
 import { SCENES } from '@/components/fx/scenes';
 import { Backdrop } from '@/components/fx/surface';
-import { Art } from '@/components/Art';
 import { saveExtras } from '@/lib/api';
 import { liveMode, message, myServerId } from '@/lib/live';
 import { loadPublicProfile } from '@/lib/live/profile';
@@ -31,15 +30,9 @@ import { PlanCards, SubBuyButton, SubStatus } from '@/components/vip/sub-plans';
 import { SubHeading, SubPerks } from '@/components/vip/sub-rights';
 import { SubCompare } from '@/components/vip/sub-compare';
 import { SubHideLevels } from '@/components/vip/sub-hide-levels';
+import { NoblePage } from '@/components/vip/noble-page';
 
 type Tab = 'svip' | 'vip' | 'noble';
-const GOLD = '#F5D7A1';
-/** The champagne gold as text on the screen or a card: GOLD on the night screen, dark gold on light cards. */
-const useGold = () => {
-  const { dark, colors } = useTheme();
-  return dark ? GOLD : colors.gold;
-};
-const fmt = (n: number) => n.toLocaleString('tr-TR');
 
 export default function PrivilegeCenter() {
   const params = useLocalSearchParams<{ tab?: string }>();
@@ -329,103 +322,12 @@ const sub = StyleSheet.create({
   manage: { alignSelf: 'center', minHeight: 44, justifyContent: 'center', paddingHorizontal: 12, marginVertical: -6 },
 });
 
+/** Rütbe: components/vip/noble-page (the owners' sample screens, 21 Nov 2026). */
 function Noble() {
-  const { nobleTier, nobleDays, buyNoble, coins } = useApp();
-  const { colors } = useTheme();
-  const styles = useStyles();
-  const gold = useGold();
-  const [sel, setSel] = useState(Math.max(1, nobleTier));
-  // Tiers (name, price, days) and rights as Seviye ve VIP ayarları have them.
-  const levels = useLevels();
-  const tiers = nobleTiersOf(levels);
-  const rights = nobleRightsOf(levels);
-  const t = tiers[sel - 1];
-  const owned = nobleTier >= sel;
-  const buy = () => {
-    if (coins < t.price)
-      return showAlert('Kilidi açılmadı', `${t.name} için 🪙 ${fmt(t.price)} gerekir. Önce jeton yükle.`, [
-        { text: 'Vazgeç', style: 'cancel' },
-        { text: 'Yükle', onPress: () => router.push('/cuzdan') },
-      ]);
-    showAlert(`${t.name} rütbesi`, `${t.days} gün · 🪙 ${fmt(t.price)}. Onaylıyor musun?`, [
-      { text: 'Vazgeç', style: 'cancel' },
-      { text: 'Al', onPress: () => buyNoble(t.tier) && showAlert(`${t.emoji} ${t.name} oldun!`, `${rights.filter((r) => r.level <= t.tier).length} hak açıldı.`) },
-    ]);
-  };
-  return (
-    <View style={styles.noble}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 120 }}>
-        <View style={styles.nobleTabs}>
-          {tiers.map((x) => (
-            <Pressable key={x.tier} onPress={() => setSel(x.tier)}>
-              <Text style={[styles.nobleTab, sel === x.tier && styles.nobleTabOn]}>{x.name}</Text>
-            </Pressable>
-          ))}
-        </View>
-        <View style={{ alignItems: 'center', paddingVertical: 18 }}>
-          <LinearGradient colors={t.colors} style={styles.emblem}>
-            {t.art ? <Art name={t.art} size={112} /> : <Text style={{ fontSize: 86 }}>{t.emoji}</Text>}
-          </LinearGradient>
-          {owned && <Text style={[styles.cardText, { color: gold, marginTop: 8 }]}>✓ Aktif · {nobleDays} gün kaldı</Text>}
-        </View>
-        <Text style={[styles.rightsTitle, { color: gold }]}>
-          Rütbe hakları {rights.filter((r) => r.level <= t.tier).length}/{rights.length}
-        </Text>
-        <View style={styles.grid}>
-          {rights.map((r) => {
-            const on = r.level <= t.tier;
-            const need = tiers.find((x) => x.tier === r.level);
-            return (
-              <Pressable
-                key={r.name}
-                style={[styles.rightCell, { backgroundColor: 'transparent', borderWidth: 0 }]}
-                accessibilityState={{ disabled: !on }}
-                onPress={() => showAlert(r.name, on ? `${t.name} ile kullanabilirsin.` : need ? `${need.name} rütbesiyle açılır.` : '')}>
-                <View style={!on && { opacity: 0.35 }}>{r.art ? <Art name={r.art} size={44} /> : <Text style={{ fontSize: 34 }}>{r.emoji}</Text>}</View>
-                <Text style={[styles.rightName, { color: on ? gold : colors.textDim }]} numberOfLines={2}>
-                  {r.name}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </ScrollView>
-      <View style={styles.bottomBar}>
-        {owned && <Art name={t.art} size={28} style={{ marginRight: -6 }} />}
-        <Text style={{ color: colors.text, fontWeight: '800', fontSize: 16, flex: 1 }}>
-          {owned ? `${t.name} aktif` : nobleTier > 0 ? `Yükselt: ${t.name} · 🪙 ${fmt(t.price)}` : `Kilidi açılmadı · 🪙 ${fmt(t.price)} / ${t.days} gün`}
-        </Text>
-        {!owned && (
-          <Pressable onPress={buy} style={styles.alBtn} accessibilityLabel={`${t.name} al`}>
-            <Text style={{ color: '#3B2A12', fontWeight: '900', fontSize: 18 }}>Al</Text>
-          </Pressable>
-        )}
-      </View>
-    </View>
-  );
+  return <NoblePage />;
 }
 
-// Light scheme only: the soft card shadow (the night screen's cards stand out by color).
-const LIGHT_SHADOW = '0 1px 2px rgba(64,20,40,0.05), 0 6px 16px rgba(64,20,40,0.06)';
-
-// Rütbe keeps its warm night palette in the dark scheme; in the light one its cards become white with dark-gold text
-// (the VIP tab draws its own night design, the Abonelik tab its own light one: components/vip).
-const useStyles = makeStyles(({ colors, ink, dark }) => {
-  const gold = dark ? GOLD : colors.gold;
-  const shadow = dark ? {} : { boxShadow: LIGHT_SHADOW };
-  return {
-    safe: { flex: 1, backgroundColor: dark ? '#0B0A0F' : colors.bg },
-    cardText: { color: '#fff', fontSize: 14 },
-    rightsTitle: { color: gold, fontWeight: '900', fontSize: 18, textAlign: 'center', marginVertical: 18 },
-    grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 10, rowGap: 12 },
-    rightCell: { width: '31.3%', marginHorizontal: '1%', alignItems: 'center', gap: 8, paddingVertical: 14, borderRadius: 14, borderWidth: 1, borderColor: dark ? 'rgba(245,215,161,0.35)' : 'rgba(183,131,46,0.28)', backgroundColor: dark ? '#15120C' : colors.card, ...shadow },
-    rightName: { color: gold, fontSize: 12, textAlign: 'center', paddingHorizontal: 4 },
-    noble: { flex: 1, backgroundColor: dark ? '#2A1A22' : '#F6E9EF' },
-    nobleTabs: { flexDirection: 'row', justifyContent: 'space-around', paddingTop: 10 },
-    nobleTab: { color: ink(0.5), fontSize: 16, fontWeight: '700', paddingVertical: 6 },
-    nobleTabOn: { color: colors.text, borderBottomWidth: 3, borderBottomColor: colors.text },
-    emblem: { width: 170, height: 170, borderRadius: 85, alignItems: 'center', justifyContent: 'center' },
-    bottomBar: { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, backgroundColor: dark ? '#1B1A17' : colors.card, borderTopLeftRadius: 22, borderTopRightRadius: 22, borderTopWidth: 2, borderColor: '#B8955A', ...(dark ? {} : { boxShadow: '0 -4px 16px rgba(64,20,40,0.08)' }) },
-    alBtn: { backgroundColor: GOLD, borderRadius: 999, paddingHorizontal: 34, paddingVertical: 12 },
-  };
-});
+// The page's ground (the tabs draw their own designs: components/vip).
+const useStyles = makeStyles(({ colors, dark }) => ({
+  safe: { flex: 1, backgroundColor: dark ? '#0B0A0F' : colors.bg },
+}));

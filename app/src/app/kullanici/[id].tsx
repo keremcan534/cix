@@ -633,8 +633,12 @@ export default function UserProfile() {
   const hasPersonal = extras.height > 0 || extras.weight > 0 || !!extras.job || extras.languages.length > 0 || !!extras.zodiac || (user.interests?.length ?? 0) > 0;
   const showsGender = !!user.gender && (isMe || user.showGender !== false);
   const hasBasics = !live || publicId !== null || !!user.username || showsGender || !!country || (isMe && !!birthday) || !!user.joinedAt || !!extras.relationship || !!extras.education;
-  // The interests under the name (the first four); all of them are in Vitrin › Kişisel Profil.
-  const headInterests = (user.interests ?? []).slice(0, 4).map(splitInterest);
+  // The interests in Hakkımda (the first four); all of them are in Vitrin › Kişisel Profil.
+  const aboutInterests = (user.interests ?? []).slice(0, 4).map(splitInterest);
+  // A bio that only names interests ("🎧 Müzik 🎮 Oyun") says what the interests line says: one line is enough.
+  const bioWords = (user.bio ?? '').toLocaleLowerCase('tr-TR').match(/[\p{L}\p{N}]+/gu) ?? [];
+  const interestWords = new Set(aboutInterests.flatMap((x) => x.label.toLocaleLowerCase('tr-TR').match(/[\p{L}\p{N}]+/gu) ?? []));
+  const aboutBio = user.bio && aboutInterests.length > 0 && bioWords.length > 0 && bioWords.every((w) => interestWords.has(w)) ? '' : (user.bio ?? '');
   // A purchased frame (mine, or theirs in a live build) reaches past the photo.
   const framed = isMe ? !!equipped.frame : !!look?.frame;
 
@@ -656,7 +660,7 @@ export default function UserProfile() {
         scrollEventThrottle={16}
       >
         {/* One identity area for every tab (the client's profile package, Nov 2026): the photo as a wide cover, the
-            framed avatar over its edge with the name, handle and status beside it, the interests and the badges. The
+            framed avatar over its edge with the name, handle and status beside it, and the badges (the interests are in Hakkımda). The
             tabs follow at once and stay at the top once scrolled; nothing of this is repeated inside a tab. */}
         <View style={[styles.hero, { paddingTop: insets.top + BAR_H + 4 }]}>
           <View style={styles.cover}>
@@ -747,14 +751,6 @@ export default function UserProfile() {
           {isMe && pendingAvatar && <Text style={styles.reviewNote}>⏳ Yeni fotoğraf incelemede · şimdilik yalnızca sen görüyorsun</Text>}
           {isMe && avatarBusy && <Text style={styles.reviewNote}>⏳ Fotoğraf yükleniyor…</Text>}
 
-          {headInterests.length > 0 && (
-            <View style={styles.headChips} accessibilityLabel={`İlgi alanları: ${headInterests.map((x) => x.label).join(', ')}`}>
-              {headInterests.map((x) => (
-                <PChip key={x.label} emoji={x.emoji} label={x.label} />
-              ))}
-            </View>
-          )}
-
           {/* Every status keeps its badge: age and gender, levels, VIP, staff, verified and the bond (Çift Lv.N). */}
           <View style={styles.badges}>
             <GenderChip user={user} owner={isMe} size="md" />
@@ -829,8 +825,18 @@ export default function UserProfile() {
               <GuardWall people={guardPeople} mine={myGuard} off={guardArea.off} onPress={openGuard} onOpen={openPerson} />
               <GiftWall top={wallTop} lit={wallLit} total={wallAll?.length ?? null} received={giftCount} onPress={() => pickTab('onur')} />
 
-              {(isMe || !!user.bio) && (
-                <InfoCard icon="chatbubble-ellipses-outline" tone="soft" title="Hakkımda" text={user.bio || 'Kendini birkaç kelimeyle anlat…'} quiet={!user.bio} onPress={isMe ? openEdit : undefined} />
+              {/* The bio, and under it the interests in the same small type (the first four; all of them are in Vitrin › Kişisel Profil). */}
+              {(isMe || !!user.bio || aboutInterests.length > 0) && (
+                <InfoCard
+                  icon="chatbubble-ellipses-outline"
+                  tone="soft"
+                  title="Hakkımda"
+                  text={aboutBio || (isMe && aboutInterests.length === 0 ? 'Kendini birkaç kelimeyle anlat…' : undefined)}
+                  more={aboutInterests.length > 0 ? aboutInterests.map((x) => `${x.emoji} ${x.label}`.trim()).join('  ') : undefined}
+                  quiet={!aboutBio}
+                  label={[aboutBio ? `Hakkımda: ${aboutBio}` : 'Hakkımda', aboutInterests.length > 0 ? `İlgi alanları: ${aboutInterests.map((x) => x.label).join(', ')}` : ''].filter(Boolean).join('. ')}
+                  onPress={isMe ? openEdit : undefined}
+                />
               )}
               {/* Live mode: their slogan from the server; mine, when I have none, is an invitation to write one (no sample). */}
               {(extras.slogan || (isMe && (!live || counts?.extras !== undefined))) && (
@@ -1757,7 +1763,6 @@ const useStyles = makeStyles(({ colors, semantic, lift, dark, edge }) => ({
   statusOn: { color: colors.text, fontWeight: '700' },
   dot: { width: 9, height: 9, borderRadius: 5 },
   reviewNote: { color: colors.gold, fontSize: 12, fontWeight: '700' },
-  headChips: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8 },
   badges: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: 6, rowGap: 6 },
   staffChip: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 25, borderRadius: 13, paddingHorizontal: 10, backgroundColor: '#B91C1C' },
   staffText: { color: '#fff', fontSize: 13, fontWeight: '800' },

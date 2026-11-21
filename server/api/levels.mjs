@@ -42,7 +42,7 @@ export const PERKS = Object.freeze(
     // lowest VIP level any of them opens at (vipItemNeed).
     { key: 'vip_store', name: 'VIP mağaza eşyaları', systems: ['vip'], ready: true, gate: true },
     { key: 'vip_gifts', name: 'Üyelere özel hediyeler', systems: ['vip'], ready: true, gate: true },
-    { key: 'silent_visit', name: 'Sessiz ziyaret', systems: ['vip'], ready: true },
+    { key: 'silent_visit', name: 'Sessiz ziyaret', systems: ['vip', 'noble'], ready: true },
     { key: 'entry_greeting', name: 'Giriş karşılaması', systems: ['noble'], ready: true },
     { key: 'visitors', name: 'Profiline bakanları gör', systems: ['vip', 'sub'], ready: true },
     { key: 'discover_boost', name: "Ana Sayfa'da öne çıkma", systems: ['charm'], ready: true },
@@ -80,6 +80,24 @@ const OFF = Object.freeze({ on: false, idleDays: 30, drop: 1, everyDays: 30, flo
 const WAS = { 7: 299, 30: 1199, 90: 3599 };
 const LABEL = { 7: '7 Gün', 30: '1 Ay', 90: '3 Ay' };
 
+/** A price rounded to a round number of coins (100s; 1000s from 100.000). */
+const roundPrice = (n) => {
+  const step = n >= 100_000 ? 1000 : 100;
+  return Math.max(step, Math.round(n / step) * step);
+};
+/**
+ * A Rütbe tier's packages besides its main term (21 Nov 2026, the owners' sample: 7, 30 and 90 days): for a 30-day
+ * main term at `price`, a week at its share plus about 10% (so the month reads ~9% off the week's rate) and three months
+ * about 14% off the week's rate. Another main term gets none until staff set them.
+ */
+export function nobleDefaultPlans(price, days = 30) {
+  if (days !== 30) return [];
+  return [
+    { days: 7, price: roundPrice((price * 7) / 30 / 0.91) },
+    { days: 90, price: roundPrice(price * 3 * 0.95) },
+  ];
+}
+
 export const DEFAULTS = Object.freeze({
   vip: {
     levels: SVIP_XP.map((points, i) => ({ level: i + 1, points, name: `VIP ${i + 1}` })),
@@ -88,9 +106,9 @@ export const DEFAULTS = Object.freeze({
     decay: OFF,
   },
   noble: {
-    levels: NOBLE.map((x) => ({ level: x.tier, name: x.name, price: x.price, days: x.days })),
-    // Today any Rütbe tier hides levels and sets a room password (its VIP level counts 3 per tier, catalog.mjs).
-    perks: [perk('badge'), perk('room_password'), perk('hide_levels'), perk('entry_greeting'), perk('frame')],
+    levels: NOBLE.map((x) => ({ level: x.tier, name: x.name, price: x.price, days: x.days, plans: nobleDefaultPlans(x.price, x.days) })),
+    // Any Rütbe tier hides levels and sets a room password; Sessiz ziyaret from Kont (the third tier).
+    perks: [perk('badge'), perk('room_password'), perk('hide_levels'), perk('entry_greeting'), perk('frame'), perk('silent_visit', 3)],
   },
   wealth: {
     levels: WEALTH_XP.map((points, level) => ({ level, points })),
@@ -135,6 +153,29 @@ function pointsList(levels, what, from0) {
     return { x, points };
   });
 }
+/**
+ * A Rütbe tier's other packages (besides its main `days` term at `price`): at most two, each { days, price }, days
+ * 1–365 and none twice nor the main term's. Missing (a document saved before packages): the defaults.
+ */
+function plansOf(v, price, days, tier) {
+  if (v === undefined) return nobleDefaultPlans(price, days);
+  const list = listOf(v, 'Paket');
+  if (list.length > 2) throw bad(`Rütbe ${tier}: ana sürenin yanında en fazla 2 paket olur`);
+  const seen = new Set([days]);
+  return list
+    .map((p) => {
+      const x = obj(p) ?? {};
+      const d = int(x.days, 1, LIMITS.days);
+      const pr = int(x.price, 1, LIMITS.price);
+      if (d === null) throw bad(`Rütbe ${tier}: paket süresi 1–${LIMITS.days} gün olmalı`);
+      if (seen.has(d)) throw bad(`Rütbe ${tier}: ${d} günlük paket iki kez var`);
+      seen.add(d);
+      if (pr === null) throw bad(`Rütbe ${tier}: ${d} günlük paketin fiyatı 1 jeton ile ${LIMITS.price.toLocaleString('tr-TR')} jeton arasında olmalı`);
+      return { days: d, price: pr };
+    })
+    .sort((a, b) => a.days - b.days);
+}
+
 function perksOf(system, v, top, bottom) {
   const seen = new Set();
   const out = [];
@@ -212,7 +253,7 @@ export function validate(system, input) {
         const days = int(x.days, 1, LIMITS.days);
         if (price === null) throw bad(`Rütbe ${i + 1}: fiyat 1 jeton ile ${LIMITS.price.toLocaleString('tr-TR')} jeton arasında olmalı`);
         if (days === null) throw bad(`Rütbe ${i + 1}: süre 1–${LIMITS.days} gün olmalı`);
-        return { level: i + 1, name: nameOf(x.name, `Rütbe ${i + 1} adı`), price, days };
+        return { level: i + 1, name: nameOf(x.name, `Rütbe ${i + 1} adı`), price, days, plans: plansOf(x.plans, price, days, i + 1) };
       }),
       perks: perksOf('noble', doc.perks, NOBLE.length, 1),
     };
@@ -314,8 +355,12 @@ const highest = (levels, points) => {
 };
 /** VIP (SVIP) level of these purchase points. */
 export const svipLevel = (xp, docs = snap.docs) => highest(docs.vip.levels, Number(xp) || 0);
-/** The VIP level the app shows (frames, shop gates): the higher of the SVIP level and three per Rütbe tier, at most 15. */
-export const vipLevelOf = (svipXp, nobleTier, docs = snap.docs) => Math.min(15, Math.max(svipLevel(svipXp, docs), (nobleTier ?? 0) * 3));
+/**
+ * The VIP level the app shows (frames, shop gates): the person's own VIP level, by purchase points. Rütbe is a system of
+ * its own (its own badge and rights, levels.mjs noble) and adds nothing to it (owners' decision, 21 Nov 2026: before,
+ * three VIP levels per Rütbe tier made Paşa show "VIP 15"). `nobleTier` is kept for the callers and ignored.
+ */
+export const vipLevelOf = (svipXp, nobleTier, docs = snap.docs) => svipLevel(svipXp, docs);
 export const wealthLevel = (points, docs = snap.docs) => highest(docs.wealth.levels, Number(points) || 0);
 export const charmLevel = (points, docs = snap.docs) => highest(docs.charm.levels, Number(points) || 0);
 /** The points `level` starts at in `system` (vip, wealth, charm); 0 below the first. */
@@ -324,11 +369,16 @@ export const pointsAt = (system, level, docs = snap.docs) => docs[system].levels
 export const topPoints = (system) => snap.docs[system].levels.at(-1).points;
 /** A Rütbe tier as the panel set it (name, price, days), or null. */
 export const nobleTierOf = (tier) => snap.docs.noble.levels.find((l) => l.level === Number(tier)) ?? null;
-/** The shop item for a Rütbe tier with the panel's name, price and days (economy.mjs sells and labels with it). */
-export const nobleItem = (item) => {
+/**
+ * The shop item for a Rütbe tier with the panel's name, price and days (economy.mjs sells and labels with it): its main
+ * term, or the package of `days` when the tier has one (7 and 90 days by default); the main term for any other `days`.
+ */
+export const nobleItem = (item, days) => {
   if (!item || item.kind !== 'noble') return item;
   const t = nobleTierOf(item.tier);
-  return t ? Object.freeze({ ...item, name: t.name, price: t.price, days: t.days }) : item;
+  if (!t) return item;
+  const plan = days !== undefined && days !== t.days ? t.plans?.find((p) => p.days === days) : undefined;
+  return Object.freeze({ ...item, name: t.name, price: plan?.price ?? t.price, days: plan?.days ?? t.days });
 };
 /** The subscription plans as the panel set them (shown ones first in their order). */
 export const subPlans = () => snap.docs.sub.plans.map((p) => ({ ...p }));

@@ -1,6 +1,6 @@
 // Gifts at the server's price, and the rankings they feed.
 //
-//   GET  /api/catalog[?gifts=2][&family=1][&emoji=1][&levels=1][&shop=1][&marks=1][&marks=2] → { gifts, counts, packs, vipPlans, svipXp, purchases, campaign, exchange, fx, v, emoji?, levels?, shop?, marks? }
+//   GET  /api/catalog[?gifts=2][&family=1][&emoji=1][&levels=1][&shop=1][&marks=1][&marks=2][&bondlooks=1] → { gifts, counts, packs, vipPlans, svipXp, purchases, campaign, exchange, fx, v, emoji?, levels?, shop?, marks?, bondLooks? }
 //   POST /api/gifts/send  { to, giftId, count, price?, room?, place?, ref } → { user, replay, total, mark?, markNote? }  (place: chat|moment|profile|family)
 //   GET  /api/rankings?board=wealth|charm|agency&period=day|week|month → { rows }  (agency: rows carry agency, not user)
 //
@@ -48,6 +48,7 @@ import { lockSendAccounts } from './send-locks.mjs';
 import { addHeldRoomXp, holdRoomXp } from './room-xp-add.mjs';
 import { announceMarks, markGift, markOfEvent, markPushBody, marksInfo, marksLevel, withMarks } from './profile-marks.mjs';
 import { markKindsRev } from './mark-kinds.mjs';
+import { bondLooksRev, catalogLooks } from './bond-looks.mjs';
 import { announceGlobalGift } from './global-gifts.mjs';
 
 export const ROOM = /^[A-Za-z0-9_-]{1,64}$/;
@@ -165,9 +166,11 @@ export const giftRoutes = {
       rooms: (({ micMinLevel, bossMinLevel, caps }) => ({ micMinLevel, bossMinLevel, caps }))(roomNumbersOf(s)),
       family: { themes: Object.fromEntries(familyRulesOf(s).themes.map((t) => [t.id, t.minLevel])) },
       bonds: bondCatalog(s),
+      // Bağ işaretleri as staff designed them level by level (bond-looks.mjs): only for an app that draws them (bondlooks=1).
+      ...(url?.searchParams.get('bondlooks') === '1' ? { bondLooks: catalogLooks() } : {}),
       // Grows with every live settings save, every change in Yönetim › Hediyeler (its İz türleri too) and Emojiler,
       // and every Seviye ayarları save (as /api/config's).
-      v: s.v + customGiftsRev() + emojiRev() + levelsRev() + shopItemsRev() + rocketVideosRev() + luckyArtRev() + markKindsRev(),
+      v: s.v + customGiftsRev() + emojiRev() + levelsRev() + shopItemsRev() + rocketVideosRev() + luckyArtRev() + markKindsRev() + bondLooksRev(),
     };
   },
 

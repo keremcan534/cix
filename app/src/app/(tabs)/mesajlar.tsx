@@ -310,7 +310,7 @@ export default function MessagesScreen() {
       )}
 
       <ActionSheet visible={menuOpen} options={menuOptions} onClose={() => setMenuOpen(false)} />
-      <VisitorsSheet visible={visitorsOpen} rows={visitors.rows} count={visitors.count} unlocked={visitors.unlocked} onClose={() => setVisitorsOpen(false)} />
+      <VisitorsSheet visible={visitorsOpen} rows={visitors.rows} count={visitors.count} unlocked={visitors.unlocked} newest={visitors.newest} onClose={() => setVisitorsOpen(false)} />
       <TeamInbox visible={teamOpen} onClose={() => setTeamOpen(false)} onUnread={setTeamNew} />
     </SafeAreaView>
   );

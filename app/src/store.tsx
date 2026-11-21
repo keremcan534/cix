@@ -12,7 +12,7 @@ import {
 } from '@/data/economy';
 import { INITIAL_RBAC, type RbacState } from '@/data/rbac';
 import { animById, isLive } from '@/lib/animations';
-import { RECHARGE_PACKS, SVIP_LEVELS, VIP_PLANS } from '@/data/status';
+import { NOBLE_DAYS, RECHARGE_PACKS, SVIP_LEVELS, VIP_PLANS } from '@/data/status';
 import { RULES, type Rules } from '@/data/rules';
 import { countsForWealth } from '@/data/wealth';
 import { charmBonusPct } from '@/data/charm';
@@ -256,7 +256,8 @@ type AppState = {
   buyPack: (packId: string) => number;
   nobleTier: number;
   nobleDays: number;
-  buyNoble: (tier: number) => boolean;
+  /** Buys a Rütbe tier's package of `days` (its main term when none). */
+  buyNoble: (tier: number, days?: number) => boolean;
   /** Days left of the Abonelik: the server's (vipSubUntil) in a live build, the demo's own count otherwise. */
   vipDays: number;
   /** Live build: when the Abonelik ends (ISO, from the server), null when none runs; always null in the demo. */
@@ -647,7 +648,9 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   // the compiled tables.
   const levels = useLevels();
   const svipLevel = svipLevelFor(levels, svipXp);
-  const vipLevel = Math.min(15, Math.max(svipLevel, nobleTier * 3, vipDaysLeft > 0 ? 1 : 0));
+  // The person's own VIP (Abonelik counts as VIP 1); Rütbe is a system of its own and adds nothing (21 Nov 2026: three
+  // levels per tier made Paşa "VIP 15", past the VIP screen's 10).
+  const vipLevel = Math.max(svipLevel, vipDaysLeft > 0 ? 1 : 0);
   const [agencyId, setAgencyId] = useState<string | null>(s.agencyId ?? null);
   const [agencyRole, setAgencyRole] = useState<AgencyRole | null>(s.agencyRole ?? null);
   const [pendingAgency, setPendingAgency] = useState<string | null>(null);
@@ -1146,25 +1149,30 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     },
     nobleTier,
     nobleDays,
-    buyNoble: (tier) => {
-      // The tier as Seviye ve VIP ayarları sell it (name, price, days), else the compiled one.
+    buyNoble: (tier, days) => {
+      // The tier as Seviye ve VIP ayarları sell it (name, packages), else the compiled one; `days`: the package picked
+      // (its main term when none).
       const lv = currentLevels();
       const t = nobleTiersOf(lv).find((x) => x.tier === tier);
-      if (!t) return false;
+      const plan = t?.plans.find((p) => p.days === (days ?? t.days));
+      if (!t || !plan) return false;
       const was = { tier: nobleTier, days: nobleDays };
-      // A tier the finance panel changed: the server sells it at the price and days this phone showed (POST
-      // /api/shop/buy); the older apps' api.spend would refuse it. A refusal puts the rank back and says why.
-      const mirror = nobleChanged(lv, tier)
-        ? () =>
-            liveShopBuy(`noble-${tier}`, t.price, t.days, (message) => {
-              setNobleTier(was.tier);
-              setNobleDays(was.days);
-              showAlert('Rütbe alınamadı', message);
-            })
-        : undefined;
-      if (!spend(t.price, `Rütbe: ${t.name} (${t.days} gün)`, mirror)) return false;
-      setNobleTier(tier);
-      setNobleDays(t.days);
+      // Live: the server sells the package at the price and days this phone showed (POST /api/shop/buy); a refusal
+      // puts the rank back and says why. A package other than the 30-day term, or a tier the panel changed, can't go
+      // through the older apps' api.spend.
+      const mirror =
+        plan.days !== t.days || nobleChanged(lv, tier) || plan.days !== NOBLE_DAYS
+          ? () =>
+              liveShopBuy(`noble-${tier}`, plan.price, plan.days, (message) => {
+                setNobleTier(was.tier);
+                setNobleDays(was.days);
+                showAlert('Rütbe alınamadı', message);
+              })
+          : undefined;
+      if (!spend(plan.price, `Rütbe: ${t.name} (${plan.days} gün)`, mirror)) return false;
+      // The same tier again adds its days (the server keeps at most 365 ahead); a higher one starts now.
+      setNobleDays(tier === nobleTier ? Math.min(365, nobleDays + plan.days) : plan.days);
+      setNobleTier(Math.max(tier, nobleTier));
       return true;
     },
     rbac,

@@ -40,6 +40,7 @@ export const NOT_EXPORTED = {
   task_rewards: 'platform settings, set by staff (Görev ödülleri: which staff member made or removed a reward)',
   shop_items: 'the shop catalog, kept by staff (which admin added or changed a frame or entry effect)',
   custom_gifts: 'the gift catalog, kept by staff (which admin added or changed a gift)',
+  bond_looks: 'the bond marks’ designs, kept by staff (which admin last changed a level)',
   mark_kinds: 'the profile mark kinds, kept by staff (which admin added or changed a kind); the marks left on someone are in profile_marks',
   emoji_packs: 'the emoji panel’s packs, kept by staff (which admin added or changed a pack)',
   emoji_stickers: 'the emoji panel’s stickers, kept by staff (which admin added or changed a sticker)',

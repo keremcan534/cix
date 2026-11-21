@@ -421,11 +421,17 @@ export function ShowcaseStrip({ top }: { top: WallGift[] }) {
 
 // --- Info ----------------------------------------------------------------------------------------------------
 
-/** A card with an icon, a title and its text (Hakkımda, Arkadaşlık Sloganı, Doğrulama). */
-export function InfoCard({ icon, tone, title, text, onPress, quiet, label }: { icon: IconName; tone: Tone; title: string; text: string; onPress?: () => void; quiet?: boolean; label?: string }) {
+/** A card with an icon, a title and its text (Hakkımda, Arkadaşlık Sloganı, Doğrulama); `more` is a second line in the same small type (Hakkımda's interests). */
+export function InfoCard({ icon, tone, title, text, more, onPress, quiet, label }: { icon: IconName; tone: Tone; title: string; text?: string; more?: string; onPress?: () => void; quiet?: boolean; label?: string }) {
+  const sub = text || more ? (
+    <View style={{ gap: 2 }}>
+      {!!text && <Text style={[s.infoText, quiet && s.infoQuiet]}>{text}</Text>}
+      {!!more && <Text style={s.infoText}>{more}</Text>}
+    </View>
+  ) : undefined;
   return (
-    <PCard onPress={onPress} label={label ?? `${title}: ${text}`} style={tone === 'blue' ? s.blueCard : undefined}>
-      <CardHead icon={icon} tone={tone} title={title} chevron={!!onPress} sub={<Text style={[s.infoText, quiet && s.infoQuiet]}>{text}</Text>} />
+    <PCard onPress={onPress} label={label ?? (text ? `${title}: ${text}` : title)} style={tone === 'blue' ? s.blueCard : undefined}>
+      <CardHead icon={icon} tone={tone} title={title} chevron={!!onPress} sub={sub} />
     </PCard>
   );
 }

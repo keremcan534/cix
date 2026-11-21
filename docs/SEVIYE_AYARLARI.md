@@ -1,6 +1,16 @@
 # Seviye ve VIP ayarları (tasarım)
 
 Sahibin kararı (17 Kasım): VIP, Rütbe, Cömertlik, Yankı ve Abonelik'in bütün ayarları finans panelinden yapılır.
+
+**Rütbe (21 Kasım, müşterinin örnek ekranlarından):**
+- **Kademeler:** Şövalye, Vikont, Kont, Markiz, Dük (eskiden Çavuş, Yüzbaşı, Binbaşı, Albay, Paşa). Panelde kaydedilmiş ayarlarda eski adla duran kademe yeni adı alır (`108_noble_names.sql`); panelden ad değiştirilmişse o kalır. Eski APK'lar kendi içindeki eski adları gösterir, alım yine çalışır.
+- **Paketler:** her kademe **jetonla** 7, 30 ve 90 günlük paketlerle satılır (sahibin kararı: TL ile değil). Ana süre 30 gün (eski APK'ların aldığı); yanına en fazla iki paket daha eklenir. Varsayılan fiyatlar: 7 gün haftalık payın yaklaşık %10 fazlası, 90 gün haftalık fiyata göre yaklaşık %14 indirimli (Şövalye: 3.800 / 15.000 / 42.800 jeton). Panelde **Seviye ve VIP › Rütbe › Kademeler ve paketler**'den her paketin günü ve fiyatı değişir. Uygulama indirimi en kısa paketin günlük fiyatına göre yazar.
+- **Süre:** aynı kademe yeniden alınınca süresi uzar, en fazla 365 gün ileri. Yüksek kademe hemen başlar, alttaki arkada bekler; yüksek rütbe varken düşüğü alınmaz.
+- **Jeton iadesi yok:** örnekteki "X jeton hediye verilir" bizde yok (sahibin kararı).
+- **Haklar:** Rütbe sayfası 28 hakkın hepsini gösterir: Şövalye 10, Vikont 16, Kont 20, Markiz 25, Dük 28 hak. Yapılmamış olanlar soluk ve "Yakında" etiketli, sayılmaz ("Özel Haklar 5/28"). Bugün çalışanlar: Rütbe nişanı, profil çerçevesi, giriş ekranı, oda kilitleme, seviyeleri gizle, **sessiz ziyaret** (yeni: Kont'tan; panelde kaydedilmiş Rütbe ayarı varsa panelden açılmalı).
+- **Sayfa:** kademe sekmeleri, büyük amblem, hak ızgarası, altta en ucuz paket ve **Al**; Al paket kartlarını açar (gün, fiyat, indirim, üstü çizili haftalık fiyat, günlük fiyat). "Rütbe kuralları" kuralları anlatır.
+
+**Rütbe VIP değildir (21 Kasım):** kartlarda, profilde ve mağaza kapılarında görünen VIP seviyesi yalnız kişinin kendi VIP'idir (yüklediği jetonla, 1–10; Abonelik VIP 1 sayılır). Eskiden Rütbenin her kademesi 3 VIP sayılıyordu: Paşa (5. kademe) "VIP 15" görünüyordu, VIP sayfası ise 10'a kadar. Rütbe kendi rozeti ve kendi haklarıyla ayrı bir sistem; kararla birlikte Rütbe alanların VIP'ten gelen hakları (VIP seviyesine bağlı çerçeve, mağaza ürünleri) gider, Rütbenin kendi hakları (bu sayfadaki tabloda "Rütbe" yazanlar) kalır. Rütbe ekranları ve sistemi aşağıdaki **Rütbe (21 Kasım)** bölümündeki gibi yeniden düzenlendi. Eski APK'lar kendi hesabında eski kuralla gösterebilir; başkasının VIP'ini sunucudan aldığı için doğru görür.
 - Seviye eşikleri.
 - Seviye adları.
 - Hangi seviyede hangi hakkın açıldığı.

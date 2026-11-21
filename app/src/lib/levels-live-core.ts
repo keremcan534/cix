@@ -8,17 +8,19 @@
 // gate again (gifts, shop, Oyun Salonu, Anlar…); this only keeps the screens in step with it.
 import type { ArtName } from '@/components/Art';
 import { CHARM_TIERS, CHARM_XP } from '@/data/charm';
-import { NOBLE_DAYS, NOBLE_SHOWN, NOBLE_TIERS, SVIP_LEVELS, SVIP_SHOWN, VIP_COMPARE, VIP_PERKS, VIP_PLANS, type ShownRight } from '@/data/status';
+import { NOBLE_DAYS, NOBLE_SHOWN, NOBLE_TIERS, nobleDefaultPlans, type NobleRight, SVIP_LEVELS, SVIP_SHOWN, VIP_COMPARE, VIP_PERKS, VIP_PLANS, type ShownRight } from '@/data/status';
 import { WEALTH_TIERS, WEALTH_XP, levelFromTable, type LevelTier } from '@/data/wealth';
 import { WHEEL_NEED_LEVEL } from '@/data/wheel';
 
 export type LevelSystem = 'vip' | 'noble' | 'wealth' | 'charm' | 'sub';
+/** A Rütbe tier as Seviye ayarları sell it: its main term and its other packages (`plans`, absent from an older server). */
+export type NobleLevel = { level: number; name: string; price: number; days: number; plans?: { days: number; price: number }[] };
 export type PerkAt = { key: string; from: number };
 export type LevelDecay = { idleDays: number; drop: number; everyDays: number; floor: number };
 export type LiveLevels = {
   rev: number;
   vip: { levels: { level: number; points: number; name: string }[]; perks: PerkAt[]; decay: LevelDecay | null } | null;
-  noble: { levels: { level: number; name: string; price: number; days: number }[]; perks: PerkAt[] } | null;
+  noble: { levels: NobleLevel[]; perks: PerkAt[] } | null;
   wealth: { points: number[]; groups: { from: number; to: number; name: string }[]; perks: PerkAt[]; decay: LevelDecay | null } | null;
   charm: { points: number[]; groups: { from: number; to: number; name: string }[]; perks: PerkAt[]; decay: LevelDecay | null } | null;
   sub: { plans: { productId: string; days: number; label: string; tl: number; was: number }[]; perks: PerkAt[] } | null;
@@ -74,10 +76,17 @@ function nobleOf(x: unknown): LiveLevels['noble'] {
   if (!Array.isArray(r.levels) || r.levels.length !== NOBLE_TIERS.length) return null;
   const levels = r.levels.map((l, i) => {
     const e = obj(l);
-    return { level: i + 1, name: name(e.name, 24), price: int(e.price, 1, 1e9), days: int(e.days, 1, 365) };
+    // Packages a malformed answer garbles are left out (the main term still sells).
+    const plans = Array.isArray(e.plans)
+      ? e.plans
+          .slice(0, 2)
+          .map((p) => ({ days: int(obj(p).days, 1, 365), price: int(obj(p).price, 1, 1e9) }))
+          .filter((p): p is { days: number; price: number } => p.days !== null && p.price !== null)
+      : undefined;
+    return { level: i + 1, name: name(e.name, 24), price: int(e.price, 1, 1e9), days: int(e.days, 1, 365), ...(plans ? { plans } : {}) };
   });
   if (levels.some((l) => l.name === null || l.price === null || l.days === null)) return null;
-  return { levels: levels as { level: number; name: string; price: number; days: number }[], perks: perksOf(r.perks, NOBLE_TIERS.length) };
+  return { levels: levels as NobleLevel[], perks: perksOf(r.perks, NOBLE_TIERS.length) };
 }
 function curveOf(x: unknown): LiveLevels['wealth'] {
   const r = obj(x);
@@ -155,10 +164,28 @@ export function tiersOf(l: LiveLevels | null, system: 'wealth' | 'charm'): Level
 export const tierFor = (tiers: LevelTier[], level: number) => tiers.find((t) => level >= t.from && level <= t.to) ?? tiers[0];
 
 /** Rütbe tiers: the server's names, prices and days with the app's pictures and colours. */
+/** One package on the Rütbe page: its days and price, the price at the week's rate (`was`) and the saving in %. */
+export type NoblePlan = { days: number; price: number; was: number; save: number };
+/**
+ * The tier's packages, shortest first: its main term and the others (the server's; from an older server or the demo,
+ * the app's defaults for a 30-day term). `was` and `save` measure each against the shortest one's daily rate.
+ */
+export function noblePlansOf(main: { price: number; days: number }, plans?: { days: number; price: number }[]): NoblePlan[] {
+  const list = [{ days: main.days, price: main.price }, ...(plans ?? nobleDefaultPlans(main.price, main.days))]
+    .filter((p, i, all) => all.findIndex((x) => x.days === p.days) === i)
+    .sort((x, y) => x.days - y.days);
+  const rate = list[0].price / list[0].days;
+  return list.map((p) => {
+    const was = Math.round(rate * p.days);
+    const save = was > p.price ? Math.floor((1 - p.price / was) * 100) : 0;
+    return { ...p, was: save > 0 ? was : p.price, save };
+  });
+}
 export function nobleTiersOf(l: LiveLevels | null) {
   return NOBLE_TIERS.map((t, i) => {
     const s = l?.noble?.levels[i];
-    return { ...t, name: s?.name ?? t.name, price: s?.price ?? t.price, days: s?.days ?? NOBLE_DAYS };
+    const main = { price: s?.price ?? t.price, days: s?.days ?? NOBLE_DAYS };
+    return { ...t, name: s?.name ?? t.name, ...main, plans: noblePlansOf(main, s?.plans) };
   });
 }
 /** Whether the server sells a tier other than the compiled one (another name, price or days). */
@@ -182,10 +209,6 @@ const LOOK: Record<string, Look> = {
   entry_greeting: { name: 'Giriş karşılaması', emoji: '🌟', art: 'ayricalik-giris-ekrani' },
   visitors: { name: 'Profiline bakanları gör', emoji: '👀' },
 };
-const NOBLE_LOOK: Record<string, Look> = {
-  badge: { name: 'Rütbe Nişanı', emoji: '🏅', art: 'ayricalik-asil-madalyasi' },
-  room_password: { name: 'Oda kilitleme', emoji: '🔒', art: 'ayricalik-oda-kilitleme' },
-};
 const shown = (perks: PerkAt[], looks: Record<string, Look>): ShownRight[] =>
   perks
     .filter((p) => looks[p.key] ?? LOOK[p.key])
@@ -193,7 +216,21 @@ const shown = (perks: PerkAt[], looks: Record<string, Look>): ShownRight[] =>
     .sort((a, b) => a.level - b.level);
 /** The VIP rights a page lists, by the level they open at (the server's when it says, else the app's list). */
 export const vipRightsOf = (l: LiveLevels | null): ShownRight[] => (l?.vip ? shown(l.vip.perks, {}) : SVIP_SHOWN);
-export const nobleRightsOf = (l: LiveLevels | null): ShownRight[] => (l?.noble ? shown(l.noble.perks, NOBLE_LOOK) : NOBLE_SHOWN);
+/**
+ * Every Rütbe right in the page's order (data/status NOBLE_SHOWN). One the app gives opens at the tier Seviye ayarları
+ * give it (its place in the list until they say); one they turned off is left out. The others stay as they are, `soon`.
+ */
+export function nobleRightsOf(l: LiveLevels | null): NobleRight[] {
+  if (!l?.noble) return NOBLE_SHOWN;
+  const perks = new Map(l.noble.perks.map((p) => [p.key, p.from]));
+  return NOBLE_SHOWN.flatMap((r) => {
+    if (!r.perk) return [r];
+    const from = perks.get(r.perk);
+    return from === undefined ? [] : [{ ...r, level: Math.max(1, from) }];
+  });
+}
+/** How many of `rights` a tier has (the ones not built yet aside) and how many there are. */
+export const nobleRightsCount = (rights: NobleRight[], tier: number) => ({ have: rights.filter((r) => !r.soon && r.level <= tier).length, all: rights.length });
 /** From which level a Cömertlik / Yankı perk opens (the app's key), or null when the server turned it off; undefined: the server didn't say. */
 export function curvePerkFrom(l: LiveLevels | null, system: 'wealth' | 'charm', appKey: string): number | null | undefined {
   const s = l?.[system];
