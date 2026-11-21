@@ -101,6 +101,9 @@ export type Settings = {
   /** Room effects on this phone (Efekt ayarları), each under `effectsOff`: gift shows and flights, entry
    *  banners, the mic effect while I talk, emoji reactions over the seats. */
   giftFx: boolean;
+  /** Şanslı hediyeler shown as gifts (the pop in the middle, the flights, the package video); off: only their banner
+   *  (Güncelleme 8). */
+  luckyFx: boolean;
   entryFx: boolean;
   micAnim: boolean;
   seatReactions: boolean;
@@ -548,6 +551,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       giftSounds: true,
       bigGiftsOnly: false, micDenoise: true, micRaw: false,
       giftFx: true,
+      luckyFx: true,
       entryFx: true,
       micAnim: true,
       seatReactions: true,

@@ -352,7 +352,7 @@ function Volume({ settings, set, k, label }: { settings: Settings; set: SetFn; k
   );
 }
 
-type ToggleKey = 'micDenoise' | 'micRaw' | 'effectsOff' | 'giftFx' | 'bigGiftsOnly' | 'entryFx' | 'micAnim' | 'seatReactions' | 'reduceMotion' | 'lowData';
+type ToggleKey = 'micDenoise' | 'micRaw' | 'effectsOff' | 'giftFx' | 'luckyFx' | 'bigGiftsOnly' | 'entryFx' | 'micAnim' | 'seatReactions' | 'reduceMotion' | 'lowData';
 const NOTE_COLOR: Record<DenoiseLine['tone'], string> = { ok: semantic.live, wait: colors.textDim, bad: colors.gold };
 /** A switch with its name, what it does and, when there is one, how it stands on this phone right now. */
 function SwitchRow({ label, hint, note, value, onChange, off = false }: { label: string; hint?: string; note?: DenoiseLine | null; value: boolean; onChange: (v: boolean) => void; off?: boolean }) {
@@ -436,6 +436,7 @@ export function EffectsSheet({
       <SoundToggle settings={settings} set={set} k="effectsOff" label="Tüm efektleri kapat" hint="Aşağıdakilerin hepsini birden kapatır." />
       <Text style={styles.label}>Hediyeler</Text>
       <SoundToggle settings={settings} set={set} k="giftFx" off={all} label="Hediye efektleri" hint="Tam ekran gösteri ve koltuğa uçan hediye." />
+      <SoundToggle settings={settings} set={set} k="luckyFx" off={all || !settings.giftFx} label="Şanslı hediyeleri göster" hint="Kapalıyken şanslı hediyenin kendisi görünmez, yalnız şeridi gelir." />
       <SoundToggle settings={settings} set={set} k="bigGiftsOnly" off={all || !settings.giftFx} label="Sadece büyük hediyeler" hint="100 jeton altındaki hediyeler sohbette yazıyla görünür." />
       <Text style={styles.label}>Oda</Text>
       <SoundToggle settings={settings} set={set} k="entryFx" off={all} label="Giriş efektleri" hint="Odaya girenlerin karşılama gösterisi." />

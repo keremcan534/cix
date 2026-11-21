@@ -51,6 +51,7 @@ import { BossSeat, BossSeatSheet, RoomInfoSheet, RoomSettingsScreen, type BossPi
 import { GiftSheet } from '@/components/room/gift-sheet';
 import { GiftCombo } from '@/components/room/gift-combo';
 import { LuckyResult } from '@/components/room/lucky-result';
+import { LuckyStrips, type LuckyStrip } from '@/components/room/lucky-banner';
 import { LuckyBagCard, LuckyBagFloat, LuckyBagRain, LuckyBagSheet, bagWhat, type BagOutcome } from '@/components/room/lucky-bag';
 import { SeatMenu, type Rect, type SeatMenuItem } from '@/components/room/seat-menu';
 import { PersonCard } from '@/components/room/person-card';
@@ -667,6 +668,15 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   };
   // My Şanslı send's result card; `after`: the package whose video plays first (the card waits for it, lib/lucky-art).
   const [luckyFx, setLuckyFx] = useState<{ records: LuckyRecord[]; after: string | null } | null>(null);
+  // Şanslı hediyelerin şeritleri (components/room/lucky-banner): one per send, shown once the send (a wheel's repeats
+  // too) has been quiet for a moment.
+  const [luckyStrips, setLuckyStrips] = useState<LuckyStrip[]>([]);
+  const stripsWaiting = useRef(new Map<string, { strip: LuckyStrip; timer: ReturnType<typeof setTimeout> }>());
+  const stripSeq = useRef(0);
+  useEffect(() => {
+    const waiting = stripsWaiting.current;
+    return () => waiting.forEach((w) => clearTimeout(w.timer));
+  }, []);
   /**
    * A Şanslı package's own video (Yönetim › Şanslı hediye, the catalog's lucky=1 clips) on the stage, in line with the
    * gifts; true when there is one on the phone to play. None: the flight and the chat line show the send, as before.
@@ -1725,17 +1735,22 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     playMove('me', move);
     if (real) sendSignal({ t: 'act', ...move });
   };
-  // Only recipients sitting on a seat get a flight; listeners see the chat line instead.
-  const flyGift = (emoji: string, count: number, toIds: string[], from: Point, giftId?: string) => {
+  // Only recipients sitting on a seat get a flight; listeners see the chat line instead. `hold`: the gift first shows
+  // big where it starts, and every copy then leaves at once (a send from the middle, Güncelleme 8); without it the
+  // copies leave one after another.
+  const flyGift = (emoji: string, count: number, toIds: string[], from: Point, giftId?: string, hold = 0) => {
     if (!visibleRef.current || settings.effectsOff || !settings.giftFx || settings.reduceMotion) return;
     toIds.forEach((uid, i) =>
       seatViews.get(uid)?.measureInWindow((x, y, w, h) => {
         if (!w) return;
         const key = `${Date.now()}-${uid}-${Math.random()}`;
-        setFlights((f) => [...f.slice(-11), { key, emoji, count, from, to: { x: x + w / 2, y: y + h / 2 }, delay: i * 90, giftId }]);
+        setFlights((f) => [...f.slice(-23), { key, emoji, count, from, to: { x: x + w / 2, y: y + h / 2 }, delay: hold ? 0 : i * 90, giftId, ...(hold ? { hold } : {}) }]);
       }),
     );
   };
+  /** Where a sent gift shows first and flies out from: the middle of the screen (Güncelleme 8: every gift, Şanslı too). */
+  const giftMiddle = (): Point => ({ x: win.width / 2, y: win.height * 0.42 });
+  const GIFT_HOLD_MS = 520;
   // Other people on mic send seat emoji now and then (quiet when effects are off).
   const botReactions = !real && !settings.effectsOff && visible;
   useEffect(() => {
@@ -2893,26 +2908,50 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     if (error) showAlert('Bazı hediyeler gönderilemedi', `${sent.length} kişiye gitti. ${error}`);
     return sent.length;
   };
-  /** A Lucky send another phone made (the server announced it): the gift lines, the flight and a big win. */
+  /**
+   * One strip for a Lucky send (Güncelleme 8: no chat lines for them): the sends of the same person, gift and
+   * recipients a wheel repeats add up, and the strip shows once they have stopped for a moment.
+   */
+  const luckyStrip = (from: string, toIds: string[], giftId: string, emoji: string, count: number, mult: number) => {
+    const key = `${from}|${giftId}|${[...toIds].sort().join(',')}`;
+    const waiting = stripsWaiting.current;
+    const was = waiting.get(key);
+    if (was) clearTimeout(was.timer);
+    const fromName = from === 'me' ? ME.name : userById(from).name;
+    const strip: LuckyStrip = was
+      ? { ...was.strip, count: was.strip.count + count, mult: Math.max(was.strip.mult, mult) }
+      : {
+          key: `${key}|${++stripSeq.current}`,
+          fromName,
+          fromAvatar: from === 'me' ? app.me.avatar : userById(from).avatar,
+          toText: toIds.length > 1 ? `${toIds.length} kişi` : toIds[0] === 'me' ? 'Sana' : userById(toIds[0]).name,
+          giftId,
+          emoji,
+          count,
+          mult,
+        };
+    const timer = setTimeout(() => {
+      waiting.delete(key);
+      setLuckyStrips((l) => [...l.slice(-5), strip]);
+    }, 1200);
+    waiting.set(key, { strip, timer });
+  };
+  /** A Lucky send another phone made (the server announced it): the flight from the middle, its video and its strip. */
   const showLuckyFrom = (from: string, toIds: string[], s: LuckySignal) => {
-    const fromName = userById(from).name;
     // The packet names the package's icon and price (newer servers): one this phone hasn't read is drawn and counted.
     noteLuckyIcon(s.giftId, s.icon);
     const price = luckyGift(s.giftId)?.price ?? s.price ?? 0;
     toIds.forEach((to) => logGift(from, to, { id: s.giftId, name: s.name, emoji: s.emoji, price }, s.count));
     if (price) addContrib(from, price * s.count * toIds.length);
-    flyGift(s.emoji, s.count, toIds, { x: 36, y: win.height * 0.72 }, s.giftId);
-    // Its video, as a gift's: only with gift effects on (Efekt ayarları, the room's choice), never minimized.
-    if (showFx(price) && visibleRef.current) playLuckyFx({ id: s.giftId, name: s.name, emoji: s.emoji, price }, from, toIds, s.count);
-    const toText = toIds.length > 1 ? `${toIds.length} kişiye` : toIds[0] === 'me' ? 'sana' : `${userById(toIds[0]).name} kişisine`;
-    addMsg({
-      id: `gift:${s.eventId}`,
-      system: true,
-      text: `🍀 ${fromName}, ${toText} ${s.emoji} ${s.name}${s.count > 1 ? ` x${s.count}` : ''} (Şanslı) gönderdi`,
-      gift: { fromId: from, toIds, emoji: s.emoji, name: s.name, count: s.count, lucky: true, giftId: s.giftId },
-    });
-    // The sender may hide their name on wins (Ayarlar), and the server doesn't know it: the line names no one.
-    if (s.bigWin > 0) addMsg({ system: true, kind: 'gift', text: `🎉 Şanslı hediyeden ×${s.best.toLocaleString('tr-TR')} kazanıldı!` });
+    // The gift itself only with "Şanslı hediyeleri göster" on (Efektler ve ses); the strip always.
+    if (settings.luckyFx) {
+      flyGift(s.emoji, s.count, toIds, giftMiddle(), s.giftId, GIFT_HOLD_MS);
+      // Its video, as a gift's: only with gift effects on (Efekt ayarları, the room's choice), never minimized.
+      if (showFx(price) && visibleRef.current) playLuckyFx({ id: s.giftId, name: s.name, emoji: s.emoji, price }, from, toIds, s.count);
+    }
+    // No chat line (thousands of sends would bury the chat): one strip once the send is over. The sender may hide
+    // their name on wins, which the server doesn't say: the strip names the sender, as the gift line did.
+    luckyStrip(from, toIds, s.giftId, s.emoji, s.count, s.bigWin > 0 ? s.best : 0);
   };
   /** A gift line, the seat flight and the big effect (mine or one another phone announced). `quiet`: no chat line
    *  (a repeat of mine the wheel counts). */
@@ -2921,8 +2960,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     toIds.forEach((to) => logGift(from, to, gift, count));
     addContrib(from, gift.price * count * toIds.length);
     if (showFx(gift.price) && visibleRef.current) playGiftFx(gift, from, toIds, count);
-    const origin = from === 'me' ? { x: win.width - 60, y: win.height - 48 } : { x: 36, y: win.height * 0.72 };
-    flyGift(gift.emoji, count, toIds, origin, gift.id);
+    flyGift(gift.emoji, count, toIds, giftMiddle(), gift.id, GIFT_HOLD_MS);
     if (quiet) return;
     const toText = toIds.length > 1 ? `${toIds.length} kişiye` : toIds[0] === 'me' ? 'sana' : `${userById(toIds[0]).name} kişisine`;
     addMsg({ system: true, text: `🎁 ${fromName}, ${toText} ${gift.emoji} ${gift.name} x${count} gönderdi!`, gift: { fromId: from, toIds, emoji: gift.emoji, name: gift.name, count, giftId: gift.id } });
@@ -2995,7 +3033,6 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   };
   /** What a Lucky send I made shows: the gift lines, the flight, the results and the win news. */
   const showLuckySend = (records: LuckyRecord[], toIds: string[], count: number, error: string | null, spec: ComboSpec, viaWheel: boolean) => {
-    const cfg = getLucky().config;
     const first = records[0];
     const spent = records.reduce((n, r) => n + r.price, 0);
     const reward = records.reduce((n, r) => n + r.reward, 0);
@@ -3008,31 +3045,19 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     });
     bump('giftsSent', records.length);
     addContrib('me', spent);
-    flyGift(first.emoji, count, sentTo, { x: win.width - 60, y: win.height - 48 }, first.giftId);
-    // Combo repeats don't add a chat line each time; the wheel shows the count.
-    const repeat = comboRepeat(spec);
-    if (!repeat)
-      addMsg({
-        id: `gift:${first.txId}`,
-        system: true,
-        text: `🍀 ${ME.name}, ${sentTo.length > 1 ? `${sentTo.length} kişiye` : `${userById(sentTo[0]).name} kişisine`} ${first.emoji} ${first.giftName}${count > 1 ? ` x${count}` : ''} (Şanslı) gönderdi`,
-        gift: { fromId: 'me', toIds: sentTo, emoji: first.emoji, name: first.giftName, count, lucky: true, giftId: first.giftId },
-      });
+    if (settings.luckyFx) flyGift(first.emoji, count, sentTo, giftMiddle(), first.giftId, GIFT_HOLD_MS);
+    // No chat line per send (Güncelleme 8): one strip once the send, the wheel's repeats included, is over.
+    luckyStrip('me', sentTo, first.giftId, first.emoji, records.length, reward > 0 ? best.mult : 0);
     if (error) addMsg({ system: true, text: `🍀 ${toIds.length * count - records.length} Şanslı hediye gönderilemedi (jetonu iade edildi): ${error}` });
     // Every win is announced in all rooms (banner); the user can hide their name in Ayarlar.
     if (reward > 0) {
       const wins = records.filter((r) => r.reward > 0).length;
       announceWin({ userName: ME.name, avatar: app.me.avatar, source: `Şanslı › ${first.giftName}`, roomTitle: roomTitleOf(id), mult: best.mult, amount: reward, wins: wins > 1 ? wins : undefined }, { mine: true });
     }
-    if (best.mult >= cfg.announceFrom)
-      addMsg({
-        system: true,
-        kind: 'gift',
-        text: settings.luckyAnnounce ? `🎉 ${ME.name} Şanslı hediyeden ×${best.mult.toLocaleString('tr-TR')} kazandı! +${reward.toLocaleString('tr-TR')} jeton` : `🎉 Bir kullanıcı Şanslı hediyeden ×${best.mult.toLocaleString('tr-TR')} kazandı!`,
-      });
-    // The package's video first, when it has one and effects are on; the result card comes once it is over.
-    const video = showFx(first.price) && visibleRef.current && playLuckyFx({ id: first.giftId, name: first.giftName, emoji: first.emoji, price: first.price }, 'me', sentTo, count);
-    setLuckyFx({ records, after: video ? first.giftId : null });
+    // The package's video first, when it has one and effects are on; the result card comes once it is over, and only
+    // for a win ("Bu sefer ödül çıkmadı" no more, Güncelleme 8).
+    const video = settings.luckyFx && showFx(first.price) && visibleRef.current && playLuckyFx({ id: first.giftId, name: first.giftName, emoji: first.emoji, price: first.price }, 'me', sentTo, count);
+    if (reward > 0) setLuckyFx({ records, after: video ? first.giftId : null });
     // Some gifts didn't go (the balance ran out): the wheel stops; else it counts this send.
     if (error) stopCombo(spec);
     else countCombo(spec, viaWheel);
@@ -4610,6 +4635,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           onExpire={() => setCombo(null)}
         />
       )}
+      {visible && luckyStrips.length > 0 && <LuckyStrips strips={luckyStrips} onDone={(k) => setLuckyStrips((l) => l.filter((x) => x.key !== k))} />}
       {luckyFx && !(luckyFx.after && luckyVideoPending(fxStage, luckyFx.after)) && (
         <LuckyResult key={luckyFx.records[0].txId} records={luckyFx.records} still={settings.effectsOff || settings.reduceMotion} onDone={() => setLuckyFx(null)} />
       )}

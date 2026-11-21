@@ -1,6 +1,8 @@
 // A sent gift flies from the gift button to each recipient's seat along an arc, then lands with a pop
 // and a "×count" tag. Window coordinates come from measureInWindow on the seat avatars.
 // Transform/opacity only, on the native driver; callers skip it when effects are off or motion is reduced.
+// `hold`: the gift first shows big where it starts (the screen's middle, Güncelleme 8) for that long, then every copy
+// of one send leaves at once.
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 
@@ -22,6 +24,8 @@ export type Flight = {
   giftId?: string;
   /** A sticker token (lib/stickers): flies its picture, playing (a Hamle's kiss or fist, lib/room-moves). */
   sticker?: string;
+  /** Ms it shows big at `from` before it flies (0: it flies at once). */
+  hold?: number;
 };
 
 const FLY_MS = 760;
@@ -41,6 +45,9 @@ export function GiftFlights({ flights, onDone }: { flights: Flight[]; onDone: (k
 function GiftFlight({ flight, onDone }: { flight: Flight; onDone: (key: string) => void }) {
   const [t] = useState(() => new Animated.Value(0));
   const [land] = useState(() => new Animated.Value(0));
+  const hold = flight.hold ?? 0;
+  // 1 while it waits big at the start (a send's pop in the middle), then it shrinks into the flight.
+  const [pop] = useState(() => new Animated.Value(hold ? 0 : 1));
   const done = useRef(onDone);
   useEffect(() => {
     done.current = onDone;
@@ -48,12 +55,18 @@ function GiftFlight({ flight, onDone }: { flight: Flight; onDone: (key: string) 
   useEffect(() => {
     const a = Animated.sequence([
       Animated.delay(flight.delay),
+      ...(hold
+        ? [
+            Animated.timing(pop, { toValue: 1, duration: Math.min(260, hold), easing: Easing.out(Easing.back(1.6)), useNativeDriver: true }),
+            Animated.delay(Math.max(0, hold - 260)),
+          ]
+        : []),
       Animated.timing(t, { toValue: 1, duration: FLY_MS, easing: Easing.inOut(Easing.cubic), useNativeDriver: true }),
       Animated.timing(land, { toValue: 1, duration: LAND_MS, easing: Easing.out(Easing.quad), useNativeDriver: true }),
     ]);
     a.start(() => done.current(flight.key));
     return () => a.stop();
-  }, [t, land, flight.delay, flight.key]);
+  }, [t, land, pop, hold, flight.delay, flight.key]);
 
   const { from, to } = flight;
   // Arc: x moves linearly, y gets an extra lift that peaks halfway.
@@ -67,13 +80,20 @@ function GiftFlight({ flight, onDone }: { flight: Flight; onDone: (key: string) 
         s.box,
         {
           opacity: Animated.multiply(
-            t.interpolate({ inputRange: [0, 0.08, 1], outputRange: [0, 1, 1] }),
+            hold ? pop.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0, 1, 1] }) : t.interpolate({ inputRange: [0, 0.08, 1], outputRange: [0, 1, 1] }),
             land.interpolate({ inputRange: [0, 0.6, 1], outputRange: [1, 1, 0] }),
           ),
           transform: [
             { translateX: t.interpolate({ inputRange: [0, 1], outputRange: [from.x - SIZE / 2, to.x - SIZE / 2] }) },
             { translateY: t.interpolate({ inputRange: [0, 0.5, 1], outputRange: [from.y - SIZE / 2, midY - SIZE / 2, to.y - SIZE / 2] }) },
-            { scale: Animated.add(t.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.6, 1.35, 1] }), land.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0, 0.45, 0.2] })) },
+            {
+              scale: Animated.add(
+                hold
+                  ? Animated.add(t.interpolate({ inputRange: [0, 0.5, 1], outputRange: [2.4, 1.35, 1] }), pop.interpolate({ inputRange: [0, 1], outputRange: [-2.4, 0] }))
+                  : t.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.6, 1.35, 1] }),
+                land.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0, 0.45, 0.2] }),
+              ),
+            },
             { rotate: t.interpolate({ inputRange: [0, 0.5, 1], outputRange: ['-14deg', '10deg', '0deg'] }) },
           ],
         },
