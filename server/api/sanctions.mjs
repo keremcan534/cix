@@ -114,6 +114,12 @@ const SYSTEM_REASONS = [CONTACT_REASON];
  * a panel that sends no list (one from before) acts as an admin, as it always did.
  */
 const PANEL_SANCTION_PERMS = { 'app.sanctions_full': ROLE_PERMS.admin, 'app.sanctions': ROLE_PERMS.moderator };
+/**
+ * A Süper yönetici: the finance panel's super_admin role (its calls carry the panel user), or an admin account using
+ * the app's own Yönetim. Their sanctions need no evidence (Güncelleme 8); they alone approve one given without it.
+ */
+export const isSuper = (u) => (u?.panel ? u.panel.role === 'super_admin' : u?.role === 'admin');
+
 export async function permsOf(u) {
   if (u.panel && Array.isArray(u.panel.perms)) return new Set(u.panel.perms.flatMap((p) => PANEL_SANCTION_PERMS[p] ?? []));
   const out = new Set(ROLE_PERMS[u.role] ?? []);
@@ -447,8 +453,8 @@ export async function applySanction(actor, input) {
       const s = (
         await c.query(
           `INSERT INTO user_sanctions (user_id, sanction_type, scope, room_id, reason_code, reason_description, internal_note, expires_at, is_permanent, status,
-                                       created_by, created_role, source, report_id, policy_step)
-           VALUES ($1,$2,$3,$4,$5,$6,$7, CASE WHEN $8::int IS NULL THEN NULL ELSE now() + make_interval(mins => $8::int) END, $8::int IS NULL, $9, $10, $11, $12, $13, $14) RETURNING *`,
+                                       created_by, created_role, source, report_id, policy_step, needs_super)
+           VALUES ($1,$2,$3,$4,$5,$6,$7, CASE WHEN $8::int IS NULL THEN NULL ELSE now() + make_interval(mins => $8::int) END, $8::int IS NULL, $9, $10, $11, $12, $13, $14, $15) RETURNING *`,
           [
             target.id,
             type,
@@ -464,6 +470,7 @@ export async function applySanction(actor, input) {
             input.source ?? 'manual',
             input.reportId ?? null,
             input.policyStep ?? null,
+            !!(input.pending && input.needsSuper),
           ],
         )
       ).rows[0];
@@ -651,7 +658,7 @@ function evidenceOf(v) {
   if (v === undefined) return [];
   if (!Array.isArray(v) || v.length > 10) throw new HttpError(400, 'En çok 10 kanıt eklenebilir');
   return v.map((e) => {
-    if (!e || !['note', 'link', 'report', 'message'].includes(e.kind)) throw new HttpError(400, 'Geçersiz kanıt türü');
+    if (!e || !['note', 'link', 'report', 'message', 'screenshot'].includes(e.kind)) throw new HttpError(400, 'Geçersiz kanıt türü');
     return { kind: e.kind, content: text(e.content, 1, 2000, 'Kanıt') };
   });
 }
@@ -676,6 +683,8 @@ async function staffView(s) {
     source: s.source,
     policyStep: s.policy_step,
     reportId: s.report_id ? Number(s.report_id) : null,
+    // Given without evidence: only a Süper yönetici approves it (Güncelleme 8).
+    needsSuper: !!s.needs_super,
     room: s.room_id ? { id: s.room_id, title: room?.title ?? null } : null,
     deviceId: s.device_registry_id ? Number(s.device_registry_id) : null,
     includeDm: !!s.include_dm,
@@ -881,10 +890,16 @@ export const sanctionRoutes = {
       if (SCOPE(type) === 'room' && !b.roomId) type = type === 'mute_room_text' ? 'mute_global_text' : 'mute_global_voice';
     }
     const need = permFor(type, minutes);
-    const pending = (!!step && (step.requires_approval || heavy(type, minutes))) || (HEAVY_APPROVAL && heavy(type, minutes));
+    const evidence = evidenceOf(b.evidence);
+    // Güncelleme 8: evidence is required (a report it comes from counts); without it, anyone but a Süper yönetici
+    // only proposes, and a Süper yönetici decides.
+    const needsSuper = !evidence.length && !b.reportId && !isSuper(me);
+    // Waiting for a Süper yönetici widens nothing: who may propose what stays as it was.
+    const approval = (!!step && (step.requires_approval || heavy(type, minutes))) || (HEAVY_APPROVAL && heavy(type, minutes));
+    const pending = needsSuper || approval;
     // A step that waits for approval may be proposed with the timed permission; whoever approves needs the full one.
     const base = type === 'account_ban' ? 'sanction.ban' : type === 'device_ban' ? 'sanction.device_ban' : need;
-    if (!perms.has(need) && !(pending && perms.has(base))) {
+    if (!perms.has(need) && !(approval && perms.has(base))) {
       await audit(db, { actor: me.id, role: me.role, action: 'apply', target: target.id, result: 'denied', detail: { type, minutes, need } });
       throw new HttpError(403, `Bu yaptırım için yetkin yok (${PERMS[need]})`);
     }
@@ -909,7 +924,8 @@ export const sanctionRoutes = {
         includeDm: b.includeDm === true,
         includeCalls: b.includeCalls === true,
         deviceIds,
-        evidence: evidenceOf(b.evidence),
+        evidence,
+        needsSuper,
         source: b.reportId ? 'report' : step ? 'policy' : 'manual',
         reportId: b.reportId ? idOf(b.reportId, 'şikâyet') : null,
         policyStep: step?.step ?? null,
@@ -943,6 +959,7 @@ export const sanctionRoutes = {
     const s = await sanctionRow(db, idOf(b.id));
     if (!s || s.status !== 'pending') throw new HttpError(404, 'Onay bekleyen yaptırım bulunamadı');
     if (s.created_by === me.id) throw new HttpError(403, 'Kendi önerdiğin yaptırımı başka bir yetkili onaylamalı');
+    if (s.needs_super && !isSuper(me)) throw new HttpError(403, 'Kanıtsız verilen yaptırımı yalnız Süper yönetici onaylar ya da reddeder');
     const minutes = s.expires_at ? Math.round((new Date(s.expires_at) - new Date(s.start_at)) / 60_000) : null;
     if (!perms.has(permFor(s.sanction_type, minutes))) throw new HttpError(403, 'Bu yaptırımı onaylama yetkin yok');
     const note = text(b.note, 3, 300, 'Onay notu');

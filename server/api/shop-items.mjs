@@ -233,6 +233,13 @@ function artOf(r) {
     reach: reachOf(box, hole, at),
   });
 }
+/** A stored `plans` list, read defensively (a row from before 110: none). */
+const planList = (v) =>
+  Object.freeze(
+    (Array.isArray(v) ? v : [])
+      .map((p) => ({ days: num(p?.days), price: num(p?.price) }))
+      .filter((p) => Number.isSafeInteger(p.days) && p.days > 0 && Number.isSafeInteger(p.price) && p.price > 0),
+  );
 const rowOf = (r) =>
   Object.freeze({
     id: r.id,
@@ -244,6 +251,7 @@ const rowOf = (r) =>
     minVip: num(r.min_vip),
     enabled: r.enabled,
     sort: num(r.sort),
+    plans: planList(r.plans),
     art: r.art_url ? artOf(r) : null,
     video: r.video_url ? Object.freeze({ url: r.video_url, bytes: num(r.video_bytes), ms: num(r.video_ms), v: r.video_v }) : null,
     plate: r.plate ?? null,
@@ -304,6 +312,7 @@ const appItemOf = (base, o) =>
     minVip: o?.minVip ?? base.minVip,
     enabled: o?.enabled ?? !SHOP_PAUSED.has(base.sku),
     sort: o?.sort ?? APP_SORT.get(base.sku),
+    plans: o?.plans ?? Object.freeze([]),
     tier: null,
     art: null,
     video: null,
@@ -325,6 +334,7 @@ const ownItemOf = (r) =>
     minVip: r.minVip,
     enabled: r.enabled,
     sort: r.sort,
+    plans: r.plans,
     tier: null,
     art: r.art,
     video: r.video,
@@ -384,6 +394,8 @@ export function shopCatalog() {
       price: x.price,
       days: x.days,
       minVip: x.minVip,
+      // Güncelleme 8: its other durations, each with its own price (an older app reads none and sells the main one).
+      ...(x.days && x.plans.length ? { plans: x.plans } : {}),
       ...(x.builtin ? { builtin: true } : {}),
       ...(x.enabled ? {} : { off: true }),
       ...(x.kind === 'frame' && x.art
@@ -446,6 +458,27 @@ const priceOf = (v) => {
   if (n === null) throw bad(`Fiyat 1 ile ${fmt(SHOP_LIMITS.priceMax)} jeton arasında tam sayı olmalı`);
   return n;
 };
+/**
+ * An item's other durations (Güncelleme 8: 7, 15, 30 gün …): at most 3 besides its main term, each { days, price },
+ * days 1–365, none twice nor the main term's. Only for an item that has a term (a permanent one sells as it is).
+ */
+function plansOf(v, days) {
+  if (v === null) return [];
+  if (!Array.isArray(v) || v.length > 3) throw bad('Ana sürenin yanında en fazla 3 süre paketi olur');
+  if (v.length && !days) throw bad('Süresiz üründe süre paketi olmaz; önce ürüne bir süre ver');
+  const seen = new Set([days]);
+  return v
+    .map((p) => {
+      const d = int(p?.days, 1, SHOP_LIMITS.daysMax);
+      if (d === null) throw bad(`Paket süresi 1–${SHOP_LIMITS.daysMax} gün olmalı`);
+      if (seen.has(d)) throw bad(`${d} günlük paket iki kez var (ana süre de sayılır)`);
+      seen.add(d);
+      const pr = int(p?.price, 1, SHOP_LIMITS.priceMax);
+      if (pr === null) throw bad(`${d} günlük paketin fiyatı 1 ile ${fmt(SHOP_LIMITS.priceMax)} jeton arasında olmalı`);
+      return { days: d, price: pr };
+    })
+    .sort((a, b) => a.days - b.days);
+}
 const daysOf = (v) => {
   const n = int(v, 0, SHOP_LIMITS.daysMax);
   if (n === null) throw bad(`Süre 1–${SHOP_LIMITS.daysMax} gün olmalı (0: süresiz)`);
@@ -876,7 +909,7 @@ async function owners(skus = null) {
 /** Rooms that have a seat color now (bought, not run out). */
 const roomsWith = async (c, id) => (await c.query('SELECT count(*)::int AS n FROM room_seat_colors WHERE color = $1 AND (ends_at IS NULL OR ends_at > now())', [id])).rows[0].n;
 const CHANGED = ['name', 'price', 'days', 'minVip', 'enabled', 'look'];
-const changedOf = (r) => (r ? CHANGED.filter((k) => r[k] !== null && r[k] !== undefined) : []);
+const changedOf = (r) => (r ? [...CHANGED.filter((k) => r[k] !== null && r[k] !== undefined), ...(r.plans?.length ? ['plans'] : [])] : []);
 /** An item as the panel shows it. */
 function itemView(x, owned) {
   const base = APP_BY_ID.get(x.sku);
@@ -890,6 +923,8 @@ function itemView(x, owned) {
     minVip: x.minVip,
     enabled: x.enabled,
     sort: x.sort,
+    // Its other durations (Güncelleme 8), each with its price.
+    plans: x.plans,
     owners: owned.get(x.sku) ?? 0,
     art: x.art
       ? {
@@ -930,8 +965,8 @@ const oneItem = async (id) => {
 /** The place before every item of `kind` (a new one goes first). */
 const firstSort = (kind) => Math.min(1, ...allShopItems().filter((x) => x.kind === kind).map((x) => x.sort)) - 1;
 
-const RESET = ['name', 'price', 'days', 'minVip', 'enabled', 'sort', 'look'];
-const COLUMN = { name: 'name', price: 'price', days: 'days', minVip: 'min_vip', enabled: 'enabled', sort: 'sort', look: 'look' };
+const RESET = ['name', 'price', 'days', 'minVip', 'enabled', 'sort', 'look', 'plans'];
+const COLUMN = { name: 'name', price: 'price', days: 'days', minVip: 'min_vip', enabled: 'enabled', sort: 'sort', look: 'look', plans: 'plans' };
 
 export const shopRoutes = {
   async 'GET /api/admin/shop'(req) {
@@ -975,6 +1010,7 @@ export const shopRoutes = {
     const name = nameOf(b.name);
     const price = priceOf(b.price);
     const days = daysOf(b.days);
+    const plans = b.plans === undefined ? [] : plansOf(b.plans, days);
     const minVip = vipOf(b.minVip ?? 0);
     if (kind === 'seat' && minVip) throw bad('Koltuk renginde VIP seviyesi olmaz: rengi oda sahibi odası için alır');
     const enabled = b.enabled === undefined ? true : boolOf(b.enabled, 'Açık / kapalı');
@@ -1021,13 +1057,13 @@ export const shopRoutes = {
         const r = await c.query(
           `INSERT INTO shop_items (id, kind, name, price, days, min_vip, enabled, sort, art_url, art_px, hole, video_url, video_bytes, video_ms, video_v, plate,
                                    job_status, job_source, job_fill, job_opaque, look, icon_url, icon_px, motion_url, motion_px, motion_bytes, hole_x, hole_y,
-                                   art_box_l, art_box_t, art_box_r, art_box_b, art_box_of, created_by, updated_by)
+                                   art_box_l, art_box_t, art_box_r, art_box_b, art_box_of, created_by, updated_by, plans)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28,
-                   $29, $30, $31, $32, $33, $34, $34) RETURNING *`,
+                   $29, $30, $31, $32, $33, $34, $34, $35) RETURNING *`,
           [id, kind, name, price, days, minVip, enabled, firstSort(kind), art?.url ?? null, art?.px ?? null, hole, stacked?.url ?? null, stacked?.bytes ?? null, stacked?.ms ?? null,
             stacked?.v ?? null, plate ? JSON.stringify(plate) : null, source ? 'processing' : null, source?.url ?? null, source?.fill ?? null, source?.opaque === true,
             look ? JSON.stringify(look) : null, icon?.url ?? null, icon?.px ?? null, motion?.url ?? null, motion?.px ?? null, motion?.bytes ?? null, at?.x ?? null, at?.y ?? null,
-            box.art_box_l, box.art_box_t, box.art_box_r, box.art_box_b, box.art_box_of, a.id],
+            box.art_box_l, box.art_box_t, box.art_box_r, box.art_box_b, box.art_box_of, a.id, plans.length ? JSON.stringify(plans) : null],
         );
         await audited(c, a, 'shop.create', { item: id, before: null, after: auditOf(r.rows[0]) }, req);
         return id;
@@ -1062,6 +1098,13 @@ export const shopRoutes = {
     if (b.days !== undefined && !isDefault) cols.days = daysOf(b.days);
     if (b.minVip !== undefined) cols.min_vip = vipOf(b.minVip);
     if (b.enabled !== undefined) cols.enabled = boolOf(b.enabled, 'Açık / kapalı');
+    // Its other durations, checked against the main term it will have after this save.
+    if (b.plans !== undefined || (cols.days !== undefined && cur.plans.length)) {
+      const main = cols.days !== undefined ? cols.days : (cur.days ?? 0);
+      if (isDefault && b.plans?.length) throw bad(`${cur.name} her odanın ücretsiz rengidir; süre paketi olmaz`);
+      const list = plansOf(b.plans === undefined ? cur.plans : b.plans, main);
+      cols.plans = list.length ? JSON.stringify(list) : null;
+    }
     const drop = [];
     if (cur.builtin) {
       // An app's seat color is drawn from its color, so its color changes too; nothing else of the app's own.

@@ -234,7 +234,7 @@ export function ApplySheet({ target, meta }: { target: ApplyTarget; meta: Sancti
         />
         <Field label="İç not" value={f.note} onChange={(note) => set({ note })} placeholder="Yalnızca yetkililer görür" max={2000} multiline />
         <Field
-          label="Kanıt (isteğe bağlı)"
+          label="Kanıt (yoksa Süper yönetici onaylayana kadar başlamaz)"
           value={f.evidence}
           onChange={(evidence) => set({ evidence })}
           placeholder="Bağlantı veya kısa açıklama"

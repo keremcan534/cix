@@ -406,7 +406,13 @@ export const socialRoutes = {
     }
     await liveUser(to);
     if (await blockedBetween(me.id, to)) throw new HttpError(403, 'Bu kişiyi takip edemezsin');
-    const r = await db.query('INSERT INTO follows (follower, followee) VALUES ($1, $2) ON CONFLICT DO NOTHING', [me.id, to]);
+    // The two accounts' key locks first, in id order (as the bond and gift routes take theirs): the row's foreign keys
+    // would take them follower-then-followee and could wait on a bond answer holding the other (a deadlock the
+    // concurrent money test found, 21 Nov 2026).
+    const r = await tx(async (c) => {
+      await c.query('SELECT id FROM users WHERE id = ANY($1::uuid[]) ORDER BY id FOR KEY SHARE', [[me.id, to]]);
+      return c.query('INSERT INTO follows (follower, followee) VALUES ($1, $2) ON CONFLICT DO NOTHING', [me.id, to]);
+    });
     // Told when the follow is new; unfollowing and following again in the same minute doesn't ring twice.
     if (r.rowCount && allow(`follow-notify:${me.id}:${to}`, 1)) {
       notify([to], { title: 'Yeni takipçi', body: `${me.name} seni takip etmeye başladı`, data: { type: 'follow', from: me.id } });

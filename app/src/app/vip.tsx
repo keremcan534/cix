@@ -31,6 +31,7 @@ import { SubHeading, SubPerks } from '@/components/vip/sub-rights';
 import { SubCompare } from '@/components/vip/sub-compare';
 import { SubHideLevels } from '@/components/vip/sub-hide-levels';
 import { NoblePage } from '@/components/vip/noble-page';
+import { useVipSetPreview } from '@/components/vip/vip-set-preview';
 
 type Tab = 'svip' | 'vip' | 'noble';
 
@@ -114,6 +115,7 @@ function Svip({ onLevel }: { onLevel: (level: number) => void }) {
   const { width, fontScale } = useWindowDimensions();
   const contentW = Math.min(width, VIP_MAX_W);
   const [index, setIndex] = useState(() => startIndex(svipLevel, list));
+  const setPreview = useVipSetPreview();
   const lv = list[Math.min(index, list.length - 1)];
   const picked = lv?.level ?? 0;
   useEffect(() => onLevel(picked), [picked, onLevel]);
@@ -144,8 +146,13 @@ function Svip({ onLevel }: { onLevel: (level: number) => void }) {
         level={lv.level}
         width={contentW}
         fontScale={fontScale}
-        onPress={(r, on) => showAlert(r.name, rightNote(r, on, lv.name, nameOf(r.level)))}
+        onPress={(r, on) => {
+          // The level's frame and entry effect play as a preview (Güncelleme 8); the rest say their note.
+          if ((r.set === 'frame' || r.set === 'entry') && setPreview.open(r.set, lv.level)) return;
+          showAlert(r.name, rightNote(r, on, lv.name, nameOf(r.level)));
+        }}
       />
+      {setPreview.view}
       <VipPointsInfo decay={decay} width={contentW} level={lv.level} />
     </ScrollView>
   );

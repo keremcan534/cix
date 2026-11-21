@@ -101,6 +101,9 @@ export type Settings = {
   /** Room effects on this phone (Efekt ayarları), each under `effectsOff`: gift shows and flights, entry
    *  banners, the mic effect while I talk, emoji reactions over the seats. */
   giftFx: boolean;
+  /** Şanslı hediyeler shown as gifts (the pop in the middle, the flights, the package video); off: only their banner
+   *  (Güncelleme 8). */
+  luckyFx: boolean;
   entryFx: boolean;
   micAnim: boolean;
   seatReactions: boolean;
@@ -181,7 +184,8 @@ type AppState = {
   // cosmetics & emoji
   inventory: Set<string>;
   equipped: Partial<Record<CosmeticKind, string>>;
-  buyCosmetic: (id: string) => string | null;
+  /** Buys a shop item; `days`: one of its other durations (Güncelleme 8), else its main term. */
+  buyCosmetic: (id: string, days?: number) => string | null;
   equip: (id: string | null, kind: CosmeticKind) => void;
   /**
    * Live: items the server says I own (Çantam, lib/live/bag) that this phone didn't know yet (a reward, a staff gift,
@@ -548,6 +552,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       giftSounds: true,
       bigGiftsOnly: false, micDenoise: true, micRaw: false,
       giftFx: true,
+      luckyFx: true,
       entryFx: true,
       micAnim: true,
       seatReactions: true,
@@ -953,10 +958,14 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
 
     inventory,
     equipped,
-    buyCosmetic: (id) => {
+    buyCosmetic: (id, days) => {
       // As Yönetim › Mağaza has it (its name, price, days, VIP level; the team's own items too), else compiled.
-      const item = cosmeticById(id);
-      if (!item) return 'Ürün bulunamadı';
+      const listed = cosmeticById(id);
+      if (!listed) return 'Ürün bulunamadı';
+      // One of its other durations, at that duration's price (Güncelleme 8).
+      const plan = days !== undefined && days !== listed.days ? listed.plans?.find((p) => p.days === days) : undefined;
+      if (days !== undefined && days !== listed.days && !plan) return 'Bu süre artık satılmıyor';
+      const item = plan ? { ...listed, price: plan.price, days: plan.days } : listed;
       if (item.retired) return 'Bu ürün artık satışta değil';
       if (inventory.has(id)) return 'Zaten sahipsin';
       if (item.minVip && vipLevel < item.minVip) return `Bu ürün VIP ${item.minVip} ve üzeri için`;

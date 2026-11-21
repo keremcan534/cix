@@ -184,10 +184,10 @@ describe('Finans paneli API’de', () => {
     const meta = (await panel('GET', '/api/admin/sanctions/meta', undefined, {}, MOD))[1];
     assert.deepEqual(meta.perms.sort(), ['sanction.appeal', 'sanction.ban', 'sanction.device_ban', 'sanction.lift', 'sanction.mute', 'sanction.view']);
     const reason = meta.reasons[0].code;
-    const [ms, m] = await panel('POST', '/api/admin/sanctions', { user: target.user.id, type: 'mute_global_text', minutes: 60, reason, description: 'Hakaret' }, {}, MOD);
+    const [ms, m] = await panel('POST', '/api/admin/sanctions', { evidence: [{ kind: 'screenshot', content: 'https://ornek.test/ekran.png' }], user: target.user.id, type: 'mute_global_text', minutes: 60, reason, description: 'Hakaret' }, {}, MOD);
     assert.equal(ms, 200, m.error);
     // A lifetime ban: a moderator may only propose it; it waits for someone with the full permissions.
-    const [bs, b] = await panel('POST', '/api/admin/sanctions', { user: target.user.id, type: 'account_ban', minutes: null, reason, description: 'Ömür boyu' }, {}, MOD);
+    const [bs, b] = await panel('POST', '/api/admin/sanctions', { evidence: [{ kind: 'screenshot', content: 'https://ornek.test/ekran.png' }], user: target.user.id, type: 'account_ban', minutes: null, reason, description: 'Ömür boyu' }, {}, MOD);
     assert.equal(bs, 200, b.error);
     const prop = (await q("SELECT id, status FROM user_sanctions WHERE user_id = $1 AND sanction_type = 'account_ban'", [target.user.id])).rows[0];
     assert.equal(prop.status, 'pending');
@@ -203,11 +203,44 @@ describe('Finans paneli API’de', () => {
     assert.equal((await panel('GET', '/api/admin/sanctions/meta', undefined, {}, NONE))[0], 403);
   });
 
+  // Güncelleme 8, madde 9: a sanction needs evidence; without it only a Süper yönetici gives it at once, anyone else's
+  // waits, and only a Süper yönetici approves or rejects it.
+  test('kanıtsız yaptırım Süper yönetici onayına düşer; Süper yönetici kanıtsız da verir', async () => {
+    const MOD = { id: 11, email: 'mod2@panel.test', name: 'Mod Can', role: 'moderator', perms: ['app.sanctions'] };
+    const FULL = { id: 12, email: 'full@panel.test', name: 'Tam Yetkili', role: 'moderation', perms: ['app.sanctions_full'] };
+    const SUPER = { id: 13, email: 'super@panel.test', name: 'Süper', role: 'super_admin', perms: ['app.sanctions_full'] };
+    const target = await h.account('Kanıtsız Ceza');
+    const reason = (await panel('GET', '/api/admin/sanctions/meta', undefined, {}, MOD))[1].reasons[0].code;
+    const mute = { user: target.user.id, type: 'mute_global_text', minutes: 60, reason, description: 'Hakaret' };
+    const [st, j] = await panel('POST', '/api/admin/sanctions', mute, {}, MOD);
+    assert.equal(st, 200, j.error);
+    assert.equal(j.sanctions[0].status, 'pending', 'kanıtsız: bekler');
+    assert.equal(j.sanctions[0].needsSuper, true);
+    const id = j.sanctions[0].id;
+    const [fs, fj] = await panel('POST', '/api/admin/sanctions/approve', { id, approve: true, note: 'Onaylıyorum' }, {}, FULL);
+    assert.equal(fs, 403);
+    assert.match(fj.error, /yalnız Süper yönetici/);
+    const [ss, sj] = await panel('POST', '/api/admin/sanctions/approve', { id, approve: true, note: 'Gördüm, doğru' }, {}, SUPER);
+    assert.equal(ss, 200, sj.error);
+    assert.equal(sj.sanction.status, 'active');
+    // With evidence: at once. A Süper yönetici: at once without it too.
+    const [es, ej] = await panel('POST', '/api/admin/sanctions', { ...mute, evidence: [{ kind: 'screenshot', content: 'https://ornek.test/1.png' }] }, {}, MOD);
+    assert.equal(es, 200, ej.error);
+    assert.equal(ej.sanctions[0].status, 'active');
+    assert.equal(ej.sanctions[0].evidence[0].kind, 'screenshot');
+    const [ps, pj] = await panel('POST', '/api/admin/sanctions', mute, {}, SUPER);
+    assert.equal(ps, 200, pj.error);
+    assert.deepEqual([pj.sanctions[0].status, pj.sanctions[0].needsSuper], ['active', false]);
+    // Waiting widens nothing: a moderator still can't give what their role doesn't allow, evidence or not.
+    const [ls, lj] = await panel('POST', '/api/admin/sanctions', { user: target.user.id, type: 'account_ban', minutes: null, reason, description: 'Ömür boyu' }, {}, { ...MOD, perms: ['app.support'] });
+    assert.equal(ls, 403, lj.error);
+  });
+
   test('iki panel kullanıcısı iki kişidir: ömür boyu yasak önerisini öneren değil, öbürü onaylar', async () => {
     const target = await h.account('Yasaklanacak');
     const meta = (await panel('GET', '/api/admin/sanctions/meta'))[1];
     const reason = meta.reasons[0].code;
-    const [ps, proposed] = await panel('POST', '/api/admin/sanctions', { user: target.user.id, type: 'account_ban', minutes: null, reason, description: 'Tekrarlayan dolandırıcılık' });
+    const [ps, proposed] = await panel('POST', '/api/admin/sanctions', { evidence: [{ kind: 'screenshot', content: 'https://ornek.test/ekran.png' }], user: target.user.id, type: 'account_ban', minutes: null, reason, description: 'Tekrarlayan dolandırıcılık' });
     assert.equal(ps, 200, proposed.error);
     const id = (await q("SELECT id, status, created_by FROM user_sanctions WHERE user_id = $1 AND sanction_type = 'account_ban'", [target.user.id])).rows[0];
     assert.deepEqual([id.status, id.created_by], ['pending', ME], 'ikinci kişiyi bekler');

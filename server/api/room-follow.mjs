@@ -140,7 +140,11 @@ export const roomFollowRoutes = {
     const mine = await db.query('SELECT count(*)::int AS n, coalesce(bool_or(owner_id = $2), false) AS has FROM room_follows WHERE user_id = $1', [me.id, room.owner]);
     if (!mine.rows[0].has) {
       if (mine.rows[0].n >= ROOM_FOLLOW_MAX) throw new HttpError(409, `En fazla ${ROOM_FOLLOW_MAX} oda takip edebilirsin`);
-      await db.query('INSERT INTO room_follows (owner_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [room.owner, me.id]);
+      // Both accounts' key locks in id order first, as follows (social.mjs) and the money routes take them.
+      await tx(async (c) => {
+        await c.query('SELECT id FROM users WHERE id = ANY($1::uuid[]) ORDER BY id FOR KEY SHARE', [[room.owner, me.id]]);
+        await c.query('INSERT INTO room_follows (owner_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [room.owner, me.id]);
+      });
     }
     return { following: true, followers: await followerCount(room.owner) };
   },

@@ -176,7 +176,7 @@ describe('Anlar', () => {
     assert.equal(done.target.content.removed, true, 'kayıt için duruyor');
 
     // A text mute covers Anlar.
-    await ok(call('POST', '/api/admin/sanctions', { user: a.user.id, type: 'mute_global_text', reason: 'spam', minutes: 30, note: 'Anlar' }, mod.session), 'sustur');
+    await ok(call('POST', '/api/admin/sanctions', { evidence: [{ kind: 'note', content: 'Test kanıtı' }], user: a.user.id, type: 'mute_global_text', reason: 'spam', minutes: 30, note: 'Anlar' }, mod.session), 'sustur');
     const [st, j] = await call('POST', '/api/moments', { text: 'Susturulmuşken', ref: rnd(10) }, a.session);
     assert.equal(st, 403);
     assert.equal(j.code, 'muted');

@@ -117,7 +117,7 @@ describe('Yaptırım kaldırmada rütbe (sunucu-3, yonetim-2)', () => {
   let mod1;
   let mod2;
   const give = async (who, body) => {
-    const [st, j] = await call('POST', '/api/admin/sanctions', { reason: 'spam', description: 'Kurallara aykırı davranış', type: 'mute_global_text', minutes: 60, ...body }, who.session);
+    const [st, j] = await call('POST', '/api/admin/sanctions', { evidence: [{ kind: 'note', content: 'Test kanıtı' }], reason: 'spam', description: 'Kurallara aykırı davranış', type: 'mute_global_text', minutes: 60, ...body }, who.session);
     assert.equal(st, 200, j.error);
     return j.sanctions[0];
   };

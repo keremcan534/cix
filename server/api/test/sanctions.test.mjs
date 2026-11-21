@@ -43,7 +43,8 @@ const until = async (fn, ms = 3000) => {
 let admin;
 let mod;
 const sanction = async (who, body) => {
-  const [st, j] = await call('POST', '/api/admin/sanctions', { reason: 'harassment', description: 'Kurallara aykırı davranış', ...body }, who.session);
+  // With evidence (Güncelleme 8: a moderator's sanction without it waits for a Süper yönetici).
+  const [st, j] = await call('POST', '/api/admin/sanctions', { reason: 'harassment', description: 'Kurallara aykırı davranış', evidence: [{ kind: 'note', content: 'Test kanıtı' }], ...body }, who.session);
   assert.equal(st, 200, j.error);
   return j.sanctions;
 };

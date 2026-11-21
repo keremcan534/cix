@@ -209,7 +209,7 @@ describe('iletişim filtresi: otomatik susturma', () => {
     await appRefusal(u);
     await appRefusal(u);
     const [m] = (
-      await ok(call('POST', '/api/admin/sanctions', { user: u.user.id, type: 'mute_global_text', reason: 'spam', minutes: 30, includeDm: true, note: 'Tekrarlı mesaj' }, mod.session), 'elle susturma')
+      await ok(call('POST', '/api/admin/sanctions', { evidence: [{ kind: 'note', content: 'Test kanıtı' }], user: u.user.id, type: 'mute_global_text', reason: 'spam', minutes: 30, includeDm: true, note: 'Tekrarlı mesaj' }, mod.session), 'elle susturma')
     ).sanctions;
     for (let i = 0; i < 4; i++) assert.deepEqual(await appRefusal(u), { counted: true }, 'zaten yazamıyor: uyarı yok');
     assert.equal((await autoMutes(u)).length, 0, 'yetkilinin susturması sürerken otomatik eklenmez');
@@ -227,7 +227,7 @@ describe('iletişim filtresi: otomatik susturma', () => {
     await appRefusal(u);
     await appRefusal(u);
     // A global text mute without DMs: the person can still write DMs, so the rule still counts and warns.
-    const [m] = (await ok(call('POST', '/api/admin/sanctions', { user: u.user.id, type: 'mute_global_text', reason: 'spam', minutes: 30, note: 'Oda sohbetini bozdu' }, mod.session))).sanctions;
+    const [m] = (await ok(call('POST', '/api/admin/sanctions', { evidence: [{ kind: 'note', content: 'Test kanıtı' }], user: u.user.id, type: 'mute_global_text', reason: 'spam', minutes: 30, note: 'Oda sohbetini bozdu' }, mod.session))).sanctions;
     assert.deepEqual(await appRefusal(u), { counted: true, strikesLeft: 2, muteMinutes: 60 });
     await lift(mod, m, 'Süre yeterli görüldü');
     assert.equal((await appRefusal(u)).strikesLeft, 1);
@@ -288,7 +288,7 @@ describe('iletişim filtresi: otomatik susturma', () => {
     const meta = await ok(call('GET', '/api/admin/sanctions/meta', null, boss.session));
     assert.ok(meta.reasons.some((r) => r.code === 'spam'));
     assert.ok(!meta.reasons.some((r) => r.code === 'contact_sharing'), 'panel sunmaz');
-    const manual = await call('POST', '/api/admin/sanctions', { user: u.user.id, type: 'mute_global_text', reason: 'contact_sharing', minutes: 60, includeDm: true, note: 'elle' }, boss.session);
+    const manual = await call('POST', '/api/admin/sanctions', { evidence: [{ kind: 'note', content: 'Test kanıtı' }], user: u.user.id, type: 'mute_global_text', reason: 'contact_sharing', minutes: 60, includeDm: true, note: 'elle' }, boss.session);
     assert.equal(manual[0], 400, JSON.stringify(manual[1]));
     const policy = await call('POST', '/api/admin/sanction-policies', { reason: 'contact_sharing', steps: [{ type: 'mute_global_text', minutes: 60, auto: true }] }, boss.session);
     assert.equal(policy[0], 400, JSON.stringify(policy[1]));

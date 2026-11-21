@@ -75,6 +75,8 @@ export type ShopItem = {
   name: string;
   price: number;
   days: number | null;
+  /** Its other durations, each priced (Güncelleme 8); absent: only `days`. */
+  plans?: { days: number; price: number }[];
   minVip: number;
   builtin: boolean;
   off: boolean;
@@ -217,6 +219,20 @@ function seatOf(raw: unknown): SeatColor | null {
 }
 
 /** GET /api/catalog `shop` (shop=1); null when there is none (an older server). Malformed items are left out. */
+/** An item's other durations from the catalog: at most 3, 1–365 days, none twice nor its main term's, priced; by days. */
+export function parsePlans(raw: unknown[], main: number): { days: number; price: number }[] {
+  const seen = new Set([main]);
+  const out: { days: number; price: number }[] = [];
+  for (const p of raw.slice(0, 3)) {
+    const x = obj(p);
+    const d = typeof x.days === 'number' && Number.isSafeInteger(x.days) && x.days >= 1 && x.days <= 365 ? x.days : null;
+    const pr = typeof x.price === 'number' && Number.isSafeInteger(x.price) && x.price >= 1 ? x.price : null;
+    if (d === null || pr === null || seen.has(d)) continue;
+    seen.add(d);
+    out.push({ days: d, price: pr });
+  }
+  return out.sort((a, b) => a.days - b.days);
+}
 export function parseLiveShop(raw: unknown): LiveShop | null {
   const list = obj(raw).items;
   if (!Array.isArray(list)) return null;
@@ -267,12 +283,15 @@ export function parseLiveShop(raw: unknown): LiveShop | null {
     if (!builtin && kind === 'bubble' && !bubble) continue;
     if (!builtin && kind === 'wave' && !wave) continue;
     seen.add(r.sku);
+    // Its other durations (Güncelleme 8): a malformed one is left out (the main term still sells).
+    const plans = days !== null && Array.isArray(r.plans) ? parsePlans(r.plans, days) : [];
     items.push({
       sku: r.sku,
       kind,
       name,
       price,
       days,
+      ...(plans.length ? { plans } : {}),
       minVip,
       builtin,
       off: r.off === true,
@@ -305,7 +324,7 @@ export function mergeShop(compiled: readonly Cosmetic[], shop: LiveShop | null):
       const base = byId.get(x.sku);
       if (x.builtin && base?.kind === kind) {
         const { retired: _was, ...rest } = base;
-        out.push({ ...rest, name: x.name, price: x.price, days: x.days, ...(x.minVip ? { minVip: x.minVip } : { minVip: undefined }), ...(x.off ? { retired: true as const } : {}) });
+        out.push({ ...rest, name: x.name, price: x.price, days: x.days, ...(x.plans ? { plans: x.plans } : {}), ...(x.minVip ? { minVip: x.minVip } : { minVip: undefined }), ...(x.off ? { retired: true as const } : {}) });
       } else if (!x.builtin && !byId.has(x.sku)) {
         out.push({
           id: x.sku,
@@ -314,6 +333,7 @@ export function mergeShop(compiled: readonly Cosmetic[], shop: LiveShop | null):
           emoji: OWN_EMOJI[kind],
           price: x.price,
           days: x.days,
+          ...(x.plans ? { plans: x.plans } : {}),
           ...(x.minVip ? { minVip: x.minVip } : {}),
           ...(x.off ? { retired: true as const } : {}),
           remote: {
