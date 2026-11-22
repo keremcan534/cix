@@ -40,6 +40,8 @@ describe('Takip satırı', () => {
     assert.equal((await follow(woman, man, false))[0], 200);
     assert.equal((await follow(woman, man))[0], 200);
     assert.equal((await lines(man)).length, 1, 'günde bir satır');
+    // The heart (chat_days) doesn't count these lines: following can't raise it.
+    assert.equal((await h.sql.query('SELECT count(*)::int AS n FROM chat_days WHERE $1 IN (lo, hi)', [man.user.id])).rows[0].n, 0, 'kalbe sayılmaz');
     // A follow that was already there writes nothing.
     assert.equal((await follow(man, woman))[0], 200);
     assert.equal((await lines(woman)).length, 1);

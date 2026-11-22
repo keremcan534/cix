@@ -51,7 +51,10 @@ describe('Verilerimin kopyası', () => {
     assert.ok(x.sessions.length >= 1 && !('tokenHash' in x.sessions[0]) && !('token_hash' in x.sessions[0]), 'oturumlar, anahtarı olmadan');
     assert.deepEqual(x.follows.following.map((p) => p.name), ['Arkadaş']);
     assert.deepEqual(x.follows.followers.map((p) => p.name), ['Arkadaş']);
+    // The two follows' lines (social.mjs, 22 Nov 2026) are messages of mine too: my own follow's, and theirs to me.
     assert.deepEqual(x.messages.map((m) => [m.direction, m.with.name, m.text]), [
+      ['sent', 'Arkadaş', 'Seni takip etti'],
+      ['received', 'Arkadaş', 'Seni takip etti'],
       ['sent', 'Arkadaş', 'Selam, nasılsın?'],
       ['received', 'Arkadaş', 'İyiyim, sen?'],
     ]);
