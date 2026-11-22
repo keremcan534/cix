@@ -90,7 +90,7 @@ export const NOBLE_RIGHTS: { name: string; emoji: string; art?: ArtName; perk?: 
   { name: 'Sessiz ziyaret', emoji: '🥷', art: 'ayricalik-gizli-ziyaret', perk: 'silent_visit' },
   { name: 'Dolu odaya girme', emoji: '🚪', art: 'ayricalik-tam-dolu-odalar', soon: true },
   { name: 'Çevrimiçi gizlilik', emoji: '🫥', soon: true },
-  { name: 'Ülke dolaşımı', emoji: '🌍', soon: true },
+  { name: 'Ülke dolaşımı', emoji: '🌍', art: 'ulke-tum-ulkeler', soon: true },
   { name: 'Sıralamada gizemli kimlik', emoji: '🕵️', art: 'ayricalik-gizemli-kisi-kimligi', soon: true },
   { name: 'Gizli oda girişi', emoji: '👻', art: 'ayricalik-gizli-oda-girisi', soon: true },
   { name: 'Yayın engelleme', emoji: '🔇', soon: true },

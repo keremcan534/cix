@@ -13,6 +13,7 @@ import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode 
 import { Image, Pressable, View } from 'react-native';
 
 import { ActionSheet } from '@/components/ActionSheet';
+import { Art } from '@/components/Art';
 import { BOND_ART, BondMark } from '@/components/bond-mark';
 import { Text } from '@/components/text';
 import { Avatar } from '@/components/ui';
@@ -368,7 +369,7 @@ export function BondsTab({ user, isMe, state, isBlocked, onMeetInvite }: { user:
           <Text style={[styles.meta, { textAlign: 'center' }]}>Bağ kurmak için birinin profilini aç, Bağlar sekmesinden “Bağ kur”a dokun.</Text>
           <Pressable onPress={onMeetInvite} style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })} accessibilityRole="button">
             <LinearGradient colors={PROFILE_GRADIENT.cta} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.cta}>
-              <Ionicons name="home" size={18} color="#fff" />
+              <Art name="iliski-bulusma-odasi" size={24} />
               <Text style={styles.ctaText}>Buluşma Odasına Davet Et</Text>
             </LinearGradient>
           </Pressable>

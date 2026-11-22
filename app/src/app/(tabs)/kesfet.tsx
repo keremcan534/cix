@@ -7,6 +7,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { Text } from '@/components/text';
 import { Art } from '@/components/Art';
+import { countryArt } from '@/data/rooms-ui';
 import { SCENES } from '@/components/fx/scenes';
 import { Backdrop } from '@/components/fx/surface';
 import { Button, CharmBadge, StateIcon, VerifiedBadge, VipBadge } from '@/components/ui';
@@ -176,8 +177,9 @@ export default function DiscoverScreen() {
 
             {!isDefault(filters) && (
               <View style={styles.activeFilters}>
+                <Art name={countryArt(country.code)} size={18} />
                 <Text style={styles.activeText} numberOfLines={1}>
-                  {country.flag} {country.name}
+                  {country.name}
                 </Text>
                 <Pressable onPress={() => setFilters(DEFAULT_FILTERS)} hitSlop={8}>
                   <Text style={{ color: colors.primaryText, fontWeight: '700', fontSize: 12 }}>Temizle</Text>
@@ -467,10 +469,9 @@ function FilterSheet({
         <Text style={styles.sheetLabel}>Hangi ülkeden kişiler görünsün?</Text>
         <View style={styles.optionWrap}>
           {COUNTRIES.map((c) => (
-            <Pressable key={c.code} onPress={() => set('country', c.code)} style={[styles.option, filters.country === c.code && styles.optionActive]}>
-              <Text style={[styles.optionText, filters.country === c.code && { color: colors.text }]}>
-                {c.flag} {c.name}
-              </Text>
+            <Pressable key={c.code} onPress={() => set('country', c.code)} style={[styles.option, styles.optionRow, filters.country === c.code && styles.optionActive]}>
+              <Art name={countryArt(c.code)} size={16} />
+              <Text style={[styles.optionText, filters.country === c.code && { color: colors.text }]}>{c.name}</Text>
             </Pressable>
           ))}
         </View>
@@ -598,6 +599,7 @@ const useStyles = makeStyles(({ colors, lift, dark, edge }) => ({
   optionWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   option: { backgroundColor: colors.cardAlt, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: 'transparent' },
   optionActive: { borderColor: colors.primaryText, backgroundColor: dark ? 'rgba(255,95,162,0.18)' : 'rgba(208,46,120,0.11)' },
+  optionRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   optionText: { color: colors.textDim, fontSize: 13, fontWeight: '600' },
   sheetBtn: { flex: 1, alignItems: 'center', borderRadius: 999, paddingVertical: 12 },
 }));

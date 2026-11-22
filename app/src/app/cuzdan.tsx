@@ -14,6 +14,7 @@ import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 import { SCENES } from '@/components/fx/scenes';
 import { Backdrop } from '@/components/fx/surface';
+import { Art } from '@/components/Art';
 import { Icon3D } from '@/components/Icon3D';
 import { IS_DEMO } from '@/lib/build';
 import { liveMode, liveTopup, message, refreshWallet, TEST_PACKS } from '@/lib/live';
@@ -291,6 +292,7 @@ export default function WalletScreen() {
             </>
           )}
           <Pressable onPress={() => router.push('/vip')} style={styles.svipLink} accessibilityRole="link" accessibilityLabel="VIP seviyelerine bak">
+            <Art name="finans-vip-elmas-paketi" size={36} />
             <Text style={styles.svipLinkText}>VIP seviyelerine bak →</Text>
             <Text style={styles.svipLinkSub}>{svipLevel ? `VIP ${svipLevel} · ${svipXp.toLocaleString('tr-TR')} puan` : 'Yüklediğin her jeton 1 puan'}</Text>
           </Pressable>
@@ -369,7 +371,7 @@ function PackTile({
             </View>
           ) : null}
         </View>
-        <Icon3D name="coin" size={40} />
+        {first ? <Art name="finans-ilk-alim-firsati" size={40} /> : <Icon3D name="coin" size={40} />}
         <Text style={styles.packCoins} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
           {coins.toLocaleString('tr-TR')}
         </Text>

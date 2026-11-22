@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { ScrollView, View, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Art } from '@/components/Art';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { Text, TextInput } from '@/components/text';
 import { Button, Card, Header } from '@/components/ui';
@@ -187,6 +188,7 @@ export default function Withdraw() {
       <KeyboardAvoid style={{ flex: 1 }}>
       <ScrollView contentContainerStyle={{ padding: 16, gap: 14 }} keyboardShouldPersistTaps="handled">
         <Card style={{ alignItems: 'center', gap: 4 }}>
+          <Art name="finans-para-cekme" size={56} />
           <Text style={styles.dim}>Çekilebilir bakiye</Text>
           <Text style={styles.big}>💎 {diamonds.toLocaleString('tr-TR')}</Text>
           <Text style={styles.dim}>≈ {usd(diamonds)} · Minimum {minD.toLocaleString('tr-TR')} elmas</Text>

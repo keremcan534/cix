@@ -7,6 +7,7 @@ import { onWebEnter } from '@/lib/enter-sends';
 
 import { Text, TextInput } from '@/components/text';
 import { Art, type ArtName } from '@/components/Art';
+import { Icon3D } from '@/components/Icon3D';
 import { ContactNote } from '@/components/contact-note';
 import { EmojiPanel } from '@/components/EmojiPanel';
 import { MessageText } from '@/components/ReactionArt';
@@ -204,7 +205,7 @@ export function GroupChat({
             />
             {onGift && (
               <Pressable onPress={onGift} accessibilityLabel="Hediye">
-                <Text style={{ fontSize: 24 }}>🎁</Text>
+                <Icon3D name="gift" size={28} />
               </Pressable>
             )}
             <Pressable onPress={send} style={styles.send} accessibilityLabel="Gönder">

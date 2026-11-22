@@ -562,7 +562,7 @@ function PayoutAccountCard({ scope }: { scope: Scope }) {
 
   return (
     <Card style={{ gap: 8 }}>
-      <SectionTitle icon="card" title="Ödeme hesabı" />
+      <SectionTitle icon="card" art="finans-odeme-ve-hak-edis" title="Ödeme hesabı" />
       {acc ? (
         <View style={styles.row}>
           <Ionicons name={acc.kind === 'bank' ? 'business' : 'globe'} size={20} color={colors.textDim} />
@@ -652,7 +652,7 @@ function PayoutForm({ scope, available, legacyWeekly = 0 }: { scope: Scope; avai
 
   return (
     <Card style={{ gap: 8 }}>
-      <SectionTitle icon="cash" title="Para çekme talebi" />
+      <SectionTitle icon="cash" art="finans-para-cekme" title="Para çekme talebi" />
       <Text style={styles.dim}>
         Çekilebilir: {dia(available)} ({usd(available)}) · Bu hafta: {dia(weekUsed)} / {dia(RULES.weeklyWithdrawLimitDiamonds)}
       </Text>
@@ -793,12 +793,12 @@ function Stat({ label, value, sub, color, art, icon }: { label: string; value: s
   );
 }
 
-function SectionTitle({ icon, title }: { icon: keyof typeof Ionicons.glyphMap; title: string }) {
+function SectionTitle({ icon, title, art }: { icon: keyof typeof Ionicons.glyphMap; title: string; art?: ArtName }) {
   const { colors } = useTheme();
   const styles = useStyles();
   return (
     <View style={styles.sectionTitle}>
-      <Ionicons name={icon} size={16} color={colors.primaryText} />
+      {art ? <Art name={art} size={20} /> : <Ionicons name={icon} size={16} color={colors.primaryText} />}
       <Text style={styles.sectionText}>{title}</Text>
     </View>
   );

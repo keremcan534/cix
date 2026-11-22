@@ -6,6 +6,7 @@ import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
+import { Art } from '@/components/Art';
 import { AuthHeader } from '@/components/AuthHeader';
 import { GradientButton } from '@/components/ui';
 import { emailError, emailTypoHint, normalizeEmail } from '@/lib/email-address';
@@ -72,7 +73,7 @@ export default function PhoneScreen() {
                 <Ionicons name="mail-outline" size={20} color={colors.textDim} />
               ) : (
                 <>
-                  <Text style={{ fontSize: 18 }}>🇹🇷</Text>
+                  <Art name="ulke-turkiye" size={20} />
                   <Text style={styles.prefixText}>+90</Text>
                 </>
               )}
