@@ -91,3 +91,17 @@ describe('Çarşı süre paketleri', () => {
     assert.match(src('store.tsx'), /const item = plan \? \{ \.\.\.listed, price: plan\.price, days: plan\.days \} : listed;/);
   });
 });
+
+// Şanslı rafında olasılık tablosu (owners, 22 Nov 2026): it no longer shows under the gifts; it opens on a tap, from
+// "Olasılıklar" over it or under the send button (store rules want the odds before the purchase).
+describe('Şanslı olasılık tablosu', () => {
+  const sheet = src('components/room/gift-sheet.tsx');
+  test('kendiliğinden açık değil; dokununca açılır', () => {
+    assert.match(sheet, /useState<'odds' \| 'history' \| null>\(null\)/);
+    assert.match(sheet, /onView=\{\(v\) => setLuckyView\(\(cur\) => \(cur === v \? null : v\)\)\}/);
+  });
+  test('gönder düğmesinin altındaki "Olasılıklar" bağlantısı duruyor', () => {
+    assert.match(sheet, /<Pressable onPress=\{showOdds\}[^>]*accessibilityLabel=\{`\$\{footer\.text\}\. Olasılık tablosunu göster`\}/);
+    assert.match(sheet, /setLuckyView\('odds'\);/);
+  });
+});

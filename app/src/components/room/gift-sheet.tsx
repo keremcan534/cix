@@ -186,7 +186,9 @@ export function GiftSheet({
     if (visible && luckyShelf && liveMode()) void refreshLucky().catch(() => {});
   }, [visible, luckyShelf]);
   const [luckyId, setLuckyId] = useState(lucky.config.gifts[0]?.id ?? '');
-  const [luckyView, setLuckyView] = useState<'odds' | 'history'>('odds');
+  // Neither table shows until asked (owners, 22 Nov 2026: the odds table under the Şanslı gifts goes). The odds stay one
+  // tap away, from "Olasılıklar" here and under the send button: store rules want them before the purchase.
+  const [luckyView, setLuckyView] = useState<'odds' | 'history' | null>(null);
   // The "Olasılıklar" link under the button: the odds table of the gift picked, scrolled into sight (store rules want the
   // odds close to the purchase). `want`: the table is still to be laid out (it was the history).
   const gridRef = useRef<ComponentRef<typeof ScrollView>>(null);
@@ -528,7 +530,7 @@ export function GiftSheet({
               gifts={lucky.config.gifts}
               selected={lg}
               view={luckyView}
-              onToggleView={() => setLuckyView((v) => (v === 'odds' ? 'history' : 'odds'))}
+              onView={(v) => setLuckyView((cur) => (cur === v ? null : v))}
               history={lucky.records.filter((r) => r.userId === 'me')}
               version={lucky.config.version}
               onShelfAt={(y) => (oddsAt.current.shelf = y)}
@@ -689,7 +691,7 @@ function LuckyShelf({
   gifts,
   selected,
   view,
-  onToggleView,
+  onView,
   history,
   version,
   onShelfAt,
@@ -698,8 +700,10 @@ function LuckyShelf({
 }: {
   gifts: LuckyGift[];
   selected: LuckyGift;
-  view: 'odds' | 'history';
-  onToggleView: () => void;
+  /** The table open under the shelf; null: none (they open on a tap). */
+  view: 'odds' | 'history' | null;
+  /** Opens that table, or closes it when it is the open one. */
+  onView: (v: 'odds' | 'history') => void;
   history: LuckyRecord[];
   version: number;
   /** Where this shelf and its odds table sit in the grid (the "Olasılıklar" link under the button scrolls there). */
@@ -741,10 +745,13 @@ function LuckyShelf({
         })}
       </View>
       <View style={g.luckyToggle}>
-        <Pressable onPress={onToggleView} hitSlop={{ top: 6, bottom: 6 }} style={g.sortBtn} accessibilityRole="button">
-          <Ionicons name={view === 'odds' ? 'time-outline' : 'stats-chart-outline'} size={14} color={colors.primaryText} />
-          <Text style={g.sortText}>{view === 'odds' ? 'Geçmişim' : 'Olasılıklar'}</Text>
-        </Pressable>
+        {(['odds', 'history'] as const).map((v) => (
+          <Pressable key={v} onPress={() => onView(v)} hitSlop={{ top: 6, bottom: 6 }} style={g.sortBtn} accessibilityRole="button" accessibilityState={{ expanded: view === v }}>
+            <Ionicons name={v === 'odds' ? 'stats-chart-outline' : 'time-outline'} size={14} color={colors.primaryText} />
+            <Text style={g.sortText}>{v === 'odds' ? 'Olasılıklar' : 'Geçmişim'}</Text>
+            <Ionicons name={view === v ? 'chevron-up' : 'chevron-down'} size={12} color={colors.primaryText} />
+          </Pressable>
+        ))}
       </View>
       {view === 'odds' ? (
         <View style={g.odds} accessibilityLabel={`${selected.name} olasılık tablosu`} onLayout={(e) => onTableAt(e.nativeEvent.layout.y)}>
@@ -764,7 +771,7 @@ function LuckyShelf({
             Bu oranlar sunucudaki gerçek ayarlardır (sürüm {version}). Ödül garanti değildir. Ödül jeton olarak bakiyene eklenir; ödülle yaptığın harcama Cömertlik puanına sayılmaz.
           </Text>
         </View>
-      ) : history.length === 0 ? (
+      ) : view === null ? null : history.length === 0 ? (
         <Text style={[g.dim, { padding: space.lg, textAlign: 'center' }]}>Henüz Şanslı gönderimin yok.</Text>
       ) : (
         <View style={g.odds}>
@@ -924,7 +931,7 @@ const g = StyleSheet.create({
   gridFill: { flex: 1, minHeight: 0 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: space.sm, paddingBottom: space.sm },
   shelfNote: { width: '100%', paddingHorizontal: space.sm, paddingBottom: 6 },
-  luckyToggle: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: space.xs },
+  luckyToggle: { flexDirection: 'row', justifyContent: 'flex-end', gap: space.md, marginTop: space.xs },
   tileWrap: { width: '25%', padding: 3 },
   // One height for every tile: art, two lines kept for the name, and the price on the same line across a row.
   tile: { height: 108, alignItems: 'center', paddingTop: 4, paddingBottom: 3, paddingHorizontal: 2, borderRadius: radius.md, borderWidth: 2, borderColor: 'transparent', backgroundColor: 'rgba(255,255,255,0.03)' },
