@@ -19,6 +19,11 @@ modunda olması, hata takibi olmaması ve kırık kodun birleşmeden önce yakal
   şans oyunundan gerçek paraya giden bir yol var. Google Play bunu "gerçek paralı kumar" sayar (lisans ve onay ister);
   Türkiye'de de lisans gerekir. Kodda varsayılan olarak **açık** (Cömertlik Lv.2 ve 18 yaş şartıyla). Panelin "Şanslı
   hediye ayarı" sayfasından paket paket kapatılabiliyor.
+- **Şanslı hediyede ×777 (22 Kasım 2026, sahip kararı, "hukuki yanı bize ait"):** örnek videolardaki gibi Şanslı
+  hediyeye ×777 adedi eklendi (normal hediyelerde yok). Bir gönderim 20 kişiye kadar ×777 gidebilir (en çok 16.000
+  çekiliş; önce 5.000'di), yani tek dokunuşta harcanan jeton ve olası kazanç büyüdü. Satın alınan jetonla oynanan ve
+  nakde dönebilen şans özelliğini **genişletir**; sahipler hukuki sorumluluğu üstlendi. Aşağıdaki avukat sorusu yine
+  geçerli. Gerekirse paketler panelden kapatılır; adedi geri almak sunucu güncellemesi ister (`lucky.mjs` `LUCKY_COUNTS`).
 - **Şanslı hediye genişledi (19 Kasım 2026, sahip kararı, hukuk riski açık):** Sahipler avukat görüşünü beklemeden
   panelden **yeni Şanslı paketi** eklenmesini (en çok 20 paket; her birinin adı, emojisi, fiyatı, olasılık tablosu,
   açık/kapalı) ve her pakete **ikon ve video** verilmesini istedi; yapıldı (Güncelleme 7 madde 10,

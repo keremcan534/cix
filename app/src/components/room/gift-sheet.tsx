@@ -77,6 +77,8 @@ const SHELF_NOTE: Record<Shelf, string> = {
 /** Live: only the server's rewards fill the backpack (today the call task). */
 const LIVE_BAG_NOTE = 'Görev ödüllerin. Gönderirken jeton harcanmaz.';
 const COUNTS = [1, 5, 10, 25, 50, 100, 250];
+/** Şanslı hediyeler also go ×777 (owners, 22 Nov 2026, as the sample videos; server/api/lucky.mjs LUCKY_COUNTS). */
+export const LUCKY_COUNTS = [...COUNTS, 777];
 /** Over a room leaving the sheet at least this under the Balkon line, the gift level stays under the title. */
 const COMPACT_UNDER = 600;
 /** One row of the grid: a 108 dp tile and the 3 dp around it. */
@@ -87,7 +89,7 @@ const ROWS_SHOWN = 3.35;
 const ROOM_CHROME = 46 + 58 + 44 + 54;
 /** What the gift level under the title adds to the title row. */
 const LEVEL_ROW = 4;
-const COUNT_LABELS: Record<number, string> = { 5: 'Selam', 25: 'Alkış', 100: 'Coşku', 250: 'Şölen' };
+const COUNT_LABELS: Record<number, string> = { 5: 'Selam', 25: 'Alkış', 100: 'Coşku', 250: 'Şölen', 777: 'Büyük şans' };
 /** Sender gift level: Lv(n+1) needs LEVEL_XP[n] coins spent in total. */
 const LEVEL_XP = [0, 870, 5_000, 20_000, 60_000, 150_000, 400_000, 1_000_000, 2_500_000, 6_000_000];
 
@@ -214,7 +216,7 @@ export function GiftSheet({
   const bag = live ? bagCounts(server?.items ?? []) : demoBag;
   const sourceOf = (id: string) => (live ? bagLabel(server?.items ?? [], id) : (BACKPACK_SOURCES[id] ?? 'Çanta'));
   const [sel, setSel] = useState<{ id: string; bag: boolean }>(() => ({ id: (shown.find((g) => (g.cat ?? 'hot') === 'hot') ?? shown[0]).id, bag: false }));
-  const [count, setCount] = useState(1);
+  const [chosenCount, setCount] = useState(1);
   const [countOpen, setCountOpen] = useState(false);
   const micIds = seated.map((x) => x.id);
   const roomIds = [...micIds, ...listeners.filter((id) => !micIds.includes(id))];
@@ -231,6 +233,8 @@ export function GiftSheet({
   const pickedListeners = roomAll ? [] : targets.filter((id) => !micIds.includes(id));
   const lg = lucky.config.gifts.find((x) => x.id === luckyId) ?? lucky.config.gifts[0];
   const isLucky = shelf === 'lucky' && !!lg;
+  // ×777 is Şanslı's only: back on a plain gift's shelf the count is ×1 again.
+  const count = isLucky || COUNTS.includes(chosenCount) ? chosenCount : 1;
   const list = shelfGifts(shown, shelf, sort, favs, bag, inBag, catalog);
   const muzipNote = shelf === 'gameplay' ? marksShelfNote() : null;
   // A pick from Çantam may be a gift off the shelf for now (Kalp from the call task).
@@ -630,7 +634,7 @@ export function GiftSheet({
             <Pressable style={StyleSheet.absoluteFill} onPress={() => setCountOpen(false)} accessibilityLabel="Adet seçimini kapat" />
             {/* Just over the ×N button, whatever the navigation bar under the sheet. */}
             <View style={[g.countPopup, { bottom: padBottom + (compact ? 54 : 60) }, compact && g.countPopupWide, compact && { width: Math.min(300, screenW - 32) }]}>
-              {COUNTS.map((n) => (
+              {(isLucky ? LUCKY_COUNTS : COUNTS).map((n) => (
                 <Pressable
                   key={n}
                   onPress={() => {

@@ -128,6 +128,13 @@ describe('Sunucu kataloğu uygulamayla aynı', () => {
     const sheet = fs.readFileSync(path.join(import.meta.dirname, '..', 'src/components/room/gift-sheet.tsx'), 'utf8');
     const counts = /const COUNTS = \[([\d,\s]+)\]/.exec(sheet)?.[1].split(',').map(Number);
     assert.deepEqual(server.GIFT_COUNTS, counts);
+    // Şanslı's own ×777 (owners, 22 Nov 2026): the server's LUCKY_COUNTS adds the same as the sheet's.
+    const lucky = fs.readFileSync(path.join(import.meta.dirname, '..', '..', 'server/api/lucky.mjs'), 'utf8');
+    const extra = (src: string, re: RegExp) => re.exec(src)?.[1].split(',').map(Number);
+    assert.deepEqual(extra(sheet, /LUCKY_COUNTS = \[\.\.\.COUNTS, ([\d,\s]+)\]/), [777]);
+    assert.deepEqual(extra(lucky, /LUCKY_COUNTS = \[\.\.\.GIFT_COUNTS, ([\d,\s]+)\]/), [777]);
+    assert.match(lucky, /export const MAX_DRAWS = 16_000;/);
+    assert.match(fs.readFileSync(path.join(import.meta.dirname, '..', 'src/components/room/live-room.tsx'), 'utf8'), /const LUCKY_DRAWS_MAX = 16_000;/);
   });
 
   test('Abonelik planları: gün, fiyat ve mağaza ürün kimlikleri', () => {

@@ -249,6 +249,8 @@ const sameCombo = (a: ComboSpec, b: ComboSpec) => a.lucky === b.lucky && a.giftI
 const COMBO_MORE = 10;
 /** Şanslı combo taps one request can carry (server/api/lucky.mjs MAX_TIMES). */
 const LUCKY_TIMES_MAX = 50;
+/** The most gifts one Şanslı request draws in all, count × taps × people (server/api/lucky.mjs MAX_DRAWS). */
+const LUCKY_DRAWS_MAX = 16_000;
 /** SimilarClub's own community rules, the first line of the chat on every entry (my screen only): short and plain. */
 const ROOM_RULES_NOTICE = 'Müstehcen, şiddet, kumar ve yasa dışı içerik yasak. Görürsen kişinin kartından şikâyet et.';
 /** Arrival time of a room event (called from handlers and effects, never while rendering). */
@@ -3144,7 +3146,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         const c = comboRef.current;
         if (!ok || !q.more || !c || !sameCombo(c, spec)) break;
         // Şanslı: every tap made meanwhile in the next request; a plain gift: the next tap.
-        times = spec.lucky ? q.more : 1;
+        // Never more than the server draws in one request (×777 to many people); the rest go in the next.
+        times = spec.lucky ? Math.max(1, Math.min(q.more, Math.floor(LUCKY_DRAWS_MAX / (spec.each * Math.max(1, spec.to.length))))) : 1;
         q.more -= times;
       }
     } finally {
