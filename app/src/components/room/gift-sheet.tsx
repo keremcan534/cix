@@ -27,7 +27,8 @@ import { LUCKY_RECIPIENT_SHARE, pct } from '@/data/rules';
 import { bagCounts, bagLabel, bagNeed as needOf, bagShort as shortOf } from '@/lib/backpack';
 import { gamblingLevelOk } from '@/lib/games';
 import { pressHaptic, tapHaptic } from '@/lib/haptics';
-import { bagGifts, giftMarkOf, isGlobalGift, roomGiftShelf, useLiveCatalog, type LiveCatalog } from '@/lib/live/catalog-live';
+import { showAlert } from '@/lib/alert';
+import { bagGifts, giftMarkOf, isGlobalGift, isSoonGift, roomGiftShelf, useLiveCatalog, type LiveCatalog } from '@/lib/live/catalog-live';
 import { liveMode } from '@/lib/live';
 import { refreshBackpack, useBackpack } from '@/lib/live/backpack';
 import { refreshLucky } from '@/lib/live/lucky';
@@ -565,9 +566,12 @@ export function GiftSheet({
                 locked={shelf !== 'bag' && isLocked(it, svipLevel)}
                 muted={targets.length > 0 && refusingMarks(giftMarkOf(it.id), targets, refusesMarks).length === targets.length}
                 global={isGlobalGift(it.id, catalog)}
+                soon={shelf !== 'bag' && isSoonGift(it.id, catalog)}
                 stock={shelf === 'bag' ? bag[it.id] : undefined}
                 onPress={() => {
                   tapHaptic();
+                  // Yakında: shown, never picked (the server refuses it too).
+                  if (shelf !== 'bag' && isSoonGift(it.id, catalog)) return showAlert('Yakında', `${it.name} yakında açılacak.`);
                   setSel({ id: it.id, bag: shelf === 'bag' });
                 }}
                 onLongPress={() => toggleFav(it.id)}
@@ -802,6 +806,7 @@ function GiftTile({
   locked,
   muted = false,
   global,
+  soon = false,
   stock,
   onPress,
   onLongPress,
@@ -814,6 +819,8 @@ function GiftTile({
   muted?: boolean;
   /** Global hediye: announced in every room of the country; its badge takes the corner. */
   global?: boolean;
+  /** Yakında (owners, 22 Nov 2026): greyed with the word instead of its price; not sent. */
+  soon?: boolean;
   stock?: number;
   onPress: () => void;
   onLongPress: () => void;
@@ -821,8 +828,8 @@ function GiftTile({
   // At most one corner badge: Global (it says the whole country hears of it), else the effect type unless locked, so
   // the important fact is never crowded out.
   const badge = global ? 'global' : locked ? null : gift.badge === '3D' || gift.badge === 'music' ? gift.badge : null;
-  const a11y = `${gift.name}, ${stock !== undefined ? `ücretsiz, ${stock} adet` : `${fmt(gift.price)} jeton`}${global ? ', global hediye' : ''}${locked ? `, VIP ${gift.minSvip} gerekli` : ''}${muted ? ', alıcı iz kabul etmiyor' : ''}${favorite ? ', favori' : ''}`;
-  const faded = locked || muted;
+  const a11y = `${gift.name}, ${stock !== undefined ? `ücretsiz, ${stock} adet` : `${fmt(gift.price)} jeton`}${global ? ', global hediye' : ''}${locked ? `, VIP ${gift.minSvip} gerekli` : ''}${muted ? ', alıcı iz kabul etmiyor' : ''}${favorite ? ', favori' : ''}${soon ? ', yakında' : ''}`;
+  const faded = locked || muted || soon;
   return (
     <Pressable onPress={onPress} onLongPress={onLongPress} delayLongPress={350} style={g.tileWrap} accessibilityRole="button" accessibilityState={{ selected }} accessibilityLabel={a11y} accessibilityHint="Uzun bas: favorilere ekle veya çıkar">
       <View style={[g.tile, selected && g.tileOn]}>
@@ -834,7 +841,11 @@ function GiftTile({
             {gift.name}
           </Text>
         </View>
-        {locked ? (
+        {soon ? (
+          <View style={g.soonPill}>
+            <Text style={g.soonText}>Yakında</Text>
+          </View>
+        ) : locked ? (
           <View style={g.lockPill}>
             <Ionicons name="lock-closed" size={10} color={colors.gold} />
             <Text style={g.lockText}>VIP {gift.minSvip}</Text>
@@ -952,6 +963,8 @@ const g = StyleSheet.create({
   luckyBadge: { alignSelf: 'center', minWidth: 20, height: 16, borderRadius: 5, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
   badgeText: { color: colors.text, fontSize: 10, fontWeight: '900' },
   musicBadge: { position: 'absolute', top: 2, right: 2, width: 20, height: 20 },
+  soonPill: { alignSelf: 'center', marginTop: 2, paddingHorizontal: 8, paddingVertical: 1, borderRadius: 999, backgroundColor: colors.cardAlt, borderWidth: 1, borderColor: colors.border },
+  soonText: { color: colors.textDim, fontSize: 10.5, fontWeight: '800' },
   globalBadge: { position: 'absolute', top: 2, right: 2, flexDirection: 'row', alignItems: 'center', gap: 1, height: 14, borderRadius: 5, paddingHorizontal: 3, backgroundColor: colors.gold },
   globalBadgeText: { color: '#1A1014', fontSize: 9, fontWeight: '900' },
   // The left corner, clear of the name: the selection above, the favourite star under it.

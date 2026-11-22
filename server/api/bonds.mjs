@@ -43,7 +43,7 @@ import { roomPacket } from './live.mjs';
 import { live } from './live-settings.mjs';
 import { notify } from './push.mjs';
 import { giftDiamonds, spendCoins } from './wallet.mjs';
-import { builtinGift, checkShownPrice } from './custom-gifts.mjs';
+import { builtinGift, checkShownPrice, giftSoon } from './custom-gifts.mjs';
 import { KINDS, LEVELS, REWARDS, levelOf, oldAppPoints, rewardLevel, scoreOf } from './bond-rules.mjs';
 import { bondNumbers, levelSql, levelsSoon, runBondDecay, scoreSql, tellLevels, tellStatus, warnQuietBonds } from './bond-life.mjs';
 
@@ -109,6 +109,8 @@ export function bondCatalog(s = live()) {
     cooldownDays: s.bondCooldownDays,
     talkDaily: s.bondTalkDaily,
     max: Object.fromEntries(Object.keys(KINDS).map((k) => [k, maxOf(k, s)])),
+    // Yakında (custom-gifts.mjs giftSoon): the kinds whose bond can't be asked for now (a newer app greys them).
+    soon: Object.keys(KINDS).filter((k) => giftSoon(`bag-${k}`)),
     levels: n.levels,
     dropPct: n.dropPct,
     dropFlat: n.dropFlat,
@@ -394,6 +396,8 @@ export const bondRoutes = {
       // After the ref claim: a retry of a request that went through gets its replay even if the price moved since.
       gift = bondGift(kind);
       checkShownPrice(gift, shown);
+      // Yakında (custom-gifts.mjs giftSoon): its gift waits on the shelf, and so does the bond.
+      if (giftSoon(gift.id)) throw Object.assign(new HttpError(409, `${k.label} bağı yakında açılacak`), { extra: { code: 'soon' } });
       const set = live();
       const open = await c.query(`SELECT status, kind FROM bonds WHERE pair_lo = LEAST($1::uuid, $2::uuid) AND pair_hi = GREATEST($1::uuid, $2::uuid) AND status IN ('pending', 'active')`, [me.id, to]);
       if (open.rows[0]?.status === 'pending') throw new HttpError(409, 'Bu kişiyle bekleyen bir bağ isteği var');

@@ -127,7 +127,8 @@ export async function quickReplyOf(me, to, no) {
   await toolsOnly(me);
   const pool = quickPool();
   if (!Number.isSafeInteger(no) || no < 1 || no > pool.length) throw new HttpError(400, 'Geçersiz hazır cevap');
-  const wrote = await db.query("SELECT 1 FROM messages WHERE sender = $1 AND recipient = $2 AND created_at > now() - interval '7 days' LIMIT 1", [to, me.id]);
+  // A follow's line (social.mjs) is no message they wrote.
+  const wrote = await db.query("SELECT 1 FROM messages WHERE sender = $1 AND recipient = $2 AND source <> 'follow' AND created_at > now() - interval '7 days' LIMIT 1", [to, me.id]);
   if (!wrote.rowCount) throw Object.assign(new HttpError(403, 'Hazır cevap yalnız sana yazan kişiye gönderilir'), { extra: { code: 'quick_not_reply' } });
   return pool[no - 1];
 }
@@ -157,8 +158,8 @@ const prefSql = (x, col) => `coalesce((SELECT p.${col} FROM privacy_settings p W
 async function closedPairs(a, b) {
   if (!a.length || !b.length) return new Set();
   const r = await db.query(
-    `SELECT sender AS a, recipient AS b FROM messages WHERE sender = ANY($1::uuid[]) AND recipient = ANY($2::uuid[])
-     UNION SELECT recipient, sender FROM messages WHERE sender = ANY($2::uuid[]) AND recipient = ANY($1::uuid[])
+    `SELECT sender AS a, recipient AS b FROM messages WHERE sender = ANY($1::uuid[]) AND recipient = ANY($2::uuid[]) AND source <> 'follow'
+     UNION SELECT recipient, sender FROM messages WHERE sender = ANY($2::uuid[]) AND recipient = ANY($1::uuid[]) AND source <> 'follow'
      UNION SELECT blocker, blocked FROM blocks WHERE blocker = ANY($1::uuid[]) AND blocked = ANY($2::uuid[])
      UNION SELECT blocked, blocker FROM blocks WHERE blocker = ANY($2::uuid[]) AND blocked = ANY($1::uuid[])
      UNION SELECT sender, recipient FROM auto_sends WHERE sender = ANY($1::uuid[]) AND recipient = ANY($2::uuid[])

@@ -234,6 +234,11 @@ export async function eraseAccount(c, id, phone) {
 export const USERNAME_OPEN = false;
 export const USERNAME_SOON = 'Kullanıcı adı değiştirme yakında açılacak. Kullanıcı adını eski haline getirip yeniden kaydet.';
 
+/** The text of a follow's line in the private chat (an older app shows it as the follower's message). */
+export const FOLLOW_LINE = 'Seni takip etti';
+/** A follow line's ref: one a day (Turkey's calendar) from one follower to one person. */
+const followRef = (to) => `follow:${to}:${new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Istanbul' })}`;
+
 export const socialRoutes = {
   async 'PATCH /api/me'(req) {
     const u = await auth(req);
@@ -418,7 +423,12 @@ export const socialRoutes = {
     // concurrent money test found, 21 Nov 2026).
     const r = await tx(async (c) => {
       await c.query('SELECT id FROM users WHERE id = ANY($1::uuid[]) ORDER BY id FOR KEY SHARE', [[me.id, to]]);
-      return c.query('INSERT INTO follows (follower, followee) VALUES ($1, $2) ON CONFLICT DO NOTHING', [me.id, to]);
+      const f = await c.query('INSERT INTO follows (follower, followee) VALUES ($1, $2) ON CONFLICT DO NOTHING', [me.id, to]);
+      // Mesajlar (owners, 22 Nov 2026): a new follow is a line in the two's private chat, "Seni takip etti", which only
+      // the person followed sees (messages.mjs). At most one a day from the same follower (its ref, a server ref with
+      // ':'), so following and unfollowing over and over can't fill the chat. Unfollowing tells nobody, anywhere.
+      if (f.rowCount) await c.query("INSERT INTO messages (sender, recipient, body, ref, source) VALUES ($1, $2, $3, $4, 'follow') ON CONFLICT (sender, ref) DO NOTHING", [me.id, to, FOLLOW_LINE, followRef(to)]);
+      return f;
     });
     // Told when the follow is new; unfollowing and following again in the same minute doesn't ring twice.
     if (r.rowCount && allow(`follow-notify:${me.id}:${to}`, 1)) {

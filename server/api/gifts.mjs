@@ -31,7 +31,7 @@ import { HttpError, auth, blockedBetween, claimRef, db, env, int, once, readJson
 import { EXCHANGE, GIFT_COUNTS, VIP_SUBS, packsSetUp } from './catalog.mjs';
 import { docsNow, levelsPayload, levelsRev, svipLevel, vipItemNeed } from './levels.mjs';
 import { shopCatalog, shopFx, shopItemsRev } from './shop-items.mjs';
-import { catalogGifts, checkShownPrice, customGiftsRev, giftFx, giftOf, replacedClips } from './custom-gifts.mjs';
+import { catalogGifts, checkShownPrice, customGiftsRev, giftFx, giftOf, giftSoon, replacedClips } from './custom-gifts.mjs';
 import { emojiCatalog, emojiRev } from './emoji.mjs';
 import { fxCatalog } from './fx.mjs';
 import { live } from './live-settings.mjs';
@@ -141,6 +141,8 @@ export const giftRoutes = {
     const app2 = url?.searchParams.get('gifts') === '2';
     // The Aile ve Dost shelf (custom-gifts.mjs catalogGifts): only for a phone that has it.
     const family = url?.searchParams.get('family') === '1';
+    // Yakında gifts (custom-gifts.mjs giftSoon): only for a phone that draws them greyed.
+    const soon = url?.searchParams.get('soon') === '1';
     // Profil izleri (profile-marks.mjs marksLevel): 0 an app without them, 1 G7's (hours), 2 kinds and minutes.
     const marks = marksLevel(url);
     return {
@@ -149,7 +151,7 @@ export const giftRoutes = {
       // catalog.mjs GIFTS_PAUSED) or hidden in Canlı ayarlar: left out, so older apps drop them too.
       // Profil izleri (profile-marks.mjs): the gifts that leave or clean a mark, and each one's `mark`, only for a phone
       // that has them (marks=1, marks=2).
-      gifts: withMarks(catalogGifts({ app2, hidden: s.giftsHidden, family }), marks, s),
+      gifts: withMarks(catalogGifts({ app2, hidden: s.giftsHidden, family, soon }), marks, s),
       ...(app2 ? { giftsFormat: 2 } : {}),
       counts: GIFT_COUNTS,
       // In the panel's order, with its first-purchase gifts; `extra` (coins on every purchase) for a newer app, which an
@@ -230,6 +232,8 @@ export const giftRoutes = {
       if (await blockedBetween(u.id, to, c)) throw new HttpError(403, 'Bu kişiye hediye gönderemezsin');
       // After the ref check: a retry of a gift that went through before the hide gets its replay, not a 400.
       if (s.giftsHidden.has(gift.id)) throw new HttpError(400, 'Bu hediye artık yok');
+      // Yakında (custom-gifts.mjs giftSoon): shown greyed to a newer app; an older one, which offers it, is told.
+      if (giftSoon(gift.id)) throw new HttpError(409, `${gift.name} yakında açılacak`);
       // The price the phone showed (none from an older app): a gift whose price moved is refused, nothing moves.
       checkShownPrice(gift, b.price);
       if (gift.bond) await checkBondGift(c, u.id, to, gift.bond);

@@ -29,6 +29,8 @@ export type ServerDm = {
 const eventCard = (d: ServerDm) => (d.event && Number.isSafeInteger(d.event.id) ? { event: { id: d.event.id, title: d.event.title ?? 'Etkinlik', startsAt: d.event.startsAt ?? null } } : null);
 export type ThreadSync = { peer: string; after: number; hidden?: readonly number[] };
 const SOURCES = ['auto_streamer', 'auto_opener', 'quick_reply'];
+/** A follow's line (newer servers, server/api/social.mjs): "X seni takip etti", drawn as a note, not a message. */
+const followOf = (d: ServerDm) => (d.source === 'follow' ? { follow: true as const } : null);
 /** The source of an automatic message or a quick reply, or nothing (a message typed by its writer, an older server). */
 const sourceOf = (d: ServerDm) => (typeof d.source === 'string' && SOURCES.includes(d.source) ? { source: d.source as 'auto_streamer' | 'auto_opener' | 'quick_reply' } : null);
 /** A gift's line: its gift, or nothing (a typed message, an older server, a malformed field). */
@@ -78,7 +80,7 @@ export function mergeThread(local: readonly ChatMessage[], server: readonly Serv
     // refused (noRetry) was never stored, so it never takes the id.
     let pending = -1;
     // A gift's line is the server's (never sent ahead from this phone), so it matches no local message either.
-    if (mine && !giftOf(d)) {
+    if (mine && !giftOf(d) && !followOf(d)) {
       // A photo is never sent ahead on this phone (it comes in from the server), so it matches no local message.
       const unconfirmed = (m: ChatMessage) => !d.image && m.fromMe && m.sid === undefined && !m.noRetry && m.text === d.text;
       pending = out.findIndex((m) => unconfirmed(m) && !m.failed);
@@ -88,7 +90,7 @@ export function mergeThread(local: readonly ChatMessage[], server: readonly Serv
       out[pending] = { ...withoutFailure(out[pending]), sid: d.id, at: d.createdAt, ...seen };
       known.set(d.id, pending);
     } else {
-      out.push({ id: `s${d.id}`, fromMe: mine, text: d.text, time: clockOf(d.createdAt), at: d.createdAt, sid: d.id, ...(d.image && { image: d.image }), ...eventCard(d), ...sourceOf(d), ...giftOf(d), ...seen });
+      out.push({ id: `s${d.id}`, fromMe: mine, text: d.text, time: clockOf(d.createdAt), at: d.createdAt, sid: d.id, ...(d.image && { image: d.image }), ...eventCard(d), ...sourceOf(d), ...giftOf(d), ...followOf(d), ...seen });
       known.set(d.id, out.length - 1);
       if (!mine) incoming++;
     }

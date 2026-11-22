@@ -247,6 +247,8 @@ export const messageRoutes = {
       `${WITH_EVENT}
         WHERE LEAST(m.sender, m.recipient) = LEAST($1::uuid, $2::uuid) AND GREATEST(m.sender, m.recipient) = GREATEST($1::uuid, $2::uuid)
           AND ($3::bigint = 0 OR m.id < $3)
+          -- A follow's line (social.mjs) is the person followed's only.
+          AND NOT (m.source = 'follow' AND m.sender = $1)
         ORDER BY m.id DESC LIMIT ${PAGE}`,
       [me.id, peer, Number.isSafeInteger(before) && before > 0 ? before : 0],
     );
@@ -261,7 +263,7 @@ export const messageRoutes = {
       `SELECT l.peer, m.*, u.name AS peer_name, u.avatar_url AS peer_avatar, ev.title AS event_title, ev.starts_at AS event_starts_at, ge.gift_id, ge.count AS gift_count,
               (SELECT count(*) FROM messages x WHERE x.recipient = $1 AND x.sender = l.peer AND x.read_at IS NULL) AS unread
          FROM (SELECT peer, max(id) AS id FROM (
-                 SELECT recipient AS peer, id FROM messages WHERE sender = $1
+                 SELECT recipient AS peer, id FROM messages WHERE sender = $1 AND source <> 'follow'
                  UNION ALL
                  SELECT sender AS peer, id FROM messages WHERE recipient = $1) t
                GROUP BY peer ORDER BY max(id) DESC LIMIT 200) l

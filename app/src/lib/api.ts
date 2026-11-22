@@ -691,12 +691,12 @@ export type ProfileTies = { agency: { id: string; name: string } | null; family:
 export const lookup = (no: string) => call<unknown>('GET', `/api/lookup?no=${encodeURIComponent(no)}`).then(parseLookup);
 /**
  * `visit`: opened on the profile screen, so it counts as a visit (Profil ziyaretçileri); a person card doesn't. `card`:
- * the room's person card, which asks for their medals (`user.medals`) and not for the received-gift count it doesn't
- * show (server/api/social.mjs `card=1&medals=1`; an older server ignores both). `looks`: their shop look as the server
- * sent it (unchecked: lib/person-card cardLookOf reads it).
+ * the room's person card, which doesn't ask for the received-gift count or the medals it doesn't show
+ * (server/api/social.mjs `card=1`; an older server ignores it; since 22 Nov 2026 the card shows no medals, so it no
+ * longer sends `medals=1`). `looks`: their shop look as the server sent it (unchecked: lib/person-card cardLookOf).
  */
 export const userProfile = (id: string, visit = false, card = false) =>
-  call<{ user: PublicUser; room?: unknown; looks?: unknown; marks?: unknown } & Partial<ProfileTies>>('GET', `/api/user?id=${encodeURIComponent(id)}${visit ? '&visit=1' : ''}${card ? '&card=1&medals=1' : ''}`).then((r) => ({
+  call<{ user: PublicUser; room?: unknown; looks?: unknown; marks?: unknown } & Partial<ProfileTies>>('GET', `/api/user?id=${encodeURIComponent(id)}${visit ? '&visit=1' : ''}${card ? '&card=1' : ''}`).then((r) => ({
     ...r.user,
     agency: r.agency ?? null,
     family: r.family ?? null,

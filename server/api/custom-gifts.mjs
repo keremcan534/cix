@@ -55,7 +55,7 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 
 import { artUrl } from './art.mjs';
-import { BOND_GIFTS, GIFTS, GIFTS_PAUSED } from './catalog.mjs';
+import { BOND_GIFTS, GIFTS, GIFTS_PAUSED, GIFTS_SOON } from './catalog.mjs';
 import { HttpError, auth, clientIp, db, env, int, limit, readJson, text, tx } from './core.mjs';
 import { FX_PATH, giftClip, mp4Duration } from './fx.mjs';
 import { globalMinPrice, globalNow, globalSave } from './global-gifts.mjs';
@@ -136,6 +136,8 @@ const viewOf = (r) =>
     video: r.video_url ? Object.freeze({ url: r.video_url, bytes: Number(r.video_bytes), ms: Number(r.video_ms ?? 0), v: r.video_v }) : null,
     videoOff: r.video_off === true,
     global: r.global === true,
+    // Yakında (115): null on an app's gift is "as in the app" (catalog.mjs GIFTS_SOON).
+    soon: r.soon ?? null,
     job: r.job_status ?? null,
     // Profil izleri (profile-mark-rules.mjs): undefined as in the app (or a plain admin's gift), null none, else the rule.
     mark: storedMark(r),
@@ -203,6 +205,7 @@ function appGiftOf(base, o) {
     videoOff: !!o?.videoOff,
     mark: appMarkOf(base.id, o?.mark),
     global: o?.global === true,
+    soon: o?.soon ?? GIFTS_SOON.has(base.id),
   };
 }
 /** One of the app's gifts as it is now (appGiftOf); undefined for an id that isn't one of them. */
@@ -246,6 +249,8 @@ export function giftOf(id) {
     ? { id: g.id, name: g.name, emoji: g.emoji, price: g.price, cat: g.cat, minSvip: g.minSvip, custom: true, mark: g.mark ?? null, ...(globalNow(g) ? { global: true, icon: g.icon } : {}) }
     : undefined;
 }
+/** Yakında (owners, 22 Nov 2026): one of the app's gifts shown greyed on its shelf that can't be sent now. */
+export const giftSoon = (id) => builtinGift(id)?.soon === true;
 /** A gift's name now, a taken-down or deleted one's too (history lines, Şanslı çanta); null when nothing has this id. */
 export const giftNameOf = (id) => builtinGift(id)?.name ?? snap.rows.get(id)?.name ?? null;
 /** A gift's emoji now, a taken-down or deleted one's too (Profil izleri's badge); null when nothing has this id. */
@@ -281,13 +286,15 @@ export function checkShownPrice(gift, shown) {
  * bond gifts and sees that shelf's other gifts on Çift (İkili before), where Koruma Kartı was. A global gift (global-gifts.mjs
  * globalNow) also says global: true, which an older app ignores (it shows it on its shelf as any gift).
  */
-export function catalogGifts({ app2 = false, hidden = new Set(), family = false } = {}) {
+export function catalogGifts({ app2 = false, hidden = new Set(), family = false, soon = false } = {}) {
   const out = [];
   for (const g of listed()) {
     const cat = family || g.cat !== 'family' ? g.cat : 'couple';
     if (g.builtin) {
       if (hidden.has(g.id) || (!family && BOND_GIFTS.has(g.id)) || (!app2 && g.price !== GIFTS.get(g.id).price)) continue;
-      out.push({ id: g.id, name: g.name, emoji: g.emoji, price: g.price, cat, minSvip: g.minSvip, ...(g.icon ? { icon: g.icon } : {}), ...(globalNow(g) ? { global: true } : {}) });
+      // Yakında: a phone that draws it (?soon=1) gets it greyed; an older one, which would offer it, doesn't get it.
+      if (g.soon && !soon) continue;
+      out.push({ id: g.id, name: g.name, emoji: g.emoji, price: g.price, cat, minSvip: g.minSvip, ...(g.icon ? { icon: g.icon } : {}), ...(globalNow(g) ? { global: true } : {}), ...(g.soon ? { soon: true } : {}) });
     } else out.push({ id: g.id, name: g.name, price: g.price, cat, minSvip: g.minSvip, emoji: g.emoji, icon: g.icon, custom: true, ...(globalNow(g) ? { global: true } : {}) });
   }
   return out;
@@ -1109,6 +1116,7 @@ const auditOf = (r) =>
     video: r.video_url ?? null,
     ...(r.video_off ? { videoOff: true } : {}),
     ...(r.global ? { global: true } : {}),
+    ...(r.soon !== null && r.soon !== undefined ? { soon: r.soon } : {}),
     job: r.job_status ?? null,
     iconLink: r.icon_link ?? null,
     videoLink: r.video_link ?? null,
@@ -1149,6 +1157,7 @@ function originalOf(id) {
     cat: base.cat,
     minSvip: base.minSvip,
     enabled: !GIFTS_PAUSED.has(id),
+    soon: GIFTS_SOON.has(id),
     mark: appMarkOf(id, undefined),
     icon: artUrl('gifts', id),
     video: clip ? { url: clip.url, bytes: clip.bytes, ms: clip.ms } : null,
@@ -1171,6 +1180,7 @@ const changedOf = (r) =>
         ...(r.icon_url !== null ? ['icon'] : []),
         ...(r.video_url !== null || r.video_off || r.job_status !== null ? ['video'] : []),
         ...(r.global ? ['global'] : []),
+        ...(r.soon !== null && r.soon !== undefined ? ['soon'] : []),
       ];
 
 /** An admin's gift as the panel shows it. */
@@ -1219,6 +1229,7 @@ function appView(id, x, sent) {
     enabled: g.enabled,
     mark: g.mark,
     global: g.global,
+    soon: g.soon,
     icon: g.icon ?? original.icon,
     iconLink: x?.icon_link ?? null,
     videoLink: x?.video_link ?? null,
@@ -1321,7 +1332,7 @@ const writeLimit = (a) => limit(`gifts-admin:${a.id}`, 60, 'Çok fazla deneme, b
  * What POST /api/admin/gifts/reset can give back to one of the app's gifts; without `fields`, all but its place (an
  * ordered shelf keeps its order). Its place goes back with its shelf when it was moved to another one.
  */
-const RESET = ['name', 'emoji', 'price', 'cat', 'enabled', 'sort', 'icon', 'video', 'mark', 'global'];
+const RESET = ['name', 'emoji', 'price', 'cat', 'enabled', 'sort', 'icon', 'video', 'mark', 'global', 'soon'];
 const RESET_ALL = RESET.filter((f) => f !== 'sort');
 
 /**
@@ -1362,6 +1373,11 @@ async function updateApp(req, a, id, b) {
   if (b.enabled !== undefined) {
     if (typeof b.enabled !== 'boolean') throw new HttpError(400, 'Açık/kapalı geçersiz');
     next.enabled = b.enabled === !GIFTS_PAUSED.has(id) ? null : b.enabled;
+  }
+  // Yakında: on the shelf greyed, not sent (giftSoon); the app's own value again is kept as "as in the app".
+  if (b.soon !== undefined) {
+    if (typeof b.soon !== 'boolean') throw new HttpError(400, 'Yakında seçimi geçersiz');
+    next.soon = b.soon === GIFTS_SOON.has(id) ? null : b.soon;
   }
   // Profil izleri: the app's own rule again is kept as "as in the app" (null columns).
   const mark = markCols(b.mark);
@@ -1405,6 +1421,7 @@ async function updateApp(req, a, id, b) {
       if (next.minSvip !== undefined) set('min_svip', next.minSvip);
       if (next.mark !== undefined) for (const [col, v] of Object.entries(next.mark)) set(col, v);
       if (next.global !== undefined) set('global', next.global);
+      if (next.soon !== undefined) set('soon', next.soon);
       // Moved to another shelf: first there, as an admin's gift is.
       if (next.cat !== undefined) {
         set('cat', next.cat);
@@ -1506,7 +1523,9 @@ export const customGiftRoutes = {
     const id = idOf(b.id, { app: true });
     // A bond gift stays on its shelf. Its price may change: bonds.mjs charges it (an older app, which shows the app's
     // price, is asked to update while it differs); a pending request keeps the coins it holds.
-    if (BOND_GIFTS.has(id) && b.cat !== undefined && b.cat !== 'family') throw new HttpError(400, 'Bağ hediyesi Aile ve Dost rafında kalır');
+    if (BOND_GIFTS.has(id) && b.cat !== undefined && b.cat !== 'family' && b.cat !== 'couple') throw new HttpError(400, 'Bağ hediyesi Aile ve Dost ya da Çift rafında kalır');
+    // Yakında is for the app's own gifts; an admin's gift goes off the shelf instead.
+    if (b.soon !== undefined && !GIFTS.has(id)) throw new HttpError(400, 'Yakında yalnız uygulamanın kendi hediyelerinde var; bu hediyeyi raftan kaldırabilirsin');
     if (GIFTS.has(id)) return updateApp(req, a, id, b);
     const cur = snap.rows.get(id);
     if (!cur || cur.deleted) throw new HttpError(404, 'Hediye bulunamadı');
@@ -1676,6 +1695,7 @@ export const customGiftRoutes = {
         if (fields.includes('enabled')) sets.push('enabled = NULL');
         if (fields.includes('mark')) sets.push('mark_role = NULL', 'mark_kind = NULL', 'mark_hours = NULL', 'mark_minutes = NULL');
         if (fields.includes('global')) sets.push('global = NULL');
+        if (fields.includes('soon')) sets.push('soon = NULL');
         // Moved to another shelf: its place there means nothing on its own one.
         if (fields.includes('sort') || (fields.includes('cat') && r.cat !== null)) sets.push('sort = NULL');
         if (fields.includes('icon')) {

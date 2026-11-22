@@ -527,5 +527,10 @@ describe('Ben ekranında VIP kutusu', () => {
     // Past the last level's colours, the top one's.
     assert.deepEqual(vipCardColors(14), ten);
     assert.match(readFileSync(resolve(import.meta.dirname, '../src/app/(tabs)/profil.tsx'), 'utf8'), /colors=\{vipCardColors\(svipLevel\) \?\? \['#D02E78', '#4A1630'\]\}/);
+    // The VIP tab's card of that level behind, and the new set's badge (not the old emblem).
+    const ben = readFileSync(resolve(import.meta.dirname, '../src/app/(tabs)/profil.tsx'), 'utf8');
+    assert.match(ben, /bg=\{svipLevel \? HERO_IMAGES\[levelArtFor\(svipLevel\) \?\? 1\] : undefined\}/);
+    assert.match(ben, /VIP_LEVEL_ART\[levelArtFor\(svipLevel\) \?\? 1\]\.badge\.source/);
+    assert.doesNotMatch(ben, /SVIP_LEVELS\[/);
   });
 });

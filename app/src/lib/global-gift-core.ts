@@ -73,6 +73,21 @@ export const globalChatLine = (g: GlobalGift) => `🌍 ${globalGiftText(g)}${g.r
 export const globalGiftBlocked = (g: GlobalGift, blocked: { has: (id: string) => boolean }) => [g.from.id, g.to.id].some((x) => !!x && blocked.has(x));
 
 /** The catalog's gifts marked global: their ids, in its order; [] when none or malformed. */
+/**
+ * The gifts the catalog marks "Yakında" (`soon: true`, server/api/custom-gifts.mjs giftSoon, owners 22 Nov 2026): on
+ * their shelf, greyed, not sent. Malformed entries are skipped.
+ */
+export function parseSoonIds(list: unknown): string[] {
+  if (!Array.isArray(list)) return [];
+  const out: string[] = [];
+  for (const x of list) {
+    const g = obj(x);
+    if (g.soon === true && typeof g.id === 'string' && GIFT_ID.test(g.id) && !out.includes(g.id)) out.push(g.id);
+    if (out.length >= 200) break;
+  }
+  return out;
+}
+
 export function parseGlobalIds(list: unknown): string[] {
   if (!Array.isArray(list)) return [];
   const out: string[] = [];

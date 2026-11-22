@@ -269,6 +269,16 @@ vardır: dosyayı kendi sitenize (ör. GoDaddy hostingde `/hediyeler/` klasörü
 - Uygulamadaki Yönetim › Hediyeler formunda bağlantı alanı yok (yeni APK gerektirir); sunucu ucu (`/api/admin/gifts/fetch`)
   hazır.
 
+## Yakında (22 Kasım 2026)
+
+Sahiplerin isteği: Aile ve Dost rafında Koruma Kartı açık kalsın; Kanka Kilidi, Kardeşlik Bağı, Can Bacım, Can Ağabey, Ablamın Işığı, Yenge Bizden Biri ve Enişte Makamı pasif görünsün, üstünde "Yakında" yazsın; Kalbim Seninle (Çift bağının hediyesi) Çift rafına geçsin; panelden açılıp kapatılabilsin.
+
+- **Panel:** Hediyeler › hediyeyi düzenle › **Yakında** kutusu. Yalnız uygulamanın kendi hediyelerinde var; yöneticinin eklediği hediyeyi raftan kaldırmak yeterli. Listede "Yakında" etiketi görünür. Varsayılanı yukarıdaki yedi bağ hediyesi (`catalog.mjs` `GIFTS_SOON`); kutu kaldırılınca hediye açılır, işaretlenince yeniden Yakında olur ("Orijinale dön" varsayılana döndürür).
+- **Telefonda (yeni APK):** hediye rafında soluk durur, fiyatın yerinde "Yakında" yazar; dokununca "… yakında açılacak" der, seçilmez. Bağ hediyesiyse o bağ türü "Bağ kur" listesinde "Yakında" yazar, istek gönderilmez.
+- **Sunucu:** Yakında hediyeyi göndermek 409 ("… yakında açılacak"), o türde yeni bağ isteği 409 (`code: soon`); jeton oynamaz. Kurulmuş bağlar sürer, ama bağ hediyesi o tür açılana kadar gönderilemez.
+- **Eski APK'lar** Yakında hediyeyi rafta hiç görmez (katalog yalnız `?soon=1` isteyen yeni uygulamaya verir); gönderemez.
+- **Kalbim Seninle (`bag-cift`)** artık uygulamanın kendi değeriyle Çift rafında. Bağ hediyesi panelde Aile ve Dost ya da Çift rafına konabilir, başka rafa konamaz.
+
 ## Global hediye (Güncelleme 7, madde 12)
 
 Çok pahalı bir hediye "Global" işaretlenirse biri onu **bir odada** birine gönderdiğinde, gönderenin ülkesindeki **bütün

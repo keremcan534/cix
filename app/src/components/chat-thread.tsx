@@ -378,7 +378,15 @@ export function ChatThread({
             )
           }
           renderItem={({ item }) =>
-            item.fromMe ? (
+            // They followed me (the server's line, lib/dm-thread): a note in the middle, not a message.
+            item.follow ? (
+              <View style={styles.followNote} accessible accessibilityLabel={`${user.name} seni takip etti, ${messageTime(item)}`}>
+                <Ionicons name="person-add" size={13} color={colors.textDim} />
+                <Text style={styles.followNoteText} numberOfLines={2}>
+                  {user.name} seni takip etti · {messageTime(item)}
+                </Text>
+              </View>
+            ) : item.fromMe ? (
               <Pressable onLongPress={() => setPicked(item)} delayLongPress={350} style={styles.mine} accessibilityHint="Seçenekler için basılı tut">
                 {!!sourceLabel(item.source ?? extras(item.sid)?.source, true) && <Text style={[styles.autoLabel, { alignSelf: 'flex-end' }]}>{sourceLabel(item.source ?? extras(item.sid)?.source, true)}</Text>}
                 <LinearGradient colors={gradientDeep} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.bubble, styles.mineBubble]}>
@@ -689,6 +697,8 @@ const useStyles = makeStyles(({ colors, lift, ink, dark }) => ({
   refusedText: { color: '#FECACA', fontWeight: '700', alignSelf: 'stretch', textAlign: 'right', lineHeight: 15 },
   theirsTime: { color: ink(0.6) },
   roomCard: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6, padding: 8, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.25)', minWidth: 190 },
+  followNote: { alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: '86%', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: 'rgba(127,127,127,0.12)' },
+  followNoteText: { color: colors.textDim, fontSize: 12.5, fontWeight: '600', flexShrink: 1 },
   giftLine: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 2, minWidth: 150 },
   giftLineEmoji: { fontSize: 34, lineHeight: 44 },
   giftLineKind: { color: 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: '700' },

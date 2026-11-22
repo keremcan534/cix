@@ -138,7 +138,7 @@ export async function dmRefusal(q, from, to) {
   if (rule === 'everyone' || (x.owner_follows && (rule === 'following' || x.follows_owner))) return null;
   // An answer: someone the owner wrote to may always write back.
   const wrote = await q.query(
-    'SELECT 1 FROM messages WHERE LEAST(sender, recipient) = LEAST($1::uuid, $2::uuid) AND GREATEST(sender, recipient) = GREATEST($1::uuid, $2::uuid) AND sender = $2 LIMIT 1',
+    "SELECT 1 FROM messages WHERE LEAST(sender, recipient) = LEAST($1::uuid, $2::uuid) AND GREATEST(sender, recipient) = GREATEST($1::uuid, $2::uuid) AND sender = $2 AND source <> 'follow' LIMIT 1",
     [from, to],
   );
   if (wrote.rowCount) return null;
