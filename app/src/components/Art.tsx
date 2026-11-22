@@ -152,6 +152,15 @@ const ART = {
   'iliski-dost-en-yakin-dostlar': require('../../assets/art/iliski-dost-en-yakin-dostlar.png'),
   'iliski-dugun-salonu': require('../../assets/art/iliski-dugun-salonu.png'),
   'iliski-koruma': require('../../assets/art/iliski-koruma.png'),
+  'jeton-paket-1': require('../../assets/art/jeton-paket-1.png'),
+  'jeton-paket-2': require('../../assets/art/jeton-paket-2.png'),
+  'jeton-paket-3': require('../../assets/art/jeton-paket-3.png'),
+  'jeton-paket-4': require('../../assets/art/jeton-paket-4.png'),
+  'jeton-paket-5': require('../../assets/art/jeton-paket-5.png'),
+  'jeton-paket-6': require('../../assets/art/jeton-paket-6.png'),
+  'jeton-paket-7': require('../../assets/art/jeton-paket-7.png'),
+  'jeton-paket-8': require('../../assets/art/jeton-paket-8.png'),
+  'jeton-paket-9': require('../../assets/art/jeton-paket-9.png'),
   'kabile-ahsap-sandik': require('../../assets/art/kabile-ahsap-sandik.png'),
   'kabile-kirmizi-sandik': require('../../assets/art/kabile-kirmizi-sandik.png'),
   'kabile-mavi-sandik': require('../../assets/art/kabile-mavi-sandik.png'),
@@ -233,6 +242,22 @@ const ART = {
   'svip-09': require('../../assets/art/svip-09.png'),
   'svip-10': require('../../assets/art/svip-10.png'),
   'svip-svip-isareti': require('../../assets/art/svip-svip-isareti.png'),
+  'ui-ayarlar': require('../../assets/art/ui-ayarlar.png'),
+  'ui-bekliyor': require('../../assets/art/ui-bekliyor.png'),
+  'ui-cikis': require('../../assets/art/ui-cikis.png'),
+  'ui-daha-fazla': require('../../assets/art/ui-daha-fazla.png'),
+  'ui-degistir': require('../../assets/art/ui-degistir.png'),
+  'ui-emoji': require('../../assets/art/ui-emoji.png'),
+  'ui-engelle': require('../../assets/art/ui-engelle.png'),
+  'ui-kamera-acik': require('../../assets/art/ui-kamera-acik.png'),
+  'ui-kamera-kapali': require('../../assets/art/ui-kamera-kapali.png'),
+  'ui-kilit-acik': require('../../assets/art/ui-kilit-acik.png'),
+  'ui-kilitli': require('../../assets/art/ui-kilitli.png'),
+  'ui-kisi': require('../../assets/art/ui-kisi.png'),
+  'ui-kulaklik': require('../../assets/art/ui-kulaklik.png'),
+  'ui-mikrofon-acik': require('../../assets/art/ui-mikrofon-acik.png'),
+  'ui-mikrofon-kapali': require('../../assets/art/ui-mikrofon-kapali.png'),
+  'ui-sikayet': require('../../assets/art/ui-sikayet.png'),
   'ulke-almanya': require('../../assets/art/ulke-almanya.png'),
   'ulke-azerbaycan': require('../../assets/art/ulke-azerbaycan.png'),
   'ulke-hollanda': require('../../assets/art/ulke-hollanda.png'),
@@ -288,3 +313,45 @@ export const artSource = (name: ArtName): number => ART[name];
 export function Art({ name, size = 24, style }: { name: ArtName; size?: number; style?: StyleProp<ImageStyle> }) {
   return <Image source={ART[name]} style={[{ width: size, height: size }, style]} resizeMode="contain" accessibilityIgnoresInvertColors />;
 }
+
+/** Coin pack pictures (one coin … the treasure chest): a pack's place among `coins` (every pack of the list), spread
+ *  over the 9 pictures so the smallest gets the coin and the largest the chest whatever the number of packs. */
+export function coinPackArt(amount: number, coins: number[]): ArtName {
+  const sizes = [...new Set(coins)].sort((a, b) => a - b);
+  const at = Math.max(0, sizes.indexOf(amount));
+  const step = sizes.length > 1 ? Math.round((at * 8) / (sizes.length - 1)) : 0;
+  return `jeton-paket-${Math.min(Math.max(step, 0), 8) + 1}` as ArtName;
+}
+
+/** The 3D picture for an Ionicons glyph that has one (menus and person cards draw it instead of the glyph). */
+const UI_ART: Record<string, ArtName> = {
+  mic: 'ui-mikrofon-acik',
+  'mic-outline': 'ui-mikrofon-acik',
+  'mic-off': 'ui-mikrofon-kapali',
+  'mic-off-outline': 'ui-mikrofon-kapali',
+  videocam: 'ui-kamera-acik',
+  'videocam-outline': 'ui-kamera-acik',
+  'videocam-off': 'ui-kamera-kapali',
+  'videocam-off-outline': 'ui-kamera-kapali',
+  'lock-closed': 'ui-kilitli',
+  'lock-closed-outline': 'ui-kilitli',
+  'lock-open': 'ui-kilit-acik',
+  'lock-open-outline': 'ui-kilit-acik',
+  'exit-outline': 'ui-cikis',
+  'log-out-outline': 'ui-cikis',
+  ban: 'ui-engelle',
+  'ban-outline': 'ui-engelle',
+  flag: 'ui-sikayet',
+  'flag-outline': 'ui-sikayet',
+  settings: 'ui-ayarlar',
+  'settings-outline': 'ui-ayarlar',
+  headset: 'ui-kulaklik',
+  'headset-outline': 'ui-kulaklik',
+  'hourglass-outline': 'ui-bekliyor',
+  'swap-horizontal': 'ui-degistir',
+  'happy-outline': 'ui-emoji',
+  person: 'ui-kisi',
+  'person-outline': 'ui-kisi',
+  'ellipsis-horizontal': 'ui-daha-fazla',
+};
+export const uiArtFor = (icon?: string): ArtName | undefined => (icon ? UI_ART[icon] : undefined);

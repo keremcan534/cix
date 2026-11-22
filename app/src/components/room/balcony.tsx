@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { FlatList, Modal, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 
 import { Text, TextInput } from '@/components/text';
-import { Art } from '@/components/Art';
+import { Art, uiArtFor } from '@/components/Art';
 import { Icon3D } from '@/components/Icon3D';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { ROLE_RANK, useSheetBottom, type RoomRole } from '@/components/room/parts';
@@ -247,7 +247,7 @@ export function ParticipantsSheet({
 function Action({ icon, label, onPress, danger, disabled }: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void; danger?: boolean; disabled?: boolean }) {
   return (
     <Pressable onPress={onPress} disabled={disabled} style={[s.action, danger && s.actionDanger, disabled && { opacity: 0.45 }]} accessibilityRole="button" accessibilityLabel={label} aria-disabled={disabled}>
-      <Ionicons name={icon} size={15} color={danger ? '#FF9AA1' : colors.text} />
+      {uiArtFor(icon) ? <Art name={uiArtFor(icon)!} size={18} /> : <Ionicons name={icon} size={15} color={danger ? '#FF9AA1' : colors.text} />}
       <Text style={[s.actionText, danger && { color: '#FF9AA1' }]}>{label}</Text>
     </Pressable>
   );
