@@ -52,3 +52,19 @@ const ART: Record<string, number> = {
 };
 
 export const storeArtOf = (id?: string | null): number | undefined => (id ? ART[id] : undefined);
+
+/** Coin packs grow with their size: a coin, stacks, a bag, a chest (assets/store/jeton-paketi-1…9). */
+const COIN_PACK_ART: { from: number; art: number }[] = [
+  { from: 0, art: require('../../assets/store/jeton-paketi-1.png') },
+  { from: 5_000, art: require('../../assets/store/jeton-paketi-2.png') },
+  { from: 10_000, art: require('../../assets/store/jeton-paketi-3.png') },
+  { from: 20_000, art: require('../../assets/store/jeton-paketi-4.png') },
+  { from: 50_000, art: require('../../assets/store/jeton-paketi-5.png') },
+  { from: 100_000, art: require('../../assets/store/jeton-paketi-6.png') },
+  { from: 200_000, art: require('../../assets/store/jeton-paketi-7.png') },
+  { from: 500_000, art: require('../../assets/store/jeton-paketi-8.png') },
+  { from: 1_000_000, art: require('../../assets/store/jeton-paketi-9.png') },
+];
+
+/** The picture for a pack of `coins` (a live store pack of any size takes the largest step it reaches). */
+export const coinPackArtOf = (coins: number): number => COIN_PACK_ART.reduce((pick, step) => (coins >= step.from ? step.art : pick), COIN_PACK_ART[0].art);

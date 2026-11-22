@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { FlatList, Pressable, ScrollView, View } from 'react-native';
+import { FlatList, Image, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { LoadError } from '@/components/load-error';
@@ -14,8 +14,8 @@ import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 import { SCENES } from '@/components/fx/scenes';
 import { Backdrop } from '@/components/fx/surface';
-import { Art, coinPackArt, type ArtName } from '@/components/Art';
-import { Icon3D } from '@/components/Icon3D';
+import { Art } from '@/components/Art';
+import { coinPackArtOf } from '@/components/StoreArt';
 import { IS_DEMO } from '@/lib/build';
 import { liveMode, liveTopup, message, refreshWallet, TEST_PACKS } from '@/lib/live';
 import { LEDGER_PAGE, useLiveLedger } from '@/lib/live/earnings';
@@ -255,7 +255,6 @@ export default function WalletScreen() {
                   return (
                     <PackTile
                       key={p.productId}
-                      art={coinPackArt(p.coins, shop.packs.map((x) => x.coins))}
                       coins={p.coins}
                       bonus={first || undefined}
                       extra={p.extra || undefined}
@@ -275,7 +274,7 @@ export default function WalletScreen() {
             <View style={styles.grid}>
               {RECHARGE_PACKS.map((p: RechargePack) => {
                 const first = !!p.firstBonus && !firstBuys.has(p.id);
-                return <PackTile key={p.id} art={coinPackArt(p.coins, RECHARGE_PACKS.map((x) => x.coins))} coins={p.coins} bonus={first ? p.firstBonus : p.bonus} first={first} price={p.price} busy={processing === p.id} onPress={() => buy(p)} />;
+                return <PackTile key={p.id} coins={p.coins} bonus={first ? p.firstBonus : p.bonus} first={first} price={p.price} busy={processing === p.id} onPress={() => buy(p)} />;
               })}
             </View>
           )}
@@ -287,7 +286,7 @@ export default function WalletScreen() {
               </View>
               <View style={styles.grid}>
                 {testPacks.map((p) => (
-                  <PackTile key={p.id} art={coinPackArt(p.coins, testPacks.map((x) => x.coins))} coins={p.coins} price="Ücretsiz" busy={processing === p.id} onPress={() => buy(p)} />
+                  <PackTile key={p.id} coins={p.coins} price="Ücretsiz" busy={processing === p.id} onPress={() => buy(p)} />
                 ))}
               </View>
             </>
@@ -318,7 +317,6 @@ export default function WalletScreen() {
  *  "Hoş geldin paketi" tag with its first-purchase `bonus`. `campaign`: the running campaign's tag and this pack's
  *  extra coins (live store packs only); with a first-purchase gift both add up under the welcome tag. */
 function PackTile({
-  art,
   coins,
   bonus,
   first,
@@ -328,8 +326,6 @@ function PackTile({
   campaign,
   extra,
 }: {
-  /** The pack's picture by its size (components/Art coinPackArt). */
-  art?: ArtName;
   coins: number;
   bonus?: number;
   /** The pack's extra coins on every purchase (the panel's Jeton paketleri). */
@@ -376,7 +372,7 @@ function PackTile({
             </View>
           ) : null}
         </View>
-        {art ? <Art name={art} size={48} /> : <Icon3D name="coin" size={40} />}
+        <Image source={coinPackArtOf(coins)} style={{ width: 48, height: 48, marginVertical: -4 }} resizeMode="contain" accessibilityIgnoresInvertColors />
         <Text style={styles.packCoins} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
           {coins.toLocaleString('tr-TR')}
         </Text>

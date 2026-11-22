@@ -21,6 +21,7 @@ import { Photo } from '@/components/photo';
 import { CallsUnavailable } from '@/components/calls-unavailable';
 import { LiveCall } from '@/components/live-call';
 import { callsAvailable, liveCalls } from '@/lib/live';
+import { GlyphIcon } from '@/components/UiIcon';
 
 type Phase = 'ringing' | 'connected' | 'ended';
 
@@ -203,7 +204,7 @@ function CallScreen() {
 function Ctrl({ icon, onPress, active, gift }: { icon: keyof typeof Ionicons.glyphMap; onPress: () => void; active?: boolean; gift?: boolean }) {
   return (
     <Pressable onPress={onPress} style={[styles.ctrl, active && { backgroundColor: '#fff' }, gift && { backgroundColor: colors.primary }]}>
-      <Ionicons name={icon} size={24} color={active ? '#000' : '#fff'} />
+      <GlyphIcon name={icon} size={24} color={active ? '#000' : '#fff'} scale={1.2} />
     </Pressable>
   );
 }
