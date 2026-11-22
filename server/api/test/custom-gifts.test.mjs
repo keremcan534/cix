@@ -444,7 +444,8 @@ describe('Yönetim › Hediyeler', () => {
     assert.equal(clip.length, done.video.bytes);
     const probed = spawnSync(process.env.FFPROBE || 'ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=codec_name,width,height', '-of', 'csv=p=0', '-'], { input: clip });
     assert.equal(String(probed.stdout).trim(), 'h264,540,1920');
-    await sleep(300);
+    // The source goes in the background (media.mjs removeFiles), after the row is ready.
+    for (let i = 0; i < 50 && stored.has(keyOfUrl(src)); i++) await sleep(100);
     assert.ok(!stored.has(keyOfUrl(src)), 'kaynak çevrildikten sonra silindi');
     assert.ok((await q("SELECT 1 FROM audit_events WHERE action = 'gift.video_ready' AND detail->>'gift' = $1", [g.id])).rowCount);
 
@@ -542,6 +543,8 @@ describe('Yönetim › Hediyeler', () => {
       assert.notEqual(row.job?.status, 'failed', row.job?.error);
     }
     assert.ok(row.video, 'video hazır');
+    // The source goes in the background (media.mjs removeFiles), after the row is ready.
+    for (let i = 0; i < 50 && stored.has(keyOfUrl(src)); i++) await sleep(100);
     assert.ok(!stored.has(keyOfUrl(src)), 'SVGA çevrildikten sonra silindi');
     const fx = (await ok(call('GET', '/api/catalog?gifts=2&family=1'))).fx.find((x) => x.id === 'rocket-3');
     assert.equal(fx.kind, 'entry');
@@ -568,7 +571,8 @@ describe('Yönetim › Hediyeler', () => {
     const clip = Buffer.from(await (await fetch(`${h.base}${done.video.url}`)).arrayBuffer());
     const probed = spawnSync(process.env.FFPROBE || 'ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=codec_name,width,height', '-of', 'csv=p=0', '-'], { input: clip });
     assert.equal(String(probed.stdout).trim(), 'h264,540,1920');
-    await sleep(300);
+    // The source goes in the background (media.mjs removeFiles), after the row is ready.
+    for (let i = 0; i < 50 && stored.has(keyOfUrl(src)); i++) await sleep(100);
     assert.ok(!stored.has(keyOfUrl(src)), 'SVGA çevrildikten sonra silindi');
     const webm = await upload(admin, 'giftsource', fs.readFileSync(files.source), 'video/webm');
     await refused(call('POST', '/api/admin/gifts/update', { id: g.id, video: { url: webm, kind: 'source', fill: 0.8 } }, admin.session), 400, /yalnız SVGA/);
