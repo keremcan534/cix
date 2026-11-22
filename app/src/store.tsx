@@ -62,6 +62,8 @@ export type Settings = {
   /** Ayarlar › Görünüm: follow the phone, or always light / dark. */
   appearance: Appearance;
   effectsOff: boolean;
+  /** Oyunlarda güçlü efektler: the GPU light, embers and lightning over a game's big win (games/fx/divine-fx). */
+  gameFx: boolean;
   haptics: boolean;
   reduceMotion: boolean;
   lowData: boolean;
@@ -522,6 +524,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     const defaults: Settings = {
       appearance: 'system',
       effectsOff: false,
+      gameFx: true,
       haptics: true,
       invisibleEntry: false,
       cityDiscovery: false, // location-based discovery is opt-in (spec §31.7)
