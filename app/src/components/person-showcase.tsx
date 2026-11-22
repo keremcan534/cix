@@ -1,11 +1,11 @@
 // The person design shared by the room's person card and the profile (the designer's package, Nov 2026): a dark
-// plum panel with pink and gold, the level pill by the name, the club and Aile pills, the interests row, four action
-// tiles, the Profili gör · Yönet · Şikâyet et row, and the three walls' links: İlişki Duvarı, Hediye Duvarı and
+// plum panel with pink and gold, the level pill by the name, the club and Aile pills, four action tiles, the
+// Profili gör · Yönet · Şikâyet et row, and the three walls' links: İlişki Duvarı, Hediye Duvarı and
 // Koruma (the profile draws the walls themselves, components/profile-design). The card is drawn with the designer's picture set
 // (components/person-card-art); every name, number and photo on it is the person's own.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import { Image, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/text';
 import { CardArt, DIVIDER_ART, SlicePill, TILE_ART, type CardArtName } from '@/components/person-card-art';
@@ -31,14 +31,14 @@ export const SHOW = {
 // --- Name line ------------------------------------------------------------------------------------------------
 
 /** "♥ Lv.N" by the name on the crowned pill: their Yankı level. */
-export function LevelPill({ level }: { level: number }) {
+export function LevelPill({ level, h = LEVEL_H }: { level: number; h?: number }) {
   return (
-    <View style={s.levelWrap} accessibilityLabel={`Yankı seviyesi ${level}`}>
-      <CardArt name="seviye-rozet" h={LEVEL_H} />
+    <View style={[s.levelWrap, { marginVertical: -Math.round(h * 0.18) }]} accessibilityLabel={`Yankı seviyesi ${level}`}>
+      <CardArt name="seviye-rozet" h={h} />
       {/* The pink part of the picture, under its crown. */}
       <View style={s.level}>
-        <CardArt name="kalp" h={10} />
-        <Text style={s.levelText} numberOfLines={1}>
+        <CardArt name="kalp" h={Math.round(h * 0.23)} />
+        <Text style={[s.levelText, { fontSize: Math.round(h * 0.27) }]} numberOfLines={1}>
           Lv.{level}
         </Text>
       </View>
@@ -50,7 +50,7 @@ export function LevelPill({ level }: { level: number }) {
 export function ClubPills({ user, onOpen }: { user: User; onOpen?: () => void }) {
   const { agency, kabile } = useAffiliations(user);
   if (!agency && !kabile) return null;
-  const pill = (a: Affiliation, art: CardArtName, more: boolean) => (
+  const pill = (a: Affiliation, art: CardArtName) => (
     <Pressable
       key={art}
       style={s.clubAt}
@@ -63,21 +63,21 @@ export function ClubPills({ user, onOpen }: { user: User; onOpen?: () => void })
       accessibilityRole={a.href ? 'button' : undefined}
       accessibilityLabel={`${a.sub}: ${a.name}`}
     >
-      <SlicePill kind="kulup" h={32}>
+      <SlicePill kind="kulup" h={36}>
         <View style={s.club}>
-          <CardArt name={art} h={15} />
-          <Text style={s.clubText} numberOfLines={1}>
+          <CardArt name={art} h={17} />
+          <Text style={s.clubText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
             {a.name}
           </Text>
-          {more && !!a.href && <CardArt name="ok" h={9} />}
+          {!!a.href && <CardArt name="ok" h={10} />}
         </View>
       </SlicePill>
     </Pressable>
   );
   return (
     <View style={s.clubs}>
-      {agency && pill(agency, 'bina', false)}
-      {kabile && pill(kabile, 'grup', true)}
+      {agency && pill(agency, 'bina')}
+      {kabile && pill(kabile, 'grup')}
     </View>
   );
 }
@@ -87,40 +87,6 @@ export const splitInterest = (i: string) => {
   const m = /^(\p{Extended_Pictographic}[️‍\p{Extended_Pictographic}]*)\s*(.+)$/u.exec(i.trim());
   return m ? { emoji: m[1], label: m[2] } : { emoji: '•', label: i.trim() };
 };
-
-/** The designer's picture for an interest; any other interest keeps its emoji. */
-const interestArt = (label: string): CardArtName | null => {
-  const l = label.toLocaleLowerCase('tr-TR');
-  if (l.includes('sohbet')) return 'sohbet';
-  if (l.includes('dans')) return 'dans';
-  if (l.includes('spor') || l.includes('futbol')) return 'spor';
-  if (l.includes('oyun')) return 'oyun';
-  if (l.includes('film') || l.includes('sinema') || l.includes('dizi')) return 'film';
-  return null;
-};
-
-/** Their interests on one line (at most five; none: nothing). */
-export function InterestRow({ interests, style }: { interests: readonly string[] | undefined; style?: StyleProp<ViewStyle> }) {
-  const list = (interests ?? []).slice(0, 5).map(splitInterest);
-  if (!list.length) return null;
-  return (
-    <View style={[s.interests, style]} accessibilityLabel={`İlgi alanları: ${list.map((x) => x.label).join(', ')}`}>
-      <View style={s.interestList}>
-        {list.map((x) => {
-          const art = interestArt(x.label);
-          return (
-            <View key={x.label} style={s.interest}>
-              {art ? <CardArt name={art} h={16} /> : <Text style={s.interestEmoji}>{x.emoji}</Text>}
-              <Text style={s.interestText} numberOfLines={1}>
-                {x.label}
-              </Text>
-            </View>
-          );
-        })}
-      </View>
-    </View>
-  );
-}
 
 // --- Actions --------------------------------------------------------------------------------------------------
 
@@ -157,8 +123,9 @@ export function ManageRow({ items }: { items: { art: CardArtName; label: string;
     <View>
       <Image source={DIVIDER_ART} style={s.divider} resizeMode="stretch" />
       <View style={s.manage}>
-        {items.map((it) => (
+        {items.map((it, i) => (
           <View key={it.label} style={s.manageCell}>
+            {i > 0 && <View style={s.manageSep} />}
             <Pressable style={s.manageItem} onPress={it.onPress} hitSlop={6} accessibilityRole="button" accessibilityLabel={it.label}>
               <CardArt name={it.art} h={17} />
               <Text style={s.manageText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
@@ -210,30 +177,27 @@ export function WallLinks({ onOpen }: { onOpen: (w: WallKey) => void }) {
 const LEVEL_H = 44;
 
 const s = StyleSheet.create({
-  levelWrap: { flexShrink: 0, marginVertical: -8 },
+  levelWrap: { flexShrink: 0 },
   level: { position: 'absolute', left: '13%', right: '13%', top: '49%', bottom: '11%', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3 },
   levelText: { color: '#fff', fontSize: 12, lineHeight: 15, fontWeight: '800' },
-  clubs: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8 },
-  clubAt: { flexShrink: 1, maxWidth: '100%' },
-  club: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, minHeight: 32 },
-  clubText: { color: SHOW.text, fontSize: 13, fontWeight: '700', flexShrink: 1 },
-  interests: { flexDirection: 'row', alignItems: 'center' },
-  interestList: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-evenly', columnGap: 10, rowGap: 4 },
-  interest: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  interestEmoji: { fontSize: 15 },
-  interestText: { color: SHOW.text, fontSize: 13 },
-  tiles: { flexDirection: 'row', gap: 6 },
-  tile: { flex: 1, minWidth: 0, minHeight: 66, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', gap: 3, paddingHorizontal: 6, paddingVertical: 6 },
+  // Two halves, as in the design (one alone keeps its half, on the left).
+  clubs: { flexDirection: 'row', gap: 10 },
+  clubAt: { width: '48.5%' },
+  club: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 16, paddingRight: 14, minHeight: 36 },
+  clubText: { flex: 1, color: SHOW.text, fontSize: 14, fontWeight: '700' },
+  tiles: { flexDirection: 'row', gap: 8 },
+  tile: { flex: 1, minWidth: 0, minHeight: 72, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 6, paddingVertical: 8 },
   tileArt: { position: 'absolute', left: 0, top: 0, width: '100%', height: '100%' },
-  tileText: { color: SHOW.text, fontSize: 12.5, fontWeight: '800' },
+  tileText: { color: SHOW.text, fontSize: 13, fontWeight: '800' },
   divider: { width: '100%', height: 3, marginTop: 2 },
   manage: { flexDirection: 'row', alignItems: 'center', minHeight: 44 },
   manageCell: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+  manageSep: { width: 1, height: 20, backgroundColor: 'rgba(255, 140, 225, 0.25)' },
   manageItem: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 44 },
   manageText: { color: SHOW.dim, fontSize: 13.5, fontWeight: '700', flexShrink: 1 },
   links: { flexDirection: 'row', gap: 6, paddingLeft: 6 },
   linkAt: { flex: 1, minWidth: 0, justifyContent: 'center' },
-  link: { flexDirection: 'row', alignItems: 'center', gap: 2, minHeight: 36, paddingLeft: 26, paddingRight: 7 },
+  link: { flexDirection: 'row', alignItems: 'center', gap: 2, minHeight: 36, paddingLeft: 24, paddingRight: 6 },
   linkArt: { position: 'absolute', left: -8, top: 0, bottom: 0, width: 34, alignItems: 'center', justifyContent: 'center' },
-  linkText: { flex: 1, color: SHOW.text, fontSize: 10, lineHeight: 13, fontWeight: '800' },
+  linkText: { flex: 1, color: SHOW.text, fontSize: 10.5, lineHeight: 13, fontWeight: '800' },
 });

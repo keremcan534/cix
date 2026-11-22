@@ -87,10 +87,10 @@ describe('Kişi kartının profil okuması (card)', () => {
   const id = 'bbbbbbbb-0000-4000-8000-000000000011';
   const user = { id, name: 'Artemis', username: null, gender: 'Kadın', age: 39, city: null, bio: '', interests: [], avatarUrl: null, publicNo: '100000020001', followers: 1, following: 0, isFollowing: true, blockedByMe: false };
 
-  test('kart madalyaları ister, hediye toplamını istemez; madalya, görünüş, ülke ve gizli seviye gelir', async () => {
+  test('kart hediye toplamını ve madalyaları istemez (göstermez); gelen madalya, görünüş, ülke ve gizli seviye okunur', async () => {
     const { loadPublicProfile } = await import('@/lib/live/profile');
     route = (p) =>
-      p === `/api/user?id=${id}&card=1&medals=1`
+      p === `/api/user?id=${id}&card=1`
         ? {
             body: {
               user: { ...user, levels: { wealth: 12, charm: null }, friends: 3, staff: null, extras: { country: 'AZ' }, photos: [], medals: ['md4', 'md1'] },
@@ -99,7 +99,7 @@ describe('Kişi kartının profil okuması (card)', () => {
           }
         : { status: 404 };
     const c = await loadPublicProfile(id, false, false, true);
-    assert.deepEqual(seen, [`/api/user?id=${id}&card=1&medals=1`], 'ziyaret yazılmaz, kart işaretleri gider');
+    assert.deepEqual(seen, [`/api/user?id=${id}&card=1`], 'ziyaret yazılmaz, kart işaretleri gider');
     assert.deepEqual(c.medals, ['md4', 'md1']);
     assert.deepEqual(c.look, { frame: 'fr-crown-gold', vipLevel: 5, specialId: null, entry: null, ride: null, noble: null });
     assert.deepEqual(c.levels, { wealth: 12, charm: null }, 'gizlenen Yankı seviyesi gizli kalır');
