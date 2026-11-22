@@ -15,6 +15,7 @@ import { Animated, Easing, Pressable, StyleSheet, View, type LayoutChangeEvent }
 
 import { Shine } from '@/components/fx/surface';
 import { Coins } from '@/components/games/fx/coins';
+import { DivineFx } from '@/components/games/fx/divine-fx';
 import { salonArt } from '@/components/games/fx/salon-art';
 import { Text } from '@/components/text';
 import { playSfx } from '@/lib/game-sound';
@@ -110,10 +111,12 @@ export function useWinFx(): { celebrate: Celebrate; layer: ReactNode } {
 }
 
 function WinCelebration({ amount, bet, tier, title, onDone }: WinShow & { tier: WinTier; onDone: () => void }) {
-  const { reduceMotion, effectsOff } = useSettings();
+  const { reduceMotion, effectsOff, gameFx } = useSettings();
   const small = tier === 'small';
   // The flourishes on top of the light and the coins: flash, rings, bursts, sparkles, fireworks, shaking.
   const lively = !small && !reduceMotion && !effectsOff;
+  // The GPU light, embers and lightning on top of them (fx/divine-fx), with Oyunlarda güçlü efektler on.
+  const divine = lively && gameFx;
   // A win that steps up its title while it counts: it builds up, and its jingle comes when the amount lands.
   const climbs = !small && !title && !reduceMotion && (tier === 'mega' || tier === 'epic');
   const ms = reduceMotion && !small ? Math.min(1400, WIN_SHOW[tier].ms) : WIN_SHOW[tier].ms;
@@ -303,6 +306,7 @@ function WinCelebration({ amount, bet, tier, title, onDone }: WinShow & { tier: 
       <Pressable style={[StyleSheet.absoluteFill, s.scrim]} onPress={close} accessibilityRole="button" accessibilityLabel={`${title ?? WIN_TITLE[tier]}, ${amount} jeton. Kapatmak için dokun`} />
       {/* Everything that shakes with a blow; the dimming behind stays put. */}
       <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ translateX: shakeX }, { translateY: shakeY }, { scale: punch }] }]} pointerEvents="none">
+        {divine && box.w > 0 && <DivineFx tier={big} pulse={burst} width={box.w} height={box.h} cx={box.w / 2} cy={box.h * MIDDLE} />}
         <View style={s.center}>
           {!reduceMotion && (
             <Animated.View style={[s.rays, { transform: [{ rotate: spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }] }]}>

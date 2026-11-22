@@ -11,6 +11,7 @@ import { Animated, Easing, Image, Pressable, StyleSheet, View, type LayoutChange
 
 import { Shine } from '@/components/fx/surface';
 import { Coins } from '@/components/games/fx/coins';
+import { DivineFx } from '@/components/games/fx/divine-fx';
 import { SALON } from '@/components/games/fx/salon';
 import { salonArt } from '@/components/games/fx/salon-art';
 import { SkinOverlay, type SlotSkin } from '@/components/games/fx/slot-skin';
@@ -77,8 +78,13 @@ export function useJackpotShow(skin: SlotSkin | undefined): { play: Play; layer:
 }
 
 function JackpotShow({ skin, kind, amount, bet, onDone }: { skin: SlotSkin; kind: ShowKind; amount: number; bet: number; onDone: () => void }) {
-  const { reduceMotion, effectsOff } = useSettings();
+  const { reduceMotion, effectsOff, gameFx } = useSettings();
   const calm = reduceMotion || effectsOff;
+  // The GPU light, embers and lightning over the show (fx/divine-fx), with Oyunlarda güçlü efektler on; each blow
+  // (the start, the burst, each step up the title, the amount landing) is a new `pulse`.
+  const divine = !calm && gameFx;
+  const [pulse, setPulse] = useState(divine ? 1 : 0);
+  const blow = useCallback(() => setPulse((p) => (p ? p + 1 : p)), []);
   const jackpot = kind === 'jackpot';
   const ms = calm ? SHOW_MS[kind].calm : SHOW_MS[kind].ms;
   const art = skin.show;
@@ -104,7 +110,8 @@ function JackpotShow({ skin, kind, amount, bet, onDone }: { skin: SlotSkin; kind
     Animated.spring(step, { toValue: 1, friction: 4, tension: 120, useNativeDriver: true }).start();
     playSfx('levelup', 0.85);
     heavyHaptic();
-  }, [stage, step]);
+    blow();
+  }, [stage, step, blow]);
   const closing = useRef(false);
   const done = useRef(onDone);
   useEffect(() => {
@@ -137,7 +144,10 @@ function JackpotShow({ skin, kind, amount, bet, onDone }: { skin: SlotSkin; kind
     enter.start();
     rays.start();
     sparkle.start();
-    const go = setTimeout(() => setBurst(true), jackpot ? 1150 : 450);
+    const go = setTimeout(() => {
+      setBurst(true);
+      blow();
+    }, jackpot ? 1150 : 450);
     return () => {
       clearTimeout(end);
       clearTimeout(go);
@@ -170,6 +180,7 @@ function JackpotShow({ skin, kind, amount, bet, onDone }: { skin: SlotSkin; kind
         playSfx('coin', 0.8);
         playSfx('impact', 0.55);
         heavyHaptic();
+        blow();
       }
     };
     frame = requestAnimationFrame(step);
@@ -196,6 +207,7 @@ function JackpotShow({ skin, kind, amount, bet, onDone }: { skin: SlotSkin; kind
       <Animated.View style={[StyleSheet.absoluteFill, s.scrim, { opacity: dim }]} pointerEvents="none" />
       {w > 0 && (
         <>
+          {divine && <DivineFx tier={jackpot ? 'jackpot' : stage === 'small' ? 'big' : stage} pulse={pulse} width={w} height={h} cx={w / 2} cy={h * 0.36} />}
           {/* The rays turn behind the plaque, a little above the middle. */}
           <Animated.Image
             source={art.rays}

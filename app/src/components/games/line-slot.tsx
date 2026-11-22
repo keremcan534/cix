@@ -22,6 +22,7 @@ import { useJackpotShow } from '@/components/games/fx/jackpot-show';
 import { Reel, type ReelHandle } from '@/components/games/fx/reel';
 import { ContactShadow, FundPlaque, Marquee, SALON, SalonStage, StageHeader, StageStatus, SymbolPlate, plaqueValue, salonScreen, symbolShadow, useBox, type ActionLook, type StatusTone } from '@/components/games/fx/salon';
 import { SKIN_GAP, SKIN_PAD, SKIN_RIM, SkinCabinet, SkinPlate, fitSkin, slotSkinOf, windowRadius } from '@/components/games/fx/slot-skin';
+import { TeaseAura } from '@/components/games/fx/divine-fx';
 import { useWinFx } from '@/components/games/fx/win-fx';
 import { SpinControls, fmt, sleep, useShortGame } from '@/components/games/slot-kit';
 import type { LineSlotId } from '@/lib/casino-odds';
@@ -171,6 +172,8 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
   const { casino, bank } = useGames();
   const game = casino.find((g) => g.id === id)!;
   const still = settings.reduceMotion;
+  // The GPU glow round a reel the game waits for (fx/divine-fx), with Oyunlarda güçlü efektler on.
+  const aura = settings.gameFx && !still && !settings.effectsOff;
   const [bet, setBet] = useState(game.bets[Math.min(2, game.bets.length - 1)]);
   // The window the machine opens with; after that each reel keeps its own (components/games/fx/reel).
   const [opening] = useState(() => slotWindow(c, c.counts.map((_, r) => r * 4)));
@@ -408,6 +411,7 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
           litStyle={skin ? s.skinLit : undefined}
           render={(sym) => (skin ? face(sym, symSize) : <Symbol label={c.symbols[sym].label} sym={sym} theme={theme} size={symSize} />)}
         />
+        {waiting[reel] && aura && <TeaseAura />}
       </View>
     ));
   const controls = (
