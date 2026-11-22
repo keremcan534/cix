@@ -82,6 +82,9 @@ export const DEFAULTS = {
   parent_min_rate: 0.01,
   parent_zero: { enabled: false, tier: 'elite' },
   parent_sees_sub_earnings: true,
+  // Referans ajans gizliliği (owners, 22 Nov 2026): off, an agency's own people see only their sub-agencies' names,
+  // never their streamers, counts, earnings or scores (subsHidden); the centre and its BD always see them.
+  parent_sees_subs: false,
   bd_policy: { rate: 0.05, basis: 'base_plus_pool' },
   suspension_policy: { reliability_below: 40, inactive_days: 90 },
   // Ajans asistanı (docs/AJANS_ASISTANI.md): how many assistants an agency may have at once.
@@ -203,6 +206,8 @@ export function validateSetting(key, value, cur) {
     }
     case 'parent_sees_sub_earnings':
       return bool(value, 'Üst ajans alt ajans kazancını görür');
+    case 'parent_sees_subs':
+      return bool(value, 'Üst ajans referans ajanslarının yayıncılarını ve rakamlarını görür');
     case 'bd_policy': {
       const v = { ...cur.bd_policy, ...obj(value, key) };
       return { rate: rate4(v.rate, 1, 'BD oranı'), basis: oneOf(v.basis, ['base', 'pool', 'base_plus_pool'], 'BD matrahı') };
@@ -360,7 +365,8 @@ export async function accessOf(c, u) {
 export function permsOn(acc, agency, settings) {
   const out = new Set(acc.agency.get(agency.id) ?? []);
   // A parent agency looks into its sub-agencies (never acts in them); earnings only if the setting allows.
-  const p = agency.parent_id && acc.agency.get(agency.parent_id);
+  // Only with parent_sees_subs on (subsHidden): by default a parent agency sees nothing inside its sub-agencies.
+  const p = agency.parent_id && settings.parent_sees_subs && acc.agency.get(agency.parent_id);
   if (p && p.has('subagencies.view')) {
     out.add('subagencies.view');
     if (p.has('streamers.view')) out.add('streamers.view');
@@ -370,6 +376,16 @@ export function permsOn(acc, agency, settings) {
   if (acc.admin || acc.platform.has('agencies.view')) VIEW_PERMS.forEach((x) => out.add(x));
   else if (acc.bd.has(agency.id) && acc.platform.has('bd.assigned')) BD_VIEW_PERMS.forEach((x) => out.add(x));
   return out;
+}
+
+/**
+ * Referans ajans gizliliği (owners, 22 Nov 2026): true when `acc` looks at `agency` as one of its own people (its
+ * owner or staff) and parent_sees_subs is off, so its sub-agencies show by name only: no streamers, counts,
+ * earnings or scores. The centre (agencies.view) and the agency's BD always see them.
+ */
+export function subsHidden(acc, agency, settings) {
+  if (settings.parent_sees_subs) return false;
+  return !(acc.admin || acc.platform.has('agencies.view') || (acc.bd.has(agency.id) && acc.platform.has('bd.assigned')));
 }
 
 /** How `acc` relates to `agency`, for the panel: owner, staff, parent, center, bd or null. */

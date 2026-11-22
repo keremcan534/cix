@@ -230,6 +230,10 @@ export async function eraseAccount(c, id, phone) {
     await c.query('DELETE FROM room_tables WHERE $1 = ANY(seats) OR opened_by = $1', [id]);
 }
 
+/** Choosing or changing a username (PATCH /api/me): closed until it opens as a paid feature (owners, 22 Nov 2026). */
+export const USERNAME_OPEN = false;
+export const USERNAME_SOON = 'Kullanıcı adı değiştirme yakında açılacak. Kullanıcı adını eski haline getirip yeniden kaydet.';
+
 export const socialRoutes = {
   async 'PATCH /api/me'(req) {
     const u = await auth(req);
@@ -240,6 +244,9 @@ export const socialRoutes = {
     if (b.name !== undefined) set.name = await publicText(b.name, 1, 40, 'Ad', u, 'profile.name', 'name');
     if (b.username !== undefined) {
       const name = typeof b.username === 'string' ? b.username.trim().toLowerCase() : '';
+      // Kullanıcı adı (owners, 22 Nov 2026): choosing or changing it will be a paid feature; until it opens nobody
+      // does, older apps included. Every app's form sends the name already held on each save: that changes nothing.
+      if (!USERNAME_OPEN && name !== (u.username ?? '')) throw new HttpError(403, USERNAME_SOON);
       if (!/^[a-z0-9_.]{3,20}$/.test(name)) throw new HttpError(400, 'Kullanıcı adı 3–20 karakter; harf, rakam, nokta ve alt çizgi');
       // 'insta_ayse', 'ayse.05321234567': read with the dots and underscores as spaces.
       await assertClean(name.replace(/[._]+/g, ' '), u, 'profile.username', 'username');

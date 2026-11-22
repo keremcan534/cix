@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 
 import { rnd, startApi } from './harness.mjs';
 
-const h = startApi({ AGENCY_JOBS: '0', ALLOW_TEST_TOPUP: '0' });
+const h = startApi({ AGENCY_JOBS: '0', ALLOW_TEST_TOPUP: '0', AGENCY_INVITES: '1' }); // the invite flow, closed by default (agency-invite-closed.test.mjs)
 const { call, signUp } = h;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -66,6 +66,8 @@ describe('Ajans ağı: kurulum ve hiyerarşi', () => {
       { key: 'elite', name: 'Çok yüksek performans', min_score: 80, sub_rate: 0.39, min_active: 10, overtake: true },
     ]);
     await setting('payout_policy', { min_diamonds: 1000 });
+    // These tests follow a parent into its sub-agencies; by default it sees them by name only (agency-subs-hidden.test.mjs).
+    await setting('parent_sees_subs', true);
   });
 
   test('[Ş1-1] merkez üst ajans oluşturur; yetkisiz kişi oluşturamaz ve reddi denetime yazılır', async () => {

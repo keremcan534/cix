@@ -4,6 +4,8 @@
 // decorative crown has room. The levels and rights themselves stay the server's (levels-live-core).
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 import { SVIP_SHOWN, VIP_PLANS } from '@/data/status';
 import { parseLiveLevels, subPlansOf, subRightsOf, vipLevelsOf, vipRightsOf } from '@/lib/levels-live-core';
@@ -20,6 +22,7 @@ import {
   PRICE_PREFIX,
   SUB_BUY_TITLE,
   artGlows,
+  vipCardColors,
   artScaleFor,
   badgeSize,
   cardMetrics,
@@ -510,5 +513,19 @@ describe('VIP sekmesi seviyenin renginde', () => {
     for (const list of [green.page, green.glass, green.info]) for (const h of list) assert.match(h, /^#[0-9a-f]{6}$/i);
     assert.equal(vipTint(null), null);
     assert.equal(vipTint({ inner: ['#024010', 'yeşil'], rim: ['#FCF797', '#FCE741'] }), null);
+  });
+});
+
+// Ben's VIP tile (owners, 22 Nov 2026): in the level's own colour from VIP 1 on, its pink without VIP.
+describe('Ben ekranında VIP kutusu', () => {
+  test('seviyenin rengi; VIP 0 kendi pembesinde', () => {
+    assert.equal(vipCardColors(0), null);
+    const ten = vipCardColors(10);
+    assert.ok(ten);
+    assert.match(ten[0], /^#[0-9a-f]{6}$/);
+    assert.notDeepEqual(vipCardColors(1), ten);
+    // Past the last level's colours, the top one's.
+    assert.deepEqual(vipCardColors(14), ten);
+    assert.match(readFileSync(resolve(import.meta.dirname, '../src/app/(tabs)/profil.tsx'), 'utf8'), /colors=\{vipCardColors\(svipLevel\) \?\? \['#D02E78', '#4A1630'\]\}/);
   });
 });

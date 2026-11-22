@@ -1,3 +1,4 @@
+// Not shown while agency invites are closed (owners, 22 Nov 2026; server agency.mjs INVITES_OPEN): kept for when they open.
 // Ajans → Ofis → Yayıncılar → "Yayıncı davet et" with a server: the owner types the streamer's name as the app
 // shows it (or a username), picks them from the people the server finds (lib/agency-net findInvitees), and the
 // invite names that account by id. Sign-up sets no username, so a username-only field left almost everyone out.

@@ -30,6 +30,13 @@ export function parseTrDate(text: string): string | null {
   return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 export const formatTrDate = (iso?: string) => (iso ? iso.split('-').reverse().join('.') : '');
+/**
+ * The birth date to show for my age: the one this phone has, only when it gives the age the server has. The server
+ * never sends the date back, so a date the phone kept from elsewhere (the demo's sample date) with no age on the
+ * server (null) or another age is not mine: it shows nothing (owners, 22 Nov 2026).
+ */
+export const birthShown = (birthDate: string | undefined, age: number | null | undefined): string =>
+  birthDate && typeof age === 'number' && /^\d{4}-\d{2}-\d{2}$/.test(birthDate) && ageFrom(birthDate) === age ? birthDate : '';
 
 export type ProfileDraft = { name: string; username: string; bio: string; city: string; birth: string };
 export type ProfileErrors = Partial<Record<keyof ProfileDraft, string>>;

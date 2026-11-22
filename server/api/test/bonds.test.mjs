@@ -237,6 +237,16 @@ describe('Bağlar: yeniden bağ hediyesi, düşüş, bildirimler', () => {
     assert.equal((await me2(b.session)).diamonds, 500 + 2500, 'kabul edilen bağ hediyesi ve yenisi elmas');
     const g = await h.sql.query("SELECT gift_id, count, total, place FROM gift_events WHERE sender = $1 AND ref = $2", [a.user.id, ref]);
     assert.deepEqual(g.rows.map((x) => [x.gift_id, x.count, Number(x.total), x.place]), [['bag-kanka', 5, 2500, 'profile']]);
+    // The recipient's SimilarClub Sistem chat tells who sent which and what it brought (owners, 22 Nov 2026), once
+    // for the two identical requests; the sender gets none.
+    const eventId = Number((await h.sql.query('SELECT id FROM gift_events WHERE sender = $1 AND ref = $2', [a.user.id, ref])).rows[0].id);
+    const told = await until(async () => (await notes(b.user.id, `bond-gift:${eventId}`))[0], 'bağ hediyesi bildirimi');
+    assert.equal(told.title, '🔗 Bağ hediyesi geldi');
+    assert.equal(told.link, '/gelir');
+    assert.match(told.body, /^A sana profil üzerinden .+ ×5 gönderdi\.\n💎 2\.500 elmas hesabına geçti \(Gelir › Profilden gelen hediyeler\)\.\nBağ puanınız \+25\.$/);
+    assert.deepEqual([told.data.from.id, told.data.count, told.data.diamonds, told.data.kind], [a.user.id, 5, 2500, 'kanka']);
+    await wait(300);
+    assert.equal((await h.sql.query("SELECT count(*)::int AS n FROM team_notices WHERE ref LIKE 'bond-gift:%' AND target = ANY($1::uuid[])", [[a.user.id, b.user.id]])).rows[0].n, 1, 'bir kez, yalnız alana');
     // B sends one back: either side's bond gift counts.
     await topUp(b.session, 1000);
     const [st, back] = await send(b.session, a.user.id, 'bag-kanka', 1, 500);

@@ -353,6 +353,15 @@ export const BADGE_COLORS: Record<number, string> = {
   9: '#4a025c',
   10: '#620400',
 };
+/**
+ * Ben's VIP tile in the level's colour, the one the VIP tab draws that level in (its badge's): a little lighter at the
+ * top left, deep at the bottom right. Null under VIP 1: the tile keeps its own pink (owners, 22 Nov 2026).
+ */
+export function vipCardColors(level: number): [string, string] | null {
+  const at = levelArtFor(level);
+  const base = at ? BADGE_COLORS[at] : undefined;
+  return base ? [mixHex(base, '#ffffff', 0.15), mixHex(base, '#000000', 0.3)] : null;
+}
 /** The VIP tab drawn in a level's colours: the page, the rights' cards and the points panel. */
 export type VipTint = {
   page: readonly [string, string, string, string];
