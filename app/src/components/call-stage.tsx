@@ -26,6 +26,7 @@ import { applyMask, maskAvailable, maskName, nextMaskKind, useMaskKind } from '@
 import { beatNow, liveSeconds, MODE_NAME, otherId, type CallView } from '@/lib/live/one-on-one';
 import { useApp } from '@/store';
 import { colors } from '@/theme';
+import { GlyphIcon } from '@/components/UiIcon';
 
 const fmt = (n: number) => n.toLocaleString('tr-TR');
 /** Every this many minutes the earner's cheer is a bigger one. */
@@ -304,7 +305,7 @@ function Tool({ text, ...ctrl }: { icon: keyof typeof Ionicons.glyphMap; onPress
 export function Ctrl({ icon, onPress, active, label }: { icon: keyof typeof Ionicons.glyphMap; onPress: () => void; active?: boolean; label: string }) {
   return (
     <Pressable onPress={onPress} style={[styles.ctrl, active && { backgroundColor: '#fff' }]} accessibilityLabel={label}>
-      <Ionicons name={icon} size={24} color={active ? '#000' : '#fff'} />
+      <GlyphIcon name={icon} size={24} color={active ? '#000' : '#fff'} scale={1.2} />
     </Pressable>
   );
 }

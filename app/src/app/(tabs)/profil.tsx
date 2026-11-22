@@ -36,6 +36,9 @@ import { myCompletion, rowVisible, type MenuFlags } from '@/lib/me-view';
 import { OwnMarkNote } from '@/components/profile-mark';
 import { useMyMarks } from '@/lib/live/marks-live';
 import { useVisitorsUnseen } from '@/lib/visitors-seen';
+import { GlyphIcon } from '@/components/UiIcon';
+
+const BEN_BG = require('../../../assets/bg/sahne-ben.jpg');
 
 type IconName = keyof typeof Ionicons.glyphMap;
 type OneWay = Exclude<TieSide, 'friends'>;
@@ -66,7 +69,7 @@ const SUPPORT: Item[] = [
 
 export default function ProfileScreen() {
   const { coins, isHost, following, blocked, me, logout, vipLevel, equipped, wealthLevel, paidGames, charmLevel, agencyId, myRoom, svipLevel, nobleTier, inventory, vipDays } = useApp();
-  const { colors, semantic } = useTheme();
+  const { colors, semantic, dark } = useTheme();
   const styles = useStyles();
   const { casino } = useGames();
   const specialId = cosmeticById(equipped.specialId);
@@ -132,7 +135,10 @@ export default function ProfileScreen() {
   const visible = (m: Item) => rowVisible(m, { demo: IS_DEMO, live, hasAgency });
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      {/* The light theme's paper: a soft pink wash with a little light at the top (dark keeps its plain surface). */}
+      {!dark && <Image source={BEN_BG} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors />}
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
       <ScrollView contentContainerStyle={{ paddingBottom: 32, gap: 12 }}>
         <View style={styles.top}>
           <Pressable onPress={() => router.push('/kullanici/me')} accessibilityLabel="Profilim">
@@ -319,6 +325,7 @@ export default function ProfileScreen() {
       <FollowListSheet visible={list !== null} {...MY_LISTS[list ?? 'followers']} load={() => loadList(list ?? 'followers')} onClose={() => setList(null)} />
       <VisitorsSheet visible={visitorsOpen} rows={visitors.rows} count={visitors.count} unlocked={visitors.unlocked} newest={visitors.newest} onClose={() => setVisitorsOpen(false)} />
     </SafeAreaView>
+    </View>
   );
 }
 
@@ -329,7 +336,7 @@ function Group({ items }: { items: Item[] }) {
     <View style={[styles.card, { paddingVertical: 4 }]}>
       {items.map((m, i) => (
         <Pressable key={m.label} style={[styles.menuRow, i > 0 && styles.sep]} onPress={m.onPress} accessibilityLabel={m.label}>
-          {m.art ? <Art name={m.art} size={30} /> : m.img ? <Icon3D name={m.img} size={28} /> : <Ionicons name={m.icon} size={24} color={colors.text} />}
+          {m.art ? <Art name={m.art} size={30} /> : m.img ? <Icon3D name={m.img} size={28} /> : <GlyphIcon name={m.icon} size={24} color={colors.text} scale={1.17} />}
           <Text style={styles.menuLabel}>{m.label}</Text>
           {m.dot && <View style={styles.redDot} />}
           <Ionicons name="chevron-forward" size={18} color={colors.textDim} />

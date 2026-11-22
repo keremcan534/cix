@@ -2,10 +2,10 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Image, Modal, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Art, uiArtFor } from '@/components/Art';
 import { Text } from '@/components/text';
 import { useSheetMax } from '@/lib/sheet-space';
 import { SCRIM, makeStyles, useTheme } from '@/theme';
+import { GlyphIcon } from '@/components/UiIcon';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 /** `icon` is an Ionicons glyph. When any option has one, the sheet becomes a left-aligned list with an icon column. */
@@ -45,7 +45,7 @@ export function ActionSheet({ visible, title, titleArt, options, onClose }: { vi
               }}
             >
               {listed && (
-                <View style={styles.iconBox}>{o.icon && (uiArtFor(o.icon) ? <Art name={uiArtFor(o.icon)!} size={24} /> : <Ionicons name={o.icon} size={20} color={o.destructive ? semantic.danger : colors.text} />)}</View>
+                <View style={styles.iconBox}>{o.icon && <GlyphIcon name={o.icon} size={20} color={o.destructive ? semantic.danger : colors.text} />}</View>
               )}
               <Text style={[styles.optionText, listed && styles.listedText, o.destructive && { color: semantic.danger }]}>{o.label}</Text>
             </Pressable>
@@ -69,5 +69,5 @@ const useStyles = makeStyles(({ colors, edge }) => ({
   optionText: { color: colors.text, fontSize: 16, fontWeight: '600' },
   listed: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: 14, paddingHorizontal: 14 },
   listedText: { flex: 1, textAlign: 'left' },
-  iconBox: { width: 26, alignItems: 'center' },
+  iconBox: { width: 24, alignItems: 'center' },
 }));
