@@ -44,24 +44,29 @@ export type LevelIcon = 'leaf' | 'diamond-outline' | 'diamond' | 'flower' | 'rib
  * A group of levels sharing one emblem (used by Cömertlik and Yankı). `art` is the group's small picture for the
  * level badge and `emblem` its finished emblem picture; without them the Ionicons `icon` is drawn instead.
  */
-export type LevelTier = { from: number; to: number; name: string; icon: LevelIcon; colors: [string, string]; ink: string; art?: ArtName; emblem?: ArtName };
+/** The level groups' designed look (components/wealth-art: emblem and name plate), by key: Cömertlik and Yankı. */
+export type WealthLook = 'kuvars' | 'opal' | 'akik' | 'ametist' | 'topaz' | 'zumrut' | 'yakut' | 'safir' | 'pirlanta' | 'hazine' | 'efsane';
+export type CharmLook = 'kivilcim' | 'isilti' | 'parilti' | 'safak' | 'ay-isigi' | 'yildiz' | 'kutup-yildizi' | 'gokkusagi' | 'kutup-isigi' | 'efsane-yanki';
+export type TierLook = WealthLook | CharmLook;
+/** `look`: the group's emblem and plate from the designer's sets; drawn instead of `emblem` and the chip. */
+export type LevelTier = { from: number; to: number; name: string; icon: LevelIcon; colors: [string, string]; ink: string; art?: ArtName; emblem?: ArtName; look?: TierLook };
 export type WealthTier = LevelTier;
 /** `soon`: not built yet in the real app; the level screen leaves it out until it is (güncelleme 6). */
 export type LevelPerk = { key: string; title: string; detail: string; emoji: string; art?: ArtName; from: number; kind: 'privilege' | 'costume'; soon?: boolean };
 /** The perks the level screen shows: the ones the app really gives. */
 export const shownPerks = (perks: LevelPerk[]) => perks.filter((p) => !p.soon);
 export const WEALTH_TIERS: WealthTier[] = [
-  { from: 0, to: 4, name: 'Kuvars', icon: 'leaf', colors: ['#2DD4BF', '#0F766E'], ink: '#ECFEFF', art: 'comertlik-simge-kuvars', emblem: 'comertlik-amblem-kuvars' },
-  { from: 5, to: 9, name: 'Opal', icon: 'diamond-outline', colors: ['#38BDF8', '#1D4ED8'], ink: '#EFF6FF', art: 'comertlik-simge-opal', emblem: 'comertlik-amblem-opal' },
-  { from: 10, to: 14, name: 'Akik', icon: 'diamond', colors: ['#6366F1', '#312E81'], ink: '#EEF2FF', art: 'comertlik-simge-akik', emblem: 'comertlik-amblem-akik' },
-  { from: 15, to: 19, name: 'Ametist', icon: 'flower', colors: ['#F472B6', '#9D174D'], ink: '#FDF2F8', art: 'comertlik-simge-ametist', emblem: 'comertlik-amblem-ametist' },
-  { from: 20, to: 24, name: 'Topaz', icon: 'ribbon', colors: ['#F97316', '#9A3412'], ink: '#FFF7ED', art: 'comertlik-simge-topaz', emblem: 'comertlik-amblem-topaz' },
-  { from: 25, to: 28, name: 'Zümrüt', icon: 'flame', colors: ['#F43F5E', '#881337'], ink: '#FFF1F2', art: 'comertlik-simge-zumrut', emblem: 'comertlik-amblem-zumrut' },
-  { from: 29, to: 32, name: 'Yakut', icon: 'sparkles', colors: ['#C084FC', '#6B21A8'], ink: '#FAF5FF', art: 'comertlik-simge-yakut', emblem: 'comertlik-amblem-yakut' },
-  { from: 33, to: 36, name: 'Safir', icon: 'shield', colors: ['#EAB308', '#7C2D12'], ink: '#FEFCE8', art: 'comertlik-simge-safir', emblem: 'comertlik-amblem-safir' },
-  { from: 37, to: 40, name: 'Pırlanta', icon: 'star', colors: ['#FDE047', '#A16207'], ink: '#422006', art: 'comertlik-simge-pirlanta', emblem: 'comertlik-amblem-pirlanta' },
-  { from: 41, to: 45, name: 'Hazine', icon: 'planet', colors: ['#818CF8', '#1E1B4B'], ink: '#E0E7FF', art: 'comertlik-simge-hazine', emblem: 'comertlik-amblem-hazine' },
-  { from: 46, to: 50, name: 'Efsane', icon: 'trophy', colors: ['#FACC15', '#18181B'], ink: '#FEF9C3', art: 'comertlik-simge-efsane', emblem: 'comertlik-amblem-efsane' },
+  { from: 0, to: 4, name: 'Kuvars', icon: 'leaf', colors: ['#2DD4BF', '#0F766E'], ink: '#ECFEFF', art: 'comertlik-simge-kuvars', emblem: 'comertlik-amblem-kuvars', look: 'kuvars' },
+  { from: 5, to: 9, name: 'Opal', icon: 'diamond-outline', colors: ['#38BDF8', '#1D4ED8'], ink: '#EFF6FF', art: 'comertlik-simge-opal', emblem: 'comertlik-amblem-opal', look: 'opal' },
+  { from: 10, to: 14, name: 'Akik', icon: 'diamond', colors: ['#6366F1', '#312E81'], ink: '#EEF2FF', art: 'comertlik-simge-akik', emblem: 'comertlik-amblem-akik', look: 'akik' },
+  { from: 15, to: 19, name: 'Ametist', icon: 'flower', colors: ['#F472B6', '#9D174D'], ink: '#FDF2F8', art: 'comertlik-simge-ametist', emblem: 'comertlik-amblem-ametist', look: 'ametist' },
+  { from: 20, to: 24, name: 'Topaz', icon: 'ribbon', colors: ['#F97316', '#9A3412'], ink: '#FFF7ED', art: 'comertlik-simge-topaz', emblem: 'comertlik-amblem-topaz', look: 'topaz' },
+  { from: 25, to: 28, name: 'Zümrüt', icon: 'flame', colors: ['#F43F5E', '#881337'], ink: '#FFF1F2', art: 'comertlik-simge-zumrut', emblem: 'comertlik-amblem-zumrut', look: 'zumrut' },
+  { from: 29, to: 32, name: 'Yakut', icon: 'sparkles', colors: ['#C084FC', '#6B21A8'], ink: '#FAF5FF', art: 'comertlik-simge-yakut', emblem: 'comertlik-amblem-yakut', look: 'yakut' },
+  { from: 33, to: 36, name: 'Safir', icon: 'shield', colors: ['#EAB308', '#7C2D12'], ink: '#FEFCE8', art: 'comertlik-simge-safir', emblem: 'comertlik-amblem-safir', look: 'safir' },
+  { from: 37, to: 40, name: 'Pırlanta', icon: 'star', colors: ['#FDE047', '#A16207'], ink: '#422006', art: 'comertlik-simge-pirlanta', emblem: 'comertlik-amblem-pirlanta', look: 'pirlanta' },
+  { from: 41, to: 45, name: 'Hazine', icon: 'planet', colors: ['#818CF8', '#1E1B4B'], ink: '#E0E7FF', art: 'comertlik-simge-hazine', emblem: 'comertlik-amblem-hazine', look: 'hazine' },
+  { from: 46, to: 50, name: 'Efsane', icon: 'trophy', colors: ['#FACC15', '#18181B'], ink: '#FEF9C3', art: 'comertlik-simge-efsane', emblem: 'comertlik-amblem-efsane', look: 'efsane' },
 ];
 export const wealthTier = (level: number) => WEALTH_TIERS.find((t) => level >= t.from && level <= t.to) ?? WEALTH_TIERS[0];
 
