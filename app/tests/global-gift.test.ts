@@ -5,10 +5,12 @@
 // catalog's global marks, and each announcement once in the banner line.
 import { beforeEach, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 import { getWinNews, shiftWinNews } from '@/lib/broadcast';
-import { globalChatLine, globalGiftBlocked, globalGiftOfLine, globalGiftText, parseGlobalIds, type GlobalGift } from '@/lib/global-gift-core';
-import { isGlobalGift, parseLiveCatalog, parseSavedLiveCatalog } from '@/lib/live/catalog-live';
+import { globalChatLine, globalGiftBlocked, globalGiftOfLine, globalGiftText, parseGlobalIds, parseSoonIds, type GlobalGift } from '@/lib/global-gift-core';
+import { isGlobalGift, isSoonGift, parseLiveCatalog, parseSavedLiveCatalog } from '@/lib/live/catalog-live';
 import { onGlobalGift, takeGlobalGiftEvent } from '@/lib/live/global-gift';
 import type { LineEvent } from '@/lib/live/line-events';
 import { dativeOf, toPerson } from '@/lib/tr-dative';
@@ -164,5 +166,31 @@ describe('Anlık hattan gelen global hediye', () => {
     assert.equal(q.length, 1);
     assert.equal(q[0].global?.id, 501);
     assert.equal(q[0].userName, 'Kaan');
+  });
+});
+
+// Yakında (owners, 22 Nov 2026): the catalog's soon: true gifts, greyed on their shelf with the word and never sent.
+describe('Yakında hediyeler', () => {
+  test('katalogdan okunur, telefonda saklanır; bozuk olan atlanır', () => {
+    const gifts = [
+      { id: 'bag-kanka', name: 'Kanka Kilidi', price: 500, cat: 'family', soon: true },
+      { id: 'koruma', name: 'Koruma Kartı', price: 999, cat: 'family' },
+      { id: 'bag-cift', name: 'Kalbim Seninle', price: 5000, cat: 'couple' },
+      { id: 'bag-abla', soon: 'evet' },
+    ];
+    assert.deepEqual(parseSoonIds(gifts), ['bag-kanka']);
+    const c = parseLiveCatalog({ gifts, giftsFormat: 2 });
+    assert.equal(isSoonGift('bag-kanka', c), true);
+    assert.equal(isSoonGift('koruma', c), false);
+    assert.deepEqual(parseSavedLiveCatalog(JSON.stringify({ ...c, fetchedAt: 1 }))?.catalog.soon, ['bag-kanka']);
+    assert.equal('soon' in parseLiveCatalog({ gifts: [] }), false);
+  });
+  test('hediye paneli Yakında hediyeyi seçtirmez; katalog ?soon=1 ister; bağ türü de istenmez', () => {
+    const src = (p: string) => readFileSync(resolve(import.meta.dirname, '../src', p), 'utf8');
+    const sheet = src('components/room/gift-sheet.tsx');
+    assert.match(sheet, /if \(shelf !== 'bag' && isSoonGift\(it\.id, catalog\)\) return showAlert\('Yakında'/);
+    assert.match(sheet, /<Text style=\{g\.soonText\}>Yakında<\/Text>/);
+    assert.match(src('lib/live/catalog-live.ts'), /&soon=1`/);
+    assert.match(src('components/bonds.tsx'), /if \(soonKind\(kind\)\) return showAlert\('Yakında'/);
   });
 });

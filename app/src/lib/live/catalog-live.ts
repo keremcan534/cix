@@ -46,7 +46,7 @@ import { setLiveSeatColors } from '@/data/seat-colors';
 import { APP_MARKS, parseMarkRules, type GiftMark, type MarkKind, type MarkRules } from '@/lib/profile-marks';
 import { setServerNow } from '@/lib/sanction-time';
 import { parseFxList, type FxVideo } from '@/lib/fx-videos-core';
-import { parseGlobalIds } from '@/lib/global-gift-core';
+import { parseGlobalIds, parseSoonIds } from '@/lib/global-gift-core';
 import { parseCatalog, type CatalogPack } from '@/lib/live/billing-core';
 
 const BASE = process.env.EXPO_PUBLIC_API_URL ?? '';
@@ -105,6 +105,8 @@ export type LiveCatalog = {
   bondLooks?: BondLooks;
   /** The gifts the server marks global (Global hediye, lib/global-gift-core); absent when none. */
   global?: string[];
+  /** The gifts the server marks "Yakında" (greyed on their shelf, not sent); absent when none. */
+  soon?: string[];
 };
 /** The rooms' numbers (server/api/live-registry.mjs roomNumbersOf): mic and boss seat levels, people per level. */
 export type RoomNumbers = { micMinLevel: number; bossMinLevel: number; caps: number[] };
@@ -291,8 +293,10 @@ export function parseLiveCatalog(raw: unknown): LiveCatalog {
     marks: parseMarkRules(r.marks, r.gifts),
     ...looksOf(r.bondLooks),
     ...globalOf(parseGlobalIds(r.gifts)),
+    ...soonOf(parseSoonIds(r.gifts)),
   };
 }
+const soonOf = (ids: string[]) => (ids.length ? { soon: ids } : {});
 const globalOf = (ids: string[]) => (ids.length ? { global: ids } : {});
 const looksOf = (raw: unknown) => {
   const looks = parseBondLooks(raw);
@@ -335,6 +339,7 @@ export function parseSavedLiveCatalog(raw: string | null): { catalog: LiveCatalo
       marks: parseMarkRules(r.marks),
       ...looksOf(r.bondLooks),
       ...globalOf(parseGlobalIds(Array.isArray(r.global) ? r.global.map((id) => ({ id, global: true })) : null)),
+      ...soonOf(parseSoonIds(Array.isArray(r.soon) ? r.soon.map((id) => ({ id, soon: true })) : null)),
     },
     // A copy an older app saved counts as old: the next poll reads the catalog again. One from before the videos were
     // listed (no fx), or from before the shelves were (no shelf): that app hid the gifts put back on the shelves
@@ -447,6 +452,8 @@ export const bondLevelsNow = (c: LiveCatalog | null = current): readonly number[
 export const bondLookOf = (kind: BondKind, level: number, c: LiveCatalog | null = current): BondLook | null => bondLookAt(c?.bondLooks, kind, level);
 
 export const isGlobalGift = (id: string, c: LiveCatalog | null = current) => !!c?.global?.includes(id);
+/** Whether the server marks this gift "Yakında": greyed on its shelf with the word, and not sent. */
+export const isSoonGift = (id: string, c: LiveCatalog | null = current) => !!c?.soon?.includes(id);
 
 /** Every gift this phone can draw, the app's own as they are now and the admins' listed (the profile's gift wall). */
 export const everyGift = (c: LiveCatalog | null = current): Gift[] => [...viewsOf(c).byId.values()];
@@ -551,7 +558,7 @@ export function fetchLiveCatalog(): Promise<unknown> {
       // marks=1&marks=2: Profil izleri with the kinds and minutes (Muzip hediyeler); a server before kinds reads the
       // first and answers as for the G7 app (hours, no kinds: the app's own pictures and the gifts' badges).
       // bondlooks=1: Bağ işaretleri as staff designed them (server/api/bond-looks.mjs).
-      const res = await fetch(`${BASE}/api/catalog?gifts=2&family=1&emoji=1&levels=1&shop=1&lucky=1&marks=1&marks=2&bondlooks=1`, { signal: ctrl.signal });
+      const res = await fetch(`${BASE}/api/catalog?gifts=2&family=1&emoji=1&levels=1&shop=1&lucky=1&marks=1&marks=2&bondlooks=1&soon=1`, { signal: ctrl.signal });
       if (!res.ok) throw new Error(`Sunucu hatası (${res.status})`);
       const body: unknown = await res.json();
       fetchedAt = Date.now();

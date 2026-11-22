@@ -21,7 +21,7 @@ import { userById, type User } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import { ApiError } from '@/lib/api';
 import { message } from '@/lib/live';
-import { bondLevelsNow, liveCatalog, useLiveCatalog } from '@/lib/live/catalog-live';
+import { bondLevelsNow, isSoonGift, liveCatalog, useLiveCatalog } from '@/lib/live/catalog-live';
 import { bondKindNow, bondRefusal, liveBondGift, liveBondsFor, liveEndBond, liveRequestBond, liveRespondBond, liveSetBondsHidden, liveWithdrawBond, loadBondRequests, loadBonds } from '@/lib/live/bonds';
 import { useApp } from '@/store';
 import { PROFILE_GRADIENT } from '@/components/profile-design';
@@ -199,8 +199,11 @@ export function BondsTab({ user, isMe, state, isBlocked, onMeetInvite }: { user:
       { text: 'Jeton yükle', onPress: () => router.push('/cuzdan') },
     ]);
 
+  // Yakında (owners, 22 Nov 2026): a kind whose bond gift waits on its shelf can't be asked for (the server refuses too).
+  const soonKind = (kind: BondKind) => live && isSoonGift(`bag-${kind}`);
   const request = (kind: BondKind) => {
     const k = bondKindNow(kind);
+    if (soonKind(kind)) return showAlert('Yakında', `${k.label} bağı yakında açılacak.`);
     if (isBlocked) return showAlert('Engelli kullanıcı', 'Engellediğin biriyle bağ kuramazsın.');
     if (live) return act(() => liveRequestBond(user.id, kind, undefined, k.price), `${k.label} isteği gönderildi. ${user.name} kabul edince ${k.gift} ona geçer; ${liveCatalog()?.bonds?.answerDays ?? 3} gün içinde yanıt gelmezse jetonların geri gelir.`);
     // Demo: the same limits the server checks, coins from this phone.
@@ -269,6 +272,7 @@ export function BondsTab({ user, isMe, state, isBlocked, onMeetInvite }: { user:
   const canAsk = !isMe && !ours && !myRequest && !theirRequest;
   const ask = (kind: BondKind) => {
     const k = bondKindNow(kind);
+    if (soonKind(kind)) return showAlert('Yakında', `${k.label} bağı yakında açılacak.`);
     showAlert(`${k.label} bağı kur`, `${user.name} ile ${k.label} bağı için ${k.gift} gider: ${k.price.toLocaleString('tr-TR')} jeton. Kabul etmezse jetonların geri gelir.`, [
       { text: 'Vazgeç', style: 'cancel' },
       { text: 'İstek gönder', onPress: () => void request(kind) },
@@ -394,7 +398,7 @@ export function BondsTab({ user, isMe, state, isBlocked, onMeetInvite }: { user:
         onClose={() => setKindSheet(false)}
         options={BOND_ORDER.map((kind) => {
           const k = bondKindNow(kind);
-          return { label: `${k.label} · ${k.gift} · ${k.price.toLocaleString('tr-TR')} jeton`, icon: k.icon, onPress: () => void request(kind) };
+          return { label: soonKind(kind) ? `${k.label} · Yakında` : `${k.label} · ${k.gift} · ${k.price.toLocaleString('tr-TR')} jeton`, icon: k.icon, onPress: () => void request(kind) };
         })}
       />
     </View>

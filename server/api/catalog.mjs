@@ -88,7 +88,8 @@ const GIFT_ROWS = [
   ['v12', 'Atlıkarınca Gecesi', '🎠', 699_999, 'privilege', 9],
   // Çift's bond gift (bond-rules.mjs KINDS.cift), on the Aile ve Dost shelf with the others (the owners, 20 Nov 2026;
   // before, only the profile's "Bağ kur" sent it). Last, so no other gift's default order (custom-gifts.mjs APP_SORT) moves.
-  ['bag-cift', 'Bağ Yüzüğü', '💍', 5_000, 'family'],
+  // The Çift bond's gift on Çift (owners, 22 Nov 2026), the other bond gifts on Aile ve Dost.
+  ['bag-cift', 'Bağ Yüzüğü', '💍', 5_000, 'couple'],
 ];
 
 /**
@@ -120,6 +121,15 @@ export const SHOP_PAUSED_DEFAULT = [
 export const SHOP_PAUSED = new Set(
   process.env.SHOP_PAUSED === undefined ? SHOP_PAUSED_DEFAULT : process.env.SHOP_PAUSED.split(',').map((x) => x.trim()).filter(Boolean),
 );
+/**
+ * The app's gifts that start as "Yakında" (owners, 22 Nov 2026): on their shelf, greyed, not sent; the panel turns each
+ * on or off (custom-gifts.mjs, custom_gifts.soon). The Aile ve Dost bond gifts but Çift's: their bonds wait too.
+ */
+export const GIFTS_SOON_DEFAULT = ['bag-kanka', 'bag-kardes', 'bag-baci', 'bag-agabey', 'bag-abla', 'bag-yenge', 'bag-enishte'];
+export const GIFTS_SOON = new Set(
+  process.env.GIFTS_SOON === undefined ? GIFTS_SOON_DEFAULT : process.env.GIFTS_SOON.split(',').map((x) => x.trim()).filter(Boolean),
+);
+
 export const GIFTS_PAUSED = new Set([
   ...['g1', 'g2', 'g3', 'g4', 'g5', 'g7', 'g8', 'h1', 'h3', 'h4', 'h5', 'h6', 'h7', 'h8', 'h9', 'h10', 'h11'],
   ...['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p9', 'p10'],

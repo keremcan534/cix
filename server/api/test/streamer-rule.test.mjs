@@ -160,7 +160,8 @@ describe('Aile ve Dost rafı', () => {
 
   test('yeni uygulama rafı görür; eski uygulama bağ hediyesini görmez, Koruma Kartı İkili rafında kalır', async () => {
     const fresh = (await ok(call('GET', '/api/catalog?gifts=2&family=1'))).gifts;
-    for (const id of [...BONDS, 'koruma']) assert.equal(fresh.find((g) => g.id === id)?.cat, 'family', id);
+    // Kalbim Seninle (bag-cift) is on Çift (owners, 22 Nov 2026), the other bond gifts and Koruma Kartı on Aile ve Dost.
+    for (const id of [...BONDS, 'koruma']) assert.equal(fresh.find((g) => g.id === id)?.cat, id === 'bag-cift' ? 'couple' : 'family', id);
     const old = (await ok(call('GET', '/api/catalog?gifts=2'))).gifts;
     assert.equal(old.some((g) => BONDS.includes(g.id)), false);
     assert.equal(old.find((g) => g.id === 'koruma').cat, 'couple');
@@ -226,13 +227,13 @@ describe('Aile ve Dost rafı', () => {
     assert.equal(g.gift.name, 'Kanka Madalyası');
   });
 
-  test('Bağ Yüzüğü Aile ve Dost rafında: yeni uygulama görür, eski görmez; panelde fiyatı ve adı değişir, rafı değişmez; profilden ve raftan aynı istek', async () => {
+  test('Bağ Yüzüğü Çift rafında: yeni uygulama görür, eski görmez; panelde fiyatı ve adı değişir, rafı Aile ve Dost ya da Çift; profilden ve raftan aynı istek', async () => {
     const fresh = (await ok(call('GET', '/api/catalog?gifts=2&family=1'))).gifts;
-    assert.deepEqual(['name', 'price', 'cat'].map((k) => fresh.find((g) => g.id === 'bag-cift')?.[k]), ['Bağ Yüzüğü', 5000, 'family']);
+    assert.deepEqual(['name', 'price', 'cat'].map((k) => fresh.find((g) => g.id === 'bag-cift')?.[k]), ['Bağ Yüzüğü', 5000, 'couple']);
     for (const q of ['/api/catalog?gifts=2', '/api/catalog']) assert.equal((await ok(call('GET', q))).gifts.some((g) => g.id === 'bag-cift'), false, q);
-    // Panel: it is listed with the other bond gifts and stays on their shelf.
-    for (const cat of ['couple', 'hot']) await refused(call('POST', '/api/admin/gifts/update', { id: 'bag-cift', cat }, admin.session), 400, /Aile ve Dost rafında/);
-    assert.ok((await ok(call('GET', '/api/admin/gifts?builtin=1', null, admin.session))).gifts.some((g) => g.id === 'bag-cift' && g.cat === 'family'));
+    // Panel: it is listed with the other bond gifts; a bond gift goes on Aile ve Dost or Çift, no other shelf.
+    await refused(call('POST', '/api/admin/gifts/update', { id: 'bag-cift', cat: 'hot' }, admin.session), 400, /Aile ve Dost ya da Çift rafında/);
+    assert.ok((await ok(call('GET', '/api/admin/gifts?builtin=1', null, admin.session))).gifts.some((g) => g.id === 'bag-cift' && g.cat === 'couple'));
     await ok(call('POST', '/api/admin/gifts/update', { id: 'bag-cift', name: 'Sevgili Yüzüğü', price: 6000 }, admin.session));
     try {
       const info = (await ok(call('GET', '/api/bonds/info'))).kinds.find((k) => k.id === 'cift');

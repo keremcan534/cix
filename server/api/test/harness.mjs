@@ -64,6 +64,9 @@ export function startApi(extraEnv = {}, { moneyCheck = true } = {}) {
       // Everything in the shop is sold (catalog.mjs SHOP_PAUSED): the tests buy Işıltı as their cheap item.
       // test/shop-paused.test.mjs runs the default.
       SHOP_PAUSED: '',
+      // No gift starts as "Yakında" (catalog.mjs GIFTS_SOON): the bond tests ask for every kind. gift-soon.test.mjs
+      // runs with the real ones.
+      GIFTS_SOON: '',
       // The Abonelik's renewal check (vip.mjs) runs on its own only where a test sets it.
       VIP_RECHECK_MIN: '0',
       // The VIP set's 30 bag items (vip-set.mjs) are added only where a test turns it on (test/vip-set.test.mjs).
