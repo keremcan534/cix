@@ -11,7 +11,7 @@ import { ActionSheet, type SheetOption } from '@/components/ActionSheet';
 import { GiftArt } from '@/components/GiftArt';
 import { FollowListSheet, MY_LISTS } from '@/components/follow-list-sheet';
 import { Avatar, Button, FramedAvatar, GradientButton, LevelChips, VerifiedBadge, VipBadge, VipTitle } from '@/components/ui';
-import { COSMETICS, FAN_LEVELS, cosmeticById, fanLevel, roomLevel, ROOM_LEVEL_ICONS } from '@/data/catalog';
+import { COSMETICS, FAN_LEVELS, cosmeticById, fanLevel, roomLevel } from '@/data/catalog';
 import { callPrice } from '@/data/economy';
 import { FOLLOWS_ME, INTERESTS, MOMENTS, ROOMS, userById, type Gift, type Moment, type Room, type User } from '@/data/mock';
 import { giftById, giftMarkOf, giftShelf, useLiveCatalog } from '@/lib/live/catalog-live';
@@ -88,6 +88,7 @@ import { ProfileGiftSheet } from '@/components/profile-gift-sheet';
 import { useGiftStage } from '@/components/fx/gift-stage';
 import { FEMALE_FILL, GenderChip, MALE_FILL, useAffiliations, useStaffBadge, type Affiliation } from '@/components/profile-badges';
 import { Icon3D } from '@/components/Icon3D';
+import { roomLevelArt } from '@/components/RoomArt';
 import { useApp, type FanClub } from '@/store';
 import { SCRIM, fonts, glass, makeStyles, useTheme } from '@/theme';
 import { Art, type ArtName } from '@/components/Art';
@@ -1035,7 +1036,7 @@ export default function UserProfile() {
                     level={
                       room.level !== null && (
                         <View style={styles.lvChip}>
-                          <Text style={{ fontSize: 12 }}>{ROOM_LEVEL_ICONS[Math.min(room.level, ROOM_LEVEL_ICONS.length) - 1]}</Text>
+                          <Image source={roomLevelArt(room.level)} style={{ width: 16, height: 16 }} resizeMode="contain" accessibilityIgnoresInvertColors />
                           <Text style={styles.lvText}>Lv.{room.level}</Text>
                         </View>
                       )

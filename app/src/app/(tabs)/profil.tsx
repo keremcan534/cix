@@ -17,7 +17,7 @@ import { NOBLE_TIERS, nobleInfo } from '@/data/status';
 import { levelArtFor, vipCardColors } from '@/lib/vip-screen';
 import { HERO_IMAGES } from '@/components/vip/assets';
 import { VIP_LEVEL_ART } from '@/components/vip/level-art';
-import { Art } from '@/components/Art';
+import { Art, type ArtName } from '@/components/Art';
 import { confirmLogout, showAlert } from '@/lib/alert';
 import { copyText } from '@/lib/clipboard';
 import { useApp } from '@/store';
@@ -39,7 +39,7 @@ import { useVisitorsUnseen } from '@/lib/visitors-seen';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 type OneWay = Exclude<TieSide, 'friends'>;
-type Item = MenuFlags & { icon: IconName; img?: Icon3DName; label: string; onPress: () => void; dot?: boolean };
+type Item = MenuFlags & { icon: IconName; img?: Icon3DName; art?: ArtName; label: string; onPress: () => void; dot?: boolean };
 
 const GROWTH: Item[] = [
   { icon: 'mic-outline', img: 'mic', label: 'Yayıncı Merkezi', onPress: () => router.push('/yayinci') },
@@ -125,7 +125,7 @@ export default function ProfileScreen() {
     { icon: 'calendar-outline', label: 'Etkinliklerim', onPress: () => openEvents({ tab: 'mine' }) },
     { icon: 'ribbon-outline', img: 'crown', label: 'Cömertlik ve Yankı', onPress: () => router.push('/seviye') },
     // Koruma is the server's (lib/live/guard): who guards me, whom I guard, my threshold.
-    ...(live ? [{ icon: 'shield-half-outline', img: 'heart', label: 'Benim Koruma', onPress: () => router.push('/koruma') } satisfies Item] : []),
+    ...(live ? [{ icon: 'shield-half-outline', img: 'heart', art: 'iliski-koruma', label: 'Benim Koruma', onPress: () => router.push('/koruma') } satisfies Item] : []),
   ];
   // Live: agency rows follow my membership on the server (none shows until it is read).
   const hasAgency = live ? (server.agency === undefined ? null : !!server.agency) : !!agencyId;
@@ -329,7 +329,7 @@ function Group({ items }: { items: Item[] }) {
     <View style={[styles.card, { paddingVertical: 4 }]}>
       {items.map((m, i) => (
         <Pressable key={m.label} style={[styles.menuRow, i > 0 && styles.sep]} onPress={m.onPress} accessibilityLabel={m.label}>
-          {m.img ? <Icon3D name={m.img} size={28} /> : <Ionicons name={m.icon} size={24} color={colors.text} />}
+          {m.art ? <Art name={m.art} size={30} /> : m.img ? <Icon3D name={m.img} size={28} /> : <Ionicons name={m.icon} size={24} color={colors.text} />}
           <Text style={styles.menuLabel}>{m.label}</Text>
           {m.dot && <View style={styles.redDot} />}
           <Ionicons name="chevron-forward" size={18} color={colors.textDim} />

@@ -341,9 +341,18 @@ export function RoomInfoSheet({
                 </Text>
                 {textEditor && <Ionicons name="create-outline" size={18} color={colors.textDim} />}
               </Pressable>
-              <Text style={styles.dim}>
-                🇹🇷 │ {th.emoji} {th.name} │ {type ? `${type.emoji} ${type.name} │ ` : ''}ID {roomIdText({ id: roomId, code: serverRoomCode(roomId) })}
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                <Art name="ulke-turkiye" size={16} />
+                <ArtText art={ROOM_THEME_ART[theme]} size={16} style={styles.dim}>
+                  {th.name}
+                </ArtText>
+                {type ? (
+                  <ArtText art={ROOM_TYPE_ART[type.id]} size={16} style={styles.dim}>
+                    {type.name}
+                  </ArtText>
+                ) : null}
+                <Text style={styles.dim}>ID {roomIdText({ id: roomId, code: serverRoomCode(roomId) })}</Text>
+              </View>
             </View>
             <Pressable onPress={onSettings} hitSlop={8} accessibilityLabel="Oda ayarlarını aç">
               <Ionicons name="settings-outline" size={26} color="#fff" />

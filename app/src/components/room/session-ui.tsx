@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react';
 import { Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Art } from '@/components/Art';
 import { Text } from '@/components/text';
 import { micHaptic, tapHaptic } from '@/lib/haptics';
 import { useKeyboardOpen } from '@/lib/keyboard-open';
@@ -242,7 +243,7 @@ export function MiniRoom({ session }: { session: RoomSession }) {
             accessibilityLabel={session.micWant ? 'Mikrofonu kapat' : 'Mikrofonu aç'}
             hitSlop={4}
           >
-            <Ionicons name={session.micWant ? 'mic' : 'mic-off'} size={18} color={session.micWant && micSending(session) ? semantic.liveInk : colors.text} />
+            <Art name={session.micWant ? 'ui-mikrofon-acik' : 'ui-mikrofon-kapali'} size={22} style={session.micWant && !micSending(session) ? { opacity: 0.55 } : undefined} />
           </Pressable>
         )}
         <Pressable

@@ -12,6 +12,7 @@ import { SCENES } from '@/components/fx/scenes';
 import { Backdrop } from '@/components/fx/surface';
 import { ActionSheet, type SheetOption } from '@/components/ActionSheet';
 import { Art } from '@/components/Art';
+import { Icon3D } from '@/components/Icon3D';
 import { goToMember } from '@/components/GroupChat';
 import { Avatar, Card, GradientButton, Header, StateIcon } from '@/components/ui';
 import { FAMILIES } from '@/data/economy';
@@ -421,7 +422,7 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
                     </ScrollView>
                   )}
                   <Pressable style={styles.roomCard} onPress={() => router.push(`/oda/${meta.roomId}`)} accessibilityLabel="Aile odası">
-                    <Text style={{ fontSize: 22 }}>🎙️</Text>
+                    <Icon3D name="mic" size={26} />
                     <View style={{ flex: 1 }}>
                       <Text style={{ color: colors.text, fontWeight: '800' }}>Aile odası</Text>
                       <Text style={styles.dim}>Aile odasında 15 dakika kal görevi buradan sayılır</Text>
@@ -788,7 +789,7 @@ function TasksTab({ roomId, weeklyPower }: { roomId: string; weeklyPower: number
         </Pressable>
       </Card>
       <Pressable style={[styles.roomCard, { backgroundColor: colors.card }, lift]} onPress={() => router.push(`/oda/${roomId}`)}>
-        <Text style={{ fontSize: 22 }}>🎙️</Text>
+        <Icon3D name="mic" size={26} />
         <Text style={{ color: colors.text, fontWeight: '700', flex: 1 }}>Aile odasına git</Text>
         <Ionicons name="chevron-forward" size={16} color={colors.textDim} />
       </Pressable>

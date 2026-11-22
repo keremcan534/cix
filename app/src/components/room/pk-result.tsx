@@ -7,6 +7,7 @@ import { Animated, Modal, Pressable, ScrollView, StyleSheet, View, useWindowDime
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
+import { Art } from '@/components/Art';
 import { Icon3D } from '@/components/Icon3D';
 import { nameOf } from '@/components/room/pk';
 import {
@@ -182,7 +183,13 @@ export function PkResultScreen({
                     <View style={s.duel}>
                       <DuelFace side={left} tone="pink" face={face} onProfile={onProfile} glow={won === 'left'} />
                       <View style={s.mid}>
-                        <Icon3D name="crown" size={Math.round(face * 0.62)} />
+                        {won === 'tie' ? (
+                          <Art name="pk-beraberlik" size={Math.round(face * 0.7)} />
+                        ) : won === 'none' || !r ? (
+                          <Art name="pk-pk-bitti" size={Math.round(face * 0.7)} />
+                        ) : (
+                          <Icon3D name="crown" size={Math.round(face * 0.62)} />
+                        )}
                         <GoldRim radius={8} width={1.5}>
                           <View style={[s.winRibbon, { backgroundColor: won === 'tie' || won === 'none' || !r ? '#5B2A86' : PK.win[0] }]}>
                             <Text style={s.winText} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>
@@ -247,7 +254,7 @@ export function PkResultScreen({
 
                     {awards && (awards.topSender || awards.topRecipient) && (
                       <View style={s.awards}>
-                        <SectionTitle text="Taç Kazandıranlar" />
+                        <SectionTitle text="Taç Kazandıranlar" art="pk-pk-mvp-one-cikan" />
                         <View style={s.awardRow}>
                           <MiniAward award={awards.topSender} tone="pink" title="En Çok Atış Yapan" onProfile={onProfile} />
                           <MiniAward award={awards.topRecipient} tone="blue" title="En Çok Atışı Alan" onProfile={onProfile} />

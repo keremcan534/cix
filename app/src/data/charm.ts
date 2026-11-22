@@ -36,7 +36,7 @@ export const charmRankBoost = (level: number) => level;
 export const CHARM_PERKS: LevelPerk[] = [
   { key: 'badge', title: 'Yankı rozeti', detail: 'Profilinde ve Ana Sayfa kartında adının yanında', emoji: '🏅', art: 'ayricalik-cazibe-rozeti', from: 1, kind: 'privilege' },
   { key: 'rank', title: 'Ana Sayfa’da öne çıkma', detail: 'Çevrim içi kişiler arasında seviyen yüksekse daha üstte', emoji: '📈', art: 'ayricalik-kesfette-one-cikma', from: 1, kind: 'privilege' },
-  { key: 'moments', title: 'Anlar’da paylaşım', detail: 'Anlar’a fotoğraf ve yazı paylaşabilirsin', emoji: '📸', from: 5, kind: 'privilege' },
+  { key: 'moments', title: 'Anlar’da paylaşım', detail: 'Anlar’a fotoğraf ve yazı paylaşabilirsin', emoji: '📸', art: 'ayricalik-kisisel-album-animasyonlu-gorsel', from: 5, kind: 'privilege' },
   { key: 'bonus', title: 'Kazanç bonusu', detail: 'Aldığın hediyelerin elmasına ek', emoji: '💎', art: 'ayricalik-kazanc-bonusu', from: 6, kind: 'privilege', soon: true },
   { key: 'bubble', title: 'Sohbet balonu', detail: 'Oda sohbetinde seviye renginde balon', emoji: '💬', art: 'ayricalik-sohbet-balonu', from: 6, kind: 'costume', soon: true },
   { key: 'medal', title: 'Yankı madalyası', detail: 'Profil vitrininde grubunun amblemi', emoji: '🎖️', art: 'ayricalik-cazibe-madalyasi', from: 11, kind: 'costume', soon: true },

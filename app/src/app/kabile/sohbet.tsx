@@ -24,7 +24,7 @@ const CHAT_GIFTS = CHAT_GIFT_IDS.map((id) => GIFTS.find((g) => g.id === id)).fil
 
 const QUICK: QuickAction[] = [
   { key: 'iliski', label: 'Uyum Köşesi', emoji: '💞', art: 'iliski-cift-cp-en-tatli-cift', onPress: () => router.push(KABILE_ROUTES.iliski) },
-  { key: 'merkez', label: 'Görevler', emoji: '🎯', tag: 'ücretsiz', onPress: () => router.push(KABILE_ROUTES.merkez) },
+  { key: 'merkez', label: 'Görevler', emoji: '🎯', art: 'ana-gorevler', tag: 'ücretsiz', onPress: () => router.push(KABILE_ROUTES.merkez) },
   { key: 'kasa', label: 'Aile Kasası', emoji: '💰', onPress: () => router.push(KABILE_ROUTES.kasa) },
 ];
 

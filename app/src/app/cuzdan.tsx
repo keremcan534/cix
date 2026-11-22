@@ -14,6 +14,7 @@ import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 import { SCENES } from '@/components/fx/scenes';
 import { Backdrop } from '@/components/fx/surface';
+import { Art, coinPackArt, type ArtName } from '@/components/Art';
 import { Icon3D } from '@/components/Icon3D';
 import { IS_DEMO } from '@/lib/build';
 import { liveMode, liveTopup, message, refreshWallet, TEST_PACKS } from '@/lib/live';
@@ -254,6 +255,7 @@ export default function WalletScreen() {
                   return (
                     <PackTile
                       key={p.productId}
+                      art={coinPackArt(p.coins, shop.packs.map((x) => x.coins))}
                       coins={p.coins}
                       bonus={first || undefined}
                       extra={p.extra || undefined}
@@ -273,7 +275,7 @@ export default function WalletScreen() {
             <View style={styles.grid}>
               {RECHARGE_PACKS.map((p: RechargePack) => {
                 const first = !!p.firstBonus && !firstBuys.has(p.id);
-                return <PackTile key={p.id} coins={p.coins} bonus={first ? p.firstBonus : p.bonus} first={first} price={p.price} busy={processing === p.id} onPress={() => buy(p)} />;
+                return <PackTile key={p.id} art={coinPackArt(p.coins, RECHARGE_PACKS.map((x) => x.coins))} coins={p.coins} bonus={first ? p.firstBonus : p.bonus} first={first} price={p.price} busy={processing === p.id} onPress={() => buy(p)} />;
               })}
             </View>
           )}
@@ -285,12 +287,13 @@ export default function WalletScreen() {
               </View>
               <View style={styles.grid}>
                 {testPacks.map((p) => (
-                  <PackTile key={p.id} coins={p.coins} price="Ücretsiz" busy={processing === p.id} onPress={() => buy(p)} />
+                  <PackTile key={p.id} art={coinPackArt(p.coins, testPacks.map((x) => x.coins))} coins={p.coins} price="Ücretsiz" busy={processing === p.id} onPress={() => buy(p)} />
                 ))}
               </View>
             </>
           )}
           <Pressable onPress={() => router.push('/vip')} style={styles.svipLink} accessibilityRole="link" accessibilityLabel="VIP seviyelerine bak">
+            <Art name="finans-vip-elmas-paketi" size={36} />
             <Text style={styles.svipLinkText}>VIP seviyelerine bak →</Text>
             <Text style={styles.svipLinkSub}>{svipLevel ? `VIP ${svipLevel} · ${svipXp.toLocaleString('tr-TR')} puan` : 'Yüklediğin her jeton 1 puan'}</Text>
           </Pressable>
@@ -315,6 +318,7 @@ export default function WalletScreen() {
  *  "Hoş geldin paketi" tag with its first-purchase `bonus`. `campaign`: the running campaign's tag and this pack's
  *  extra coins (live store packs only); with a first-purchase gift both add up under the welcome tag. */
 function PackTile({
+  art,
   coins,
   bonus,
   first,
@@ -324,6 +328,8 @@ function PackTile({
   campaign,
   extra,
 }: {
+  /** The pack's picture by its size (components/Art coinPackArt). */
+  art?: ArtName;
   coins: number;
   bonus?: number;
   /** The pack's extra coins on every purchase (the panel's Jeton paketleri). */
@@ -350,7 +356,8 @@ function PackTile({
         {/* The same slot on every tile, tag or not, so the coins of a row line up. */}
         <View style={styles.tagSlot}>
           {first ? (
-            <View style={styles.firstTag}>
+            <View style={[styles.firstTag, { flexDirection: 'row', alignItems: 'center', gap: 2 }]}>
+              <Art name="finans-ilk-alim-firsati" size={14} />
               <Text style={styles.firstTagText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                 Hoş geldin paketi
               </Text>
@@ -369,7 +376,7 @@ function PackTile({
             </View>
           ) : null}
         </View>
-        <Icon3D name="coin" size={40} />
+        {art ? <Art name={art} size={48} /> : <Icon3D name="coin" size={40} />}
         <Text style={styles.packCoins} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
           {coins.toLocaleString('tr-TR')}
         </Text>

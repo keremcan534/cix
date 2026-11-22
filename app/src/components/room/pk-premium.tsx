@@ -7,6 +7,7 @@ import type { ReactNode } from 'react';
 import { Image, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Text } from '@/components/text';
+import { Art, type ArtName } from '@/components/Art';
 import { Icon3D } from '@/components/Icon3D';
 import { Photo } from '@/components/photo';
 
@@ -299,10 +300,11 @@ export function TimerPill({ text }: { text: string }) {
 }
 
 /** A section title between two thin gold lines with laurel-like stars. */
-export function SectionTitle({ text }: { text: string }) {
+export function SectionTitle({ text, art }: { text: string; art?: ArtName }) {
   return (
     <View style={styles.section}>
       <LinearGradient colors={['transparent', PK.goldEdge]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.sectionLine} />
+      {art ? <Art name={art} size={22} /> : null}
       <Text style={styles.sectionText} numberOfLines={1}>
         {text}
       </Text>
