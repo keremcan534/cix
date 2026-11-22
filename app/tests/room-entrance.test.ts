@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 
 import { jointEntries, type JointState, type RoomBond } from '@/data/bonds';
 import { emptyEntryLine, pushEntry, shiftEntry, type EntryLine } from '@/lib/entry-queue';
-import { RETURN_MS, cameInAfter, entranceView, entryPlanOf, newPeerLog, peerStep } from '@/lib/room-entrance';
+import { BYE_MS, RETURN_MS, cameInAfter, entranceView, entryPlanOf, newPeerLog, peerBye, peerStep } from '@/lib/room-entrance';
 
 type Look = { entry?: string | null; ride?: string | null; noble?: number | null; vipLevel?: number };
 type Person = { id: string; name: string; look?: Look };
@@ -64,6 +64,10 @@ function phone(me: Person, meJoinedAt: number, roomBonds: RoomBond[] = [], stale
       joint = r.state;
       for (const b of r.show) line = pushEntry(line, { id: `bond:${b.a}|${b.b}`, who: [b.a, b.b], show: `${nameOf(b.a)} & ${nameOf(b.b)}` });
       return step;
+    },
+    /** Their phone said "bye" ("Odadan çık", lib/live/room-bus), just before their voice connection closes. */
+    bye(uid: string, now: number) {
+      log = peerBye(log, uid, now);
     },
     /** My connection dropped: LiveKit says I'm not connected (my join time 0) until it is back. */
     drop() {
@@ -170,6 +174,40 @@ describe('(b) yeni gelen, içerideki kişilerin girişlerini tekrar görmez', ()
     p.sync([{ ...kaan, at: T + 70 * S + RETURN_MS }], T + 71 * S + RETURN_MS);
     assert.deepEqual(p.played(), ['KaaN:dragon'], 'çıkıp sonra giren');
     assert.deepEqual(p.chat.slice(1), ['KaaN odadan ayrıldı', 'KaaN odaya girdi']);
+  });
+
+  // Owners, 22 Nov 2026: two people in a room, one chose "Odayı kapat" and came straight back: no entry effect. The
+  // leaving phone now says "bye" first, so a quick return is an entrance, and its leave line is written at once.
+  test('"Odadan çık" deyip hemen dönen: ayrıldı satırı hemen, dönüşte giriş satırı ve efekti', () => {
+    const p = phone(newbie, T);
+    p.sync([], T + S);
+    p.sync([{ ...kaan, at: T + 5 * S }], T + 6 * S);
+    assert.deepEqual(p.played(), ['KaaN:dragon']);
+    p.bye('u-kaan', T + 20 * S);
+    p.sync([], T + 20 * S + 200);
+    assert.deepEqual(p.chat, ['KaaN odaya girdi', 'KaaN odadan ayrıldı'], 'ayrıldı satırı beklemeden');
+    assert.deepEqual(p.members(), ['me']);
+    p.sync([{ ...kaan, at: T + 23 * S }], T + 23 * S + 300);
+    assert.deepEqual(p.played(), ['KaaN:dragon'], '3 saniye sonra dönen yine giriş');
+    assert.deepEqual(p.chat.slice(2), ['KaaN odaya girdi']);
+    // The "bye" is used up: a drop of the same person later is a drop again (no lines, no effect).
+    p.sync([], T + 40 * S);
+    p.sync([{ ...kaan, at: T + 42 * S }], T + 43 * S);
+    assert.deepEqual(p.played(), []);
+    assert.equal(p.chat.length, 3);
+  });
+
+  test('eski bir "bye" unutulur; bağlantısı kopan "bye" demez', () => {
+    const p = phone(newbie, T);
+    p.sync([], T + S);
+    p.sync([{ ...artemis, at: T + 5 * S }], T + 6 * S);
+    p.played();
+    // A "bye" that wasn't followed by a leave (it didn't go through to the end) is forgotten after BYE_MS.
+    p.bye('u-artemis', T + 10 * S);
+    p.sync([], T + 10 * S + BYE_MS);
+    p.sync([{ ...artemis, at: T + 12 * S + BYE_MS }], T + 13 * S + BYE_MS);
+    assert.deepEqual(p.played(), [], 'eski bye: kopup gelen sayılır');
+    assert.deepEqual(p.chat, ['ARTEMİS odaya girdi']);
   });
 
   test('ses sunucusunun saatiyle: benden sonra gelen giriştir, önce gelen ya da bilinmeyen değil', () => {

@@ -275,6 +275,8 @@ test('soru-cevap: soru ve seçim telefondan gelir; biçimi bozuk olan atılır',
   assert.equal((parseSignal({ t: 'q', id: 'q1', text: 'a'.repeat(500) }) as { text: string }).text.length, 200);
   assert.deepEqual(parseSignal({ t: 'qpick', id: 'q123' }), { t: 'qpick', id: 'q123' });
   assert.equal(parseSignal({ t: 'qpick' }), null);
+  // "Odadan çık" (22 Nov 2026): the leaving phone's bye; nothing else rides on it.
+  assert.deepEqual(parseSignal({ t: 'bye', text: 'x' }), { t: 'bye' });
 });
 
 test('görünüm: sunucunun paketi o odada okunur; telefondan gelen, başka oda ve bozuk alanlar alınmaz', () => {

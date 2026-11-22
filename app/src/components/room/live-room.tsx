@@ -1202,6 +1202,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         if (q) addMsg({ id: `qpick:${msg.id}`, system: true, text: `🎤 Seçilen soru (${userById(q.userId).name}): ${q.text}` });
         return;
       }
+      // "bye" (left on purpose) is the presence's business (lib/live/room); nothing to draw.
+      if (msg.t === 'bye') return;
       const to = msg.to.map((t) => (t === myServerId() ? 'me' : t));
       if (msg.t === 'lucky') return showLuckyFrom(from, to, msg);
       const gift = giftById(msg.giftId);

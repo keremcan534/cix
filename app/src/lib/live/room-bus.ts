@@ -48,7 +48,13 @@ export type PeerSignal =
   | { t: 'anim'; animationId: string }
   /** Soru-cevap: a listener's question, and the staff's pick (the room screen takes a pick only from its staff). */
   | { t: 'q'; id: string; text: string }
-  | { t: 'qpick'; id: string };
+  | { t: 'qpick'; id: string }
+  /**
+   * "Odadan çık" (22 Nov 2026): the phone leaving on purpose says so just before it closes the voice connection, so
+   * the others write "odadan ayrıldı" at once and, should they come back in a moment, see an entrance (their line and
+   * their entry effect) instead of a dropped connection coming back. Older apps don't send it and ignore it.
+   */
+  | { t: 'bye' };
 /** A paid Hareketli the server announced (server/api/room-fx.mjs): `eventId` its room_animations row. */
 export type FxSignal = { t: 'fx'; animationId: string; eventId: number };
 /**
@@ -326,6 +332,7 @@ export function parseSignal(raw: unknown): PeerSignal | null {
   const qid = typeof m.id === 'string' && /^[A-Za-z0-9_.-]{1,40}$/.test(m.id) ? m.id : null;
   if (m.t === 'q' && qid && typeof m.text === 'string' && m.text.trim()) return { t: 'q', id: qid, text: m.text.slice(0, 200) };
   if (m.t === 'qpick' && qid) return { t: 'qpick', id: qid };
+  if (m.t === 'bye') return { t: 'bye' };
   return null;
 }
 

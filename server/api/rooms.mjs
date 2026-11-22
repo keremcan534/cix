@@ -32,7 +32,7 @@
 // LiveKit hands every phone in the room the moment it changes, and again on joining.
 import { HttpError, LIVE_SANCTION, SANCTION_SELECT, UUID, auth, blockedBetween, db, env, filesOut, int, limit, publicText, readJson, sanctionView, sha, text, userId } from './core.mjs';
 // live.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
-import { announceRoom, deleteVoiceRoom, presenceTracked, removeFromVoice, roomService, voiceCounts } from './live.mjs';
+import { announceRoom, deleteVoiceRoom, presenceNewer, presenceTracked, removeFromVoice, roomService, voiceCounts } from './live.mjs';
 import { applySanction, audit, liftSanction, refreshVoice } from './sanctions.mjs';
 import { applyRules, memberCap, rulesOf } from './room-rules.mjs';
 import { ROOM_COVERS, ROOM_THEMES, SEAT_DEFAULT } from './catalog.mjs';
@@ -124,11 +124,14 @@ const SELECT = `SELECT r.*, u.name AS owner_name, u.avatar_url AS owner_avatar, 
                            AND e.revoked_at IS NULL AND e.starts_at <= now() AND e.ends_at > now()) AS bg_paid_until
                   FROM rooms r JOIN users u ON u.id = r.owner LEFT JOIN users b ON b.id = r.boss_id LEFT JOIN room_decor d ON d.owner = r.owner`;
 
-/** Puts LiveKit's people count on the rows of rooms it has open now (rooms it doesn't have keep room_presence's). */
+/**
+ * Puts LiveKit's people count on the rows of rooms it has open now (rooms it doesn't have keep room_presence's), but
+ * not on a room whose people changed after that count was asked for: room_presence already has the change.
+ */
 async function withVoiceCounts(rows) {
   const n = await voiceCounts();
   if (!n) return rows;
-  return rows.map((r) => (n.has(liveKitName(r.id)) ? { ...r, listeners: n.get(liveKitName(r.id)) } : r));
+  return rows.map((r) => (n.has(liveKitName(r.id)) && !presenceNewer(liveKitName(r.id)) ? { ...r, listeners: n.get(liveKitName(r.id)) } : r));
 }
 // Room social (room-social.mjs) lists rooms the same way: Odalarım › Katıl.
 export { out as roomOut, SELECT as ROOM_SELECT, withVoiceCounts };
@@ -301,7 +304,7 @@ export async function voiceAccess(name, u, password) {
     const level = roomLevel((await db.query('SELECT room_xp FROM users WHERE id = $1', [room.owner])).rows[0]?.room_xp ?? 0);
     const cap = rulesOf(room.rules).limit ?? memberCap(level);
     const counts = await voiceCounts();
-    const here = counts?.has(name)
+    const here = counts?.has(name) && !presenceNewer(name)
       ? counts.get(name)
       : Number((await db.query('SELECT count(*) AS n FROM room_presence WHERE room = $1 AND identity <> $2', [name, u.id])).rows[0].n);
     if (here >= cap) throw new HttpError(403, `Oda dolu (en fazla ${cap.toLocaleString('tr-TR')} kişi)`);

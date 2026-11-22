@@ -247,7 +247,8 @@ export function endRoom(reason: EndReason, endText?: string, endBody?: string) {
   stopTimers();
   state = { ...state, session: { ...s, micWant: false } };
   engine.setPublishing(false);
-  engine.disconnect();
+  // Left by choice ("Odadan çık", another room): the other phones hear it first (lib/live/room-bus 'bye').
+  engine.disconnect(reason === 'left' || reason === 'switched');
   persist(null);
   // Ended by the room (kicked, closed by the server): keep an "ended" session so the UI can say why.
   const shown = reason === 'kicked' || reason === 'server';

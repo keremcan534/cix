@@ -111,6 +111,7 @@ async function onEvent(e) {
       }
       // A reconnect keeps the first join time, so the time in the room isn't cut short.
       await db.query('INSERT INTO room_presence (room, identity, sid) VALUES ($1, $2, $3) ON CONFLICT (room, identity) DO UPDATE SET sid = EXCLUDED.sid', [room, who, sid]);
+      presenceChanged(room);
       // Arkadaşını Getir: an invitee's room entry pays their waiting invite (referrals.mjs; never fails the webhook).
       await roomEntered(who, room);
       // A running event in the room counts them as come (events.mjs; never fails the webhook).
@@ -122,6 +123,7 @@ async function onEvent(e) {
       // Only this connection: after a reconnect the new one has another sid.
       if (who) {
         const gone = await db.query("DELETE FROM room_presence WHERE room = $1 AND identity = $2 AND (sid = $3 OR $3 = '') RETURNING room, identity, joined_at", [room, who, sid]);
+        if (gone.rowCount) presenceChanged(room);
         await logPresence(gone);
         // Its mics are off too (a voice room's speaking time, media-minutes.mjs).
         await connectionEnded(room, who, sid);
@@ -222,21 +224,40 @@ async function cleanup() {
  * One read at a time: everyone who asks while LiveKit answers shares it (a whole room re-reads at once when the
  * room changes, docs/YUK_TESTI.md), so a busy moment costs LiveKit one ListRooms, not hundreds.
  */
-let counts = { at: 0, map: null, reading: null };
+let counts = { at: 0, from: 0, map: null, reading: null };
 export async function voiceCounts() {
   if (!env.LIVEKIT_API_URL) return null;
   if (Date.now() - counts.at < 10_000) return counts.map;
-  counts.reading ??= listVoiceRooms(3_000)
-    .then(
-      (list) => new Map(list.map((x) => [x.name, x.people])),
-      (e) => (console.error('livekit ListRooms counts', String(e).slice(0, 200)), null),
-    )
-    .then((map) => {
-      counts = { at: Date.now(), map, reading: null };
-      return map;
-    });
+  if (!counts.reading) {
+    // When the read was asked: a webhook after this moment may not be in it (presenceNewer).
+    const from = Date.now();
+    counts.reading = listVoiceRooms(3_000)
+      .then(
+        (list) => new Map(list.map((x) => [x.name, x.people])),
+        (e) => (console.error('livekit ListRooms counts', String(e).slice(0, 200)), null),
+      )
+      .then((map) => {
+        counts = { at: Date.now(), from, map, reading: null };
+        return map;
+      });
+  }
   return counts.reading;
 }
+
+/**
+ * When a webhook last changed a room's people (this process's clock). Someone who left (or came) after the last
+ * LiveKit count was asked for is already in room_presence: for that room the lists read room_presence until the next
+ * count (owners, 22 Nov 2026: a room showed 2 people on Odalar for a while after one of the 2 left).
+ */
+const presenceAt = new Map();
+function presenceChanged(room) {
+  const now = Date.now();
+  presenceAt.set(room, now);
+  // Only the ones newer than a count matter; the map stays small.
+  if (presenceAt.size > 5_000) for (const [r, at] of presenceAt) if (now - at > 60_000) presenceAt.delete(r);
+}
+/** True when room_presence knows of a change in `room` the cached LiveKit count may not have (voiceCounts). */
+export const presenceNewer = (room) => (presenceAt.get(room) ?? 0) >= counts.from;
 
 /**
  * The voice rooms LiveKit has open now, each with how many people are in it; null when LIVEKIT_API_URL isn't set or

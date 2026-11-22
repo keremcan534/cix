@@ -35,6 +35,8 @@ export type LiveKitConfig = {
   onMicStarted?: () => void;
 };
 
+/** How long a leaving phone waits for its "bye" to go out before it closes the voice connection (room-bus 'bye'). */
+const BYE_WAIT_MS = 400;
 /** LiveKit room names allow what the token service allows: letters, digits, _ and -. */
 const roomName = (roomId: string) => `oda-${roomId}`.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 64);
 /** A participant's join time (LiveKit's, whole seconds of the voice server's clock) in ms; 0 when there is none. */
@@ -302,7 +304,7 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
       if (room.state === ConnectionState.Disconnected) void join(s.roomId, room);
       return true;
     },
-    disconnect() {
+    disconnect(bye = false) {
       if (!s.roomId) return;
       const r = room;
       room = null;
@@ -317,7 +319,12 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
       s.disconnects++;
       if (r) {
         if (cfg.attachAudio !== false) r.remoteParticipants.forEach((p) => p.audioTrackPublications.forEach((pub) => pub.track?.detach().forEach((el) => el.remove())));
-        void r.disconnect().finally(() => releaseAudio(r));
+        // Leaving on purpose: "bye" to the other phones first (room-bus), at most a moment's wait, then close.
+        const said =
+          bye && r.state === ConnectionState.Connected
+            ? Promise.race([r.localParticipant.publishData(encodeSignal({ t: 'bye' }), { reliable: true }).catch(() => {}), new Promise((done) => setTimeout(done, BYE_WAIT_MS))])
+            : Promise.resolve();
+        void said.then(() => r.disconnect()).finally(() => releaseAudio(r));
       }
     },
     setPublishing(on) {
