@@ -44,10 +44,12 @@ export type LevelIcon = 'leaf' | 'diamond-outline' | 'diamond' | 'flower' | 'rib
  * A group of levels sharing one emblem (used by Cömertlik and Yankı). `art` is the group's small picture for the
  * level badge and `emblem` its finished emblem picture; without them the Ionicons `icon` is drawn instead.
  */
-/** The Cömertlik groups' designed look (components/wealth-art: emblem and name plate), by key. */
+/** The level groups' designed look (components/wealth-art: emblem and name plate), by key: Cömertlik and Yankı. */
 export type WealthLook = 'kuvars' | 'opal' | 'akik' | 'ametist' | 'topaz' | 'zumrut' | 'yakut' | 'safir' | 'pirlanta' | 'hazine' | 'efsane';
-/** `look`: the group's emblem and plate from the designer's set (Cömertlik); drawn instead of `emblem` and the chip. */
-export type LevelTier = { from: number; to: number; name: string; icon: LevelIcon; colors: [string, string]; ink: string; art?: ArtName; emblem?: ArtName; look?: WealthLook };
+export type CharmLook = 'kivilcim' | 'isilti' | 'parilti' | 'safak' | 'ay-isigi' | 'yildiz' | 'kutup-yildizi' | 'gokkusagi' | 'kutup-isigi' | 'efsane-yanki';
+export type TierLook = WealthLook | CharmLook;
+/** `look`: the group's emblem and plate from the designer's sets; drawn instead of `emblem` and the chip. */
+export type LevelTier = { from: number; to: number; name: string; icon: LevelIcon; colors: [string, string]; ink: string; art?: ArtName; emblem?: ArtName; look?: TierLook };
 export type WealthTier = LevelTier;
 /** `soon`: not built yet in the real app; the level screen leaves it out until it is (güncelleme 6). */
 export type LevelPerk = { key: string; title: string; detail: string; emoji: string; art?: ArtName; from: number; kind: 'privilege' | 'costume'; soon?: boolean };

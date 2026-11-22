@@ -5,7 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useRef, useState, type ComponentRef, type ReactNode } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
@@ -76,17 +76,7 @@ function systemsOf(l: LiveLevels | null): Record<Kind, System> {
       Badge: WealthBadge,
       perkDetail: (p, level) => (p.key === 'gift' ? `${levelGiftOf(level)} · ${p.detail}` : p.detail),
     },
-    charm: {
-      title: 'Yankı',
-      art: 'seviye-cazibe-seviyesi',
-      point: 'Yankı puanı',
-      table: charmTableOf(l),
-      tiers: charmTiers,
-      perks: perksOf(l, 'charm'),
-      tierOf: (level) => tierFor(charmTiers, level),
-      Badge: CharmBadge,
-      perkDetail: (p) => p.detail,
-    },
+    charm: { title: 'Yankı', art: 'seviye-cazibe-seviyesi', point: 'Yankı puanı', table: charmTableOf(l), tiers: charmTiers, perks: perksOf(l, 'charm'), tierOf: (level) => tierFor(charmTiers, level), Badge: CharmBadge, perkDetail: (p) => p.detail },
   };
 }
 const SYSTEMS = systemsOf(null);
@@ -131,14 +121,14 @@ export default function LevelsScreen() {
           </Pressable>
         </View>
 
-        <LevelPane key={tab} kind={tab} xp={xp} myLevel={level} />
+        <LevelPane key={tab} kind={tab} xp={xp} myLevel={level} onGuide={() => setHelp(true)} />
         <Guide kind={tab} visible={help} onClose={() => setHelp(false)} />
       </SafeAreaView>
     </View>
   );
 }
 
-function LevelPane({ kind, xp, myLevel }: { kind: Kind; xp: number; myLevel: number }) {
+function LevelPane({ kind, xp, myLevel, onGuide }: { kind: Kind; xp: number; myLevel: number; onGuide: () => void }) {
   const levels = useLevels();
   const sys = systemsOf(levels)[kind];
   const decay = decayLineOf(levels, kind);
@@ -158,11 +148,28 @@ function LevelPane({ kind, xp, myLevel }: { kind: Kind; xp: number; myLevel: num
   const nextSvip = vipList[svipLevel];
   const Badge = sys.Badge;
   const firstCostume = sys.perks.filter((p) => p.kind === 'costume').reduce((m, p) => Math.min(m, p.from), 99);
-  // Four groups across the screen, as in the design; the row scrolls through all of them.
-  const tileW = Math.max(76, Math.floor((Math.min(width, 560) - 24) / 4));
+  // The two designs differ here: Cömertlik shows four big emblems across the screen, swiped; Yankı five smaller ones
+  // between ‹ › arrows with dots under them (four on a narrow phone). Either row scrolls through all the groups.
+  const slider = kind === 'charm';
+  const across = slider && width >= 360 ? 5 : 4;
+  const tileW = Math.floor((Math.min(width, 560) - (slider ? 2 * ARROW_W + 8 : 24)) / across);
   const band = useRef<ComponentRef<typeof ScrollView>>(null);
   // The row opens on my group with the one before it in sight (contentOffset isn't applied on every platform).
-  const toMine = () => band.current?.scrollTo({ x: Math.max(0, (sys.tiers.indexOf(mine) - 1) * tileW), animated: false });
+  const toMine = () =>
+    band.current?.scrollTo({
+      x: Math.max(0, (sys.tiers.indexOf(mine) - 1) * tileW),
+      animated: false,
+    });
+  // The arrows move it two groups at a time; a dot for each of those steps (the design's ‹ › and dots).
+  const [bandX, setBandX] = useState(0);
+  const steps = Math.max(1, Math.ceil((sys.tiers.length - across) / 2) + 1);
+  const step = Math.min(steps - 1, Math.round(bandX / (2 * tileW)));
+  const go = (d: number) =>
+    band.current?.scrollTo({
+      x: Math.min(Math.max(0, sys.tiers.length - across) * tileW, Math.max(0, Math.min(steps - 1, step + d)) * 2 * tileW),
+      animated: true,
+    });
+  const pink = kind === 'charm';
 
   return (
     <ScrollView contentContainerStyle={{ paddingBottom: 48 }}>
@@ -172,7 +179,14 @@ function LevelPane({ kind, xp, myLevel }: { kind: Kind; xp: number; myLevel: num
           <Avatar uri={me.avatar} size={64} />
         </View>
         <View style={{ flex: 1, gap: 6, minWidth: 0 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
+              flexWrap: 'wrap',
+            }}
+          >
             <Text style={l.name} numberOfLines={1}>
               {me.name}
             </Text>
@@ -181,35 +195,69 @@ function LevelPane({ kind, xp, myLevel }: { kind: Kind; xp: number; myLevel: num
           <Text style={l.meLine}>
             {sys.point} <Text style={{ fontWeight: '900', color: LUX.white }}>{fmt(xp)}</Text> · {mine.name}
           </Text>
-          <View style={l.track} accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: 100, now: Math.round(pct * 100) }}>
-            <LinearGradient colors={[LUX.purple, '#C084FC', LUX.gold]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[l.fill, { width: `${Math.round(pct * 100)}%` }]} />
+          <View
+            style={l.track}
+            accessibilityRole="progressbar"
+            accessibilityValue={{
+              min: 0,
+              max: 100,
+              now: Math.round(pct * 100),
+            }}
+          >
+            <LinearGradient colors={pink ? ['#B4237A', LUX.pink, '#FF9BD0'] : [LUX.purple, '#C084FC', LUX.gold]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[l.fill, { width: `${Math.round(pct * 100)}%` }]} />
           </View>
           <Text style={l.meDim}>{myLevel >= max ? 'En yüksek seviyedesin.' : `Lv.${next} için ${fmt(to - xp)} puan daha (${fmt(xp)} / ${fmt(to)})`}</Text>
         </View>
       </View>
 
-      <ScrollView ref={band} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={l.tiers} onContentSizeChange={toMine}>
-        {sys.tiers.map((t) => (
-          <TierEmblem key={t.name} tier={t} width={tileW} on={t === tier} reached={myLevel >= t.from} onPress={() => setLevel(Math.max(1, t.from))} />
-        ))}
-      </ScrollView>
+      <View style={l.bandRow}>
+        {slider && (
+          <Pressable onPress={() => go(-1)} disabled={step === 0} style={[l.arrow, step === 0 && { opacity: 0.3 }]} hitSlop={{ left: 8, right: 8 }} accessibilityRole="button" accessibilityState={{ disabled: step === 0 }} accessibilityLabel="Önceki seviye grupları">
+            <Ionicons name="chevron-back" size={24} color={LUX.gold} />
+          </Pressable>
+        )}
+        <ScrollView ref={band} horizontal showsHorizontalScrollIndicator={false} style={{ width: across * tileW, flexGrow: 0 }} contentContainerStyle={l.tiers} onContentSizeChange={toMine} onScroll={(e) => setBandX(e.nativeEvent.contentOffset.x)} scrollEventThrottle={32}>
+          {sys.tiers.map((t) => (
+            <TierEmblem key={t.name} tier={t} width={tileW} on={t === tier} reached={myLevel >= t.from} onPress={() => setLevel(Math.max(1, t.from))} />
+          ))}
+        </ScrollView>
+        {slider && (
+          <Pressable onPress={() => go(1)} disabled={step >= steps - 1} style={[l.arrow, step >= steps - 1 && { opacity: 0.3 }]} hitSlop={{ left: 8, right: 8 }} accessibilityRole="button" accessibilityState={{ disabled: step >= steps - 1 }} accessibilityLabel="Sonraki seviye grupları">
+            <Ionicons name="chevron-forward" size={24} color={LUX.gold} />
+          </Pressable>
+        )}
+      </View>
+      {slider && (
+        <View style={l.dots} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+          {Array.from({ length: steps }, (_, i) => (
+            <View key={i} style={[l.dot, i === step && l.dotOn]} />
+          ))}
+        </View>
+      )}
 
-      <View style={l.levels}>
-        {Array.from({ length: tier.to - Math.max(1, tier.from) + 1 }, (_, i) => Math.max(1, tier.from) + i).map((lv) => {
-          const on = lv === level;
-          const got = myLevel >= lv;
-          return (
-            <Pressable key={lv} onPress={() => setLevel(lv)} style={[l.chip, on && l.chipOn]} accessibilityRole="tab" accessibilityState={{ selected: on }} accessibilityLabel={`Seviye ${lv}${got ? ', açık' : ', kilitli'}`}>
-              <Text style={[l.chipText, on && { color: LUX.white }]}>Lv.{lv}</Text>
-              {got ? <Ionicons name="checkmark-circle" size={18} color={LUX.positive} /> : <Ionicons name="lock-closed" size={14} color={LUX.muted} />}
-            </Pressable>
-          );
-        })}
+      <View style={l.levelsRow}>
+        <View style={l.levels}>
+          {Array.from({ length: tier.to - Math.max(1, tier.from) + 1 }, (_, i) => Math.max(1, tier.from) + i).map((lv) => {
+            const on = lv === level;
+            const got = myLevel >= lv;
+            return (
+              <Pressable key={lv} onPress={() => setLevel(lv)} hitSlop={{ top: 6, bottom: 6 }} style={[l.chip, on && (pink ? l.chipPink : l.chipGold)]} accessibilityRole="tab" accessibilityState={{ selected: on }} accessibilityLabel={`Seviye ${lv}${got ? ', açık' : ', kilitli'}`}>
+                {on && <LinearGradient colors={pink ? ['#B0186A', '#6E0E44'] : ['#4A1838', '#2A0E26']} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={[StyleSheet.absoluteFill, { borderRadius: 999 }]} />}
+                <Text style={[l.chipText, on && { color: LUX.white }]}>Lv.{lv}</Text>
+                {got ? <Ionicons name="checkmark-circle" size={14} color={LUX.positive} /> : <Ionicons name="lock-closed" size={11} color="#F2B8D2" />}
+              </Pressable>
+            );
+          })}
+        </View>
+        {/* The design's book: the level guide, a tap away. */}
+        <Pressable onPress={onGuide} style={l.book} accessibilityRole="button" accessibilityLabel={`${sys.title} seviyesi rehberi`}>
+          <Image source={DECO.kitap} style={{ width: 44, height: 44 }} accessibilityIgnoresInvertColors />
+        </Pressable>
       </View>
 
       <View style={{ paddingHorizontal: 16, gap: 18 }}>
         <View style={[l.status, open && l.statusOk]} accessibilityLiveRegion="polite">
-          <Ionicons name={open ? 'checkmark-circle-outline' : 'lock-closed'} size={22} color={open ? LUX.positive : LUX.gold} />
+          <Ionicons name={open ? 'checkmark-circle-outline' : 'lock-closed'} size={19} color={open ? LUX.positive : LUX.gold} />
           <Text style={l.statusText}>{open ? `Lv.${level} ayrıcalıkları açık.` : `Lv.${level} için ${fmt(sys.table[level] - xp)} ${sys.point.toLowerCase()} gerekiyor (toplam ${fmt(sys.table[level])}).`}</Text>
         </View>
         {decay && (
@@ -220,20 +268,17 @@ function LevelPane({ kind, xp, myLevel }: { kind: Kind; xp: number; myLevel: num
         )}
         <PerkGrid title={`Lv.${level} ayrıcalıkları`} perks={sys.perks.filter((p) => p.kind === 'privilege' && p.from <= level)} level={level} open={open} Badge={Badge} detail={sys.perkDetail} />
         {/* No look rewards are built yet (güncelleme 6): the section comes back with the first one. */}
-        {firstCostume < 99 && (
-          <PerkGrid title={`Lv.${level} görünüm`} perks={sys.perks.filter((p) => p.kind === 'costume' && p.from <= level)} level={level} open={open} Badge={Badge} detail={sys.perkDetail} empty={`Görünüm ödülleri Lv.${fromN(firstCostume)} itibaren açılır.`} />
-        )}
+        {firstCostume < 99 && <PerkGrid title={`Lv.${level} görünüm`} perks={sys.perks.filter((p) => p.kind === 'costume' && p.from <= level)} level={level} open={open} Badge={Badge} detail={sys.perkDetail} empty={`Görünüm ödülleri Lv.${fromN(firstCostume)} itibaren açılır.`} />}
 
-        {kind === 'wealth' && (
-          <Panel title="Diğer ayrıcalıklarım">
-            <Pressable onPress={() => router.push('/vip')} accessibilityRole="button" accessibilityLabel="Diğer ayrıcalıklarım: ayrıcalıklara git" style={{ gap: 2 }}>
-              <OtherRow icon="crown" text={`VIP seviyesi: ${svipLevel ? (vipList[svipLevel - 1]?.name ?? `VIP ${svipLevel}`) : 'Yok'} · ${fmt(svipXp)} puan${nextSvip ? ` · ${nextSvip.name} için ${fmt(nextSvip.xp - svipXp)}` : ''}`} />
-              <OtherRow icon="noble" art={noble?.art} text={`Rütbe: ${noble ? `${noble.name} · ${nobleDays} gün` : 'Henüz alınmadı'}`} />
-              <OtherRow icon="vip" text={`VIP aboneliği: ${vipDays > 0 ? `${vipDays} gün kaldı` : 'Yok'}`} last />
-              <Text style={l.goto}>Ayrıcalıklara git ›</Text>
-            </Pressable>
-          </Panel>
-        )}
+        <Panel title="Diğer ayrıcalıklarım">
+          <Image source={DECO.hediye} style={[l.gift, width < 360 && { width: 70, height: 72 }]} resizeMode="contain" accessibilityElementsHidden importantForAccessibility="no" />
+          <Pressable onPress={() => router.push('/vip')} accessibilityRole="button" accessibilityLabel="Diğer ayrıcalıklarım: ayrıcalıklara git" style={{ gap: 2, paddingRight: width < 360 ? 50 : 78 }}>
+            <OtherRow icon="crown" text={`VIP seviyesi: ${svipLevel ? (vipList[svipLevel - 1]?.name ?? `VIP ${svipLevel}`) : 'Yok'} · ${fmt(svipXp)} puan${nextSvip ? ` · ${nextSvip.name} için ${fmt(nextSvip.xp - svipXp)}` : ''}`} />
+            <OtherRow icon="noble" art={noble?.art} text={`Rütbe: ${noble ? `${noble.name} · ${nobleDays} gün` : 'Henüz alınmadı'}`} />
+            <OtherRow icon="vip" text={`VIP aboneliği: ${vipDays > 0 ? `${vipDays} gün kaldı` : 'Yok'}`} last />
+            <Text style={l.goto}>Ayrıcalıklara git ›</Text>
+          </Pressable>
+        </Panel>
         <View style={l.note}>
           <Ionicons name="information-circle-outline" size={18} color={LUX.muted} />
           <Text style={l.noteText}>Cömertlik ve Yankı seviyeleri kalıcıdır, düşmez. VIP aboneliği ve Rütbe süreli; VIP seviyesi ise yükledikçe yükselir ve kalıcıdır.</Text>
@@ -247,9 +292,7 @@ function LevelPane({ kind, xp, myLevel }: { kind: Kind; xp: number; myLevel: num
 function OtherRow({ icon, art, text, last }: { icon: 'crown' | 'noble' | 'vip'; art?: ArtName; text: string; last?: boolean }) {
   return (
     <View style={[l.otherRow, !last && l.otherLine]}>
-      <View style={l.otherIcon}>
-        {art ? <Art name={art} size={26} /> : icon === 'vip' ? <Text style={l.vipMark}>VIP</Text> : <Ionicons name={icon === 'crown' ? 'trophy' : 'ribbon'} size={20} color={LUX.gold} />}
-      </View>
+      <View style={l.otherIcon}>{art ? <Art name={art} size={26} /> : <Image source={icon === 'vip' ? DECO.vipAbone : icon === 'crown' ? DECO.vipSeviye : DECO.rutbe} style={{ width: 26, height: 26 }} resizeMode="contain" />}</View>
       <Text style={l.otherText}>{text}</Text>
     </View>
   );
@@ -277,14 +320,33 @@ function TierEmblem({ tier, width, on, reached, onPress }: { tier: LevelTier; wi
   const range = `Lv.${Math.max(1, tier.from)}–${tier.to}`;
   return (
     <Pressable onPress={onPress} style={[l.tier, { width }]} accessibilityRole="button" accessibilityState={{ selected: on }} accessibilityLabel={`${tier.name}, seviye ${Math.max(1, tier.from)}–${tier.to}${reached ? '' : ', henüz ulaşılmadı'}`}>
-      <View style={{ height: width * 0.9, justifyContent: 'flex-end', alignItems: 'center' }}>
+      <View
+        style={{
+          height: width * 0.9,
+          justifyContent: 'flex-end',
+          alignItems: 'center',
+        }}
+      >
         {tier.look ? (
           // The designed emblem carries the group's name on its ribbon; the range is live text under it.
           <WealthEmblem look={tier.look} width={Math.round(width * (on ? 1.04 : 0.94))} dim={!reached && !on} />
         ) : tier.emblem ? (
           <Art name={tier.emblem} size={Math.round(width * (on ? 0.86 : 0.7))} style={{ opacity: reached || on ? 1 : 0.45 }} />
         ) : (
-          <LinearGradient colors={tier.colors} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={[l.emblem, { width: width * 0.55, height: width * 0.55, borderRadius: width * 0.16, opacity: reached || on ? 1 : 0.45 }]}>
+          <LinearGradient
+            colors={tier.colors}
+            start={{ x: 0.2, y: 0 }}
+            end={{ x: 0.8, y: 1 }}
+            style={[
+              l.emblem,
+              {
+                width: width * 0.55,
+                height: width * 0.55,
+                borderRadius: width * 0.16,
+                opacity: reached || on ? 1 : 0.45,
+              },
+            ]}
+          >
             <View style={{ transform: [{ rotate: '-45deg' }] }}>
               <Ionicons name={tier.icon} size={on ? 34 : 24} color={tier.ink} />
             </View>
@@ -303,26 +365,28 @@ function TierEmblem({ tier, width, on, reached, onPress }: { tier: LevelTier; wi
 }
 
 function PerkGrid({ title, perks, level, open, empty, Badge, detail }: { title: string; perks: LevelPerk[]; level: number; open: boolean; empty?: string; Badge: System['Badge']; detail: System['perkDetail'] }) {
+  const many = perks.length > 1;
   return (
     <Panel title={title}>
       {perks.length === 0 ? (
         <Text style={l.noteText}>{empty}</Text>
       ) : (
-        <View style={{ gap: 14 }}>
+        <View style={many ? l.cards : { gap: 14 }}>
           {perks.map((p) => (
-            <View key={p.key} style={l.perk} accessibilityLabel={`${p.title}: ${detail(p, level)}${open ? '' : ', kilitli'}`}>
-              <View style={l.perkArt}>
-                {p.key === 'badge' ? <Badge level={level} size="lg" /> : p.art ? <Art name={p.art} size={44} /> : <Text style={{ fontSize: 32 }}>{p.emoji}</Text>}
+            <View key={p.key} style={many ? l.card3 : l.perk} accessibilityLabel={`${p.title}: ${detail(p, level)}${open ? '' : ', kilitli'}`}>
+              <View style={many ? l.perkArtSm : l.perkArt}>
+                {p.key === 'badge' ? <Badge level={level} size={many ? 'md' : 'lg'} /> : p.art ? <Art name={p.art} size={many ? 32 : 44} /> : <Text style={{ fontSize: many ? 24 : 32 }}>{p.emoji}</Text>}
                 {!open && (
                   <View style={l.lock}>
                     <Ionicons name="lock-closed" size={11} color="#fff" />
                   </View>
                 )}
               </View>
-              <View style={{ flex: 1, gap: 2 }}>
-                <Text style={l.perkTitle}>{p.title}</Text>
-                <Text style={l.perkDetail}>{detail(p, level)}</Text>
+              <View style={many ? { gap: 3, alignItems: 'center' } : { flex: 1, gap: 2 }}>
+                <Text style={many ? l.cardTitle : l.perkTitle}>{p.title}</Text>
+                <Text style={many ? l.cardText : l.perkDetail}>{detail(p, level)}</Text>
               </View>
+              {!many && <Image source={DECO.tac} style={l.crown} resizeMode="contain" accessibilityElementsHidden importantForAccessibility="no" />}
             </View>
           ))}
         </View>
@@ -331,18 +395,58 @@ function PerkGrid({ title, perks, level, open, empty, Badge, detail }: { title: 
   );
 }
 
-const GUIDE: Record<Kind, { title: string; art?: ArtName; icon?: keyof typeof Ionicons.glyphMap; body: string[] }[]> = {
+const GUIDE: Record<
+  Kind,
+  {
+    title: string;
+    art?: ArtName;
+    icon?: keyof typeof Ionicons.glyphMap;
+    body: string[];
+  }[]
+> = {
   wealth: [
-    { title: 'Cömertlik seviyesi nedir?', art: 'seviye-servet-seviyesi', body: ['Similar Club’da yaptığın geçerli jeton harcamalarının toplamını gösteren kalıcı seviyedir. Harcadıkça cömertlik puanın birikir; eşik geçildiğinde seviyen yükselir ve düşmez.'] },
-    { title: 'Ne işe yarar?', icon: 'gift-outline', body: ['Seviyen profilinde adının yanında rozet olarak görünür. Yeni ayrıcalıklar eklendikçe bu ekranda listelenir.'] },
-    { title: 'Puan nasıl kazanılır?', icon: 'trending-up', body: ['Harcanan her 1 jeton 1 cömertlik puanıdır. Sayılanlar: odada ve sohbette hediye, Şanslı hediye (yalnızca harcadığın jeton; kazandığın ödül sayılmaz), ücretli mesaj ve aramalar, mağaza alışverişi, aile kurma ve aile hediyeleri, oda etkinlikleri ve animasyonlar.'] },
-    { title: 'Sayılmayanlar', icon: 'alert-circle-outline', body: ['• Jetonla oynanan oyunlar.', '• Jeton dağıtma: oda zarfı, jeton transferi.', '• İade edilen işlemler ve kural dışı bulunan hareketler; şüpheli işlemlerde puan verilmez.'] },
+    {
+      title: 'Cömertlik seviyesi nedir?',
+      art: 'seviye-servet-seviyesi',
+      body: ['Similar Club’da yaptığın geçerli jeton harcamalarının toplamını gösteren kalıcı seviyedir. Harcadıkça cömertlik puanın birikir; eşik geçildiğinde seviyen yükselir ve düşmez.'],
+    },
+    {
+      title: 'Ne işe yarar?',
+      icon: 'gift-outline',
+      body: ['Seviyen profilinde adının yanında rozet olarak görünür. Yeni ayrıcalıklar eklendikçe bu ekranda listelenir.'],
+    },
+    {
+      title: 'Puan nasıl kazanılır?',
+      icon: 'trending-up',
+      body: ['Harcanan her 1 jeton 1 cömertlik puanıdır. Sayılanlar: odada ve sohbette hediye, Şanslı hediye (yalnızca harcadığın jeton; kazandığın ödül sayılmaz), ücretli mesaj ve aramalar, mağaza alışverişi, aile kurma ve aile hediyeleri, oda etkinlikleri ve animasyonlar.'],
+    },
+    {
+      title: 'Sayılmayanlar',
+      icon: 'alert-circle-outline',
+      body: ['• Jetonla oynanan oyunlar.', '• Jeton dağıtma: oda zarfı, jeton transferi.', '• İade edilen işlemler ve kural dışı bulunan hareketler; şüpheli işlemlerde puan verilmez.'],
+    },
   ],
   charm: [
-    { title: 'Yankı seviyesi nedir?', art: 'seviye-cazibe-seviyesi', body: ['Diğer kullanıcıların seninle ne kadar etkileşim kurduğunu gösteren kalıcı seviyedir. Her kullanıcının bir Yankı seviyesi vardır ve profilinde ve Ana Sayfa kartında rozet olarak görünür.'] },
-    { title: 'Ne işe yarar?', icon: 'diamond-outline', body: ['• Popülerlik: Ana Sayfa’da çevrim içi kişiler arasında Yankı seviyesi yüksek olan daha üstte gösterilir.', '• Lv.5’te Anlar’da paylaşım açılır.'] },
-    { title: 'Puan nasıl kazanılır?', icon: 'trending-up', body: ['Sana gönderilen hediyelerden gelen her 1 elmas 1 Yankı puanıdır; seninle yapılan ücretli aramalar da sayılır. Beğeni ve özel sohbet puanları sunucuya geçince günlük sınırla eklenecek.'] },
-    { title: 'Dikkat', icon: 'alert-circle-outline', body: ['Sahte etkileşimle puan artırmak, başkasının kimliğini kullanmak veya kural ihlali puan silinmesine ve hesabın kapatılmasına yol açar.'] },
+    {
+      title: 'Yankı seviyesi nedir?',
+      art: 'seviye-cazibe-seviyesi',
+      body: ['Diğer kullanıcıların seninle ne kadar etkileşim kurduğunu gösteren kalıcı seviyedir. Her kullanıcının bir Yankı seviyesi vardır ve profilinde ve Ana Sayfa kartında rozet olarak görünür.'],
+    },
+    {
+      title: 'Ne işe yarar?',
+      icon: 'diamond-outline',
+      body: ['• Popülerlik: Ana Sayfa’da çevrim içi kişiler arasında Yankı seviyesi yüksek olan daha üstte gösterilir.', '• Lv.5’te Anlar’da paylaşım açılır.'],
+    },
+    {
+      title: 'Puan nasıl kazanılır?',
+      icon: 'trending-up',
+      body: ['Sana gönderilen hediyelerden gelen her 1 elmas 1 Yankı puanıdır; seninle yapılan ücretli aramalar da sayılır. Beğeni ve özel sohbet puanları sunucuya geçince günlük sınırla eklenecek.'],
+    },
+    {
+      title: 'Dikkat',
+      icon: 'alert-circle-outline',
+      body: ['Sahte etkileşimle puan artırmak, başkasının kimliğini kullanmak veya kural ihlali puan silinmesine ve hesabın kapatılmasına yol açar.'],
+    },
   ],
 };
 
@@ -417,6 +521,19 @@ const useStyles = makeStyles(({ colors, semantic, lift, dark }) => ({
   cell: { flex: 1, color: colors.text, fontSize: 12, fontVariant: ['tabular-nums'] },
 }));
 
+/** The design's own pictures on this screen (assets/levels/ekran, cut from the owners' screens, 23 Nov 2026). */
+const DECO = {
+  kitap: require('../../assets/levels/ekran/kitap.webp'),
+  tac: require('../../assets/levels/ekran/tac.webp'),
+  hediye: require('../../assets/levels/ekran/hediye.webp'),
+  vipSeviye: require('../../assets/levels/ekran/ikon-vip-seviye.webp'),
+  rutbe: require('../../assets/levels/ekran/ikon-rutbe.webp'),
+  vipAbone: require('../../assets/levels/ekran/ikon-vip-abone.webp'),
+};
+
+/** The width of each ‹ › arrow beside the row of groups. */
+const ARROW_W = 26;
+
 const l = StyleSheet.create({
   brand: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingTop: 6 },
   brandLine: { flex: 1, maxWidth: 70, height: 1, backgroundColor: LUX.goldLine },
@@ -434,25 +551,55 @@ const l = StyleSheet.create({
   meDim: { color: LUX.muted, fontSize: 12 },
   track: { height: 9, borderRadius: 5, backgroundColor: 'rgba(255,255,255,0.12)', overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(245,200,120,0.25)' },
   fill: { height: '100%', borderRadius: 5 },
-  tiers: { paddingHorizontal: 12, paddingTop: 14, alignItems: 'flex-end' },
+  tiers: { alignItems: 'flex-end' },
   tier: { alignItems: 'center', gap: 2, paddingBottom: 10 },
-  emblem: { alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.25)', transform: [{ rotate: '45deg' }] },
+  emblem: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.25)',
+    transform: [{ rotate: '45deg' }],
+  },
   tierName: { color: LUX.muted, fontWeight: '800', fontSize: 12, marginTop: 4 },
-  tierRange: { color: LUX.muted, fontSize: 13, fontWeight: '700', marginTop: 2 },
+  tierRange: { color: LUX.muted, fontSize: 11.5, fontWeight: '700', marginTop: 1 },
   tierGlow: { position: 'absolute', bottom: 2, width: '46%', height: 3, borderRadius: 2, backgroundColor: LUX.gold, boxShadow: '0 0 8px rgba(245,200,120,0.9)' },
-  levels: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingVertical: 14 },
-  chip: { minHeight: 44, flexBasis: '22.5%', flexGrow: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 999, borderWidth: 1.5, borderColor: 'rgba(215,185,203,0.25)', backgroundColor: 'rgba(255,255,255,0.05)', paddingHorizontal: 6 },
-  chipOn: { borderColor: LUX.gold, backgroundColor: '#3A1230', boxShadow: '0 0 10px rgba(245,200,120,0.35)' },
-  chipText: { color: LUX.muted, fontWeight: '800', fontSize: 15 },
-  status: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 12, backgroundColor: 'rgba(245,200,120,0.08)', borderWidth: 1, borderColor: 'rgba(245,200,120,0.25)' },
+  // Slim pills, as in the design (32 points tall; hitSlop makes the touch area 44, rows 12 apart so they never overlap).
+  levels: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', columnGap: 8, rowGap: 12, paddingLeft: 16, paddingRight: 6, paddingVertical: 12 },
+  chip: { height: 32, flexBasis: '22.5%', flexGrow: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: 999, borderWidth: 1, borderColor: 'rgba(242,184,210,0.28)', backgroundColor: 'rgba(255,255,255,0.04)', paddingHorizontal: 6, overflow: 'hidden' },
+  chipPink: { borderColor: '#FF5FB4', borderWidth: 1.5, boxShadow: '0 0 10px rgba(255,79,168,0.6)' },
+  chipGold: { borderColor: LUX.gold, borderWidth: 1.5, boxShadow: '0 0 10px rgba(245,200,120,0.55)' },
+  levelsRow: { flexDirection: 'row', alignItems: 'center', paddingRight: 12 },
+  book: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
+  crown: { width: 64, height: 48, opacity: 0.9 },
+  gift: { position: 'absolute', right: -6, bottom: 6, width: 96, height: 99 },
+  chipText: { color: '#E9D3DE', fontWeight: '700', fontSize: 13 },
+  status: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9, backgroundColor: 'rgba(245,200,120,0.08)', borderWidth: 1, borderColor: 'rgba(245,200,120,0.25)' },
   statusOk: { backgroundColor: 'rgba(66,229,163,0.08)', borderColor: 'rgba(66,229,163,0.35)' },
-  statusText: { color: LUX.white, fontSize: 15, flex: 1 },
+  statusText: { color: LUX.white, fontSize: 14, flex: 1 },
   panel: { backgroundColor: LUX.card, borderRadius: 24, borderWidth: 1.5, borderColor: LUX.goldLine, paddingHorizontal: 16, paddingBottom: 16, paddingTop: 30, marginTop: 14, boxShadow: '0 0 20px rgba(147,67,248,0.15)' },
   ribbonRow: { position: 'absolute', top: -18, left: 14, right: 14, flexDirection: 'row', alignItems: 'center' },
   ribbon: { borderRadius: 14, borderWidth: 1.5, borderColor: LUX.gold, paddingHorizontal: 18, paddingVertical: 6, overflow: 'hidden', maxWidth: '85%' },
   ribbonText: { color: '#FFE3B0', fontSize: 18, fontWeight: '800' },
   ribbonTail: { flex: 1, height: 1, backgroundColor: LUX.goldLine, marginLeft: 6 },
   perk: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  // Two or more perks: cards side by side (the design's Yankı ayrıcalıkları), wrapping on a narrow phone.
+  cards: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  card3: { flexGrow: 1, flexBasis: '30%', minWidth: 76, alignItems: 'center', gap: 6, paddingHorizontal: 6, paddingVertical: 10, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(245,200,120,0.28)' },
+  cardTitle: { color: LUX.white, fontWeight: '800', fontSize: 12.5, textAlign: 'center' },
+  cardText: { color: LUX.muted, fontSize: 11, lineHeight: 14, textAlign: 'center' },
+  perkArtSm: { height: 36, alignItems: 'center', justifyContent: 'center' },
+  // ‹ row of groups ›: the arrows stand beside the row, never over an emblem.
+  bandRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, paddingTop: 10 },
+  arrow: { width: ARROW_W, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  dots: { flexDirection: 'row', justifyContent: 'center', gap: 8, marginTop: 2 },
+  dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: 'rgba(215,185,203,0.35)' },
+  dotOn: {
+    backgroundColor: LUX.gold,
+    transform: [{ rotate: '45deg' }],
+    width: 9,
+    height: 9,
+    borderRadius: 2,
+  },
   perkArt: { minWidth: 84, minHeight: 56, alignItems: 'center', justifyContent: 'center' },
   lock: { position: 'absolute', top: 0, right: 0, width: 20, height: 20, borderRadius: 10, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' },
   perkTitle: { color: LUX.white, fontWeight: '800', fontSize: 16 },
@@ -460,7 +607,6 @@ const l = StyleSheet.create({
   otherRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
   otherLine: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(245,200,120,0.2)' },
   otherIcon: { width: 32, alignItems: 'center' },
-  vipMark: { color: LUX.gold, fontWeight: '900', fontSize: 11, borderWidth: 1.5, borderColor: LUX.gold, borderRadius: 8, paddingHorizontal: 4, paddingVertical: 1 },
   otherText: { color: LUX.white, fontSize: 14, flex: 1 },
   goto: { color: LUX.gold, fontWeight: '800', fontSize: 15, paddingTop: 10 },
   note: { flexDirection: 'row', gap: 8, paddingHorizontal: 4, alignItems: 'flex-start' },

@@ -1,4 +1,4 @@
-// Cömertlik rozetleri (the owners' "Cömertlik Rozetleri – Tasarım Seti", 22 Nov 2026): for each of the 11 level groups
+// Cömertlik and Yankı rozetleri (the owners' design sets, 22–23 Nov 2026): for each level group (11 Cömertlik, 10 Yankı)
 // a big emblem (its stone in a crown of wings with the group's name on a ribbon; the level range is written under it
 // as live text, since Seviye ve VIP ayarları can move the ranges) and a long plate drawn next to a name with the
 // person's level written live in its number field. The pictures were cut from the designer's sheets
@@ -8,13 +8,13 @@
 import { Image, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Text } from '@/components/text';
-import type { WealthLook } from '@/data/wealth';
+import type { TierLook } from '@/data/wealth';
 
 /**
  * Each group's pictures: the emblem (`ratio` its width over height) and the plate (`ratio`, and where its number
  * field is: the centre `cx`, `cy` and the printed digits' height `h`, as fractions of the plate).
  */
-const ART: Record<WealthLook, { emblem: number; emblemRatio: number; plate: number; plateRatio: number; cx: number; cy: number; h: number }> = {
+const ART: Record<TierLook, { emblem: number; emblemRatio: number; plate: number; plateRatio: number; cx: number; cy: number; h: number }> = {
   kuvars: { emblem: require('../../assets/levels/comertlik/rozet-kuvars.webp'), emblemRatio: 384 / 310, plate: require('../../assets/levels/comertlik/plaka-kuvars.webp'), plateRatio: 288 / 102, cx: 0.75, cy: 0.533, h: 0.367 },
   opal: { emblem: require('../../assets/levels/comertlik/rozet-opal.webp'), emblemRatio: 384 / 308, plate: require('../../assets/levels/comertlik/plaka-opal.webp'), plateRatio: 288 / 114, cx: 0.774, cy: 0.582, h: 0.365 },
   akik: { emblem: require('../../assets/levels/comertlik/rozet-akik.webp'), emblemRatio: 384 / 305, plate: require('../../assets/levels/comertlik/plaka-akik.webp'), plateRatio: 288 / 116, cx: 0.784, cy: 0.55, h: 0.351 },
@@ -26,10 +26,21 @@ const ART: Record<WealthLook, { emblem: number; emblemRatio: number; plate: numb
   pirlanta: { emblem: require('../../assets/levels/comertlik/rozet-pirlanta.webp'), emblemRatio: 384 / 320, plate: require('../../assets/levels/comertlik/plaka-pirlanta.webp'), plateRatio: 288 / 101, cx: 0.759, cy: 0.578, h: 0.348 },
   hazine: { emblem: require('../../assets/levels/comertlik/rozet-hazine.webp'), emblemRatio: 384 / 337, plate: require('../../assets/levels/comertlik/plaka-hazine.webp'), plateRatio: 288 / 110, cx: 0.806, cy: 0.585, h: 0.324 },
   efsane: { emblem: require('../../assets/levels/comertlik/rozet-efsane.webp'), emblemRatio: 384 / 335, plate: require('../../assets/levels/comertlik/plaka-efsane.webp'), plateRatio: 288 / 118, cx: 0.81, cy: 0.622, h: 0.26 },
+  // Yankı (the owners' "Yankı Rozetleri – Tam Tasarım Seti", 23 Nov 2026): the same two pictures for its 10 groups.
+  'kivilcim': { emblem: require('../../assets/levels/yanki/rozet-kivilcim.webp'), emblemRatio: 384 / 299, plate: require('../../assets/levels/yanki/plaka-kivilcim.webp'), plateRatio: 288 / 112, cx: 0.77, cy: 0.524, h: 0.326 },
+  'isilti': { emblem: require('../../assets/levels/yanki/rozet-isilti.webp'), emblemRatio: 384 / 306, plate: require('../../assets/levels/yanki/plaka-isilti.webp'), plateRatio: 288 / 118, cx: 0.754, cy: 0.51, h: 0.326 },
+  'parilti': { emblem: require('../../assets/levels/yanki/rozet-parilti.webp'), emblemRatio: 384 / 311, plate: require('../../assets/levels/yanki/plaka-parilti.webp'), plateRatio: 288 / 116, cx: 0.754, cy: 0.514, h: 0.333 },
+  'safak': { emblem: require('../../assets/levels/yanki/rozet-safak.webp'), emblemRatio: 384 / 301, plate: require('../../assets/levels/yanki/plaka-safak.webp'), plateRatio: 288 / 120, cx: 0.748, cy: 0.535, h: 0.319 },
+  'ay-isigi': { emblem: require('../../assets/levels/yanki/rozet-ay-isigi.webp'), emblemRatio: 384 / 315, plate: require('../../assets/levels/yanki/plaka-ay-isigi.webp'), plateRatio: 288 / 121, cx: 0.753, cy: 0.542, h: 0.319 },
+  'yildiz': { emblem: require('../../assets/levels/yanki/rozet-yildiz.webp'), emblemRatio: 384 / 311, plate: require('../../assets/levels/yanki/plaka-yildiz.webp'), plateRatio: 288 / 132, cx: 0.756, cy: 0.552, h: 0.299 },
+  'kutup-yildizi': { emblem: require('../../assets/levels/yanki/rozet-kutup-yildizi.webp'), emblemRatio: 384 / 294, plate: require('../../assets/levels/yanki/plaka-kutup-yildizi.webp'), plateRatio: 288 / 126, cx: 0.761, cy: 0.538, h: 0.312 },
+  'gokkusagi': { emblem: require('../../assets/levels/yanki/rozet-gokkusagi.webp'), emblemRatio: 384 / 314, plate: require('../../assets/levels/yanki/plaka-gokkusagi.webp'), plateRatio: 288 / 130, cx: 0.755, cy: 0.556, h: 0.306 },
+  'kutup-isigi': { emblem: require('../../assets/levels/yanki/rozet-kutup-isigi.webp'), emblemRatio: 384 / 314, plate: require('../../assets/levels/yanki/plaka-kutup-isigi.webp'), plateRatio: 288 / 133, cx: 0.757, cy: 0.549, h: 0.292 },
+  'efsane-yanki': { emblem: require('../../assets/levels/yanki/rozet-efsane-yanki.webp'), emblemRatio: 384 / 272, plate: require('../../assets/levels/yanki/plaka-efsane-yanki.webp'), plateRatio: 288 / 146, cx: 0.761, cy: 0.611, h: 0.264 },
 };
 
 /** The group's big emblem, `width` points wide; its name is on its ribbon. Decoration: a screen reader reads the caller's label. */
-export function WealthEmblem({ look, width, dim = false }: { look: WealthLook; width: number; dim?: boolean }) {
+export function WealthEmblem({ look, width, dim = false }: { look: TierLook; width: number; dim?: boolean }) {
   const a = ART[look];
   return (
     <Image
@@ -48,7 +59,7 @@ export function WealthEmblem({ look, width, dim = false }: { look: WealthLook; w
  * little above and below its pill (the stone's points, a glow), so it is drawn `bleed` times the row's height and
  * hangs over the row by as much: the row keeps the height it had with the old chip.
  */
-export function WealthPlate({ look, level, height, label, style }: { look: WealthLook; level: number; height: number; label: string; style?: StyleProp<ViewStyle> }) {
+export function WealthPlate({ look, level, height, label, style }: { look: TierLook; level: number; height: number; label: string; style?: StyleProp<ViewStyle> }) {
   const a = ART[look];
   const h = Math.round(height * BLEED);
   const w = Math.round(h * a.plateRatio);
