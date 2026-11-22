@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, View, type ImageSourcePropType } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
@@ -13,8 +13,10 @@ import { VisitorsSheet, useProfileVisitors } from '@/components/visitors-sheet';
 import { FollowListSheet, MY_LISTS } from '@/components/follow-list-sheet';
 import { FOLLOWS_ME, userById } from '@/data/mock';
 import { publicIdOf } from '@/data/profile';
-import { NOBLE_TIERS, SVIP_LEVELS, nobleInfo } from '@/data/status';
-import { vipCardColors } from '@/lib/vip-screen';
+import { NOBLE_TIERS, nobleInfo } from '@/data/status';
+import { levelArtFor, vipCardColors } from '@/lib/vip-screen';
+import { HERO_IMAGES } from '@/components/vip/assets';
+import { VIP_LEVEL_ART } from '@/components/vip/level-art';
 import { Art } from '@/components/Art';
 import { confirmLogout, showAlert } from '@/lib/alert';
 import { copyText } from '@/lib/clipboard';
@@ -195,13 +197,15 @@ export default function ProfileScreen() {
             <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
           </Pressable>
           <View style={{ flexDirection: 'row', gap: 8 }}>
-            {/* Each tile has its own picture: the VIP level's emblem, the subscription's crown, the rank's crest (the
-                first level's emblem and crest, dimmed, until there is one). */}
+            {/* Each tile has its own picture: the VIP level's badge, the subscription's crown, the rank's crest (the
+                first level's badge and crest, dimmed, until there is one). The VIP tile is the VIP tab's card of that
+                level (its picture behind, its badge; owners, 22 Nov 2026); without VIP its own pink. */}
             <StatusCard
               title="VIP"
               sub={svipLevel ? `VIP ${svipLevel}` : 'Yok'}
               colors={vipCardColors(svipLevel) ?? ['#D02E78', '#4A1630']}
-              icon={<Art name={SVIP_LEVELS[Math.max(0, Math.min(SVIP_LEVELS.length, svipLevel) - 1)].art} size={30} style={!svipLevel && { opacity: 0.6 }} />}
+              bg={svipLevel ? HERO_IMAGES[levelArtFor(svipLevel) ?? 1] : undefined}
+              icon={<Image source={VIP_LEVEL_ART[levelArtFor(svipLevel) ?? 1].badge.source} style={[{ width: 36, height: 36 }, !svipLevel && { opacity: 0.6 }]} resizeMode="contain" accessibilityIgnoresInvertColors />}
               onPress={() => router.push({ pathname: '/vip', params: { tab: 'svip' } })}
             />
             <StatusCard
@@ -336,11 +340,13 @@ function Group({ items }: { items: Item[] }) {
 }
 
 /** Status tile; `sub` stays short (its own picture sits in the bottom-right corner). */
-function StatusCard({ title, sub, colors: c, dot, icon, onPress }: { title: string; sub: string; colors: [string, string]; dot?: boolean; icon: ReactNode; onPress: () => void }) {
+function StatusCard({ title, sub, colors: c, dot, icon, bg, onPress }: { title: string; sub: string; colors: [string, string]; dot?: boolean; icon: ReactNode; bg?: ImageSourcePropType; onPress: () => void }) {
   const styles = useStyles();
   return (
     <Pressable style={{ flex: 1 }} onPress={onPress} accessibilityLabel={title}>
       <LinearGradient colors={c} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.status}>
+        {/* A picture behind (the VIP tab's card): its middle, a little larger so its frame stays out of the tile. */}
+        {bg && <Image source={bg} style={[StyleSheet.absoluteFill, { transform: [{ scale: 1.15 }] }]} resizeMode="cover" accessibilityIgnoresInvertColors />}
         {dot && <View style={[styles.redDot, { position: 'absolute', top: 8, right: 8 }]} />}
         {/* One line in every tile, so the three stay the same height ("Abonelik" broke in two on narrow phones). */}
         <Text style={styles.statusTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
