@@ -163,6 +163,8 @@ export type Conversation = {
     source?: 'auto_streamer' | 'auto_opener' | 'quick_reply';
     /** Live mode: the line of a gift sent from the chat (the server's, lib/dm-gift-fx): drawn as the gift, played once. */
     gift?: { id: string; count: number };
+    /** Live mode: they followed me (the server's line, lib/dm-thread): drawn as a note in the middle, not a bubble. */
+    follow?: true;
   }[];
   unread: number;
 };

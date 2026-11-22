@@ -4,6 +4,8 @@
 // instead of a second copy, and the unread count follows the server without lighting up an open chat.
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 import type { Conversation } from '@/data/mock';
 import { applyThread, hideIds, markSent, mergeThread, settle, type ChatMessage, type ServerDm } from '@/lib/dm-thread';
@@ -233,5 +235,22 @@ describe('Bildirim bağlantıları (noticeHref)', () => {
     const uuid = '3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d';
     for (const href of ['/cuzdan', `/sohbet/${uuid}`, `/kullanici/${uuid}`, `/oda/${uuid}`, '/bildirimler']) assert.equal(noticeHref(href, true), href, href);
     assert.equal(noticeHref(undefined, true), undefined);
+  });
+});
+
+// Takip satırı (owners, 22 Nov 2026): they followed me; the server's line (source 'follow') is a note, not a message.
+describe('Takip satırı', () => {
+  test('takip satırı not olarak gelir; benim gönderilmemiş mesajımla eşleşmez', () => {
+    const { messages, incoming } = mergeThread([], [dm(5, PEER, 'Seni takip etti', { source: 'follow' })], { peer: PEER, after: 0 });
+    assert.equal(incoming, 1);
+    assert.equal(messages[0].follow, true);
+    assert.equal(messages[0].source, undefined, 'otomatik mesaj etiketi yok');
+    // A plain message with the same words is a message.
+    assert.equal(mergeThread([], [dm(6, PEER, 'Seni takip etti')], { peer: PEER, after: 0 }).messages[0].follow, undefined);
+  });
+  test('sohbet ekranı satırı ortada not olarak çizer', () => {
+    const src = readFileSync(resolve(import.meta.dirname, '../src/components/chat-thread.tsx'), 'utf8');
+    assert.match(src, /item\.follow \? \(\s*<View style=\{styles\.followNote\}/);
+    assert.match(src, /\{user\.name\} seni takip etti · \{messageTime\(item\)\}/);
   });
 });
