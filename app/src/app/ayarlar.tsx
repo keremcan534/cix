@@ -427,6 +427,7 @@ export default function SettingsScreen() {
         <ListGroup label="Görünüm ve erişilebilirlik" footer="Odalar, oyunlar ve aramalar her temada koyu kalır.">
           <AppearancePicker />
           <Toggle k="effectsOff" icon="sparkles-outline" title="Animasyon ve giriş efektlerini kapat" />
+          <Toggle k="gameFx" icon="flash-outline" title="Oyunlarda güçlü efektler" subtitle="Büyük kazançta ışık, kıvılcım ve şimşek. Eski telefonda oyun takılırsa kapat." />
           <Toggle k="haptics" icon="pulse-outline" title="Dokunuş titreşimi" />
           <Toggle k="reduceMotion" icon="contrast-outline" title="Hareketi azalt" subtitle="Geçişler ve titreşimli efektler sadeleştirilir." />
           <Toggle k="lowData" icon="cellular-outline" title="Düşük veri modu" subtitle="Düşük çözünürlük, otomatik oynatma kapalı." />

@@ -3,7 +3,8 @@
 // (fx/coins with the skin's coin), sparkles twinkle and the amount counts up on the win plate; then it closes
 // itself. A Büyük Kazanç is the same pieces, lighter and shorter: its title on the shared Büyük Kazanç plaque
 // (fx/salon-art) instead of the JACKPOT one, and no pile; its title climbs with the amount (DEV, EFSANE KAZANÇ) with a
-// pop and a fanfare at each step. A tap ends it early.
+// pop and a fanfare at each step. Each blow (the start, the burst, a step up, the amount landing) shakes the show,
+// harder as the title climbs. A tap ends it early.
 // "Animasyonları azalt" and "Efektleri kapat" show it still: everything in place, the amount at once, no coins.
 // Native-driven Animated only (the count-up is the text). Decoration: the round was settled before it starts.
 import { useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -11,6 +12,7 @@ import { Animated, Easing, Image, Pressable, StyleSheet, View, type LayoutChange
 
 import { Shine } from '@/components/fx/surface';
 import { Coins } from '@/components/games/fx/coins';
+import { DivineFx } from '@/components/games/fx/divine-fx';
 import { SALON } from '@/components/games/fx/salon';
 import { salonArt } from '@/components/games/fx/salon-art';
 import { SkinOverlay, type SlotSkin } from '@/components/games/fx/slot-skin';
@@ -30,6 +32,8 @@ const fmt = (n: number) => Math.floor(n).toLocaleString('tr-TR');
 const BIG_PLAQUE = salonArt('levha-buyuk-kazanc');
 const BIG_ASPECT = 768 / 263;
 
+/** How far a blow shakes the show, per title (px; the same as the shared celebration, fx/win-fx). */
+const QUAKE = { big: 5, mega: 8, epic: 12, jackpot: 14 } as const;
 /** How long each show stays (ms), moving and still. */
 const SHOW_MS: Record<ShowKind, { ms: number; calm: number }> = { jackpot: { ms: 4500, calm: 2200 }, big: { ms: 2800, calm: 1600 } };
 
@@ -77,8 +81,30 @@ export function useJackpotShow(skin: SlotSkin | undefined): { play: Play; layer:
 }
 
 function JackpotShow({ skin, kind, amount, bet, onDone }: { skin: SlotSkin; kind: ShowKind; amount: number; bet: number; onDone: () => void }) {
-  const { reduceMotion, effectsOff } = useSettings();
+  const { reduceMotion, effectsOff, gameFx } = useSettings();
   const calm = reduceMotion || effectsOff;
+  // The GPU light, embers and lightning over the show (fx/divine-fx), with Oyunlarda güçlü efektler on; each blow
+  // (the start, the burst, each step up the title, the amount landing) is a new `pulse`.
+  const divine = !calm && gameFx;
+  const [pulse, setPulse] = useState(divine ? 1 : 0);
+  // A blow also shakes the show (not the dimming behind it), harder as the title climbs; damped, the axes out of step.
+  const [shakeX] = useState(() => new Animated.Value(0));
+  const [shakeY] = useState(() => new Animated.Value(0));
+  const quake = useCallback(
+    (px: number) => {
+      if (calm) return;
+      const jolts = (v: Animated.Value, steps: number[]) => Animated.sequence(steps.map((k) => Animated.timing(v, { toValue: k * px, duration: 40, useNativeDriver: true })));
+      Animated.parallel([jolts(shakeX, [1, -0.85, 0.7, -0.55, 0.4, -0.25, 0.12, 0]), jolts(shakeY, [-0.6, 0.75, -0.5, 0.45, -0.3, 0.18, -0.08, 0])]).start();
+    },
+    [calm, shakeX, shakeY],
+  );
+  const blow = useCallback(
+    (px: number) => {
+      setPulse((p) => (p ? p + 1 : p));
+      quake(px);
+    },
+    [quake],
+  );
   const jackpot = kind === 'jackpot';
   const ms = calm ? SHOW_MS[kind].calm : SHOW_MS[kind].ms;
   const art = skin.show;
@@ -104,7 +130,8 @@ function JackpotShow({ skin, kind, amount, bet, onDone }: { skin: SlotSkin; kind
     Animated.spring(step, { toValue: 1, friction: 4, tension: 120, useNativeDriver: true }).start();
     playSfx('levelup', 0.85);
     heavyHaptic();
-  }, [stage, step]);
+    blow(QUAKE[stage === 'small' ? 'big' : stage]);
+  }, [stage, step, blow]);
   const closing = useRef(false);
   const done = useRef(onDone);
   useEffect(() => {
@@ -137,7 +164,11 @@ function JackpotShow({ skin, kind, amount, bet, onDone }: { skin: SlotSkin; kind
     enter.start();
     rays.start();
     sparkle.start();
-    const go = setTimeout(() => setBurst(true), jackpot ? 1150 : 450);
+    quake(jackpot ? QUAKE.jackpot : QUAKE.big);
+    const go = setTimeout(() => {
+      setBurst(true);
+      blow(jackpot ? QUAKE.jackpot : QUAKE.big);
+    }, jackpot ? 1150 : 450);
     return () => {
       clearTimeout(end);
       clearTimeout(go);
@@ -170,6 +201,7 @@ function JackpotShow({ skin, kind, amount, bet, onDone }: { skin: SlotSkin; kind
         playSfx('coin', 0.8);
         playSfx('impact', 0.55);
         heavyHaptic();
+        blow(jackpot ? QUAKE.jackpot : QUAKE[final === 'small' ? 'big' : final]);
       }
     };
     frame = requestAnimationFrame(step);
@@ -195,7 +227,8 @@ function JackpotShow({ skin, kind, amount, bet, onDone }: { skin: SlotSkin; kind
     <Animated.View style={[StyleSheet.absoluteFill, s.layer, { opacity: fade }]} onLayout={onLayout} accessibilityLiveRegion="assertive">
       <Animated.View style={[StyleSheet.absoluteFill, s.scrim, { opacity: dim }]} pointerEvents="none" />
       {w > 0 && (
-        <>
+        <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ translateX: shakeX }, { translateY: shakeY }] }]} pointerEvents="none">
+          {divine && <DivineFx tier={jackpot ? 'jackpot' : stage === 'small' ? 'big' : stage} pulse={pulse} width={w} height={h} cx={w / 2} cy={h * 0.36} />}
           {/* The rays turn behind the plaque, a little above the middle. */}
           <Animated.Image
             source={art.rays}
@@ -276,7 +309,7 @@ function JackpotShow({ skin, kind, amount, bet, onDone }: { skin: SlotSkin; kind
               <Text style={s.unit}>jeton{x >= 2 ? ` · bahsin ${fmt(x)} katı` : ''}</Text>
             </Animated.View>
           </View>
-        </>
+        </Animated.View>
       )}
       <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityRole="button" accessibilityLabel={`${jackpot ? 'JACKPOT' : WIN_TITLE[final === 'small' ? 'big' : final]}, ${amount} jeton. Kapatmak için dokun`} />
     </Animated.View>
