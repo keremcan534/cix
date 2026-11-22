@@ -26,10 +26,13 @@ export type Flight = {
   sticker?: string;
   /** Ms it shows big at `from` before it flies (0: it flies at once). */
   hold?: number;
+  /** A Şanslı copy (the owners' sample videos): it grows over the recipient's photo, stays a moment, then pops. */
+  perch?: boolean;
 };
 
 const FLY_MS = 760;
 const LAND_MS = 520;
+const PERCH_MS = 1100;
 const SIZE = 44;
 
 export function GiftFlights({ flights, onDone }: { flights: Flight[]; onDone: (key: string) => void }) {
@@ -62,11 +65,11 @@ function GiftFlight({ flight, onDone }: { flight: Flight; onDone: (key: string) 
           ]
         : []),
       Animated.timing(t, { toValue: 1, duration: FLY_MS, easing: Easing.inOut(Easing.cubic), useNativeDriver: true }),
-      Animated.timing(land, { toValue: 1, duration: LAND_MS, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      Animated.timing(land, { toValue: 1, duration: flight.perch ? PERCH_MS : LAND_MS, easing: flight.perch ? Easing.linear : Easing.out(Easing.quad), useNativeDriver: true }),
     ]);
     a.start(() => done.current(flight.key));
     return () => a.stop();
-  }, [t, land, pop, hold, flight.delay, flight.key]);
+  }, [t, land, pop, hold, flight.delay, flight.key, flight.perch]);
 
   const { from, to } = flight;
   // Arc: x moves linearly, y gets an extra lift that peaks halfway.
@@ -81,7 +84,7 @@ function GiftFlight({ flight, onDone }: { flight: Flight; onDone: (key: string) 
         {
           opacity: Animated.multiply(
             t.interpolate({ inputRange: [0, hold ? 0.02 : 0.08, 1], outputRange: [0, 1, 1] }),
-            land.interpolate({ inputRange: [0, 0.6, 1], outputRange: [1, 1, 0] }),
+            flight.perch ? land.interpolate({ inputRange: [0, 0.82, 1], outputRange: [1, 1, 0] }) : land.interpolate({ inputRange: [0, 0.6, 1], outputRange: [1, 1, 0] }),
           ),
           transform: [
             { translateX: t.interpolate({ inputRange: [0, 1], outputRange: [from.x - SIZE / 2, to.x - SIZE / 2] }) },
@@ -91,7 +94,8 @@ function GiftFlight({ flight, onDone }: { flight: Flight; onDone: (key: string) 
                 hold
                   ? Animated.add(t.interpolate({ inputRange: [0, 0.5, 1], outputRange: [2.4, 1.35, 1] }), pop.interpolate({ inputRange: [0, 1], outputRange: [-2.4, 0] }))
                   : t.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.6, 1.35, 1] }),
-                land.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0, 0.45, 0.2] }),
+                // A perched copy covers the photo, bobs once and pops bigger as it goes.
+                flight.perch ? land.interpolate({ inputRange: [0, 0.12, 0.3, 0.45, 0.82, 1], outputRange: [0, 0.75, 0.55, 0.65, 0.6, 1.2] }) : land.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0, 0.45, 0.2] }),
               ),
             },
             { rotate: t.interpolate({ inputRange: [0, 0.5, 1], outputRange: ['-14deg', '10deg', '0deg'] }) },

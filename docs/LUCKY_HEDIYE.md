@@ -112,3 +112,17 @@ Kullanıcı Uğurlu kategorisinden bir hediye gönderir. Sunucu yayımlanmış o
 - **Hukuk:** Mevzuat, mağaza kuralları ve yaş sınırı incelemesi. 19 Kasım 2026'da sahipler hukuk görüşünü beklemeden yeni paket, ikon ve video özelliğini istedi (yukarıda); soru açık.
   - Jetonlar nakde çevrilemez.
   - Gerçek para karşılığı ödül, hukuki onay olmadan eklenmeyecek.
+
+## Odada gönderim ve şerit, videolardaki gibi (22 Kasım 2026)
+
+Sahiplerin isteği ve örnek videoları (başka uygulamaların şanslı hediye gönderimleri): soldan çıkan bildirim her gönderimi saysın; bu yalnız şanslı hediyelerde olsun; gönderim de videolardaki gibi görünsün, ama hediye yine ortadan çıksın. Videolar tek tek incelendi; kopyalanan bir görsel yok, aynı işleyiş kendi renklerimiz ve hediye resimlerimizle yapıldı (`components/room/lucky-banner.tsx`, `lib/lucky-strip.ts`, `components/room/live-room.tsx` `luckyStrip` ve `flyLucky`).
+
+- **Şerit ilk hediyede çıkar ve sayar:** eskiden gönderim bitince tek şerit toplamı gösteriyordu. Artık ilk hediyede soldan kayarak gelir; aynı kişinin aynı hediyeyi aynı kişilere her yeni gönderimi (tekrar çarkı, başka telefonların gönderimleri) aynı şeride eklenir. Sayı yeni toplama kadar **bir bir** sayarak çıkar (×10 yaklaşık 0,75 sn, ×100 yaklaşık 1,9 sn, en çok 2,6 sn) ve her adımda büyüyüp yerine oturur; şeridin üstünden ışık geçer. Sayı her alıcının aldığı hediye sayısıdır.
+- **Renk sayıyla yükselir:** 1–9 mavi, 10–49 mor, 50–199 pembe, 200–499 turuncu, 500 ve üstü altın.
+- **Kazanç:** kazanılan en büyük çarpan hediyenin üstünde rozet olarak patlar ("×500"); 100 kat ve üstü şeridi altına çevirir ve "BÜYÜK KAZANÇ" yazar.
+- **Bitiş:** sayma bitip 2,6 sn yeni hediye gelmezse şerit hızla sola çekilir. Aynı anda en çok üç şerit görünür.
+- **Hediyenin uçuşu:** yine ekranın ortasından çıkar, ama ortada büyük gösteri yapmadan kopyaları art arda bütün alıcılara akar; her alıcının yüzünün üstüne konar, bir an durur ve patlayarak kaybolur (az alıcıda 3, çok alıcıda 1 kopya). "Şanslı hediyeleri göster" kapalıyken, efektler kapalıyken ve hareketi azalt açıkken uçuş görünmez, şerit görünür.
+- **Diğer hediyeler değişmedi:** onlarda sohbet satırı, ortadaki gösteri ve uçuş eskisi gibi.
+- **Sunucu ve eski APK'lar:** değişiklik yalnız uygulamada; sunucu ve para kuralları aynı. Eski APK'lar şeridi eskisi gibi gönderim bitince gösterir.
+- **Olasılık tablosu kendiliğinden açık değil (sahiplerin isteği):** hediye panelinde Şanslı hediyelerin altındaki tablo kalktı. Rafın üstündeki "Olasılıklar" ve "Geçmişim" düğmeleri ve gönder düğmesinin altındaki "Olasılıklar" bağlantısı tabloyu açar. Mağazalar (Google Play, App Store) şans ürününde olasılıkların satın almadan önce gösterilmesini istediği için tablo tamamen silinmedi, bir dokunuş uzakta.
+- **×777 (sahiplerin kararı, "hukuki yanı bize ait"):** Şanslı hediyenin adetleri 1, 5, 10, 25, 50, 100, 250 ve **777** ("Büyük şans"); normal hediyelerde 777 yok, Şanslı'dan normal rafa geçince adet ×1'e döner. Sunucu Şanslı'da 777'yi kabul eder (`lucky.mjs` `LUCKY_COUNTS`, `GET /api/lucky` `counts`); bir istek en çok 16.000 çekiliş yapar (önce 5.000; 777 × 20 kişi = 15.540 sığar). Tekrar çarkında birikmiş dokunuşlar bu sınırı aşmayacak kadar tek istekte gider, kalanı bir sonrakinde. Eski APK'larda 777 seçeneği yok. Hukuk riski `DENETIM.md`'de.

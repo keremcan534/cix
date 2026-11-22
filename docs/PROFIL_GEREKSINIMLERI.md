@@ -20,7 +20,7 @@ Ekran adları: **Profil** = `src/app/kullanici/[id].tsx`, **Ayarlar** = `src/app
 | Madde | Durum | Bu güncellemede | Nerede / not |
 |---|---|---|---|
 | Profil fotoğrafı | 2 | 🆕 değiştirme | Kendi profilinde avatara dokun veya *Profili düzenle → Fotoğrafı değiştir*. Yeni fotoğraf önce incelemeye düşer ("İncelemede"); onaylanana kadar başkaları eski fotoğrafı görür. |
-| Kullanıcı adı (@handle) | 2 | 🆕 | Benzersiz; 3–20 karakter, harfle başlar, a-z 0-9 . _ kullanılır. Ayrılmış adlar (admin, destek, similarclub…) ve alınmış adlar reddedilir. Kopyalanabilir. |
+| Kullanıcı adı (@handle) | 2 | 🆕 | Benzersiz; 3–20 karakter, harfle başlar, a-z 0-9 . _ kullanılır. Ayrılmış adlar (admin, destek, similarclub…) ve alınmış adlar reddedilir. Kopyalanabilir. **22 Kasım 2026: seçmek ve değiştirmek herkese kapalı** (ileride ücretli özellik); profil düzenlemede alan kilitli, "Yakında" yazar; sunucu eski APK'lardan gelen değişikliği de reddeder. |
 | Benzersiz kullanıcı ID'si | 2 | ✓ | 12 haneli, değiştirilemez, kopyalanabilir. Sunucu üretir (`users.public_no`, [`KIMLIK_NUMARASI.md`](KIMLIK_NUMARASI.md)); odanın ID'si sahibinin ID'si. |
 | Görünen ad / takma ad | 2 | ✓ (kurallar 🆕) | En fazla 20 karakter, küfür filtresi. |
 | Doğum tarihi / yaş | 2 | 🆕 tarih düzenleme | GG.AA.YYYY olarak girilir, 18 yaş altı reddedilir. Doğum tarihini yalnızca sahibi görür, diğerleri sadece yaşı görür. Not: kayıt ekranı şu an sadece doğum yılını soruyor. |

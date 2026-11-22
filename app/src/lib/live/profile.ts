@@ -60,6 +60,8 @@ export function meFromServer(u: api.ServerMe): Partial<User> {
     // "Gizli": I still see my gender, marked as hidden from others.
     showGender: u.genderHidden !== true,
     ...(typeof u.age === 'number' && { age: u.age }),
+    // No birth date on the server (age null): a date this phone remembers is not mine (owners, 22 Nov 2026).
+    ...(u.age === null && { birthDate: '' }),
     ...(u.avatarUrl && { avatar: u.avatarUrl }),
     ...(u.createdAt && { joinedAt: u.createdAt.slice(0, 10) }),
     // My own number, the ID my profile shows (an older server sends none: data/profile publicIdOf).

@@ -147,6 +147,32 @@ describe('Şanslı hediyeler sunucuda', () => {
     assert.equal(Number((await h.sql.query('SELECT count(*) AS n FROM gift_events WHERE sender = $1', [a.user.id])).rows[0].n), 2);
   });
 
+  // ×777 (owners, 22 Nov 2026, as the sample videos; the legal side is theirs): Şanslı only, to as many as 20 people in
+  // one send; the wheel's taps stay within 16.000 draws a request; a plain gift still can't go ×777.
+  test('×777: tek kişiye ve 20 kişiye; çekiliş sınırı; normal hediyede yok', async () => {
+    const a = await player('Yedi Yüz', 640_000); // 777 + 777 × 20 + 777 × 20 lk1 (20 jeton)
+    const people = await Promise.all(Array.from({ length: 20 }, (_, i) => signUp(`Alan ${i}`)));
+    let [st, j] = await send(a.session, { giftId: 'lk1', to: [people[0].user.id], count: 777 });
+    assert.equal(st, 200, j.error);
+    assert.equal(j.send.draws.length, 777);
+    assert.equal((await me(people[0].session)).diamonds, 4 * 777, 'alıcıya %20');
+    [st, j] = await send(a.session, { giftId: 'lk1', to: people.map((p) => p.user.id), count: 777 });
+    assert.equal(st, 200, j.error);
+    assert.equal(j.send.draws.length, 777 * 20);
+    // 777 × 2 taps × 20 people = 31.080 draws: more than one request draws.
+    [st, j] = await send(a.session, { giftId: 'lk1', to: people.map((p) => p.user.id), count: 777, times: 2 });
+    assert.deepEqual([st, j.error], [400, 'Geçersiz tekrar sayısı']);
+    [st, j] = await send(a.session, { giftId: 'lk1', to: [people[1].user.id], count: 777, times: 20 });
+    assert.equal(st, 200, j.error);
+    assert.equal(j.send.draws.length, 777 * 20);
+    assert.equal((await send(a.session, { giftId: 'lk1', to: [people[1].user.id], count: 776 }))[0], 400);
+    const [, cfg] = await call('GET', '/api/lucky', null, a.session);
+    assert.deepEqual(cfg.counts, [1, 5, 10, 25, 50, 100, 250, 777]);
+    // A plain gift: the counts it always had.
+    const [gst, g] = await call('POST', '/api/gifts/send', { to: people[2].user.id, giftId: 'g1', count: 777, ref: rnd(8) }, a.session);
+    assert.deepEqual([gst, g.error], [400, 'Adet 1, 5, 10, 25, 50, 100, 250 olabilir']);
+  });
+
   test('yönetici ayarları: yetki, denetim, sürüm, kapalı paket, kesin oranlar ve günlük limit', async () => {
     const user = await signUp('Sıradan');
     assert.equal((await call('GET', '/api/admin/lucky', null, user.session))[0], 403);

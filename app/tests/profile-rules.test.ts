@@ -4,9 +4,11 @@
 // boundary (18 today vs one day short) is checked exactly and the tests don't change with the calendar.
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 import { CONTACT_MESSAGE, onContactRefusal, type ContactRefusal } from '@/lib/contact-filter';
-import { LIMITS, ageFrom, formatTrDate, hasProfanity, noteProfileRefusal, parseTrDate, validateProfile, type ProfileDraft } from '@/lib/profile-rules';
+import { LIMITS, ageFrom, birthShown, formatTrDate, hasProfanity, noteProfileRefusal, parseTrDate, validateProfile, type ProfileDraft } from '@/lib/profile-rules';
 
 /** 2 Kasım 2026, local time (ageFrom reads local date parts). */
 const TODAY = new Date(2026, 10, 2);
@@ -171,5 +173,24 @@ describe('18 yaş sınırı', () => {
   test('tarih verilmezse bugünün tarihi kullanılır (mevcut çağrılar)', () => {
     assert.equal(validateProfile(OK).birth, undefined);
     assert.equal(validateProfile({ ...OK, birth: '01.01.2100' }).birth, 'Similar Club 18 yaş ve üzeri içindir.');
+  });
+});
+
+// A field locked on a date never entered (owners, 22 Nov 2026): the phone's date shows only when it gives the
+// server's age; the form locks only on the server's age.
+describe('Doğum tarihi: telefonun hatırladığı tarih', () => {
+  test('sunucunun yaşını veren tarih görünür; başka her durumda görünmez', () => {
+    const today = new Date();
+    const date = `${today.getFullYear() - 30}-01-01`;
+    assert.equal(birthShown(date, 30), date);
+    assert.equal(birthShown(date, null), '');
+    assert.equal(birthShown(date, 24), '');
+    assert.equal(birthShown('', 30), '');
+    assert.equal(birthShown('bozuk', 30), '');
+  });
+  test('form kilidi yalnız sunucunun yaşına bakar', () => {
+    const form = readFileSync(resolve(import.meta.dirname, '../src/app/kullanici/[id].tsx'), 'utf8');
+    assert.match(form, /const birthLocked = live \? serverAge !== null : !!user\.birthDate;/);
+    assert.match(form, /useState\(birthLocked \|\| live \? '' : formatTrDate\(user\.birthDate\)\)/);
   });
 });

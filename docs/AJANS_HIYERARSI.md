@@ -29,7 +29,9 @@ böylece her gelir **gerçekleştiği andaki** zincire göre hesaplanır.
 Ajans durumları: `draft → pending → approved`, ayrıca `rejected`, `suspended`, `closed`. Her geçiş
 `agency_status_history` tablosuna yazılır. Askıya alma ve kapatma geçmişi silmez.
 
-Yayıncı edinme yolları: davet kodu, bağlantı, davet (ajans çağırır, yayıncı kabul eder), başvuru ve merkez ataması.
+Yayıncı edinme yolları: davet kodu, bağlantı, başvuru ve merkez ataması. **Davet (ajans çağırır, yayıncı kabul eder) 22 Kasım 2026'dan beri kapalı** (sahiplerin kararı): "Yayıncı davet et" düğmesi kalktı, sunucu her uygulamanın davetini reddeder, bekleyen davetler iptal edildi (yayıncıya bildirim gitmedi). Yayıncı ajans koduyla ya da ajansın davet bağlantısıyla gelir. Sunucunun `.env`'inde `AGENCY_INVITES=1` daveti yeniden açar.
+
+**Referans ajans gizliliği (22 Kasım 2026, sahiplerin kararı):** üst ajans, referans ajanslarını yalnız adıyla görür: yayıncılarını, yayıncı sayısını, hediye ve kazanç rakamlarını, puanlarını ve sıralamalarını görmez; referans ajansın panelini açamaz. Kendi kazancı (referans ajanslardan geçen fark dahil) ve bakiyesi görünür kalır, çünkü ödeme talebini o bakiyeden yapar; komisyon satırlarında referans ajansın adı yazar, yayıncının adı yazmaz. Merkez ve BD her şeyi görür. Ajans ayarı **"Üst ajans referans ajanslarının yayıncılarını ve rakamlarını görür"** (`parent_sees_subs`, panel › Ajans merkezi › ağ kuralları) açılırsa eski görünüm döner. Eski APK'larda "Referans ajans yayıncıları" sekmesi hata verir ve referans ajans kartları 0 gösterir.
 Katılım onayı `join_policy.requires_approval` ile yönetilir.
 
 Alt ajans açma: üst ajans `POST /api/agency/sub/create` ile taslak açar, `submit` ile gönderir. Onay politikası

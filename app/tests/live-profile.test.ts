@@ -101,6 +101,13 @@ describe('Profilim sunucudan: demo değeri kalmaz', () => {
     assert.equal('age' in meFromServer({ ...SERVER_ME, age: null }), false);
   });
 
+  test('sunucuda doğum tarihi yoksa telefonun hatırladığı tarih silinir (alan kilitlenmez)', async () => {
+    const { meFromServer } = await profile();
+    assert.equal(meFromServer({ ...SERVER_ME, age: null }).birthDate, '');
+    // Set there: the date this phone has stays (the server never sends it back).
+    assert.equal('birthDate' in meFromServer({ ...SERVER_ME, age: 24 }), false);
+  });
+
   test('profil ID’m sunucunun verdiği numara; eski sunucu ya da bozuk değer: yok (ekran id’den yapar)', async () => {
     const { meFromServer } = await profile();
     assert.equal(meFromServer({ ...SERVER_ME, publicNo: '100000007919' }).publicNo, '100000007919');

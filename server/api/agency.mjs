@@ -28,7 +28,7 @@
 //   POST /api/agency/sub/close { id, reason, ref }        POST /api/agency/appeal { id, subject, body }
 //   GET  /api/agency/notices?id=
 import { agencyMessagePerformance, periodOf } from './auto-chat.mjs';
-import { HttpError, REF, UUID, assertClean, auth, db, readJson, text, tx } from './core.mjs';
+import { HttpError, REF, UUID, assertClean, auth, db, env, readJson, text, tx } from './core.mjs';
 import {
   AGENCY_PERMS,
   PLATFORM_PERMS,
@@ -46,6 +46,7 @@ import {
   rateView,
   rowStatus,
   settingsAt,
+  subsHidden,
   tierName,
   usdOf,
   viewerOf,
@@ -110,7 +111,8 @@ async function ctx(c, req) {
 async function agencyFor(c, x, id, perm = null) {
   const a = await agencyRow(c, uuid(id, 'ajans'));
   if (perm) await needAgency(c, x.acc, perm, a, x.s);
-  else if (!viewerOf(x.acc, a)) {
+  // A parent agency doesn't look into its sub-agencies unless parent_sees_subs (agency-lib subsHidden).
+  else if (!viewerOf(x.acc, a) || (viewerOf(x.acc, a) === 'parent' && !x.s.parent_sees_subs)) {
     await audit(db, x.u.id, 'agency.view', 'agency', a.id, { result: 'denied' });
     throw new HttpError(403, 'Bu ajans için yetkin yok');
   }
@@ -220,6 +222,17 @@ const streamerView = (r) => ({
 });
 
 // --- Routes ------------------------------------------------------------------------------------------------
+/** A sub-agency's streamers asked for while the agency sees its sub-agencies by name only (agency-lib subsHidden). */
+export const SUBS_HIDDEN = 'Referans ajansların yayıncıları ve rakamları üst ajansa gösterilmez.';
+
+/**
+ * "Yayıncı davet et" (owners, 22 Nov 2026): no agency sends invites any more; a streamer joins with the agency's
+ * code or its invite link (an assistant's own code too). Every app's invite and its search are refused; migration
+ * 113 cancelled the invites still waiting. AGENCY_INVITES=1 (.env) opens them again.
+ */
+export const INVITES_OPEN = env.AGENCY_INVITES === '1';
+export const INVITES_CLOSED = 'Ajanslar yayıncıya davet gönderemez. Yayıncı, ajans koduyla ya da ajansın davet bağlantısıyla katılır.';
+
 export const agencyRoutes = {
   // --- Streamer side ---
   async 'GET /api/agency/me'(req) {
@@ -312,6 +325,8 @@ export const agencyRoutes = {
       const x = await ctx(c, req);
       const r = await c.query("SELECT * FROM agency_requests WHERE id = $1 AND user_id = $2 AND kind = 'invite' AND status = 'pending' FOR UPDATE", [b.requestId, x.u.id]);
       if (!r.rowCount) throw new HttpError(404, 'Davet bulunamadı');
+      // Invites closed: none is left waiting (migration 113); one that somehow is can only be turned down.
+      if (!INVITES_OPEN && b.accept === true) throw new HttpError(409, INVITES_CLOSED);
       const a = await agencyRow(c, r.rows[0].agency_id, true);
       // Whoever sent the invite brought this streamer (an agency assistant gets their share from it).
       if (b.accept === true) await linkStreamer(c, x.u.id, a, 'invite', x.u.id, null, r.rows[0].created_at, r.rows[0].created_by);
@@ -384,6 +399,8 @@ export const agencyRoutes = {
         [a.id, x.s.performance.active_days],
       )
     ).rows[0];
+    // Sub-agencies by name only (subsHidden): how many streamers they have stays out (0 for an older app's field).
+    if (subsHidden(x.acc, a, x.s)) counts.sub_streamers = 0;
     let earnings = null;
     if (perms.has('reports.commission')) {
       const e = (
@@ -417,6 +434,8 @@ export const agencyRoutes = {
       owner: owner ? { id: owner.id, name: owner.name } : null,
       viewer: viewerOf(x.acc, a),
       perms: [...perms],
+      // Sub-agencies by name only for this viewer (agency-lib subsHidden): a newer app leaves their numbers out.
+      subsHidden: subsHidden(x.acc, a, x.s),
       counts,
       rate: await rateView(db, a, x.s),
       earnings,
@@ -436,6 +455,7 @@ export const agencyRoutes = {
     const scope = url.searchParams.get('scope') ?? 'direct';
     if (!['direct', 'sub'].includes(scope)) bad('Geçersiz kapsam');
     const a = await agencyFor(db, x, url.searchParams.get('id'), scope === 'sub' ? 'subagencies.view' : 'streamers.view');
+    if (scope === 'sub' && subsHidden(x.acc, a, x.s)) throw new HttpError(403, SUBS_HIDDEN);
     const r =
       scope === 'direct'
         ? await db.query(`${STREAMER_ROW} WHERE m.agency_id = $1 AND m.ended_at IS NULL ORDER BY m.joined_at DESC LIMIT 500`, [a.id, x.s.performance.active_days])
@@ -467,6 +487,32 @@ export const agencyRoutes = {
       WHERE s.parent_id = $1 AND s.status <> 'rejected' ORDER BY s.status = 'approved' DESC, s.name`,
       [a.id, x.s.performance.active_days],
     );
+    // By name only (subsHidden): every other field there for an older app's parser, empty, and `hidden` for a newer.
+    if (subsHidden(x.acc, a, x.s)) {
+      const zero = { day: 0, week: 0, month: 0 };
+      const names = r.rows.map((s) => ({
+        ...card(s, x.s),
+        hidden: true,
+        owner: null,
+        pendingWith: s.pending_with,
+        streamers: 0,
+        active: 0,
+        volume30: 0,
+        earned30: null,
+        mine30: 0,
+        gifts: zero,
+        mine: zero,
+        rate: null,
+        parentShare: null,
+        upcoming: null,
+        payoutStatus: null,
+        score: null,
+        overallRank: null,
+        overtakes: false,
+        next: null,
+      }));
+      return { subagencies: names, nearPromotion: [], hidden: true };
+    }
     const out = [];
     for (const s of r.rows) {
       const perms = permsOn(x.acc, s, x.s);
@@ -512,7 +558,10 @@ export const agencyRoutes = {
     const to = dateParam(q.get('to'), new Date(Date.now() + 60e3));
     const vals = [a.id, from, to];
     const where = ['l.agency_id = $1', 'l.created_at >= $2', 'l.created_at < $3'];
-    if (q.get('streamer')) where.push(`k.streamer_id = $${vals.push(uuid(q.get('streamer')))}`);
+    // Sub-agencies by name only (subsHidden): a sub-agency's streamer can't be picked out, and its rows name no one.
+    const hide = subsHidden(x.acc, a, x.s);
+    const theirs = (l) => hide && !!l.source_agency && l.source_agency !== a.id;
+    if (q.get('streamer')) where.push(`k.streamer_id = $${vals.push(uuid(q.get('streamer')))}${hide ? ' AND k.agency_id = $1' : ''}`);
     if (q.get('sub')) where.push(`k.agency_id = $${vals.push(uuid(q.get('sub')))}`);
     if (q.get('kind')) where.push(`l.kind = $${vals.push(String(q.get('kind')))}`);
     const r = await db.query(
@@ -535,14 +584,14 @@ export const agencyRoutes = {
       createdAt: l.created_at,
       note: l.note,
       txn: l.txn,
-      streamer: l.streamer_id ? { id: l.streamer_id, name: l.streamer_name } : null,
+      streamer: l.streamer_id && !theirs(l) ? { id: l.streamer_id, name: l.streamer_name } : null,
       sourceAgency: l.source_agency ? { id: l.source_agency, name: l.source_name } : null,
-      base: l.base_diamonds === null ? null : n(l.base_diamonds),
+      base: l.base_diamonds === null || theirs(l) ? null : n(l.base_diamonds),
       incomeType: l.income_type,
       totalRate: l.total_rate === null ? null : n(l.total_rate),
-      subRate: l.agency_rate === null ? null : n(l.agency_rate),
+      subRate: l.agency_rate === null || theirs(l) ? null : n(l.agency_rate),
       parentRate: l.parent_rate === null ? null : n(l.parent_rate),
-      subAmount: l.agency_amount === null ? null : d4(l.agency_amount),
+      subAmount: l.agency_amount === null || theirs(l) ? null : d4(l.agency_amount),
       parentAmount: l.parent_amount === null ? null : d4(l.parent_amount),
       transitionAmount: l.transition_amount === null ? null : d4(l.transition_amount),
       poolCap: l.pool_cap === null ? null : n(l.pool_cap),
@@ -573,7 +622,8 @@ export const agencyRoutes = {
     const tiers = await db.query('SELECT * FROM agency_tier_history WHERE agency_id = $1 ORDER BY id DESC LIMIT 50', [a.id]);
     const rates = await db.query('SELECT * FROM agency_rates WHERE agency_id = $1 ORDER BY effective_from DESC, id DESC LIMIT 50', [a.id]);
     let subs = [];
-    if (latest && a.level === 1) {
+    // Sub-agencies by name only (subsHidden): their scores and ranking stay out.
+    if (latest && a.level === 1 && !subsHidden(x.acc, a, x.s)) {
       const r = await db.query(
         `SELECT sc.agency_id, g.name, sc.score, sc.rank, sc.overtakes, sc.assigned_tier, sc.change, sc.metrics->>'active' AS active, sc.metrics->>'volume' AS volume
            FROM agency_perf_scores sc JOIN agencies g ON g.id = sc.agency_id WHERE sc.run_id = $1 AND sc.parent_id = $2 ORDER BY sc.score DESC`,
@@ -632,7 +682,9 @@ export const agencyRoutes = {
       );
       earn = r.rows.map((e) => ({ bucket: e.b, direct: d4(e.direct), difference: d4(e.difference), transition: d4(e.transition), total: d4(e.total) }));
     }
-    return { group, from, to, volume: vol.rows.map((v) => ({ bucket: v.b, direct: n(v.direct), org: n(v.org) })), joins: joins.rows.map((j) => ({ bucket: j.b, count: j.n })), earnings: earn };
+    // Sub-agencies by name only (subsHidden): the organisation's volume is the agency's own (no sub-agency's gifts).
+    const own = subsHidden(x.acc, a, x.s);
+    return { group, from, to, volume: vol.rows.map((v) => ({ bucket: v.b, direct: n(v.direct), org: own ? n(v.direct) : n(v.org) })), joins: joins.rows.map((j) => ({ bucket: j.b, count: j.n })), earnings: earn };
   },
 
   async 'GET /api/agency/requests'(req, url) {
@@ -653,6 +705,7 @@ export const agencyRoutes = {
    */
   async 'GET /api/agency/invite/search'(req, url) {
     const x = await ctx(db, req);
+    if (!INVITES_OPEN) throw new HttpError(403, INVITES_CLOSED);
     const a = await agencyRow(db, uuid(url.searchParams.get('id'), 'ajans'));
     await actIn(db, x, a, 'streamers.invite');
     const q = (url.searchParams.get('q') ?? '').trim().replace(/^@+/, '');
@@ -679,6 +732,7 @@ export const agencyRoutes = {
     const b = await readJson(req);
     return tx(async (c) => {
       const x = await ctx(c, req);
+      if (!INVITES_OPEN) throw new HttpError(403, INVITES_CLOSED);
       const a = await agencyRow(c, uuid(b.id, 'ajans'));
       await actIn(c, x, a, 'streamers.invite');
       if (a.status !== 'approved') throw new HttpError(409, 'Ajans aktif değil');

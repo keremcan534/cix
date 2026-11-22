@@ -68,9 +68,9 @@ describe('Hızlı hediye gönderimi', () => {
       assert.equal(st, 400, `times ${times}`);
       assert.match(j.error, /tekrar/);
     }
-    // At most 5000 gifts drawn in one send.
-    [st] = await lucky(a.session, { to: [b.user.id, c.user.id], count: 250, times: 11 });
-    assert.equal(st, 400);
+    // At most 16.000 gifts drawn in one send (5.000 before ×777, 22 Nov 2026): 250 × 33 × 2 = 16.500.
+    [st, j] = await lucky(a.session, { to: [b.user.id, c.user.id], count: 250, times: 33 });
+    assert.deepEqual([st, j.error], [400, 'Geçersiz tekrar sayısı']);
     // Nothing moved for the refused ones.
     assert.equal(Number((await h.sql.query('SELECT count(*) FROM lucky_sends WHERE user_id = $1', [a.user.id])).rows[0].count), 2);
   });

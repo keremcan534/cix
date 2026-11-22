@@ -56,7 +56,10 @@ const MAX_TO = 20;
  * together, as count × times gifts each), and the most gifts one send draws in all. Older apps send none (1).
  */
 const MAX_TIMES = 50;
-const MAX_DRAWS = 5000;
+// 777 to 20 people in one send (15.540 draws) fits (owners, 22 Nov 2026: ×777 for Şanslı, as the sample videos).
+export const MAX_DRAWS = 16_000;
+/** The counts a Şanslı send takes: a plain gift's, and ×777 (owners, 22 Nov 2026; the legal side is theirs). */
+export const LUCKY_COUNTS = [...GIFT_COUNTS, 777];
 const DAY_START = `(date_trunc('day', now() AT TIME ZONE 'Europe/Istanbul') AT TIME ZONE 'Europe/Istanbul')`;
 
 /** The packages in force: the admins' saved ones, or the built-in ones until the first save. */
@@ -140,7 +143,7 @@ export const luckyRoutes = {
       gifts: config.gifts.filter((g) => g.enabled).map((g) => ({ ...g, since: sinceOf(g, cur.version), open: paid + g.price * maxMult(g) <= config.dailyPayoutLimit, ...luckyArtOf(g.id) })),
       announceFrom: config.announceFrom,
       share: SHARE,
-      counts: GIFT_COUNTS,
+      counts: LUCKY_COUNTS,
       needLevel: casinoNeed().level,
       allowed: points >= casinoNeed().points,
       minAge: MIN_AGE,
@@ -156,7 +159,7 @@ export const luckyRoutes = {
     const b = await readJson(req);
     if (!REF.test(b.ref ?? '') || b.ref.length > 60) throw new HttpError(400, 'Geçersiz istek kimliği');
     if (typeof b.giftId !== 'string' || b.giftId.length > 30) throw new HttpError(400, 'Hediye bulunamadı');
-    if (!GIFT_COUNTS.includes(b.count)) throw new HttpError(400, `Adet ${GIFT_COUNTS.join(', ')} olabilir`);
+    if (!LUCKY_COUNTS.includes(b.count)) throw new HttpError(400, `Adet ${LUCKY_COUNTS.join(', ')} olabilir`);
     if (!Array.isArray(b.to) || b.to.length < 1 || b.to.length > MAX_TO) throw new HttpError(400, 'Geçersiz alıcı');
     const to = b.to.map((x) => userId(x, 'alıcı'));
     if (new Set(to).size !== to.length) throw new HttpError(400, 'Geçersiz alıcı');

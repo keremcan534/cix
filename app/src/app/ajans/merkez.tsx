@@ -879,6 +879,7 @@ const SETTING_TEXT: Record<string, string> = {
   parent_min_rate: 'Üst ajans asgari payı',
   parent_zero: 'Üst ajans payını sıfırlama',
   parent_sees_sub_earnings: 'Alt ajans kazancı görünürlüğü',
+  parent_sees_subs: 'Üst ajans referans ajanslarının yayıncılarını ve rakamlarını görür',
   bd_policy: 'BD politikası',
   suspension_policy: 'Askıya alma politikası',
   assistant_policy: 'Ajans asistanı sınırı',

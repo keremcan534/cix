@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import { CONTACT_MESSAGE } from '../contact-filter.mjs';
 import { rnd, startApi } from './harness.mjs';
 
-const h = startApi({ LOCK_DAYS_STORE: '0', TEST_TOPUP_DAILY: '1000000', AGENCY_JOBS: '0', AUTO_MUTE_REFUSALS: '0' });
+const h = startApi({ LOCK_DAYS_STORE: '0', TEST_TOPUP_DAILY: '1000000', AGENCY_JOBS: '0', AUTO_MUTE_REFUSALS: '0', AGENCY_INVITES: '1' }); // the invite's note, closed by default
 const { call, signUp } = h;
 const ref = () => `c${rnd(8)}`;
 const q = async (sql, vals = []) => (await h.sql.query(sql, vals)).rows;
@@ -71,14 +71,16 @@ describe('iletişim filtresi: uçlar', () => {
   test('profil: ad, kullanıcı adı, şehir, hakkında', async () => {
     await blocked(patchMe({ bio: 'wp: 0532 123 45 67' }), 'phone', 'bio');
     await blocked(patchMe({ name: 'Ayşe insta: ayse' }), 'social', 'name');
-    await blocked(patchMe({ username: 'insta_ayse' }), 'social', 'username');
-    await blocked(patchMe({ username: 'ayse05321234567' }), 'phone', 'username');
+    // A username can't be chosen for now (owners, 22 Nov 2026): refused before the filter, nothing counted.
+    const before = (await refusals(a)).length;
+    assert.equal((await patchMe({ username: 'insta_ayse' }))[0], 403);
+    assert.equal((await refusals(a)).length, before);
     await blocked(patchMe({ city: 'www.ayse.com' }), 'link', 'city');
     // One refused field changes nothing, not even the fields that passed.
     await blocked(patchMe({ name: 'Ayşe Yılmaz', bio: 'snapim ayse' }), 'social', 'bio');
     assert.equal((await ok(call('GET', '/api/me', null, a.session))).user.name, 'Ayşe');
-    const u = (await ok(patchMe({ name: 'Ayşe Yılmaz', username: 'ayse.yilmaz', city: 'İzmir', bio: 'Müzik ve kitap. 1998 doğumluyum, 3 kedim var.' }))).user;
-    assert.deepEqual([u.name, u.username, u.city, u.bio], ['Ayşe Yılmaz', 'ayse.yilmaz', 'İzmir', 'Müzik ve kitap. 1998 doğumluyum, 3 kedim var.']);
+    const u = (await ok(patchMe({ name: 'Ayşe Yılmaz', city: 'İzmir', bio: 'Müzik ve kitap. 1998 doğumluyum, 3 kedim var.' }))).user;
+    assert.deepEqual([u.name, u.city, u.bio], ['Ayşe Yılmaz', 'İzmir', 'Müzik ve kitap. 1998 doğumluyum, 3 kedim var.']);
   });
 
   test('giriş: iletişim bilgisi olan ad yerine "Yeni üye"', async () => {
@@ -161,7 +163,8 @@ describe('iletişim filtresi: uçlar', () => {
     const cols = (await q("SELECT column_name FROM information_schema.columns WHERE table_name = 'contact_refusals' ORDER BY ordinal_position")).map((r) => r.column_name);
     assert.deepEqual(cols, ['id', 'user_id', 'category', 'place', 'created_at']);
     const mine = await refusals(a);
-    for (const p of ['dm', 'dm.sequence', 'profile.bio', 'profile.name', 'profile.username', 'profile.city', 'room.title', 'room.announcement', 'room.mute']) {
+    // profile.username: no username can be chosen for now (social.mjs USERNAME_OPEN), so none is refused there.
+    for (const p of ['dm', 'dm.sequence', 'profile.bio', 'profile.name', 'profile.city', 'room.title', 'room.announcement', 'room.mute']) {
       assert.ok(mine.some((r) => r.place === p), `${p} sayılmadı`);
     }
     for (const p of ['agency.join', 'agency.name', 'agency.region', 'agency.transfer']) assert.ok((await refusals(c)).some((r) => r.place === p), `${p} sayılmadı`);

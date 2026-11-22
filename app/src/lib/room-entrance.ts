@@ -78,8 +78,15 @@ export type PeerLog = {
   leftAt: ReadonlyMap<string, number>;
   held: ReadonlyMap<string, number>;
   names: ReadonlyMap<string, string>;
+  /** Who said "bye" (left on purpose, lib/live/room-bus) during this visit, and when (this phone's clock). */
+  byes?: ReadonlyMap<string, number>;
 };
-export const newPeerLog = (): PeerLog => ({ conn: 0, leftAt: new Map(), held: new Map(), names: new Map() });
+export const newPeerLog = (): PeerLog => ({ conn: 0, leftAt: new Map(), held: new Map(), names: new Map(), byes: new Map() });
+
+/** How long a "bye" counts: the voice connection's leave comes right after it; a stale one is forgotten. */
+export const BYE_MS = 60_000;
+/** Someone said "bye" (they chose "Odadan çık"): their leave is a walk-out, and their return an entrance. */
+export const peerBye = (log: PeerLog, uid: string, now: number): PeerLog => ({ ...log, byes: new Map(log.byes ?? []).set(uid, now) });
 
 export type PeerStep = {
   log: PeerLog;
@@ -110,6 +117,7 @@ export function peerStep(log: PeerLog, members: readonly string[], here: Readonl
   const leftAt = new Map(log.leftAt);
   const held = new Map(log.held);
   const names = new Map(log.names);
+  const byes = new Map([...(log.byes ?? [])].filter(([, at]) => now - at < BYE_MS));
   // Due lines first, so someone back after theirs gets "odaya girdi" after "odadan ayrıldı". Someone back on a baseline
   // (I wasn't connected to see when) gets neither; someone back sooner than RETURN_MS neither (the join drops theirs).
   const lines: { uid: string; name: string }[] = [];
@@ -124,13 +132,19 @@ export function peerStep(log: PeerLog, members: readonly string[], here: Readonl
   if (!baseline) {
     for (const uid of changes.leaves) {
       leftAt.set(uid, now);
-      held.set(uid, now);
+      // A walk-out ("bye" said): their line now, not after RETURN_MS. A drop's line waits.
+      if (byes.has(uid)) lines.push({ uid, name: names.get(uid) ?? 'Bir üye' });
+      else held.set(uid, now);
     }
   }
   for (const j of changes.joins) held.delete(j.uid);
-  const joins = baseline ? changes.joins.map((j) => ({ ...j, join: { fresh: false, at: j.join.at, away: null } })) : changes.joins;
+  // Back after a walk-out, however soon: an entrance (their line and entry effect), not a dropped connection.
+  const joins = baseline
+    ? changes.joins.map((j) => ({ ...j, join: { fresh: false, at: j.join.at, away: null } }))
+    : changes.joins.map((j) => (byes.has(j.uid) && j.join.away !== null ? { ...j, join: { ...j.join, away: Math.max(j.join.away, RETURN_MS) } } : j));
+  for (const j of changes.joins) byes.delete(j.uid);
   for (const [uid, p] of here) names.set(uid, p.name);
-  return { log: { conn: meJoinedAt, leftAt, held, names }, leaves: changes.leaves, joins, lines, next: nextDue(held) };
+  return { log: { conn: meJoinedAt, leftAt, held, names, byes }, leaves: changes.leaves, joins, lines, next: nextDue(held) };
 }
 
 /** When the oldest held line is due; null when none is held. */

@@ -14,6 +14,7 @@ import { FollowListSheet, MY_LISTS } from '@/components/follow-list-sheet';
 import { FOLLOWS_ME, userById } from '@/data/mock';
 import { publicIdOf } from '@/data/profile';
 import { NOBLE_TIERS, SVIP_LEVELS, nobleInfo } from '@/data/status';
+import { vipCardColors } from '@/lib/vip-screen';
 import { Art } from '@/components/Art';
 import { confirmLogout, showAlert } from '@/lib/alert';
 import { copyText } from '@/lib/clipboard';
@@ -199,7 +200,7 @@ export default function ProfileScreen() {
             <StatusCard
               title="VIP"
               sub={svipLevel ? `VIP ${svipLevel}` : 'Yok'}
-              colors={['#D02E78', '#4A1630']}
+              colors={vipCardColors(svipLevel) ?? ['#D02E78', '#4A1630']}
               icon={<Art name={SVIP_LEVELS[Math.max(0, Math.min(SVIP_LEVELS.length, svipLevel) - 1)].art} size={30} style={!svipLevel && { opacity: 0.6 }} />}
               onPress={() => router.push({ pathname: '/vip', params: { tab: 'svip' } })}
             />

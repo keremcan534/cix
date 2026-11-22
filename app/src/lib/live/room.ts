@@ -15,7 +15,7 @@ import { getRoom, join, leave, leaveSeat, takeSeat } from '@/lib/room-presence';
 import { rememberUser, refreshWallet, toLocal } from '@/lib/live';
 import { onServerSeat, onSignal, publishSeat, useLivePeers, type RoomSignal } from '@/lib/live/room-bus';
 import { reportMarkEvent } from '@/lib/mark-store';
-import { newPeerLog, peerStep, type PeerJoin } from '@/lib/room-entrance';
+import { newPeerLog, peerBye, peerStep, type PeerJoin } from '@/lib/room-entrance';
 
 type Hooks = {
   /** Someone is now in the room (their local id and name; `join` says what it shows: lib/room-entrance entranceView). */
@@ -104,6 +104,11 @@ export function useLiveRoomSync(roomId: string, enabled: boolean, mySeat: number
     if (!enabled) return;
     return onSignal(roomId, (from, msg) => {
       const sender = toLocal(from);
+      // "Odadan çık" on their phone: their leave, coming right after, is a walk-out (lib/room-entrance peerBye).
+      if (msg.t === 'bye') {
+        if (sender !== 'me') log.current = peerBye(log.current, sender, Date.now());
+        return;
+      }
       const gift = msg.t === 'gift' || msg.t === 'lucky';
       // Profil izleri: a mark left or cleaned, my own gifts' too (the photos change on every phone; lib/mark-store).
       if (msg.t === 'gift' && msg.mark) reportMarkEvent({ room: roomId, eventId: msg.eventId, from, to: msg.to[0], news: msg.mark });

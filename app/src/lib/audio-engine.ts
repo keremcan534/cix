@@ -39,7 +39,8 @@ export interface AudioEngine {
   connect(roomId: string): void;
   /** Re-establish the current room's transport after a drop; false when the network isn't back yet. */
   reconnect(): boolean;
-  disconnect(): void;
+  /** `bye`: the user left on purpose ("Odadan çık", another room): the other phones are told first (room-bus 'bye'). */
+  disconnect(bye?: boolean): void;
   setPublishing(on: boolean): void;
   setRoute(route: AudioRoute): void;
   /** "Mikrofon denoise": the AI cleaning on the live mic, on top of the always-on noise suppression (engines without a real mic skip it). */

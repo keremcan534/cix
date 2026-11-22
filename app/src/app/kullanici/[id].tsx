@@ -80,7 +80,7 @@ import { goBack } from '@/lib/nav';
 import { errorHaptic, successHaptic } from '@/lib/haptics';
 import { checkInteraction, type Action } from '@/lib/interaction';
 import { shareLink } from '@/lib/links';
-import { LIMITS, ageFrom, formatTrDate, noteProfileRefusal, parseTrDate, validateProfile, type ProfileErrors } from '@/lib/profile-rules';
+import { LIMITS, ageFrom, birthShown, formatTrDate, noteProfileRefusal, parseTrDate, validateProfile, type ProfileErrors } from '@/lib/profile-rules';
 import { similarity } from '@/lib/similarity';
 import { SimilarityCard } from '@/components/similarity';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
@@ -629,7 +629,9 @@ export default function UserProfile() {
 
   // Live mode: every tab has the server's data behind it (Anlar: their posts; Vitrin: profiles.mjs showcase).
   const tabs = TABS;
-  const birthday = user.birthDate ? formatTrDate(user.birthDate) : extras.birthday;
+  // Live mode: my date only when it gives the age the server has (lib/profile-rules birthShown).
+  const myBirth = live ? birthShown(user.birthDate, user.age || null) : user.birthDate;
+  const birthday = myBirth ? formatTrDate(myBirth) : extras.birthday;
   const hasPersonal = extras.height > 0 || extras.weight > 0 || !!extras.job || extras.languages.length > 0 || !!extras.zodiac || (user.interests?.length ?? 0) > 0;
   const showsGender = !!user.gender && (isMe || user.showGender !== false);
   const hasBasics = !live || publicId !== null || !!user.username || showsGender || !!country || (isMe && !!birthday) || !!user.joinedAt || !!extras.relationship || !!extras.education;
@@ -1543,12 +1545,16 @@ function EditSheet({
   const styles = useStyles();
   const insets = useSafeAreaInsets();
   const [name, setName] = useState(user.name);
-  const [username, setUsername] = useState(user.username ?? '');
+  const [username] = useState(user.username ?? '');
   const [bio, setBio] = useState(user.bio);
   const [city, setCity] = useState(user.city);
   // The birth date is set once (sign-up or here, the first time) and never again: the server refuses a second one.
-  const birthLocked = live ? serverAge !== null || !!user.birthDate : !!user.birthDate;
-  const [birth, setBirth] = useState(birthLocked ? '' : formatTrDate(user.birthDate));
+  // Live mode: only the server's age says it is set. A date this phone remembers from elsewhere (the demo's sample
+  // date) neither locks the field nor shows (owners, 22 Nov 2026: a field locked on a date never entered).
+  const birthLocked = live ? serverAge !== null : !!user.birthDate;
+  const shownBirth = live ? birthShown(user.birthDate, serverAge) : user.birthDate;
+  // Live mode: an open field starts empty (a date this phone remembers was never sent).
+  const [birth, setBirth] = useState(birthLocked || live ? '' : formatTrDate(user.birthDate));
   // Live mode: the extras, the country and "Gizli" only when the server keeps them.
   const withExtras = !live || !!extras;
   const [gender, setGender] = useState<User['gender'] | 'hidden'>(withExtras && user.showGender === false ? 'hidden' : user.gender);
@@ -1566,8 +1572,8 @@ function EditSheet({
     const e = validateProfile(draft);
     // A birth date already set isn't sent again; one not entered yet stays optional.
     if (birthLocked || !birth.trim()) delete e.birth;
-    // Live mode: an account may have no username yet; leaving it empty keeps it that way.
-    if (live && !username.trim() && !user.username) delete e.username;
+    // The username can't be changed for now (USERNAME_SOON): the one held goes back unchanged, unchecked.
+    delete e.username;
     setErrors(e);
     const xe = extrasDraft ? validateExtras(extrasDraft) : {};
     setExtrasErrors(xe);
@@ -1610,10 +1616,16 @@ function EditSheet({
             <Field label="Görünen ad" error={errors.name}>
               <TextInput value={name} onChangeText={setName} maxLength={LIMITS.name} style={styles.input} placeholder="Adın veya takma adın" placeholderTextColor={colors.textDim} />
             </Field>
-            <Field label="Kullanıcı adı" error={errors.username} hint={live ? 'Benzersiz olmalı.' : 'Benzersiz olmalı. ID numaran değişmez.'}>
-              <View style={[styles.row, styles.input, { paddingVertical: 0 }]}>
-                <Text style={{ color: colors.textDim, fontSize: 15 }}>@</Text>
-                <TextInput value={username} onChangeText={(t) => setUsername(t.toLowerCase())} autoCapitalize="none" autoCorrect={false} maxLength={20} style={{ flex: 1, color: colors.text, fontSize: 15, paddingVertical: 10 }} placeholder="kullanici.adi" placeholderTextColor={colors.textDim} />
+            {/* Choosing or changing a username will be a paid feature (owners, 22 Nov 2026): locked for everyone, "Yakında". */}
+            <Field label="Kullanıcı adı" hint={USERNAME_SOON}>
+              <View style={[styles.row, styles.input]} accessible accessibilityLabel={`Kullanıcı adı ${username ? `@${username}` : 'yok'}. ${USERNAME_SOON}`}>
+                <Ionicons name="lock-closed" size={14} color={colors.textDim} />
+                <Text style={{ flex: 1, color: colors.textDim, fontSize: 15 }} numberOfLines={1}>
+                  {username ? `@${username}` : 'Kullanıcı adı yok'}
+                </Text>
+                <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, backgroundColor: semantic.tonal }}>
+                  <Text style={{ color: semantic.tonalText, fontSize: 11, fontWeight: '800' }}>Yakında</Text>
+                </View>
               </View>
             </Field>
             <Field label={`Hakkımda · ${bio.length}/${LIMITS.bio}`} error={errors.bio}>
@@ -1623,7 +1635,7 @@ function EditSheet({
               <Field label="Doğum tarihi" hint="Değiştirmek için Destek'e yaz. Diğerleri yalnız yaşını görür.">
                 <View style={[styles.row, styles.input]}>
                   <Ionicons name="lock-closed" size={14} color={colors.textDim} />
-                  <Text style={{ color: colors.textDim, fontSize: 15 }}>{user.birthDate ? formatTrDate(user.birthDate) : `${serverAge ?? user.age} yaş`}</Text>
+                  <Text style={{ color: colors.textDim, fontSize: 15 }}>{shownBirth ? formatTrDate(shownBirth) : `${serverAge ?? user.age} yaş`}</Text>
                 </View>
               </Field>
             ) : (
@@ -1669,6 +1681,9 @@ function EditSheet({
     </Modal>
   );
 }
+
+/** The username field's note: choosing or changing one opens later, as a paid feature (server social.mjs USERNAME_OPEN). */
+const USERNAME_SOON = 'Kullanıcı adı değiştirme yakında açılacak.';
 
 function Field({ label, error, hint, children }: { label: string; error?: string; hint?: string; children: ReactNode }) {
   const styles = useStyles();

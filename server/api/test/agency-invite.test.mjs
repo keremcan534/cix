@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 
 import { startApi } from './harness.mjs';
 
-const h = startApi({ AGENCY_JOBS: '0' });
+const h = startApi({ AGENCY_JOBS: '0', AGENCY_INVITES: '1' }); // the invite flow, closed by default (agency-invite-closed.test.mjs)
 const { call, signUp } = h;
 
 async function account(name) {

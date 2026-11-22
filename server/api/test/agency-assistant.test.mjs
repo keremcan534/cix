@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import { rnd, startApi } from './harness.mjs';
 
 // Test top-ups on: the centre may date an income (occurredAt), so next week's share can be tried today.
-const h = startApi({ AGENCY_JOBS: '0', ALLOW_TEST_TOPUP: '1' });
+const h = startApi({ AGENCY_JOBS: '0', ALLOW_TEST_TOPUP: '1', AGENCY_INVITES: '1' }); // the invite flow, closed by default (agency-invite-closed.test.mjs)
 const { call, signUp } = h;
 
 async function account(name) {

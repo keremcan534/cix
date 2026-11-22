@@ -92,6 +92,8 @@ export type Overview = {
   owner: Named | null;
   viewer: Viewer;
   perms: string[];
+  /** Sub-agencies by name only for me (server subsHidden, 22 Nov 2026); an older server sends none. */
+  subsHidden?: boolean;
   counts: { streamers: number; active: number; subs: number; active_subs: number; pending_subs: number; sub_streamers: number; pending_requests: number; pending_transfers: number };
   rate: RateView;
   earnings: {
@@ -384,7 +386,7 @@ export const agencyNet = {
   // Agency panel
   overview: (id: string) => get<Overview>('/api/agency/overview', { id }),
   streamers: (id: string, scope: 'direct' | 'sub' = 'direct') => get<{ streamers: Streamer[] }>('/api/agency/streamers', { id, scope }).then((r) => r.streamers),
-  subagencies: (id: string) => get<{ subagencies: SubAgency[]; nearPromotion: string[] }>('/api/agency/subagencies', { id }),
+  subagencies: (id: string) => get<{ subagencies: SubAgency[]; nearPromotion: string[]; hidden?: boolean }>('/api/agency/subagencies', { id }),
   commissions: (id: string, f: { from?: string; to?: string; kind?: string; sub?: string; streamer?: string } = {}) => get<{ rows: LedgerRow[]; totals: LedgerTotals }>('/api/agency/commissions', { id, ...f }),
   commissionsCsv: (id: string, f: { from?: string; to?: string } = {}) => get<{ csv: string; rows: number }>('/api/agency/commissions', { id, ...f, format: 'csv' }),
   performance: (id: string) => get<Performance>('/api/agency/performance', { id }),

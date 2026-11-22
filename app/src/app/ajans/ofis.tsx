@@ -35,7 +35,6 @@ import {
 import { HubSections, TransferCard, openOffice } from '@/components/agency-net-hub';
 import { parseAgencyActivity } from '@/lib/agency-activity';
 import { AssistantsTab } from '@/components/agency-assistants';
-import { InviteSheet } from '@/components/agency-invite-sheet';
 import { SCENES } from '@/components/fx/scenes';
 import { Backdrop, DepthCard } from '@/components/fx/surface';
 import { ChoiceChips, ListGroup, ListRow } from '@/components/list';
@@ -60,7 +59,6 @@ import {
   fmtPct,
   fmtScore,
   fmtUsd,
-  inviteStreamer,
   runAction,
   useNet,
   usdOf,
@@ -217,7 +215,7 @@ function Summary({ c }: { c: Ctx }) {
           <Kpi label="Bu ay komisyon" icon="diamond-outline" tone="money" {...diamondsKpi(e.month)} />
           <Kpi label="Çekilebilir" icon="wallet-outline" tone="success" {...diamondsKpi(e.balances.available)} />
           <Kpi label="Aktif yayıncı" icon="mic-outline" value={`${o.counts.active} / ${o.counts.streamers}`} sub="son 30 gün" />
-          {sub ? <Kpi label="Performans puanı" icon="speedometer-outline" value={p ? fmtScore(p.score) : '—'} sub={p?.rank ? `Genel sıra ${p.rank}` : 'Henüz değerlendirilmedi'} /> : <Kpi label="Alt ajans" icon="git-branch-outline" value={`${o.counts.active_subs} / ${o.counts.subs}`} sub={o.counts.pending_subs ? `${o.counts.pending_subs} onay bekliyor` : `${o.counts.sub_streamers} yayıncı`} />}
+          {sub ? <Kpi label="Performans puanı" icon="speedometer-outline" value={p ? fmtScore(p.score) : '—'} sub={p?.rank ? `Genel sıra ${p.rank}` : 'Henüz değerlendirilmedi'} /> : <Kpi label="Alt ajans" icon="git-branch-outline" value={`${o.counts.active_subs} / ${o.counts.subs}`} sub={o.counts.pending_subs ? `${o.counts.pending_subs} onay bekliyor` : o.subsHidden ? undefined : `${o.counts.sub_streamers} yayıncı`} />}
         </KpiGrid>
       )}
       {e && (
@@ -386,18 +384,11 @@ function Actions({ c }: { c: Ctx }) {
 
 // --- Streamers ----------------------------------------------------------------------------------------------
 function Streamers({ c }: { c: Ctx }) {
-  const subsAllowed = c.o.agency.level === 1 && c.can('subagencies.view');
+  // Referans ajans yayıncıları: not while this agency sees its sub-agencies by name only (server subsHidden).
+  const subsAllowed = c.o.agency.level === 1 && c.can('subagencies.view') && !c.o.subsHidden;
   const [scope, setScope] = useState<'direct' | 'sub'>('direct');
   const [period, setPeriod] = useState<'week' | 'month'>('week');
   const q = useNet(c.name, () => agencyNet.streamers(c.id, scope), () => demoStreamers(c.id, scope), [c.id, scope]);
-  const [inviting, setInviting] = useState(false);
-  const invite = async () => {
-    // With a server: pick the streamer from the people it finds by name (sign-up sets no username, and the app
-    // shows no profile ID on other people's profiles). The example data keeps the typed field.
-    if (!c.demo) return setInviting(true);
-    const r = await c.ask({ title: 'Yayıncı davet et', message: 'Yayıncının profilindeki ID numarasını ya da kullanıcı adını yaz. Davet kabul edilince yayıncı ajansına bağlanır; başka bir ajansa bağlıysa transfer kuralları uygulanır.', field: { label: 'Profil ID’si veya kullanıcı adı', placeholder: 'Örn. 104829301457', caps: false }, reasonLabel: 'Davet notu', min: 0, confirm: 'Davet gönder', place: 'agency.invite' });
-    if (r) await runAction(c.demo, () => inviteStreamer(c.id, r.field, r.reason || undefined), 'Davet gönderildi.', q.reload);
-  };
   // The weekly and monthly earnings as a table: shared as a .csv file (opens in Excel), or its text by mail.
   const title = `${c.o.agency.name} yayıncı kazançları (${fmtDate(new Date().toISOString())})`;
   const send = async (rows: Streamer[], how: 'share' | 'mail') => {
@@ -421,8 +412,8 @@ function Streamers({ c }: { c: Ctx }) {
           ]}
         />
       )}
-      {c.acting && c.can('streamers.invite') && scope === 'direct' && c.o.agency.status === 'approved' && <Button title="Yayıncı davet et" icon="person-add-outline" onPress={invite} />}
-      {inviting && <InviteSheet agencyId={c.id} onClose={() => setInviting(false)} onSent={q.reload} />}
+      {/* No "Yayıncı davet et" (owners, 22 Nov 2026): a streamer joins with the agency's code or its invite link. */}
+      {c.acting && scope === 'direct' && c.o.agency.status === 'approved' && <Text style={st.foot}>Yayıncılar ajansına kodunla ya da davet bağlantınla katılır.</Text>}
       <NetState q={q}>
         {(rows) => {
           const total = rows.reduce((x, r) => x + r[period], 0);
@@ -508,9 +499,17 @@ function Subs({ c }: { c: Ctx }) {
         {(d) => {
           const open = d.subagencies.filter((s) => s.status === 'approved');
           const sum = (p: 'day' | 'week' | 'month') => open.reduce((x, s) => x + s.mine[p], 0);
-          return d.subagencies.length === 0 ? (
-            <Empty icon="git-branch-outline" text="Henüz referans ajans yok. Yönetim bir ajansı altına eklediğinde burada görünür." />
-          ) : (
+          if (d.subagencies.length === 0) return <Empty icon="git-branch-outline" text="Henüz referans ajans yok. Yönetim bir ajansı altına eklediğinde burada görünür." />;
+          // By name only (owners, 22 Nov 2026; server subsHidden): no streamers, numbers or panel to open.
+          if ((d as { hidden?: boolean }).hidden)
+            return (
+              <ListGroup footer="Referans ajansların yayıncıları ve rakamları üst ajansa gösterilmez.">
+                {d.subagencies.map((s) => (
+                  <ListRow key={s.id} leading={<Ionicons name="git-branch-outline" size={20} color={colors.textDim} />} title={s.name} right={<Pill text={STATUS_TEXT[s.status]} tone={statusTone(s.status)} />} />
+                ))}
+              </ListGroup>
+            );
+          return (
             <View style={{ gap: space.md }}>
               <KpiGrid>
                 <Kpi label="Bugün sana geçen" icon="today-outline" tone="money" {...diamondsKpi(sum('day'))} />

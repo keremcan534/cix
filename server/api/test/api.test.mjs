@@ -68,15 +68,23 @@ describe('Giriş ve cüzdan', () => {
 });
 
 describe('Profil', () => {
-  test('güncelleme, benzersiz kullanıcı adı, 18 yaş, doğum tarihi bir kez', async () => {
+  test('güncelleme, kullanıcı adı yakında, 18 yaş, doğum tarihi bir kez', async () => {
     const a = await signUp('Ada');
     const b = await signUp('Bora');
     const name = `ada_${rnd(3)}`;
+    // Choosing or changing a username will be a paid feature (owners, 22 Nov 2026): refused for everyone, older apps
+    // included, and the rest of the save with it.
+    const [no, refused] = await call('PATCH', '/api/me', { username: name, bio: 'Yeni' }, a.session);
+    assert.deepEqual([no, refused.error], [403, 'Kullanıcı adı değiştirme yakında açılacak. Kullanıcı adını eski haline getirip yeniden kaydet.']);
+    assert.equal((await call('GET', '/api/me', null, a.session))[1].user.bio, '', 'hiçbir alan değişmez');
+    // One already held (from before) comes back on every save of every app's form: that is no change.
+    await h.sql.query('UPDATE users SET username = $2 WHERE id = $1', [a.user.id, name]);
     const [st, j] = await call('PATCH', '/api/me', { username: name.toUpperCase(), gender: 'Kadın', birthDate: '2000-05-20', city: 'İzmir', bio: 'Merhaba', interests: ['🎧 Müzik', '☕ Kahve'] }, a.session);
     assert.equal(st, 200, j.error);
     assert.equal(j.user.username, name, 'küçük harfe çevrilir');
     assert.ok(j.user.age >= 26);
-    assert.equal((await call('PATCH', '/api/me', { username: name }, b.session))[0], 409, 'alınmış ad');
+    assert.equal((await call('PATCH', '/api/me', { username: `${name}x` }, a.session))[0], 403, 'değiştirilemez');
+    assert.equal((await call('PATCH', '/api/me', { username: name }, b.session))[0], 403, 'başkasınınki de seçilemez');
     const young = new Date(Date.now() - 17 * 365.25 * 864e5).toISOString().slice(0, 10);
     assert.equal((await call('PATCH', '/api/me', { birthDate: young }, b.session))[0], 403, '18 yaş altı');
     assert.equal((await call('PATCH', '/api/me', { birthDate: '1999-01-01' }, a.session))[0], 409, 'doğum tarihi değişmez');
@@ -397,7 +405,8 @@ describe('Hesap silme', () => {
   test('kişisel veriler gider, işlem kaydı kalır, aynı cihaz yeni hesap açar', async () => {
     const a = await signUp('Silinecek');
     const b = await signUp('Arkadaş');
-    await call('PATCH', '/api/me', { username: `sil_${rnd(3)}`, bio: 'gizli', birthDate: '1990-01-01' }, a.session);
+    await h.sql.query('UPDATE users SET username = $2 WHERE id = $1', [a.user.id, `sil_${rnd(3)}`]);
+    await call('PATCH', '/api/me', { bio: 'gizli', birthDate: '1990-01-01' }, a.session);
     await call('POST', '/api/wallet/test-topup', { amount: 1000, ref: rnd(6) }, a.session);
     await call('POST', '/api/follow', { to: b.user.id }, a.session);
     await call('POST', '/api/messages', { to: b.user.id, text: 'merhaba', ref: rnd(6) }, a.session);

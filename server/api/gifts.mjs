@@ -26,6 +26,7 @@
 // (global-gifts.mjs) is also told, once paid, to every room of the sender's country; the catalog marks it `global`.
 import { recordIncome } from './agency-lib.mjs';
 import { addBondCoins, bondCatalog, bondGiftOf, checkBondGift } from './bonds.mjs';
+import { systemNotice } from './system-notices.mjs';
 import { HttpError, auth, blockedBetween, claimRef, db, env, int, once, readJson, userId } from './core.mjs';
 import { EXCHANGE, GIFT_COUNTS, VIP_SUBS, packsSetUp } from './catalog.mjs';
 import { docsNow, levelsPayload, levelsRev, svipLevel, vipItemNeed } from './levels.mjs';
@@ -102,6 +103,20 @@ async function readBoard(board, period, n) {
   return r.rows.map((x, i) => ({ rank: i + 1, user: { id: x.id, name: x.name, avatarUrl: x.avatar_url ?? null }, score: Number(x.score) }));
 }
 export const PLACES = ['chat', 'moment', 'profile', 'family'];
+
+const fmtTr = (n) => Number(n).toLocaleString('tr-TR');
+/** The recipient's notice of a bond gift sent outside a room (SimilarClub Sistem, category bond). */
+export function bondGiftNotice({ from, to, label, total, eventId, kind, giftId, count }) {
+  return systemNotice({
+    target: to,
+    category: 'bond',
+    ref: `bond-gift:${eventId}`,
+    link: '/gelir',
+    title: '🔗 Bağ hediyesi geldi',
+    body: [`${from.name} sana profil üzerinden ${label} gönderdi.`, `💎 ${fmtTr(total)} elmas hesabına geçti (Gelir › Profilden gelen hediyeler).`, `Bağ puanınız +${fmtTr(Math.floor(total / 100))}.`].join('\n'),
+    data: { kind, from: { id: from.id, name: from.name }, gift: giftId, count, diamonds: total, event: eventId },
+  });
+}
 /** A server room's LiveKit name (rooms.mjs liveKitName), from its id or that name; null for anything else. */
 export const liveKitRoom = (room) => {
   const m = /^(?:oda-)?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/.exec(room ?? '');
@@ -287,6 +302,10 @@ export const giftRoutes = {
     // Oda roketi: a level this gift filled launches and is paid (not awaited: the gift is done).
     if (!out.replay && lkRoom && rocket) void launchRockets(lkRoom.slice(4), rocket);
     if (!out.replay && !room) notify([to], { title: 'Hediye geldi', body: markPushBody(mark, u.name) ?? `${u.name} sana ${label} gönderdi`, data: { type: 'gift', from: u.id } });
+    // A bond gift outside a room (Bağlar, a profile; owners, 22 Nov 2026): the recipient's SimilarClub Sistem chat
+    // tells who sent which and how many, and the diamonds it brought (Gelir shows only the total). After the commit,
+    // once per gift (its ref); never fails the gift.
+    if (!out.replay && !room && gift.bond && eventId !== null) void bondGiftNotice({ from: u, to, label, total, eventId, kind: gift.bond, giftId: gift.id, count });
     if (!out.replay && guardNew) guardStarted(u, to);
     // Global hediye (global-gifts.mjs): sent in a server room, every room of the sender's country hears of it, paced
     // (not awaited). A send from a chat, a profile, the family chat or Anlar stays between the two.
