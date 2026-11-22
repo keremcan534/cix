@@ -2,6 +2,8 @@
 
 > **Güncelleme 6 (17 Kasım):** Aşağıdaki "Açtıkları" listelerinin çoğu henüz yapılmadı; uygulama artık yalnız çalışanları gösteriyor (Cömertlik: seviye rozeti; Yankı: rozet, Ana Sayfa'da öne çıkma, Lv.5'te Anlar paylaşımı). Yankı kazanç bonusu sunucuda yok. Ayrıntı: [`GUNCELLEME_6.md`](GUNCELLEME_6.md).
 
+> **Cömertlik rozetleri (23 Kasım):** Sahiplerin "Cömertlik Rozetleri – Tasarım Seti" uygulandı. 11 grubun (Kuvars Lv.0–4 … Efsane Lv.46–50) her biri iki resimle çizilir (`app/assets/levels/comertlik`, `components/wealth-art.tsx`): seviye ekranındaki rütbe bandında büyük amblem (taş ve adı yazan şerit; aralık, panelden değişebildiği için altında canlı yazı) ve adın yanında yatay plaka (kişinin seviyesi plakanın sayı alanına canlı yazılır; plakadaki basılı sayı silindi). Plaka profil, kişi kartı ve seviye ekranında eski renkli çipin yerine geçer. Seviye ekranı tasarımdaki gibi koyu mürdüm, pembe ve altın: başlık, iki sekme, özet kartı, 4'lü rütbe bandı (benim grubuma kayar), seviye düğmeleri, durum satırı, şeritli ayrıcalık panelleri ve dipnot; iki renk temasında da aynı. Yankı sekmesi aynı görünümü kendi rozetleriyle kullanır. Eşikler, gruplar ve haklar değişmedi; hepsi eskisi gibi sunucudan gelir. Resimler tasarım görselinden kesildi: amblemlerin altındaki aralık etiketi ve plakaların sayıları görüntü işlemeyle temizlendi, tasarımcıdan katmanlı dosyalar gelirse aynı adlarla değiştirilir. Panelden bir grubun adı değişirse amblemin şeridindeki ad resimde kalır.
+
 "Kullanıcı Seviyesi" ekranının yerini **Cömertlik Seviyesi** ve **Yankı Seviyesi** sekmeleri aldı (`/seviye`, Yankı için `/seviye?tab=charm`).
 
 Ekranlar SimilarClub'ın koyu temasında, kendi amblem ve metinleriyle tasarlandı.

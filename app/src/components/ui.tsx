@@ -24,6 +24,7 @@ import { FadeImage, useImageRetry } from '@/components/photo';
 import { RollingNumber } from '@/components/fx/rolling-number';
 import { MarkLayer } from '@/components/profile-mark';
 import { VIP_LEVEL_ART } from '@/components/vip/level-art';
+import { WealthPlate } from '@/components/wealth-art';
 import { LEVEL_ART_TOP, levelArtFor } from '@/lib/vip-screen';
 
 export function Avatar({ uri, size = 44, online, ring, name }: { uri?: string; size?: number; online?: boolean; ring?: boolean; name?: string }) {
@@ -365,6 +366,8 @@ export function CharmBadge({ level, size = 'sm' }: { level: number; size?: ChipS
 function TierBadge({ tier: t, level, size, label }: { tier: LevelTier; level: number; size: ChipSize; label: string }) {
   const styles = useStyles();
   const c = CHIP[size];
+  // Cömertlik: the group's designed plate with the level written in it (components/wealth-art).
+  if (t.look) return <WealthPlate look={t.look} level={level} height={c.height} label={`${label}, ${t.name}`} />;
   return (
     <LinearGradient
       colors={t.colors}
