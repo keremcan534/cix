@@ -63,9 +63,9 @@ export function ClubPills({ user, onOpen }: { user: User; onOpen?: () => void })
       accessibilityRole={a.href ? 'button' : undefined}
       accessibilityLabel={`${a.sub}: ${a.name}`}
     >
-      <SlicePill kind="kulup" h={36}>
+      <SlicePill kind="kulup" h={30}>
         <View style={s.club}>
-          <CardArt name={art} h={17} />
+          <CardArt name={art} h={15} />
           <Text style={s.clubText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
             {a.name}
           </Text>
@@ -181,10 +181,11 @@ const s = StyleSheet.create({
   level: { position: 'absolute', left: '13%', right: '13%', top: '49%', bottom: '11%', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3 },
   levelText: { color: '#fff', fontSize: 12, lineHeight: 15, fontWeight: '800' },
   // Two halves, as in the design (one alone keeps its half, on the left).
-  clubs: { flexDirection: 'row', gap: 10 },
-  clubAt: { width: '48.5%' },
-  club: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 16, paddingRight: 14, minHeight: 36 },
-  clubText: { flex: 1, color: SHOW.text, fontSize: 14, fontWeight: '700' },
+  // Small chips as wide as their names, from the left (the owners' design, 23 Nov 2026), not two half-card pills.
+  clubs: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  clubAt: { maxWidth: '64%' },
+  club: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 12, paddingRight: 10, minHeight: 30 },
+  clubText: { flexShrink: 1, color: SHOW.text, fontSize: 13, fontWeight: '700' },
   tiles: { flexDirection: 'row', gap: 8 },
   tile: { flex: 1, minWidth: 0, minHeight: 72, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 6, paddingVertical: 8 },
   tileArt: { position: 'absolute', left: 0, top: 0, width: '100%', height: '100%' },
@@ -197,7 +198,8 @@ const s = StyleSheet.create({
   manageText: { color: SHOW.dim, fontSize: 13.5, fontWeight: '700', flexShrink: 1 },
   links: { flexDirection: 'row', gap: 6, paddingLeft: 6 },
   linkAt: { flex: 1, minWidth: 0, justifyContent: 'center' },
-  link: { flexDirection: 'row', alignItems: 'center', gap: 2, minHeight: 36, paddingLeft: 24, paddingRight: 6 },
-  linkArt: { position: 'absolute', left: -8, top: 0, bottom: 0, width: 34, alignItems: 'center', justifyContent: 'center' },
+  // The picture stands half out of the pill's left end; the words start clear of it (the İ of İlişki was under it).
+  link: { flexDirection: 'row', alignItems: 'center', gap: 2, minHeight: 36, paddingLeft: 27, paddingRight: 6 },
+  linkArt: { position: 'absolute', left: -10, top: 0, bottom: 0, width: 34, alignItems: 'center', justifyContent: 'center' },
   linkText: { flex: 1, color: SHOW.text, fontSize: 10.5, lineHeight: 13, fontWeight: '800' },
 });
