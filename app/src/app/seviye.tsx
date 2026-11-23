@@ -80,8 +80,8 @@ function systemsOf(l: LiveLevels | null): Record<Kind, System> {
   };
 }
 const SYSTEMS = systemsOf(null);
-/** The two tabs' icons: the Pırlanta diamond and the Şafak heart, cut from the groups' emblems (assets/levels). */
-const TAB_ICON: Record<Kind, number> = { wealth: require('../../assets/levels/sekme-comertlik.png'), charm: require('../../assets/levels/sekme-yanki.png') };
+/** The two tabs' icons, whole: the gold diamond and the gold heart of the level icon set (components/Art). */
+const TAB_ICON: Record<Kind, ArtName> = { wealth: 'comertlik-simge-akik', charm: 'yanki-simge-safak' };
 
 export default function LevelsScreen() {
   const params = useLocalSearchParams<{ tab?: string }>();
@@ -111,7 +111,7 @@ export default function LevelsScreen() {
             {(['wealth', 'charm'] as const).map((k) => (
               <Pressable key={k} onPress={() => setTab(k)} style={[l.segItem, tab === k && l.segOn]} accessibilityRole="tab" accessibilityState={{ selected: tab === k }} accessibilityLabel={`${SYSTEMS[k].title} Seviyesi`}>
                 {tab === k && <LinearGradient colors={[LUX.pink, '#B4237A']} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={[StyleSheet.absoluteFill, { borderRadius: 999 }]} />}
-                <Image source={TAB_ICON[k]} style={{ width: narrow ? 20 : 24, height: narrow ? 20 : 24 }} resizeMode="contain" accessibilityIgnoresInvertColors />
+                <Art name={TAB_ICON[k]} size={narrow ? 20 : 24} />
                 <Text style={[l.segText, narrow && { fontSize: 13 }, tab === k && { color: LUX.white }]} numberOfLines={1}>
                   {SYSTEMS[k].title}
                 </Text>
