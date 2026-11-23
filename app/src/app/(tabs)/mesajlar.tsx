@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useRef, useState, type ComponentRef, type ReactNode } from 'react';
-import { FlatList, Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { FlatList, Image, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
@@ -180,9 +180,9 @@ export default function MessagesScreen() {
     <View>
       <View style={styles.hubs}>
         {/* SimilarClub Sistem (server/api/system-notices.mjs): Similar Ekibi's announcements and my account's notices. */}
-        <HubTile title="SimilarClub Sistem" sub="Kazanç, ödül, duyuru" art={HUB_ART.team} tint={['#2B4FD8', '#5B21B6']} badge={teamNew} onPress={() => setTeamOpen(true)} />
-        <HubTile title="Çevrim içi hizmet" sub="Destek ekibine yaz" art={HUB_ART.support} tint={['#0B7A86', '#14532D']} onPress={() => router.push('/destek')} />
-        <HubTile title="Ajansım" sub="Ajans ve kazanç" art={HUB_ART.agency} tint={['#9A4A12', '#6B1F3A']} onPress={() => router.push('/ajans')} />
+        <HubTile title="SimilarClub Sistem" sub="Kazanç, ödül, duyuru" art={HUB_ART.team} look={HUB_LOOK.team} badge={teamNew} onPress={() => setTeamOpen(true)} />
+        <HubTile title="Çevrim içi hizmet" sub="Destek ekibine yaz" art={HUB_ART.support} look={HUB_LOOK.support} onPress={() => router.push('/destek')} />
+        <HubTile title="Ajansım" sub="Ajans ve kazanç" art={HUB_ART.agency} look={HUB_LOOK.agency} onPress={() => router.push('/ajans')} />
       </View>
       {live && <OpenerNotice />}
       <View style={styles.chipRow}>
@@ -334,15 +334,26 @@ function TabButton({ label, active, badge, onPress }: { label: string; active: b
   );
 }
 
+/** A filter pill, as in the owners' Mesajlar design (23 Nov 2026): glass with a lilac neon rim; the chosen one glossy
+ *  magenta with a white rim and a pink glow. */
 function Chip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
   const styles = useStyles();
   return (
     // The slop stays inside the strip's own padding: a horizontal list takes no touch past its bounds.
-    <Pressable onPress={onPress} hitSlop={{ top: 7, bottom: 7 }} style={[styles.chip, active && styles.chipActive]}>
-      <Text style={[styles.chipText, active && { color: '#fff' }]}>{label}</Text>
+    <Pressable onPress={onPress} hitSlop={{ top: 6, bottom: 6 }} style={[styles.chip, active && styles.chipActive]} accessibilityRole="button" accessibilityState={{ selected: active }}>
+      {active && <LinearGradient colors={['#FF5CC8', '#E5179A', '#B70C78']} start={{ x: 0.3, y: 0 }} end={{ x: 0.7, y: 1 }} style={[StyleSheet.absoluteFill, { borderRadius: 999 }]} />}
+      <Text style={[styles.chipText, active && styles.chipTextOn]}>{label}</Text>
     </Pressable>
   );
 }
+
+/** The three doors' colours (the owners' Mesajlar design, 23 Nov 2026): a deep gradient, a neon rim and its glow. */
+const HUB_LOOK = {
+  team: { fill: ['#9A3BFF', '#5A1BD8', '#2E0E96'], rim: '#F0A8FF', glow: 'rgba(196,72,255,0.75)' },
+  support: { fill: ['#119AA6', '#0A5F6B', '#063F4A'], rim: '#7AF6FF', glow: 'rgba(40,220,255,0.7)' },
+  agency: { fill: ['#E0521A', '#A8204F', '#5E0E3E'], rim: '#FFC266', glow: 'rgba(255,150,40,0.75)' },
+} as const;
+type HubLook = (typeof HUB_LOOK)[keyof typeof HUB_LOOK];
 
 /** The three doors' pictures (docs/GORSEL_URETIM_LISTESI.md § 13, app/assets/banners, 192 px). */
 const HUB_ART = {
@@ -352,22 +363,27 @@ const HUB_ART = {
 } as const;
 
 /** One of the three big doors at the top of Mesajlar. */
-function HubTile({ title, sub, art, tint, badge = 0, onPress }: { title: string; sub: string; art: number; tint: readonly [string, string]; badge?: number; onPress: () => void }) {
+function HubTile({ title, sub, art, look, badge = 0, onPress }: { title: string; sub: string; art: number; look: HubLook; badge?: number; onPress: () => void }) {
   const styles = useStyles();
+  // A narrow phone (320 points) keeps "SimilarClub" whole on its line.
+  const narrow = useWindowDimensions().width < 360;
   // The outer View takes the third of the row: PressableScale puts its style on the inner view, so a flex there
   // would leave each tile as wide as its text and push the last one off a narrow screen.
   return (
     <View style={{ flex: 1 }}>
       <PressableScale onPress={onPress} accessibilityRole="button" accessibilityLabel={badge > 0 ? `${title}, ${badge} yeni` : title}>
-        <LinearGradient colors={tint} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hub}>
+        <LinearGradient colors={look.fill} start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }} style={[styles.hub, narrow && { paddingHorizontal: 5 }, { borderColor: look.rim, boxShadow: `0 0 12px ${look.glow}` }]}>
           <Gloss radius={16} strength={0.18} />
+          {/* The design's light sweeps: two thin arcs across the lower corner. */}
+          <View style={styles.hubSweep} pointerEvents="none" />
+          <View style={[styles.hubSweep, styles.hubSweep2]} pointerEvents="none" />
           {/* The picture fills the tile's top, down to its title. */}
-          <Image source={art} style={{ width: 56, height: 56 }} resizeMode="contain" accessibilityIgnoresInvertColors />
+          <Image source={art} style={{ width: 58, height: 58 }} resizeMode="contain" accessibilityIgnoresInvertColors />
           <View style={{ gap: 1 }}>
-            <Text style={styles.hubTitle} numberOfLines={2}>
+            <Text style={[styles.hubTitle, narrow && { fontSize: 12, lineHeight: 15 }]} numberOfLines={2}>
               {title}
             </Text>
-            <Text style={styles.hubSub} numberOfLines={2}>
+            <Text style={[styles.hubSub, narrow && { fontSize: 10.5, lineHeight: 13 }]} numberOfLines={2}>
               {sub}
             </Text>
           </View>
@@ -576,22 +592,27 @@ const useStyles = makeStyles(({ colors, lift, dark }) => ({
   },
   hubs: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 12 },
   // Tall enough for the 56 px picture over a two-line title and a two-line note, so a third of a narrow phone cuts no word.
-  hub: { height: 152, borderRadius: 16, overflow: 'hidden', paddingHorizontal: 7, paddingVertical: 10, justifyContent: 'space-between' },
-  hubTitle: { color: '#fff', fontSize: 14, lineHeight: 18, fontWeight: '800' },
-  hubSub: { color: 'rgba(255,255,255,0.78)', fontSize: 11, lineHeight: 14 },
+  hub: { height: 156, borderRadius: 18, borderWidth: 2, overflow: 'hidden', paddingHorizontal: 8, paddingVertical: 10, justifyContent: 'space-between' },
+  hubTitle: { color: '#fff', fontSize: 15, lineHeight: 18, fontWeight: '800', textShadowColor: 'rgba(0,0,0,0.25)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
+  hubSub: { color: 'rgba(255,255,255,0.9)', fontSize: 11.5, lineHeight: 14 },
+  hubSweep: { position: 'absolute', width: 220, height: 120, borderRadius: 110, borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)', left: -30, bottom: -78, transform: [{ rotate: '-14deg' }] },
+  hubSweep2: { left: 10, bottom: -92, borderColor: 'rgba(255,255,255,0.14)' },
   hubBadge: { position: 'absolute', top: 8, right: 8 },
   chipRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingRight: 12, paddingTop: 3 },
-  chips: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 16, paddingRight: 4, paddingVertical: 7 },
+  chips: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 16, paddingRight: 4, paddingVertical: 10 },
   chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
+    height: 34,
+    justifyContent: 'center',
+    paddingHorizontal: 12,
     borderRadius: 999,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
+    overflow: 'hidden',
+    backgroundColor: dark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.78)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(176,140,255,0.85)',
   },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  chipText: { color: colors.textDim, fontSize: 13, fontWeight: '600' },
+  chipActive: { borderColor: 'rgba(255,255,255,0.9)', boxShadow: '0 0 6px rgba(255,40,170,0.55)' },
+  chipText: { color: dark ? colors.text : '#4A1650', fontSize: 13.5, fontWeight: '700' },
+  chipTextOn: { color: '#fff', textShadowColor: 'rgba(120,0,70,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
   systemCard: {
     marginHorizontal: 12,
     marginTop: 6,

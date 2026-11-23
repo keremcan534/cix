@@ -1,4 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
 import { Tabs } from 'expo-router/js-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -24,19 +25,22 @@ const NAV = {
 // Rooms stay the landing tab even though "Ana Sayfa" (people to meet, /kesfet) is first in the bar.
 export const unstable_settings = { anchor: 'index' };
 
-/** The bar's colours (the owner's design): plum line icons on pink glass, the chosen tab on its own pill (a pink
- *  icon, its name in deep pink: pink text this small would be too faint on the pill). */
-const NAV_INK = { on: glass.pink, label: glass.deep, off: glass.plum } as const;
+/** The bar's colours (the owners' design, 23 Nov 2026): plum line icons and names on pink glass; the chosen tab on a
+ *  glowing magenta pill with its icon and name in white. */
+const NAV_INK = { on: '#FFFFFF', off: glass.plum } as const;
+/** The chosen tab's neon pill, top to bottom. */
+const PILL_FILL = ['#FF5CC8', '#E5179A', '#B70C78'] as const;
 
-/** Every tab the same: its icon and name; the chosen one filled, pink, on a soft pink pill (icon and name together). */
-function icon(name: IconName, active: IconName, title: string, badge?: () => number) {
+/** Every tab the same: its line icon and name; the chosen one on the neon pill (icon and name together). */
+function icon(name: IconName, title: string, badge?: () => number) {
   return function TabIcon({ focused }: { color: ColorValue; focused: boolean }) {
     const s = useStyles();
     const c = focused ? NAV_INK.on : NAV_INK.off;
     return (
       <View style={[s.pill, focused && s.pillOn]}>
-        <Ionicons name={focused ? active : name} size={22} color={c} />
-        <Text style={[s.label, { color: focused ? NAV_INK.label : c }, focused && s.labelOn]} numberOfLines={1}>
+        {focused && <LinearGradient colors={PILL_FILL} start={{ x: 0.3, y: 0 }} end={{ x: 0.7, y: 1 }} style={s.pillFill} />}
+        <Ionicons name={name} size={23} color={c} />
+        <Text style={[s.label, { color: c }, focused && s.labelOn]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
           {title}
         </Text>
         {/* A new message: the count hops once (components/fx/bounce-badge). */}
@@ -82,19 +86,19 @@ export default function TabLayout() {
           // Tab scenes take the scheme's background (the root navigator's own theme is dark).
           sceneStyle: { backgroundColor: colors.bg },
           tabBarBackground: TabBarGlass,
-          tabBarIconStyle: { width: 68, height: 48, overflow: 'visible' },
+          tabBarIconStyle: { width: 74, height: 48, overflow: 'visible' },
           // Switching tabs slides the screens a little instead of cutting.
           animation: 'shift',
         }}
       >
         {/* Güncelleme 2, madde 46: the bar's "Benzerler" is now "Ana Sayfa" (its own tabs start with Ana Sayfa as well). */}
-        <Tabs.Screen name="kesfet" options={{ title: 'Ana Sayfa', tabBarIcon: icon('home-outline', 'home', 'Ana Sayfa') }} />
-        <Tabs.Screen name="anlar" options={{ title: 'Anlar', tabBarIcon: icon('aperture-outline', 'aperture', 'Anlar') }} />
+        <Tabs.Screen name="kesfet" options={{ title: 'Ana Sayfa', tabBarIcon: icon('home-outline', 'Ana Sayfa') }} />
+        <Tabs.Screen name="anlar" options={{ title: 'Anlar', tabBarIcon: icon('aperture-outline', 'Anlar') }} />
         <Tabs.Screen
           name="index"
           options={{
             title: 'Odalar',
-            tabBarIcon: icon('mic-outline', 'mic', 'Odalar'),
+            tabBarIcon: icon('mic-outline', 'Odalar'),
             // Rooms scroll under the glass bar (the screen pads its list by the bar height).
             tabBarStyle: { ...bar, position: 'absolute' },
           }}
@@ -103,20 +107,22 @@ export default function TabLayout() {
           name="mesajlar"
           options={{
             title: 'Mesajlar',
-            tabBarIcon: icon('chatbox-ellipses-outline', 'chatbox-ellipses', 'Mesajlar', () => unread),
+            tabBarIcon: icon('chatbox-ellipses-outline', 'Mesajlar', () => unread),
           }}
         />
-        <Tabs.Screen name="profil" options={{ title: 'Ben', tabBarIcon: icon('person-circle-outline', 'person-circle', 'Ben') }} />
+        <Tabs.Screen name="profil" options={{ title: 'Ben', tabBarIcon: icon('person-circle-outline', 'Ben') }} />
       </Tabs>
     </ThemeProvider>
   );
 }
 
 const useStyles = makeStyles(({ colors }) => ({
-  pill: { width: 68, height: 48, borderRadius: 18, alignItems: 'center', justifyContent: 'center', gap: 1 },
-  pillOn: { backgroundColor: glass.tint },
-  label: { fontSize: 11, fontFamily: 'JakartaSemiBold' },
-  labelOn: { fontFamily: 'JakartaBold' },
+  pill: { width: 74, height: 48, paddingHorizontal: 4, borderRadius: 18, alignItems: 'center', justifyContent: 'center', gap: 1 },
+  // The chosen tab: a magenta pill with a white rim and a pink glow, as in the design.
+  pillOn: { borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.85)', boxShadow: '0 0 14px rgba(255,40,170,0.7)' },
+  pillFill: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, borderRadius: 16.5 },
+  label: { fontSize: 12, fontFamily: 'JakartaSemiBold' },
+  labelOn: { fontFamily: 'JakartaBold', textShadowColor: 'rgba(120,0,70,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
   glass: {
     position: 'absolute',
     left: 0,

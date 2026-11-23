@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useRef, useState, type ComponentRef } from 'react';
-import { FlatList, Modal, Pressable, ScrollView, View, useWindowDimensions } from 'react-native';
+import { FlatList, Image, Modal, Pressable, ScrollView, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
@@ -288,11 +288,30 @@ function TileArt({ id, emoji, size }: { id: string; emoji: string; size: number 
   return <EmojiIcon emoji={emoji} size={size * 0.82} />;
 }
 
-/** One of the four glossy tiles: its colour, a gloss on top, its picture and its name. */
+/**
+ * The owners' glossy neon tiles (23 Nov 2026, assets/home/kisayol): each picture is the whole tile, its name written
+ * on it, cut out with its glow. `left`, `top` and `width` say where the tile's body sits in the picture, in body widths:
+ * the body fills the tile's place in the row and the glow spills around it, never taking room or catching a tap.
+ */
+const TILE_PICTURES: Record<string, { src: number; left: number; top: number; width: number; height: number; ratio: number }> = {
+  call: { src: require('../../../assets/home/kisayol/hemen-tanis.webp'), left: 0.2135, top: 0.238, width: 1.3454, height: 1.3536, ratio: 0.9965 },
+  party: { src: require('../../../assets/home/kisayol/canli-odalar.webp'), left: 0.2404, top: 0.1562, width: 1.3654, height: 1.3966, ratio: 1.0024 },
+  tribe: { src: require('../../../assets/home/kisayol/aile.webp'), left: 0.2506, top: 0.2458, width: 1.5036, height: 1.5036, ratio: 1.03 },
+  free: { src: require('../../../assets/home/kisayol/jeton-kazan.webp'), left: 0.2316, top: 0.2363, width: 1.4893, height: 1.4893, ratio: 1.019 },
+};
+
+/** One of the four glossy tiles: the owners' picture when there is one, else its colour, a gloss, its picture and name. */
 function QuickTile({ id, title, subtitle, emoji, colors: fill, count, onPress }: { id: string; title: string; subtitle?: string; emoji: string; colors: readonly [string, string]; count: number; onPress: () => void }) {
   const styles = useStyles();
   const { width } = useWindowDimensions();
   const w = Math.floor((Math.min(width, 640) - 32 - (count - 1) * 8) / count);
+  const pic = TILE_PICTURES[id];
+  if (pic)
+    return (
+      <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={subtitle ? `${title}, ${subtitle}` : title} style={({ pressed }) => [{ width: w, height: Math.round(w * pic.ratio) }, pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] }]}>
+        <Image source={pic.src} style={{ position: 'absolute', left: -w * pic.left, top: -w * pic.top, width: w * pic.width, height: w * pic.height }} resizeMode="stretch" accessibilityIgnoresInvertColors />
+      </Pressable>
+    );
   // Only the call tile (one of four) has a subtitle: where it shows, every tile keeps that line, so the art stays level.
   const subRow = w >= 88 && count === 4;
   return (
@@ -509,7 +528,7 @@ const useStyles = makeStyles(({ colors, lift, dark, edge }) => ({
   greet: { flex: 1, color: HOME.deep, fontSize: 17, fontFamily: fonts.display, letterSpacing: -0.2 },
   greetHearts: { flexDirection: 'row', alignItems: 'flex-start' },
   greetHeartSmall: { marginLeft: -4, marginTop: -8 },
-  tiles: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 10 },
+  tiles: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 6 },
   tile: { borderRadius: 20, paddingHorizontal: 3, paddingVertical: 8, overflow: 'hidden', alignItems: 'center', justifyContent: 'flex-end', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.55)' },
   tileGloss: { position: 'absolute', left: 0, right: 0, top: 0, height: '48%' },
   tileArt: { flex: 1, alignItems: 'center', justifyContent: 'center' },

@@ -18,6 +18,7 @@ import { ROOM_EVENTS } from '@/data/rooms-ui';
 import { liveMode } from '@/lib/live';
 import { TEAM_KIND_LABEL, roomBanners, type BoardKey, type BoardPeriod, type RoomBanners as Banners, type TeamKind } from '@/lib/live/team';
 import { noticeHref } from '@/lib/notice-links';
+import { compact } from '@/lib/compact';
 import { useApp } from '@/store';
 import { ThemeScope, fonts, makeStyles } from '@/theme';
 
@@ -52,14 +53,9 @@ const KIND_LOOK: Record<TeamKind, { tint: readonly [string, string]; art: number
   rule: { tint: ['#0F766E', '#1E40AF'], art: icon3dSource('tasks'), hue: '#99F6E4' },
 };
 const EVERY_MS = 5500;
+/** Every slide's height: the podium card's crowns, laurels and stage need the room. */
+const CARD_H = 204;
 
-/** 12.400 → "12,4 B"; 1.250.000 → "1,3 Mn". */
-function short(n: number) {
-  const one = (x: number) => (Math.round(x * 10) / 10).toLocaleString('tr-TR');
-  if (n >= 1_000_000) return `${one(n / 1_000_000)} Mn`;
-  if (n >= 10_000) return `${one(n / 1_000)} B`;
-  return n.toLocaleString('tr-TR');
-}
 
 function liveSlides(d: Banners): Slide[] {
   const events: Slide[] = d.events.map((e) => ({ kind: 'event', id: `e${e.id}`, tag: e.kind, title: e.title, body: e.body, image: e.imageUrl, link: e.link ?? undefined }));
@@ -210,6 +206,20 @@ function EventCard({ s, live }: { s: EventSlide; live: boolean }) {
   );
 }
 
+/**
+ * The podium's pictures (the owners' "En çok hediye gönderenler" card, 23 Nov 2026, assets/banners/podyum): a gold,
+ * silver and bronze crown over the first three, and a laurel on each side of the first. Names, faces, scores and the
+ * period are live; the pictures only dress them.
+ */
+const PODIUM = {
+  crown: [require('../../assets/banners/podyum/tac-altin.webp'), require('../../assets/banners/podyum/tac-gumus.webp'), require('../../assets/banners/podyum/tac-bronz.webp')],
+  crownRatio: [100 / 44, 77 / 32, 67 / 31],
+  laurel: require('../../assets/banners/podyum/defne-sol.webp'),
+  laurelRatio: 50 / 138,
+} as const;
+/** The card's neon rim (pink, violet, blue) and its navy glass. */
+const NEON = { rim: ['#FF4FD8', '#B44CFF', '#5B6CFF', '#22D3FF'], fill: ['#1E0F48', '#130A33', '#1A0B3A'] } as const;
+
 function BoardCard({ s }: { s: BoardSlide }) {
   const styles = useStyles();
   const b = BOARD[s.id];
@@ -222,79 +232,100 @@ function BoardCard({ s }: { s: BoardSlide }) {
   const podium = [rows[1], rows[0], rows[2]];
   return (
     <PressableScale to={0.98} onPress={() => router.push(`/siralama?board=${b.screen}&period=${screen}` as Href)} accessibilityRole="button" accessibilityLabel={`${b.title}, tam sıralama`}>
-      <LinearGradient colors={b.tint} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.fill}>
-        <Gloss radius={18} strength={0.12} />
-        {/* The title has the whole line; what it counts shares the next one with the period switch, on two lines if it must. */}
-        <View style={styles.boardHead}>
-          <Image source={b.art} style={{ width: 20, height: 20 }} resizeMode="contain" accessibilityIgnoresInvertColors />
-          <Text style={styles.boardTitle} numberOfLines={1}>
-            {b.title}
-          </Text>
-        </View>
-        <View style={styles.boardLine}>
-          <Text style={styles.boardSub} numberOfLines={2}>
-            {b.sub}
-          </Text>
-          <View style={styles.periods} accessibilityRole="tablist">
-            {PERIODS.map((p) => (
-              <Pressable key={p.key} onPress={() => setPicked(p.key)} hitSlop={4} accessibilityRole="tab" accessibilityState={{ selected: p.key === period }} style={[styles.period, p.key === period && styles.periodOn]}>
-                <Text style={[styles.periodText, p.key === period && styles.periodTextOn]}>{p.label}</Text>
-              </Pressable>
-            ))}
+      <LinearGradient colors={NEON.rim} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.rim}>
+        <LinearGradient colors={NEON.fill} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.boardFill}>
+          {/* The first place's stage: two glowing rings under the middle of the podium. */}
+          <View style={styles.stage} pointerEvents="none">
+            <View style={styles.stageOuter} />
+            <View style={styles.stageInner} />
           </View>
-        </View>
-        {rows.length ? (
-          <View style={styles.podium}>
-            {podium.map((r, i) => {
-              const rank = i === 1 ? 1 : i === 0 ? 2 : 3;
-              // A place nobody holds yet still shows as a place, so one name never floats alone in an empty row.
-              if (!r)
-                return (
-                  <View key={`empty${rank}`} style={styles.place} accessible accessibilityLabel={`${rank}. sıra boş`}>
-                    <View>
-                      <View style={styles.emptyFace}>
-                        <Ionicons name="person" size={16} color="rgba(255,255,255,0.45)" />
-                      </View>
-                      <View style={styles.rank}>
-                        <Text style={styles.rankText}>{rank}</Text>
-                      </View>
-                    </View>
-                    <Text style={[styles.name, styles.emptyText]} numberOfLines={1}>
-                      Sıra boş
-                    </Text>
-                    <Text style={[styles.scoreText, styles.emptyText]}>—</Text>
+          {/* The title has the whole line; what it counts shares the next one with the period switch, on two lines if it must. */}
+          <View style={styles.boardHead}>
+            <Image source={b.art} style={{ width: 28, height: 28 }} resizeMode="contain" accessibilityIgnoresInvertColors />
+            <Text style={styles.boardTitle} numberOfLines={1}>
+              {b.title}
+            </Text>
+          </View>
+          <View style={styles.boardLine}>
+            <Text style={styles.boardSub} numberOfLines={2}>
+              {b.sub}
+            </Text>
+            <View style={styles.periods} accessibilityRole="tablist">
+              {PERIODS.map((p) => (
+                <Pressable key={p.key} onPress={() => setPicked(p.key)} hitSlop={6} accessibilityRole="tab" accessibilityState={{ selected: p.key === period }} style={[styles.period, p.key === period && styles.periodOn]}>
+                  <Text style={[styles.periodText, p.key === period && styles.periodTextOn]}>{p.label}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+          {rows.length ? (
+            <View style={styles.podium}>
+              {podium.map((r, i) => {
+                const rank = i === 1 ? 1 : i === 0 ? 2 : 3;
+                const first = rank === 1;
+                const face = first ? 54 : 44;
+                const crownW = first ? 44 : 30;
+                const crown = <Image source={PODIUM.crown[rank - 1]} style={{ width: crownW, height: crownW / PODIUM.crownRatio[rank - 1], marginBottom: -3 }} resizeMode="contain" />;
+                const badge = (
+                  <View style={[styles.rank, first && styles.rankFirst]}>
+                    <Text style={[styles.rankText, first && styles.rankTextFirst]}>{rank}</Text>
                   </View>
                 );
-              return (
-                <View key={r.id} style={styles.place} accessible accessibilityLabel={`${rank}. ${r.name}, ${short(r.score)}`}>
-                  <View>
-                    <Avatar uri={r.avatar || undefined} name={r.name} size={rank === 1 ? 42 : 38} ring={rank === 1} />
-                    <View style={[styles.rank, rank === 1 && styles.rankFirst]}>
-                      <Text style={styles.rankText}>{rank}</Text>
+                // A place nobody holds yet still shows as a place, so one name never floats alone in an empty row.
+                if (!r)
+                  return (
+                    <View key={`empty${rank}`} style={styles.place} accessible accessibilityLabel={`${rank}. sıra boş`}>
+                      {crown}
+                      <View>
+                        <View style={[styles.emptyFace, { width: face, height: face, borderRadius: face / 2 }]}>
+                          <Ionicons name="person" size={face * 0.45} color="rgba(255,255,255,0.45)" />
+                        </View>
+                        {badge}
+                      </View>
+                      <Text style={[styles.name, styles.emptyText]} numberOfLines={1}>
+                        Sıra boş
+                      </Text>
+                      <Text style={[styles.scoreText, styles.emptyText]}>—</Text>
+                    </View>
+                  );
+                return (
+                  <View key={r.id} style={styles.place} accessible accessibilityLabel={`${rank}. ${r.name}, ${compact(r.score)}`}>
+                    {crown}
+                    <View>
+                      {first && (
+                        <>
+                          <Image source={PODIUM.laurel} style={[styles.laurel, { left: -26 }]} resizeMode="contain" />
+                          <Image source={PODIUM.laurel} style={[styles.laurel, { right: -26, transform: [{ scaleX: -1 }] }]} resizeMode="contain" />
+                        </>
+                      )}
+                      <View style={[styles.faceRing, first ? styles.faceRingFirst : styles.faceRingOther, { borderRadius: face / 2 + 3 }]}>
+                        <Avatar uri={r.avatar || undefined} name={r.name} size={face} />
+                      </View>
+                      {badge}
+                    </View>
+                    <Text style={[styles.name, first && styles.nameFirst]} numberOfLines={1}>
+                      {r.name}
+                    </Text>
+                    <View style={styles.score}>
+                      <Icon3D name={b.unit} size={15} />
+                      <Text style={styles.scoreText}>{compact(r.score)}</Text>
                     </View>
                   </View>
-                  <Text style={styles.name} numberOfLines={1}>
-                    {r.name}
-                  </Text>
-                  <View style={styles.score}>
-                    <Icon3D name={b.unit} size={12} />
-                    <Text style={styles.scoreText}>{short(r.score)}</Text>
-                  </View>
-                </View>
-              );
-            })}
-          </View>
-        ) : (
-          <Text style={styles.none}>Bu dönemde henüz kimse yok.</Text>
-        )}
+                );
+              })}
+            </View>
+          ) : (
+            <Text style={styles.none}>Bu dönemde henüz kimse yok.</Text>
+          )}
+        </LinearGradient>
       </LinearGradient>
     </PressableScale>
   );
 }
 
 const useStyles = makeStyles(({ colors }) => ({
-  card: { height: 164, borderRadius: 18, overflow: 'hidden' },
-  fill: { height: 164, borderRadius: 18, overflow: 'hidden', paddingHorizontal: 14, paddingVertical: 12 },
+  card: { height: CARD_H, borderRadius: 20, overflow: 'hidden' },
+  fill: { height: CARD_H, borderRadius: 20, overflow: 'hidden', paddingHorizontal: 14, paddingVertical: 12 },
   cover: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, width: '100%', height: '100%' },
   dots: { flexDirection: 'row', justifyContent: 'center', gap: 5 },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.border },
@@ -309,47 +340,56 @@ const useStyles = makeStyles(({ colors }) => ({
   eventTitlePlain: { fontSize: 22, lineHeight: 27 },
   eventSub: { color: 'rgba(255,255,255,0.86)', fontSize: 13, lineHeight: 18 },
 
+  rim: { height: CARD_H, borderRadius: 20, padding: 1.5 },
+  boardFill: { flex: 1, borderRadius: 18.5, overflow: 'hidden', paddingHorizontal: 14, paddingTop: 10, paddingBottom: 18 },
   boardHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  boardTitle: { flex: 1, minWidth: 0, color: '#fff', fontSize: 15, fontFamily: fonts.display },
-  boardLine: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  boardSub: { flex: 1, minWidth: 0, color: 'rgba(255,255,255,0.7)', fontSize: 12, lineHeight: 15 },
-  periods: { flexDirection: 'row', padding: 2, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.12)' },
-  period: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999 },
-  periodOn: { backgroundColor: 'rgba(255,255,255,0.92)' },
-  periodText: { color: 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: '700' },
-  periodTextOn: { color: '#1A1530' },
+  boardTitle: { flex: 1, minWidth: 0, color: '#fff', fontSize: 17, fontFamily: fonts.display },
+  boardLine: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
+  boardSub: { flex: 1, minWidth: 0, color: 'rgba(255,255,255,0.78)', fontSize: 12.5, lineHeight: 16 },
+  periods: { flexDirection: 'row', padding: 2, borderRadius: 999, borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)', backgroundColor: 'rgba(255,255,255,0.06)' },
+  period: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, borderWidth: 1.5, borderColor: 'transparent' },
+  periodOn: { borderColor: '#FF4FD8', backgroundColor: 'rgba(255,60,200,0.14)', boxShadow: '0 0 8px rgba(255,60,210,0.7)' },
+  periodText: { color: 'rgba(255,255,255,0.82)', fontSize: 13, fontWeight: '700' },
+  periodTextOn: { color: '#fff' },
 
   podium: { flex: 1, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-around' },
-  place: { flex: 1, alignItems: 'center', gap: 3 },
+  place: { flex: 1, alignItems: 'center', gap: 1 },
+  faceRing: { padding: 2, borderWidth: 2 },
+  faceRingFirst: { borderColor: '#FFC24A', boxShadow: '0 0 12px rgba(255,190,60,0.85)' },
+  faceRingOther: { borderColor: '#E58CFF', boxShadow: '0 0 8px rgba(229,140,255,0.6)' },
+  laurel: { position: 'absolute', top: 2, width: 23, height: 23 / (50 / 138) },
   rank: {
     position: 'absolute',
     right: -4,
-    bottom: -4,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
+    bottom: -2,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
     paddingHorizontal: 4,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.9)',
+    backgroundColor: '#F2F0FA',
   },
-  rankFirst: { backgroundColor: colors.gold },
-  rankText: { color: '#1A1530', fontSize: 11, fontWeight: '900' },
-  name: { color: '#fff', fontSize: 12, fontWeight: '700', maxWidth: '92%' },
-  score: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  scoreText: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  // An empty place: the second and third places' size, a dashed dim ring, dim words.
+  rankFirst: { backgroundColor: '#FFC83D', boxShadow: '0 0 6px rgba(255,200,60,0.8)' },
+  rankText: { color: '#1E2A5A', fontSize: 12, fontWeight: '900' },
+  rankTextFirst: { color: '#3A2400' },
+  name: { color: '#fff', fontSize: 14, fontWeight: '800', maxWidth: '94%', marginTop: 3 },
+  nameFirst: { fontSize: 15 },
+  score: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  scoreText: { color: 'rgba(255,255,255,0.9)', fontSize: 13, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  // An empty place: a dashed dim ring, dim words.
   emptyFace: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
     borderStyle: 'dashed',
-    borderColor: 'rgba(255,255,255,0.35)',
+    borderColor: 'rgba(255,255,255,0.5)',
     backgroundColor: 'rgba(255,255,255,0.06)',
   },
-  emptyText: { color: 'rgba(255,255,255,0.5)' },
+  emptyText: { color: 'rgba(255,255,255,0.6)' },
+  // The first place's stage: a wide violet ring and a pink one inside it, glowing.
+  stage: { position: 'absolute', left: 0, right: 0, bottom: -24, height: 40, alignItems: 'center', justifyContent: 'center' },
+  stageOuter: { position: 'absolute', width: '62%', height: 30, borderRadius: 999, borderWidth: 2, borderColor: 'rgba(120,110,255,0.85)', boxShadow: '0 0 12px rgba(90,120,255,0.7)' },
+  stageInner: { position: 'absolute', width: '42%', height: 18, top: 6, borderRadius: 999, borderWidth: 2, borderColor: 'rgba(255,80,216,0.95)', boxShadow: '0 0 12px rgba(255,60,210,0.8)' },
   none: { flex: 1, color: 'rgba(255,255,255,0.75)', fontSize: 13, textAlign: 'center', textAlignVertical: 'center', paddingTop: 30 },
 }));

@@ -2,17 +2,17 @@
 // app click (join a room, greet someone, send a first gift); progress comes from real app state, and
 // finishing all of them pays a one-time reward. Closable; disappears once the reward is claimed.
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router, type Href } from 'expo-router';
 import { useState } from 'react';
-import { Modal, Pressable, View } from 'react-native';
+import { Image, Modal, Pressable, View } from 'react-native';
 
 import { Text } from '@/components/text';
 import { RewardBurst } from '@/components/fx/reward';
-import { DepthCard } from '@/components/fx/surface';
 import { Icon3D, type Icon3DName } from '@/components/Icon3D';
 import { liveMode } from '@/lib/live';
 import { useApp } from '@/store';
-import { makeStyles, useTheme } from '@/theme';
+import { makeStyles } from '@/theme';
 
 const REWARD = 300;
 /** Tümü and the close button: 44 dp tall, and their touch areas stay apart. */
@@ -29,7 +29,6 @@ export function StarterPath({ roomHref }: { roomHref?: Href } = {}) {
   const { me, recentRooms, stats, following, checkedInToday, starter, claimStarter, hideStarter, settings } = useApp();
   const [open, setOpen] = useState(false);
   const [celebrate, setCelebrate] = useState(false);
-  const { colors, semantic } = useTheme();
   const s = useStyles();
   if (starter.hidden || (starter.claimed && !celebrate)) return null;
 
@@ -49,35 +48,41 @@ export function StarterPath({ roomHref }: { roomHref?: Href } = {}) {
   const shown = open ? steps : next ? [next] : [];
 
   return (
-    <DepthCard style={s.card}>
+    // The owners' neon card (23 Nov 2026): deep navy glass inside a pink-to-blue neon rim, in either colour scheme.
+    <LinearGradient colors={NEON.rim} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.rim}>
+      <LinearGradient colors={NEON.fill} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.card}>
       <View style={s.head}>
+        <Image source={ROCKET} style={s.rocket} resizeMode="contain" accessibilityIgnoresInvertColors />
         <Text style={s.title}>İlk adımlar</Text>
         <Text style={s.count}>
           {doneCount}/{steps.length}
         </Text>
         <View style={{ flex: 1 }} />
-        <Pressable onPress={() => setOpen((o) => !o)} hitSlop={HEAD_SLOP} accessibilityLabel={open ? 'Adımları gizle' : 'Tüm adımları göster'}>
+        <Pressable onPress={() => setOpen((o) => !o)} hitSlop={HEAD_SLOP} style={s.linkRow} accessibilityLabel={open ? 'Adımları gizle' : 'Tüm adımları göster'}>
           <Text style={s.link}>{open ? 'Gizle' : 'Tümü'}</Text>
+          <Ionicons name={open ? 'chevron-up' : 'chevron-forward'} size={15} color={NEON.pink} />
         </Pressable>
         <Pressable onPress={hideStarter} hitSlop={HEAD_SLOP} accessibilityLabel="İlk adımlar kartını kapat">
-          <Ionicons name="close" size={18} color={colors.textDim} />
+          <Ionicons name="close" size={18} color={NEON.dim} />
         </Pressable>
       </View>
       <View style={s.track}>
-        <View style={[s.fill, { width: `${(doneCount / steps.length) * 100}%` }]} />
+        <LinearGradient colors={['#FF3FD0', '#FF2DB8', '#F05BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[s.fill, { width: `${(doneCount / steps.length) * 100}%` }]} />
       </View>
 
       {shown.map((x) => (
         <Pressable key={x.key} style={s.row} onPress={() => !x.done && router.push(x.href)} disabled={x.done} accessibilityLabel={`${x.title}${x.done ? ', tamamlandı' : ''}`}>
-          <Icon3D name={x.icon} size={30} style={x.done ? { opacity: 0.45 } : undefined} />
+          <Icon3D name={x.icon} size={32} style={x.done ? { opacity: 0.45 } : undefined} />
           <Text style={[s.stepText, x.done && s.stepDone]} numberOfLines={1}>
             {x.title}
           </Text>
-          {x.done ? <Ionicons name="checkmark-circle" size={22} color={semantic.successText} /> : (
-            <View style={s.goPill}>
+          {x.done ? (
+            <Ionicons name="checkmark-circle" size={22} color="#42E5A3" />
+          ) : (
+            <LinearGradient colors={['#FF4FCB', '#D81B93', '#A80E78']} start={{ x: 0.3, y: 0 }} end={{ x: 0.7, y: 1 }} style={s.goPill}>
               <Text style={s.go}>Git</Text>
-              <Ionicons name="chevron-forward" size={13} color={semantic.actionText} />
-            </View>
+              <Ionicons name="chevron-forward" size={14} color="#fff" />
+            </LinearGradient>
           )}
         </Pressable>
       ))}
@@ -97,8 +102,9 @@ export function StarterPath({ roomHref }: { roomHref?: Href } = {}) {
       )}
       {next && (
         <View style={s.hintRow}>
+          <Icon3D name="gift" size={22} />
           <Text style={s.hint}>Hepsini bitirince</Text>
-          <Icon3D name="coin" size={14} />
+          <Icon3D name="coin" size={18} />
           <Text style={s.hint}>{REWARD} hediye</Text>
         </View>
       )}
@@ -106,25 +112,38 @@ export function StarterPath({ roomHref }: { roomHref?: Href } = {}) {
       <Modal visible={celebrate} transparent animationType="fade" onRequestClose={() => setCelebrate(false)}>
         {celebrate && <RewardBurst reward={{ icon: 'trophy', title: 'İlk adımları tamamladın!', amount: REWARD }} still={settings.reduceMotion} onDone={() => setCelebrate(false)} />}
       </Modal>
-    </DepthCard>
+      </LinearGradient>
+    </LinearGradient>
   );
 }
 
-const useStyles = makeStyles(({ colors, semantic, dark, ink }) => ({
-  card: { marginHorizontal: 16, padding: 14, gap: 10 },
+/** The design's colours: the rim (pink, violet, blue, pink), the card's navy glass and its pink. */
+const NEON = {
+  rim: ['#FF4FD8', '#B44CFF', '#3D8BFF', '#22D3FF', '#FF4FD8'],
+  fill: ['#1E0F45', '#140A33', '#1D0B3A'],
+  pink: '#FF6FE0',
+  dim: 'rgba(255,255,255,0.55)',
+} as const;
+const ROCKET = require('../../assets/home/ilk-adimlar/roket.webp');
+
+const useStyles = makeStyles(({ semantic }) => ({
+  rim: { marginHorizontal: 16, borderRadius: 22, padding: 1.5, boxShadow: '0 0 14px rgba(255,60,210,0.45), 0 0 22px rgba(60,140,255,0.3)' },
+  card: { borderRadius: 20.5, paddingHorizontal: 14, paddingVertical: 12, gap: 9 },
   head: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  title: { color: colors.text, fontWeight: '900', fontSize: 16 },
-  count: { color: semantic.actionText, fontWeight: '800', fontSize: 13 },
-  link: { color: semantic.tonalText, fontWeight: '700', fontSize: 13, marginRight: 6 },
-  track: { height: 6, borderRadius: 3, backgroundColor: dark ? 'rgba(0,0,0,0.3)' : ink(0.08), overflow: 'hidden' },
-  fill: { height: 6, borderRadius: 3, backgroundColor: semantic.action, boxShadow: dark ? '0 0 8px rgba(255,95,162,0.8)' : '0 0 6px rgba(255,95,162,0.45)' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 7 },
-  stepText: { color: colors.text, fontWeight: '700', fontSize: 14, flex: 1 },
-  stepDone: { color: colors.textDim, textDecorationLine: 'line-through' },
-  goPill: { flexDirection: 'row', alignItems: 'center', gap: 1, paddingLeft: 10, paddingRight: 6, paddingVertical: 4, borderRadius: 999, backgroundColor: dark ? 'rgba(255,95,162,0.12)' : 'rgba(208,46,120,0.08)' },
-  go: { color: semantic.actionText, fontWeight: '700', fontSize: 13 },
-  hintRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  hint: { color: colors.textDim, fontSize: 12 },
+  rocket: { width: 28, height: 26 },
+  title: { color: '#FFFFFF', fontWeight: '900', fontSize: 17 },
+  count: { color: NEON.pink, fontWeight: '900', fontSize: 15 },
+  linkRow: { flexDirection: 'row', alignItems: 'center', gap: 2, marginRight: 8 },
+  link: { color: NEON.pink, fontWeight: '800', fontSize: 14 },
+  track: { height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.16)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.2)' },
+  fill: { height: 8, borderRadius: 4, boxShadow: '0 0 8px rgba(255,60,210,0.9)' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 4 },
+  stepText: { color: '#FFFFFF', fontWeight: '800', fontSize: 15, flex: 1 },
+  stepDone: { color: 'rgba(255,255,255,0.5)', textDecorationLine: 'line-through' },
+  goPill: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingLeft: 14, paddingRight: 9, paddingVertical: 6, borderRadius: 999, borderWidth: 1.5, borderColor: 'rgba(255,190,240,0.9)', boxShadow: '0 0 10px rgba(255,60,200,0.6)' },
+  go: { color: '#FFFFFF', fontWeight: '800', fontSize: 14 },
+  hintRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  hint: { color: 'rgba(255,255,255,0.82)', fontSize: 13 },
   claim: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: semantic.money, borderRadius: 999, paddingVertical: 11 },
   claimText: { color: semantic.moneyInk, fontWeight: '900', fontSize: 15 },
 }));

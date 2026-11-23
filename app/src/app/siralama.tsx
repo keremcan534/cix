@@ -2,17 +2,18 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { FlatList, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { FlatList, Image, Pressable, ScrollView, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
 import { Art, type ArtName } from '@/components/Art';
 import { Icon3D } from '@/components/Icon3D';
-import { Avatar, Header } from '@/components/ui';
+import { Avatar } from '@/components/ui';
 import { LEADERBOARDS } from '@/data/economy';
 import { AGENCIES } from '@/data/agency';
 import { ROOMS, USERS, type User } from '@/data/mock';
-import { makeStyles, useTheme } from '@/theme';
+import { makeStyles } from '@/theme';
+import { goBack } from '@/lib/nav';
 import { Photo } from '@/components/photo';
 import { periodLabel } from '@/lib/tr';
 import { agencyRankings, rankings, roomXpRankings, type AgencyRankingRow, type RankingRow, type RoomXpRow } from '@/lib/api';
@@ -39,8 +40,8 @@ const BOARDS: { key: Board; label: string; emoji: string; art?: ArtName; unit: U
 type Row = { id: string; name: string; avatar: string; score: number; user?: User; roomId?: string };
 
 export default function Leaderboard() {
-  const { colors, dark } = useTheme();
   const styles = useStyles();
+  const { width } = useWindowDimensions();
   // An Odalar banner opens its own board and period (?board=ajans&period=weekly).
   const params = useLocalSearchParams<{ board?: string; period?: string }>();
   const [board, setBoard] = useState<Board>(() => BOARDS.find((b) => b.key === params.board)?.key ?? 'zengin');
@@ -98,81 +99,150 @@ export default function Leaderboard() {
           : LEADERBOARDS[board][period === 'monthly' ? 'weekly' : period].map((r) => ({ id: r.user.id, name: r.user.name, avatar: r.user.avatar, score: r.score * mult, user: r.user }));
 
   const open = (r: Row) => (r.roomId ? router.push(`/oda/${r.roomId}`) : r.user ? router.push(`/kullanici/${r.id}`) : undefined);
-  const [first, second, third] = rows;
+  const first = rows[0];
+
+  // The podium card as in the design: its frame (wings, glass, stage) is the design's own picture, 830 x 514.
+  const cardW = Math.min(width, 520) - 20;
+  const cardH = Math.round(cardW / CARD_RATIO);
+  const face = Math.round(cardW * 0.247);
+  // All five boards fit one row on a usual phone, as in the design: their words follow the screen's width.
+  const tabFont = Math.min(13, Math.max(10, (width - 80) / 29));
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <Header title="Sıralama" />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.tabs}>
-        {boards.map((b) => (
-          <Pressable key={b.key} onPress={() => setBoard(b.key)} style={[styles.tab, board === b.key && styles.tabActive]} accessibilityLabel={b.label}>
-            {b.art && <Art name={b.art} size={17} />}
-            <Text style={[styles.tabText, board === b.key && styles.tabTextActive]}>{b.art ? b.label : `${b.emoji} ${b.label}`}</Text>
-          </Pressable>
-        ))}
+    // The owners' neon Sıralama (23 Nov 2026): a deep violet night with neon rims, in either colour scheme
+    // (components/fx/dark-routes keeps the screen dark).
+    <SafeAreaView style={{ flex: 1, backgroundColor: NIGHT[1] }}>
+      <LinearGradient colors={NIGHT} locations={NIGHT_AT} style={FILL} pointerEvents="none" />
+      {/* The design's neon horizon at the bottom: its own picture, fading in at its top. */}
+      <Image source={HORIZON} style={{ position: 'absolute', left: 0, bottom: 0, width, height: Math.round((width * 368) / 841) }} resizeMode="stretch" pointerEvents="none" />
+
+      <View style={styles.head}>
+        <Pressable onPress={() => goBack()} hitSlop={10} style={styles.back} accessibilityRole="button" accessibilityLabel="Geri">
+          <Ionicons name="chevron-back" size={28} color="#fff" />
+        </Pressable>
+        <View style={styles.titleRow} pointerEvents="none">
+          <LinearGradient colors={['rgba(120,90,255,0)', 'rgba(120,120,255,0.8)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.titleLine} />
+          <Image source={TITLE_LAUREL} style={styles.laurel} resizeMode="contain" />
+          <Text style={styles.title} accessibilityRole="header">
+            Sıralama
+          </Text>
+          <Image source={TITLE_LAUREL} style={[styles.laurel, { transform: [{ scaleX: -1 }] }]} resizeMode="contain" />
+          <LinearGradient colors={['rgba(120,120,255,0.8)', 'rgba(120,90,255,0)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.titleLine} />
+        </View>
+      </View>
+
+      {/* The five boards in one row, as in the design (a narrow phone scrolls them). */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, flexShrink: 0 }} contentContainerStyle={styles.tabs}>
+        {boards.map((b) => {
+          const on = board === b.key;
+          return (
+            <Pressable key={b.key} onPress={() => setBoard(b.key)} hitSlop={{ top: 5, bottom: 5 }} style={[styles.tab, on && styles.tabActive]} accessibilityRole="tab" accessibilityState={{ selected: on }} accessibilityLabel={b.label}>
+              {on && <LinearGradient colors={['#F02AAE', '#B8127F']} start={{ x: 0.3, y: 0 }} end={{ x: 0.7, y: 1 }} style={[FILL, { borderRadius: 999 }]} />}
+              {b.art && <Art name={b.art} size={Math.round(tabFont + 5)} />}
+              <Text style={[styles.tabText, { fontSize: tabFont }]}>{b.art ? b.label : `${b.emoji} ${b.label}`}</Text>
+            </Pressable>
+          );
+        })}
       </ScrollView>
       <View style={styles.periods}>
-        {PERIOD_KEYS.map((p) => (
-          <Pressable key={p} onPress={() => setPeriod(p)} hitSlop={{ top: 13, bottom: 13, left: 12, right: 12 }}>
-            <Text style={[styles.period, period === p && styles.periodActive]}>{p === 'daily' ? 'Günlük' : p === 'weekly' ? 'Haftalık' : 'Aylık'}</Text>
-          </Pressable>
-        ))}
+        {PERIOD_KEYS.map((p) => {
+          const on = period === p;
+          return (
+            <Pressable key={p} onPress={() => setPeriod(p)} hitSlop={{ top: 10, bottom: 10, left: 12, right: 12 }} style={styles.periodItem} accessibilityRole="tab" accessibilityState={{ selected: on }}>
+              <Text style={[styles.period, on && styles.periodActive]}>{p === 'daily' ? 'Günlük' : p === 'weekly' ? 'Haftalık' : 'Aylık'}</Text>
+              <View style={[styles.periodBar, on && styles.periodBarOn]} />
+            </Pressable>
+          );
+        })}
       </View>
       <Text style={styles.how}>
         {periodLabel(period)} · Ölçüt: {info.how} · İade edilen hediyeler ve sahte etkileşimler hariç
       </Text>
 
       <FlatList
-        data={rows.slice(3)}
+        data={rows.slice(1)}
         keyExtractor={(r) => r.id}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 30, gap: 8 }}
+        contentContainerStyle={{ paddingHorizontal: 14, paddingBottom: 40, gap: 8 }}
         ListHeaderComponent={
-          <LinearGradient colors={[dark ? '#4A1630' : '#FADBE8', colors.bg]} style={styles.podium}>
-            {second && <Podium row={second} place={2} unit={unit} onPress={() => open(second)} />}
-            {first && <Podium row={first} place={1} unit={unit} onPress={() => open(first)} />}
-            {third && <Podium row={third} place={3} unit={unit} onPress={() => open(third)} />}
-            {!first &&
-              (!rankError && live && board !== 'oda' && serverRows === null ? (
-                <BrandLoader size={26} style={{ flex: 1, paddingVertical: 22 }} />
-              ) : (
-                <Text style={[styles.how, { flex: 1, textAlign: 'center', paddingVertical: 28 }]}>
-                  {rankError ? 'Sıralama şu an yüklenemedi. Biraz sonra tekrar dene.' : board === 'oda' ? 'Şu an açık oda yok.' : board === 'odaxp' ? 'Bu dönemde henüz XP kazanan oda yok. Odada gönderilen hediyeler odanın XP’si olur.' : 'Bu dönemde henüz kimse yok. İlk hediyeyi sen gönder!'}
-                </Text>
-              ))}
-          </LinearGradient>
+          <View style={{ width: cardW, height: cardH, alignSelf: 'center', marginBottom: 10 }}>
+            <Image source={CARD} style={{ position: 'absolute', left: 0, top: 0, width: cardW, height: cardH }} resizeMode="stretch" accessibilityIgnoresInvertColors />
+            {first ? (
+              <Pressable onPress={() => open(first)} style={FILL} accessibilityRole="button" accessibilityLabel={`1. ${first.name}, ${compact(first.score)}${unit === 'xp' ? ' XP' : ''}`}>
+                {/* The medal, the picture in its gold ring, the name and the score, where the design has them. */}
+                <View style={[styles.place, { top: cardH * 0.035 }]}>
+                  <Art name="derece-1" size={Math.round(cardW * 0.1)} />
+                </View>
+                <View style={[styles.place, { top: cardH * 0.4144 - face / 2 - 5 }]}>
+                  <View style={[styles.goldRing, { borderRadius: face / 2 + 5 }]}>
+                    <Photo uri={first.avatar} kind="face" seed={first.roomId} style={{ width: face, height: face, borderRadius: face / 2 }} />
+                  </View>
+                </View>
+                <View style={[styles.place, { top: cardH * 0.61 }]}>
+                  <Text style={styles.firstName} numberOfLines={1}>
+                    {first.name}
+                  </Text>
+                </View>
+                <View style={[styles.place, styles.plateRow, { top: cardH * 0.735 }]}>
+                  <Image source={GOLD_LAUREL} style={styles.plateLaurel} resizeMode="contain" />
+                  <View style={styles.plate}>
+                    <Score unit={unit} n={first.score} big />
+                  </View>
+                  <Image source={GOLD_LAUREL} style={[styles.plateLaurel, { transform: [{ scaleX: -1 }] }]} resizeMode="contain" />
+                </View>
+              </Pressable>
+            ) : (
+              <View style={[FILL, { alignItems: 'center', justifyContent: 'center', paddingHorizontal: cardW * 0.22 }]}>
+                {!rankError && live && board !== 'oda' && serverRows === null ? (
+                  <BrandLoader size={26} />
+                ) : (
+                  <Text style={[styles.how, { marginTop: 0, marginBottom: 0 }]}>
+                    {rankError ? 'Sıralama şu an yüklenemedi. Biraz sonra tekrar dene.' : board === 'oda' ? 'Şu an açık oda yok.' : board === 'odaxp' ? 'Bu dönemde henüz XP kazanan oda yok. Odada gönderilen hediyeler odanın XP’si olur.' : 'Bu dönemde henüz kimse yok. İlk hediyeyi sen gönder!'}
+                  </Text>
+                )}
+              </View>
+            )}
+          </View>
         }
-        renderItem={({ item, index }) => (
-          <Pressable style={styles.row} onPress={() => open(item)}>
-            <Text style={styles.rank}>{index + 4}</Text>
-            {item.roomId ? <Photo uri={item.avatar} kind="cover" seed={item.roomId} style={{ width: 40, height: 40, borderRadius: 10 }} /> : <Avatar uri={item.avatar} size={40} />}
-            <Text style={styles.name} numberOfLines={1}>
-              {item.name}
-            </Text>
-            <Score unit={unit} n={item.score} />
-          </Pressable>
-        )}
+        renderItem={({ item, index }) => {
+          const place = index + 2;
+          return (
+            <Pressable style={[styles.row, place <= 3 && styles.rowTop]} onPress={() => open(item)} accessibilityRole="button" accessibilityLabel={`${place}. ${item.name}`}>
+              {place <= 3 ? <Art name={place === 2 ? 'derece-2' : 'derece-3'} size={26} /> : <Text style={styles.rank}>{place}</Text>}
+              {item.roomId ? <Photo uri={item.avatar} kind="cover" seed={item.roomId} style={{ width: 42, height: 42, borderRadius: 12 }} /> : <Avatar uri={item.avatar} size={42} />}
+              <Text style={styles.name} numberOfLines={1}>
+                {item.name}
+              </Text>
+              <Score unit={unit} n={item.score} />
+            </Pressable>
+          );
+        }}
       />
     </SafeAreaView>
   );
 }
 
-const MEDAL = {
-  1: { emoji: '🥇', art: 'derece-1', color: '#FBBF24', size: 84 },
-  2: { emoji: '🥈', art: 'derece-2', color: '#CBD5E1', size: 68 },
-  3: { emoji: '🥉', art: 'derece-3', color: '#F59E0B', size: 68 },
-} as const satisfies Record<1 | 2 | 3, { emoji: string; art: ArtName; color: string; size: number }>;
+/** The screen's night, top to bottom (sampled from the design), and where each colour sits. */
+const NIGHT = ['#170831', '#100B3B', '#0B0F3C', '#180B38', '#240A48', '#1F0B47'] as const;
+const NIGHT_AT = [0, 0.2, 0.5, 0.62, 0.78, 1] as const;
+const GOLD = '#FFD56A';
+const FILL = { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 } as const;
+/** The design's own pieces (assets/siralama, cut from the owners' screen, 23 Nov 2026). */
+const CARD = require('../../assets/siralama/kart.webp');
+const CARD_RATIO = 830 / 514;
+const HORIZON = require('../../assets/siralama/ufuk.webp');
+const TITLE_LAUREL = require('../../assets/siralama/defne-mor.webp');
+const GOLD_LAUREL = require('../../assets/banners/podyum/defne-sol.webp');
 
 /** A board's number with its unit drawn as an icon (coins, diamonds, people) or as an XP suffix. */
-function Score({ unit, n, small }: { unit: Unit; n: number; small?: boolean }) {
-  const { colors } = useTheme();
+function Score({ unit, n, big }: { unit: Unit; n: number; big?: boolean }) {
   const styles = useStyles();
-  const size = small ? 14 : 16;
+  const size = big ? 20 : 16;
   return (
     <View style={styles.scoreRow}>
       {unit === 'coin' && <Icon3D name="coin" size={size} />}
       {unit === 'diamond' && <Icon3D name="diamond" size={size} />}
-      {unit === 'people' && <Ionicons name="people" size={size - 2} color={colors.textDim} />}
-      <Text style={[styles.score, small && { fontSize: 12 }]}>
+      {unit === 'people' && <Ionicons name="people" size={size - 2} color="rgba(255,255,255,0.75)" />}
+      <Text style={[styles.score, big && styles.scoreBig]}>
         {compact(n)}
         {unit === 'xp' ? ' XP' : ''}
       </Text>
@@ -180,40 +250,35 @@ function Score({ unit, n, small }: { unit: Unit; n: number; small?: boolean }) {
   );
 }
 
-function Podium({ row, place, unit, onPress }: { row: Row; place: 1 | 2 | 3; unit: Unit; onPress: () => void }) {
-  const styles = useStyles();
-  const { dark } = useTheme();
-  const m = MEDAL[place];
-  // The pale silver ring vanishes on the light podium; a deeper silver there.
-  const ring = place === 2 && !dark ? '#94A3B8' : m.color;
-  return (
-    <Pressable onPress={onPress} style={{ alignItems: 'center', flex: 1, gap: 4, marginTop: place === 1 ? 0 : 28 }}>
-      <Art name={m.art} size={33} />
-      <Photo uri={row.avatar} kind="face" style={{ width: m.size, height: m.size, borderRadius: m.size / 2, borderWidth: 3, borderColor: ring }} />
-      <Text style={styles.podiumName} numberOfLines={1}>
-        {row.name}
-      </Text>
-      <Score unit={unit} n={row.score} small />
-    </Pressable>
-  );
-}
-
-const useStyles = makeStyles(({ colors, lift, dark, ink }) => ({
-  how: { color: colors.textDim, fontSize: 12, textAlign: 'center', paddingHorizontal: 16, marginBottom: 8 },
-  tabs: { gap: 6, paddingHorizontal: 16 },
-  // Light: a hairline instead of the card shadow, which the horizontal scroller would clip.
-  tab: { flexDirection: 'row', justifyContent: 'center', gap: 4, paddingVertical: 9, paddingHorizontal: 14, borderRadius: 999, backgroundColor: colors.card, alignItems: 'center', ...(dark ? {} : { borderWidth: StyleSheet.hairlineWidth, borderColor: ink(0.12) }) },
-  tabActive: { backgroundColor: colors.primary, ...(dark ? {} : { borderColor: colors.primary }) },
-  tabText: { color: colors.textDim, fontWeight: '700', fontSize: 13 },
-  tabTextActive: { color: '#fff' },
-  periods: { flexDirection: 'row', justifyContent: 'center', gap: 24, paddingVertical: 12 },
-  period: { color: colors.textDim, fontWeight: '600' },
-  periodActive: { color: colors.text, textDecorationLine: 'underline' },
-  podium: { flexDirection: 'row', alignItems: 'flex-start', borderRadius: 20, paddingVertical: 18, paddingHorizontal: 8, marginBottom: 8 },
-  podiumName: { color: colors.text, fontWeight: '700', maxWidth: 100 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.card, borderRadius: 14, padding: 10, ...lift },
-  rank: { color: colors.textDim, fontWeight: '800', width: 22, textAlign: 'center' },
-  name: { color: colors.text, fontWeight: '600', flex: 1 },
-  score: { color: colors.gold, fontWeight: '700' },
-  scoreRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+const useStyles = makeStyles(() => ({
+  head: { height: 58, justifyContent: 'center' },
+  back: { position: 'absolute', left: 6, zIndex: 2, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 50 },
+  titleLine: { flex: 1, height: 1.5, maxWidth: 80 },
+  laurel: { width: 20, height: 29 },
+  title: { color: '#fff', fontSize: 27, fontWeight: '900', marginHorizontal: 4, textShadowColor: 'rgba(210,120,255,0.85)', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 12 },
+  tabs: { gap: 3, paddingHorizontal: 4, paddingVertical: 8, flexGrow: 1, justifyContent: 'center' },
+  tab: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 2, height: 34, paddingHorizontal: 5, borderRadius: 999, overflow: 'hidden', borderWidth: 1.5, borderColor: 'rgba(100,170,255,0.9)', backgroundColor: 'rgba(18,12,52,0.92)', boxShadow: '0 0 7px rgba(80,140,255,0.5)' },
+  tabActive: { borderColor: '#FF8BE3', boxShadow: '0 0 12px rgba(255,60,210,0.85)' },
+  tabText: { color: '#fff', fontWeight: '800', letterSpacing: -0.3 },
+  periods: { flexShrink: 0, flexDirection: 'row', justifyContent: 'center', gap: 32, paddingTop: 12, marginHorizontal: 70, borderBottomWidth: 1, borderBottomColor: 'rgba(170,150,255,0.35)' },
+  periodItem: { alignItems: 'center', gap: 6 },
+  period: { color: 'rgba(255,255,255,0.88)', fontWeight: '600', fontSize: 17 },
+  periodActive: { color: '#FFE6FA', fontWeight: '800', textShadowColor: 'rgba(255,90,220,0.8)', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 8 },
+  periodBar: { height: 3, alignSelf: 'stretch', marginHorizontal: -8, borderRadius: 2, backgroundColor: 'transparent' },
+  periodBarOn: { backgroundColor: '#FF4FD8', boxShadow: '0 0 8px rgba(255,60,210,0.95)' },
+  how: { color: '#C2B4F0', fontSize: 12.5, lineHeight: 17, textAlign: 'center', paddingHorizontal: 18, marginTop: 10, marginBottom: 12 },
+  place: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
+  goldRing: { padding: 2, borderWidth: 3, borderColor: '#FFC24A', boxShadow: '0 0 16px rgba(255,180,50,0.9)' },
+  firstName: { color: '#fff', fontSize: 21, fontWeight: '800', maxWidth: '70%', textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  plateRow: { flexDirection: 'row', justifyContent: 'center', gap: 6 },
+  plateLaurel: { width: 15, height: 40 },
+  plate: { paddingHorizontal: 22, paddingVertical: 5, borderRadius: 12, borderWidth: 1.5, borderColor: '#FFC24A', backgroundColor: 'rgba(60,20,60,0.55)', boxShadow: '0 0 10px rgba(255,190,60,0.6)' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: 'rgba(28,18,70,0.94)', borderRadius: 16, paddingVertical: 9, paddingHorizontal: 12, borderWidth: 1, borderColor: 'rgba(140,150,255,0.35)' },
+  rowTop: { borderColor: 'rgba(255,110,220,0.55)', boxShadow: '0 0 8px rgba(255,60,210,0.3)' },
+  rank: { color: '#fff', fontWeight: '900', width: 26, textAlign: 'center', fontSize: 15 },
+  name: { color: '#fff', fontWeight: '700', flex: 1, fontSize: 15 },
+  score: { color: GOLD, fontWeight: '800', fontSize: 15 },
+  scoreBig: { fontSize: 20, fontWeight: '900' },
+  scoreRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
 }));
