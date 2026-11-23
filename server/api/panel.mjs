@@ -115,6 +115,8 @@ export const PANEL_ROUTES = new Set([
   'GET /api/admin/casino/report',
   'GET /api/admin/alerts',
   'GET /api/admin/money-check',
+  // Sunucu kapasitesi (server-load.mjs): the machine's load measured on it, for the panel's capacity simulation.
+  'GET /api/admin/capacity',
   'GET /api/admin/finance-sync',
   // Kullanıcılar (admin.mjs, referrals.mjs): search, ban and lifting it, room level, deleting, an invite's coins back.
   'GET /api/admin/users',
