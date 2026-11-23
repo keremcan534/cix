@@ -11,3 +11,8 @@ export function DivineFx(_: DivineProps) {
 export function TeaseAura() {
   return null;
 }
+
+/** A reel coming to rest: the web keeps the reel's own stop (no sparks). */
+export function ReelSpark() {
+  return null;
+}

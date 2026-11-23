@@ -290,3 +290,58 @@ function Aura({ w, h }: { w: number; h: number }) {
     </Canvas>
   );
 }
+
+/**
+ * A reel coming to rest: a white flash runs down it and sparks jump from its foot, gone in half a second (then it
+ * unmounts, so no clock keeps running). Drawn on a new key for each stop.
+ */
+export function ReelSpark() {
+  const [box, setBox] = useState({ w: 0, h: 0 });
+  const [done, setDone] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setDone(true), SPARK_MS + 80);
+    return () => clearTimeout(t);
+  }, []);
+  if (done) return null;
+  const onLayout = (e: LayoutChangeEvent) => setBox({ w: Math.round(e.nativeEvent.layout.width), h: Math.round(e.nativeEvent.layout.height) });
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none" onLayout={onLayout}>
+      {box.w > 0 && <Spark w={box.w} h={box.h} />}
+    </View>
+  );
+}
+
+const SPARK_MS = 520;
+const STOP_SPARKS = makeEmbers(22, 41);
+
+function Spark({ w, h }: { w: number; h: number }) {
+  const clock = useClock();
+  const flash = useDerivedValue(() => Math.max(0, 1 - clock.value / 260) * 0.55);
+  const sparks = usePathValue((b) => {
+    'worklet';
+    const t = clock.value;
+    if (t > SPARK_MS) return;
+    const s = t / 1000;
+    const left = 1 - t / SPARK_MS;
+    for (let i = 0; i < STOP_SPARKS.length; i += 1) {
+      const e = STOP_SPARKS[i];
+      // Up and out from the foot, falling back a little.
+      const vx = Math.cos(e.angle) * e.speed * 0.35;
+      const vy = -Math.abs(Math.sin(e.angle)) * e.speed * 0.9;
+      const x = w / 2 + (e.angle / 6.28 - 0.5) * w * 0.8 + vx * s;
+      const y = h - 4 + vy * s + 520 * s * s;
+      const r = e.size * 0.9 * left;
+      if (r > 0.2) b.addCircle(x, y, r);
+    }
+  });
+  return (
+    <Canvas style={StyleSheet.absoluteFill}>
+      <Rect x={0} y={0} width={w} height={h} opacity={flash}>
+        <LinearGradient start={vec(0, 0)} end={vec(0, h)} colors={['rgba(255,255,255,0)', 'rgba(255,246,214,0.9)']} />
+      </Rect>
+      <Path path={sparks} color="#FFE39A">
+        <BlurMask blur={3} style="solid" />
+      </Path>
+    </Canvas>
+  );
+}

@@ -377,15 +377,63 @@ export const ACTION: ActionLook = { ring: ['#FFF1C9', '#F6BD60', '#B7832E'], cor
  * The round action button (Çevir): a gold ring, a deep core with its icon, a halo that breathes while it waits, a
  * press that sinks and glows, and the icon turning while a round runs. `count` shows Oto's spins left instead.
  */
+/**
+ * Two rings of light thrown out from a button when it is pressed (Çevir, Fırlat): a coloured one and a white one
+ * after it, spreading past the button and fading. `fire()` on press; `rings` drawn behind the button, taking no taps.
+ * Still with the salon's quiet effects.
+ */
+function usePressRings(color: string, size: number, radius: number) {
+  const { quiet } = useSalonFx();
+  const [a] = useState(() => new Animated.Value(1));
+  const [b] = useState(() => new Animated.Value(1));
+  const fire = () => {
+    if (quiet) return;
+    a.setValue(0);
+    b.setValue(0);
+    Animated.timing(a, { toValue: 1, duration: 520, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+    Animated.sequence([Animated.delay(90), Animated.timing(b, { toValue: 1, duration: 560, easing: Easing.out(Easing.cubic), useNativeDriver: true })]).start();
+  };
+  const ring = (v: Animated.Value, c: string, w: number) => (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        width: size,
+        height: size,
+        borderRadius: radius,
+        borderWidth: w,
+        borderColor: c,
+        opacity: v.interpolate({ inputRange: [0, 0.1, 1], outputRange: [0, 0.95, 0] }),
+        transform: [{ scale: v.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1.9] }) }],
+      }}
+    />
+  );
+  return { fire, rings: quiet ? null : (<>{ring(a, color, 4)}{ring(b, 'rgba(255,255,255,0.9)', 2)}</>) };
+}
+
 export function ActionButton({ onPress, disabled, busy, count, icon = 'sync', look = ACTION, size = SALON.action, label, art }: { onPress: () => void; disabled?: boolean; busy?: boolean; count?: number | null; icon?: keyof typeof Ionicons.glyphMap; look?: ActionLook; size?: number; label: string; /** A picture of the whole button (a skinned machine's, fx/slot-skin) instead of the ring and core. */ art?: number }) {
   const { still, quiet } = useSalonFx();
   const press = usePress(0.9);
   const breath = useBreath(!quiet && !busy && !disabled && count == null);
   const turn = useTurn(!!busy && !still && count == null);
   const core = Math.round(size * 0.8);
+  const burst = usePressRings(look.ring[1], size, size / 2);
   return (
-    <Pressable onPress={onPress} onPressIn={press.onPressIn} onPressOut={press.onPressOut} disabled={disabled} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled: !!disabled, busy: !!busy }} hitSlop={6}>
+    <Pressable
+      onPress={() => {
+        burst.fire();
+        onPress();
+      }}
+      onPressIn={press.onPressIn}
+      onPressOut={press.onPressOut}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: !!disabled, busy: !!busy }}
+      hitSlop={6}
+    >
       <Animated.View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center', transform: [{ scale: press.scale }] }}>
+        {burst.rings}
         {/* The halo spreads well past the button: it takes no taps, or the bet's − above it would start a round. */}
         <View style={st.halo} pointerEvents="none">
           <Animated.Image source={GLOW} style={{ width: size * 2, height: size * 2, tintColor: look.ring[1], opacity: breath.interpolate({ inputRange: [0, 1], outputRange: [quiet ? 0.32 : 0.28, 0.6] }) }} />

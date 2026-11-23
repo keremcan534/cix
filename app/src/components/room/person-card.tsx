@@ -292,8 +292,8 @@ const s = StyleSheet.create({
   pillText: { color: SHOW.text, fontSize: 12, fontWeight: '700', flexShrink: 1 },
   idSpecial: { color: SHOW.gold },
   middle: { gap: 12, paddingTop: 4 },
-  // The badges stand on one line, a gold dot between two; crowns and sparkles rise above them.
-  badges: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', rowGap: 12, paddingTop: 6 },
+  // The badges on one strip in the middle of the card, a gold dot between two; crowns and sparkles rise above them.
+  badges: { alignSelf: 'center', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', rowGap: 12, marginTop: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,120,215,0.22)' },
   badgeAt: { flexDirection: 'row', alignItems: 'center' },
   dot: { width: 4, height: 4, borderRadius: 2, backgroundColor: SHOW.gold, marginHorizontal: 5 },
   age: { width: AGE_H * 3, height: AGE_H, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3 },

@@ -1,8 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { FlatList, Image, Pressable, ScrollView, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Animated, Easing, FlatList, Pressable, ScrollView, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { LoadError } from '@/components/load-error';
@@ -10,11 +10,18 @@ import { Text } from '@/components/text';
 import { RECHARGE_PACKS, type RechargePack } from '@/data/status';
 import { goBack } from '@/lib/nav';
 import { showAlert } from '@/lib/alert';
-import { useApp } from '@/store';
+import { useApp, useSettings } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 import { SCENES } from '@/components/fx/scenes';
-import { Backdrop } from '@/components/fx/surface';
+import { Backdrop, Shine } from '@/components/fx/surface';
 import { Art } from '@/components/Art';
+import { AmbientGold } from '@/components/fx/ambient-gold';
+import { GlintIcon } from '@/components/fx/glint-icon';
+
+import { Coins } from '@/components/games/fx/coins';
+import { icon3dSource } from '@/components/Icon3D';
+import { bestValue, bonusPct, packRim, type PackRim } from '@/lib/coin-shop-look';
+import { successHaptic } from '@/lib/haptics';
 import { coinPackArtOf } from '@/components/StoreArt';
 import { IS_DEMO } from '@/lib/build';
 import { liveMode, liveTopup, message, refreshWallet, TEST_PACKS } from '@/lib/live';
@@ -69,6 +76,39 @@ export default function WalletScreen() {
   }, [live]);
   const { colors, semantic } = useTheme();
   const styles = useStyles();
+  // Jeton Yükle wears the treasury (LUX); its light and coins move unless motion is reduced or effects are off.
+  const lux = tab === 'buy';
+  const calm = settings.reduceMotion || settings.effectsOff;
+  const [box, setBox] = useState({ w: 0, h: 0 });
+  const onLayout = (e: LayoutChangeEvent) => setBox({ w: Math.round(e.nativeEvent.layout.width), h: Math.round(e.nativeEvent.layout.height) });
+  // The balance counts up when coins arrive (a purchase, a test pack), and gold bursts over the screen.
+  const [shown, setShown] = useState(coins);
+  const [burst, setBurst] = useState(0);
+  const was = useRef(coins);
+  useEffect(() => {
+    const from = was.current;
+    was.current = coins;
+    if (coins <= from || calm || tab !== 'buy') return setShown(coins);
+    successHaptic();
+    setBurst((b) => b + 1);
+    const start = Date.now();
+    let frame = 0;
+    const step = () => {
+      const t = Math.min(1, (Date.now() - start) / 1400);
+      setShown(Math.round(from + (coins - from) * (1 - (1 - t) ** 3)));
+      if (t < 1) frame = requestAnimationFrame(step);
+    };
+    frame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coins]);
+  // The rim each pack wears by its size among its list, and the one pack that really gives the most per lira.
+  const rimOf = (n: number, list: { coins: number }[]) => {
+    const sizes = [...new Set(list.map((x) => x.coins))].sort((a, b) => a - b);
+    return packRim(Math.max(0, sizes.indexOf(n)), sizes.length);
+  };
+  const bestLive = live && shop.status === 'ready' ? bestValue(shop.packs.map((p) => ({ key: p.productId, coins: p.coins + (p.extra ?? 0), price: p.price }))) : null;
+  const bestDemo = live ? null : bestValue(RECHARGE_PACKS.map((p) => ({ key: p.id, coins: p.coins, price: p.price })));
 
   // Live mode: Google Play takes the payment; the coins arrive only with the server's answer.
   const buyLive = (productId: string) => {
@@ -115,18 +155,27 @@ export default function WalletScreen() {
   const serverRows = history.rows.filter((r) => r.currency === filter);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <Backdrop scene={SCENES.wallet} />
+    <SafeAreaView style={{ flex: 1, backgroundColor: lux ? LUX.bg[2] : colors.bg }} onLayout={onLayout}>
+      {/* Jeton Yükle: a night treasury in every colour scheme, light falling from above and gold rising
+          (fx/ambient-gold); Hareketler keeps the wallet's photo. */}
+      {lux ? (
+        <>
+          <LinearGradient colors={LUX.bg} locations={[0, 0.45, 1]} style={StyleSheet.absoluteFill} />
+          {!calm && <AmbientGold />}
+        </>
+      ) : (
+        <Backdrop scene={SCENES.wallet} />
+      )}
       <View style={styles.header}>
         <Pressable onPress={() => goBack()} hitSlop={10} accessibilityLabel="Geri">
-          <Ionicons name="arrow-back" size={26} color={colors.text} />
+          <Ionicons name="arrow-back" size={26} color={lux ? LUX.text : colors.text} />
         </Pressable>
-        <Text style={[styles.title, { flex: 1, marginLeft: 12 }]}>{tab === 'buy' ? 'Jeton Yükle' : 'Hareketler'}</Text>
+        <Text style={[styles.title, { flex: 1, marginLeft: 12 }, lux && { color: LUX.text }]}>{tab === 'buy' ? 'Jeton Yükle' : 'Hareketler'}</Text>
         <Pressable onPress={() => setTab(tab === 'buy' ? 'history' : 'buy')} hitSlop={8} accessibilityLabel="Hareketler" style={{ marginRight: 16 }}>
-          <Ionicons name={tab === 'buy' ? 'document-text-outline' : 'wallet-outline'} size={24} color={colors.text} />
+          <Ionicons name={tab === 'buy' ? 'document-text-outline' : 'wallet-outline'} size={24} color={lux ? LUX.text : colors.text} />
         </Pressable>
         <Pressable onPress={() => router.push({ pathname: '/destek', params: { kategori: 'Ödeme' } })} hitSlop={8} accessibilityLabel="Destek">
-          <Ionicons name="headset-outline" size={24} color={colors.text} />
+          <Ionicons name="headset-outline" size={24} color={lux ? LUX.text : colors.text} />
         </Pressable>
       </View>
 
@@ -209,10 +258,15 @@ export default function WalletScreen() {
         <ScrollView contentContainerStyle={{ paddingBottom: 30 }}>
           <View style={{ paddingHorizontal: 20, paddingVertical: 8 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-              <Text style={{ color: colors.textDim, fontSize: 15, fontWeight: '500' }}>Jeton bakiyem</Text>
-              <Ionicons name="information-circle-outline" size={16} color={colors.textDim} />
+              <Text style={{ color: LUX.dim, fontSize: 15, fontWeight: '600' }}>Jeton bakiyem</Text>
+              <Ionicons name="information-circle-outline" size={16} color={LUX.dim} />
             </View>
-            <Text style={styles.balanceN}>{coins.toLocaleString('tr-TR')}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 2 }}>
+              <GlintIcon source={icon3dSource('coin')} size={46} every={2800} />
+              <Text style={styles.balanceLux} accessibilityLabel={`${coins.toLocaleString('tr-TR')} jeton`}>
+                {shown.toLocaleString('tr-TR')}
+              </Text>
+            </View>
             {live && walletError && <LoadError text="Bakiyen sunucudan güncellenemedi; son bilinen bakiye gösteriliyor." onRetry={readWallet} style={{ marginTop: 8 }} />}
             {IS_DEMO && !live && (
               <Pressable
@@ -230,8 +284,8 @@ export default function WalletScreen() {
             )}
           </View>
           <View style={styles.packHead}>
-            <Text style={[styles.title, { flex: 1, fontSize: 20 }]}>Paket seç</Text>
-            <Text style={styles.currency}>{!live ? 'Fiyatlar TL' : shop.status === 'ready' ? 'Google Play ile' : ''}</Text>
+            <Text style={[styles.title, { flex: 1, fontSize: 20, color: LUX.text }]}>Paket seç</Text>
+            <Text style={[styles.currency, { color: LUX.dim }]}>{!live ? 'Fiyatlar TL' : shop.status === 'ready' ? 'Google Play ile' : ''}</Text>
           </View>
           {campaign && (
             <View style={styles.campaign} accessibilityRole="summary">
@@ -249,12 +303,15 @@ export default function WalletScreen() {
           {live ? (
             shop.status === 'ready' ? (
               <View style={styles.grid}>
-                {shop.packs.map((p) => {
+                {shop.packs.map((p, i) => {
                   // The server's first-purchase gift for this pack while I haven't bought it (GET /api/rewards).
                   const first = firstBonusOf(rewards, p.productId);
                   return (
                     <PackTile
                       key={p.productId}
+                      index={i}
+                      rim={rimOf(p.coins, shop.packs)}
+                      best={bestLive === p.productId}
                       coins={p.coins}
                       bonus={first || undefined}
                       extra={p.extra || undefined}
@@ -274,7 +331,7 @@ export default function WalletScreen() {
             <View style={styles.grid}>
               {RECHARGE_PACKS.map((p: RechargePack) => {
                 const first = !!p.firstBonus && !firstBuys.has(p.id);
-                return <PackTile key={p.id} coins={p.coins} bonus={first ? p.firstBonus : p.bonus} first={first} price={p.price} busy={processing === p.id} onPress={() => buy(p)} />;
+                return <PackTile key={p.id} index={RECHARGE_PACKS.indexOf(p)} rim={rimOf(p.coins, RECHARGE_PACKS)} best={bestDemo === p.id} coins={p.coins} bonus={first ? p.firstBonus : p.bonus} first={first} price={p.price} busy={processing === p.id} onPress={() => buy(p)} />;
               })}
             </View>
           )}
@@ -286,7 +343,7 @@ export default function WalletScreen() {
               </View>
               <View style={styles.grid}>
                 {testPacks.map((p) => (
-                  <PackTile key={p.id} coins={p.coins} price="Ücretsiz" busy={processing === p.id} onPress={() => buy(p)} />
+                  <PackTile key={p.id} index={testPacks.indexOf(p)} rim={rimOf(p.coins, testPacks)} coins={p.coins} price="Ücretsiz" busy={processing === p.id} onPress={() => buy(p)} />
                 ))}
               </View>
             </>
@@ -309,14 +366,40 @@ export default function WalletScreen() {
           </Text>
         </ScrollView>
       )}
+      {/* A purchase that landed: gold bursts up over the screen while the balance counts up. */}
+      {burst > 0 && box.w > 0 && (
+        <View style={StyleSheet.absoluteFill} pointerEvents="none">
+          <Coins key={burst} kind="fountain" count={36} width={box.w} height={box.h} ms={2200} from={0.3} />
+        </View>
+      )}
     </SafeAreaView>
   );
 }
 
-/** One pack in the grid: coins, an optional bonus, and its price (the store's, in a live build). `first`: the
- *  "Hoş geldin paketi" tag with its first-purchase `bonus`. `campaign`: the running campaign's tag and this pack's
- *  extra coins (live store packs only); with a first-purchase gift both add up under the welcome tag. */
+/** The treasury's colours (Jeton Yükle in every colour scheme): night plum to black, gold writing. */
+const LUX = {
+  bg: ['#2B0E40', '#150822', '#08040F'] as const,
+  text: '#FFF7EC',
+  dim: 'rgba(255,226,170,0.78)',
+  gold: '#FFE08A',
+};
+/** Each rim's metal, outside in, and the light behind its coins. */
+const RIM: Record<PackRim, { rim: readonly [string, string, string]; halo: string }> = {
+  bronze: { rim: ['#FFD6A0', '#A0582A', '#F3B06A'], halo: 'rgba(255,170,80,0.45)' },
+  gold: { rim: ['#FFF4C2', '#D99A1E', '#FFE08A'], halo: 'rgba(255,214,90,0.55)' },
+  royal: { rim: ['#F7D9FF', '#A855F7', '#FFD475'], halo: 'rgba(220,140,255,0.55)' },
+};
+
+/**
+ * One pack in the grid: its picture shining and floating over a light, the coins in gold, a bonus as coins and as a
+ * percentage, and its price on a gold button; the rim grows with the pack (lib/coin-shop-look). `first`: the "Hoş
+ * geldin paketi" tag with its first-purchase `bonus`; `campaign`: the running campaign's tag and this pack's extra
+ * coins (live store packs only); `best`: the pack that truly gives the most per lira. A press sinks it a little.
+ */
 function PackTile({
+  index,
+  rim,
+  best,
   coins,
   bonus,
   first,
@@ -326,6 +409,9 @@ function PackTile({
   campaign,
   extra,
 }: {
+  index: number;
+  rim: PackRim;
+  best?: boolean;
   coins: number;
   bonus?: number;
   /** The pack's extra coins on every purchase (the panel's Jeton paketleri). */
@@ -336,57 +422,101 @@ function PackTile({
   onPress: () => void;
   campaign?: { percent: number; extra: number };
 }) {
-  const { colors, dark } = useTheme();
   const styles = useStyles();
+  const { reduceMotion, effectsOff } = useSettings();
+  const calm = reduceMotion || effectsOff;
+  const look = RIM[rim];
+  const plus = (bonus ?? 0) + (extra ?? 0) + (campaign?.extra ?? 0);
+  const pct = bonusPct(coins, plus);
+  const [press] = useState(() => new Animated.Value(1));
+  const [bob] = useState(() => new Animated.Value(0));
+  useEffect(() => {
+    if (calm) return;
+    const a = Animated.loop(
+      Animated.sequence([
+        Animated.delay((index % 3) * 220),
+        Animated.timing(bob, { toValue: 1, duration: 1300, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(bob, { toValue: 0, duration: 1300, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      ]),
+    );
+    a.start();
+    return () => a.stop();
+  }, [calm, bob, index]);
+  const sink = (to: number) => Animated.spring(press, { toValue: to, friction: 5, tension: 260, useNativeDriver: true }).start();
   return (
     <Pressable
       onPress={onPress}
+      onPressIn={() => sink(0.94)}
+      onPressOut={() => sink(1)}
       accessibilityRole="button"
-      accessibilityLabel={`${coins.toLocaleString('tr-TR')} jeton${first && bonus ? `, artı ${bonus.toLocaleString('tr-TR')} ilk alım hediyesi` : ''}${extra ? `, artı ${extra.toLocaleString('tr-TR')} ek jeton` : ''}${campaign?.extra ? `, artı ${campaign.extra.toLocaleString('tr-TR')} kampanya jetonu` : ''}, ${price}`}
-      style={{ width: '31.3%', margin: '1%' }}
+      accessibilityLabel={`${coins.toLocaleString('tr-TR')} jeton${first && bonus ? `, artı ${bonus.toLocaleString('tr-TR')} ilk alım hediyesi` : ''}${extra ? `, artı ${extra.toLocaleString('tr-TR')} ek jeton` : ''}${campaign?.extra ? `, artı ${campaign.extra.toLocaleString('tr-TR')} kampanya jetonu` : ''}, ${price}${best ? ', en avantajlı paket' : ''}`}
+      style={{ width: '31.3%', margin: '1%', marginTop: 12 }}
     >
-      <LinearGradient
-        colors={first ? ['rgba(246,189,96,0.30)', dark ? 'rgba(22,37,60,0.96)' : 'rgba(255,255,255,0.96)'] : [colors.cardAlt, colors.card]}
-        style={[styles.pack, (first || !!campaign?.extra || !!extra) && styles.packFirst, busy && { opacity: 0.5 }]}
-      >
-        {/* The same slot on every tile, tag or not, so the coins of a row line up. */}
-        <View style={styles.tagSlot}>
-          {first ? (
-            <View style={[styles.firstTag, { flexDirection: 'row', alignItems: 'center', gap: 2 }]}>
-              <Art name="finans-ilk-alim-firsati" size={14} />
-              <Text style={styles.firstTagText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
-                Hoş geldin paketi
-              </Text>
+      <Animated.View style={{ transform: [{ scale: press }], opacity: busy ? 0.55 : 1 }}>
+        <LinearGradient colors={look.rim} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.rim, best && styles.rimBest]}>
+          <LinearGradient colors={['#34144D', '#1A0B2A', '#120720']} style={styles.packLux}>
+            {/* The same slot on every tile, tag or not, so the coins of a row line up. */}
+            <View style={styles.tagSlot}>
+              {first ? (
+                <View style={[styles.firstTag, { flexDirection: 'row', alignItems: 'center', gap: 2 }]}>
+                  <Art name="finans-ilk-alim-firsati" size={14} />
+                  <Text style={styles.firstTagText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                    Hoş geldin paketi
+                  </Text>
+                </View>
+              ) : campaign?.extra ? (
+                <View style={styles.firstTag}>
+                  <Text style={styles.firstTagText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                    +%{campaign.percent} kampanya
+                  </Text>
+                </View>
+              ) : extra ? (
+                <View style={styles.firstTag}>
+                  <Text style={styles.firstTagText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                    Ek jetonlu
+                  </Text>
+                </View>
+              ) : null}
             </View>
-          ) : campaign?.extra ? (
-            <View style={styles.firstTag}>
-              <Text style={styles.firstTagText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
-                +%{campaign.percent} kampanya
-              </Text>
+            <View style={styles.artBox}>
+              <View style={[styles.halo, { backgroundColor: look.halo, boxShadow: `0 0 26px 10px ${look.halo}` }]} />
+              <Animated.View style={{ transform: [{ translateY: bob.interpolate({ inputRange: [0, 1], outputRange: [2, -4] }) }] }}>
+                <GlintIcon source={coinPackArtOf(coins)} size={60} every={3400 + (index % 4) * 300} delay={index * 420} />
+              </Animated.View>
             </View>
-          ) : extra ? (
-            <View style={styles.firstTag}>
-              <Text style={styles.firstTagText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
-                Ek jetonlu
+            <Text style={styles.packCoinsLux} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+              {coins.toLocaleString('tr-TR')}
+            </Text>
+            {plus > 0 ? (
+              <View style={styles.bonusRow}>
+                <Text style={styles.packBonusLux} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                  +{plus.toLocaleString('tr-TR')}
+                </Text>
+                {pct > 0 && (
+                  <View style={styles.pctChip}>
+                    <Text style={styles.pctText}>+%{pct}</Text>
+                  </View>
+                )}
+              </View>
+            ) : (
+              <View style={{ height: 19 }} />
+            )}
+            <LinearGradient colors={['#FFF1B8', '#F2C14E', '#C98A14']} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={styles.priceBtn}>
+              <Text style={styles.priceText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                {busy ? 'Bekleniyor…' : price}
               </Text>
-            </View>
-          ) : null}
-        </View>
-        <Image source={coinPackArtOf(coins)} style={{ width: 48, height: 48, marginVertical: -4 }} resizeMode="contain" accessibilityIgnoresInvertColors />
-        <Text style={styles.packCoins} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
-          {coins.toLocaleString('tr-TR')}
-        </Text>
-        {bonus || campaign?.extra || extra ? (
-          <Text style={styles.packBonus} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
-            +{((bonus ?? 0) + (extra ?? 0) + (campaign?.extra ?? 0)).toLocaleString('tr-TR')}
-          </Text>
-        ) : (
-          <View style={{ height: 18 }} />
+            </LinearGradient>
+            {!calm && <Shine radius={16} every={5200 + (index % 3) * 700} delay={index * 380} />}
+          </LinearGradient>
+        </LinearGradient>
+        {best && (
+          <LinearGradient colors={['#FF5FB2', '#C2187A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.bestRibbon}>
+            <Text style={styles.bestText} numberOfLines={1}>
+              EN AVANTAJLI
+            </Text>
+          </LinearGradient>
         )}
-        <Text style={[styles.packPrice, first && { color: colors.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
-          {busy ? 'Bekleniyor…' : price}
-        </Text>
-      </LinearGradient>
+      </Animated.View>
     </Pressable>
   );
 }
@@ -405,6 +535,21 @@ const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark }) =>
   balance: { margin: 16, borderRadius: 20, padding: 20, gap: 6 },
   balanceLabel: { color: ink(0.85) },
   balanceN: { color: colors.text, fontSize: 32, fontWeight: '800' },
+  balanceLux: { color: LUX.gold, fontSize: 36, fontWeight: '900', fontVariant: ['tabular-nums'], textShadowColor: 'rgba(255,196,80,0.85)', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 16 },
+  rim: { borderRadius: 18, padding: 1.6, boxShadow: '0 6px 18px rgba(0,0,0,0.45)' },
+  rimBest: { boxShadow: '0 0 18px rgba(255,95,178,0.75)' },
+  packLux: { alignItems: 'center', gap: 4, paddingTop: 8, paddingBottom: 10, paddingHorizontal: 6, borderRadius: 16.5, minHeight: 168, overflow: 'hidden' },
+  artBox: { width: 72, height: 66, alignItems: 'center', justifyContent: 'center' },
+  halo: { position: 'absolute', width: 40, height: 40, borderRadius: 20 },
+  packCoinsLux: { color: LUX.gold, fontSize: 19, fontWeight: '900', fontVariant: ['tabular-nums'], textShadowColor: 'rgba(255,190,60,0.7)', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 8 },
+  bonusRow: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 19, maxWidth: '100%' },
+  packBonusLux: { color: '#FFC94A', fontWeight: '900', fontSize: 13, flexShrink: 1 },
+  pctChip: { backgroundColor: '#FF3FA4', borderRadius: 6, paddingHorizontal: 4, paddingVertical: 1 },
+  pctText: { color: '#fff', fontSize: 10, fontWeight: '900' },
+  priceBtn: { alignSelf: 'stretch', marginTop: 4, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.55)' },
+  priceText: { color: '#3A1A00', fontSize: 13, fontWeight: '900' },
+  bestRibbon: { position: 'absolute', top: -9, alignSelf: 'center', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.7)' },
+  bestText: { color: '#fff', fontSize: 9.5, fontWeight: '900', letterSpacing: 0.6 },
   section: { color: colors.text, fontWeight: '700', fontSize: 16, paddingHorizontal: 16, marginBottom: 10 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 10 },
   packHead: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, marginTop: 18, marginBottom: 8 },

@@ -13,6 +13,7 @@ import { Animated, Easing, Image, Pressable, StyleSheet, View, type LayoutChange
 import { Shine } from '@/components/fx/surface';
 import { Coins } from '@/components/games/fx/coins';
 import { DivineFx } from '@/components/games/fx/divine-fx';
+import { useGameQuake } from '@/components/games/fx/quake';
 import { SALON } from '@/components/games/fx/salon';
 import { salonArt } from '@/components/games/fx/salon-art';
 import { SkinOverlay, type SlotSkin } from '@/components/games/fx/slot-skin';
@@ -90,13 +91,15 @@ function JackpotShow({ skin, kind, amount, bet, onDone }: { skin: SlotSkin; kind
   // A blow also shakes the show (not the dimming behind it), harder as the title climbs; damped, the axes out of step.
   const [shakeX] = useState(() => new Animated.Value(0));
   const [shakeY] = useState(() => new Animated.Value(0));
+  const shakeGame = useGameQuake();
   const quake = useCallback(
     (px: number) => {
       if (calm) return;
+      shakeGame(px * 0.8);
       const jolts = (v: Animated.Value, steps: number[]) => Animated.sequence(steps.map((k) => Animated.timing(v, { toValue: k * px, duration: 40, useNativeDriver: true })));
       Animated.parallel([jolts(shakeX, [1, -0.85, 0.7, -0.55, 0.4, -0.25, 0.12, 0]), jolts(shakeY, [-0.6, 0.75, -0.5, 0.45, -0.3, 0.18, -0.08, 0])]).start();
     },
-    [calm, shakeX, shakeY],
+    [calm, shakeX, shakeY, shakeGame],
   );
   const blow = useCallback(
     (px: number) => {
