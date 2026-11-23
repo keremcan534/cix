@@ -18,6 +18,7 @@ import { ROOM_EVENTS } from '@/data/rooms-ui';
 import { liveMode } from '@/lib/live';
 import { TEAM_KIND_LABEL, roomBanners, type BoardKey, type BoardPeriod, type RoomBanners as Banners, type TeamKind } from '@/lib/live/team';
 import { noticeHref } from '@/lib/notice-links';
+import { compact } from '@/lib/compact';
 import { useApp } from '@/store';
 import { ThemeScope, fonts, makeStyles } from '@/theme';
 
@@ -55,13 +56,6 @@ const EVERY_MS = 5500;
 /** Every slide's height: the podium card's crowns, laurels and stage need the room. */
 const CARD_H = 204;
 
-/** 12.400 → "12,4 B"; 1.250.000 → "1,3 Mn". */
-function short(n: number) {
-  const one = (x: number) => (Math.round(x * 10) / 10).toLocaleString('tr-TR');
-  if (n >= 1_000_000) return `${one(n / 1_000_000)} Mn`;
-  if (n >= 10_000) return `${one(n / 1_000)} B`;
-  return n.toLocaleString('tr-TR');
-}
 
 function liveSlides(d: Banners): Slide[] {
   const events: Slide[] = d.events.map((e) => ({ kind: 'event', id: `e${e.id}`, tag: e.kind, title: e.title, body: e.body, image: e.imageUrl, link: e.link ?? undefined }));
@@ -295,7 +289,7 @@ function BoardCard({ s }: { s: BoardSlide }) {
                     </View>
                   );
                 return (
-                  <View key={r.id} style={styles.place} accessible accessibilityLabel={`${rank}. ${r.name}, ${short(r.score)}`}>
+                  <View key={r.id} style={styles.place} accessible accessibilityLabel={`${rank}. ${r.name}, ${compact(r.score)}`}>
                     {crown}
                     <View>
                       {first && (
@@ -314,7 +308,7 @@ function BoardCard({ s }: { s: BoardSlide }) {
                     </Text>
                     <View style={styles.score}>
                       <Icon3D name={b.unit} size={15} />
-                      <Text style={styles.scoreText}>{short(r.score)}</Text>
+                      <Text style={styles.scoreText}>{compact(r.score)}</Text>
                     </View>
                   </View>
                 );
