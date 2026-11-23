@@ -38,6 +38,7 @@ import { failed } from './reporting.mjs';
 import { adminRoutes } from './admin.mjs';
 import { lookupRoutes } from './public-no.mjs';
 import { alertRoutes, warningCodes } from './alerts.mjs';
+import { serverLoadRoutes, startServerLoad, stopServerLoad } from './server-load.mjs';
 import { CONFIG_CACHE, configRoutes, gate } from './features.mjs';
 import { agencyRoutes } from './agency.mjs';
 import { agencyAdminRoutes } from './agency-admin.mjs';
@@ -395,6 +396,7 @@ const routes = {
   ...agencyAssistantRoutes,
   ...configRoutes,
   ...alertRoutes,
+  ...serverLoadRoutes,
   ...sanctionRoutes,
   ...liveSettingsRoutes,
 };
@@ -551,6 +553,7 @@ function shutdown(signal) {
   stopLevels();
   stopLevelDecay();
   stopGuardSweep();
+  stopServerLoad();
   stopShopItems();
   stopLuckyArt();
   stopMarkKinds();
@@ -602,6 +605,7 @@ startEmoji();
 startLevels();
 startLevelDecay();
 startGuardSweep();
+startServerLoad();
 startShopItems();
 // VIP seti: the client's VIP 1–10 frames, bubbles and entry effects as bag rewards, added once (vip-set.mjs).
 addVipSet().catch((e) => console.error('vip set', String(e?.message ?? e).slice(0, 200)));
