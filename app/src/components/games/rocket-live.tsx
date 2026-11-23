@@ -33,7 +33,7 @@ const GREEN = '#4ADE80';
 const RED = '#FB7185';
 const CLIMB = '#FDE047';
 const RULES =
-  'Her turda herkes aynı roketi izler. Geri sayım bitene kadar bidonlara dokunarak yakıt al; her dokunuş bir bahistir. Roket kalkınca çarpan yükselir: istediğin an Kaç’a bas, yakıtın o anki çarpanla ödenir. Roket sen kaçmadan patlarsa yakıtın gider. Otomatik kaç seçersen roket o çarpana gelince kendiliğinden kaçarsın. Patlama noktası tur açılırken sunucuda belirlenir; tırmanışın hızı her turda aynıdır, sonucu önceden göstermez.';
+  'Her turda herkes aynı roketi izler. Geri sayım bitene kadar bidonlara dokunarak yakıt al; her dokunuş bir bahistir. Roket kalkınca çarpan yükselir: istediğin an Kaç’a bas, yakıtın o anki çarpanla ödenir. Roket sen kaçmadan patlarsa yakıtın gider. Otomatik kaç seçersen roket o çarpana gelince kendiliğinden kaçarsın. Tırmanışın hızı her turda aynıdır.';
 
 /** Yörünge: live and shared on a server that plays it that way; the one-player screen in the demo and on an older server. */
 export function YorungePlayer({ entry }: { entry: Entry }) {
@@ -296,7 +296,7 @@ export function LiveRocketPlayer({ entry }: { entry: Entry }) {
             </View>
           ))}
           <Text style={s.paysNote}>
-            Roket her 100 turun yaklaşık {100 - ret} turunda kalkmadan patlar. Bir turda en çok {fmt(st.game?.maxFuel ?? 0)} jeton yakıt alınır. Ödül havuzu yetmezse roket daha erken patlayabilir.
+            Bir turda en çok {fmt(st.game?.maxFuel ?? 0)} jeton yakıt alınır. Çok yakıt alınan turlarda roket tablodakinden daha erken patlayabilir.
           </Text>
         </View>
       </GameInfoSheet>
