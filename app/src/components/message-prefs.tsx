@@ -115,6 +115,7 @@ export function MessagePrefsButton() {
           <View style={[smile.eye, { left: 10 }]} />
           <View style={[smile.eye, { right: 10 }]} />
           <View style={smile.mouth} />
+          <View style={smile.shine} />
         </LinearGradient>
       </Pressable>
       {open && <PrefsSheet onClose={() => setOpen(false)} />}
@@ -123,10 +124,12 @@ export function MessagePrefsButton() {
 }
 
 const smile = StyleSheet.create({
-  face: { width: 34, height: 34, borderRadius: 17, boxShadow: '0 2px 5px rgba(180,110,0,0.35)' },
-  eye: { position: 'absolute', top: 9, width: 4, height: 7, borderRadius: 2, backgroundColor: '#6B3A00' },
+  // The design's glossy face, a little bigger than the pills beside it.
+  face: { width: 38, height: 38, borderRadius: 19, boxShadow: '0 2px 6px rgba(180,110,0,0.4)' },
+  eye: { position: 'absolute', top: 10, width: 4.5, height: 8, borderRadius: 2.5, backgroundColor: '#6B3A00' },
+  shine: { position: 'absolute', left: 8, top: 4, width: 11, height: 5, borderRadius: 5, backgroundColor: 'rgba(255,255,255,0.4)', transform: [{ rotate: '-20deg' }] },
   // Only the bottom edge is drawn: it thins out toward the corners of the smile.
-  mouth: { position: 'absolute', left: 8, top: 16, width: 18, height: 10, borderBottomLeftRadius: 10, borderBottomRightRadius: 10, borderBottomWidth: 2.5, borderColor: '#6B3A00' },
+  mouth: { position: 'absolute', left: 9, top: 18, width: 20, height: 11, borderBottomLeftRadius: 10, borderBottomRightRadius: 10, borderBottomWidth: 2.5, borderColor: '#6B3A00' },
 });
 
 const useStyles = makeStyles(({ colors }) => ({
