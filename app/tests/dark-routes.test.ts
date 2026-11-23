@@ -8,8 +8,9 @@ import assert from 'node:assert/strict';
 import { isDarkRoute } from '@/components/fx/dark-routes';
 
 describe('Koyu ekranlar', () => {
-  test('oda ve ajans ekranları her zaman koyu', () => {
+  test('oda, ajans ve sıralama ekranları her zaman koyu', () => {
     for (const calls of [true, false]) {
+      assert.equal(isDarkRoute('siralama', calls), true);
       assert.equal(isDarkRoute('oda/[id]', calls), true);
       assert.equal(isDarkRoute('ajans', calls), true);
       assert.equal(isDarkRoute('ajans/basvuru', calls), true);
