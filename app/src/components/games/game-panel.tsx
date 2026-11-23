@@ -17,6 +17,7 @@ import { GoldTreePlayer } from '@/components/games/gold-tree';
 import { BoardPlayer } from '@/components/games/board';
 import { LineSlotPlayer } from '@/components/games/line-slot';
 import { SkinBackdrop, SkinOverlay, slotSkinOf } from '@/components/games/fx/slot-skin';
+import { QuakeView } from '@/components/games/fx/quake';
 import { salonArt } from '@/components/games/fx/salon-art';
 import { FenerPlayer } from '@/components/games/fener';
 import { YorungePlayer } from '@/components/games/rocket-live';
@@ -216,6 +217,8 @@ export function GamePanel({
 
       {/* At least as tall as the panel: an Oyun Salonu game's stage takes the free height (games/fx/salon), its
           controls stay at the bottom; a phone too short for it scrolls. */}
+      {/* The game itself trembles with its wins and blows (fx/quake). */}
+      <QuakeView>
       <ScrollView contentContainerStyle={{ flexGrow: 1, paddingVertical: 8, gap: 10 }} keyboardShouldPersistTaps="handled">
         {roomGame &&
           (roomGame.playable ? (
@@ -248,6 +251,7 @@ export function GamePanel({
         )}
         {wheel && casinoVisible(wealthLevel, paidGames) && <WheelPlayer entry={entry} />}
       </ScrollView>
+      </QuakeView>
       {skin && overlay}
     </View>
   );

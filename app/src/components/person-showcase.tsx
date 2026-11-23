@@ -5,10 +5,11 @@
 // (components/person-card-art); every name, number and photo on it is the person's own.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Image, Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/text';
-import { CardArt, DIVIDER_ART, SlicePill, TILE_ART, type CardArtName } from '@/components/person-card-art';
+import { CardArt, DIVIDER_ART, SlicePill, type CardArtName } from '@/components/person-card-art';
 import { useAffiliations, type Affiliation } from '@/components/profile-badges';
 import type { User } from '@/data/mock';
 
@@ -63,9 +64,9 @@ export function ClubPills({ user, onOpen }: { user: User; onOpen?: () => void })
       accessibilityRole={a.href ? 'button' : undefined}
       accessibilityLabel={`${a.sub}: ${a.name}`}
     >
-      <SlicePill kind="kulup" h={36}>
+      <SlicePill kind="kulup" h={30}>
         <View style={s.club}>
-          <CardArt name={art} h={17} />
+          <CardArt name={art} h={15} />
           <Text style={s.clubText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
             {a.name}
           </Text>
@@ -106,7 +107,8 @@ export function ActionTiles({ tiles }: { tiles: Tile[] }) {
           accessibilityLabel={t.label}
           accessibilityState={t.on !== undefined ? { selected: t.on } : undefined}
         >
-          <Image source={t.on ? TILE_ART.on : TILE_ART.off} style={s.tileArt} resizeMode="stretch" />
+          {/* A ground drawn the same on both sides (the stretched picture's light ran to one corner). */}
+          <LinearGradient colors={t.on ? ['rgba(255,57,196,0.42)', 'rgba(150,20,105,0.38)'] : ['rgba(255,255,255,0.10)', 'rgba(120,24,92,0.20)']} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={[StyleSheet.absoluteFill, s.tileGround, t.on && s.tileOn]} />
           <CardArt name={t.art} h={25} />
           <Text style={s.tileText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
             {t.label}
@@ -148,25 +150,21 @@ const WALLS = {
 };
 export type WallKey = keyof typeof WALLS;
 
-const WALL_ART: Record<WallKey, { art: CardArtName; h: number }> = { iliski: { art: 'iliski', h: 19 }, hediye: { art: 'hediye', h: 30 }, koruma: { art: 'koruma', h: 30 } };
+const WALL_ART: Record<WallKey, { art: CardArtName; h: number }> = { iliski: { art: 'iliski', h: 15 }, hediye: { art: 'hediye', h: 22 }, koruma: { art: 'koruma', h: 23 } };
 
-/** The card's three links, each with its picture standing out of the pill: each opens that wall. */
+/** The card's three links, the same width, each its picture over its name inside its pill: each opens that wall. */
 export function WallLinks({ onOpen }: { onOpen: (w: WallKey) => void }) {
   return (
     <View style={s.links}>
       {(Object.keys(WALLS) as WallKey[]).map((k) => (
         <Pressable key={k} style={s.linkAt} onPress={() => onOpen(k)} accessibilityRole="button" accessibilityLabel={WALLS[k].label}>
-          <SlicePill kind="duvar" h={36}>
-            <View style={s.link}>
-              {/* One line, as in the design: a narrow phone draws it a little smaller rather than on two lines. */}
-              <Text style={s.linkText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} maxFontSizeMultiplier={1}>
-                {WALLS[k].label}
-              </Text>
-              <CardArt name="ok" h={9} />
-            </View>
-          </SlicePill>
-          <View style={s.linkArt} pointerEvents="none">
+          <LinearGradient colors={WALLS[k].pill} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={[StyleSheet.absoluteFill, s.linkGround, { borderColor: WALLS[k].colors[0] }]} />
+          <View style={s.link}>
             <CardArt name={WALL_ART[k].art} h={WALL_ART[k].h} />
+            {/* The picture over its name, so a 360-point phone keeps "İlişki Duvarı" whole. */}
+            <Text style={s.linkText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={1}>
+              {WALLS[k].label}
+            </Text>
           </View>
         </Pressable>
       ))}
@@ -181,23 +179,25 @@ const s = StyleSheet.create({
   level: { position: 'absolute', left: '13%', right: '13%', top: '49%', bottom: '11%', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3 },
   levelText: { color: '#fff', fontSize: 12, lineHeight: 15, fontWeight: '800' },
   // Two halves, as in the design (one alone keeps its half, on the left).
-  clubs: { flexDirection: 'row', gap: 10 },
-  clubAt: { width: '48.5%' },
-  club: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 16, paddingRight: 14, minHeight: 36 },
-  clubText: { flex: 1, color: SHOW.text, fontSize: 14, fontWeight: '700' },
+  // Small chips as wide as their names, in the middle (the owners, 23 Nov 2026: the card symmetric), not two half-card pills.
+  clubs: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8 },
+  clubAt: { maxWidth: '64%' },
+  club: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 12, paddingRight: 10, minHeight: 30 },
+  clubText: { flexShrink: 1, color: SHOW.text, fontSize: 13, fontWeight: '700' },
   tiles: { flexDirection: 'row', gap: 8 },
-  tile: { flex: 1, minWidth: 0, minHeight: 72, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 6, paddingVertical: 8 },
-  tileArt: { position: 'absolute', left: 0, top: 0, width: '100%', height: '100%' },
-  tileText: { color: SHOW.text, fontSize: 13, fontWeight: '800' },
+  tile: { flex: 1, minWidth: 0, minHeight: 70, borderRadius: 16, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 6, paddingVertical: 8 },
+  tileGround: { borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,120,215,0.35)' },
+  tileOn: { borderColor: '#FF6FD8', borderWidth: 1.5 },
+  tileText: { color: SHOW.text, fontSize: 13, fontWeight: '800', textAlign: 'center' },
   divider: { width: '100%', height: 3, marginTop: 2 },
   manage: { flexDirection: 'row', alignItems: 'center', minHeight: 44 },
   manageCell: { flex: 1, flexDirection: 'row', alignItems: 'center' },
   manageSep: { width: 1, height: 20, backgroundColor: 'rgba(255, 140, 225, 0.25)' },
   manageItem: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 44 },
   manageText: { color: SHOW.dim, fontSize: 13.5, fontWeight: '700', flexShrink: 1 },
-  links: { flexDirection: 'row', gap: 6, paddingLeft: 6 },
-  linkAt: { flex: 1, minWidth: 0, justifyContent: 'center' },
-  link: { flexDirection: 'row', alignItems: 'center', gap: 2, minHeight: 36, paddingLeft: 24, paddingRight: 6 },
-  linkArt: { position: 'absolute', left: -8, top: 0, bottom: 0, width: 34, alignItems: 'center', justifyContent: 'center' },
-  linkText: { flex: 1, color: SHOW.text, fontSize: 10.5, lineHeight: 13, fontWeight: '800' },
+  links: { flexDirection: 'row', gap: 6 },
+  linkAt: { flex: 1, minWidth: 0, minHeight: 52, justifyContent: 'center' },
+  linkGround: { borderRadius: 16, borderWidth: 1 },
+  link: { alignItems: 'center', justifyContent: 'center', gap: 3, minHeight: 52, paddingHorizontal: 4, paddingVertical: 5 },
+  linkText: { color: SHOW.text, fontSize: 11.5, lineHeight: 14, fontWeight: '800', textAlign: 'center' },
 });

@@ -16,6 +16,7 @@ import { Animated, Easing, Pressable, StyleSheet, View, type LayoutChangeEvent }
 import { Shine } from '@/components/fx/surface';
 import { Coins } from '@/components/games/fx/coins';
 import { DivineFx } from '@/components/games/fx/divine-fx';
+import { useGameQuake } from '@/components/games/fx/quake';
 import { salonArt } from '@/components/games/fx/salon-art';
 import { Text } from '@/components/text';
 import { playSfx } from '@/lib/game-sound';
@@ -113,6 +114,8 @@ export function useWinFx(): { celebrate: Celebrate; layer: ReactNode } {
 function WinCelebration({ amount, bet, tier, title, onDone }: WinShow & { tier: WinTier; onDone: () => void }) {
   const { reduceMotion, effectsOff, gameFx } = useSettings();
   const small = tier === 'small';
+  // The game screen round the show trembles with it (fx/quake).
+  const shakeGame = useGameQuake();
   // The flourishes on top of the light and the coins: flash, rings, bursts, sparkles, fireworks, shaking.
   const lively = !small && !reduceMotion && !effectsOff;
   // The GPU light, embers and lightning on top of them (fx/divine-fx), with Oyunlarda güçlü efektler on.
@@ -172,16 +175,18 @@ function WinCelebration({ amount, bet, tier, title, onDone }: WinShow & { tier: 
       Animated.timing(flash, { toValue: 0, duration: 360, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
       // A damped shake, the two axes out of step.
       const p = QUAKE[at] * (0.6 + 0.4 * strength);
+      shakeGame(p * 0.8);
       const jolts = (v: Animated.Value, steps: number[]) => Animated.sequence(steps.map((k) => Animated.timing(v, { toValue: k * p, duration: 40, useNativeDriver: true })));
       Animated.parallel([jolts(shakeX, [1, -0.85, 0.7, -0.55, 0.4, -0.25, 0.12, 0]), jolts(shakeY, [-0.6, 0.75, -0.5, 0.45, -0.3, 0.18, -0.08, 0])]).start();
     },
-    [lively, pop, punch, wave, streak, flash, shakeX, shakeY],
+    [lively, pop, punch, wave, streak, flash, shakeX, shakeY, shakeGame],
   );
 
   useEffect(() => {
     if (small) {
       successHaptic();
       playSfx('win', 0.8);
+      if (!reduceMotion && !effectsOff) shakeGame(3);
     } else if (tier === 'jackpot') {
       playSfx('jackpot', 1);
       rumbleHaptic([90, 120, 170]);
@@ -291,6 +296,7 @@ function WinCelebration({ amount, bet, tier, title, onDone }: WinShow & { tier: 
   if (small)
     return (
       <View style={StyleSheet.absoluteFill} pointerEvents="none" onLayout={onLayout}>
+        {!reduceMotion && !effectsOff && gameFx && box.w > 0 && <DivineFx tier="small" pulse={1} width={box.w} height={box.h} cx={box.w / 2} cy={box.h * 0.42} />}
         {!reduceMotion && <Coins kind="fountain" count={WIN_SHOW.small.coins} width={box.w} height={box.h} ms={ms} from={0.42} />}
         <Animated.View style={[s.floatWrap, { opacity: inV.interpolate({ inputRange: [0, 0.12, 0.75, 1], outputRange: [0, 1, 1, 0] }), transform: [{ translateY: inV.interpolate({ inputRange: [0, 1], outputRange: [10, -46] }) }] }]}>
           <Text style={s.float}>+{fmt(amount)}</Text>

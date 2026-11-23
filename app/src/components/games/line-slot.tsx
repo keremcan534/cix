@@ -22,7 +22,8 @@ import { useJackpotShow } from '@/components/games/fx/jackpot-show';
 import { Reel, type ReelHandle } from '@/components/games/fx/reel';
 import { ContactShadow, FundPlaque, Marquee, SALON, SalonStage, StageHeader, StageStatus, SymbolPlate, plaqueValue, salonScreen, symbolShadow, useBox, type ActionLook, type StatusTone } from '@/components/games/fx/salon';
 import { SKIN_GAP, SKIN_PAD, SKIN_RIM, SkinCabinet, SkinPlate, fitSkin, slotSkinOf, windowRadius } from '@/components/games/fx/slot-skin';
-import { TeaseAura } from '@/components/games/fx/divine-fx';
+import { ReelSpark, TeaseAura } from '@/components/games/fx/divine-fx';
+import { useGameQuake } from '@/components/games/fx/quake';
 import { useWinFx } from '@/components/games/fx/win-fx';
 import { SpinControls, fmt, sleep, useShortGame } from '@/components/games/slot-kit';
 import type { LineSlotId } from '@/lib/casino-odds';
@@ -174,6 +175,9 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
   const still = settings.reduceMotion;
   // The GPU glow round a reel the game waits for (fx/divine-fx), with Oyunlarda güçlü efektler on.
   const aura = settings.gameFx && !still && !settings.effectsOff;
+  // Each reel's last stop (a new number throws its sparks) and the machine's knock as it lands (fx/quake).
+  const [stops, setStops] = useState<number[]>([]);
+  const shakeGame = useGameQuake();
   const [bet, setBet] = useState(game.bets[Math.min(2, game.bets.length - 1)]);
   // The window the machine opens with; after that each reel keeps its own (components/games/fx/reel).
   const [opening] = useState(() => slotWindow(c, c.counts.map((_, r) => r * 4)));
@@ -280,6 +284,13 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
           if (!alive.current) return;
           playSfx('stop', 0.75);
           tapHaptic();
+          // The last reel knocks hardest.
+          shakeGame(i === sp.grid.length - 1 ? 3.5 : 1.8);
+          setStops((s) => {
+            const next = s.slice();
+            next[i] = (next[i] ?? 0) + 1;
+            return next;
+          });
           setWaiting((w) => w.map((x, k) => (k === i ? false : x)));
           if (waits[i + 1] && !waits[i]) playSfx('tease', 0.6);
         }),
@@ -412,6 +423,7 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
           render={(sym) => (skin ? face(sym, symSize) : <Symbol label={c.symbols[sym].label} sym={sym} theme={theme} size={symSize} />)}
         />
         {waiting[reel] && aura && <TeaseAura />}
+        {aura && !!stops[reel] && <ReelSpark key={stops[reel]} />}
       </View>
     ));
   const controls = (

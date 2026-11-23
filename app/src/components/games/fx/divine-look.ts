@@ -2,7 +2,7 @@
 // title, and what joins it as the title climbs (lightning from EFSANE KAZANÇ up, the beam of light from above on a
 // JACKPOT). Plain data, shared by the phone layer and its web stand-in, and checked by tests/divine-look.test.ts.
 
-export type DivineTier = 'big' | 'mega' | 'epic' | 'jackpot';
+export type DivineTier = 'small' | 'big' | 'mega' | 'epic' | 'jackpot';
 
 export type DivineProps = {
   tier: DivineTier;
@@ -29,6 +29,8 @@ export type DivineLook = {
 };
 
 export const DIVINE: Record<DivineTier, DivineLook> = {
+  // A plain win: a short warm flash of light and one burst of embers, so every win is felt.
+  small: { tint: '#FFD54A', rgb: [1, 0.83, 0.29], rays: 8, power: 0.32, lightning: false, beam: false },
   big: { tint: '#FFC94A', rgb: [1, 0.79, 0.29], rays: 10, power: 0.6, lightning: false, beam: false },
   mega: { tint: '#FF7A2F', rgb: [1, 0.48, 0.18], rays: 12, power: 0.78, lightning: false, beam: false },
   epic: { tint: '#5FF3FF', rgb: [0.37, 0.95, 1], rays: 14, power: 0.92, lightning: true, beam: false },

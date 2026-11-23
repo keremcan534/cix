@@ -42,9 +42,9 @@ export function EntryBox({ plan, name, avatar, w, h }: { plan: EntryPlan; name: 
   const what = entryBoxShow(plan, { reduceMotion, lowData, effectsOff: effectsOff || !entryFx, clipKept: !!media && failed !== media.uri });
   if (!show || !what) return null;
   return (
-    // A clip stands on the card by itself, with no box around it (owners, 21 Nov 2026: "the frame shouldn't show"); the
-    // drawn banner keeps its box.
-    <View style={[what.kind === 'video' && media ? s.bare : s.box, { width: w, height: h }]} pointerEvents="none" accessible accessibilityLabel={`Giriş efekti${show.badge ? `, ${show.badge}` : ''}`}>
+    // Both stand in the glass box of the design (owners, 23 Nov 2026: the card looks orderly with it; on 21 Nov the
+    // clip had none, and a clip that starts with a thin streak then looked like a stray line beside the name).
+    <View style={[s.box, what.kind === 'video' && media && s.clipBox, { width: w, height: h }]} pointerEvents="none" accessible accessibilityLabel={`Giriş efekti${show.badge ? `, ${show.badge}` : ''}`}>
       {what.kind === 'video' && media ? (
         <LoopClip key={media.uri} media={media} plate={what.plate} show={show} w={w} h={h} onFail={() => setFailed(media.uri)} />
       ) : (
@@ -250,7 +250,7 @@ function MiniBanner({ show, w, h, still }: { show: EntryShow; w: number; h: numb
 
 const s = StyleSheet.create({
   box: { borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,57,196,0.5)', backgroundColor: 'rgba(255,255,255,0.06)' },
-  bare: { overflow: 'hidden' },
+  clipBox: { backgroundColor: 'rgba(255,255,255,0.03)' },
   sheen: { position: 'absolute', left: 0, right: 0, top: 0, height: '45%' },
   shade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '50%' },
   sweep: { position: 'absolute', top: -30, bottom: -30, left: 0, width: 34 },

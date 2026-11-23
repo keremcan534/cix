@@ -155,7 +155,7 @@ export default function ProfileScreen() {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
               {/* A size up here: under the big name the small chips' pictures were too small to read. */}
               <GenderChip user={me} owner size="md" />
-              <LevelChips wealth={wealthLevel} charm={charmLevel} size="md" />
+              <LevelChips wealth={wealthLevel} charm={charmLevel} size="sm" />
             </View>
             <AffiliationPills user={me} />
             {publicId !== null && (

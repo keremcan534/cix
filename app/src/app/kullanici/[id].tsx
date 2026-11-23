@@ -760,7 +760,7 @@ export default function UserProfile() {
             {/* Live mode: someone else's levels once the server sent them. */}
             {levels && (
               <LevelChips
-                size="md"
+                size="sm"
                 wealth={levels.wealth ?? 0}
                 charm={levels.charm ?? 0}
                 hideWealth={levels.wealth === null || (isMe && myHidden.wealth)}

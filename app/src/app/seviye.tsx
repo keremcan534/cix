@@ -80,6 +80,8 @@ function systemsOf(l: LiveLevels | null): Record<Kind, System> {
   };
 }
 const SYSTEMS = systemsOf(null);
+/** The two tabs' icons, whole: the gold diamond and the gold heart of the level icon set (components/Art). */
+const TAB_ICON: Record<Kind, ArtName> = { wealth: 'comertlik-simge-akik', charm: 'yanki-simge-safak' };
 
 export default function LevelsScreen() {
   const params = useLocalSearchParams<{ tab?: string }>();
@@ -109,7 +111,7 @@ export default function LevelsScreen() {
             {(['wealth', 'charm'] as const).map((k) => (
               <Pressable key={k} onPress={() => setTab(k)} style={[l.segItem, tab === k && l.segOn]} accessibilityRole="tab" accessibilityState={{ selected: tab === k }} accessibilityLabel={`${SYSTEMS[k].title} Seviyesi`}>
                 {tab === k && <LinearGradient colors={[LUX.pink, '#B4237A']} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={[StyleSheet.absoluteFill, { borderRadius: 999 }]} />}
-                <Art name={SYSTEMS[k].art} size={narrow ? 16 : 20} />
+                <Art name={TAB_ICON[k]} size={narrow ? 20 : 24} />
                 <Text style={[l.segText, narrow && { fontSize: 13 }, tab === k && { color: LUX.white }]} numberOfLines={1}>
                   {SYSTEMS[k].title}
                 </Text>
