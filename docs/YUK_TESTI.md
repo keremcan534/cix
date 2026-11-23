@@ -17,7 +17,7 @@ olabilir. Testte HTTPS (Caddy) ve finans paneli yoktu. Canlıda bu ikisi de bira
   - **İkisi birlikte:** 200 kişilik bir oda ve 250 aktif kullanıcı birlikte rahat çalışıyor. 500 kullanıcıda çekirdek
     doluyor: ses yine kayıpsız, ama uygulama yavaşlıyor.
   - **Çekirdek dolunca:** Bütün odalarda ses bozulur ve uygulama herkes için yavaşlar.
-- **Makineyi 4 çekirdeğe büyütmek** kapasiteyi kabaca 4 katına çıkarır ve Oracle'ın ücretsiz sınırının içinde kalır.
+- **Makineyi 4 çekirdeğe büyütmek** kapasiteyi kabaca 4 katına çıkarır ve hesap PAYG'deyse Oracle'ın ücretsiz sınırının içinde kalır (ücretsiz hesapta sınır artık 2 çekirdek / 12 GB).
   Ses ve veritabanı yükü çekirdeklere dağılıyor: 2 çekirdekte iki dolu oda kayıpsız çalıştı.
 - **Bu turda koddaki iki darboğaz giderildi** (aşağıda). Yine de asıl kazanç makineyi büyütmekten gelir.
 
@@ -25,7 +25,8 @@ olabilir. Testte HTTPS (Caddy) ve finans paneli yoktu. Canlıda bu ikisi de bira
 
 1. **Oracle'da makineyi 4 OCPU / 24 GB yapın.** En önemli adım bu.
    - Makine birkaç dakika kapanıp açılır. Bunu kullanıcı az olduğu bir saatte yapın.
-   - Oracle'ın ücretsiz Ampere sınırı toplam tam bu kadar. Hepsini canlıya verirseniz, test sunucusu
+   - Oracle 2026'da ücretsiz hesabın ARM sınırını **2 çekirdek / 12 GB**'a indirdi. **Kullandıkça öde (PAYG)** hesapta ise ayda 3.000 çekirdek-saat ve 18.000 GB-saat ücretsiz, yani 4 çekirdek / 24 GB bedava kalır. Bu yüzden önce hesap PAYG'ye geçirilir (kart ister, ücretsiz kısım ücretsiz kalır), bir bütçe uyarısı kurulur, sonra makine büyütülür.
+   - PAYG hesapta ücretsiz Ampere sınırı toplam tam bu kadar. Hepsini canlıya verirseniz, test sunucusu
      ([`DENETIM.md`](DENETIM.md) Kritik 6) için ücretsiz yer kalmaz; o zaman test sunucusu küçük ve ücretli bir makine
      olur. Önerim: 4 çekirdeğin hepsini canlıya verin.
    - Frankfurt'ta Ampere kapasitesi bazen doluyor. Oracle "out of capacity" derse birkaç saat sonra tekrar deneyin.

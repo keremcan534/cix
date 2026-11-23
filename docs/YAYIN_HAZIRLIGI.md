@@ -26,7 +26,7 @@ Bunlar olmadan ilgili mühendislik işi bitemez. Sıra, yayına etkisine göre.
 | 11 | **Yasal metinler sıfırdan:** Kullanım koşulları, gizlilik/KVKK ve topluluk kuralları avukatla sıfırdan yazılacak; rakip metinlerinden uyarlama yapılmayacak | Başka uygulamaların metinleri hem telif hem uyum riski taşır; metin bizim veri akışımızı ve kurallarımızı anlatmalı. | ⛔ |
 | 12 | **Ad ve mevzuat taraması:** Uygulama adı için TÜRKPATENT/EUIPO taraması; Oyun Salonu (jetonlu şans oyunları) mevzuat incelemesi | Ad, mağaza kaydından ve bundle ID'den önce kesinleşmeli. Oyun Salonu madde 1'deki kararla birlikte değerlendirilir. | ⛔ |
 | 13 | **Görsel kaynakları:** arka plan fotoğraflarının kaynağı ve lisansı | Kaynağı bilinmeyen görsel yayına çıkmaz. Liste: [`docs/VARLIK_KAYNAKLARI.md`](VARLIK_KAYNAKLARI.md). | ⛔ |
-| 14 | **Sunucuyu büyütmek:** Oracle'da makineyi 4 OCPU / 24 GB yapmak | Yük testinde bugünkü tek çekirdek, bir dolu oda ve birkaç yüz aktif kullanıcıyla doldu ([`YUK_TESTI.md`](YUK_TESTI.md)). Ücretsiz sınırın içinde, birkaç dakika sürer. | ⛔ |
+| 14 | **Sunucuyu büyütmek:** Oracle'da makineyi 4 OCPU / 24 GB yapmak | Yük testinde bugünkü tek çekirdek, bir dolu oda ve birkaç yüz aktif kullanıcıyla doldu ([`YUK_TESTI.md`](YUK_TESTI.md)). Hesap PAYG'deyse ücretsiz (ücretsiz hesapta sınır artık 2 OCPU / 12 GB; [`SUNUCU.md`](SUNUCU.md) › Oracle hesabı ve maliyet), birkaç dakika sürer. | ⛔ |
 | 15 | **Oda kişi üst sınırı kararı** | Odanın seviyesine göre kişi sınırı 5000'e kadar çıkıyor, tek makine bunu taşımaz. Önerimiz: ses sunucusu ayrılana kadar geçici olarak en çok 500 kişi. | ⛔ |
 
 ---

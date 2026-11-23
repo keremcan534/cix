@@ -52,8 +52,7 @@ modunda olması, hata takibi olmaması ve kırık kodun birleşmeden önce yakal
   - Bu makine, 200 kişilik bir dolu oda ve birkaç yüz aktif kullanıcıyla doluyor. İki dolu oda sesi bozuyor.
   - Çekirdek dolunca bütün odalar ve uygulama birlikte bozulur.
   - Koddaki iki darboğaz giderildi: sıralama ve odadaki kişi sayısı.
-- **Hemen:** Oracle'da makineyi **4 çekirdek / 24 GB**'a büyütün. Ücretsiz sınırın içinde kalır; makine birkaç dakika
-  kapanıp açılır.
+- **Hemen:** Oracle'da makineyi **4 çekirdek / 24 GB**'a büyütün; makine birkaç dakika kapanıp açılır. Oracle 2026'da ücretsiz hesabın ARM sınırını **2 çekirdek / 12 GB**'a indirdi. **Kullandıkça öde (PAYG)** hesapta ise ayda 3.000 çekirdek-saat ve 18.000 GB-saat ücretsiz, yani 4 çekirdek / 24 GB bedava kalır. Bu yüzden önce hesap PAYG'ye geçirilir (kart ister, ücretsiz kısım ücretsiz kalır), bir bütçe uyarısı kurulur, sonra makine büyütülür ([`SUNUCU.md`](SUNUCU.md) › Oracle hesabı ve maliyet).
 - **Oda kişi sınırı (siz: karar):**
   - Odanın seviyesine göre kişi sınırı 5000'e kadar çıkıyor. Tek makine bunu taşımaz.
   - Öneri: ses sunucusu ayrılana kadar geçici bir üst sınır koymak, 4 çekirdekte 500 kişi. Panelden değiştirilebilir
@@ -86,7 +85,7 @@ modunda olması, hata takibi olmaması ve kırık kodun birleşmeden önce yakal
 ### 6. Test (staging) sunucusu yok (siz: onay · Claude: kurulum)
 - Birleşen her PR doğrudan tek ve canlı sunucuya kuruluyor. Gerçek kullanıcılar gelince yeni özellik önce ayrı bir test
   sunucusunda denenmeli.
-- Oracle'ın ücretsiz Ampere sınırı toplam 4 çekirdek / 24 GB. Canlı sunucu 4 çekirdeğin hepsini alırsa (Kritik 2), test
+- Oracle'ın ücretsiz Ampere sınırı PAYG hesapta toplam 4 çekirdek / 24 GB (ücretsiz hesapta 2 / 12). Canlı sunucu 4 çekirdeğin hepsini alırsa (Kritik 2), test
   sunucusu küçük ve ücretli bir makine olur.
 
 ### 7. Hesaplar ve yasal metinler (siz)
