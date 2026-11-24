@@ -87,6 +87,7 @@ describe('defaults are today', () => {
       room_bg_custom_days: 30,
       room_staff_away_minutes: 5,
       boss_seat_coins: 25_000,
+      room_owner_bonus_pct: 0,
       boss_seat_minutes: 10,
       dj_live_kbps: 96,
       dj_live_per_room: 1,
@@ -277,6 +278,7 @@ describe('defaults are today', () => {
       'room_bg_custom_days',
       'room_staff_away_minutes',
       'boss_seat_coins',
+      'room_owner_bonus_pct',
       'boss_seat_minutes',
       'dj_live_kbps',
       'dj_live_per_room',
@@ -624,7 +626,10 @@ describe('Oda süslemesi', () => {
 
 describe('Odalar', () => {
   test('yetkilisiz oda 1–60 dakika; patron koltuğu binlik jeton ve 1–60 dakika', () => {
-    for (const k of ['room_staff_away_minutes', 'boss_seat_coins', 'boss_seat_minutes', 'dj_live_kbps', 'dj_live_per_room']) assert.equal(REGISTRY[k].group, 'Odalar', k);
+    // Oda sahibi bonusu: 0 now, nothing higher until the server pays one.
+    assert.equal(validate('room_owner_bonus_pct', 0), 0);
+    refused(() => validate('room_owner_bonus_pct', 10), /Oda sahibi bonusu/);
+    for (const k of ['room_staff_away_minutes', 'boss_seat_coins', 'room_owner_bonus_pct', 'boss_seat_minutes', 'dj_live_kbps', 'dj_live_per_room']) assert.equal(REGISTRY[k].group, 'Odalar', k);
     // DJ modu: 0 turns it off; at most 192 kbps, at most 4 at once in a room.
     assert.equal(validate('dj_live_kbps', 0), 0);
     refused(() => validate('dj_live_kbps', 256), /DJ modu/);
