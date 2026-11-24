@@ -117,6 +117,8 @@ export const BOND_GIFTS = new Set([...GIFTS.keys()].filter((id) => id.startsWith
 export const SHOP_PAUSED_DEFAULT = [
   ...['en-sparkle', 'en-thunder', 'en-comet'],
   ...['en-roket', 'en-ayicik', 'en-panda', 'en-tac', 'en-tekboynuz', 'en-anka', 'en-gemi', 'en-saray', 'en-otomobil', 'en-aslan'],
+  // Binekler (owners, 25 Nov 2026): off the shelf; Yönetim › Mağaza › Binekler puts one back.
+  ...['rd-scooter', 'rd-sport', 'rd-jet'],
 ];
 export const SHOP_PAUSED = new Set(
   process.env.SHOP_PAUSED === undefined ? SHOP_PAUSED_DEFAULT : process.env.SHOP_PAUSED.split(',').map((x) => x.trim()).filter(Boolean),
@@ -314,6 +316,8 @@ const SHOP_ROWS = [
   ['id-777', 'specialId', 'ID 777', 8_000, null, 0],
   ['id-2026', 'specialId', 'ID 2026', 3_000, null, 0],
   ['id-1001', 'specialId', 'ID 1001', 2_000, null, 0],
+  // Takma isim (owners, 25 Nov 2026): with the Özel IDs, paid, "Yakında" (shop-items.mjs SHOP_SOON_DEFAULT).
+  ['nick-name', 'specialId', 'Takma isim oluştur', 5_000, null, 0],
   // Ses dalgası: the ring around the seat while one talks (app components/room/voice-wave.tsx). Kept for good.
   ['wv-sparkle', 'wave', 'Parıltı', 1_500, null, 0],
   ['wv-flame', 'wave', 'Alev', 2_500, null, 0],

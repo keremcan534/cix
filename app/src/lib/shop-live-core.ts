@@ -66,8 +66,8 @@ export type WaveLook = { style: WaveStyle; colors: readonly string[]; art?: { ur
  * side. None (not measured yet, an older server): the whole square is drawn, as before.
  */
 export type FrameReach = { x: number; top: number; bottom: number };
-/** The kinds the shop's list covers; the others stay the app's own. */
-export const SHOP_LIST_KINDS = ['frame', 'entry', 'bubble', 'wave'] as const;
+/** The kinds the shop's list covers; the others stay the app's own. Rides: the app's own only (a newer server's). */
+export const SHOP_LIST_KINDS = ['frame', 'entry', 'bubble', 'wave', 'ride', 'specialId'] as const;
 type ListKind = (typeof SHOP_LIST_KINDS)[number];
 export type ShopItem = {
   sku: string;
@@ -80,6 +80,7 @@ export type ShopItem = {
   minVip: number;
   builtin: boolean;
   off: boolean;
+  soon?: boolean;
   /**
    * An admin's frame: its still picture, the hole (its radius; `at`: its centre when it isn't the picture's middle, as
    * shares of the picture), the animated WebP the app plays when it has one, and how far its drawn part reaches from
@@ -282,6 +283,8 @@ export function parseLiveShop(raw: unknown): LiveShop | null {
     if (!builtin && kind === 'entry' && r.video !== true) continue;
     if (!builtin && kind === 'bubble' && !bubble) continue;
     if (!builtin && kind === 'wave' && !wave) continue;
+    // A ride is always the app's own (the app draws it).
+    if (!builtin && (kind === 'ride' || kind === 'specialId')) continue;
     seen.add(r.sku);
     // Its other durations (Güncelleme 8): a malformed one is left out (the main term still sells).
     const plans = days !== null && Array.isArray(r.plans) ? parsePlans(r.plans, days) : [];
@@ -295,6 +298,8 @@ export function parseLiveShop(raw: unknown): LiveShop | null {
       minVip,
       builtin,
       off: r.off === true,
+      // "Yakında": on the shelf with the tag, not sold (Yönetim › Mağaza).
+      ...(r.soon === true ? { soon: true } : {}),
       ...(art ? { art } : {}),
       ...(kind === 'entry' && r.video === true ? { video: true, plate: parsePlate(r.plate), ...(icon ? { icon } : {}) } : {}),
       ...(bubble ? { look: bubble } : {}),
@@ -307,7 +312,7 @@ export function parseLiveShop(raw: unknown): LiveShop | null {
   return { items, seats };
 }
 
-const OWN_EMOJI: Record<ListKind, string> = { frame: '🖼️', entry: '✨', bubble: '💬', wave: '🔊' };
+const OWN_EMOJI: Record<ListKind, string> = { frame: '🖼️', entry: '✨', bubble: '💬', wave: '🔊', ride: '🛵', specialId: '🔢' };
 /**
  * The shop's frames, entry effects, bubbles and waves as the server has them, as the app's Cosmetics: the app's own
  * with the server's name, price, days, VIP level and shelf (their art stays), the admins' own with `remote` (their
@@ -323,8 +328,8 @@ export function mergeShop(compiled: readonly Cosmetic[], shop: LiveShop | null):
     for (const x of shop.items.filter((i) => i.kind === kind)) {
       const base = byId.get(x.sku);
       if (x.builtin && base?.kind === kind) {
-        const { retired: _was, ...rest } = base;
-        out.push({ ...rest, name: x.name, price: x.price, days: x.days, ...(x.plans ? { plans: x.plans } : {}), ...(x.minVip ? { minVip: x.minVip } : { minVip: undefined }), ...(x.off ? { retired: true as const } : {}) });
+        const { retired: _was, soon: _soon, ...rest } = base;
+        out.push({ ...rest, name: x.name, price: x.price, days: x.days, ...(x.plans ? { plans: x.plans } : {}), ...(x.minVip ? { minVip: x.minVip } : { minVip: undefined }), ...(x.off ? { retired: true as const } : {}), ...(x.soon ? { soon: true as const } : {}) });
       } else if (!x.builtin && !byId.has(x.sku)) {
         out.push({
           id: x.sku,
@@ -336,6 +341,7 @@ export function mergeShop(compiled: readonly Cosmetic[], shop: LiveShop | null):
           ...(x.plans ? { plans: x.plans } : {}),
           ...(x.minVip ? { minVip: x.minVip } : {}),
           ...(x.off ? { retired: true as const } : {}),
+          ...(x.soon ? { soon: true as const } : {}),
           remote: {
             ...(x.art ? { art: x.art } : {}),
             ...(x.video ? { video: true as const, plate: x.plate ?? null } : {}),
