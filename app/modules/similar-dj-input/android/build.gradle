@@ -1,0 +1,20 @@
+// DJ modu: the phone's sound inputs (a USB/OTG sound card, a mixer's cable, a wired headset, the phone's own mic)
+// and the one the voice engine records from (DjInput).
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'com.similarclub'
+version = '1.0.0'
+
+android {
+  namespace "expo.modules.similardjinput"
+  defaultConfig {
+    versionCode 1
+    versionName "1.0.0"
+  }
+  lintOptions {
+    abortOnError false
+  }
+}

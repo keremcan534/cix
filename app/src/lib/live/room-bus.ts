@@ -38,7 +38,8 @@ import { parseMarkNews, type MarkNews } from '@/lib/profile-marks';
  * `joinedAt`: when they came into the room, on the voice server's clock (ms; 0 or missing: not known). `via`: whom
  * they came following (their voice token's attribute, server-checked; lib/follow-room).
  */
-export type LivePeer = { identity: string; name: string; seat: number | null; speaking: boolean; micOn: boolean; joinedAt?: number; via?: string };
+/** dj: in DJ modu (the `dj` attribute, server/api/dj-live.mjs); a phone can write its own, so the room checks who may. */
+export type LivePeer = { identity: string; name: string; seat: number | null; speaking: boolean; micOn: boolean; joinedAt?: number; via?: string; dj?: boolean };
 /** What one phone may send the others: a chat line, an emoji or sticker over its own seat, a free Hareketli. */
 export type PeerSignal =
   | { t: 'chat'; text: string }
@@ -161,7 +162,8 @@ export function reportPeers(roomId: string | null, peers: LivePeer[], meSpeaking
         p.micOn === peers[i].micOn &&
         p.name === peers[i].name &&
         p.joinedAt === peers[i].joinedAt &&
-        p.via === peers[i].via,
+        p.via === peers[i].via &&
+        !!p.dj === !!peers[i].dj,
     );
   if (same) return;
   // The locks belong to the room: a new list of people keeps them, another room starts without.

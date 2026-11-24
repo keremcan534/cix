@@ -286,6 +286,9 @@ describe('values as the admin reads them', () => {
     assert.equal(valueText('room_staff_away_minutes', 5), '5 dakika sonra kapanır');
     assert.equal(valueText('boss_seat_coins', 25_000), 'Tek seferde 25.000 jeton');
     assert.equal(valueText('boss_seat_minutes', 10), '10 dakika');
+    assert.equal(valueText('dj_live_kbps', 0), 'DJ modu kapalı');
+    assert.equal(valueText('dj_live_kbps', 96), '96 kbps');
+    assert.equal(valueText('dj_live_per_room', 1), 'Aynı anda 1 DJ');
     assert.equal(valueText('heart_video_level', 3), 'Kalp Lv.3');
     assert.equal(valueText('heart_msg_points', 2), 'Mesaj başına 2 puan');
     assert.equal(valueText('heart_msg_daily', 0), 'Mesaj saymaz');

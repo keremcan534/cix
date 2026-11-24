@@ -122,6 +122,8 @@ import { useFollowerInvite, useServerMicInvites, useServerPoll } from '@/lib/liv
 import { followerInviteAt, inviteSeat as pickInviteSeat, roomShareText, serverInviteId } from '@/lib/room-social';
 import { liveDm } from '@/lib/live/messages';
 import { LiveMusicSheet, useRoomMusicPlayer } from '@/components/room/room-music';
+import { DjLiveBar, DjLiveSheet } from '@/components/room/dj-live';
+import { liveDjsOf, useDjState } from '@/lib/live/dj-live';
 import { SeatColorSheet } from '@/components/room/seat-color-sheet';
 import { roomSeatColorShown, seatColorName } from '@/data/seat-colors';
 import { roomUnmute } from '@/lib/api';
@@ -391,6 +393,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const superIds = real ? staff.superAdmins : [];
   // DJs (server rooms, server/api/music.mjs): the owner names them; they play music in the room and nothing else.
   const djIds = real ? staff.djs : [];
+  // DJ modu (components/room/dj-live, server/api/dj-live.mjs): the owner and the DJs send a mixer live from their mic.
+  const mayDj = real && (hostId === 'me' || djIds.includes('me'));
   const rankOf = (uid: string) => (uid === hostId ? 3 : superIds.includes(uid) ? 2 : adminIds.includes(uid) ? 1 : 0);
   // The mark on a staff member's mic (components/room/role-mark), each role its own; a DJ's only without a higher one.
   const staffOf = (uid: string): StaffMark | null => (uid === hostId ? 'owner' : superIds.includes(uid) ? 'super' : adminIds.includes(uid) ? 'admin' : djIds.includes(uid) ? 'dj' : null);
@@ -737,7 +741,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const [inviteSeat, setInviteSeat] = useState<number | null>(null);
   const [sheet, setSheet] = useState<{ title: string; options: SheetOption[] } | null>(null);
   const [msgFilter, setMsgFilter] = useState({ joins: true, gifts: true, bot: true });
-  const [panel, setPanel] = useState<null | 'menu' | 'msgSettings' | 'info' | 'settings' | 'music' | 'envelope' | 'bag' | 'dice' | 'contrib' | 'requests' | 'poll' | 'goal' | 'events' | 'qa' | 'effects' | 'mod' | 'invite' | 'results' | 'session' | 'seatColor' | 'rocket'>(null);
+  const [panel, setPanel] = useState<null | 'menu' | 'msgSettings' | 'info' | 'settings' | 'music' | 'envelope' | 'bag' | 'dice' | 'contrib' | 'requests' | 'poll' | 'goal' | 'events' | 'qa' | 'effects' | 'mod' | 'invite' | 'results' | 'session' | 'seatColor' | 'rocket' | 'dj'>(null);
   const [poll, setPoll] = useState<Poll | null>(null);
   const [goal, setGoal] = useState<Goal | null>(null);
   const [events, setEvents] = useState<RoomEvent[]>(() =>
@@ -894,6 +898,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // The boss seat is a speaking seat: the presence server counts its holder as on a mic (PK, lists, counts).
   useEffect(() => setBoss(id, bossId), [id, bossId]);
   const mySeat = allSeats.indexOf('me');
+  // Who is live as DJ now, by the `dj` attribute, only people the room lets (a phone can write its own attribute).
+  const djMe = useDjState();
+  const liveDjNames = real ? liveDjsOf(roomMeta.peers, (identity) => toLocal(identity) === hostId || djIds.includes(toLocal(identity))).map((p) => p.name) : [];
   const amSeated = mySeat >= 0 || bossId === 'me';
   // Landing on a mic (by myself, by an invite, moved by the staff): one firm tick, so it is felt as well as seen.
   const wasSeated = useRef(amSeated);
@@ -3346,6 +3353,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         ...(roomType === 'qa' ? [{ key: 'qa', label: 'Sorular', emoji: '❓', art: ROOM_ICON_ART.questions, colors: ['#F97316', '#DC2626'] as [string, string], onPress: () => setPanel('qa'), badge: questions.filter((q) => !q.picked).length }] : []),
         // Müzik is the room's staff's and its DJs' (they play it); everyone else just hears it.
         ...(canControlMusic ? [{ key: 'music', label: 'Müzik', emoji: '🎵', art: ROOM_ICON_ART.music, colors: ['#C93C4F', '#D02E78'] as [string, string], onPress: () => setPanel('music') }] : []),
+        // DJ modu: the owner's and the DJs' mixer live from the mic (not admins: they are not DJs).
+        ...(mayDj ? [{ key: 'dj', label: 'DJ modu', emoji: '🎧', art: ROOM_ICON_ART.music, colors: ['#7C3AED', '#DB2777'] as [string, string], onPress: () => setPanel('dj') }] : []),
       ],
     },
     // The free room games are opened by the room's staff (owner and admins); everyone else joins the table they open.
@@ -3977,6 +3986,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             top={
               <>
                 {musicEnabled && <MusicBar music={shownMusic} canControl={canControlMusic} onOpen={() => setPanel('music')} onToggle={music$.toggle} onClose={music$.close} />}
+                {real && <DjLiveBar names={liveDjNames} me={djMe.on} onOpen={mayDj ? () => setPanel('dj') : undefined} />}
                 {session && <SessionBanner session={session} />}
                 {callActive && (
                   <Pressable style={styles.callBanner} onPress={() => router.push(media.call?.kind === 'match' ? '/tanis' : { pathname: '/arama/[id]', params: { id: media.call!.peerId } })} accessibilityLabel="Görüşmeye dön">
@@ -4393,6 +4403,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       {real && myRole === 'owner' && (
         <SeatColorSheet visible={panel === 'seatColor'} onClose={closePanel} room={id} current={seatColor} onDone={(text) => addMsg({ system: true, text })} />
       )}
+      {mayDj && <DjLiveSheet visible={panel === 'dj'} onClose={closePanel} room={id} onMic={mySeat >= 0} onDone={(text) => addMsg({ system: true, text })} />}
       {real ? (
         <LiveMusicSheet
           visible={panel === 'music'}

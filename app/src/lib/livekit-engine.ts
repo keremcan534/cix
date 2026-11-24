@@ -7,14 +7,16 @@
 // still the current one, so leaving or switching rooms mid-join never leaves a second connection open.
 import { ConnectionState, DisconnectReason, Room, RoomEvent, Track, VideoPresets, type LocalAudioTrack, type Participant } from 'livekit-client';
 
-import type { AudioEngine, EngineStats } from '@/lib/audio-engine';
+import type { AudioEngine, DjMode, EngineStats } from '@/lib/audio-engine';
 import type { TrackRef } from '@/lib/call-media';
 import { bindLink, decodeSignal, encodeSignal, parseSeat, parseServerClosed, reportPeers, reportRoomMeta, reportServerSeat, reportSignal, type PeerSignal } from '@/lib/live/room-bus';
 import { reportCams } from '@/lib/live/room-cams';
 import { parseVia } from '@/lib/follow-room';
+import { djKbps, reportDj, type DjStop } from '@/lib/live/dj-live';
 import { reportLevel } from '@/lib/live/voice-level';
 import type { EngineEvent } from '@/lib/room-session';
 import { setAiDenoise, setPhoneNoiseSuppressor } from '../../modules/similar-denoise';
+import { preferDjInput } from '../../modules/similar-dj-input';
 
 export type LiveKitConfig = {
   /** wss:// address of the LiveKit server. */
@@ -33,7 +35,12 @@ export type LiveKitConfig = {
   backgroundAudio?: () => boolean;
   /** Native: my mic track is on (the background service then keeps the mic going too). */
   onMicStarted?: () => void;
+  /** Web: the browser records a stereo input in stereo (a phone's voice engine records mono). DJ modu sends it so. */
+  stereoCapture?: boolean;
 };
+
+/** A `dj` attribute "" that reaches me this soon after DJ modu went on is the server's older write, not a stop. */
+const DJ_SETTLE_MS = 3_000;
 
 /** How long a leaving phone waits for its "bye" to go out before it closes the voice connection (room-bus 'bye'). */
 const BYE_WAIT_MS = 400;
@@ -67,7 +74,22 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
   // follows from the next room). The mic in use is captured again with it at once.
   let raw = false;
   const RAW = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
-  const capture = () => (raw ? RAW : CAPTURE);
+  // DJ modu (lib/live/dj-live, server/api/dj-live.mjs): a mixer through the mic, sent as it is (RAW), at music quality,
+  // from the input the DJ picked; on the web in stereo. It always comes with a new mic track (publish options are set
+  // when a track is published), and it ends by itself when I leave the mic, the server clears my `dj` attribute or
+  // I leave the room.
+  let dj: DjMode | null = null;
+  let djSince = 0;
+  const capture = () => {
+    if (!dj) return raw ? RAW : CAPTURE;
+    return { ...RAW, ...(cfg.stereoCapture ? { channelCount: 2 } : {}), ...(dj.deviceId ? { deviceId: dj.deviceId } : {}) };
+  };
+  const publishing = () =>
+    dj ? { audioPreset: { maxBitrate: djKbps(dj.kbps) * 1000 }, dtx: false, red: false, ...(cfg.stereoCapture ? { forceStereo: true } : {}) } : undefined;
+  const voiceProcessing = () => {
+    setAiDenoise(denoise && !raw && !dj);
+    setPhoneNoiseSuppressor(!raw && !dj);
+  };
   let restarting: Promise<void> = Promise.resolve();
   // "Konuşma sesi", or 0 while "Oda sesi" is off (lib/room-session): every remote voice plays at this volume, new ones too.
   let volume = 1;
@@ -87,7 +109,7 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
     if (r.state !== ConnectionState.Connected) return;
     // Voice muted by the server: asking LiveKit would only fail (and read as a missing phone permission).
     if (on && !grant(r).canPublish) return;
-    r.localParticipant.setMicrophoneEnabled(on, on ? capture() : undefined).then(() => void (on && cfg.onMicStarted?.()), (e) => {
+    r.localParticipant.setMicrophoneEnabled(on, on ? capture() : undefined, on ? publishing() : undefined).then(() => void (on && cfg.onMicStarted?.()), (e) => {
       // The phone said no to the microphone: the session shows "Mikrofon izni yok" and keeps the room playing.
       const name = e instanceof Error ? e.name : '';
       if (name === 'NotAllowedError' || name === 'PermissionDeniedError' || /permission/i.test(String(e))) tell(r, { type: 'mic_denied' });
@@ -135,7 +157,7 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
       if (room !== r) return void r.disconnect();
       // The AI denoise goes into the mic's path once the voice engine has started (Android; no-op elsewhere).
       // Not in "Ham mikrofon": it used to come back on for singers at every room they joined (güncelleme 6).
-      setAiDenoise(denoise && !raw);
+      setAiDenoise(denoise && !raw && !dj);
       // Browsers block sound until a user gesture; opening a room is one, so this usually succeeds at once.
       await r.startAudio().catch(() => {});
       if (s.publishing) setMic(r, true);
@@ -179,6 +201,12 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
     if (next === seat) return;
     seat = next;
     reportServerSeat(s.roomId, next);
+    if (next === null) stopDj('seat');
+  };
+  /** My `dj` attribute cleared by the server (taken off the room's DJs): DJ modu stops here too. */
+  const djFromServer = (r: Room, changed: Record<string, string>) => {
+    if (room !== r || !dj || !('dj' in changed) || changed.dj === '1' || Date.now() - djSince < DJ_SETTLE_MS) return;
+    stopDj('server');
   };
   /** Everyone else in the room for the room screen (lib/live/room-bus). */
   const snapshot = (r: Room) => {
@@ -191,6 +219,7 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
       micOn: p.isMicrophoneEnabled,
       joinedAt: joinedMs(p.joinedAt),
       via: parseVia(p.attributes?.via),
+      dj: p.attributes?.dj === '1',
     }));
     // My own join time is the voice server's once connected; before that LiveKit would make one up from this phone's clock.
     reportPeers(s.roomId, peers, r.localParticipant.isSpeaking, r.state === ConnectionState.Connected ? joinedMs(r.localParticipant.joinedAt) : 0);
@@ -200,6 +229,7 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
       if (next === seat) return;
       seat = next;
       if (room) pushSeat(room);
+      if (next === null) stopDj('seat');
     },
     send(msg: PeerSignal) {
       if (room?.state !== ConnectionState.Connected) return false;
@@ -229,7 +259,9 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
     });
     r.on(RoomEvent.Reconnecting, () => tell(r, { type: 'lost' }));
     r.on(RoomEvent.ParticipantAttributesChanged, (changed, participant) => {
-      if (participant === r.localParticipant) seatFromServer(r, changed);
+      if (participant !== r.localParticipant) return;
+      seatFromServer(r, changed);
+      djFromServer(r, changed);
     });
     // Locked mics live in the room's metadata, written only by the server (server/api/rooms.mjs).
     r.on(RoomEvent.RoomMetadataChanged, (metadata) => {
@@ -277,6 +309,37 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
     return r;
   }
 
+  /**
+   * A new mic track with DJ modu's capture and publish options (or a voice's again): the one sent now is unpublished
+   * and, while I am on the mic, published again. One after another with the raw switch's restarts.
+   */
+  function remic() {
+    const r = room;
+    if (!r) return;
+    restarting = restarting
+      .then(async () => {
+        if (room !== r || r.state !== ConnectionState.Connected) return;
+        const track = r.localParticipant.getTrackPublication(Track.Source.Microphone)?.track as LocalAudioTrack | undefined;
+        if (track) await r.localParticipant.unpublishTrack(track, true);
+        // The phone's own suppressor and the preferred input can't change while the mic records: again now it is off.
+        voiceProcessing();
+        preferDjInput(dj?.nativeInput ?? -1);
+        if (room === r && s.publishing) setMic(r, true);
+      })
+      .catch((e) => fail('Mikrofon', e));
+  }
+  /** DJ modu off: asked (why null) or by itself (left the mic, the server, the room). The other phones' bar goes too. */
+  function stopDj(why: DjStop | null) {
+    if (!dj) return;
+    dj = null;
+    preferDjInput(-1);
+    voiceProcessing();
+    reportDj({ on: false, kbps: 0, stopped: why });
+    const r = room;
+    if (r?.state === ConnectionState.Connected) r.localParticipant.setAttributes({ dj: '' }).catch((e) => fail('DJ modu', e));
+    remic();
+  }
+
   const engine: AudioEngine = {
     name: 'LiveKit (gerçek ses)',
     capabilities: {
@@ -313,6 +376,12 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
       seat = null;
       camera = false;
       pendingSeats = [];
+      if (dj) {
+        dj = null;
+        preferDjInput(-1);
+        voiceProcessing();
+        reportDj({ on: false, kbps: 0, stopped: 'room' });
+      }
       reportPeers(null, []);
       reportCams(new Map());
       s.concurrent--;
@@ -347,13 +416,26 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
     setNoiseSuppression(on) {
       // The AI denoise (RNNoise) cleans what the phone's own suppression leaves (fans, traffic, keyboards), at once.
       denoise = on;
-      setAiDenoise(on && !raw);
+      setAiDenoise(on && !raw && !dj);
+    },
+    setDjMode(next) {
+      if (!next) return stopDj(null);
+      if (!s.roomId || seat === null) return;
+      const was = dj;
+      dj = { kbps: djKbps(next.kbps), ...(next.nativeInput !== undefined ? { nativeInput: next.nativeInput } : {}), ...(next.deviceId ? { deviceId: next.deviceId } : {}) };
+      if (!was) djSince = Date.now();
+      if (was && was.kbps === dj.kbps && was.nativeInput === dj.nativeInput && was.deviceId === dj.deviceId) return;
+      preferDjInput(dj.nativeInput ?? -1);
+      voiceProcessing();
+      reportDj({ on: true, kbps: dj.kbps, stopped: null });
+      remic();
     },
     setRawMic(on) {
       if (raw === on) return;
       raw = on;
-      setAiDenoise(denoise && !on);
-      setPhoneNoiseSuppressor(!on);
+      voiceProcessing();
+      // In DJ modu the mic is sent without processing anyway.
+      if (dj) return;
       const r = room;
       const track = r?.localParticipant.getTrackPublication(Track.Source.Microphone)?.track as LocalAudioTrack | undefined;
       if (!r || !track) return;

@@ -7,7 +7,7 @@
 // the mini card, navigating, or the app going to the background never do.
 import { useSyncExternalStore } from 'react';
 
-import { createSimulatedEngine, type AudioEngine, type AudioRoute } from '@/lib/audio-engine';
+import { createSimulatedEngine, type AudioEngine, type AudioRoute, type DjMode } from '@/lib/audio-engine';
 import { wantVia } from '@/lib/follow-room';
 import { isOnline } from '@/lib/room-presence';
 
@@ -513,6 +513,10 @@ let rawMic = false;
 export function setRawMic(on: boolean) {
   rawMic = on;
   engine.setRawMic?.(on);
+}
+// DJ modu (lib/live/dj-live): for the room I am in now; it ends with the room, so a new engine starts without it.
+export function setDjMode(dj: DjMode | null) {
+  engine.setDjMode?.(dj);
 }
 // "Konuşma sesi" (settings.voiceVolume): how loud the room's voices play on this phone.
 let volume = 1;

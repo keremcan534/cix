@@ -174,7 +174,7 @@ export async function roomService(method, body, grant) {
 }
 
 /**
- * Who is in a voice room now, with their mic (`seat` attribute: "0"–"99", missing or "" = not on a mic). null
+ * Who is in a voice room now, with their mic (`seat` attribute: "0"–"99", missing or "" = not on a mic) and DJ modu. null
  * when LIVEKIT_API_URL isn't set; throws when LiveKit can't be reached.
  */
 export async function voiceParticipants(room) {
@@ -188,7 +188,8 @@ export async function voiceParticipants(room) {
   if (r.status === 404) return [];
   if (!r.ok) throw new Error(`livekit ListParticipants ${r.status}`);
   const j = await r.json();
-  return (j.participants ?? []).map((p) => ({ identity: String(p.identity ?? ''), seat: /^\d{1,2}$/.test(p.attributes?.seat ?? '') ? Number(p.attributes.seat) : null }));
+  // dj: in DJ modu now (dj-live.mjs writes the attribute; a phone can write its own too, so callers check who may).
+  return (j.participants ?? []).map((p) => ({ identity: String(p.identity ?? ''), seat: /^\d{1,2}$/.test(p.attributes?.seat ?? '') ? Number(p.attributes.seat) : null, dj: p.attributes?.dj === '1' }));
 }
 
 /** Ends a voice room for everyone in it. Never fails the caller: the room is closed in our records either way. */
