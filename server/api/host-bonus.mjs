@@ -8,7 +8,9 @@
 // - Who: when the week ended, a streamer with an approved contract with an approved agency, or a yönetim yayıncısı
 //   (streamer-rule.mjs: a woman in no agency, past her days to pick one after signing up, or dropped from one: inactive
 //   too long, the agency closed; a streamer can't leave an agency of her own accord, only transfer), "diğer ajanslı
-//   yayıncılardan farkı yok" (owners). A streamer still in her first days with no agency gets none.
+//   yayıncılardan farkı yok" (owners). A streamer still in her first days with no agency gets none, and an agency's
+//   owner none (owners: no weekly bonus for agency owners or for family owners as such; a family owner who is an
+//   agency's streamer or a yönetim yayıncısı gets hers as that).
 // - No agency commission: the bonus is not an income event (agency-lib.mjs counts those), only a ledger row.
 // - Off (the setting's `on`): the week is written skipped; staff may pay it later from the panel.
 // - Staff may take a bonus back: what of it may still leave the account (not locked) returns, the rest stays.
@@ -17,7 +19,7 @@ import { HttpError, auth, clientIp, db, env, limit, readJson, tx, move } from '.
 import { live } from './live-settings.mjs';
 import { panelDetail } from './panel.mjs';
 import { bonusNotice, systemNotice } from './system-notices.mjs';
-import { heldWomanAtSql } from './streamer-rule.mjs';
+import { agencyOwnerSql, heldWomanAtSql } from './streamer-rule.mjs';
 import { diamondState } from './wallet.mjs';
 
 const fmt = (n) => Number(n).toLocaleString('tr-TR');
@@ -59,7 +61,8 @@ export async function earnedOf(c, ids, from, to, least = 1) {
 
 /**
  * Who of `ids` counts at instant `at`: id → { kind: 'agency', agencyId } (an approved contract with an approved
- * agency) or { kind: 'management', agencyId: null } (the yönetim yayıncısı). The others are absent.
+ * agency) or { kind: 'management', agencyId: null } (the yönetim yayıncısı). The others are absent, and so is the
+ * owner of an approved agency (now).
  */
 export async function eligibleAt(c, ids, at) {
   if (!ids.length) return new Map();
@@ -70,7 +73,7 @@ export async function eligibleAt(c, ids, at) {
                 AND s.joined_at < $2 AND (s.ended_at IS NULL OR s.ended_at >= $2)
               ORDER BY s.joined_at DESC LIMIT 1) AS agency_id,
             ${heldWomanAtSql('u.id', '$2::timestamptz')} AS held
-       FROM users u WHERE u.id = ANY($1::uuid[]) AND u.deleted_at IS NULL`,
+       FROM users u WHERE u.id = ANY($1::uuid[]) AND u.deleted_at IS NULL AND NOT ${agencyOwnerSql('u.id')}`,
     [ids, at],
   );
   const out = new Map();

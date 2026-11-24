@@ -36,7 +36,7 @@
 >   bir önceki baremin bonusunu alır. Baremler: 10.000 → 5.000, 20.000 → 10.000, 40.000 → 20.000, 70.000 → 35.000,
 >   100.000 → 50.000, 140.000 → 70.000, 200.000 → 100.000, 300.000 → 150.000, 500.000 → 250.000, 1.000.000 → 500.000,
 >   2.000.000 → 1.000.000, 5.000.000 ve üstü → 2.500.000 (bonus kazancın yarısı). Bildirim SimilarClub Sistem'den.
->   İlk 3 gününde ajansı olmayan yayıncı almaz. Bonustan ajans komisyonu çıkmaz; bonus elması bir sonraki haftanın kazancına sayılmaz. Panel: Canlı ayarlar ›
+>   İlk 3 gününde ajansı olmayan yayıncı almaz; ajans sahiplerine ve aile sahiplerine haftalık bonus yok. Bonustan ajans komisyonu çıkmaz; bonus elması bir sonraki haftanın kazancına sayılmaz. Panel: Canlı ayarlar ›
 >   Ödemeler › **Yayıncı haftalık bonusu** (baremler, aç/kapa) ve Ajanslar › **Yayıncı haftalık bonusu** sayfası
 >   (haftalar, ödenenler, süren haftanın önizlemesi, atlanan haftayı öde, bonusu geri al; yetki `app.host_bonus`).
 >   Uygulama: Yayıncı Merkezi'nde "Haftalık bonus" kartı (bu haftaki kazanç, ulaşılan bonus, sonraki bareme kalan).

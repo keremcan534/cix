@@ -65,6 +65,9 @@ describe('Yayıncı haftalık bonusu', () => {
     await gift(loner, 60); // 30.000
     await gift(held, 90); // 45.000
     await gift(man, 24); // 12.000
+    // The agency's owner: a woman in no agency, signed up 5 days ago; an owner gets no bonus.
+    await q("UPDATE users SET created_at = now() - interval '5 days' WHERE id = $1", [owner.id]);
+    await gift(owner, 40); // 20.000
   });
 
   test('Yayıncı Merkezi: bu haftanın kazancı, ulaşılan barem ve sonrakine kalan', async () => {
@@ -81,6 +84,7 @@ describe('Yayıncı haftalık bonusu', () => {
     const h1 = ok(await held.get('/api/wallet/host-bonus'));
     assert.deepEqual([h1.eligible, h1.kind, h1.tier.bonus], [true, 'management', 20_000], 'yönetim yayıncısı ajanslı gibi');
     assert.equal(ok(await man.get('/api/wallet/host-bonus')).eligible, false, 'ajanssız erkek yönetim yayıncısı değil');
+    assert.equal(ok(await owner.get('/api/wallet/host-bonus')).eligible, false, 'ajans sahibine haftalık bonus yok');
   });
 
   test('canlı ayar: barem sırası bozuk ya da boş tablo reddedilir', async () => {
@@ -107,15 +111,15 @@ describe('Yayıncı haftalık bonusu', () => {
     refused(await admin.post('/api/admin/host-bonus/pay', { week }), 400, 'gerekçe');
     refused(await admin.post('/api/admin/host-bonus/pay', { week: addDays(week, 1), reason: 'Deneme' }), 400, 'Pazartesi değil');
     refused(await admin.post('/api/admin/host-bonus/pay', { week: addDays(week, 7), reason: 'Deneme' }), 404, 'kapanmamış hafta');
-    const before = await Promise.all([s1, s2, loner, held, man].map(diamonds));
+    const before = await Promise.all([s1, s2, loner, held, man, owner].map(diamonds));
     const commission = (await q('SELECT count(*)::int AS n, coalesce(sum(amount), 0)::numeric AS s FROM agency_ledger WHERE agency_id = $1', [agencyId]))[0];
     const paid = ok(await admin.post('/api/admin/host-bonus/pay', { week, reason: 'Ayar yanlışlıkla kapalı kalmıştı' }), 'öde');
     assert.deepEqual([paid.people, paid.diamonds], [2, 30_000]);
-    const after = await Promise.all([s1, s2, loner, held, man].map(diamonds));
+    const after = await Promise.all([s1, s2, loner, held, man, owner].map(diamonds));
     assert.deepEqual(
       after.map((n, i) => n - before[i]),
-      [10_000, 0, 0, 20_000, 0],
-      '25.000 → 10.000; 9.000 baremin altı; ilk günlerindeki ajanssız almaz; yönetim yayıncısı 45.000 → 20.000; ajanssız erkek almaz',
+      [10_000, 0, 0, 20_000, 0, 0],
+      '25.000 → 10.000; 9.000 baremin altı; ilk günlerindeki ajanssız almaz; yönetim yayıncısı 45.000 → 20.000; ajanssız erkek almaz; ajans sahibi almaz',
     );
     const kinds = await q('SELECT user_id, kind, agency_id FROM host_bonuses ORDER BY bonus');
     assert.deepEqual(kinds.map((k) => [k.user_id, k.kind, k.agency_id]), [[s1.id, 'agency', agencyId], [held.id, 'management', null]]);
