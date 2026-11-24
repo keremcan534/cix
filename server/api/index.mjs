@@ -42,6 +42,7 @@ import { serverLoadRoutes, startServerLoad, stopServerLoad } from './server-load
 import { CONFIG_CACHE, configRoutes, gate } from './features.mjs';
 import { agencyRoutes } from './agency.mjs';
 import { agencyAdminRoutes } from './agency-admin.mjs';
+import { agencyLevelRoutes } from './agency-levels.mjs';
 import { agencyChatRoutes } from './agency-chat.mjs';
 import { agencyAssistantRoutes } from './agency-assistants.mjs';
 import { recordIncome } from './agency-lib.mjs';
@@ -404,6 +405,7 @@ const routes = {
   ...financeSyncRoutes,
   ...agencyRoutes,
   ...agencyAdminRoutes,
+  ...agencyLevelRoutes,
   ...agencyChatRoutes,
   ...agencyAssistantRoutes,
   ...configRoutes,

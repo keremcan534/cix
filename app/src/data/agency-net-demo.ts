@@ -143,15 +143,21 @@ export function demoOverview(id: string): Overview {
         : [],
     tiers: DEMO_TIERS,
     poolCap: POOL,
-    // Aday ajans / aktif ajans (lib/agency-activity): the owners' rule with this demo agency's numbers.
-    activity: {
-      status: a.streamers >= 20 ? 'active' : 'candidate',
-      off: false,
-      hosts: a.streamers,
-      earners: Math.min(a.active, 6),
-      newThisMonth: 2,
-      penalty: 0,
-      need: { hosts: 20, earners: 10, earnUsd: 10, demoteBelow: 20, monthlyNew: 5, penaltyPct: 5 },
+    // Aday ajans ended (24 Nov 2026); the weekly level (lib/agency-level) with this demo agency's numbers.
+    activity: null,
+    level: {
+      week: '2026-11-23',
+      base: 342_500,
+      active: Math.min(a.active, 22),
+      minActive: 20,
+      activeUsd: 10,
+      level: a.active >= 20 ? { name: 'Bronz', rate: 0.6 } : { name: null, rate: 0.35 },
+      reason: a.active >= 20 ? 'threshold' : 'active',
+      reached: a.active >= 20 ? null : { name: 'Bronz', rate: 0.6 },
+      next: { name: 'Gümüş', rate: 0.7, from: 500_000, left: 157_500 },
+      isNew: false,
+      newUntil: null,
+      last: { week: '2026-11-16', name: null, rate: 0.5, base: 248_000, active: 21 },
     },
   };
 }

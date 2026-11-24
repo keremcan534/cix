@@ -195,7 +195,7 @@ function Dashboard() {
           )}
           <Text style={{ color: colors.textDim, fontSize: 12, lineHeight: 17 }}>
             {agency
-              ? `${RULES.agencyHostInactiveDays} gün çevrimiçi olmaz ve çekim yapmazsan ajanstan düşer, yönetim hesabına aktarılırsın. Kazancın etkilenmez.`
+              ? `${RULES.agencyHostInactiveDays} gün çevrimiçi olmazsan ajanstan düşersin. Döndüğünde ${RULES.hostAgencyJoinDays} gün içinde bir ajansa katılabilirsin; katılmazsan yönetim yayıncısı olursun. Kazancın etkilenmez.`
               : `Kayıttan itibaren ${RULES.hostAgencyJoinDays} gün içinde bir ajansa katılmazsan yönetim hesabına (platform) bağlanırsın: kazancını almaya ve para çekmeye sorunsuz devam edersin, sadece senin üzerinden ajans komisyonu oluşmaz. ${joinDaysLeft > 0 ? `Kalan süre: ${joinDaysLeft} gün.` : 'Bu süre doldu: yönetim yayıncısısın. Bir ajansa artık kodla katılamazsın, yalnız ajansın ve merkezin onayladığı transfer talebiyle geçebilirsin.'}`}
           </Text>
           {!agency && (

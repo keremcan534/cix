@@ -1,11 +1,12 @@
-// Aday ajans / aktif ajans (agency-activity.mjs, docs/AJANS_STATUSU.md) against a real Postgres: an agency is a
-// candidate until it has enough streamers and earners, then active; a candidate's commission is kept but not paid;
-// a streamer inactive for the set days leaves the agency, which falls back to candidate below the line; an active
-// agency that brought too few new streamers last month gets fewer points of its own share this month.
+// The streamers' 60-day rule and the return (agency-activity.mjs, owners 24 Nov 2026) against a real Postgres: a
+// streamer offline for 60 days leaves her agency; when she comes back she has the days to pick an agency (3) with a
+// code; past them she is a yönetim yayıncısı (streamer-rule.mjs) and moves only by a transfer. The aday ajans rule
+// is gone: an agency with few streamers asks for its payout like any other (agency.test.mjs).
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { rnd, startApi } from './harness.mjs';
+import { heldWomanSql, streamerKindSql } from '../streamer-rule.mjs';
 
 const h = startApi({ AGENCY_JOBS: '0', ALLOW_TEST_TOPUP: '0' });
 const { call, signUp } = h;
@@ -17,7 +18,6 @@ const refused = ([st, j], code, msg = '') => {
   assert.equal(st, code, `${msg}: beklenen ${code}, gelen ${st} ${JSON.stringify(j).slice(0, 200)}`);
   return j;
 };
-const ref = () => `t${rnd(8)}`;
 const q = async (sql, vals = []) => (await h.sql.query(sql, vals)).rows;
 
 async function account(name, gender = 'Kadın') {
@@ -27,100 +27,75 @@ async function account(name, gender = 'Kadın') {
 }
 
 let admin;
-async function setLive(changes) {
-  const view = ok(await admin.get('/api/admin/live-settings'));
-  return ok(await admin.post('/api/admin/live-settings', { changes, reason: 'Ajans statüsü testi', baseV: view.v, confirm: true }), 'ayar');
-}
 const jobs = async () => ok(await admin.post('/api/admin/agency/jobs/run', {}), 'işler');
-const income = async (streamer, diamonds) => ok(await admin.post('/api/admin/agency/income', { streamer: streamer.id, type: 'gift', diamonds, ref: ref() }), 'gelir');
+/** Last online `days` days ago (sessions and devices), as the job reads it. */
+const offline = (u, days) =>
+  Promise.all([
+    q(`UPDATE sessions SET last_seen_at = now() - make_interval(days => $2) WHERE user_id = $1`, [u.id, days]),
+    q(`UPDATE device_accounts SET last_seen_at = now() - make_interval(days => $2) WHERE user_id = $1`, [u.id, days]),
+  ]);
+const kindOf = async (u) => (await q(`SELECT ${streamerKindSql('$1::uuid')} AS k, ${heldWomanSql('$1::uuid')} AS held`, [u.id]))[0];
+const codeOf = async (id) => (await q('SELECT code FROM agencies WHERE id = $1', [id]))[0].code;
 
-describe('Ajans statüsü', () => {
-  let owner, A, streamers;
-  const overview = async () => ok(await owner.get(`/api/agency/overview?id=${A.id}`), 'özet');
+describe('Pasif yayıncı: 60 gün ve geri dönüş', () => {
+  let A, B, idle, near, busy, late;
 
-  test('hazırlık: kural 3 yayıncı, 2 kazanan × 1 USD, 3 altında aday; bir ajans ve üç yayıncı', async () => {
+  test('hazırlık: iki ajans; dört yayıncı 70 gün önce katılmış', async () => {
     admin = await account('Merkez', null);
     await q("UPDATE users SET role = 'admin' WHERE id = $1", [admin.id]);
-    await setLive({ agency_activation_hosts: 3, agency_activation_earners: 2, agency_activation_earn_usd: 1, agency_demote_below: 3, agency_monthly_new_hosts: 5, agency_monthly_penalty_pct: 5, agency_inactive_days: 90 });
-    owner = await account('Statü Sahibi', null);
-    A = ok(await admin.post('/api/admin/agency/create', { name: `Statü Ajans ${rnd(3)}`, owner: owner.id })).agency;
-    assert.equal((await q('SELECT activity FROM agencies WHERE id = $1', [A.id]))[0].activity, 'candidate', 'yeni ajans aday');
-    const code = (await q('SELECT code FROM agencies WHERE id = $1', [A.id]))[0].code;
-    streamers = [];
-    for (const n of ['Bir', 'İki', 'Üç']) {
-      const s = await account(`Yayıncı ${n}`);
-      ok(await s.post('/api/agency/join', { code }), 'katıl');
-      streamers.push(s);
-    }
+    const [oa, ob] = [await account('Sahip A', null), await account('Sahip B', null)];
+    A = ok(await admin.post('/api/admin/agency/create', { name: `Pasif A ${rnd(3)}`, owner: oa.id })).agency;
+    B = ok(await admin.post('/api/admin/agency/create', { name: `Pasif B ${rnd(3)}`, owner: ob.id })).agency;
+    [idle, near, busy, late] = [await account('Uzun Süre Yok'), await account('59 Gün'), await account('Her Gün'), await account('Geç Dönen')];
+    for (const s of [idle, near, busy, late]) ok(await s.post('/api/agency/join', { code: await codeOf(A.id) }), 'katıl');
+    await q("UPDATE agency_streamers SET joined_at = now() - interval '70 days' WHERE agency_id = $1", [A.id]);
+    await q("UPDATE users SET created_at = now() - interval '80 days' WHERE id = ANY($1::uuid[])", [[idle, near, busy, late].map((x) => x.id)]);
   });
 
-  test('yayıncı tamam ama kazanç yok: aday; kazanç gelince aktif; aday ajans ödeme alamaz, aktif alır', async () => {
-    let o = await overview();
-    assert.deepEqual([o.activity.status, o.activity.hosts, o.activity.earners, o.activity.need.hosts], ['candidate', 3, 0, 3]);
-    // A candidate's commission is kept like any other.
-    await income(streamers[0], 6_000);
-    const kept = await q('SELECT sum(amount)::numeric AS s FROM agency_ledger WHERE agency_id = $1', [A.id]);
-    assert.ok(Number(kept[0].s) > 0, 'komisyon birikir');
-    const period = (await q('SELECT DISTINCT period FROM agency_ledger WHERE agency_id = $1', [A.id]))[0].period;
-    await q('INSERT INTO agency_periods (period) VALUES ($1) ON CONFLICT DO NOTHING', [period]);
-    ok(await admin.post('/api/admin/agency/settings', { key: 'payout_policy', value: { min_diamonds: 0 }, reason: 'Test' }), 'alt limit');
-    const cand = refused(await owner.post('/api/agency/payouts/request', { id: A.id, currency: 'USD', ref: ref() }), 409, 'aday');
-    assert.equal(cand.code, 'agency_candidate');
-    assert.match(cand.error, /3 yayıncıya ve bunlardan 2 tanesi 1 USD kazanınca/);
-    await income(streamers[1], 5_000);
-    o = await overview();
-    assert.deepEqual([o.activity.status, o.activity.earners], ['active', 2]);
+  test('60 gün çevrimiçi olmayan düşer (para çekmek saymaz); 59 gün olan ve her gün giren kalır', async () => {
+    await offline(idle, 61);
+    await offline(late, 61);
+    await offline(near, 59);
     const r = await jobs();
-    assert.equal(r.activated, 1);
-    assert.equal((await q('SELECT activity FROM agencies WHERE id = $1', [A.id]))[0].activity, 'active');
-    const notes = await q("SELECT title FROM agency_notices WHERE agency_id = $1 AND kind = 'status'", [A.id]);
-    assert.ok(notes.some((n) => /aktif oldu/.test(n.title)));
-    const paid = await owner.post('/api/agency/payouts/request', { id: A.id, currency: 'USD', ref: ref() });
-    assert.notEqual(paid[1].code, 'agency_candidate', 'aktif ajans aday diye reddedilmez');
+    assert.equal(r.inactive, 2);
+    const links = await q("SELECT streamer_id, end_reason FROM agency_streamers WHERE agency_id = $1 AND ended_at IS NOT NULL", [A.id]);
+    assert.deepEqual(new Set(links.map((l) => l.streamer_id)), new Set([idle.id, late.id]));
+    assert.ok(links.every((l) => l.end_reason === 'inactive'));
+    const open = await q('SELECT streamer_id FROM agency_streamers WHERE agency_id = $1 AND ended_at IS NULL', [A.id]);
+    assert.deepEqual(new Set(open.map((l) => l.streamer_id)), new Set([near.id, busy.id]));
+    const [note] = await q("SELECT title, body FROM agency_notices WHERE agency_id = $1 AND kind = 'status' ORDER BY id DESC LIMIT 1", [A.id]);
+    assert.match(note.title, /2 yayıncı 60 gün çevrimiçi olmadığı için ajanstan düştü/);
+    assert.match(note.body, /3 gün içinde bir ajansa katılabilir/);
+    // Not back yet: not a yönetim yayıncısı (her days start when she returns).
+    assert.deepEqual(await kindOf(idle), { k: null, held: false });
   });
 
-  test('aylık şart: geçen ay 5 yeni yayıncı yoksa bu ay kendi payı 5 puan düşük; üst ajansa dokunmaz', async () => {
-    // Approved before last month: the month's rule applies. All its streamers joined this month: last month 0 new.
-    await q("UPDATE agencies SET approved_at = now() - interval '70 days', created_at = now() - interval '70 days' WHERE id = $1", [A.id]);
+  test('dönünce 3 gün içinde kodla başka bir ajansa katılabilir', async () => {
+    await offline(idle, 0);
     const r = await jobs();
-    assert.ok(r.monthRules >= 1);
-    const [rule] = await q('SELECT new_hosts, needed, penalty FROM agency_month_rules WHERE agency_id = $1', [A.id]);
-    assert.deepEqual([rule.new_hosts, rule.needed, Number(rule.penalty)], [0, 5, 0.05]);
-    assert.equal((await jobs()).monthRules, 0, 'ayda bir kez');
-    const before = (await q('SELECT count(*)::int AS n FROM agency_commissions WHERE agency_id = $1', [A.id]))[0].n;
-    await income(streamers[2], 10_000);
-    const [k] = await q('SELECT total_rate, agency_rate, penalty_rate, agency_amount FROM agency_commissions WHERE agency_id = $1 ORDER BY id DESC LIMIT 1', [A.id]);
-    assert.equal((await q('SELECT count(*)::int AS n FROM agency_commissions WHERE agency_id = $1', [A.id]))[0].n, before + 1);
-    assert.deepEqual([Number(k.total_rate), Number(k.agency_rate), Number(k.penalty_rate), Number(k.agency_amount)], [0.35, 0.35, 0.05, 3_500]);
-    assert.equal((await overview()).activity.penalty, 0.05);
-  });
-
-  test('90 gün pasif yayıncı düşer, yönetim yayıncısı olur; ajans 3 altına inince adaya düşer', async () => {
-    const idle = streamers[2];
-    await q("UPDATE agency_streamers SET joined_at = now() - interval '100 days' WHERE streamer_id = $1 AND ended_at IS NULL", [idle.id]);
-    await q("UPDATE sessions SET last_seen_at = now() - interval '100 days' WHERE user_id = $1", [idle.id]);
-    await q("UPDATE device_accounts SET last_seen_at = now() - interval '100 days' WHERE user_id = $1", [idle.id]);
-    // One still active (a recent sign-in) stays even with an old link.
-    await q("UPDATE agency_streamers SET joined_at = now() - interval '100 days' WHERE streamer_id = $1 AND ended_at IS NULL", [streamers[0].id]);
-    const r = await jobs();
-    assert.equal(r.inactive, 1);
-    assert.equal(r.demoted, 1);
-    const [link] = await q('SELECT end_reason FROM agency_streamers WHERE streamer_id = $1 ORDER BY id DESC LIMIT 1', [idle.id]);
-    assert.equal(link.end_reason, 'inactive');
+    assert.equal(r.returned, 1);
+    const [l] = await q("SELECT returned_at FROM agency_streamers WHERE streamer_id = $1 AND end_reason = 'inactive'", [idle.id]);
+    assert.ok(l.returned_at);
     const me = ok(await idle.get('/api/agency/me'));
     assert.equal(me.membership, null);
-    assert.equal(me.streamer.held, true, 'yönetim yayıncısı: yalnız transferle geçer');
-    const o = await overview();
-    assert.deepEqual([o.activity.status, o.activity.hosts], ['candidate', 2]);
-    assert.equal(o.agency.activity, 'candidate');
-    const notes = await q("SELECT title FROM agency_notices WHERE agency_id = $1 AND kind = 'status' ORDER BY id DESC LIMIT 3", [A.id]);
-    assert.ok(notes.some((n) => /aday ajansa düştü/.test(n.title)));
-    assert.ok(notes.some((n) => /pasif kaldığı için/.test(n.title)));
+    assert.equal(me.streamer.held, false, 'süresi var');
+    const left = new Date(me.streamer.pickUntil).getTime() - Date.now();
+    assert.ok(left > 2.9 * 86400e3 && left <= 3 * 86400e3, 'dönüşten 3 gün');
+    assert.deepEqual(await kindOf(idle), { k: null, held: false }, 'süre içinde yönetim yayıncısı değil');
+    ok(await idle.post('/api/agency/join', { code: await codeOf(B.id) }), 'başka ajansa kodla');
+    assert.equal(ok(await idle.get('/api/agency/me')).membership?.agencyId ?? (await q('SELECT agency_id FROM agency_streamers WHERE streamer_id = $1 AND ended_at IS NULL', [idle.id]))[0].agency_id, B.id);
+    assert.equal((await kindOf(idle)).k, 'agency');
   });
 
-  test('kural kapalı (0): her ajans aktif', async () => {
-    await setLive({ agency_activation_hosts: 0 });
-    assert.equal((await overview()).activity.status, 'active');
-    await setLive({ agency_activation_hosts: null, agency_activation_earners: null, agency_activation_earn_usd: null, agency_demote_below: null, agency_monthly_new_hosts: null, agency_monthly_penalty_pct: null, agency_inactive_days: null });
+  test('3 günde katılmayan yönetim yayıncısı olur; artık kodla katılamaz, yalnız transferle', async () => {
+    await offline(late, 0);
+    await jobs();
+    await q("UPDATE agency_streamers SET returned_at = now() - interval '4 days' WHERE streamer_id = $1 AND end_reason = 'inactive'", [late.id]);
+    assert.deepEqual(await kindOf(late), { k: 'management', held: true });
+    const me = ok(await late.get('/api/agency/me'));
+    assert.equal(me.streamer.held, true);
+    const r = refused(await late.post('/api/agency/join', { code: await codeOf(B.id) }), 409, 'süre doldu');
+    assert.match(r.error, /transfer talebi/);
+    assert.equal((await jobs()).returned, 0, 'dönüş bir kez yazılır');
   });
 });

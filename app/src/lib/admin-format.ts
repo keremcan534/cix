@@ -87,6 +87,8 @@ export const AGENCY_LEDGER_LABEL: Record<string, string> = {
   reversal: 'İptal / iade',
   bd: 'BD komisyonu',
   assistant: 'Asistan payı',
+  // Ajans seviyeleri (24 Nov 2026): the week's level difference, one row when the week closes.
+  level: 'Haftalık seviye farkı',
 };
 
 /** "5.000 jeton + 2.500 hediye". */

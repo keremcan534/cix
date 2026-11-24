@@ -54,8 +54,13 @@ describe('Ajans asistanı', () => {
     await q("UPDATE users SET gender = 'Kadın' WHERE id = ANY($1::uuid[])", [[helper, a1, a2, a3, outsider, helper2, b1].map((x) => x.id)]);
     T = ok(await admin.post('/api/admin/agency/create', { name: 'Asistan Ajans', owner: owner.id })).agency;
     T2 = ok(await admin.post('/api/admin/agency/create', { name: 'İkinci Ajans', owner: owner2.id })).agency;
-    // The owner's commission in the example: 20 % of the streamer's income.
-    for (const a of [T, T2]) ok(await admin.post('/api/admin/agency/rate', { id: a.id, rate: 0.2, reason: 'Örnek oran' }));
+    // The owner's commission in the example: 20 % of the streamer's income (the weekly levels' level 0 here, no new
+    // agency weeks; the weeks are not closed in this file: agency-levels.test.mjs).
+    ok(await admin.post('/api/admin/agency/settings', {
+      key: 'weekly_levels',
+      value: { min_active: 20, active_usd: 10, new_weeks: 0, new_level: 'ust', levels: [{ key: 'ornek', name: 'Örnek', rate: 0.2, from: 0, shown: false }, { key: 'ust', name: 'Üst', rate: 0.5, from: 1e9, shown: true }] },
+      reason: 'Örnek oran',
+    }));
     ok(await helper.post('/api/agency/join', { code: await codeOf(T.id), method: 'code' }), 'asistan adayı yayıncı olur');
     ok(await helper2.post('/api/agency/join', { code: await codeOf(T2.id), method: 'code' }));
   });

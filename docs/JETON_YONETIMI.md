@@ -41,6 +41,10 @@
 >   (haftalar, ödenenler, süren haftanın önizlemesi, atlanan haftayı öde, bonusu geri al; yetki `app.host_bonus`).
 >   Uygulama: Yayıncı Merkezi'nde "Haftalık bonus" kartı (bu haftaki kazanç, ulaşılan bonus, sonraki bareme kalan).
 >   Eski uygulamalar kartı göstermez; bonus onlara da yüklenir ve bildirim gider.
+> - **Ajans seviyeleri (24 Kasım 2026):** ajans komisyonu haftalık seviyeden: %35 (Gönül Bağı) … %100 (Elmas,
+>   1.500.000 elmas); seviye 1 ve üstü için 20 aktif yayıncı (haftada 10 USD); yeni ajans ilk 4 hafta %50; üst ajans
+>   fark almaz. Aday ajans kuralı ve aylık ceza kalktı. Pasif yayıncı 60 günde düşer, dönünce 3 günü var. Ayrıntı:
+>   `AJANS_HIYERARSI.md`, `AJANS_STATUSU.md`.
 > - **Sonraki adımlar (sahiplerle):** jetonla fiyatlanan her şey (hediyeler, VIP eşikleri, Rütbe, mağaza, oyunlar) ayrı
 >   ayrı konuşulacak; şimdilik jeton sayıları aynı.
 

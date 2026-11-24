@@ -134,8 +134,6 @@ export function defaultsOf(e = process.env) {
     bond_levels: BOND_LEVELS.join(', '),
     // Aile's game (FAMILY_AMOUNTS): family-rules.mjs's numbers.
     ...Object.fromEntries(Object.entries(FAMILY_AMOUNTS).map(([k, x]) => [k, x.default])),
-    // Ajans statüsü (AGENCY_AMOUNTS): the owners' numbers.
-    ...Object.fromEntries(Object.entries(AGENCY_AMOUNTS).map(([k, x]) => [k, x.default])),
     // Oda seviyeleri and Vitrin (ROOM_LEVEL_AMOUNTS, BADGE_AMOUNTS): room-rules.mjs's and profile-rules.mjs's numbers.
     ...Object.fromEntries(Object.entries(ROOM_LEVEL_AMOUNTS).map(([k, x]) => [k, x.default])),
     ...Object.fromEntries(Object.entries(BADGE_AMOUNTS).map(([k, x]) => [k, x.default])),
@@ -493,28 +491,9 @@ export function roomNumbersOf(s) {
     caps: ROOM_CAPS_DEFAULT.map((n, i) => v(`roomCapLv${i + 1}`, n)),
   };
 }
-/**
- * Ajans statüsü (agency-activity.mjs, docs/AJANS_STATUSU.md, the owners' rule of 19 Nov 2026): an agency is a
- * candidate until it has `agency_activation_hosts` streamers and `agency_activation_earners` of them earned
- * `agency_activation_earn_usd` each in it; an active agency falls back to candidate below `agency_demote_below`
- * streamers. A candidate's commission is kept but not paid out. An active agency that brought fewer than
- * `agency_monthly_new_hosts` new streamers in a month gets `agency_monthly_penalty_pct` points less of its own share
- * the next month. A streamer neither signed in nor withdrew for `agency_inactive_days` leaves the agency (0: never).
- */
-const AGENCY_GROUP = 'Ajans statüsü';
-const AGENCY_AMOUNTS = {
-  agency_activation_hosts: { group: AGENCY_GROUP, field: 'agencyActivationHosts', label: 'Aktif ajans için yayıncı', default: 20, bounds: { min: 0, max: 1_000, step: 1 }, unit: ' yayıncı', help: 'Ajans bu kadar yayıncıya (ve aşağıdaki kazanç şartına) ulaşınca aday ajanstan aktif ajansa geçer. Aday ajansın komisyonu birikir ama ödenmez. 0: kural kapalı, her ajans aktif.', text: (a, b) => `Aktif ajans için ${a} → ${b} yayıncı.` },
-  agency_activation_earners: { group: AGENCY_GROUP, field: 'agencyActivationEarners', label: 'Aktif ajans için kazanan yayıncı', default: 10, bounds: { min: 0, max: 1_000, step: 1 }, unit: ' yayıncı', help: 'Aktif olmak için yayıncılardan en az bu kadarının bu ajanstayken aşağıdaki kadar kazanmış olması gerekir. 0: kazanç şartı yok.', text: (a, b) => `Kazanan yayıncı şartı ${a} → ${b}.` },
-  agency_activation_earn_usd: { group: AGENCY_GROUP, field: 'agencyActivationEarnUsd', label: 'Kazanan yayıncı: en az kazanç (USD)', default: 10, bounds: { min: 0, max: 10_000, step: 1 }, unit: ' USD', help: 'Bir yayıncının "kazanan" sayılması için bu ajanstayken kazandığı en az tutar (elması USD olarak).', text: (a, b) => `Kazanan yayıncı için en az ${a} → ${b} USD.` },
-  agency_demote_below: { group: AGENCY_GROUP, field: 'agencyDemoteBelow', label: 'Aday ajansa düşme: yayıncı bunun altına inerse', default: 20, bounds: { min: 0, max: 1_000, step: 1 }, unit: ' yayıncı', help: 'Aktif ajansın yayıncı sayısı bunun altına inerse (örneğin 90 gün pasif kalanlar düşünce) yeniden aday ajans olur.', text: (a, b) => `Aktif ajans ${a} → ${b} yayıncının altında adaya düşer.` },
-  agency_monthly_new_hosts: { group: AGENCY_GROUP, field: 'agencyMonthlyNewHosts', label: 'Aylık yeni yayıncı şartı', default: 5, bounds: { min: 0, max: 1_000, step: 1 }, unit: ' yayıncı', help: 'Aktif ajans bir ayda bu kadar yeni yayıncı getirmezse bir sonraki ay komisyonu aşağıdaki kadar düşer. 0: şart yok.', text: (a, b) => `Aylık yeni yayıncı şartı ${a} → ${b}.` },
-  agency_monthly_penalty_pct: { group: AGENCY_GROUP, field: 'agencyMonthlyPenaltyPct', label: 'Aylık şart tutmazsa komisyon düşüşü (puan)', default: 5, bounds: { min: 0, max: 40, step: 1, money: true }, unit: ' puan', help: 'Aylık yeni yayıncı şartını tutmayan ajansın kendi komisyon oranı bir sonraki ay bu kadar puan düşer (%40 ise %35). Düşen kısım platformda kalır; üst ajansın payı değişmez.', text: (a, b) => `Aylık şart tutmazsa komisyon ${a} → ${b} puan düşer.` },
-  agency_inactive_days: { group: AGENCY_GROUP, field: 'agencyInactiveDays', label: 'Pasif yayıncı ajanstan düşer (gün)', default: 90, bounds: { min: 0, max: 3_650, step: 1 }, unit: ' gün', help: 'Bu kadar gün uygulamaya girmeyen ve para çekmeyen yayıncı ajanstan düşer ve yönetim yayıncısı olur; kazancı ve çekimi sürer. 0: kimse düşmez.', text: (a, b) => `Pasif yayıncı ${a} → ${b} günde ajanstan düşer.` },
-};
-/** The agency status rule as Canlı ayarlar has it (snapshot `s`). */
-export function agencyRuleOf(s) {
-  return Object.fromEntries(Object.entries(AGENCY_AMOUNTS).map(([, x]) => [x.field.replace(/^agency/, '').replace(/^./, (c) => c.toLowerCase()), Number.isSafeInteger(s?.[x.field]) ? s[x.field] : x.default]));
-}
+// Ajans statüsü (aday / aktif ajans, the monthly penalty, the inactive days) left Canlı ayarlar on 24 Nov 2026: the
+// weekly levels replaced the first two (agency-levels.mjs) and the owners fixed the inactive days at 60
+// (agency-activity.mjs). A stored value of those keys is ignored.
 
 /** Vitrin (profiles.mjs): what earns a medal or a title. Earned ones come and go with the rule. */
 const BADGES = 'Profil rozetleri';
@@ -1303,7 +1282,6 @@ export const REGISTRY = {
     impact: (before, after) => `Lv2 ${fmt(bondLevelsOf(before)?.[1] ?? 0)} → ${fmt(bondLevelsOf(after)?.[1] ?? 0)}, Lv10 ${fmt(bondLevelsOf(before)?.[9] ?? 0)} → ${fmt(bondLevelsOf(after)?.[9] ?? 0)}, Lv20 ${fmt(bondLevelsOf(before)?.[19] ?? 0)} → ${fmt(bondLevelsOf(after)?.[19] ?? 0)} puan.`,
   },
   ...roomEntries(FAMILY_AMOUNTS),
-  ...roomEntries(AGENCY_AMOUNTS),
   ...roomEntries(ROOM_LEVEL_AMOUNTS),
   ...roomEntries(BADGE_AMOUNTS),
   ...eventEntries(),
@@ -1454,7 +1432,6 @@ export function snapshotOf(rows = [], e = process.env, { v = 0 } = {}) {
     // As written ("0, 10, 30"); bonds.mjs reads it with bond-rules.mjs levelsOf.
     bondLevels: val('bond_levels'),
     ...Object.fromEntries(Object.entries(FAMILY_AMOUNTS).map(([k, x]) => [x.field, val(k)])),
-    ...Object.fromEntries(Object.entries(AGENCY_AMOUNTS).map(([k, x]) => [x.field, val(k)])),
     ...Object.fromEntries(Object.entries(ROOM_LEVEL_AMOUNTS).map(([k, x]) => [x.field, val(k)])),
     ...Object.fromEntries(Object.entries(BADGE_AMOUNTS).map(([k, x]) => [x.field, val(k)])),
     ...Object.fromEntries(Object.entries(EVENT_RULES).map(([k, x]) => [x.field, val(k)])),

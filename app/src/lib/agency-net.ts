@@ -88,8 +88,10 @@ export type Notice = { id: number; kind: string; title: string; body: string; cr
 
 export type Overview = {
   agency: AgencyCard;
-  /** Aday ajans / aktif ajans with its progress; raw, read with lib/agency-activity parseAgencyActivity. */
+  /** Aday ajans / aktif ajans with its progress (ended 24 Nov 2026: null); raw, read with lib/agency-activity parseAgencyActivity. */
   activity?: unknown;
+  /** Haftalık seviye (server/api/agency-levels.mjs); raw, read with lib/agency-level parseAgencyLevel. An older server sends none. */
+  level?: unknown;
   owner: Named | null;
   viewer: Viewer;
   perms: string[];
@@ -162,7 +164,7 @@ export type SubAgency = AgencyCard & {
   rank: number | null;
 };
 
-export type LedgerKind = 'direct' | 'difference' | 'transition' | 'transfer_fee' | 'adjustment' | 'reversal' | 'bd' | 'assistant';
+export type LedgerKind = 'direct' | 'difference' | 'transition' | 'transfer_fee' | 'adjustment' | 'reversal' | 'bd' | 'assistant' | 'level';
 export type LedgerRow = {
   id: number;
   kind: LedgerKind;

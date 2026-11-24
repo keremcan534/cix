@@ -11,6 +11,7 @@ import { Linking, Pressable, ScrollView, Share, StyleSheet, View } from 'react-n
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
+  AgencyLevelCard,
   AgencyStatusCard,
   Empty,
   Kpi,
@@ -34,6 +35,7 @@ import {
 } from '@/components/agency-net';
 import { HubSections, TransferCard, openOffice } from '@/components/agency-net-hub';
 import { parseAgencyActivity } from '@/lib/agency-activity';
+import { parseAgencyLevel } from '@/lib/agency-level';
 import { AssistantsTab } from '@/components/agency-assistants';
 import { SCENES } from '@/components/fx/scenes';
 import { Backdrop, DepthCard } from '@/components/fx/surface';
@@ -96,7 +98,8 @@ export default function AgencyOffice() {
     { key: 'summary', label: 'Özet' },
     { key: 'streamers', label: 'Yayıncılar', perm: 'streamers.view' },
     { key: 'subs', label: 'Referans ajanslar', perm: 'subagencies.view', hidden: !!o && o.agency.level > 1, badge: o?.counts.pending_subs },
-    { key: 'performance', label: 'Performans', perm: 'reports.performance' },
+    // The performance engine's screen; the weekly levels replaced its rates (an older server still sends it).
+    { key: 'performance', label: 'Performans', perm: 'reports.performance', hidden: !!o && !!parseAgencyLevel(o.level) },
     // Otomatik mesaj: how the agency's streamers answer paid messages (figures only, server/api/auto-chat.mjs).
     { key: 'messages', label: 'Mesaj performansı', perm: 'streamers.view', hidden: !live },
     { key: 'earnings', label: 'Kazanç', perm: 'reports.commission' },
@@ -176,6 +179,8 @@ function Summary({ c }: { c: Ctx }) {
   const e = o.earnings;
   // Aday ajans / aktif ajans (server/api/agency-activity.mjs); none from an older server.
   const activity = parseAgencyActivity(o.activity);
+  // Haftalık seviye (server/api/agency-levels.mjs); none from an older server, which keeps the old screens.
+  const level = parseAgencyLevel(o.level);
   const share = () => Share.share({ message: `${a.name} ajansına katılmak için kod: ${a.code}` }).catch(() => {});
   return (
     <View style={{ gap: space.xl }}>
@@ -191,7 +196,7 @@ function Summary({ c }: { c: Ctx }) {
             <View style={st.pills}>
               <Pill text={LEVEL_TEXT(a.level)} tone="action" />
               <Pill text={STATUS_TEXT[a.status]} tone={statusTone(a.status)} />
-              {sub && !!a.tierName && <Pill text={a.tierName} tone="money" icon="trending-up" />}
+              {(sub || !!level) && !!a.tierName && <Pill text={a.tierName} tone="money" icon="trending-up" />}
               {activity && !activity.off && <Pill text={activity.status === 'active' ? 'Aktif ajans' : 'Aday ajans'} tone={activity.status === 'active' ? 'success' : 'money'} icon={activity.status === 'active' ? 'checkmark-circle-outline' : 'hourglass-outline'} />}
             </View>
           </View>
@@ -209,13 +214,16 @@ function Summary({ c }: { c: Ctx }) {
       {(a.status === 'pending' || a.status === 'draft') && <Banner icon="hourglass-outline" tone="money" text={a.status === 'draft' ? 'Taslak: onaya gönderilmedi.' : 'Başvuru inceleniyor. Onaylanınca panel açılır.'} />}
 
       {activity && !activity.off && <AgencyStatusCard a={activity} />}
+      {level && a.status !== 'pending' && a.status !== 'draft' && <AgencyLevelCard v={level} date={fmtDate} />}
 
       {e && (
         <KpiGrid>
           <Kpi label="Bu ay komisyon" icon="diamond-outline" tone="money" {...diamondsKpi(e.month)} />
           <Kpi label="Çekilebilir" icon="wallet-outline" tone="success" {...diamondsKpi(e.balances.available)} />
           <Kpi label="Aktif yayıncı" icon="mic-outline" value={`${o.counts.active} / ${o.counts.streamers}`} sub="son 30 gün" />
-          {sub ? <Kpi label="Performans puanı" icon="speedometer-outline" value={p ? fmtScore(p.score) : '—'} sub={p?.rank ? `Genel sıra ${p.rank}` : 'Henüz değerlendirilmedi'} /> : <Kpi label="Alt ajans" icon="git-branch-outline" value={`${o.counts.active_subs} / ${o.counts.subs}`} sub={o.counts.pending_subs ? `${o.counts.pending_subs} onay bekliyor` : o.subsHidden ? undefined : `${o.counts.sub_streamers} yayıncı`} />}
+          {level ? (
+            <Kpi label="Bu hafta elmas" icon="trending-up-outline" value={fmtD(level.base)} sub={`${level.active} aktif yayıncı`} />
+          ) : sub ? <Kpi label="Performans puanı" icon="speedometer-outline" value={p ? fmtScore(p.score) : '—'} sub={p?.rank ? `Genel sıra ${p.rank}` : 'Henüz değerlendirilmedi'} /> : <Kpi label="Alt ajans" icon="git-branch-outline" value={`${o.counts.active_subs} / ${o.counts.subs}`} sub={o.counts.pending_subs ? `${o.counts.pending_subs} onay bekliyor` : o.subsHidden ? undefined : `${o.counts.sub_streamers} yayıncı`} />}
         </KpiGrid>
       )}
       {e && (
@@ -235,7 +243,7 @@ function Summary({ c }: { c: Ctx }) {
         <Panel>
           <View style={ns.rowBetween}>
             <Text style={ns.title}>{fmtPct(o.rate.rate)}</Text>
-            {sub && <Text style={ns.dim}>Üst ajans farkı {fmtPct(o.rate.parentShare)}</Text>}
+            {sub && o.rate.parentShare > 0 && <Text style={ns.dim}>Üst ajans farkı {fmtPct(o.rate.parentShare)}</Text>}
           </View>
           <RateSplit rate={o.rate.rate} parentShare={o.rate.parentShare} poolCap={o.rate.poolCap} ownLabel={sub ? 'Bu alt ajans' : 'Bu ajans (doğrudan)'} />
           {o.rate.upcoming && (
@@ -247,11 +255,15 @@ function Summary({ c }: { c: Ctx }) {
               </Text>
             </View>
           )}
-          {sub && <Text style={st.foot}>Alt ajans oranını yalnızca performans motoru veya merkez belirler; üst ajans puanı, seviyeyi veya oranı değiştiremez. Değişiklikler gelecek dönemden geçerlidir.</Text>}
+          {level ? (
+            <Text style={st.foot}>Oran haftalık seviyenden gelir; her ajans yalnız kendi yayıncılarıyla değerlendirilir, üst ajans alt ajanstan pay almaz.</Text>
+          ) : (
+            sub && <Text style={st.foot}>Alt ajans oranını yalnızca performans motoru veya merkez belirler; üst ajans puanı, seviyeyi veya oranı değiştiremez. Değişiklikler gelecek dönemden geçerlidir.</Text>
+          )}
         </Panel>
       </Section>
 
-      {p && (
+      {p && !level && (
         <Section title="Performans">
           <Panel>
             <View style={ns.rowBetween}>

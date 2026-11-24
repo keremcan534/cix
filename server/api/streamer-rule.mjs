@@ -21,22 +21,22 @@ export const familyOwnerSql = (x, members = live().familyCashoutMembers) =>
   `EXISTS (SELECT 1 FROM family_members o JOIN families f ON f.id = o.family_id AND f.closed_at IS NULL
             WHERE o.user_id = ${x} AND o.role = 'owner' AND (SELECT count(*) FROM family_members m WHERE m.family_id = o.family_id) >= ${Number(members)})`;
 
-/** Whether account `x` is a woman the centre holds: in no agency, and past her days to pick one or out of one. */
-export const heldWomanSql = (x) =>
-  `EXISTS (SELECT 1 FROM users w WHERE w.id = ${x} AND w.gender = 'Kadın' AND w.deleted_at IS NULL
-              AND NOT EXISTS (SELECT 1 FROM agency_streamers l WHERE l.streamer_id = w.id AND l.ended_at IS NULL)
-              AND (EXISTS (SELECT 1 FROM agency_streamers l WHERE l.streamer_id = w.id)
-                   OR (${PICK_DAYS} > 0 AND w.created_at <= now() - make_interval(days => ${PICK_DAYS}))))`;
-
 /**
- * heldWomanSql at instant `at` (an SQL expression): in no agency then, and by then past her days to pick one or
- * dropped from one (Yayıncı haftalık bonusu reads who was a yönetim yayıncısı when the week ended, host-bonus.mjs).
+ * Whether account `x` is a woman the centre holds at instant `at` (SQL; the yönetim yayıncısı): in no agency then,
+ * and either never in one and past her days to pick one after signing up, or out of one: at once when it ended for
+ * any reason but inactivity; after an inactivity drop (agency-activity.mjs, 60 days offline) only once she came back
+ * and her days to pick one again from her return passed without joining one (owners, 24 Nov 2026).
  */
 export const heldWomanAtSql = (x, at) =>
   `EXISTS (SELECT 1 FROM users w WHERE w.id = ${x} AND w.gender = 'Kadın' AND w.deleted_at IS NULL
               AND NOT EXISTS (SELECT 1 FROM agency_streamers l WHERE l.streamer_id = w.id AND l.joined_at < ${at} AND (l.ended_at IS NULL OR l.ended_at >= ${at}))
-              AND (EXISTS (SELECT 1 FROM agency_streamers l WHERE l.streamer_id = w.id AND l.joined_at < ${at})
-                   OR (${PICK_DAYS} > 0 AND w.created_at <= ${at} - make_interval(days => ${PICK_DAYS}))))`;
+              AND CASE WHEN EXISTS (SELECT 1 FROM agency_streamers l WHERE l.streamer_id = w.id AND l.joined_at < ${at})
+                       THEN (SELECT l.end_reason IS DISTINCT FROM 'inactive' OR (l.returned_at IS NOT NULL AND l.returned_at <= ${at} - make_interval(days => ${PICK_DAYS}))
+                               FROM agency_streamers l WHERE l.streamer_id = w.id AND l.joined_at < ${at} ORDER BY l.joined_at DESC LIMIT 1)
+                       ELSE ${PICK_DAYS} > 0 AND w.created_at <= ${at} - make_interval(days => ${PICK_DAYS}) END)`;
+
+/** heldWomanAtSql now. */
+export const heldWomanSql = (x) => heldWomanAtSql(x, 'now()');
 
 /** Whether account `x` (an SQL expression) is a streamer now. */
 export const streamerSql = (x) =>

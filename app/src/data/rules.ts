@@ -49,7 +49,7 @@ export type Rules = {
   bonusCashable: number; // 0 = bonus credits can never be withdrawn
   // Host & agency lifecycle
   hostAgencyJoinDays: number; // unaffiliated host moves to the management account after N days
-  agencyHostInactiveDays: number; // inactive + no withdrawal for N days → host leaves the agency
+  agencyHostInactiveDays: number; // offline for N days → host leaves the agency (owners 24 Nov 2026: 60, fixed)
   agencyActivationHosts: number; // hosts needed to become an active agency
   agencyActivationEarners: number; // of which at least N must earn ≥ agencyActivationEarnUsd
   agencyActivationEarnUsd: number;
@@ -91,7 +91,7 @@ export const DEFAULT_RULES: Rules = {
   jetonPendingDays: 1,
   bonusCashable: 0,
   hostAgencyJoinDays: 3,
-  agencyHostInactiveDays: 90,
+  agencyHostInactiveDays: 60,
   agencyActivationHosts: 20,
   agencyActivationEarners: 10,
   agencyActivationEarnUsd: 10,

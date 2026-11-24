@@ -9,7 +9,8 @@ import crypto from 'node:crypto';
 import { HttpError, db, move } from './core.mjs';
 import { live } from './live-settings.mjs';
 import { LOCK_HOURS, diamondState } from './wallet.mjs';
-import { penaltyAt } from './agency-activity.mjs';
+import { WEEKLY_LEVELS_DEFAULT, cleanWeeklyLevels, isNewAgency, levelFor } from './agency-level-rules.mjs';
+import { weekBounds, weekStartOf } from './host-bonus-rules.mjs';
 
 /** 1 USD = ? 💎 now (Canlı ayarlar › diamonds_per_usd; owners, 24 Nov 2026: 1.000). */
 export const diamondsPerUsd = () => live().diamondsPerUsd;
@@ -91,6 +92,9 @@ export const DEFAULTS = {
   suspension_policy: { reliability_below: 40, inactive_days: 90 },
   // Ajans asistanı (docs/AJANS_ASISTANI.md): how many assistants an agency may have at once.
   assistant_policy: { max: 1 },
+  // Ajans seviyeleri (owners, 24 Nov 2026; agency-level-rules.mjs, agency-levels.mjs): the commission by the week's
+  // level. They replace the pool, the tiers, the performance engine and the parent's difference (calcEvent).
+  weekly_levels: WEEKLY_LEVELS_DEFAULT,
 };
 
 const bad = (msg) => {
@@ -218,6 +222,8 @@ export function validateSetting(key, value, cur) {
       const v = { ...cur.suspension_policy, ...obj(value, key) };
       return { reliability_below: num(v.reliability_below, 0, 100, 'Güvenilirlik eşiği'), inactive_days: whole(v.inactive_days, 1, 3650, 'Pasiflik süresi') };
     }
+    case 'weekly_levels':
+      return cleanWeeklyLevels(value, bad);
     case 'assistant_policy': {
       const v = { ...cur.assistant_policy, ...obj(value, key) };
       return { max: whole(v.max, 0, 10, 'Ajans asistanı sınırı') };
@@ -515,26 +521,35 @@ export async function calcEvent(c, eventId) {
     if (g.rows[0]?.gender === 'Erkek') return (await done('excluded'), null);
   }
 
-  const chain = await chainAt(c, link.rows[0].agency_id, t);
-  const { eff, rows, cap } = await effectiveChain(c, chain, t, s);
-  const base = Number(ev.diamonds);
-  const n = chain.length;
-  // Shares in 1/10,000 diamond: the streamer's agency gets base × its rate; each ancestor the difference
-  // between its rate and the one below it. Their sum is base × the top's effective rate, never more.
-  const shares = [{ agency: chain[0], kind: 'direct', rate: eff[0], amount: base * eff[0] }];
-  for (let j = 1; j < n; j++) shares.push({ agency: chain[j], kind: 'difference', rate: eff[j] - eff[j - 1], amount: base * (eff[j] - eff[j - 1]) });
-
-  // The month's rule (agency-activity.mjs): an active agency that brought too few new streamers last month gets
-  // fewer points of its own share this month. Only its own share: the parent's difference stays, the platform keeps it.
-  const penalty = Math.min(e4(await penaltyAt(c, chain[0], t)), shares[0].rate);
-  if (penalty > 0) {
-    shares[0].rate -= penalty;
-    shares[0].amount -= base * penalty;
+  // Ajans seviyeleri (owners, 24 Nov 2026; agency-level-rules.mjs): only the streamer's own agency earns; a parent
+  // gets no difference. The rate is level 0's for now; when the week closes (agency-levels.mjs settleLevels) the
+  // level the agency reached adds the rest in one row. A new agency (its first weeks) has its fixed level at once,
+  // and a week already closed (a late calculation) its settled rate: neither is touched again.
+  const chain = [link.rows[0].agency_id];
+  // The agency's place in the tree then: kept on the record for reports and the BD, not for any share.
+  const tree = await chainAt(c, chain[0], t);
+  const lv = s.weekly_levels;
+  const ag = (await c.query('SELECT approved_at, created_at FROM agencies WHERE id = $1', [chain[0]])).rows[0];
+  const week = weekStartOf(t);
+  let ownRate;
+  let levelWeek = null;
+  const settled = await c.query('SELECT rate FROM agency_level_weeks WHERE agency_id = $1 AND week_start = $2', [chain[0], week]);
+  if (settled.rowCount) ownRate = e4(settled.rows[0].rate);
+  else if (isNewAgency(ag.approved_at ?? ag.created_at, t, lv)) ownRate = e4(lv.levels.find((l) => l.key === lv.new_level)?.rate ?? lv.levels[0].rate);
+  else {
+    ownRate = e4(lv.levels[0].rate);
+    levelWeek = week;
   }
+  const eff = [ownRate];
+  const cap = Math.max(ownRate, e4(lv.levels.at(-1).rate));
+  const base = Number(ev.diamonds);
+  const n = 1;
+  const shares = [{ agency: chain[0], kind: 'direct', rate: ownRate, amount: base * ownRate }];
+  const penalty = 0;
 
   // Transition commission: a former parent keeps a share of an independent agency's own streamers for a set time.
   let transition = null;
-  if (n === 1) {
+  if (tree.length === 1) {
     const tr = await c.query(
       `SELECT * FROM agency_transitions WHERE agency_id = $1 AND starts_at <= $2 AND ends_at > $2
           AND (scope = 'all' OR $3::timestamptz <= starts_at) AND (cardinality(income_types) = 0 OR $4 = ANY(income_types))
@@ -565,21 +580,21 @@ export async function calcEvent(c, eventId) {
   const total = base * (eff[n - 1] - penalty);
   let period = periodOf(t, s.commission_period);
   if (await isClosed(c, period)) period = periodOf(new Date(), s.commission_period);
-  const version = `cap#${ids.pool_cap ?? 0}|r#${rows.map((r) => r?.id ?? 0).join(',')}${transition ? `|t#${transition.row.id}` : ''}`;
+  const version = `lv#${ids.weekly_levels ?? 0}${levelWeek ? `|w${levelWeek}` : ''}${transition ? `|t#${transition.row.id}` : ''}`;
   const parentAmount = shares.filter((x) => x.kind === 'difference').reduce((a, x) => a + x.amount, 0);
   const ins = await c.query(
     `INSERT INTO agency_commissions (income_event_id, txn, streamer_id, agency_id, parent_agency_id, top_agency_id, chain, base_diamonds, income_type,
-       pool_cap, total_rate, agency_rate, parent_rate, transition_rate, agency_amount, parent_amount, transition_amount, usd, period, rule_version, occurred_at, assistant_amount, penalty_rate)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18::numeric / ${diamondsPerUsd()}, $19, $20, $21, $22, $23)
+       pool_cap, total_rate, agency_rate, parent_rate, transition_rate, agency_amount, parent_amount, transition_amount, usd, period, rule_version, occurred_at, assistant_amount, penalty_rate, level_week)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18::numeric / ${diamondsPerUsd()}, $19, $20, $21, $22, $23, $24)
      ON CONFLICT (income_event_id) DO NOTHING RETURNING *`,
     [
       ev.id,
       `AKM-${ev.id}`,
       ev.streamer_id,
       chain[0],
-      n > 1 ? chain[1] : null,
-      chain[n - 1],
-      chain,
+      tree.length > 1 ? tree[1] : null,
+      tree.at(-1),
+      tree,
       base,
       ev.source_type,
       fmt4(cap),
@@ -596,6 +611,7 @@ export async function calcEvent(c, eventId) {
       t,
       fmt4(split?.amount ?? 0),
       fmt4(penalty),
+      levelWeek,
     ],
   );
   if (!ins.rowCount) return (await done('done'), null);
@@ -607,9 +623,9 @@ export async function calcEvent(c, eventId) {
   if (split) await bookAssistantShare(c, { commissionId: com.id, agencyId: chain[0], streamerId: ev.streamer_id, period, a: split });
   // BD: the agency's responsible BD then (the streamer's agency first, else the closest ancestor). A separate
   // item paid by the platform; the agency shares above are untouched.
-  const bd = await c.query('SELECT bd_id, agency_id FROM bd_assignments WHERE agency_id = ANY($1) AND assigned_at <= $2 AND (ended_at IS NULL OR ended_at > $2)', [chain, t]);
+  const bd = await c.query('SELECT bd_id, agency_id FROM bd_assignments WHERE agency_id = ANY($1) AND assigned_at <= $2 AND (ended_at IS NULL OR ended_at > $2)', [tree, t]);
   if (bd.rowCount && s.bd_policy.rate > 0) {
-    const pick = bd.rows.sort((a, b) => chain.indexOf(a.agency_id) - chain.indexOf(b.agency_id))[0];
+    const pick = bd.rows.sort((a, b) => tree.indexOf(a.agency_id) - tree.indexOf(b.agency_id))[0];
     const basis = s.bd_policy.basis === 'base' ? base * 1e4 : s.bd_policy.basis === 'pool' ? total : base * 1e4 + total;
     const amount = Math.round((basis * e4(s.bd_policy.rate)) / 1e4);
     if (amount !== 0)
@@ -696,7 +712,7 @@ export const ASSISTANT_BACK_REASON = 'Ajans asistanı payı geri alındı';
  * diamonds that may leave. Diamonds locked by someone's gift stay where they are: they answer that gift's store
  * refund (jeton.mjs). So the locks never count more diamonds than the account has (money-check.mjs `locks`).
  */
-async function settleAssistant(c, userId, amount, ref, detail) {
+export async function settleAssistant(c, userId, amount, ref, detail) {
   await c.query('SELECT 1 FROM users WHERE id = $1 FOR UPDATE', [userId]);
   const r = await c.query('SELECT coalesce(sum(amount), 0) AS exact, coalesce(sum(wallet), 0) AS wallet FROM agency_assistant_ledger WHERE user_id = $1', [userId]);
   const target = Math.floor((e4(r.rows[0].exact) + amount) / 1e4);
@@ -795,19 +811,28 @@ export async function balances(c, agencyId) {
   return out;
 }
 
-/** Current own rate, the parent's share above it and an announced change, for panels. */
+/** The week's numbers of agency `agencyId` in [from, to): its streamers' diamonds and how many earned `least`. */
+export async function weekNumbers(c, agencyId, from, to, least) {
+  const r = await c.query(
+    `SELECT coalesce(sum(n), 0) AS base, count(*) FILTER (WHERE n >= $4)::int AS active
+       FROM (SELECT streamer_id, sum(base_diamonds) AS n FROM agency_commissions
+              WHERE agency_id = $1 AND occurred_at >= $2 AND occurred_at < $3 GROUP BY streamer_id) x`,
+    [agencyId, from, to, least],
+  );
+  return { base: Number(r.rows[0].base), active: r.rows[0].active };
+}
+
+/**
+ * The agency's rate this week for panels (Ajans seviyeleri): the level it would get if the week ended now (a new
+ * agency's fixed one). No parent share any more; the old fields stay for older apps (parentShare 0, the pool the
+ * top level's rate, no announced change).
+ */
 export async function rateView(c, agency, s) {
-  const now = new Date();
-  const chain = await chainAt(c, agency.id, now);
-  const { eff } = await effectiveChain(c, chain, now, s);
-  const next = await c.query('SELECT effective_from, rate, tier, source, reason FROM agency_rates WHERE agency_id = $1 AND effective_from > now() ORDER BY effective_from, id LIMIT 1', [agency.id]);
-  return {
-    rate: eff[0] / 1e4,
-    parentShare: chain.length > 1 ? (eff[1] - eff[0]) / 1e4 : 0,
-    total: eff[chain.length - 1] / 1e4,
-    poolCap: s.pool_cap,
-    upcoming: next.rowCount ? { effectiveFrom: next.rows[0].effective_from, rate: Number(next.rows[0].rate), tier: next.rows[0].tier, source: next.rows[0].source, reason: next.rows[0].reason } : null,
-  };
+  const lv = s.weekly_levels;
+  const { from, to } = weekBounds(weekStartOf());
+  const nums = await weekNumbers(c, agency.id, from, to, lv.active_usd * diamondsPerUsd());
+  const { level } = levelFor({ ...nums, isNew: isNewAgency(agency.approved_at ?? agency.created_at, new Date(), lv) }, lv);
+  return { rate: level.rate, parentShare: 0, total: level.rate, poolCap: lv.levels.at(-1).rate, upcoming: null };
 }
 
 /** The rate a sub-agency gets in a tier, within the pool and its parent's current rate minus the floor. */

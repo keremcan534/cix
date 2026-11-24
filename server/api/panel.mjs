@@ -94,6 +94,9 @@ export const PANEL_ROUTES = new Set([
   'GET /api/admin/agency/payouts',
   'POST /api/admin/agency/payouts/decide',
   'GET /api/admin/agency/settings',
+  // Ajans seviyeleri (agency-levels.mjs): every agency's week, and closing the last week now.
+  'GET /api/admin/agency/levels',
+  'POST /api/admin/agency/levels/run',
   // İadeler and the wallet audit (refunds.mjs, jeton.mjs).
   'GET /api/admin/purchases',
   'POST /api/admin/purchases/refund',
