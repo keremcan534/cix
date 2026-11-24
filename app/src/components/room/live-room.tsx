@@ -119,6 +119,7 @@ import { bagResult, grabCode, joinBag, useRoomBags, type Bag } from '@/lib/live/
 import { banLeft, roomBan, roomQueue, roomSeat, roomSetAdmin, roomSetDj, roomUnban, useRoomStaff, type QueueAction, type SeatAction } from '@/lib/live/room-staff';
 import { roomMusicAction, type MusicAction } from '@/lib/live/music';
 import { useFollowerInvite, useServerMicInvites, useServerPoll } from '@/lib/live/room-social';
+import { useShareTargets } from '@/lib/live/share-targets';
 import { followerInviteAt, inviteSeat as pickInviteSeat, roomShareText, serverInviteId } from '@/lib/room-social';
 import { liveDm } from '@/lib/live/messages';
 import { LiveMusicSheet, useRoomMusicPlayer } from '@/components/room/room-music';
@@ -3259,6 +3260,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   };
   // A server room: the server counts the followers, sends the notices and keeps the 24 hours (server/api/room-social.mjs).
   const followerInvite = useFollowerInvite(id, real && canManage && panel === 'invite');
+  // Aileye paylaş / Ajansta paylaş (lib/live/share-targets): the same invite line as a friend's, into those chats.
+  const shareTargets = useShareTargets(id, real && panel === 'invite', () => roomShareText(title, roomIdText({ id, code: serverRoomCode(id) })));
   const inviteFollowersLive = () => {
     const info = followerInvite.info;
     if (!info || offlineBlocked()) return;
@@ -4616,6 +4619,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         sent={sharedTo}
         onSend={sendToFriend}
         onExternal={shareExternal}
+        family={real ? shareTargets.family : null}
+        agency={real ? shareTargets.agency : null}
         followers={
           !canManage
             ? null

@@ -31,7 +31,7 @@ export const SHOW = {
 
 // --- Name line ------------------------------------------------------------------------------------------------
 
-/** "♥ Lv.N" by the name on the crowned pill: their Yankı level. */
+/** "♥ N" on the crowned pill: their Yankı level (no "Lv.", owners 24 Nov 2026). */
 export function LevelPill({ level, h = LEVEL_H }: { level: number; h?: number }) {
   return (
     <View style={[s.levelWrap, { marginVertical: -Math.round(h * 0.18) }]} accessibilityLabel={`Yankı seviyesi ${level}`}>
@@ -40,7 +40,7 @@ export function LevelPill({ level, h = LEVEL_H }: { level: number; h?: number })
       <View style={s.level}>
         <CardArt name="kalp" h={Math.round(h * 0.23)} />
         <Text style={[s.levelText, { fontSize: Math.round(h * 0.27) }]} numberOfLines={1}>
-          Lv.{level}
+          {level}
         </Text>
       </View>
     </View>

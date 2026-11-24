@@ -1,4 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -538,9 +539,30 @@ export function ModerationSheet({
 }
 
 // --- Invite friends ---------------------------------------------------------------------
+/** One of the share sheet's tiles (Odaya davet et, Aileye paylaş, Ajansta paylaş): an icon on its gradient, a name, a line. */
+function ShareTile({ icon, colors: tint, title, sub, done, disabled, onPress, label }: { icon: keyof typeof Ionicons.glyphMap; colors: [string, string]; title: string; sub: string; done: boolean; disabled: boolean; onPress: () => void; label: string }) {
+  return (
+    <Pressable onPress={onPress} disabled={disabled || done} style={[styles.tile, (disabled || done) && { opacity: 0.6 }]} accessibilityRole="button" accessibilityState={{ disabled: disabled || done }} accessibilityLabel={label}>
+      <LinearGradient colors={tint} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.tileIcon}>
+        <Ionicons name={done ? 'checkmark' : icon} size={22} color="#fff" />
+      </LinearGradient>
+      <Text style={styles.tileTitle} numberOfLines={2}>
+        {title}
+      </Text>
+      <Text style={styles.tileSub} numberOfLines={2}>
+        {sub}
+      </Text>
+    </Pressable>
+  );
+}
+
+/** A place the room can be shared to in one tap: my family's chat or my agency's chat group. */
+export type ShareTarget = { name: string; sent: boolean; busy: boolean; onSend: () => void };
+
 /**
- * "Paylaş": send the room to in-app friends as a chat invite card, or to other apps (system share sheet).
- * Owner and admins also get "Odaya davet et", which invites every follower of the room's account, once a day.
+ * "Paylaş": send the room to in-app friends as a chat invite card, or to other apps (system share sheet). At the top,
+ * side by side: "Odaya davet et" (owner and admins: every follower of the room's account, once a day), "Aileye
+ * paylaş" (my family's chat) and "Ajansta paylaş" (my agency's chat group), each when I have it.
  */
 export function ShareRoomSheet({
   visible,
@@ -550,6 +572,8 @@ export function ShareRoomSheet({
   onSend,
   onExternal,
   followers,
+  family = null,
+  agency = null,
   showOnline = true,
 }: {
   visible: boolean;
@@ -563,6 +587,10 @@ export function ShareRoomSheet({
   onExternal: () => void;
   /** Managers only: follower count of the room's account and when they were last invited (ms). */
   followers: { count: number; lastAt: number | undefined; onSend: () => void } | null;
+  /** My family's chat (null: no family, or not known yet). */
+  family?: ShareTarget | null;
+  /** My agency's chat group (null: none). */
+  agency?: ShareTarget | null;
 }) {
   const [query, setQuery] = useState('');
   // Ticks while open so the follower invite's remaining time stays current.
@@ -582,24 +610,45 @@ export function ShareRoomSheet({
   const left = followers ? followerInviteLeft(followers.lastAt, now) : 0;
   return (
     <Sheet visible={visible} onClose={onClose} title="📨 Odayı paylaş">
-      {followers && (
-        <Pressable
-          onPress={followers.onSend}
-          disabled={left > 0}
-          style={[styles.followers, left > 0 && { opacity: 0.6 }]}
-          accessibilityRole="button"
-          accessibilityState={{ disabled: left > 0 }}
-          accessibilityLabel={left > 0 ? `Odaya davet et. Tekrar ${formatWait(left)} sonra gönderilebilir` : `Odaya davet et: ${followers.count} takipçiye gönder`}
-        >
-          <Ionicons name="megaphone-outline" size={22} color={colors.gold} />
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={{ color: '#fff', fontWeight: '800' }}>Odaya davet et</Text>
-            <Text style={styles.dim}>
-              {left > 0 ? `Gönderildi · tekrar ${formatWait(left)} sonra` : `Odanın tüm takipçilerine (${followers.count.toLocaleString('tr-TR')}) · 24 saatte bir`}
-            </Text>
-          </View>
-          {left > 0 ? <Ionicons name="time-outline" size={18} color={colors.textDim} /> : <Ionicons name="chevron-forward" size={18} color={colors.textDim} />}
-        </Pressable>
+      {(followers || family || agency) && (
+        <View style={styles.tiles}>
+          {followers && (
+            <ShareTile
+              icon="megaphone"
+              colors={['#F59E0B', '#EA580C']}
+              title="Odaya davet et"
+              sub={left > 0 ? `Tekrar ${formatWait(left)} sonra` : `${followers.count.toLocaleString('tr-TR')} takipçi`}
+              done={false}
+              disabled={left > 0}
+              onPress={followers.onSend}
+              label={left > 0 ? `Odaya davet et. Tekrar ${formatWait(left)} sonra gönderilebilir` : `Odaya davet et: ${followers.count} takipçiye gönder`}
+            />
+          )}
+          {family && (
+            <ShareTile
+              icon="home"
+              colors={['#EC4899', '#BE185D']}
+              title="Aileye paylaş"
+              sub={family.sent ? 'Gönderildi' : family.name}
+              done={family.sent}
+              disabled={family.busy}
+              onPress={family.onSend}
+              label={family.sent ? 'Aileye paylaşıldı' : `Odayı ${family.name} ailesinin sohbetine gönder`}
+            />
+          )}
+          {agency && (
+            <ShareTile
+              icon="briefcase"
+              colors={['#8B5CF6', '#4F46E5']}
+              title="Ajansta paylaş"
+              sub={agency.sent ? 'Gönderildi' : agency.name}
+              done={agency.sent}
+              disabled={agency.busy}
+              onPress={agency.onSend}
+              label={agency.sent ? 'Ajans sohbetinde paylaşıldı' : `Odayı ${agency.name} ajans sohbetine gönder`}
+            />
+          )}
+        </View>
       )}
       <Text style={styles.label}>Arkadaşlarına gönder</Text>
       {friends.length > 4 && <TextInput value={query} onChangeText={setQuery} placeholder="Arkadaş ara" placeholderTextColor={colors.textDim} style={styles.input} />}
@@ -657,6 +706,11 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 3 },
   track: { height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.15)', overflow: 'hidden' },
   followers: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 14, padding: 12 },
+  tiles: { flexDirection: 'row', gap: 8 },
+  tile: { flex: 1, alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 16, paddingVertical: 12, paddingHorizontal: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  tileIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  tileTitle: { color: '#fff', fontWeight: '800', fontSize: 12.5, textAlign: 'center' },
+  tileSub: { color: colors.textDim, fontSize: 11, textAlign: 'center' },
   small: { backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
   smallText: { color: '#fff', fontWeight: '700', fontSize: 12 },
   vol: { backgroundColor: colors.cardAlt, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 5 },

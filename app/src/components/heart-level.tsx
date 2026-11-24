@@ -229,7 +229,7 @@ export function HeartBadge({ level, size = 'sm', t: outer, still, style }: { lev
           style={[s.badge, { height: b.h, borderRadius: b.h / 2, paddingHorizontal: b.pad, gap: b.gap }, tier.rim && { borderWidth: 1.5, borderColor: tier.rim, paddingHorizontal: b.pad - 1.5 }]}
         >
           <Ionicons name={tier.id === 'none' ? 'chatbubble-outline' : 'chatbubble-ellipses'} size={b.icon} color="#fff" />
-          <Text style={[s.badgeText, { fontSize: b.font, lineHeight: b.h - 2 }]}>Lv.{level}</Text>
+          <Text style={[s.badgeText, { fontSize: b.font, lineHeight: b.h - 2 }]}>{level}</Text>
         </LinearGradient>
         {tier.rim && <Ionicons name="sparkles" size={b.icon} color={tier.rim} style={{ position: 'absolute', right: -b.icon / 2, top: -b.icon / 2 }} />}
       </Animated.View>

@@ -471,6 +471,12 @@ export function useServerRooms(): Room[] {
   }, [focused]);
   return list;
 }
+/** An open server room by its ID (the owner's number, a shared room's message): the list as last read, else read again. */
+export async function serverRoomByCode(code: string): Promise<Room | null> {
+  const hit = rooms.find((r) => r.code === code);
+  if (hit) return hit;
+  return (await loadRooms()).find((r) => r.code === code) ?? null;
+}
 /** The open server rooms as last read, without reading them again (a screen that only looks one up). */
 export const useServerRoomList = (): Room[] => useSyncExternalStore(subscribeRooms, () => rooms, () => rooms);
 /** Whether the last read of the room list worked ('failed': the list offers "Tekrar dene"). */
