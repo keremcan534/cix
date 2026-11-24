@@ -83,49 +83,6 @@ export function sessionStatus(s: RoomSession, invited = false): { text: string; 
   return { text: 'Dinliyorsun', tone: 'live', icon: 'headset' };
 }
 
-// --- Two-choice sheet -----------------------------------------------------------------------------------
-type Choice = { label: string; desc: string; icon: keyof typeof Ionicons.glyphMap; onPress: () => void };
-/** Primary (filled turquoise) and exit (outlined red) never look alike, so a wrong tap is unlikely. */
-function ChoiceSheet({ visible, title, primary, exit, extra, onCancel, top = false }: { visible: boolean; title: string; primary: Choice; exit: Choice; /** A rarer third choice, shown as a quiet text button. */ extra?: Choice; onCancel: () => void; /** Opens under the top edge, near the room's close button, instead of from the bottom. */ top?: boolean }) {
-  const insets = useSafeAreaInsets();
-  const backdrop = <Pressable style={s.backdrop} onPress={onCancel} accessibilityLabel="Vazgeç" />;
-  return (
-    <Modal visible={visible} transparent animationType={top ? 'fade' : 'slide'} onRequestClose={onCancel}>
-      {!top && backdrop}
-      <View style={top ? [s.sheet, s.sheetTop, { paddingTop: space.md + insets.top }] : [s.sheet, { paddingBottom: space.xl + insets.bottom }]} accessibilityViewIsModal>
-        {!top && <View style={s.handle} />}
-        <Text style={s.sheetTitle} accessibilityRole="header">
-          {title}
-        </Text>
-        <Pressable style={({ pressed }) => [s.choice, s.choicePrimary, pressed && { opacity: 0.85 }]} onPress={primary.onPress} accessibilityRole="button" accessibilityLabel={`${primary.label}. ${primary.desc}`}>
-          <Ionicons name={primary.icon} size={24} color={semantic.actionInk} />
-          <View style={{ flex: 1 }}>
-            <Text style={[s.choiceLabel, { color: semantic.actionInk }]}>{primary.label}</Text>
-            <Text style={[s.choiceDesc, { color: semantic.actionInk }]}>{primary.desc}</Text>
-          </View>
-        </Pressable>
-        <Pressable style={({ pressed }) => [s.choice, s.choiceExit, pressed && { backgroundColor: 'rgba(255,122,130,0.12)' }]} onPress={exit.onPress} accessibilityRole="button" accessibilityLabel={`${exit.label}. ${exit.desc}`}>
-          <Ionicons name={exit.icon} size={24} color={semantic.danger} />
-          <View style={{ flex: 1 }}>
-            <Text style={[s.choiceLabel, { color: semantic.danger }]}>{exit.label}</Text>
-            <Text style={s.choiceDesc}>{exit.desc}</Text>
-          </View>
-        </Pressable>
-        {extra && (
-          <Pressable style={s.cancel} onPress={extra.onPress} accessibilityRole="button" accessibilityLabel={`${extra.label}. ${extra.desc}`}>
-            <Text style={[s.cancelText, { color: semantic.danger }]}>{extra.label}</Text>
-          </Pressable>
-        )}
-        <Pressable style={s.cancel} onPress={onCancel} accessibilityRole="button">
-          <Text style={s.cancelText}>Vazgeç</Text>
-        </Pressable>
-        {top && <View style={s.handle} />}
-      </View>
-      {top && backdrop}
-    </Modal>
-  );
-}
-
 // --- Mini room ------------------------------------------------------------------------------------------
 const TAB_PATHS = ['/', '/kesfet', '/anlar', '/mesajlar', '/profil'];
 /** Tabs with a floating button in the bottom-right corner. */
@@ -181,8 +138,7 @@ class MiniDrag {
 
 /**
  * The room while the user is elsewhere in the app. Tap: back to the full room (same session). Mic button:
- * the same mic as in the room. X: choose between hiding the card (the room keeps running, the edge tab
- * brings it back) and leaving. It is dragged anywhere on the screen with a finger (owners, 25 Nov 2026: up and down
+ * the same mic as in the room. X: leaves the room at once (owners, 25 Nov 2026; it asked before). It is dragged anywhere on the screen with a finger (owners, 25 Nov 2026: up and down
  * only before) and stays where it is let go, kept inside the screen; a quick fling to the right hides it.
  */
 export function MiniRoom({ session }: { session: RoomSession }) {
@@ -192,7 +148,6 @@ export function MiniRoom({ session }: { session: RoomSession }) {
   const keyboard = useKeyboardOpen();
   // The room may not be seeded yet right after a restart; read it defensively.
   const room = useRoomLive(session.roomId).room as ReturnType<typeof useRoomLive>['room'] | undefined;
-  const [closeAsk, setCloseAsk] = useState(false);
   // Placed by the screen (top on chat screens); the finger moves it from there (drag below).
   const atTop = CHAT.some((r) => r.test(path));
   const invited = !!room?.invites.some((i) => i.toId === 'me' && i.status === 'pending');
@@ -225,7 +180,6 @@ export function MiniRoom({ session }: { session: RoomSession }) {
       </Pressable>
     );
 
-  const exitChoice: Choice = { label: 'Odadan çık', desc: 'Canlı odadan ayrılacaksın.', icon: 'exit-outline', onPress: () => (setCloseAsk(false), endRoom('left')) };
   return (
     <>
       <Animated.View
@@ -293,29 +247,15 @@ export function MiniRoom({ session }: { session: RoomSession }) {
         )}
         <Pressable
           style={s.miniClose}
-          onPress={() => (ended ? dismissEnded() : setCloseAsk(true))}
+          // Leaves the room at once (owners, 25 Nov 2026: no question); hiding the card is a fling to the right.
+          onPress={() => (ended ? dismissEnded() : endRoom('left'))}
           accessibilityRole="button"
-          accessibilityLabel={ended ? 'Kapat' : 'Mini oda seçenekleri: gizle veya odadan çık'}
+          accessibilityLabel={ended ? 'Kapat' : 'Odadan çık'}
           hitSlop={8}
         >
           <Ionicons name="close" size={18} color={colors.textDim} />
         </Pressable>
       </Animated.View>
-      <ChoiceSheet
-        visible={closeAsk && !ended}
-        title={session.title}
-        primary={{
-          label: 'Odayı küçültülmüş görünümden kaldır',
-          desc: 'Oda bağlantın ve mikrofon durumun aynen sürer. Sağ kenardaki sekmeden odaya dönebilirsin.',
-          icon: 'eye-off-outline',
-          onPress: () => {
-            setCloseAsk(false);
-            setMiniHidden(true);
-          },
-        }}
-        exit={exitChoice}
-        onCancel={() => setCloseAsk(false)}
-      />
     </>
   );
 }
