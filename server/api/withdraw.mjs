@@ -176,7 +176,7 @@ export const withdrawRoutes = {
     const status = url.searchParams.get('status') || 'pending';
     if (status !== 'all' && !STATUSES.includes(status)) throw new HttpError(400, 'Geçersiz durum');
     const r = await db.query(
-      `SELECT w.*, u.name, u.phone FROM withdrawals w JOIN users u ON u.id = w.user_id
+      `SELECT w.*, u.name, u.phone, u.public_no FROM withdrawals w JOIN users u ON u.id = w.user_id
         WHERE ($1 = 'all' OR w.status = $1) ORDER BY w.id ${status === 'pending' ? 'ASC' : 'DESC'} LIMIT 200`,
       [status],
     );
@@ -189,7 +189,8 @@ export const withdrawRoutes = {
       rows: r.rows.map((w) => ({
         ...view(w),
         tlNow: payoutTl(Number(w.usd), rate),
-        user: { id: w.user_id, name: w.name, phone: w.phone ?? null },
+        // publicNo: the person's ID in the app (12 digits), what staff read and type; id stays for the calls.
+        user: { id: w.user_id, name: w.name, phone: w.phone ?? null, publicNo: w.public_no === null || w.public_no === undefined ? null : String(w.public_no) },
         play: w.play,
         payable: w.status === 'pending' && !w.play && !playMoney,
         decidedBy: w.decided_by,

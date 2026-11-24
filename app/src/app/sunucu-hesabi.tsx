@@ -97,7 +97,7 @@ export default function ServerAccount() {
           {user && (
             <>
               <Text style={s.dim} selectable>
-                Hesap kimliği: {user.id}
+                ID: {user.publicNo ?? '—'}
               </Text>
               <View style={s.balances}>
                 <View style={s.balanceItem} accessibilityLabel={`${fmt(user.coins)} jeton`}>

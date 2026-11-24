@@ -92,7 +92,7 @@ function rules() {
 }
 
 const SELECT = `SELECT e.*, c.name AS cat_name, c.icon AS cat_icon, r.title AS room_title, r.closed_at AS room_closed, r.room_type,
-                       o.name AS host_name, o.avatar_url AS host_avatar,
+                       o.name AS host_name, o.avatar_url AS host_avatar, o.public_no AS host_no,
                        (SELECT count(*) FROM event_reservations x WHERE x.event_id = e.id AND x.status IN ('confirmed', 'attended', 'missed'))::int AS reserved,
                        (SELECT count(*) FROM event_participants p WHERE p.event_id = e.id)::int AS came,
                        (SELECT x.status FROM event_reservations x WHERE x.event_id = e.id AND x.user_id = $1) AS my_reservation
@@ -110,8 +110,9 @@ function view(e) {
     category: { id: e.category, name: e.cat_name, icon: e.cat_icon },
     theme: e.theme,
     coverUrl: e.cover_url ?? null,
-    room: { id: e.room_id, title: e.room_title, closed: !!e.room_closed },
-    host: { id: e.owner_id, name: e.host_name ?? 'Üye', avatarUrl: e.host_avatar ?? null },
+    // code: the room's ID (its owner's ID in the app, docs/KIMLIK_NUMARASI.md); publicNo: the host's.
+    room: { id: e.room_id, title: e.room_title, closed: !!e.room_closed, code: e.host_no === null || e.host_no === undefined ? null : String(e.host_no) },
+    host: { id: e.owner_id, name: e.host_name ?? 'Üye', avatarUrl: e.host_avatar ?? null, publicNo: e.host_no === null || e.host_no === undefined ? null : String(e.host_no) },
     startsAt: iso(e.starts_at),
     endsAt: iso(e.ends_at),
     startedAt: iso(e.started_at),
@@ -594,7 +595,7 @@ async function report(days, { owner = null, room = null } = {}) {
   for (const x of rows) if (x.ended_at && x.end_reason in ends) ends[x.end_reason] += 1;
   // The starts and ends in the period (by when they happened), newest first.
   const records = await db.query(
-    `SELECT l.action, l.detail, l.created_at, u.name AS by_name, e.id, e.title, r.title AS room_title
+    `SELECT l.action, l.detail, l.created_at, u.name AS by_name, e.id, e.title, r.title AS room_title, (SELECT o.public_no::text FROM users o WHERE o.id = e.owner_id) AS room_code
        FROM event_log l JOIN events e ON e.id = l.event_id JOIN rooms r ON r.id = e.room_id LEFT JOIN users u ON u.id = l.actor
       WHERE l.action IN ('start', 'end', 'not_started') AND l.created_at >= now() - make_interval(days => $1) ${scope.map((x) => `AND ${x}`).join(' ')}
       ORDER BY l.id DESC LIMIT 20`,
@@ -621,6 +622,7 @@ async function report(days, { owner = null, room = null } = {}) {
     records: records.rows.map((x) => ({
       event: { id: Number(x.id), title: x.title },
       room: x.room_title,
+      roomCode: x.room_code ?? null,
       action: x.action,
       reason: x.action === 'end' ? (x.detail?.reason ?? null) : null,
       by: x.by_name ?? 'Sistem',

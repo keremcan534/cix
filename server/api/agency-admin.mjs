@@ -214,7 +214,9 @@ export const agencyAdminRoutes = {
          (SELECT coalesce(sum(l.amount), 0) FROM agency_ledger l WHERE l.agency_id = a.id AND l.created_at > now() - interval '30 days') AS earned30,
          (SELECT row_to_json(z) FROM (SELECT sc.score, sc.rank, sc.overtakes, sc.flags FROM agency_perf_scores sc JOIN agency_perf_runs pr ON pr.id = sc.run_id
              WHERE sc.agency_id = a.id AND pr.dry_run = false ORDER BY sc.run_id DESC LIMIT 1) z) AS perf,
-         (SELECT b.bd_id FROM bd_assignments b WHERE b.agency_id = a.id AND b.ended_at IS NULL) AS bd_id
+         (SELECT b.bd_id FROM bd_assignments b WHERE b.agency_id = a.id AND b.ended_at IS NULL) AS bd_id,
+         (SELECT row_to_json(z) FROM (SELECT bu.name, bu.public_no::text AS no FROM bd_assignments b JOIN users bu ON bu.id = b.bd_id WHERE b.agency_id = a.id AND b.ended_at IS NULL LIMIT 1) z) AS bd_user,
+         u.public_no AS owner_no
        FROM agencies a LEFT JOIN users u ON u.id = a.owner_id
       WHERE a.status IN ('approved', 'suspended', 'pending', 'draft') ORDER BY a.level, a.name LIMIT 5000`,
     );
@@ -248,6 +250,10 @@ export const agencyAdminRoutes = {
         overtakes: a.perf?.overtakes ?? false,
         flags: a.perf?.flags ?? [],
         bd: a.bd_id,
+        // The BD and the owner as staff know them: name and ID in the app (bd above stays for the calls).
+        bdName: a.bd_user?.name ?? null,
+        bdNo: a.bd_user?.no ?? null,
+        ownerNo: a.owner_no === null || a.owner_no === undefined ? null : String(a.owner_no),
       });
     }
     return { nodes, poolCap: x.s.pool_cap, topRate: x.s.top_rate };
