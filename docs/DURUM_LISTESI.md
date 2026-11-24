@@ -169,6 +169,14 @@ Ayrıntı: [`OTOMATIK_MESAJ.md`](OTOMATIK_MESAJ.md).
   - Hâlâ görünmeyen biri olursa: o kişinin ID'si ve hangi ekranda olduğu (mikrofon, Balkon, sohbet, Mesajlar). Fotoğrafını eski bir APK'da seçip hiç yeni APK açmamış biri, profilini bir kez açınca fotoğrafı sunucuya gider.
 - **"Şu an odada" (madde 15):** Birinin profilinde bulunduğu oda yine görünüyor: "Şu an odada: <oda> · Git". Şifreli odada "Şifreli oda · girişte şifre sorulur". Kişinin "Bulunduğum odayı göster" ayarına uyar (başta açık); engellenen kişiye, giremeyeceği odada ve bire bir görüşmede görünmez. "Git" ile (profil, ajans sohbeti, aile) gelen için odadaki herkes "Kaan, Artemis'i takip ederek geldi" görür, Artemis hâlâ odadaysa. Eski APK'lar profilde odayı göstermez ve girişte yine "X odaya girdi" yazar. **Telefonda denenmeli:** satır, ses sunucusunun (LiveKit 1.9.1) giriş anahtarındaki katılımcı özelliğine dayanıyor; bilgisayarda değil, gerçek iki telefonla denenmeli.
 
+## Özel albüm (yeni APK)
+
+- **Ne yapar:** Ajanstaki onaylı yayıncılar profillerinin Vitrin sekmesine en çok 12 fotoğraflık bir özel albüm koyar. Başkaları albümde kaç fotoğraf olduğunu ve fiyatını görür, "X jetonla aç" ile açar. Açan kişi albümü (sonradan eklenenler dahil) hep görür.
+- **Fiyat:** Herkese aynı, panelde **Canlı ayarlar › Özel albüm** (başta 500 jeton). 0 yazılırsa özel albüm kapanır; önceden açanlar görmeye devam eder.
+- **Para:** Jeton açandan düşer, yayıncıya hediye gibi elmas olarak geçer (jetonun kilidiyle), ajans komisyonu hediye gibi işler. Finans paneline "ozel_album" adlı hediye olarak gider. Aynı kişi ikinci kez ödemez.
+- **Fotoğraflar onaysız hemen görünür** (sizin kararınız). Sorunlu olan panelde Kullanıcılar ya da Şikâyetler › "Özel albüm" ile kaldırılır; kaldırılan fotoğrafı albümü açmış olanlar da görmez. Mağaza riski için [`DENETIM.md`](DENETIM.md).
+- **Eski APK'lar:** Özel albümü görmez; yeni APK ile gelir. Demoda yok (yalnız canlı sunucuda).
+
 ## Ses tanıtımı (yeni APK)
 
 - **Ne yapar:** Profiline en çok 15 saniyelik bir ses kaydı eklersin; profiline bakan herkes dinler. Profil sekmesinde "Ses tanıtımı ekle" kartı var: mikrofona basıp konuşursun, yeniden basınca durur (15 saniyede kendiliğinden durur), dinlersin, beğenirsen kaydedersin. Kayıt varken kartta oynat düğmesi ve "Değiştir" çıkar; kayıt penceresinden silinir.

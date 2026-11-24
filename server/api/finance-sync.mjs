@@ -100,6 +100,8 @@ export function eventsOf(r) {
     return [];
   }
 
+  // An Özel albüm opened (private-album.mjs), from the payer's row: a gift to the streamer named 'ozel_album'.
+  if (typeof d.privateAlbum === 'string' && r.counterparty) return [{ ...base, type: 'gift', sender_ref: r.user_id, publisher_ref: r.counterparty, coins: -amount, gift_ref: 'ozel_album' }];
   // A paid message or call minute (one-on-one.mjs payOneOnOne), from the payer's row: it names the earner (counterparty).
   if (typeof d.oneOnOne === 'string') {
     if (!r.counterparty) return [{ ...base, type: 'coin_spend', user_ref: r.user_id, coins: -amount, item_ref: d.oneOnOne }];

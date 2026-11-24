@@ -99,6 +99,7 @@ import { keepingMarks, keptLine, parseMarkNote } from '@/lib/profile-marks';
 import { photoMarksOf } from '@/lib/live/marks-live';
 import { serverNow } from '@/lib/sanction-time';
 import { VoiceCard, VoiceRecorderSheet } from '@/components/voice-intro';
+import { PrivateAlbumCard } from '@/components/private-album';
 import { removeVoiceIntro, saveVoiceIntro } from '@/lib/live/voice-intro';
 import { dropDemoVoice, keepDemoVoice, useDemoVoice } from '@/lib/voice-intro-store';
 import type { VoiceIntro } from '@/lib/voice-intro-core';
@@ -1012,6 +1013,9 @@ export default function UserProfile() {
                   {isMe && album.length === 0 && <Text style={styles.glassMeta}>Henüz fotoğraf eklenmedi.</Text>}
                 </PCard>
               )}
+
+              {/* Özel albüm (live mode): an approved agency streamer's photos others open with coins; mine to fill. */}
+              {live && serverId && <PrivateAlbumCard key={serverId} serverId={serverId} ownerName={user.name} />}
 
               {/* Only what is filled in (live mode: the interests and the extras the server keeps). Mine opens the form. */}
               {(hasPersonal || extras.tags.length > 0 || isMe) && (

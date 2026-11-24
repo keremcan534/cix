@@ -206,6 +206,19 @@ Hukuk riski Kritik §1'de. Bu işte ayrıca:
 - **Yük:** videolar öteki hediye videoları gibi API sunucusundan iner (CDN yok, "Medya dağıtımı"); yalnız satıştaki
   paketlerin videosu ve yalnız yeni APK'ya listelenir.
 
+## Özel albüm: onaysız ücretli fotoğraf, mağaza riski (24 Kasım 2026, sahiplerin kararı)
+
+Ajanstaki onaylı yayıncılar profillerine jetonla açılan bir "özel albüm" koyabiliyor ([`OZEL_ALBUM.md`](OZEL_ALBUM.md)).
+Fotoğraflar **onaylanmadan hemen** görünür (sizin kararınız); sorunlu olan şikâyetle ve panelden kaldırılır.
+
+- **Mağaza riski:** 18+ bir uygulamada kullanıcıların para karşılığı açılan fotoğraf satması, Google Play'in **cinsel
+  içerik** ve **kullanıcı içeriği** politikalarında ve App Store 1.1 / 3.1'de en çok bakılan şeylerden. Bir incelemeci
+  ya da şikâyet "ücretli müstehcen içerik" görürse uygulama kaldırılabilir.
+- **İlk istenecekler:** yüklemeden önce onay (panelde bir onay sırası) ya da otomatik içerik taraması. Gerekirse
+  Claude ekler; altyapı hazır (fotoğraflar sunucuda tek tabloda, kaldırma ve denetim kaydı var).
+- **Para:** jeton hediye gibi yayıncıya elmas olarak geçer, ajans komisyonu hediye gibi işler; para denetimi ve
+  finans paneli bunu görür. Fiyat Canlı ayarlar › Özel albüm (0: kapalı).
+
 ## Muzip hediyeler ve profil izleri: taciz ve mağaza riski (19–20 Kasım 2026, sahiplerin kararı)
 
 Muzip rafında iz bırakan hediyeler var: 💩 Kaka Şakası ve 🩴 Terlik Geldi!. Alıcının profil fotoğrafına herkesin

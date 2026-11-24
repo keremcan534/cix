@@ -151,6 +151,15 @@ export async function once<T>(key: string, run: (ref: string) => Promise<T>): Pr
   }
 }
 
+/**
+ * Özel albüm: opens `owner`'s album for the price the screen showed (server/api/private-album.mjs). The coins leave
+ * my wallet here at once; the answer is their album, now open. A moved price is a 409 price_changed (nothing taken)
+ * with the server's sentence and the price now (`data.price`); a short balance a 409 insufficient.
+ */
+export async function liveUnlockPrivateAlbum(owner: string, price: number) {
+  return applied(await once(`album:${owner}:${price}`, (ref) => api.unlockPrivateAlbum(owner, price, ref)), 'Özel albüm');
+}
+
 /** Test top-up (no payment): the server credits one of the test packs, at most 50.000 coins a day. */
 export async function liveTopup(coins: number) {
   if (!TEST_PACKS.includes(coins)) throw new Error('Test sürümünde 1.000, 5.000 ve 10.000 jetonluk paketler denenebilir.');

@@ -156,6 +156,8 @@ export async function eraseAccount(c, id, phone) {
     // Profile extras, the album rows (their files go with removeUserFiles) and the gender choice (profiles.mjs).
     await c.query('DELETE FROM profile_extras WHERE user_id = $1', [id]);
     await c.query('DELETE FROM profile_photos WHERE user_id = $1', [id]);
+    // Özel albüm: the photos go (their files with the account's, media.mjs removeUserFiles); the unlocks stay as money records.
+    await c.query('DELETE FROM private_album_photos WHERE user_id = $1', [id]);
     await c.query('UPDATE users SET gender_hidden = false WHERE id = $1', [id]);
     await c.query('DELETE FROM messages WHERE sender = $1 OR recipient = $1', [id]);
     // Their own wording of the automatic messages (auto-chat.mjs). The rights used and the sends stay as records; a
