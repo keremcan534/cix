@@ -45,7 +45,7 @@ import {
 import { EventRoomBanner, EventThemeLayer, RoomEventsSheet, type RoomEvents } from '@/components/events/room-events';
 import { RoomMenuSheet, type MenuSection } from '@/components/room/menu';
 import { ContribBoard } from '@/components/room/contrib-board';
-import { RocketPill, RocketSheet, RocketShow } from '@/components/room/room-rocket';
+import { RocketPill, RocketSheet, RocketShortcut, RocketShow } from '@/components/room/room-rocket';
 import { RoomFollowHeart } from '@/components/room/members';
 import { BossSeat, BossSeatSheet, RoomInfoSheet, RoomSettingsScreen, type BossPick, type GiftLogRow, type SettingsSection } from '@/components/room/owner';
 import { GiftSheet } from '@/components/room/gift-sheet';
@@ -224,6 +224,10 @@ const nowMs = () => Date.now();
 const reactionKey = () => Date.now() + Math.random();
 /** A server room's slow mode: one chat line per 10 seconds for everyone but its staff (server/api/room-rules.mjs). */
 const SLOW_MS = 10_000;
+/** How high the Rüzgâr Gülü shortcut stands (its disc and name): the Oda roketi shortcut sits just above it. */
+const WHEEL_STACK = 70;
+/** How high the Oda roketi shortcut stands (its rocket, bar and level). */
+const ROCKET_STACK = 74;
 /** Room the chat leaves on its right for the Rüzgâr Gülü shortcut (styles.wheelBtn: 46 wide disc, 10 from the edge). */
 const WHEEL_ROOM = 62;
 /** From the screen's right edge, past the lucky bag float (80 px) or the repeat wheel (90 px) that holds the chat's corner. */
@@ -739,6 +743,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const [moving, setMoving] = useState<string | null>(null);
   // The Rüzgâr Gülü shortcut floats over the chat's right side; while it shows, the chat keeps that side free.
   const wheelShown = full && !game && !combo && !moving && !emojiOpen && !typing && !chatRefused && casinoVisible(app.wealthLevel, app.paidGames);
+  // The Oda roketi shortcut (owners, 25 Nov 2026): on the same right side, just above the Rüzgâr Gülü (or where it would
+  // be), while the room's rocket is on; it steps aside as the wheel does.
   const [inviteSeat, setInviteSeat] = useState<number | null>(null);
   const [sheet, setSheet] = useState<{ title: string; options: SheetOption[] } | null>(null);
   const [msgFilter, setMsgFilter] = useState({ joins: true, gifts: true, bot: true });
@@ -3492,6 +3498,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const serverTop = useRoomTop(id, real && unlocked, giftLog[0]?.id);
   // Oda roketi (lib/live/room-rocket): a server room's rocket today; read again after gifts and when it launches.
   const roomRocket = useRoomRocket(real && unlocked ? id : null, { open: panel === 'rocket', bump: giftLog[0]?.id, onNews: playRocketFx });
+  const rocketShown = full && !game && !combo && !moving && !emojiOpen && !typing && !chatRefused && !!roomRocket.rocket?.on;
   const top3 = real ? serverTop : ranking.slice(0, 3).map(([uid]) => uid);
 
   // Mic invites I sent: announce each answer once (accepted, declined, no answer, no free mic left).
@@ -4058,7 +4065,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
               />
             }
             chat={(onBasis) => (
-              <ChatFeed messages={messages} visible={visibleInAll} renderItem={renderChat} renderTyping={renderTyping} screenHeight={win.height} fill={typing} onLarge={setSeatsSmall} onBasis={onBasis} hidden={emojiOpen && !typing} onTouch={emojiOpen ? () => setEmojiOpen(false) : undefined} sideRoom={wheelShown || (bagsUp && !typing) ? WHEEL_ROOM : 0} mentions={chipMentions} onMentionsSeen={mentionsSeen} attended={chatAttended} />
+              <ChatFeed messages={messages} visible={visibleInAll} renderItem={renderChat} renderTyping={renderTyping} screenHeight={win.height} fill={typing} onLarge={setSeatsSmall} onBasis={onBasis} hidden={emojiOpen && !typing} onTouch={emojiOpen ? () => setEmojiOpen(false) : undefined} sideRoom={wheelShown || rocketShown || (bagsUp && !typing) ? WHEEL_ROOM : 0} mentions={chipMentions} onMentionsSeen={mentionsSeen} attended={chatAttended} />
             )}
             overlay={
               emojiOpen && (
@@ -4204,7 +4211,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         <LuckyBagFloat
           bags={bags.bags.filter((b) => !blocked.has(b.from.id))}
           now={bags.now}
-          bottom={bagsStack && (wheelShown || combo) ? overBar + bagLift : overBar}
+          bottom={bagsStack && (wheelShown || combo || rocketShown) ? overBar + (wheelShown || combo ? bagLift : 0) + (rocketShown ? ROCKET_STACK : 0) : overBar}
           still={settings.reduceMotion}
           onOpen={(b) => {
             setBagOutcome(null);
@@ -4700,6 +4707,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       )}
       {/* Rüzgâr Gülü shortcut: one tap from the room, only where the Oyun Salonu exists (Cömertlik Lv.2+). It steps
           aside while the emoji panel, the keyboard or a refusal note is up, so it never covers their text. */}
+      {rocketShown && (!bagsUp || bagsStack) && roomRocket.rocket && (
+        <RocketShortcut rocket={roomRocket.rocket} onPress={() => setPanel('rocket')} style={[styles.wheelBtn, { bottom: overBar + (wheelShown ? WHEEL_STACK : 0) }]} />
+      )}
       {wheelShown && (!bagsUp || bagsStack) && (
         <Pressable style={[styles.wheelBtn, { bottom: overBar }]} onPress={() => (setGame({ kind: 'wheel' }), setGameMin(false))} accessibilityRole="button" accessibilityLabel="Rüzgâr Gülü">
           <SalonArt

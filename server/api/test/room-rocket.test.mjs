@@ -7,7 +7,7 @@ import { after, before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 
-import { DEFAULT_ROCKET, drawWinners, levelEnds, splitFuel } from '../room-rocket-rules.mjs';
+import { DEFAULT_ROCKET, levelEnds, prizeSlots, rankWinners, splitFuel } from '../room-rocket-rules.mjs';
 import { rnd, startApi } from './harness.mjs';
 
 const lkCalls = [];
@@ -85,13 +85,20 @@ describe('Oda roketi kuralları (saf)', () => {
     assert.deepEqual(splitFuel(ends, 15_000, 2_000), []);
     assert.equal(levelEnds(DEFAULT_ROCKET).length, 5);
   });
-  test('çekiliş: herkes en çok bir kez; ilk ödülde çok veren daha şanslı', () => {
-    const fuel = [{ user: 'a', coins: 900 }, { user: 'b', coins: 100 }];
-    assert.deepEqual(drawWinners(fuel, 5, (m) => m - 1).sort(), ['a', 'b']);
-    // A draw at 0..899 lands on a, 900..999 on b.
-    assert.deepEqual(drawWinners(fuel, 1, () => 899), ['a']);
-    assert.deepEqual(drawWinners(fuel, 1, () => 900), ['b']);
-    assert.deepEqual(drawWinners([], 3, () => 0), []);
+  // Owners, 25 Nov 2026: no draw; the one who gave most takes the biggest coin prize, items after the coins.
+  test('katkı sırası: en çok veren en büyük jeton ödülünü alır; herkes en çok bir kez', () => {
+    const fuel = [{ user: 'b', coins: 100 }, { user: 'a', coins: 900 }, { user: 'c', coins: 500 }, { user: 'd', coins: 0 }];
+    assert.deepEqual(rankWinners(fuel, 5), ['a', 'c', 'b']);
+    assert.deepEqual(rankWinners(fuel, 1), ['a']);
+    assert.deepEqual(rankWinners([{ user: 'y', coins: 5 }, { user: 'x', coins: 5 }], 2), ['x', 'y'], 'eşitlikte hep aynı sıra');
+    assert.deepEqual(rankWinners([], 3), []);
+    const slots = prizeSlots([
+      { kind: 'item', sku: 'fr-neon', days: 1, winners: 1 },
+      { kind: 'coins', amount: 100, winners: 2 },
+      { kind: 'coins', amount: 500, winners: 1 },
+    ]);
+    assert.deepEqual(slots.map((s) => (s.kind === 'coins' ? s.amount : s.sku)), [500, 100, 100, 'fr-neon']);
+    assert.deepEqual(slots.map((s) => s.slot), [0, 1, 2, 3]);
   });
 });
 
@@ -131,7 +138,7 @@ describe('Oda roketi', () => {
     assert.deepEqual([audit.version, audit.after.levels[0].goal, audit.before.levels[0].goal], [2, 1_000, DEFAULT_ROCKET.levels[0].goal]);
   });
 
-  test('odadaki hediyeler roketi doldurur; dolan seviye kalkar, ödüller katkı verenlere çekilir ve bir kez ödenir', async () => {
+  test('odadaki hediyeler roketi doldurur; dolan seviye kalkar, ödüller katkı sırasıyla verilir ve bir kez ödenir', async () => {
     const from = lkCalls.length;
     await gift(a, owner.user.id, room, 'g5', 1); // 500
     let s = await state(room, a);
@@ -143,13 +150,12 @@ describe('Oda roketi', () => {
     await gift(b, owner.user.id, room, 'g4', 1);
     assert.ok(await until(async () => (await paidLaunches(room)).length === 1), 'Lv.1 ödendi');
     const w = await wins(room, 1);
-    // Two people filled Lv.1, three prizes: two winners, different people, the first drawn takes the frame.
+    // Two people gave 500 each by Lv.1's launch, three prizes: the two coin prizes (coins before items), the frame
+    // left; equal amounts in the account id's order (owners, 25 Nov 2026: by what each gave, no draw).
     assert.equal(w.length, 2);
-    assert.deepEqual(w.map((x) => x.user_id).sort(), [a.user.id, b.user.id].sort());
-    assert.deepEqual([w[0].prize.kind, w[0].prize.sku, w[1].prize.kind, w[1].prize.amount], ['item', 'fr-neon', 'coins', 100]);
+    assert.deepEqual(w.map((x) => x.user_id), [a.user.id, b.user.id].sort());
+    assert.deepEqual(w.map((x) => [x.prize.kind, x.prize.amount]), [['coins', 100], ['coins', 100]]);
     assert.ok(w.every((x) => x.outcome === 'paid' && x.ref.startsWith('rocket:')));
-    const frame = (await h.sql.query("SELECT source, price, ends_at - starts_at AS len FROM entitlements WHERE user_id = $1 AND sku = 'fr-neon'", [w[0].user_id])).rows[0];
-    assert.deepEqual([frame.source, Number(frame.price), frame.len.days], ['rocket', 0, 1]);
     const lot = (await h.sql.query("SELECT channel, amount FROM coin_lots WHERE user_id = $1 AND channel = 'ugurlu'", [w[1].user_id])).rows;
     assert.deepEqual(lot.map((x) => Number(x.amount)), [100], 'normal jeton (Şanslı ödülü): her yerde harcanır, Cömertlik saymaz');
     const led = (await h.sql.query("SELECT reason FROM ledger WHERE user_id = $1 AND ref = $2", [w[1].user_id, w[1].ref])).rows[0];
