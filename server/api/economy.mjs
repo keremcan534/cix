@@ -490,8 +490,8 @@ export const economyRoutes = {
     const b = await readJson(req);
     const sold = sellable(b.sku);
     // "Yakında" (Yönetim › Mağaza): on the shelf, not sold yet.
-    const soon = !sold && shopItem(b.sku)?.soon && shopItem(b.sku)?.enabled;
-    if (soon) throw new HttpError(409, `${shopItem(b.sku).name} yakında satışa çıkacak`);
+    const waiting = !sold ? (packItem(b.sku, { any: true }) ?? shopItem(b.sku)) : null;
+    if (waiting?.soon && waiting.enabled !== false) throw new HttpError(409, `${waiting.name} yakında satışa çıkacak`);
     if (!sold) throw new HttpError(400, 'Bu ürün artık satışta değil');
     // A Rütbe package (7, 30 or 90 days, Seviye ayarları) or a shop item's other duration (Yönetim › Mağaza,
     // Güncelleme 8): the one of the days the phone showed; any other days get the main term (and a 409 below).

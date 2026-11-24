@@ -37,6 +37,7 @@ function viewsOf(c: LiveCatalog | null): Views {
         ...(p.animated ? { animated: true } : {}),
         ...(p.roomOnly ? { roomOnly: true } : {}),
         ...(p.off ? { retired: true } : {}),
+        ...(p.soon ? { soon: true } : {}),
         stickers: p.stickers.filter((s) => !s.off).map(({ id, name, emoji: e }) => ({ id, name, emoji: e })),
       };
       for (const s of p.stickers) {

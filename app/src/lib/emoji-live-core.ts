@@ -11,7 +11,7 @@ import { STICKER_PACKS, type Sticker } from '@/data/catalog';
 
 export type StickerArtRef = { url: string; kind: 'image' | 'lottie' };
 export type LiveSticker = { id: string; name: string; emoji: string; art?: StickerArtRef; off?: true; custom?: true };
-export type LivePack = { id: string; name: string; price: number; minVip?: number; animated?: true; roomOnly?: true; off?: true; custom?: true; stickers: LiveSticker[] };
+export type LivePack = { id: string; name: string; price: number; minVip?: number; animated?: true; roomOnly?: true; off?: true; soon?: true; custom?: true; stickers: LiveSticker[] };
 export type LiveEmoji = { packs: LivePack[]; gone: Sticker[] };
 
 const ID = /^[a-z0-9]+(-[a-z0-9]+)*$/;
@@ -41,6 +41,7 @@ const asLive = (p: (typeof STICKER_PACKS)[number], stickers = p.stickers): LiveP
   ...(p.animated ? { animated: true as const } : {}),
   ...(p.roomOnly ? { roomOnly: true as const } : {}),
   ...(p.retired ? { off: true as const } : {}),
+  ...(p.soon ? { soon: true as const } : {}),
   stickers: stickers.map((s) => ({ id: s.id, name: s.name, emoji: s.emoji })),
 });
 
@@ -83,6 +84,8 @@ export function parseLiveEmoji(raw: unknown): LiveEmoji | null {
       ...(p.animated === true || base?.animated ? { animated: true as const } : {}),
       ...(base?.roomOnly ? { roomOnly: true as const } : {}),
       ...(p.off === true ? { off: true as const } : {}),
+      // "Yakında" (Yönetim › Emojiler): on Çarşı's shelf with the tag, not sold.
+      ...(p.soon === true ? { soon: true as const } : {}),
       ...(base ? {} : { custom: true as const }),
       stickers,
     });

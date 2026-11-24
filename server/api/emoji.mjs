@@ -75,6 +75,8 @@ const STICKER_SORT = new Map(STICKER_PACKS.flatMap((p) => p.stickers.map((s, i) 
 
 // --- The tables in memory ----------------------------------------------------------------------------------
 /** rev: the largest emoji_rev in use (0: none yet); packs and stickers: id → the row as viewOf reads it. */
+/** The app's sold packs start "Yakında" (owners, 25 Nov 2026); PACKS_SOON=0 sells them as before (the tests' server). */
+const PACKS_SOON = env.PACKS_SOON !== '0';
 let snap = { rev: 0, packs: new Map(), stickers: new Map() };
 
 const packRow = (r) =>
@@ -85,6 +87,8 @@ const packRow = (r) =>
     price: num(r.price),
     minVip: num(r.min_vip),
     enabled: r.enabled,
+    // Yakında (128): null "as the default" (an app's pack that is sold or opened by VIP: yes; any other: no).
+    soon: r.soon ?? null,
     sort: num(r.sort),
     deleted: !!r.deleted_at,
     updatedAt: r.updated_at,
@@ -149,12 +153,14 @@ const appPackOf = (base, o) => ({
   price: o?.price ?? base.price,
   minVip: o?.minVip ?? base.minVip,
   enabled: o?.enabled ?? !base.retired,
+  // Yakında (owners, 25 Nov 2026): every pack sold in Çarşı or opened by VIP starts so (PACKS_SOON=0: none, the tests).
+  soon: o?.soon ?? (PACKS_SOON && (base.price > 0 || !!base.minVip)),
   sort: o?.sort ?? PACK_SORT.get(base.id),
   roomOnly: base.roomOnly,
   animated: base.animated,
   row: o ?? null,
 });
-const customPackOf = (r) => ({ id: r.id, builtin: false, name: r.name, price: r.price, minVip: r.minVip, enabled: r.enabled, sort: r.sort, roomOnly: false, animated: false, row: r });
+const customPackOf = (r) => ({ id: r.id, builtin: false, name: r.name, price: r.price, minVip: r.minVip, enabled: r.enabled, soon: r.soon === true, sort: r.sort, roomOnly: false, animated: false, row: r });
 /** One of the app's stickers as it is now; `art` only when it was replaced. */
 const appStickerOf = (base, packId, o) => ({
   id: base.id,
@@ -204,6 +210,8 @@ export function emojiCatalog() {
     ...(p.roomOnly ? { roomOnly: true } : {}),
     ...(p.animated ? { animated: true } : {}),
     ...(p.enabled ? {} : { off: true }),
+    // On Çarşı's shelf with a "Yakında" tag, not sold (an older app shows it as before and is refused at the purchase).
+    ...(p.soon ? { soon: true } : {}),
     ...(p.builtin ? {} : { custom: true }),
     stickers: p.stickers.map((s) => ({
       id: s.id,
@@ -225,8 +233,8 @@ export function emojiCatalog() {
 export function packItem(sku, { any = false } = {}) {
   if (typeof sku !== 'string' || !sku.startsWith('pack-')) return undefined;
   const p = packOf(sku.slice(5));
-  if (!p || (!any && (!p.enabled || p.roomOnly || p.price <= 0))) return null;
-  return Object.freeze({ sku, kind: 'sticker', name: p.name, price: p.price, days: null, minVip: p.minVip, tier: null });
+  if (!p || (!any && (!p.enabled || p.soon || p.roomOnly || p.price <= 0))) return null;
+  return Object.freeze({ sku, kind: 'sticker', name: p.name, price: p.price, days: null, minVip: p.minVip, tier: null, ...(p.soon ? { soon: true } : {}) });
 }
 /** Every pack's sku, in the packs' order (the shop lists those packItem sells). */
 export const packSkus = () => allPacks().map((p) => `pack-${p.id}`);
@@ -388,7 +396,7 @@ async function owners() {
 }
 
 /** Which of an app's pack's values were changed (its row's columns that aren't null), its place aside. */
-const packChanged = (r) => (r ? ['name', 'price', 'minVip', 'enabled'].filter((k) => r[k] !== null) : []);
+const packChanged = (r) => (r ? ['name', 'price', 'minVip', 'enabled', 'soon'].filter((k) => r[k] !== null) : []);
 const stickerChanged = (r) => (r ? ['pack', 'name', 'emoji', 'enabled', 'art'].filter((k) => r[k] !== null) : []);
 
 /** A sticker as the panel shows it: `picture` is what to draw (the app's own served here, a replaced or own file). */
@@ -422,13 +430,14 @@ function packView(p, owned) {
     price: p.price,
     minVip: p.minVip,
     enabled: p.enabled,
+    soon: p.soon,
     sort: p.sort,
     roomOnly: p.roomOnly,
     animated: p.animated,
     // The free packs drawn inside the emoji panel's Emoji tab (Duygular, Müzik, Hamle) rather than a tab of their own.
     emojiTab: EMOJI_TAB_PACKS.includes(p.id),
     owners: owned.get(`pack-${p.id}`) ?? 0,
-    ...(base ? { original: { name: base.name, price: base.price, minVip: base.minVip, enabled: !base.retired }, changed: packChanged(p.row) } : {}),
+    ...(base ? { original: { name: base.name, price: base.price, minVip: base.minVip, enabled: !base.retired, soon: PACKS_SOON && (base.price > 0 || !!base.minVip) }, changed: packChanged(p.row) } : {}),
     stickers: p.stickers.map(stickerView),
     updatedAt: p.row?.updatedAt ?? null,
   };
@@ -454,7 +463,7 @@ const firstPackSort = () => Math.min(1, ...allPacks().map((p) => p.sort)) - 1;
 /** Link downloads running now (each up to a sticker's size). */
 let fetching = 0;
 
-const PACK_RESET = ['name', 'price', 'minVip', 'enabled', 'sort'];
+const PACK_RESET = ['name', 'price', 'minVip', 'enabled', 'soon', 'sort'];
 const STICKER_RESET = ['pack', 'name', 'emoji', 'enabled', 'sort', 'art'];
 const fieldsOf = (v, all) => {
   if (v === undefined) return all.filter((f) => f !== 'sort');
@@ -516,6 +525,7 @@ export const emojiRoutes = {
     }
     if (b.minVip !== undefined) cols.min_vip = as(vipOf(b.minVip), base?.minVip);
     if (b.enabled !== undefined) cols.enabled = as(enabledOf(b.enabled), base ? !base.retired : undefined);
+    if (b.soon !== undefined) cols.soon = as(enabledOf(b.soon), base ? PACKS_SOON && (base.price > 0 || !!base.minVip) : undefined);
     if (!Object.keys(cols).length) throw new HttpError(400, 'Değişiklik yok');
     await saving(() =>
       tx(async (c) => {
@@ -543,7 +553,7 @@ export const emojiRoutes = {
       tx(async (c) => {
         const r = (await c.query('SELECT * FROM emoji_packs WHERE id = $1 FOR UPDATE', [id])).rows[0];
         if (!r) return;
-        const col = { name: 'name', price: 'price', minVip: 'min_vip', enabled: 'enabled', sort: 'sort' };
+        const col = { name: 'name', price: 'price', minVip: 'min_vip', enabled: 'enabled', soon: 'soon', sort: 'sort' };
         const next = await setRow(c, 'emoji_packs', id, Object.fromEntries(fields.map((f) => [col[f], null])), a.id);
         await audited(c, a, 'emoji.pack_reset', { pack: id, fields, before: auditOf(r), after: auditOf(next) }, req);
       }),

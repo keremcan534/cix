@@ -54,6 +54,9 @@ export function startApi(extraEnv = {}, { moneyCheck = true } = {}) {
       PUSH_ENABLED: '0',
       // The owners' one-time shop move (shop-items.mjs ownerShopMoves) would take fr-neon, which tests sell, off the shelf.
       SHOP_OWNER_MOVES: '0',
+      // The app's sticker packs start "Yakında" (emoji.mjs); the tests buy them, so they are sold here. emoji.test.mjs
+      // checks the default.
+      PACKS_SOON: '0',
       ALLOW_DEV_AUTH: '1',
       // The storage is a stand-in address in most tests: an uploaded file isn't looked up there (media.mjs).
       UPLOAD_VERIFY: '0',

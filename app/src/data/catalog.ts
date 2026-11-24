@@ -184,6 +184,8 @@ export type StickerPack = {
   roomOnly?: boolean;
   /** No longer offered (neither the emoji panel nor the shop shows it); kept so stickers already sent still draw. */
   retired?: boolean;
+  /** "Yakında" (owners, 25 Nov 2026): on Çarşı's shelf with the tag, not sold; the server's Yönetim › Emojiler says. */
+  soon?: boolean;
 };
 const st = (id: string, name: string, emoji: string): Sticker => ({ id, name, emoji });
 export const STICKER_PACKS: StickerPack[] = [
