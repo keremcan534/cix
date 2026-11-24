@@ -89,6 +89,8 @@ export default function TabLayout() {
           tabBarIconStyle: { width: 74, height: 48, overflow: 'visible' },
           // Switching tabs slides the screens a little instead of cutting.
           animation: 'shift',
+          // A tab that isn't shown doesn't redraw (it catches up when it comes back): see the root stack.
+          freezeOnBlur: true,
         }}
       >
         {/* Güncelleme 2, madde 46: the bar's "Benzerler" is now "Ana Sayfa" (its own tabs start with Ana Sayfa as well). */}

@@ -316,6 +316,7 @@ export function GoldTreePlayer({ entry }: { entry: Entry }) {
                           shade="rgba(0,0,0,0.5)"
                           litStyle={t.skinLit}
                           render={(sym) => <SkinCell src={skin.symbols[sym]} size={coin} />}
+                          renderKey={coin}
                         />
                       </View>
                     ))}
@@ -367,6 +368,7 @@ export function GoldTreePlayer({ entry }: { entry: Entry }) {
                     lit={[false, !!hit, false]}
                     shade="rgba(15,23,42,0.22)"
                     render={(sym) => <TreeCell sym={sym as TreeSym} size={coin} />}
+                    renderKey={coin}
                   />
                 </View>
               ))}

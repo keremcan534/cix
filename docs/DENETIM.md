@@ -176,6 +176,22 @@ modunda olması, hata takibi olmaması ve kırık kodun birleşmeden önce yakal
 3. **Uçtan uca testler ve gece kontrolü** (Sonra).
 4. Sizden gelecek hesaplar geldikçe: Sentry, analitik, push, görsel moderasyon bağlantıları.
 
+## Akıcılık (25 Kasım 2026, sahipler "çoğu yerde kasma var" dedi)
+
+Kod taraması yapıldı (telefonda ölçülmedi). Yapılanlar:
+- Arkada kalan ekranlar ve görünmeyen sekmeler donduruluyor (`freezeOnBlur`): uygulamanın ortak durumu sık değişiyor
+  (jeton, mesaj, odanın saniyeleri) ve yığındaki her ekran görünmeden yeniden çiziliyordu.
+- İnternetten gelen fotoğraflar çizildiği boyda açılıyor (`resizeMethod="resize"`): 800 piksellik oda kapağı 84 dp
+  kutuda, 640 piksellik yüz 44 dp halkada tam boy açılıyordu.
+- Odalar listesi 6 saniyede bir okunuyor; artık değişmeyen oda satırı yeniden çizilmiyor, hiç değişmeyen liste ekranı
+  uyandırmıyor.
+- Odada müzik çalarken bütün oda her saniye yeniden çiziliyordu; saniyeyi artık yalnız müzik çubuğu sayıyor.
+- Oyunlar: makara, Yörünge ve kontroller ayrı (`docs/OYUN_MERKEZI.md`).
+
+Kalanlar (sonraki iş, daha büyük): ortak durumun (`store.tsx`, 144 kullanıcı) parçalara bölünmesi; oda ekranında
+koltukların ve sohbetin yalnız kendi değişikliğinde çizilmesi (4.800 satırlık tek bileşen, konuşma her değiştiğinde
+hepsi çiziliyor); fotoğraflar için `expo-image` ve sunucudan küçük boy; cüzdandaki sürekli çalışan Skia efekti.
+
 ## Bağlar, Güncelleme 7 (19 Kasım 2026, sahiplerin kararları)
 
 Ayrıntı: [`BAGLAR.md`](BAGLAR.md). Bağ hediyesi bağı olana normal hediye olarak tekrar gider, puan hediyesiz gecelerde düşer, 30 gün hediyesiz bağ biter, Aile ve Kanka bağları pratikte sınırsız (1000), her bağ değişikliği SimilarClub Sistem'e yazılır.

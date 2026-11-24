@@ -39,6 +39,7 @@ export function GoldText({
   face = 'casino',
   spacing = 0.04,
   glow = true,
+  lite = false,
   style,
 }: {
   children: string;
@@ -50,6 +51,8 @@ export function GoldText({
   spacing?: number;
   /** The soft light round the letters (off for small labels on busy pictures). */
   glow?: boolean;
+  /** Four outline copies instead of eight and no deep edge: for a number redrawn many times a second. */
+  lite?: boolean;
   style?: StyleProp<ViewStyle>;
 }) {
   const m = METAL[metal];
@@ -64,7 +67,7 @@ export function GoldText({
     // Cinzel's capitals stand a little above the middle of their line (room for Ş's cedilla below): nudged down.
     <View style={[s.wrap, { transform: [{ translateY: size * 0.05 }] }, style]} accessible accessibilityLabel={children}>
       {glow && copy('transparent', { textShadowColor: m.glow, textShadowRadius: size * 0.35, textShadowOffset: { width: 0, height: 0 } })}
-      {DIRS.map(([x, y], i) => (
+      {(lite ? DIRS.slice(4) : DIRS).map(([x, y], i) => (
         <Text key={i} style={[text, s.copy, { color: m.line, left: x * line, top: y * line }]} numberOfLines={1} accessible={false}>
           {children}
         </Text>
@@ -76,9 +79,11 @@ export function GoldText({
       <View style={[s.band, { top: 0, height: '50%' }]} pointerEvents="none">
         {copy(m.hi)}
       </View>
-      <View style={[s.band, { top: '78%', bottom: 0 }]} pointerEvents="none">
-        {copy(m.deep, { top: -Math.round(size * 1.22 * 0.78) })}
-      </View>
+      {!lite && (
+        <View style={[s.band, { top: '78%', bottom: 0 }]} pointerEvents="none">
+          {copy(m.deep, { top: -Math.round(size * 1.22 * 0.78) })}
+        </View>
+      )}
     </View>
   );
 }

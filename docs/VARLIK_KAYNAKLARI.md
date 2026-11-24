@@ -54,6 +54,10 @@ Plus Jakarta Sans, `@expo-google-fonts/plus-jakarta-sans` paketiyle gelir. Lisan
 - **Cinzel ve Cinzel Decorative** (telif: The Cinzel Project Authors; Decorative: Natanael Gama, ayrılmış ad "Cinzel"; yazı tiplerini değiştirmiyoruz), `@expo-google-fonts/cinzel` ve `@expo-google-fonts/cinzel-decorative` paketleriyle gelir. Lisans SIL Open Font License 1.1 (Plus Jakarta Sans ile aynı lisans): uygulamaya gömülerek ticari kullanılabilir, yazı tipi tek başına satılamaz. Oyun Salonu'nun kazanç yazıları ve düğme etiketleri. Durum: doğrulandı (paketlerin `LICENSE_FONT` dosyası OFL 1.1, 2026-11-24).
 - **3D altın jeton ve yıldız parıltısı** (`app/assets/fx/coin-spin.png`, `sparkle-burst.png`): bizim çizimimiz. Jeton Blender'da modellenip çizildi (taç ve elmas bizim işaretimiz, kimsenin logosu değil); parıltı kodla üretildi. Dış kaynak yok. Durum: doğrulandı.
 
+## 4c. Yörünge görselleri (`app/assets/games/yorunge/`)
+
+Roket, alev, patlama, duman, uzay, gezegen, rampa, yakıt bidonu, paraşüt ve Kaç düğmesi (25 Kasım 2026) OpenAI'nin görsel üretimiyle (Codex, `gpt-6.2-sol`) sıfırdan üretildi; Kızıl Yedi paketi yalnız stil örneği olarak verildi, hiçbir marka ya da bilinen oyun kopyalanmadı. Üretim istemleri ve tam boy asıllar sahiplerin bilgisayarında `oyun-gorselleri/yorunge-v2/` klasöründe (`PROMPT.md`, `RAPOR.md`; depoda değil); uygulamadakiler küçültülmüş kopyalardır. OpenAI'nin kullanım koşullarına göre üretilen görselin hakları kullanıcıya aittir; yayından önce şirket hesabıyla bu koşullar bir kez daha okunmalı. Durum: doğrulanmalı (avukat, mağaza öncesi).
+
 ## 5. Kişi fotoğrafları
 
 Örnek kullanıcılar için gerçek yüz fotoğrafı kullanılmıyor. Mağaza derlemesinde (`EXPO_PUBLIC_DEMO=0`) örnek veride hiç dış görsel yok; demo derlemesinde oda kapakları ve anlar picsum.photos'tan rastgele manzara görselleridir.

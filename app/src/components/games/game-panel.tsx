@@ -109,6 +109,8 @@ export function GamePanel({
   const [tools, setTools] = useState<'games' | 'sound' | null>(null);
   const inRoom = entry.from === 'room';
   // A room's sheet runs to the screen's bottom edge: its last control has to end above the phone's navigation buttons.
+  // Oyun Salonu's games (machines, Yörünge, the wheel) take the whole screen under the status bar: in the room's
+  // usual sheet their machine was squeezed to tiny symbols once the phone's navigation bar took its share too.
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
   // A server room plays its free games at the server's table (Ludo, Renk Kartları, XOX); Okey stays out of it there.
@@ -135,7 +137,7 @@ export function GamePanel({
   const titleArt = wheel ? WHEEL_ART : gameArtOf(open.id);
 
   const body = (
-    <View style={[p.panel, inRoom ? p.sheet : p.full, inRoom && { paddingBottom: Math.max(14, insets.bottom + 6) }, inRoom && isTall(openId) && { top: height - tallSheetHeight(height) }, skin && p.skinned, hidden && { display: 'none' }]}>
+    <View style={[p.panel, inRoom ? p.sheet : p.full, inRoom && { paddingBottom: Math.max(14, insets.bottom + 6) }, inRoom && isTall(openId) && { top: casinoGame || wheel ? insets.top + 6 : height - tallSheetHeight(height) }, skin && p.skinned, hidden && { display: 'none' }]}>
       {skin && <SkinBackdrop skin={skin} />}
       <View style={p.head}>
         {titleArt && <Image source={titleArt} style={{ width: 28, height: 28, marginRight: -6 }} />}

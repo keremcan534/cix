@@ -10,8 +10,9 @@ import { Animated, Easing, PanResponder, StyleSheet, View } from 'react-native';
 import { playSfx } from '@/lib/game-sound';
 import { heavyHaptic, tapHaptic } from '@/lib/haptics';
 
-/** The lever's width on the stage (px): the machine leaves this much on its right. */
+/** The lever's width (px). It stands over the cabinet's right side, this much of it past the cabinet's edge (into the panel's margin). */
 export const LEVER_W = 34;
+export const LEVER_OUT = 12;
 const BALL = 30;
 const ROD = 8;
 const SOCKET = 23;

@@ -26,13 +26,13 @@ import { ReelSpark, TeaseAura } from '@/components/games/fx/divine-fx';
 import { useGameQuake } from '@/components/games/fx/quake';
 import { useWinFx } from '@/components/games/fx/win-fx';
 import { WinLines, type WinLine } from '@/components/games/fx/win-lines';
-import { LEVER_W, SlotLever } from '@/components/games/fx/slot-lever';
+import { LEVER_OUT, LEVER_W, SlotLever } from '@/components/games/fx/slot-lever';
 import { SpinControls, fmt, sleep, useShortGame } from '@/components/games/slot-kit';
 import type { LineSlotId } from '@/lib/casino-odds';
 import { casinoAccess, useGames, type Entry } from '@/lib/games';
 import { playSfx, warmSfx } from '@/lib/game-sound';
 import { playRound } from '@/lib/live/casino';
-import { errorHaptic, pressHaptic, tapHaptic } from '@/lib/haptics';
+import { errorHaptic, pressHaptic, rumbleHaptic, tapHaptic } from '@/lib/haptics';
 import { slotWindow, stripsOf } from '@/lib/line-slot';
 import { REEL_PACE, reelRun, teasedReels, type ReelPace } from '@/lib/reel-plan';
 import { winTierOf } from '@/lib/win-tier';
@@ -241,8 +241,8 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
   const fitW = area.w ? Math.floor((area.w - FRAME - (CABINET ? 12 : 0) - (reels - 1) * GAP) / reels) - REEL_EDGE : 0;
   const fitH = area.h ? Math.floor((area.h - CABINET - FRAME - REEL_EDGE - (c.rows - 1) * GAP) / c.rows) : 0;
   const shape = reels === 3 ? 1.2 : 1.75;
-  // A skinned machine leaves room on its right for its pull lever.
-  const fit = skin && area.w && area.h ? fitSkin(skin, area.w - LEVER_W, area.h, reels, c.rows) : null;
+  // The machine takes the whole width: its pull lever stands over its right side, never shrinking it.
+  const fit = skin && area.w && area.h ? fitSkin(skin, area.w, area.h, reels, c.rows) : null;
   const gap = skin ? SKIN_GAP : GAP;
   const plainH = fitW && fitH ? Math.max(40, Math.min(Math.round(fitW * shape), fitH)) : 0;
   // A skin's cell never outgrows the cabinet's window: a taller one would push the bottom row behind the cabinet.
@@ -309,7 +309,11 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
             return next;
           });
           setWaiting((w) => w.map((x, k) => (k === i ? false : x)));
-          if (waits[i + 1] && !waits[i]) playSfx('tease', 0.6);
+          // The next reels are waited for (a big prize is one symbol away): the hum, and the phone trembles with it.
+          if (waits[i + 1] && !waits[i]) {
+            playSfx('tease', 0.6);
+            rumbleHaptic([40, 40, 60]);
+          }
         }),
       ),
     );
@@ -450,6 +454,7 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
           pop={pops}
           popDelay={reel * 70}
           render={(sym) => (skin ? face(sym, symSize) : <Symbol label={c.symbols[sym].label} sym={sym} theme={theme} size={symSize} />)}
+          renderKey={symSize}
         />
         {waiting[reel] && aura && <TeaseAura />}
         {aura && !!stops[reel] && <ReelSpark key={stops[reel]} />}
@@ -534,7 +539,7 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
             {fit && cellH > 0 && (
               // Out of the flow: the area's height stays the free height the machine is fitted to (fx/slot-skin
               // fitSkin), never the machine's own, which would grow it past the phone's height.
-              <View style={{ position: 'absolute', width: fit.fw, alignItems: 'center', transform: [{ translateX: -LEVER_W / 2 }] }}>
+              <View style={{ position: 'absolute', width: fit.fw, alignItems: 'center' }}>
                 <View style={{ width: fit.fw, height: fit.fh }}>
                   {/* The reels fill the cabinet's window and run a little under its edge; the cabinet is drawn over them. */}
                   <LinearGradient colors={skin.reels} style={[s.skinWindow, { left: fit.win.x - 2, top: fit.win.y - 2, width: fit.win.w + 4, height: fit.win.h + 4, padding: SKIN_PAD + 2, borderRadius: windowRadius(skin), overflow: skin.frame ? 'visible' : 'hidden' }]} accessibilityLabel={reelsLabel}>
@@ -542,7 +547,7 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
                     <WinLines lines={winLines} still={still} />
                   </LinearGradient>
                   <SkinCabinet skin={skin} fit={fit} />
-                  <View style={{ position: 'absolute', left: fit.fw - 3, top: fit.win.y, height: fit.win.h }}>
+                  <View style={{ position: 'absolute', left: fit.fw - LEVER_W + LEVER_OUT, top: fit.win.y, height: fit.win.h }}>
                     <SlotLever height={fit.win.h} pulls={pulls} disabled={busy || !cellH} still={still} onPull={() => void (auto !== null ? undefined : play())} />
                   </View>
                 </View>

@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { FlatList, Image, Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -536,7 +536,7 @@ function PromoBanner() {
 
 const TOP_BG = ['#4A3510', '#241A3D'] as const;
 
-function RoomRow({
+const RoomRow = memo(function RoomRow({
   room,
   match,
   mine,
@@ -574,7 +574,7 @@ function RoomRow({
       )}
     </PressableScale>
   );
-}
+});
 
 function RoomRowBody({ room, match, pk, mark, closed }: { room: Room; match: number; pk?: boolean; /** Odalarım › Katıl: "Üye" or "Takipte". */ mark?: string; closed?: boolean }) {
   const { colors } = useTheme();
