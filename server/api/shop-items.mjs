@@ -86,8 +86,16 @@ const REACH_TOOL = path.join(import.meta.dirname, 'tools', 'frame-reach.py');
  */
 // ride (Binek: Scooter, Spor Araba, Özel Jet; Çarşı shows them with the entry effects): the app's own only, managed
 // like the app's frames (name, price, days, VIP level, on the shelf, order; owners 25 Nov 2026), never added here.
-export const SHOP_KINDS = Object.freeze(['frame', 'entry', 'bubble', 'wave', 'seat', 'ride']);
-const KIND_NAME = { frame: 'Çerçeve', entry: 'Giriş efekti', bubble: 'Sohbet balonu', wave: 'Ses dalgası', seat: 'Koltuk rengi', ride: 'Binek' };
+// specialId (Özel ID, and the Takma isim beside them; owners 25 Nov 2026): the app's own only too, all "Yakında".
+export const SHOP_KINDS = Object.freeze(['frame', 'entry', 'bubble', 'wave', 'seat', 'ride', 'specialId']);
+const KIND_NAME = { frame: 'Çerçeve', entry: 'Giriş efekti', bubble: 'Sohbet balonu', wave: 'Ses dalgası', seat: 'Koltuk rengi', ride: 'Binek', specialId: 'Özel ID' };
+/** Kinds that are the app's own only: managed here, never added (the app draws them, or the feature is the app's). */
+const APP_ONLY_KINDS = new Set(['ride', 'specialId']);
+/**
+ * "Yakında" (owners, 25 Nov 2026): on the shelf with a "Yakında" tag, not sold. Every Özel ID and Takma isim starts so;
+ * Mağaza › Düzenle › Yakında turns it on or off for any item (`soon`, 127).
+ */
+export const SHOP_SOON_DEFAULT = new Set(['id-777', 'id-2026', 'id-1001', 'nick-name']);
 /** An admin's item's id: this and a number. */
 const PREFIX = { frame: 'sf', entry: 'se', bubble: 'sb', wave: 'sw', seat: 'sc' };
 /** The color a new seat color starts with until the panel changes it (the default's). */
@@ -257,6 +265,8 @@ const rowOf = (r) =>
     days: num(r.days),
     minVip: num(r.min_vip),
     enabled: r.enabled,
+    // Yakında: null "as the default" (an app's item: SHOP_SOON_DEFAULT; an admin's: not).
+    soon: r.soon ?? null,
     sort: num(r.sort),
     plans: planList(r.plans),
     art: r.art_url ? artOf(r) : null,
@@ -318,6 +328,7 @@ const appItemOf = (base, o) =>
     days: o?.days === null || o?.days === undefined ? base.days : o.days === 0 ? null : o.days,
     minVip: o?.minVip ?? base.minVip,
     enabled: o?.enabled ?? !SHOP_PAUSED.has(base.sku),
+    soon: o?.soon ?? SHOP_SOON_DEFAULT.has(base.sku),
     sort: o?.sort ?? APP_SORT.get(base.sku),
     plans: o?.plans ?? Object.freeze([]),
     tier: null,
@@ -340,6 +351,7 @@ const ownItemOf = (r) =>
     days: r.days === 0 ? null : r.days,
     minVip: r.minVip,
     enabled: r.enabled,
+    soon: r.soon === true,
     sort: r.sort,
     plans: r.plans,
     tier: null,
@@ -405,6 +417,8 @@ export function shopCatalog() {
       ...(x.days && x.plans.length ? { plans: x.plans } : {}),
       ...(x.builtin ? { builtin: true } : {}),
       ...(x.enabled ? {} : { off: true }),
+      // On the shelf with a "Yakında" tag, not sold (an older app shows it as before and is refused at the purchase).
+      ...(x.soon ? { soon: true } : {}),
       ...(x.kind === 'frame' && x.art
         ? {
             art: {
@@ -449,7 +463,7 @@ const audited = (c, a, action, detail, req) =>
   c.query('INSERT INTO audit_events (actor, action, target, detail, ip) VALUES ($1, $2, NULL, $3, $4)', [a.id, action, JSON.stringify({ ...detail, ...panelDetail(a) }), clientIp(req)]);
 
 const kindOf = (v) => {
-  if (!SHOP_KINDS.includes(v)) throw bad('Tür çerçeve (frame), giriş efekti (entry), sohbet balonu (bubble), ses dalgası (wave), koltuk rengi (seat) ya da binek (ride) olmalı');
+  if (!SHOP_KINDS.includes(v)) throw bad('Tür çerçeve (frame), giriş efekti (entry), sohbet balonu (bubble), ses dalgası (wave), koltuk rengi (seat), binek (ride) ya da özel ID (specialId) olmalı');
   return v;
 };
 /** A seat color's look: the cushion's color (the app tints the seat with it, the gold stays). */
@@ -964,7 +978,7 @@ async function owners(skus = null) {
 }
 /** Rooms that have a seat color now (bought, not run out). */
 const roomsWith = async (c, id) => (await c.query('SELECT count(*)::int AS n FROM room_seat_colors WHERE color = $1 AND (ends_at IS NULL OR ends_at > now())', [id])).rows[0].n;
-const CHANGED = ['name', 'price', 'days', 'minVip', 'enabled', 'look'];
+const CHANGED = ['name', 'price', 'days', 'minVip', 'enabled', 'soon', 'look'];
 const changedOf = (r) => (r ? [...CHANGED.filter((k) => r[k] !== null && r[k] !== undefined), ...(r.plans?.length ? ['plans'] : [])] : []);
 /** An item as the panel shows it. */
 function itemView(x, owned) {
@@ -978,6 +992,7 @@ function itemView(x, owned) {
     days: x.days,
     minVip: x.minVip,
     enabled: x.enabled,
+    soon: x.soon,
     sort: x.sort,
     // Its other durations (Güncelleme 8), each with its price.
     plans: x.plans,
@@ -1021,8 +1036,8 @@ const oneItem = async (id) => {
 /** The place before every item of `kind` (a new one goes first). */
 const firstSort = (kind) => Math.min(1, ...allShopItems().filter((x) => x.kind === kind).map((x) => x.sort)) - 1;
 
-const RESET = ['name', 'price', 'days', 'minVip', 'enabled', 'sort', 'look', 'plans'];
-const COLUMN = { name: 'name', price: 'price', days: 'days', minVip: 'min_vip', enabled: 'enabled', sort: 'sort', look: 'look', plans: 'plans' };
+const RESET = ['name', 'price', 'days', 'minVip', 'enabled', 'soon', 'sort', 'look', 'plans'];
+const COLUMN = { name: 'name', price: 'price', days: 'days', minVip: 'min_vip', enabled: 'enabled', soon: 'soon', sort: 'sort', look: 'look', plans: 'plans' };
 
 export const shopRoutes = {
   async 'GET /api/admin/shop'(req) {
@@ -1063,7 +1078,7 @@ export const shopRoutes = {
     writeLimit(a);
     const b = await readJson(req, 8192);
     const kind = kindOf(b.kind);
-    if (kind === 'ride') throw bad('Binekler uygulamanın kendisinin: yenisi eklenmez, var olanlar düzenlenir');
+    if (APP_ONLY_KINDS.has(kind)) throw bad(`${KIND_NAME[kind]} uygulamanın kendisinin: yenisi eklenmez, var olanlar düzenlenir`);
     const name = nameOf(b.name);
     const price = priceOf(b.price);
     const days = daysOf(b.days);
@@ -1071,6 +1086,7 @@ export const shopRoutes = {
     const minVip = vipOf(b.minVip ?? 0);
     if (kind === 'seat' && minVip) throw bad('Koltuk renginde VIP seviyesi olmaz: rengi oda sahibi odası için alır');
     const enabled = b.enabled === undefined ? true : boolOf(b.enabled, 'Açık / kapalı');
+    const soon = b.soon === undefined ? null : boolOf(b.soon, 'Yakında');
     nameFree(kind, name, null);
     if (allShopItems().filter((x) => !x.builtin).length >= SHOP_LIMITS.itemsMax) throw bad(`En fazla ${SHOP_LIMITS.itemsMax} eşya eklenebilir`);
     let art = null;
@@ -1114,13 +1130,13 @@ export const shopRoutes = {
         const r = await c.query(
           `INSERT INTO shop_items (id, kind, name, price, days, min_vip, enabled, sort, art_url, art_px, hole, video_url, video_bytes, video_ms, video_v, plate,
                                    job_status, job_source, job_fill, job_opaque, look, icon_url, icon_px, motion_url, motion_px, motion_bytes, hole_x, hole_y,
-                                   art_box_l, art_box_t, art_box_r, art_box_b, art_box_of, created_by, updated_by, plans)
+                                   art_box_l, art_box_t, art_box_r, art_box_b, art_box_of, created_by, updated_by, plans, soon)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28,
-                   $29, $30, $31, $32, $33, $34, $34, $35) RETURNING *`,
+                   $29, $30, $31, $32, $33, $34, $34, $35, $36) RETURNING *`,
           [id, kind, name, price, days, minVip, enabled, firstSort(kind), art?.url ?? null, art?.px ?? null, hole, stacked?.url ?? null, stacked?.bytes ?? null, stacked?.ms ?? null,
             stacked?.v ?? null, plate ? JSON.stringify(plate) : null, source ? 'processing' : null, source?.url ?? null, source?.fill ?? null, source?.opaque === true,
             look ? JSON.stringify(look) : null, icon?.url ?? null, icon?.px ?? null, motion?.url ?? null, motion?.px ?? null, motion?.bytes ?? null, at?.x ?? null, at?.y ?? null,
-            box.art_box_l, box.art_box_t, box.art_box_r, box.art_box_b, box.art_box_of, a.id, plans.length ? JSON.stringify(plans) : null],
+            box.art_box_l, box.art_box_t, box.art_box_r, box.art_box_b, box.art_box_of, a.id, plans.length ? JSON.stringify(plans) : null, soon],
         );
         await audited(c, a, 'shop.create', { item: id, before: null, after: auditOf(r.rows[0]) }, req);
         return id;
@@ -1155,6 +1171,7 @@ export const shopRoutes = {
     if (b.days !== undefined && !isDefault) cols.days = daysOf(b.days);
     if (b.minVip !== undefined) cols.min_vip = vipOf(b.minVip);
     if (b.enabled !== undefined) cols.enabled = boolOf(b.enabled, 'Açık / kapalı');
+    if (b.soon !== undefined) cols.soon = boolOf(b.soon, 'Yakında');
     // Its other durations, checked against the main term it will have after this save.
     if (b.plans !== undefined || (cols.days !== undefined && cur.plans.length)) {
       const main = cols.days !== undefined ? cols.days : (cur.days ?? 0);

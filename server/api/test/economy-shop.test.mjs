@@ -159,9 +159,11 @@ describe('Mağaza alımı', () => {
     assert.equal((await rows(u)).length, 0);
   });
 
-  test('özel numara satışta değil (SHOP_SPECIAL_IDS yok): alım 400, eski uygulama "update_required", ücret yok', async () => {
+  test('özel numara satışta değil (Yakında; SHOP_SPECIAL_IDS yok): alım 409, eski uygulama "update_required", ücret yok', async () => {
     const u = await person('Numara İsteyen', 5000);
-    assert.equal((await buy(u.session, 'id-1001', 2000))[0], 400);
+    // Özel ID'ler "Yakında" (owners, 25 Nov 2026): the shop says so.
+    const [bst, bj] = await buy(u.session, 'id-1001', 2000);
+    assert.deepEqual([bst, bj.error], [409, 'ID 1001 yakında satışa çıkacak']);
     const [st, j] = await spend(u.session, 2000, 'Mağaza: ID 1001');
     assert.deepEqual([st, j.code], [409, 'update_required']);
     assert.equal(await coins(u), 5000);

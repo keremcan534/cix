@@ -252,7 +252,7 @@ export function sellable(sku) {
   // paused ones count as off).
   const own = pack === undefined ? shopItem(sku) : undefined;
   const item = pack !== undefined ? pack : own !== undefined ? own : typeof sku === 'string' ? SHOP.get(sku) : undefined;
-  if (!item || live().shopHidden.has(sku) || (own ? !own.enabled : SHOP_PAUSED.has(sku))) return null;
+  if (!item || live().shopHidden.has(sku) || (own ? !own.enabled || own.soon : SHOP_PAUSED.has(sku))) return null;
   if (item.kind === 'specialId' && env.SHOP_SPECIAL_IDS !== '1') return null;
   return nobleItem(item);
 }
@@ -489,6 +489,9 @@ export const economyRoutes = {
     limit(`buy:${u.id}`, 30);
     const b = await readJson(req);
     const sold = sellable(b.sku);
+    // "Yakında" (Yönetim › Mağaza): on the shelf, not sold yet.
+    const soon = !sold && shopItem(b.sku)?.soon && shopItem(b.sku)?.enabled;
+    if (soon) throw new HttpError(409, `${shopItem(b.sku).name} yakında satışa çıkacak`);
     if (!sold) throw new HttpError(400, 'Bu ürün artık satışta değil');
     // A Rütbe package (7, 30 or 90 days, Seviye ayarları) or a shop item's other duration (Yönetim › Mağaza,
     // Güncelleme 8): the one of the days the phone showed; any other days get the main term (and a 409 below).
@@ -567,6 +570,7 @@ export const economyRoutes = {
     // Yönetim › Mağaza.
     const own = shopItem(base.sku);
     if (live().shopHidden.has(base.sku) || (own ? !own.enabled : SHOP_PAUSED.has(base.sku))) throw new HttpError(409, 'Bu ürün artık satışta değil');
+    if (own?.soon) throw new HttpError(409, `${own.name} yakında satışa çıkacak`);
     const item = own ?? nobleItem(base);
     const r = await once(u.id, 'coin', ref, (c) => buyInTx(c, u.id, item, ref, n, 'bridge', { compiled: compiledOf(base) }));
     if (r.replay && !(await boughtWith(u.id, ref))) throw new HttpError(409, 'Geçersiz istek kimliği');

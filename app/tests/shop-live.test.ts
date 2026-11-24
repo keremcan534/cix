@@ -48,6 +48,25 @@ describe('Mağaza: sunucunun listesi', () => {
     assert.deepEqual(shop!.items.map((x) => [x.sku, x.plate]), [['se3', null]], 'yalnız geçerli olan');
   });
 
+  // Yakında and Özel ID (owners, 25 Nov 2026): the Özel IDs and Takma isim from the server's list, tagged "Yakında".
+  test('Yakında: sunucunun işaretlediği eşya etiketli; işaret kalkınca satılır', () => {
+    const shop = parseLiveShop({
+      items: [
+        { sku: 'id-777', kind: 'specialId', name: 'ID 777', price: 8000, days: null, minVip: 0, builtin: true, soon: true },
+        { sku: 'nick-name', kind: 'specialId', name: 'Takma isim oluştur', price: 5000, days: null, minVip: 0, builtin: true, soon: true },
+        { sku: 'id-2026', kind: 'specialId', name: 'ID 2026', price: 3000, days: null, minVip: 0, builtin: true },
+        { sku: 'si9', kind: 'specialId', name: 'Uydurma', price: 1, days: null, minVip: 0 },
+      ],
+    });
+    const merged = mergeShop(COSMETICS, shop);
+    assert.equal(merged.find((c) => c.id === 'id-777')?.soon, true);
+    assert.equal(merged.find((c) => c.id === 'nick-name')?.soon, true);
+    assert.equal(merged.find((c) => c.id === 'id-2026')?.soon, undefined, 'sunucu Yakında demiyorsa satılır');
+    assert.equal(merged.some((c) => c.id === 'si9'), false, 'yöneticinin özel ID’si olmaz');
+    // Without a server: the app's own, all Yakında.
+    assert.ok(COSMETICS.filter((c) => c.kind === 'specialId').every((c) => c.soon));
+  });
+
   // Binekler (owners, 25 Nov 2026): the server's Mağaza › Binekler names, prices and shelves the app's rides.
   test('binekler sunucunun listesinden: satıştan kalkan gizlenir, fiyat ve ad sunucunun', () => {
     const shop = parseLiveShop({

@@ -73,6 +73,8 @@ export default function StoreScreen() {
           <GlossButton label={isEquipped ? 'Çıkar' : 'Kullan'} tone={isEquipped ? 'locked' : 'action'} small />
         </PressableScale>
       );
+    // "Yakında" (Yönetim › Mağaza): on the shelf, not sold yet.
+    if (c.soon) return <GlossButton label="Yakında" tone="locked" small icon={<Ionicons name="time-outline" size={12} color={t.dark ? '#C7D2E5' : t.colors.textDim} />} />;
     if (c.minVip && vipLevel < c.minVip)
       return (
         <PressableScale

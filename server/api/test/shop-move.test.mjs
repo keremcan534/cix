@@ -90,4 +90,27 @@ describe('Çarşı: çerçeveyi Ses halkasına taşı', () => {
     assert.notEqual(await status(call('POST', '/api/shop/buy', { sku: 'rd-sport', price: 1200, days: 30, ref: `b1-${Date.now()}` }, u.session)), 200, 'kapalı binek satılmaz');
     await ok(call('POST', '/api/shop/buy', { sku: 'rd-scooter', price: 300, days: 7, ref: `b2-${Date.now()}` }, u.session), 'yeni fiyatla al');
   });
+
+  // Özel ID and Yakında (owners, 25 Nov 2026): the Özel IDs and Takma isim in Mağaza, all "Yakında" (not sold); the
+  // panel turns it off and on; any item can be "Yakında".
+  test('Özel ID panelde, hepsi Yakında; Yakında kalkınca satılır, eklenince satılmaz', async () => {
+    const adm = await signUp('Özel ID Yöneticisi');
+    await h.sql.query("UPDATE users SET role = 'admin' WHERE id = $1", [adm.user.id]);
+    const ids = (await ok(call('GET', '/api/admin/shop', null, adm.session), 'liste')).items.filter((x) => x.kind === 'specialId');
+    assert.deepEqual(ids.map((x) => [x.id, x.soon]).sort(), [['id-1001', true], ['id-2026', true], ['id-777', true], ['nick-name', true]]);
+    assert.equal(await status(call('POST', '/api/admin/shop', { kind: 'specialId', name: 'ID 42', price: 10, days: 0 }, adm.session)), 400);
+    const u = await signUp('Takma');
+    const cat = await shelf(u.session);
+    assert.equal(cat.find((x) => x.sku === 'nick-name').soon, true);
+    assert.equal(cat.find((x) => x.sku === 'nick-name').name, 'Takma isim oluştur');
+    await h.credit(u.user.id, 10000);
+    const [st, j] = await call('POST', '/api/shop/buy', { sku: 'nick-name', price: 5000, ref: `n-${Date.now()}` }, u.session);
+    assert.deepEqual([st, j.error], [409, 'Takma isim oluştur yakında satışa çıkacak']);
+    // A frame marked Yakında isn't sold; unmarked it is again.
+    await ok(call('POST', '/api/admin/shop/update', { id: 'fr-aurora', soon: true }, adm.session), 'yakında');
+    assert.equal((await shelf(u.session)).find((x) => x.sku === 'fr-aurora').soon, true);
+    assert.equal(await status(call('POST', '/api/shop/buy', { sku: 'fr-aurora', price: 600, days: 30, ref: `a-${Date.now()}` }, u.session)), 409);
+    await ok(call('POST', '/api/admin/shop/update', { id: 'fr-aurora', soon: false }, adm.session), 'satışa');
+    await ok(call('POST', '/api/shop/buy', { sku: 'fr-aurora', price: 600, days: 30, ref: `a2-${Date.now()}` }, u.session), 'al');
+  });
 });

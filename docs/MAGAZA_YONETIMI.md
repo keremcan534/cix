@@ -160,3 +160,10 @@ Panelde bir çerçeveyi **Düzenle › Bölüm › Ses halkası** ile Ses halkas
 - Alanlar süresi bitene kadar bineğiyle odaya girmeye devam eder.
 - Eski APK'da Çarşı'da görünmeye devam eder ama satın alınamaz ("Bu ürün artık satışta değil"). Yeni APK sunucunun listesine göre gösterir.
 
+## Özel ID, Takma isim ve "Yakında" (25 Kasım 2026)
+
+- **Mağaza › Özel ID** sekmesi: ID 777, ID 2026, ID 1001 ve **Takma isim oluştur** (5.000 jeton, ücretli). Uygulamanın kendisinin; adı, fiyatı, VIP seviyesi, satışta ve Yakında olup olmadığı değişir, yenisi eklenmez.
+- **Yakında**: her eşyanın Düzenle penceresinde bir kutu. İşaretli eşya Çarşı'da "Yakında" etiketiyle durur, satın alınamaz ("… yakında satışa çıkacak"). Özel ID'lerin ve Takma isim'in hepsi Yakında başlar.
+- Eski APK: Özel ID'ler eskisi gibi görünür ama satın alınamaz; Takma isim görünmez.
+- Takma isim henüz bir özellik değil: Yakında kalkmadan önce ne yapacağı (adın yanında mı, yerine mi görünecek, kaç harf, filtre) yazılmalı.
+
