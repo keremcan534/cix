@@ -651,9 +651,10 @@ export default function UserProfile() {
   const hasBasics = !live || publicId !== null || !!user.username || showsGender || !!country || (isMe && !!birthday) || !!user.joinedAt || !!extras.relationship || !!extras.education;
   // The interests in Hakkımda (the first four); all of them are in Vitrin › Kişisel Profil.
   const aboutInterests = (user.interests ?? []).slice(0, 4).map(splitInterest);
-  // A bio that only names interests ("🎧 Müzik 🎮 Oyun") says what the interests line says: one line is enough.
+  // A bio that only names interests ("🎧 Müzik 🎮 Oyun") says what the interests line says: one line is enough. Its words
+  // are checked against all the interests, not only the four shown (a bio of five interests showed twice, 24 Nov).
   const bioWords = (user.bio ?? '').toLocaleLowerCase('tr-TR').match(/[\p{L}\p{N}]+/gu) ?? [];
-  const interestWords = new Set(aboutInterests.flatMap((x) => x.label.toLocaleLowerCase('tr-TR').match(/[\p{L}\p{N}]+/gu) ?? []));
+  const interestWords = new Set((user.interests ?? []).map(splitInterest).flatMap((x) => x.label.toLocaleLowerCase('tr-TR').match(/[\p{L}\p{N}]+/gu) ?? []));
   const aboutBio = user.bio && aboutInterests.length > 0 && bioWords.length > 0 && bioWords.every((w) => interestWords.has(w)) ? '' : (user.bio ?? '');
   // A purchased frame (mine, or theirs in a live build) reaches past the photo.
   const framed = isMe ? !!equipped.frame : !!look?.frame;
