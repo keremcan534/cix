@@ -167,9 +167,9 @@ export function RocketSheet({ rocket, onClose, onGift }: { rocket: RoomRocket; o
           )}
 
           <Text style={s.rules}>
-            Odada gönderilen her hediye roketi jetonu kadar doldurur. Seviye dolunca roket kalkar ve ödüller o seviyeye hediye gönderenler arasında çekilir:
-            kim ne kadar katkı verdiyse şansı o kadar; herkes en çok bir ödül alır. Kazanılan jeton normal jetondur. Roket her gün 00:00&apos;da
-            Lv.1&apos;den başlar.
+            Odada gönderilen her hediye roketi jetonu kadar doldurur. Seviye dolunca roket kalkar ve ödüller o gün odada katkı verenlere katkı
+            sırasıyla verilir: en çok katkı veren en büyük jeton ödülünü alır, sonra ikincisi; herkes en çok bir ödül alır. Kazanılan jeton
+            normal jetondur. Roket her gün 00:00&apos;da Lv.1&apos;den başlar.
           </Text>
         </ScrollView>
         <Pressable onPress={onGift} style={[s.cta, { backgroundColor: hue }]} accessibilityRole="button">

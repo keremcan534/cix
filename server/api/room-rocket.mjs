@@ -1,8 +1,9 @@
 // Oda roketi (docs/ODA_ROKETI.md): the coins people spend on gifts in a server room fill its rocket for the day
 // (Istanbul's calendar, from 00:00). Five levels in a row, each with its own goal (the panel's, room-rocket-rules.mjs);
 // a gift past a level's goal fills the next with the rest. A full level launches: its prizes, as the panel had them at
-// that moment, are drawn among the people who filled that level (each person's chance as their share of it, at most
-// one prize each, the first prize first). Paid in a transaction of its own after the gift's (settleLaunch), never
+// that moment, go to the people who gave in the room that day by how much each gave (owners, 25 Nov 2026; a draw
+// before): the most first takes the biggest coin prize, then the next, the items after the coins; at most one prize
+// each (room-rocket-rules.mjs rankWinners, prizeSlots). Paid in a transaction of its own after the gift's (settleLaunch), never
 // inside it: the winners are locked there in id order, as every money write locks people, and a missed one is paid by
 // the sweep. Coins are normal coins, the owners' choice: the Şanslı hediye rewards' channel (wallet.mjs `ugurlu`:
 // spent anywhere, gifts too, so a prize can become diamonds and cash; what they pay for never counts for Cömertlik or
@@ -31,7 +32,7 @@ import { roomPacket } from './live.mjs';
 import { panelDetail } from './panel.mjs';
 import { notify } from './push.mjs';
 import { systemNotice } from './system-notices.mjs';
-import { DEFAULT_ROCKET, PRIZE_ITEM_KINDS, ROCKET_LIMITS, checkRocket, drawWinners, isRocketError, levelEnds, levelsFull, prizeSlots, splitFuel } from './room-rocket-rules.mjs';
+import { DEFAULT_ROCKET, PRIZE_ITEM_KINDS, ROCKET_LIMITS, checkRocket, isRocketError, levelEnds, levelsFull, prizeSlots, rankWinners, splitFuel } from './room-rocket-rules.mjs';
 // rooms.mjs reaches this file through gifts.mjs; its functions are only used inside handlers, after both have loaded.
 import { liveKitName } from './rooms.mjs';
 import { allShopItems, shopItem } from './shop-items.mjs';
@@ -187,13 +188,14 @@ export async function settleLaunch(id) {
     if (!l) return null;
     const fuel = (
       await c.query(
-        `SELECT f.user_id, f.coins FROM room_rocket_fuel f JOIN users u ON u.id = f.user_id AND u.deleted_at IS NULL
-          WHERE f.room_id = $1 AND f.day = $2 AND f.level = $3 ORDER BY f.user_id`,
+        // What each gave in the room that day up to this level (every level it filled), deleted accounts left out.
+        `SELECT f.user_id, sum(f.coins) AS coins FROM room_rocket_fuel f JOIN users u ON u.id = f.user_id AND u.deleted_at IS NULL
+          WHERE f.room_id = $1 AND f.day = $2 AND f.level <= $3 GROUP BY f.user_id ORDER BY f.user_id`,
         [l.room_id, l.day, l.level],
       )
     ).rows.map((x) => ({ user: x.user_id, coins: Number(x.coins) }));
     const slots = prizeSlots(l.prizes);
-    const winners = drawWinners(fuel, slots.length, (max) => crypto.randomInt(0, max));
+    const winners = rankWinners(fuel, slots.length);
     // Everyone paid, locked in id order before any of them is paid (a gift locks its sender and recipient the same way).
     if (winners.length) await c.query('SELECT id FROM users WHERE id = ANY($1::uuid[]) ORDER BY id FOR UPDATE', [winners]);
     const wins = [];
