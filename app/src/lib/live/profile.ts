@@ -19,6 +19,7 @@ import { extrasPatch, showcaseView, type ExtrasDraft, type ShowcaseView } from '
 import { cardLookOf, medalIds, type CardLook } from '@/lib/person-card';
 import { putMarks } from '@/lib/mark-store';
 import { parseMarks } from '@/lib/profile-marks';
+import { parseVoice, type VoiceIntro } from '@/lib/voice-intro-core';
 
 // Someone's agency and family as their profile last answered, by server id (the profile pills and sections).
 const ties = new Map<string, api.ProfileTies>();
@@ -46,6 +47,8 @@ export type SocialCounts = { followers: number; following: number; oneWay?: { fo
   /** Read for the room's person card (`card`): their medal ids (an older server sends none) and their look. */
   medals?: string[];
   look?: CardLook | null;
+  /** Ses tanıtımı: their clip, null for none; absent when the server sent none (an older one). */
+  voice?: VoiceIntro | null;
 };
 
 /** My profile as the server keeps it. Empty fields stay empty, so no demo value (a handle, a city) survives. */
@@ -137,7 +140,14 @@ export async function loadPublicProfile(serverId: string, mine = false, visit = 
     // "Şu an odada" (lib/follow-room): never on my own profile, where my own open room shows instead.
     ...(!mine && p.room && { room: p.room }),
     ...(card && cardPart(p.medals, p.looks)),
+    ...voicePart(p.voice),
   };
+}
+
+/** Ses tanıtımı: the clip when the server's answer has a readable one (or says none). */
+function voicePart(v: unknown): Pick<SocialCounts, 'voice'> {
+  const voice = parseVoice(v);
+  return voice === undefined ? {} : { voice };
 }
 
 /** What the card adds: the medals when the server sent them (an older one doesn't), and the look when it is readable. */

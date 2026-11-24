@@ -92,6 +92,7 @@ import { purchaseRoutes } from './purchases.mjs';
 import { pkRoutes } from './pk.mjs';
 import { crossPkRoutes } from './pk-cross.mjs';
 import { profileRoutes } from './profiles.mjs';
+import { voiceIntroRoutes } from './voice-intro.mjs';
 import { pushRoutes } from './push.mjs';
 import { ROOM_XP_THRESHOLDS, roomRoutes } from './rooms.mjs';
 import { sanctionRoutes, startSanctionSweep, stopSanctionSweep } from './sanctions.mjs';
@@ -359,6 +360,7 @@ const routes = {
   ...liveRoutes,
   ...socialRoutes,
   ...profileRoutes,
+  ...voiceIntroRoutes,
   ...supportRoutes,
   ...myDataRoutes,
   ...spendLimitRoutes,

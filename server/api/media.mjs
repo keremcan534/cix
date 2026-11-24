@@ -1,7 +1,7 @@
 // Photo and video uploads go straight from the phone to S3-compatible storage (Cloudflare R2, Backblaze B2,
 // AWS S3…); the API only hands out a short-lived signed address, so big files never pass through it.
 //
-//   POST /api/media/upload-url { kind: 'avatar' | 'moment' | 'dm' | 'album' | 'notice' | 'evidence' | 'music' | 'ticket' | 'roombg' | 'roomcover' | 'eventcover' | 'gifticon' | 'giftvideo' | 'giftsource' | 'stickerart' | 'shopframe' | 'markart', contentType, size } → { uploadUrl, headers, publicUrl, expiresIn }
+//   POST /api/media/upload-url { kind: 'avatar' | 'moment' | 'dm' | 'album' | 'voice' | 'notice' | 'evidence' | 'music' | 'ticket' | 'roombg' | 'roomcover' | 'eventcover' | 'gifticon' | 'giftvideo' | 'giftsource' | 'stickerart' | 'shopframe' | 'markart', contentType, size } → { uploadUrl, headers, publicUrl, expiresIn }
 //
 // The app PUTs the file to uploadUrl with exactly `headers` (type and size are signed, so a different file
 // is refused by the storage), then saves publicUrl (e.g. PATCH /api/me { avatarUrl }).
@@ -43,6 +43,9 @@ const KINDS = {
   dm: { types: ['image/jpeg', 'image/png', 'image/webp', 'image/heic'], max: 8 * 1024 * 1024 },
   // A profile album photo (profiles.mjs, at most ALBUM_MAX each), shrunk on the phone like a moment's.
   album: { types: ['image/jpeg', 'image/png', 'image/webp', 'image/heic'], max: 8 * 1024 * 1024 },
+  // Ses tanıtımı (voice-intro.mjs): the phone's AAC recording (.m4a), at most 15 seconds; the server reads it back and
+  // checks it is one before the profile shows it. 15 s at the recorder's 128 kbit/s is about 240 KB.
+  voice: { types: ['audio/mp4', 'audio/x-m4a', 'audio/m4a'], max: 1024 * 1024 },
   notice: { types: ['image/jpeg', 'image/png', 'image/webp'], max: 5 * 1024 * 1024, admin: true },
   // A sanction's screenshot (sanctions.mjs evidence, kind screenshot): staff pick the file in the panel (owners,
   // 21 Nov 2026: "kanıta ekran görüntüsü nasıl eklenecek?"). The evidence keeps its address.
@@ -157,7 +160,7 @@ const signed = (method, key, query = {}) =>
     expires: 60,
     query,
   });
-const FILE_KEY = /^(avatar|moment|dm|album|notice|evidence|music|ticket|roombg|roomcover|eventcover|gifticon|giftvideo|giftsource|stickerart|shopframe|markart)\/[0-9a-f-]{36}\/[A-Za-z0-9._-]{1,80}$/;
+const FILE_KEY = /^(avatar|moment|dm|album|voice|notice|evidence|music|ticket|roombg|roomcover|eventcover|gifticon|giftvideo|giftsource|stickerart|shopframe|markart)\/[0-9a-f-]{36}\/[A-Za-z0-9._-]{1,80}$/;
 
 /** The storage key of one of our files from its public address (kind/<uploader>/<name>), else null. With
  *  `owner`, only a file that person uploaded. */
@@ -439,12 +442,12 @@ export function removeFiles(urls, owner) {
   if (keys.length && storageOn()) later('storage delete failed', () => deleteKeys(keys));
 }
 
-/** Deletes every file a deleted account uploaded (its avatars, moment, chat and album photos, music, ticket
+/** Deletes every file a deleted account uploaded (its avatars, moment, chat and album photos, voice clips, music, ticket
  *  evidence, room pictures). A notice's picture stays: it is the company's, whoever put it up. */
 export function removeUserFiles(uid) {
   if (!storageOn() || !/^[0-9a-f-]{36}$/.test(String(uid))) return;
   later('storage erase failed', async () => {
-    for (const kind of ['avatar', 'moment', 'dm', 'album', 'music', 'ticket', 'roombg', 'roomcover', 'eventcover']) await deleteKeys(await listKeys(`${kind}/${uid}/`));
+    for (const kind of ['avatar', 'moment', 'dm', 'album', 'voice', 'music', 'ticket', 'roombg', 'roomcover', 'eventcover']) await deleteKeys(await listKeys(`${kind}/${uid}/`));
   });
 }
 

@@ -169,6 +169,17 @@ Ayrıntı: [`OTOMATIK_MESAJ.md`](OTOMATIK_MESAJ.md).
   - Hâlâ görünmeyen biri olursa: o kişinin ID'si ve hangi ekranda olduğu (mikrofon, Balkon, sohbet, Mesajlar). Fotoğrafını eski bir APK'da seçip hiç yeni APK açmamış biri, profilini bir kez açınca fotoğrafı sunucuya gider.
 - **"Şu an odada" (madde 15):** Birinin profilinde bulunduğu oda yine görünüyor: "Şu an odada: <oda> · Git". Şifreli odada "Şifreli oda · girişte şifre sorulur". Kişinin "Bulunduğum odayı göster" ayarına uyar (başta açık); engellenen kişiye, giremeyeceği odada ve bire bir görüşmede görünmez. "Git" ile (profil, ajans sohbeti, aile) gelen için odadaki herkes "Kaan, Artemis'i takip ederek geldi" görür, Artemis hâlâ odadaysa. Eski APK'lar profilde odayı göstermez ve girişte yine "X odaya girdi" yazar. **Telefonda denenmeli:** satır, ses sunucusunun (LiveKit 1.9.1) giriş anahtarındaki katılımcı özelliğine dayanıyor; bilgisayarda değil, gerçek iki telefonla denenmeli.
 
+## Ses tanıtımı (yeni APK)
+
+- **Ne yapar:** Profiline en çok 15 saniyelik bir ses kaydı eklersin; profiline bakan herkes dinler. Profil sekmesinde "Ses tanıtımı ekle" kartı var: mikrofona basıp konuşursun, yeniden basınca durur (15 saniyede kendiliğinden durur), dinlersin, beğenirsen kaydedersin. Kayıt varken kartta oynat düğmesi ve "Değiştir" çıkar; kayıt penceresinden silinir.
+- **Kim görür:** Profiline bakabilen herkes. Profilin gizliyse yalnız takip ettiklerin dinler (albüm gibi). Seni engelleyen kişi profilini zaten göremez.
+- **Sınırlar:** En az 1, en çok 15 saniye. Sunucu dosyayı kendisi okuyup süresini ve gerçekten ses olduğunu kontrol eder; yanlış dosyayı reddedip siler.
+- **Odadayken kayıt yapılamaz:** Odanın mikrofonuyla çakışmasın diye "Önce odadan çık" der.
+- **Yönetim:** Panelde Kullanıcılar ve Şikâyetler'de "Ses tanıtımı" düğmesi: dinlenir, sebebiyle kaldırılır, denetim kaydına yazılır.
+- **Demo:** Kayıt yalnız bu telefonda kalır. Web'de kayıt yapılmaz ("Telefonda kaydedilir").
+- **Eski APK'lar:** Ses kaydını görmez ve kaydedemez; yeni APK ile gelir.
+- **Telefonda denenmeli:** Kayıt ve çalma gerçek telefonda (Android ve iPhone) denenmeli; bilgisayarda yalnız görünüm denendi.
+
 ## Profil izleri: 💩 Kaka ve 💧 Su (G7 APK)
 
 Güncelleme 7'de geldi; 20 Kasım'da "Muzip hediyeler" ile değişti (aşağıda). Ayrıntı: [`PROFIL_IZLERI.md`](PROFIL_IZLERI.md).

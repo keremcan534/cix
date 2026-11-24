@@ -591,6 +591,8 @@ export async function exportOf(c, uid) {
   const profileMore = {
     extras: (await all('SELECT height_cm, weight_kg, job, languages, zodiac, tags, relationship, education, slogan, country, updated_at FROM profile_extras WHERE user_id = $1'))[0] ?? null,
     album: await all('SELECT url, created_at FROM profile_photos WHERE user_id = $1 ORDER BY id', (x) => ({ url: x.url, at: x.created_at })),
+    // Ses tanıtımı (voice-intro.mjs): my profile's voice clip, or null.
+    voice: (await all('SELECT voice_url, voice_ms, voice_at FROM users WHERE id = $1 AND voice_url IS NOT NULL', (x) => ({ url: x.voice_url, ms: x.voice_ms, at: x.voice_at })))[0] ?? null,
   };
   const privacy = {
     settings: (await all('SELECT profile_public, show_online, show_last_seen, show_current_room, dm_from, calls_from, invites_from, voice_calls, video_calls, message_push, push_close_only, auto_receive, auto_opener, auto_opener_seen, auto_send, profile_marks, marks_from, global_hide_name, updated_at FROM privacy_settings WHERE user_id = $1'))[0] ?? null,

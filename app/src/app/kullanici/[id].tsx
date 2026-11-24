@@ -98,6 +98,10 @@ import { MarkLayer, OwnMarkNote } from '@/components/profile-mark';
 import { keepingMarks, keptLine, parseMarkNote } from '@/lib/profile-marks';
 import { photoMarksOf } from '@/lib/live/marks-live';
 import { serverNow } from '@/lib/sanction-time';
+import { VoiceCard, VoiceRecorderSheet } from '@/components/voice-intro';
+import { removeVoiceIntro, saveVoiceIntro } from '@/lib/live/voice-intro';
+import { dropDemoVoice, keepDemoVoice, useDemoVoice } from '@/lib/voice-intro-store';
+import type { VoiceIntro } from '@/lib/voice-intro-core';
 
 // The app's own mark (the sign-in screen's), beside its name in the top bar.
 const LOGO = require('../../../assets/brand/logo.png');
@@ -153,6 +157,14 @@ export default function UserProfile() {
     };
   }, [serverId, id]);
   const counts = social && social.id === serverId ? social.counts : null;
+  // Ses tanıtımı: live, the server's (absent from an older server: no card, no invitation); the demo keeps mine here.
+  const demoVoice = useDemoVoice();
+  const voice = live ? (counts?.voice ?? null) : isMe ? demoVoice : null;
+  const voiceShown = live ? counts?.voice !== undefined : isMe;
+  const [voiceOpen, setVoiceOpen] = useState(false);
+  const setLiveVoice = (v: VoiceIntro | null) => setSocial((x) => (x && x.id === serverId ? { ...x, counts: { ...x.counts, voice: v } } : x));
+  const saveVoice = async (uri: string, ms: number) => (live ? setLiveVoice(await saveVoiceIntro(uri)) : keepDemoVoice(uri, ms));
+  const removeVoice = async () => (live ? setLiveVoice(await removeVoiceIntro()) : dropDemoVoice());
   const user = isMe ? me : userById(id);
   const insets = useSafeAreaInsets();
   const { colors, semantic } = useTheme();
@@ -824,6 +836,8 @@ export default function UserProfile() {
               {heart && heart.level > 0 && <HeartCard heart={heart} me={{ uri: me.avatar, name: me.name }} them={{ uri: user.avatar, name: user.name }} />}
               {/* No reward is given for a full profile, so the card doesn't promise one. */}
               {isMe && <CompletionCard percent={completion} onPress={openEdit} />}
+              {/* Ses tanıtımı: their clip to play; mine to change, or an invitation to record one. */}
+              {voiceShown && <VoiceCard voice={voice} mine={isMe} onEdit={isMe ? () => setVoiceOpen(true) : undefined} />}
               <RelationWall owner={user.avatar} partner={partner} days={bondDaysNow || null} onPress={() => pickTab('iliski')} />
               <GuardWall people={guardPeople} mine={myGuard} off={guardArea.off} onPress={openGuard} onOpen={openPerson} />
               <GiftWall top={wallTop} lit={wallLit} total={wallAll?.length ?? null} received={giftCount} onPress={() => pickTab('onur')} />
@@ -1195,6 +1209,7 @@ export default function UserProfile() {
               ]
         }
       />
+      {isMe && <VoiceRecorderSheet visible={voiceOpen} current={voice} onClose={() => setVoiceOpen(false)} save={saveVoice} remove={removeVoice} />}
       {isMe && <FollowListSheet visible={list !== null} {...MY_LISTS[list ?? 'followers']} load={() => loadList(list ?? 'followers')} onClose={() => setList(null)} />}
       {giftable && (
         <ProfileGiftSheet

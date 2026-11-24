@@ -130,7 +130,8 @@ async function tellVisit(owner, visitor) {
 export async function eraseAccount(c, id, phone) {
     await c.query(
       `UPDATE users SET name = 'Silinmiş hesap', username = NULL, gender = NULL, birth_date = NULL, city = NULL, bio = '',
-         interests = '{}', avatar_url = NULL, device_key_hash = NULL, phone = NULL, equipped = '{}', deleted_at = now() WHERE id = $1`,
+         interests = '{}', avatar_url = NULL, voice_url = NULL, voice_ms = NULL, voice_at = NULL, device_key_hash = NULL, phone = NULL, equipped = '{}',
+         deleted_at = now() WHERE id = $1`,
       [id],
     );
     // Shop items are revoked (a special ID is free again); the rows stay as accounting records.
