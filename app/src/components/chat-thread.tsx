@@ -21,6 +21,7 @@ import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { onWebEnter } from '@/lib/enter-sends';
 
 import { ActionSheet, type SheetOption } from '@/components/ActionSheet';
+import { PhotoViewer } from '@/components/photo-viewer';
 import { useReport } from '@/components/report-sheet';
 import { Text, TextInput } from '@/components/text';
 import { EmojiPanel } from '@/components/EmojiPanel';
@@ -97,6 +98,8 @@ export function ChatThread({
   // An open chat with a real person reads its thread every few seconds (both sides, the server's times).
   useLiveThread(user.id, { importDms });
   const [picked, setPicked] = useState<ChatMessage | null>(null);
+  // A photo message opened over the whole screen (tap it; a long press still opens the message's options).
+  const [viewing, setViewing] = useState<string | null>(null);
   const [reporting, setReporting] = useState<ChatMessage | null>(null);
   // Muted for DMs by the server (lib/sanctions): the composer stays closed until it ends.
   const dmStopped = useStopped('dm');
@@ -390,7 +393,11 @@ export function ChatThread({
               <Pressable onLongPress={() => setPicked(item)} delayLongPress={350} style={styles.mine} accessibilityHint="Seçenekler için basılı tut">
                 {!!sourceLabel(item.source ?? extras(item.sid)?.source, true) && <Text style={[styles.autoLabel, { alignSelf: 'flex-end' }]}>{sourceLabel(item.source ?? extras(item.sid)?.source, true)}</Text>}
                 <LinearGradient colors={gradientDeep} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.bubble, styles.mineBubble]}>
-                  {!!item.image && <Image source={{ uri: item.image }} style={styles.photo} resizeMode="cover" accessibilityLabel="Fotoğraf" />}
+                  {!!item.image && (
+                    <Pressable onPress={() => setViewing(item.image!)} onLongPress={() => setPicked(item)} delayLongPress={350} accessibilityRole="imagebutton" accessibilityLabel="Fotoğraf. Büyütmek için dokun">
+                      <Image source={{ uri: item.image }} style={styles.photo} resizeMode="cover" />
+                    </Pressable>
+                  )}
                   {item.gift ? (
                     <GiftLine gift={item.gift} text={item.text} onPlay={() => replayGift(item, item.gift!)} onLongPress={() => setPicked(item)} />
                   ) : (
@@ -425,7 +432,11 @@ export function ChatThread({
               <View style={{ gap: 6 }}>
                 {!!sourceLabel(item.source ?? extras(item.sid)?.source, false) && <Text style={styles.autoLabel}>{sourceLabel(item.source ?? extras(item.sid)?.source, false)}</Text>}
                 <Pressable onLongPress={() => setPicked(item)} delayLongPress={350} style={[styles.bubble, styles.theirs]} accessibilityHint="Seçenekler için basılı tut">
-                  {!!item.image && <Image source={{ uri: item.image }} style={styles.photo} resizeMode="cover" accessibilityLabel="Fotoğraf" />}
+                  {!!item.image && (
+                    <Pressable onPress={() => setViewing(item.image!)} onLongPress={() => setPicked(item)} delayLongPress={350} accessibilityRole="imagebutton" accessibilityLabel="Fotoğraf. Büyütmek için dokun">
+                      <Image source={{ uri: item.image }} style={styles.photo} resizeMode="cover" />
+                    </Pressable>
+                  )}
                   {item.gift ? (
                     <GiftLine gift={item.gift} text={item.text} theirs onPlay={() => replayGift(item, item.gift!)} onLongPress={() => setPicked(item)} />
                   ) : (
@@ -552,6 +563,7 @@ export function ChatThread({
       </Body>
       {report.sheet}
       {gift.sheet}
+      <PhotoViewer uri={viewing} onClose={() => setViewing(null)} />
       <ActionSheet visible={!!picked} options={messageOptions} onClose={() => setPicked(null)} />
       {quick && (
         <ActionSheet
