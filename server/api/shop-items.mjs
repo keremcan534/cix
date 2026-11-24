@@ -95,7 +95,10 @@ const APP_ONLY_KINDS = new Set(['ride', 'specialId']);
  * "Yakında" (owners, 25 Nov 2026): on the shelf with a "Yakında" tag, not sold. Every Özel ID and Takma isim starts so;
  * Mağaza › Düzenle › Yakında turns it on or off for any item (`soon`, 127).
  */
-export const SHOP_SOON_DEFAULT = new Set(['id-777', 'id-2026', 'id-1001', 'nick-name']);
+export const SHOP_SOON_DEFAULT = new Set(
+  // SHOP_SOON in .env replaces the list (comma separated; empty: none, as economy-special.test.mjs sells the IDs).
+  env.SHOP_SOON === undefined ? ['id-777', 'id-2026', 'id-1001', 'nick-name'] : env.SHOP_SOON.split(',').map((x) => x.trim()).filter(Boolean),
+);
 /** An admin's item's id: this and a number. */
 const PREFIX = { frame: 'sf', entry: 'se', bubble: 'sb', wave: 'sw', seat: 'sc' };
 /** The color a new seat color starts with until the panel changes it (the default's). */
