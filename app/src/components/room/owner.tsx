@@ -432,7 +432,7 @@ export function RoomInfoSheet({
               <Text style={styles.h2}>Oda Sahibi Merkezi</Text>
               <View style={{ flexDirection: 'row', gap: 10 }}>
                 {/* A server room pays its owner no share of the gifts (their value goes to the recipient): none shown. */}
-                {!live && (
+                {!live && RULES.roomOwnerBonus > 0 && (
                   <LinearGradient colors={['#C2410C', '#9A3412']} style={[styles.card, { flex: 1, flexDirection: 'row', alignItems: 'center' }]}>
                     <Text style={[styles.cardLabel, { flex: 1 }]}>Oda Sahibi Payı</Text>
                     <Text style={[styles.cardValue, { fontSize: 22 }]}>{pct(RULES.roomOwnerBonus)}</Text>

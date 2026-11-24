@@ -70,7 +70,8 @@ export const DEFAULT_RULES: Rules = {
   coinsBankExchangeFee: 0.03,
   luckyHostShare: LUCKY_RECIPIENT_SHARE,
   agencyCommission: 0.4,
-  roomOwnerBonus: 0.2,
+  // Oda sahibi bonusu: 0 (owners, 25 Nov 2026; the server pays none: Canlı ayarlar › Odalar › room_owner_bonus_pct).
+  roomOwnerBonus: 0,
   familyRates: [0.01, 0.0125, 0.015, 0.0175, 0.02, 0.0225, 0.025, 0.0275, 0.03, 0.0325, 0.035, 0.0375, 0.04, 0.045, 0.05],
   oneOnOneBonus: 0.05,
   voiceCallBonus: 0.03,
