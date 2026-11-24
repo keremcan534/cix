@@ -82,6 +82,7 @@ export const PANEL_ROUTES = new Set([
   'POST /api/admin/shop/reset',
   'POST /api/admin/shop/delete',
   'POST /api/admin/shop/order',
+  'POST /api/admin/shop/move',
   'POST /api/admin/shop/frame-svga',
   // Para çekme (withdraw.mjs).
   'GET /api/admin/withdrawals',

@@ -25,6 +25,8 @@ export type Cosmetic = {
    * own entry); the server refuses a purchase (server/api/catalog.mjs SHOP_PAUSED, the same list).
    */
   retired?: true;
+  /** "Yakında" (owners, 25 Nov 2026): on the shelf with the tag, not sold (the server's Mağaza › Yakında). */
+  soon?: true;
   /**
    * An item the team added in Yönetim › Mağaza (lib/shop-live-core): its frame picture (`art`, the empty centre's
    * radius as a share of its width), its entry clip (`video`: in the catalog's fx as entry <id>) and the name plate
@@ -92,9 +94,11 @@ export const COSMETICS: Cosmetic[] = [
   { id: 'bb-candy', kind: 'bubble', name: 'Şeker', emoji: '🍬', price: 120, days: 7, color: ['#F472B6', '#FB7185'] },
   { id: 'bb-galaxy', kind: 'bubble', name: 'Galaksi', emoji: '🌌', price: 450, days: 30, color: ['#312E81', '#7C3AED'] },
   { id: 'bb-gold', kind: 'bubble', name: 'Altın', emoji: '🏆', price: 1_500, days: null, color: ['#B45309', '#F59E0B'], minVip: 5 },
-  { id: 'id-777', kind: 'specialId', name: 'ID 777', emoji: '🔢', price: 8_000, days: null },
-  { id: 'id-2026', kind: 'specialId', name: 'ID 2026', emoji: '🔢', price: 3_000, days: null },
-  { id: 'id-1001', kind: 'specialId', name: 'ID 1001', emoji: '🔢', price: 2_000, days: null },
+  { id: 'id-777', kind: 'specialId', name: 'ID 777', emoji: '🔢', price: 8_000, days: null, soon: true },
+  { id: 'id-2026', kind: 'specialId', name: 'ID 2026', emoji: '🔢', price: 3_000, days: null, soon: true },
+  { id: 'id-1001', kind: 'specialId', name: 'ID 1001', emoji: '🔢', price: 2_000, days: null, soon: true },
+  // Takma isim (owners, 25 Nov 2026): paid, "Yakında" like the Özel IDs.
+  { id: 'nick-name', kind: 'specialId', name: 'Takma isim oluştur', emoji: '🏷️', price: 5_000, days: null, soon: true },
   // Ses dalgası: the ring around my seat while I talk (components/room/voice-wave.tsx draws them). Kept for good.
   { id: 'wv-sparkle', kind: 'wave', name: 'Parıltı', emoji: '✨', price: 1_500, days: null, color: ['#FFFFFF', '#3D9BFF'] },
   { id: 'wv-flame', kind: 'wave', name: 'Alev', emoji: '🔥', price: 2_500, days: null, color: ['#FF8A3D', '#FF3B30'] },
@@ -180,6 +184,8 @@ export type StickerPack = {
   roomOnly?: boolean;
   /** No longer offered (neither the emoji panel nor the shop shows it); kept so stickers already sent still draw. */
   retired?: boolean;
+  /** "Yakında" (owners, 25 Nov 2026): on Çarşı's shelf with the tag, not sold; the server's Yönetim › Emojiler says. */
+  soon?: boolean;
 };
 const st = (id: string, name: string, emoji: string): Sticker => ({ id, name, emoji });
 export const STICKER_PACKS: StickerPack[] = [

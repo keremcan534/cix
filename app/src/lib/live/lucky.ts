@@ -1,5 +1,5 @@
 // Şanslı hediyeler in live mode: the server (server/api/lucky.mjs) keeps the packages and odds, takes the price,
-// gives each recipient their 20 % as diamonds, draws and pays the rewards in coins. This phone reads the
+// gives each recipient their share (the panel's, 10 % by the owners' rule) as diamonds, draws and pays the rewards in coins. This phone reads the
 // packages into lib/lucky (applyServerLucky; malformed ones left out, lib/lucky-art) and their own icons into
 // lib/lucky-art, sends with the price and the settings' version the sheet showed (a moved one is refused with nothing
 // moved, and the sheet reads the packages again), and shows what the server answered.
@@ -7,7 +7,7 @@ import * as api from '@/lib/api';
 import { applyServerUser, liveMode, once, rememberUser, toLocal, toServer } from '@/lib/live';
 import { addServerRecords, applyServerLucky, getLucky, luckyGift, type LuckyGift, type LuckyRecord } from '@/lib/lucky';
 import { luckyShown, parseLuckyPackages, setLuckyIcons, type ServerLuckyPackage } from '@/lib/lucky-art';
-import { luckyHostDiamonds } from '@/data/rules';
+import { luckyHostDiamonds, setLuckyShare } from '@/data/rules';
 
 const clock = (t: number) => `${new Date(t).toLocaleDateString('tr-TR')} ${new Date(t).toTimeString().slice(0, 8)}`;
 const toGift = (g: ServerLuckyPackage): LuckyGift => ({ id: g.id, name: g.name, emoji: g.emoji, price: g.price, enabled: g.enabled, tiers: g.tiers });
@@ -40,6 +40,8 @@ let known = new Map<string, ServerLuckyPackage>();
 export async function refreshLucky() {
   if (!liveMode()) return;
   const r = await api.lucky();
+  // The recipient's share the panel set (an older server sends its fixed 0.2).
+  setLuckyShare(r.share);
   const gifts = parseLuckyPackages(r.gifts);
   known = new Map(gifts.map((g) => [g.id, g]));
   setLuckyIcons(gifts);

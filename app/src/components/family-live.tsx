@@ -13,6 +13,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ActionSheet, type SheetOption } from '@/components/ActionSheet';
 import { MemberPicker, useFamilyGift } from '@/components/family-center-live';
 import { EmojiText } from '@/components/ReactionArt';
+import { RoomShareChip } from '@/components/room-share-chip';
 import { SCENES } from '@/components/fx/scenes';
 import { Backdrop } from '@/components/fx/surface';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
@@ -892,6 +893,7 @@ export function LiveFamilyChat() {
                   <View style={[styles.bubble, { backgroundColor: mine ? colors.primary : colors.card }]}>
                     {!mine && <Text style={styles.author}>{m.author.name}</Text>}
                     <EmojiText text={m.text} style={[styles.msgText, mine && { color: '#fff' }]} />
+                    <RoomShareChip text={m.text} mine={mine} />
                   </View>
                 </View>
               );

@@ -13,6 +13,7 @@ import { Backdrop, PressableScale, glassChipOf } from '@/components/fx/surface';
 import { CoinPill, Header } from '@/components/ui';
 import { COSMETIC_KINDS, shopCosmetics, type Cosmetic, type CosmeticKind } from '@/data/catalog';
 import { showAlert } from '@/lib/alert';
+import { liveMode } from '@/lib/live';
 import { useLiveCatalog } from '@/lib/live/catalog-live';
 import { livePacks } from '@/lib/live/emoji-live';
 import { useApp } from '@/store';
@@ -73,6 +74,8 @@ export default function StoreScreen() {
           <GlossButton label={isEquipped ? 'Çıkar' : 'Kullan'} tone={isEquipped ? 'locked' : 'action'} small />
         </PressableScale>
       );
+    // "Yakında" (Yönetim › Mağaza): on the shelf, not sold yet.
+    if (c.soon) return <GlossButton label="Yakında" tone="locked" small icon={<Ionicons name="time-outline" size={12} color={t.dark ? '#C7D2E5' : t.colors.textDim} />} />;
     if (c.minVip && vipLevel < c.minVip)
       return (
         <PressableScale
@@ -152,6 +155,8 @@ export default function StoreScreen() {
                   <View style={styles.cta}>
                     {owned ? (
                       <Text style={styles.owned}>✓ Açık</Text>
+                    ) : p.soon || (!liveMode() && (p.price > 0 || !!p.minVip)) ? (
+                      <GlossButton label="Yakında" tone="locked" small icon={<Ionicons name="time-outline" size={12} color={t.dark ? '#C7D2E5' : t.colors.textDim} />} />
                     ) : p.minVip && !p.price ? (
                       <View>
                         <GlossButton label={`VIP ${p.minVip}`} tone="locked" small icon={<Ionicons name="lock-closed" size={12} color={t.dark ? '#C7D2E5' : t.colors.textDim} />} />

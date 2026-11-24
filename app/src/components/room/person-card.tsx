@@ -184,10 +184,10 @@ export function PersonCard({ uid, note, onClose, onGift, onMention, onReport, on
   // One row of their badges as in the design: age, then their levels, a small gold dot between them.
   const badgeList = [
     <AgePill key="age" user={u} />,
-    charm !== null && <LevelPill key="charm" level={charm} h={width < 380 ? 31 : 36} />,
-    wealth !== null && <WealthBadge key="wealth" level={wealth} />,
+    charm !== null && <LevelPill key="charm" level={charm} h={BADGE_ART_H} />,
+    wealth !== null && <WealthBadge key="wealth" level={wealth} size="md" />,
     vip > 0 ? <VipTitle key="vip" level={vip} /> : u.vip ? <VipBadge key="vip" /> : null,
-    heart && heart.level > 0 ? <HeartBadge key="heart" level={heart.level} /> : null,
+    heart && heart.level > 0 ? <HeartBadge key="heart" level={heart.level} size="md" /> : null,
   ].filter(Boolean);
 
   return (
@@ -270,7 +270,10 @@ export function PersonCard({ uid, note, onClose, onGift, onMention, onReport, on
   );
 }
 
-const AGE_H = 22;
+// The badge row's pills are one height (owners, 24 Nov 2026): the gender chip's 25 (profile-badges chipMd), the age art,
+// Cömertlik and the chat heart at their md size, and the Yankı art drawn so its pink pill (under its crown) is as tall.
+const AGE_H = 25;
+const BADGE_ART_H = 44;
 
 /** Their photo (its frame drawn around it) and the box it sits in. */
 const AVATAR = 62;
@@ -293,7 +296,7 @@ const s = StyleSheet.create({
   idSpecial: { color: SHOW.gold },
   middle: { gap: 12, paddingTop: 4 },
   // The badges on one strip in the middle of the card, a gold dot between two; crowns and sparkles rise above them.
-  badges: { alignSelf: 'center', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', rowGap: 12, marginTop: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,120,215,0.22)' },
+  badges: { alignSelf: 'center', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', rowGap: 16, marginTop: 6, paddingHorizontal: 12, paddingTop: 17, paddingBottom: 8, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,120,215,0.22)' },
   badgeAt: { flexDirection: 'row', alignItems: 'center' },
   dot: { width: 4, height: 4, borderRadius: 2, backgroundColor: SHOW.gold, marginHorizontal: 5 },
   age: { width: AGE_H * 3, height: AGE_H, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3 },

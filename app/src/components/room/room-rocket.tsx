@@ -23,10 +23,50 @@ import { useSheetMax } from '@/lib/sheet-space';
 import { SCRIM, colors } from '@/theme';
 
 const ROCKET_ART = require('../../../assets/gifts/192/hediye-roket.png');
+
+/** Each level's own rocket (owners, 25 Nov 2026: their five pictures, in the order they sent them, Lv.1 to Lv.5). */
+const LEVEL_ART = [
+  require('../../../assets/rocket/oda-roketi-lv1.png'),
+  require('../../../assets/rocket/oda-roketi-lv2.png'),
+  require('../../../assets/rocket/oda-roketi-lv3.png'),
+  require('../../../assets/rocket/oda-roketi-lv4.png'),
+  require('../../../assets/rocket/oda-roketi-lv5.png'),
+];
+export const rocketArtOf = (level: number) => LEVEL_ART[Math.min(Math.max(level, 1), LEVEL_ART.length) - 1] ?? ROCKET_ART;
+/** A level's rocket picture (the shortcut, the sheet, the pill); its launch video plays only when it launches. */
+function RocketArt({ level, size, label }: { level: number; size: number; label?: string }) {
+  return <Image source={rocketArtOf(level)} style={{ width: size, height: size }} resizeMode="contain" accessibilityLabel={label} />;
+}
+
 /** Each level's colour: pink, orange, blue, purple, gold. */
 export const ROCKET_HUES = ['#FF5FA2', '#FF8A3D', '#3D9BFF', '#A855F7', '#F6BD60'] as const;
 const hueOf = (level: number) => ROCKET_HUES[(level - 1) % ROCKET_HUES.length];
 const KIND_EMOJI: Record<string, string> = { frame: '🖼️', entry: '✨', ride: '🏎️', bubble: '💬', wave: '🔊' };
+
+/**
+ * The room's right-side shortcut, just above the Rüzgâr Gülü (owners, 25 Nov 2026): the level filling now as its own
+ * launching rocket (RocketArt: that level's launch video, else the picture), a thin bar of how full it is and its level.
+ */
+export function RocketShortcut({ rocket, onPress, style }: { rocket: RoomRocket; onPress: () => void; style?: object }) {
+  const l = rocket.levels[shownLevel(rocket) - 1];
+  const pct = rocketPct(l);
+  const hue = hueOf(l.level);
+  const done = rocket.current === null;
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[s.shortcut, style]}
+      accessibilityRole="button"
+      accessibilityLabel={done ? 'Oda roketi: bugünün beş seviyesi kalktı' : `Oda roketi, Lv.${l.level}, ${pctText(pct)} dolu`}
+    >
+      <RocketArt level={l.level} size={46} />
+      <View style={s.shortcutTrack}>
+        <View style={[s.shortcutFill, { width: `${done ? 100 : pct}%`, backgroundColor: hue }]} />
+      </View>
+      <Text style={s.shortcutText}>{done ? `Lv.5 ✓` : `Lv.${l.level}`}</Text>
+    </Pressable>
+  );
+}
 
 /** The pill under the room's name: the level filling now and how full it is (✓ once all five launched today). */
 export function RocketPill({ rocket, onPress }: { rocket: RoomRocket; onPress: () => void }) {
@@ -40,7 +80,7 @@ export function RocketPill({ rocket, onPress }: { rocket: RoomRocket; onPress: (
       style={[s.pill, { borderColor: `${hueOf(l.level)}99` }]}
       accessibilityRole="button"
       accessibilityLabel={done ? 'Oda roketi: bugünün beş seviyesi kalktı' : `Oda roketi, Lv.${l.level}, ${pctText(pct)} dolu`}>
-      <Image source={ROCKET_ART} style={s.pillArt} />
+      <Image source={rocketArtOf(l.level)} style={s.pillArt} resizeMode="contain" />
       <Text style={s.pillText} numberOfLines={1}>
         {pillText(rocket)}
       </Text>
@@ -73,7 +113,7 @@ export function RocketSheet({ rocket, onClose, onGift }: { rocket: RoomRocket; o
       <Pressable style={s.scrim} onPress={onClose} />
       <View style={[roomStyles.sheet, { maxHeight, paddingBottom }]}>
         <View style={s.head}>
-          <Image source={ROCKET_ART} style={{ width: 34, height: 34 }} />
+          <RocketArt level={level} size={34} />
           <View style={{ flex: 1 }}>
             <Text style={s.title}>Oda Roketi</Text>
             <Text style={s.sub}>Odadaki hediyeler roketi doldurur, dolunca kalkar</Text>
@@ -102,7 +142,7 @@ export function RocketSheet({ rocket, onClose, onGift }: { rocket: RoomRocket; o
           <View style={s.stage}>
             <View style={{ width: 120, height: 120 }}>
               <Halo size={120} hue={hue} strength={0.55} />
-              <Image source={ROCKET_ART} style={{ width: 120, height: 120 }} accessibilityLabel={`Lv.${level} roketi`} />
+              <RocketArt level={level} size={120} label={`Lv.${level} roketi`} />
             </View>
             {l.launched && <Text style={[s.launched, { color: hue }]}>Kalktı 🚀</Text>}
           </View>
@@ -167,9 +207,9 @@ export function RocketSheet({ rocket, onClose, onGift }: { rocket: RoomRocket; o
           )}
 
           <Text style={s.rules}>
-            Odada gönderilen her hediye roketi jetonu kadar doldurur. Seviye dolunca roket kalkar ve ödüller o seviyeye hediye gönderenler arasında çekilir:
-            kim ne kadar katkı verdiyse şansı o kadar; herkes en çok bir ödül alır. Kazanılan jeton normal jetondur. Roket her gün 00:00&apos;da
-            Lv.1&apos;den başlar.
+            Odada gönderilen her hediye roketi jetonu kadar doldurur. Seviye dolunca roket kalkar ve ödüller o gün odada katkı verenlere katkı
+            sırasıyla verilir: en çok katkı veren en büyük jeton ödülünü alır, sonra ikincisi; herkes en çok bir ödül alır. Kazanılan jeton
+            normal jetondur. Roket her gün 00:00&apos;da Lv.1&apos;den başlar.
           </Text>
         </ScrollView>
         <Pressable onPress={onGift} style={[s.cta, { backgroundColor: hue }]} accessibilityRole="button">
@@ -248,7 +288,7 @@ function RocketPhase({ news, still, muted, onDone }: { news: RocketNews; still?:
           ]}>
           <View style={{ width: 140, height: 140 }}>
             <Halo size={140} hue={hue} strength={0.7} />
-            <Image source={ROCKET_ART} style={{ width: 140, height: 140 }} />
+            <Image source={rocketArtOf(news.level)} style={{ width: 140, height: 140 }} resizeMode="contain" />
           </View>
         </Animated.View>
       )}
@@ -260,6 +300,10 @@ function RocketPhase({ news, still, muted, onDone }: { news: RocketNews; still?:
 }
 
 const s = StyleSheet.create({
+  shortcut: { alignItems: 'center', gap: 3, width: 54 },
+  shortcutTrack: { width: 44, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.22)', overflow: 'hidden' },
+  shortcutFill: { height: 4, borderRadius: 2 },
+  shortcutText: { color: '#fff', fontSize: 10, fontWeight: '800', textShadowColor: 'rgba(0,0,0,0.7)', textShadowRadius: 3 },
   pill: { flexDirection: 'row', alignItems: 'center', gap: 3, height: 20, paddingLeft: 2, paddingRight: 7, borderRadius: 999, borderWidth: 1, backgroundColor: 'rgba(8,15,30,0.55)' },
   pillArt: { width: 16, height: 16 },
   pillText: { color: '#fff', fontSize: 11, fontWeight: '700' },

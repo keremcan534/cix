@@ -27,7 +27,9 @@ type ServerShopItem = { sku: string; kind: string; name: string; price: number; 
 describe('Sunucu kataloğu uygulamayla aynı', () => {
   test('satıştan kalkan giriş efektleri iki tarafta aynı: çizimliler ve hediye klipleri; satışta yalnız Ejderha', () => {
     const retired = COSMETICS.filter((c) => c.retired).map((c) => c.id).sort();
-    assert.deepEqual(retired, [...(server.SHOP_PAUSED_DEFAULT as string[])].sort());
+    // The server also pauses the three rides (owners, 25 Nov 2026): a newer app reads that from the shop's list
+    // (Mağaza › Binekler), so they stay unretired here and whoever has one still rides in.
+    assert.deepEqual([...retired, 'rd-jet', 'rd-scooter', 'rd-sport'].sort(), [...(server.SHOP_PAUSED_DEFAULT as string[])].sort());
     assert.equal(retired.length, 13);
     assert.deepEqual(COSMETICS.filter((c) => c.kind === 'entry' && !c.retired).map((c) => c.id), ['en-dragon']);
   });

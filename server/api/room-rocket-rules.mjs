@@ -105,8 +105,28 @@ export function splitFuel(ends, before, coins) {
   return out;
 }
 
-/** A level's prizes one per winner, in the order they are drawn: [{ ...prize, slot }]. */
-export const prizeSlots = (prizes) => prizes.flatMap((p) => Array.from({ length: p.winners }, () => p)).map((p, slot) => ({ ...p, slot }));
+/**
+ * A level's prizes one per winner, biggest first (owners, 25 Nov 2026): the coin prizes from the most coins down, then
+ * the items in the panel's order. [{ ...prize, slot }]: `slot` is the place in that order, the winner's rank.
+ */
+export const prizeSlots = (prizes) =>
+  prizes
+    .flatMap((p, at) => Array.from({ length: p.winners }, () => ({ p, at })))
+    .sort((x, y) => (x.p.kind === 'coins' ? 0 : 1) - (y.p.kind === 'coins' ? 0 : 1) || (x.p.kind === 'coins' ? y.p.amount - x.p.amount : 0) || x.at - y.at)
+    .map(({ p }, slot) => ({ ...p, slot }));
+
+/**
+ * Who wins at a launch (owners, 25 Nov 2026: no draw): up to `n` different people out of `fuel` ([{ user, coins }],
+ * what each gave in the room that day), the most first, so the one who gave most takes the biggest prize (prizeSlots).
+ * Equal amounts: the account id's order, the same every time.
+ */
+export function rankWinners(fuel, n) {
+  return fuel
+    .filter((x) => x.coins > 0)
+    .sort((a, b) => b.coins - a.coins || (a.user < b.user ? -1 : a.user > b.user ? 1 : 0))
+    .slice(0, n)
+    .map((x) => x.user);
+}
 
 /**
  * Who wins at a launch: up to `n` different people out of `fuel` ([{ user, coins }]), drawn one after another

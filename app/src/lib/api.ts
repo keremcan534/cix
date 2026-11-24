@@ -1525,7 +1525,7 @@ export type LiveKey =
 /** Kazanç duyurusu (server/api/live-registry.mjs): from how many coins a Şanslı win is announced in every room (0: every win). */
 export type WinKey = 'lucky_announce_min_coins';
 /** Odalar (server/api/live-registry.mjs, "Odalar"): when a room without its staff closes, and the Patron koltuğu's coins and minutes. */
-export type RoomKey = 'room_staff_away_minutes' | 'boss_seat_coins' | 'boss_seat_minutes' | 'dj_live_kbps' | 'dj_live_per_room';
+export type RoomKey = 'room_staff_away_minutes' | 'boss_seat_coins' | 'room_owner_bonus_pct' | 'boss_seat_minutes' | 'dj_live_kbps' | 'dj_live_per_room';
 /** Etkinlik Merkezi (server/api/live-registry.mjs, "Etkinlikler"): who may apply, how far ahead, how long and big, the grace, strikes. */
 export type EventKey =
   | 'event_min_room_level'

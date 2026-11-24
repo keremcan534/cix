@@ -37,13 +37,51 @@ describe('Mağaza: sunucunun listesi', () => {
         { sku: 'se1', kind: 'entry', name: 'Videosuz', price: 10, days: 30, minVip: 0 },
         { sku: 'BAD ID', kind: 'frame', name: 'x', price: 10, days: 30, minVip: 0, builtin: true },
         { sku: 'fr-neon', kind: 'frame', name: 'Neon', price: -5, days: 30, minVip: 0, builtin: true },
-        { sku: 'fr-ocean', kind: 'ride', name: 'Yörünge', price: 300, days: 30, minVip: 0, builtin: true },
+        { sku: 'fr-ocean', kind: 'yat', name: 'Yörünge', price: 300, days: 30, minVip: 0, builtin: true },
+        // A ride is the app's own only: an admin's one is skipped.
+        { sku: 'sr1', kind: 'ride', name: 'Bisiklet', price: 10, days: 30, minVip: 0 },
         { sku: 'se2', kind: 'entry', name: 'Süresi sıfır', price: 10, days: 0, minVip: 0, video: true, plate: PLATE },
         { sku: 'se3', kind: 'entry', name: 'İyi', price: 10, days: null, minVip: 0, video: true, plate: { ...PLATE, color: 'altın' } },
       ],
     });
     // se2: 0 days is not a length the server sends (for good is null); se3's plate is malformed: none (the usual banner).
     assert.deepEqual(shop!.items.map((x) => [x.sku, x.plate]), [['se3', null]], 'yalnız geçerli olan');
+  });
+
+  // Yakında and Özel ID (owners, 25 Nov 2026): the Özel IDs and Takma isim from the server's list, tagged "Yakında".
+  test('Yakında: sunucunun işaretlediği eşya etiketli; işaret kalkınca satılır', () => {
+    const shop = parseLiveShop({
+      items: [
+        { sku: 'id-777', kind: 'specialId', name: 'ID 777', price: 8000, days: null, minVip: 0, builtin: true, soon: true },
+        { sku: 'nick-name', kind: 'specialId', name: 'Takma isim oluştur', price: 5000, days: null, minVip: 0, builtin: true, soon: true },
+        { sku: 'id-2026', kind: 'specialId', name: 'ID 2026', price: 3000, days: null, minVip: 0, builtin: true },
+        { sku: 'si9', kind: 'specialId', name: 'Uydurma', price: 1, days: null, minVip: 0 },
+      ],
+    });
+    const merged = mergeShop(COSMETICS, shop);
+    assert.equal(merged.find((c) => c.id === 'id-777')?.soon, true);
+    assert.equal(merged.find((c) => c.id === 'nick-name')?.soon, true);
+    assert.equal(merged.find((c) => c.id === 'id-2026')?.soon, undefined, 'sunucu Yakında demiyorsa satılır');
+    assert.equal(merged.some((c) => c.id === 'si9'), false, 'yöneticinin özel ID’si olmaz');
+    // Without a server: the app's own, all Yakında.
+    assert.ok(COSMETICS.filter((c) => c.kind === 'specialId').every((c) => c.soon));
+  });
+
+  // Binekler (owners, 25 Nov 2026): the server's Mağaza › Binekler names, prices and shelves the app's rides.
+  test('binekler sunucunun listesinden: satıştan kalkan gizlenir, fiyat ve ad sunucunun', () => {
+    const shop = parseLiveShop({
+      items: [
+        { sku: 'rd-scooter', kind: 'ride', name: 'Scooter', price: 250, days: 7, minVip: 0, builtin: true, off: true },
+        { sku: 'rd-sport', kind: 'ride', name: 'Süper Araba', price: 900, days: 30, minVip: 0, builtin: true },
+      ],
+    });
+    const merged = mergeShop(COSMETICS, shop);
+    const scooter = merged.find((c) => c.id === 'rd-scooter')!;
+    const sport = merged.find((c) => c.id === 'rd-sport')!;
+    assert.equal(scooter.retired, true, 'satıştan kalktı');
+    assert.deepEqual([sport.kind, sport.name, sport.price, !!sport.retired], ['ride', 'Süper Araba', 900, false]);
+    // Not listed (an older server): the app's own, as compiled.
+    assert.equal(merged.find((c) => c.id === 'rd-jet')?.retired, undefined);
   });
 
   test('uygulamanın eşyası sunucunun adı, fiyatı, süresi ve rafıyla; ekibin eşyası resmiyle ya da videosu ve plakasıyla', () => {

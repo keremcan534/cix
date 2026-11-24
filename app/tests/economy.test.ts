@@ -4,7 +4,7 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { DEFAULT_RULES, RULES, luckyHostDiamonds } from '@/data/rules';
+import { DEFAULT_RULES, RULES, luckyHostDiamonds, luckyShare, pctOf, setLuckyShare } from '@/data/rules';
 import { RECHARGE_PACKS } from '@/data/status';
 import { splitStake } from '@/lib/casino-odds';
 import { convertDiamonds, diamondValueTl, exchangeOwnDiamonds, exchangeRate, selfExchangeRate, wholesaleQuote } from '@/lib/coins-bank';
@@ -18,7 +18,7 @@ describe('Kurallar', () => {
     assert.ok(close(RULES.coinsBankRetailCoinsPerTl, 1_000 / 220));
     assert.equal(RULES.coinsBankWholesaleTlPer1000, 220);
     assert.equal(RULES.coinsBankExchangeFee, 0.03);
-    assert.equal(RULES.luckyHostShare, 0.2);
+    assert.equal(RULES.luckyHostShare, 0.1);
     assert.equal(RULES.payoutUsdTry, 49);
     assert.ok(close(diamondValueTl(1_000_000), 49_000, 1e-6), '1.000.000 💎 = 1.000 USD = 49.000 TL (ödeme kuru 49)');
   });
@@ -129,10 +129,19 @@ describe('Gelir > Çevir (elmas → jeton)', () => {
 });
 
 describe('Lucky ve casino bakiyesi', () => {
-  test('Lucky hediyede alıcıya fiyatın %20’si elmas yazılır (aşağı yuvarlanır)', () => {
+  test('Lucky hediyede alıcıya fiyatın payı (%10, sunucununki) elmas yazılır (aşağı yuvarlanır)', () => {
+    // 10 % (owners, 24 Nov 2026) until the server says otherwise; then the server's.
+    assert.equal(luckyHostDiamonds(1_000), 100);
+    assert.equal(luckyHostDiamonds(20), 2);
+    assert.equal(luckyHostDiamonds(7), 0);
+    setLuckyShare(0.2);
     assert.equal(luckyHostDiamonds(1_000), 200);
-    assert.equal(luckyHostDiamonds(20), 4);
-    assert.equal(luckyHostDiamonds(7), 1);
+    setLuckyShare('x');
+    setLuckyShare(2);
+    assert.equal(luckyShare(), 0.2, 'bozuk değer yok sayılır');
+    setLuckyShare(0.1);
+    // The percent with its Turkish ending, as it is read.
+    assert.deepEqual([0.1, 0.2, 0.15, 0.05, 0.3, 0.5, 0.12, 0.4].map(pctOf), ['%10’u', '%20’si', '%15’i', '%5’i', '%30’u', '%50’si', '%12’si', '%40’ı']);
   });
   test('bahis önce oyun bakiyesinden, kalanı cüzdandan düşer', () => {
     assert.deepEqual(splitStake(100, 0), { fromGame: 0, fromWallet: 100 });

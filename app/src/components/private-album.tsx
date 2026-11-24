@@ -7,10 +7,10 @@ import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useCallback, useEffect, useState } from 'react';
-import { Image, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { CardHead, PCard } from '@/components/profile-design';
+import { PhotoViewer } from '@/components/photo-viewer';
 import { Text } from '@/components/text';
 import { Button } from '@/components/ui';
 import { showAlert } from '@/lib/alert';
@@ -152,21 +152,6 @@ export function PrivateAlbumCard({ serverId, ownerName }: { serverId: string; ow
   );
 }
 
-/** One photo over the whole screen; a tap anywhere or the close button ends it. */
-function PhotoViewer({ uri, onClose }: { uri: string | null; onClose: () => void }) {
-  const insets = useSafeAreaInsets();
-  return (
-    <Modal visible={!!uri} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={s.viewer} onPress={onClose} accessibilityLabel="Kapat">
-        {uri && <Image source={{ uri }} style={s.full} resizeMode="contain" />}
-        <View style={[s.close, { top: insets.top + 10 }]}>
-          <Ionicons name="close" size={26} color="#fff" />
-        </View>
-      </Pressable>
-    </Modal>
-  );
-}
-
 const s = StyleSheet.create({
   photo: { width: 104, height: 104, borderRadius: 16 },
   add: { backgroundColor: glass.white, borderWidth: 1.5, borderStyle: 'dashed', borderColor: glass.line, alignItems: 'center', justifyContent: 'center', gap: 2 },
@@ -175,7 +160,4 @@ const s = StyleSheet.create({
   more: { color: '#FFE3F2', fontSize: 14, fontWeight: '800' },
   remove: { position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(22,14,18,0.75)', alignItems: 'center', justifyContent: 'center' },
   meta: { color: glass.plum, fontSize: 13 },
-  viewer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.94)', alignItems: 'center', justifyContent: 'center' },
-  full: { width: '100%', height: '80%' },
-  close: { position: 'absolute', right: 16, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' },
 });

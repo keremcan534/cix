@@ -5,7 +5,8 @@ import assert from 'node:assert/strict';
 
 import { rnd, startApi } from './harness.mjs';
 
-const h = startApi({ SHOP_SPECIAL_IDS: '1', AGENCY_JOBS: '0' });
+// SHOP_SOON '': the IDs aren't "Yakında" here (owners, 25 Nov 2026: they are by default; economy-shop.test.mjs).
+const h = startApi({ SHOP_SPECIAL_IDS: '1', SHOP_SOON: '', AGENCY_JOBS: '0' });
 const { call, signUp } = h;
 
 const ok = async (p) => {

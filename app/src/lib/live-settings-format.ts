@@ -142,6 +142,7 @@ export const EVENT_NUMBER_KEYS: { key: Exclude<EventKey, 'event_reminders_off'>;
 export const ROOM_NUMBER_KEYS: { key: RoomKey; unit: string }[] = [
   { key: 'room_staff_away_minutes', unit: ' dakika' },
   { key: 'boss_seat_coins', unit: ' jeton' },
+  { key: 'room_owner_bonus_pct', unit: ' %' },
   { key: 'boss_seat_minutes', unit: ' dakika' },
   { key: 'dj_live_kbps', unit: ' kbps' },
   { key: 'dj_live_per_room', unit: ' DJ' },
@@ -297,6 +298,8 @@ export function valueText(key: LiveKey, v: LiveValue, { stored = false, names = 
       return typeof v === 'number' ? `${fmtNum(v)} dakika sonra kapanır` : String(v);
     case 'boss_seat_coins':
       return typeof v === 'number' ? `Tek seferde ${fmtNum(v)} jeton` : String(v);
+    case 'room_owner_bonus_pct':
+      return typeof v === 'number' ? (v === 0 ? 'Ödenmiyor (%0)' : `%${fmtNum(v)}`) : String(v);
     case 'boss_seat_minutes':
       return typeof v === 'number' ? `${fmtNum(v)} dakika` : String(v);
     case 'dj_live_kbps':

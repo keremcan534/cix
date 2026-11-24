@@ -2,7 +2,7 @@
 // mixer or DJ controller live from the mic, and the bar every phone in the room shows while someone does.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useMemo, useState } from 'react';
-import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Image, Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/text';
 import { ROOM_ICON_ART } from '@/components/RoomArt';
@@ -111,7 +111,7 @@ export function DjLiveSheet({ visible, onClose, room, onMic, onDone }: { visible
       visible={visible}
       onClose={onClose}
       title="DJ modu"
-      art={ROOM_ICON_ART.music}
+      art={ROOM_ICON_ART.dj}
       foot={
         dj.on ? (
           <Pressable style={s.stop} onPress={stop} accessibilityRole="button">
@@ -175,7 +175,7 @@ export function DjLiveBar({ names, me, onOpen }: { names: string[]; me: boolean;
   const text = me ? (names.length ? `Canlı DJ: sen, ${names.join(', ')}` : 'Canlı DJ yayınındasın') : `Canlı DJ: ${names.join(', ')}`;
   return (
     <Pressable style={s.bar} onPress={onOpen} disabled={!onOpen} accessibilityRole={onOpen ? 'button' : 'text'} accessibilityLabel={text}>
-      <Text style={{ fontSize: 15 }}>🎧</Text>
+      <Image source={ROOM_ICON_ART.dj} style={{ width: 20, height: 20 }} />
       <View style={s.dot} />
       <Text style={s.barText} numberOfLines={1}>
         {text}

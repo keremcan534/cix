@@ -12,6 +12,7 @@ import { ApiError, type ServerLuckyAdmin, type ServerLuckyAdminSend, type Server
 import { message } from '@/lib/live';
 import { loadLuckyAdmin, saveLuckyAdmin } from '@/lib/live/lucky';
 import { ODDS_TOTAL, maxMult, newGiftDraft, oddsLabel, validate, type LuckyGift } from '@/lib/lucky';
+import { luckyShare, pctOf } from '@/data/rules';
 import { makeStyles, space } from '@/theme';
 
 import { LuckyEditor } from './lucky-editor';
@@ -84,7 +85,7 @@ export function LuckySection() {
         {(d) => (
           <>
             <Notice
-              text={`Ayar sürümü v${d.version}${d.updatedAt ? ` · son değişiklik ${fmtDate(d.updatedAt)}` : ' · hazır paketler'}. Ödüller jeton olarak ödenir (Cömertlik puanına sayılmaz); alıcıya fiyatın %20’si elmas yazılır.`}
+              text={`Ayar sürümü v${d.version}${d.updatedAt ? ` · son değişiklik ${fmtDate(d.updatedAt)}` : ' · hazır paketler'}. Ödüller jeton olarak ödenir (Cömertlik puanına sayılmaz); alıcıya fiyatın ${pctOf(luckyShare())} elmas yazılır.`}
             />
             <ItemCard title="Bugün" sub="İstanbul saatiyle gece yarısından beri">
               <Line label="Gönderim" value={fmt(d.stats.today.sends)} />
@@ -179,7 +180,7 @@ export function LuckySection() {
                     save(d, { ...d.config, announceFrom: Number(v) }, { title: 'Duyuru', message: `×${v} ve üstü kazançlar odada duyurulsun mu?`, confirm: 'Kaydet' }, 'Duyuru ayarı kaydedildi')
                   }
                 />
-                <Text style={s.hint}>Kullanıcı başına gönderim sınırı yok; Cömertlik Lv.2 ve 18 yaş şartı sunucuda denetlenir. PK’da hediyenin %20’si puan sayılır, ödül sayılmaz.</Text>
+                <Text style={s.hint}>Kullanıcı başına gönderim sınırı yok; Cömertlik Lv.2 ve 18 yaş şartı sunucuda denetlenir. PK’da hediyenin {pctOf(luckyShare())} puan sayılır, ödül sayılmaz.</Text>
               </>
             )}
 

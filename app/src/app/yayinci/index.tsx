@@ -335,7 +335,8 @@ function Analytics() {
       </View>
       <Text style={[styles.cardTitle, { fontSize: 14, marginTop: 4 }]}>Kazanç dökümü</Text>
       <Line label="Brüt hediye değeri" value={`💎 ${gifts.toLocaleString('tr-TR')}`} />
-      <Line label={`Oda sahibi bonusu (${pct(RULES.roomOwnerBonus)})`} value={`+ ${ownerBonus.toLocaleString('tr-TR')}`} />
+      {/* Oda sahibi bonusu: none now (owners, 25 Nov 2026); an older record of one still shows. */}
+      {(RULES.roomOwnerBonus > 0 || ownerBonus > 0) && <Line label={`Oda sahibi bonusu (${pct(RULES.roomOwnerBonus)})`} value={`+ ${ownerBonus.toLocaleString('tr-TR')}`} />}
       <Line label="Aile bonusu" value={`+ ${familyBonus.toLocaleString('tr-TR')}`} />
       {oneOnOneOpen() && <Line label="Arama kazancı / bonusu" value={`+ ${callBonus.toLocaleString('tr-TR')}`} />}
       <Line label="Net hak edişin" value={`💎 ${net.toLocaleString('tr-TR')} · ${usd(net)}`} bold />

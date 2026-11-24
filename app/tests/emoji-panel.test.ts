@@ -30,21 +30,23 @@ const saved = () => JSON.parse(store.get(KEY) ?? 'null');
 beforeEach(() => store.clear());
 
 describe('Emoji paneli: sekmeler', () => {
-  test('sohbette: Sabit\'te Emoji ilk, sonra Favoriler; VIP\'te satılan paketler', async () => {
+  test('sohbette: Sabit\'te Emoji, yanında Favoriler, sonra VIP\'te satılan paketler (Yakında)', async () => {
     const { panelTabs } = await pure();
     const tabs = panelTabs(false);
     assert.deepEqual(
       tabs.map((t) => `${t.kind}:${t.id}`),
-      ['sabit:emoji', 'sabit:fav', 'vip:fun', 'vip:love', 'vip:animals', 'vip:vip', 'vip:anim', 'vip:voice', 'vip:tea', 'vip:feels', 'vip:party', 'vip:costume', 'vip:penguen'],
+      ['sabit:emoji', 'fav:fav', 'vip:fun', 'vip:love', 'vip:animals', 'vip:vip', 'vip:anim', 'vip:voice', 'vip:tea', 'vip:feels', 'vip:party', 'vip:costume', 'vip:penguen'],
     );
   });
 
-  test('odada: Hareketli ücretsizi Sabit\'te, ücretlisi VIP\'te', async () => {
-    const { panelTabs } = await pure();
+  // Owners, 25 Nov 2026: Hareketli is gone from the panel; Favoriler sits beside Sabit; VIP is "Yakında".
+  test('odada da Hareketli yok; aynı sekmeler; VIP Yakında', async () => {
+    const { panelTabs, VIP_SOON } = await pure();
     assert.deepEqual(
       panelTabs(true).map((t) => `${t.kind}:${t.id}`),
-      ['sabit:emoji', 'sabit:fav', 'sabit:animated-free', 'vip:animated', 'vip:fun', 'vip:love', 'vip:animals', 'vip:vip', 'vip:anim', 'vip:voice', 'vip:tea', 'vip:feels', 'vip:party', 'vip:costume', 'vip:penguen'],
+      ['sabit:emoji', 'fav:fav', 'vip:fun', 'vip:love', 'vip:animals', 'vip:vip', 'vip:anim', 'vip:voice', 'vip:tea', 'vip:feels', 'vip:party', 'vip:costume', 'vip:penguen'],
     );
+    assert.equal(VIP_SOON, true);
   });
 
   test('telefon klavyesi emojileri, Temel, Duygular, Müzik ve Hamle ayrı sekme değil; Emoji sekmesinin içinde', async () => {
@@ -81,8 +83,10 @@ describe('Emoji paneli: sekmeler', () => {
     assert.equal(openTab(undefined, chat).id, 'emoji');
     assert.deepEqual([openTab('love', chat).id, openTab('love', chat).kind], ['love', 'vip']);
     assert.equal(openTab('fav', room).id, 'fav');
-    assert.equal(openTab('animated-free', room).id, 'animated-free');
-    // A room's tab in a chat, a retired or unknown tab: the first one.
+    // Hareketli is gone: a panel last left on it opens Emoji.
+    assert.equal(openTab('animated-free', room).id, 'emoji');
+    assert.equal(openTab('animated', room).id, 'emoji');
+    // A retired or unknown tab: the first one.
     assert.equal(openTab('animated-free', chat).id, 'emoji');
     assert.equal(openTab('basic', room).id, 'emoji');
     assert.equal(openTab('yok', room).id, 'emoji');
@@ -149,7 +153,8 @@ describe('Emoji paneli: telefonda kalan bellek', () => {
     const b = await startApp();
     assert.equal(b.lastTab(), 'animated-free');
     assert.deepEqual(b.pickCounts(), { '⟦duygu-alkis⟧': { n: 2, at: 20 } });
-    assert.equal(b.openTab(b.lastTab(), b.panelTabs(true)).id, 'animated-free');
+    // Hareketli is gone from the panel (owners, 25 Nov 2026): the saved tab opens Emoji now.
+    assert.equal(b.openTab(b.lastTab(), b.panelTabs(true)).id, 'emoji');
   });
 
   test('bozuk ya da eski kayıt açılışı bozmaz: yalnız doğru olanlar alınır', async () => {

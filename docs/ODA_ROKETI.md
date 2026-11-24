@@ -13,12 +13,12 @@ Oyun Salonu'ndaki Yörünge ("patlamadan önce çık") ayrı bir oyundur; deği�
 ## Nasıl çalışır
 
 - **Ne doldurur:** odada gönderilen her ücretli hediye roketi jetonu kadar doldurur. Uğurlu hediyede gönderimin bütün jetonu sayılır. Çantadan gönderilen bedava hediye ve Şanslı çanta payları saymaz.
-- **Seviyeler:** beş seviye sırayla dolar; her seviyenin hedefi panelden. Bir hediye seviyeyi aşarsa artanı sonraki seviyeye geçer. Büyük bir hediye birkaç seviyeyi birden kaldırabilir; her biri ayrı çekilir.
-- **Kalkış:** seviye dolunca roket kalkar. Odadakiler kalkışı görür, ödüller hemen çekilir ve dağıtılır, kazananlar odada yazılır ve telefonlarına bildirim gider.
-- **Çekiliş:** ödüller o seviyeye hediye gönderenler arasında çekilir.
-  - Kim ne kadar gönderdiyse şansı o kadar. Örneğin seviyenin %90'ını dolduranın ilk ödülü alma şansı %90.
-  - Herkes bir kalkışta en çok bir ödül alır.
-  - Ödüller panelde yazılan sırayla çekilir: ilk ödül önce. Değerli ödülü başa yazın.
+- **Seviyeler:** beş seviye sırayla dolar; her seviyenin hedefi panelden. Bir hediye seviyeyi aşarsa artanı sonraki seviyeye geçer. Büyük bir hediye birkaç seviyeyi birden kaldırabilir; her birinin ödülleri ayrı verilir.
+- **Kalkış:** seviye dolunca roket kalkar. Odadakiler kalkışı görür, ödüller hemen dağıtılır, kazananlar odada yazılır ve telefonlarına bildirim gider.
+- **Dağıtım (25 Kasım 2026, sahiplerin kararı; önceden çekilişti):** ödüller o gün odada katkı verenlere, kalkışa kadar kim ne kadar gönderdiyse o sırayla verilir. Şans yok.
+  - En çok gönderen en büyük jeton ödülünü alır, ikinci en çok gönderen ikinci büyüğü, böyle gider.
+  - Jeton ödülleri önce (büyükten küçüğe), eşya ödülleri sonra (paneldeki sırayla).
+  - Herkes bir kalkışta en çok bir ödül alır. Eşit gönderenlerde sıra her seferinde aynıdır (hesap sırası).
   - Katkı verenden çok ödül varsa artanı kimseye verilmez.
 - **Gün:** her gün 00:00'da (Türkiye saati) roket Lv.1'den başlar. Lv.5 kalktıktan sonra o gün daha fazla dolmaz.
 
@@ -72,7 +72,7 @@ Oyun Salonu'ndaki Yörünge ("patlamadan önce çık") ayrı bir oyundur; deği�
 
 ## Hukuk
 
-- Ödüller şansla dağıtılıyor ve jeton ödülü hediyeyle elmasa, elmas da nakde dönebiliyor. Bu, Şanslı hediye ile aynı durum ([`DENETIM.md`](DENETIM.md), Kritik 1): satın alınan jetonla katılınan, kazancı nakde dönebilen bir çekiliş.
+- 25 Kasım 2026'dan beri ödüller şansla değil katkı sırasıyla veriliyor: çekiliş değil, en çok harcayana ödül (bir sıralama ödülü). Jeton ödülü yine hediyeyle elmasa, elmas da nakde dönebiliyor; bu yüzden avukata sormak yine iyi olur ([`DENETIM.md`](DENETIM.md), Kritik 1).
 - Karar avukatla sizin. Bu yüzden roket kapalı gelir. Kapatınca hiçbir oda dolmaz; kazanılan ödüller kişilerde kalır.
 - Riski azaltmak istenirse jeton ödülü yerine yalnız süreli mağaza eşyası verilebilir (eşya nakde dönmez).
 
@@ -80,7 +80,7 @@ Oyun Salonu'ndaki Yörünge ("patlamadan önce çık") ayrı bir oyundur; deği�
 
 - **Tablolar:** `080_room_rocket` (ayar, odanın günü, kişinin seviye katkısı, kalkışlar, kazananlar; eşya ödülü için `entitlements.source = 'rocket'`).
 - **Sunucu:**
-  - `room-rocket.mjs`: yakıt, kalkış, ödeme ve uçlar. `room-rocket-rules.mjs`: hedefler, bölme ve çekiliş kuralları.
+  - `room-rocket.mjs`: yakıt, kalkış, ödeme ve uçlar. `room-rocket-rules.mjs`: hedefler, bölme ve dağıtım sırası (`rankWinners`, `prizeSlots`).
   - `gifts.mjs` ve `lucky.mjs`: roket hediyenin işlemi içinde dolar (hediyeyi hiç düşürmez).
   - Ödeme hediyeden sonra kendi işleminde. Kazananlar kimlik sırasıyla kilitlenir; bir kalkış bir kez ödenir. Kaçan ödemeyi 30 saniyede bir çalışan süpürge öder.
   - Oda paketleri: `{type: 'rocket', event: 'launch' | 'paid'}`.

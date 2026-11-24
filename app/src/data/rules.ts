@@ -3,8 +3,19 @@
 // start time — past ledger rows keep the rule they were made with) is done on the separate
 // Finance Control platform, not in the mobile app.
 
-/** Lucky gifts: share of the gift value the recipient earns (diamonds) and scores in PK. */
-export const LUCKY_RECIPIENT_SHARE = 0.2;
+/**
+ * Lucky gifts: share of the gift value the recipient earns (diamonds) and scores in PK. The owners' rule is 10 % (24 Nov
+ * 2026; 20 % before); the server's panel sets it (server/api/lucky-rules.mjs sharePct), and live mode reads it with the
+ * packages (luckyShare). This is the demo's and the first screen's value.
+ */
+export const LUCKY_RECIPIENT_SHARE = 0.1;
+let luckyShareNow = LUCKY_RECIPIENT_SHARE;
+/** The recipient's share now: the server's (GET /api/lucky `share`) once read, else LUCKY_RECIPIENT_SHARE. */
+export const luckyShare = () => luckyShareNow;
+/** Live mode: the server's share; anything not a fraction above 0 and at most 1 is ignored. */
+export const setLuckyShare = (v: unknown) => {
+  if (typeof v === 'number' && Number.isFinite(v) && v > 0 && v <= 1) luckyShareNow = v;
+};
 
 export type Rules = {
   version: number;
@@ -70,7 +81,8 @@ export const DEFAULT_RULES: Rules = {
   coinsBankExchangeFee: 0.03,
   luckyHostShare: LUCKY_RECIPIENT_SHARE,
   agencyCommission: 0.4,
-  roomOwnerBonus: 0.2,
+  // Oda sahibi bonusu: 0 (owners, 25 Nov 2026; the server pays none: Canlı ayarlar › Odalar › room_owner_bonus_pct).
+  roomOwnerBonus: 0,
   familyRates: [0.01, 0.0125, 0.015, 0.0175, 0.02, 0.0225, 0.025, 0.0275, 0.03, 0.0325, 0.035, 0.0375, 0.04, 0.045, 0.05],
   oneOnOneBonus: 0.05,
   voiceCallBonus: 0.03,
@@ -106,9 +118,18 @@ export const DEFAULT_RULES: Rules = {
 export const RULES: Rules = { ...DEFAULT_RULES, familyRates: [...DEFAULT_RULES.familyRates] };
 
 export const pct = (r: number) => `%${(r * 100).toLocaleString('tr-TR', { maximumFractionDigits: 2 })}`;
+// The possessive ending of a whole percent as it is read ("yüzde on" → "%10’u", "yüzde yirmi" → "%20’si").
+const ONES = ['', 'i', 'si', 'ü', 'ü', 'i', 'sı', 'si', 'i', 'u'];
+const TENS = ['', 'u', 'si', 'u', 'ı', 'si', 'ı', 'i', 'i', 'ı'];
+/** "%10’u", "%20’si", "%15’i": a percent with its possessive ending (whole percents; others "’i"). */
+export const pctOf = (r: number) => {
+  const n = Math.round(r * 100);
+  const end = Math.abs(r * 100 - n) > 1e-9 ? 'i' : n === 100 ? 'ü' : n === 0 ? 'ı' : n % 10 ? ONES[n % 10] : TENS[(n / 10) % 10];
+  return `${pct(r)}’${end}`;
+};
 export const usdValue = (diamonds: number) => diamonds / RULES.diamondsPerUsd;
-/** Lucky gifts: diamonds the recipient earns (and PK points it scores) for one send: 20 % of the price, rounded down. */
-export const luckyHostDiamonds = (price: number, share = LUCKY_RECIPIENT_SHARE) => Math.floor(price * share);
+/** Lucky gifts: diamonds the recipient earns (and PK points it scores) for one send: the share of the price, rounded down. */
+export const luckyHostDiamonds = (price: number, share = luckyShare()) => Math.floor(price * share);
 export const usd = (diamonds: number) => `$${usdValue(diamonds).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 /** Streamer keeps 100% of earned diamonds; agency commission is a separate platform liability. */
