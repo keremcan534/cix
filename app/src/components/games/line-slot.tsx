@@ -25,6 +25,8 @@ import { SKIN_GAP, SKIN_PAD, SKIN_RIM, SkinCabinet, SkinPlate, fitSkin, slotSkin
 import { ReelSpark, TeaseAura } from '@/components/games/fx/divine-fx';
 import { useGameQuake } from '@/components/games/fx/quake';
 import { useWinFx } from '@/components/games/fx/win-fx';
+import { WinLines, type WinLine } from '@/components/games/fx/win-lines';
+import { LEVER_W, SlotLever } from '@/components/games/fx/slot-lever';
 import { SpinControls, fmt, sleep, useShortGame } from '@/components/games/slot-kit';
 import type { LineSlotId } from '@/lib/casino-odds';
 import { casinoAccess, useGames, type Entry } from '@/lib/games';
@@ -182,6 +184,12 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
   // The window the machine opens with; after that each reel keeps its own (components/games/fx/reel).
   const [opening] = useState(() => slotWindow(c, c.counts.map((_, r) => r * 4)));
   const [lit, setLit] = useState<Set<string>>(new Set());
+  // The winning lines as [reel, row] cells with what each paid: drawn over the reels (fx/win-lines).
+  const [paid, setPaid] = useState<{ cells: [number, number][]; amount: number }[]>([]);
+  // Counts real wins: each makes the winning symbols jump out once, reel after reel (fx/reel).
+  const [pops, setPops] = useState(0);
+  // Counts rounds started: the pull lever comes down for each.
+  const [pulls, setPulls] = useState(0);
   const [status, setStatus] = useState<{ text: string; tone?: StatusTone; amount?: number; label?: string }>({ text: theme.status });
   const [busy, setBusy] = useState(false);
   const [turbo, setTurbo] = useState(false);
@@ -233,13 +241,20 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
   const fitW = area.w ? Math.floor((area.w - FRAME - (CABINET ? 12 : 0) - (reels - 1) * GAP) / reels) - REEL_EDGE : 0;
   const fitH = area.h ? Math.floor((area.h - CABINET - FRAME - REEL_EDGE - (c.rows - 1) * GAP) / c.rows) : 0;
   const shape = reels === 3 ? 1.2 : 1.75;
-  const fit = skin && area.w && area.h ? fitSkin(skin, area.w, area.h, reels, c.rows) : null;
+  // A skinned machine leaves room on its right for its pull lever.
+  const fit = skin && area.w && area.h ? fitSkin(skin, area.w - LEVER_W, area.h, reels, c.rows) : null;
   const gap = skin ? SKIN_GAP : GAP;
   const plainH = fitW && fitH ? Math.max(40, Math.min(Math.round(fitW * shape), fitH)) : 0;
   // A skin's cell never outgrows the cabinet's window: a taller one would push the bottom row behind the cabinet.
   const cellH = skin ? (fit ? Math.max(10, fit.cellH) : 0) : plainH;
   const cellW = fit ? fit.reelW - 2 * SKIN_RIM : cellH ? Math.min(fitW, Math.round(cellH * (reels === 3 ? 1.25 : 1))) : 0;
   const symSize = fit ? fit.symSize : Math.round(Math.min(cellW, cellH) * (reels === 3 ? 0.74 : 0.8));
+  // Where a cell's middle stands in the reels' box (the plain machine's or a skin's window), for the win lines.
+  const centerOf = ([reel, row]: [number, number]): [number, number] =>
+    skin
+      ? [SKIN_PAD + 2 + reel * (cellW + 2 * SKIN_RIM + SKIN_GAP) + SKIN_RIM + cellW / 2, SKIN_PAD + 2 + SKIN_RIM + row * (cellH + SKIN_GAP) + cellH / 2]
+      : [6 + reel * (cellW + REEL_EDGE + GAP) + REEL_EDGE / 2 + cellW / 2, 6 + REEL_EDGE / 2 + row * (cellH + GAP) + cellH / 2];
+  const winLines: WinLine[] = cellW && cellH ? paid.map((p) => ({ points: p.cells.map(centerOf), amount: p.amount })) : [];
   // The reels keep the same pace in symbols a second however tall a cell is.
   const paceOf = (p: ReelPace): ReelPace => ({ ...p, speed: p.speed * Math.max(1, cellH / (reels === 3 ? 110 : 62)) });
 
@@ -249,6 +264,8 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
     beat.current?.stop();
     pulse.setValue(0);
     setLit(new Set());
+    setPaid([]);
+    setPulls((n) => n + 1);
     setWaiting([]);
     setStatus({ text: theme.status });
     setHeld(balance.current - bet);
@@ -305,9 +322,19 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
     if (sp.scatters >= 3) sp.grid.forEach((col, reel) => col.forEach((x, row) => x === c.scatter && cells.add(`${reel}-${row}`)));
     setLit(cells);
     const payout = r.row.payout;
-    // Less than the stake back is no win: the paying symbols are shown, but nothing beats, rings or rains.
+    // Less than the stake back is no win: the paying symbols are shown, but nothing beats, rings, rains or is drawn.
     const won = payout > bet || (!!c.jackpotShare && sp.jackpotLines.length > 0);
+    const lineStake = bet / c.lines.length;
+    setPaid(
+      won
+        ? [
+            ...(c.jackpotShare ? sp.jackpotLines.map((l) => ({ cells: c.lines[l].map((row, reel): [number, number] => [reel, row]), amount: 0 })) : []),
+            ...sp.wins.map((w) => ({ cells: c.lines[w.line].slice(0, w.count).map((row, reel): [number, number] => [reel, row]), amount: w.pay * lineStake })),
+          ]
+        : [],
+    );
     if (cells.size && won && !still) {
+      setPops((n) => n + 1);
       beat.current = Animated.loop(
         Animated.sequence([
           Animated.timing(pulse, { toValue: 1, duration: 360, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
@@ -420,6 +447,8 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
           lit={col.map((_, row) => lit.has(`${reel}-${row}`))}
           shade={skin ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.35)'}
           litStyle={skin ? s.skinLit : undefined}
+          pop={pops}
+          popDelay={reel * 70}
           render={(sym) => (skin ? face(sym, symSize) : <Symbol label={c.symbols[sym].label} sym={sym} theme={theme} size={symSize} />)}
         />
         {waiting[reel] && aura && <TeaseAura />}
@@ -505,13 +534,17 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
             {fit && cellH > 0 && (
               // Out of the flow: the area's height stays the free height the machine is fitted to (fx/slot-skin
               // fitSkin), never the machine's own, which would grow it past the phone's height.
-              <View style={{ position: 'absolute', width: fit.fw, alignItems: 'center' }}>
+              <View style={{ position: 'absolute', width: fit.fw, alignItems: 'center', transform: [{ translateX: -LEVER_W / 2 }] }}>
                 <View style={{ width: fit.fw, height: fit.fh }}>
                   {/* The reels fill the cabinet's window and run a little under its edge; the cabinet is drawn over them. */}
                   <LinearGradient colors={skin.reels} style={[s.skinWindow, { left: fit.win.x - 2, top: fit.win.y - 2, width: fit.win.w + 4, height: fit.win.h + 4, padding: SKIN_PAD + 2, borderRadius: windowRadius(skin), overflow: skin.frame ? 'visible' : 'hidden' }]} accessibilityLabel={reelsLabel}>
                     {columns()}
+                    <WinLines lines={winLines} still={still} />
                   </LinearGradient>
                   <SkinCabinet skin={skin} fit={fit} />
+                  <View style={{ position: 'absolute', left: fit.fw - 3, top: fit.win.y, height: fit.win.h }}>
+                    <SlotLever height={fit.win.h} pulls={pulls} disabled={busy || !cellH} still={still} onPull={() => void (auto !== null ? undefined : play())} />
+                  </View>
                 </View>
                 <SkinPlate skin={skin} width={fit.plateW} text={status.text} tone={status.tone} amount={status.amount} label={status.label} style={{ marginTop: -fit.lap }} />
               </View>
@@ -540,6 +573,7 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
             {CABINET > 0 && <Marquee width={boxW} hot={hot} />}
             <View style={[s.reels, { width: boxW, backgroundColor: theme.reels, borderColor: theme.frame }]} accessibilityLabel={reelsLabel}>
               {columns()}
+              <WinLines lines={winLines} still={still} />
             </View>
             {CABINET > 0 && <Marquee width={boxW} hot={hot} />}
           </View>

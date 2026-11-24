@@ -5,6 +5,8 @@ import {
   PlusJakartaSans_700Bold,
   PlusJakartaSans_800ExtraBold,
 } from '@expo-google-fonts/plus-jakarta-sans';
+import { Cinzel_700Bold, Cinzel_900Black } from '@expo-google-fonts/cinzel';
+import { CinzelDecorative_900Black } from '@expo-google-fonts/cinzel-decorative';
 import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from 'expo-font';
@@ -81,6 +83,10 @@ export default function RootLayout() {
     JakartaSemiBold: PlusJakartaSans_600SemiBold,
     JakartaBold: PlusJakartaSans_700Bold,
     JakartaExtraBold: PlusJakartaSans_800ExtraBold,
+    // Oyun Salonu's lettering: wins, titles and the controls' labels in carved Roman capitals (theme fonts.casino*).
+    CasinoBold: Cinzel_700Bold,
+    CasinoBlack: Cinzel_900Black,
+    CasinoTitle: CinzelDecorative_900Black,
   });
   if (!fontsLoaded && !fontError) return null;
   return (

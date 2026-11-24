@@ -11,6 +11,18 @@ export const LICENSES: LicenseEntry[] = [
     "url": "https://github.com/expo/config-plugins"
   },
   {
+    "name": "@expo-google-fonts/cinzel",
+    "version": "0.4.2",
+    "license": "MIT AND OFL-1.1",
+    "url": "https://github.com/expo/google-fonts"
+  },
+  {
+    "name": "@expo-google-fonts/cinzel-decorative",
+    "version": "0.4.1",
+    "license": "MIT AND OFL-1.1",
+    "url": "https://github.com/expo/google-fonts"
+  },
+  {
     "name": "@expo-google-fonts/plus-jakarta-sans",
     "version": "0.4.2",
     "license": "MIT AND OFL-1.1",
@@ -47,6 +59,12 @@ export const LICENSES: LicenseEntry[] = [
     "url": "https://github.com/react-native-async-storage/async-storage"
   },
   {
+    "name": "@react-native-google-signin/google-signin",
+    "version": "16.1.5",
+    "license": "MIT",
+    "url": "https://github.com/react-native-google-signin/google-signin"
+  },
+  {
     "name": "@react-navigation/bottom-tabs",
     "version": "7.21.0",
     "license": "MIT",
@@ -71,8 +89,32 @@ export const LICENSES: LicenseEntry[] = [
     "url": "https://github.com/getsentry/sentry-react-native"
   },
   {
+    "name": "@shopify/react-native-skia",
+    "version": "2.14.0",
+    "license": "MIT",
+    "url": "https://github.com/Shopify/react-native-skia"
+  },
+  {
     "name": "expo",
     "version": "58.0.19",
+    "license": "MIT",
+    "url": "https://github.com/expo/expo"
+  },
+  {
+    "name": "expo-application",
+    "version": "58.1.2",
+    "license": "MIT",
+    "url": "https://github.com/expo/expo"
+  },
+  {
+    "name": "expo-asset",
+    "version": "58.0.20",
+    "license": "MIT",
+    "url": "https://github.com/expo/expo"
+  },
+  {
+    "name": "expo-audio",
+    "version": "58.0.11",
     "license": "MIT",
     "url": "https://github.com/expo/expo"
   },
@@ -90,13 +132,25 @@ export const LICENSES: LicenseEntry[] = [
   },
   {
     "name": "expo-constants",
-    "version": "58.0.13",
+    "version": "58.0.15",
     "license": "MIT",
     "url": "https://github.com/expo/expo"
   },
   {
     "name": "expo-crypto",
     "version": "58.0.7",
+    "license": "MIT",
+    "url": "https://github.com/expo/expo"
+  },
+  {
+    "name": "expo-document-picker",
+    "version": "58.0.4",
+    "license": "MIT",
+    "url": "https://github.com/expo/expo"
+  },
+  {
+    "name": "expo-file-system",
+    "version": "58.0.13",
     "license": "MIT",
     "url": "https://github.com/expo/expo"
   },
@@ -113,8 +167,26 @@ export const LICENSES: LicenseEntry[] = [
     "url": "https://github.com/expo/expo"
   },
   {
+    "name": "expo-iap",
+    "version": "6.4.1",
+    "license": "MIT",
+    "url": "https://github.com/hyodotdev/openiap"
+  },
+  {
+    "name": "expo-image-manipulator",
+    "version": "58.0.16",
+    "license": "MIT",
+    "url": "https://github.com/expo/expo"
+  },
+  {
     "name": "expo-image-picker",
     "version": "58.0.10",
+    "license": "MIT",
+    "url": "https://github.com/expo/expo"
+  },
+  {
+    "name": "expo-intent-launcher",
+    "version": "58.0.3",
     "license": "MIT",
     "url": "https://github.com/expo/expo"
   },
@@ -131,8 +203,32 @@ export const LICENSES: LicenseEntry[] = [
     "url": "https://github.com/expo/expo"
   },
   {
+    "name": "expo-notifications",
+    "version": "58.1.8",
+    "license": "MIT",
+    "url": "https://github.com/expo/expo"
+  },
+  {
     "name": "expo-router",
     "version": "58.0.26",
+    "license": "MIT",
+    "url": "https://github.com/expo/expo"
+  },
+  {
+    "name": "expo-screen-capture",
+    "version": "58.0.6",
+    "license": "MIT",
+    "url": "https://github.com/expo/expo"
+  },
+  {
+    "name": "expo-secure-store",
+    "version": "58.0.2",
+    "license": "MIT",
+    "url": "https://github.com/expo/expo"
+  },
+  {
+    "name": "expo-sharing",
+    "version": "58.0.22",
     "license": "MIT",
     "url": "https://github.com/expo/expo"
   },
@@ -160,6 +256,12 @@ export const LICENSES: LicenseEntry[] = [
     "license": "Apache-2.0"
   },
   {
+    "name": "lottie-react-native",
+    "version": "7.5.0",
+    "license": "Apache-2.0",
+    "url": "https://github.com/lottie-react-native/lottie-react-native"
+  },
+  {
     "name": "react",
     "version": "19.3.0",
     "license": "MIT",
@@ -176,6 +278,12 @@ export const LICENSES: LicenseEntry[] = [
     "version": "0.88.0",
     "license": "MIT",
     "url": "https://github.com/react/react-native"
+  },
+  {
+    "name": "react-native-reanimated",
+    "version": "4.7.1",
+    "license": "MIT",
+    "url": "https://github.com/software-mansion/react-native-reanimated"
   },
   {
     "name": "react-native-safe-area-context",
@@ -200,6 +308,12 @@ export const LICENSES: LicenseEntry[] = [
     "version": "14.0.1",
     "license": "MIT",
     "url": "https://github.com/react-native-webview/react-native-webview"
+  },
+  {
+    "name": "react-native-worklets",
+    "version": "0.13.0",
+    "license": "MIT",
+    "url": "https://github.com/software-mansion/react-native-reanimated"
   }
 ];
 

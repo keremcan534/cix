@@ -1,7 +1,9 @@
 // Coins in the air: a fountain from the middle of the stage for a small win, a shower from the top for a big one, and
 // for a big one's first moment a burst: thrown from the middle every way round, growing as they come at the viewer.
 // One timing drives every coin (native driver), each with its own stretch of it, so sixty coins cost one animation.
-// Purely decoration: never takes a touch, and nothing waits for it.
+// The coin itself is a real 3D gold coin turning in the air (assets/fx/coin-spin: rendered in Blender, sixteen frames
+// of one turn; a half turn looks the same, so eight are used), stepped frame by frame by the same timing. A game that
+// brings its own coin picture gets the old flat flip. Purely decoration: never takes a touch, and nothing waits for it.
 import { useEffect, useMemo, useState } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 
@@ -9,6 +11,28 @@ import { icon3dSource } from '@/components/Icon3D';
 import { coinPaths } from '@/lib/win-tier';
 
 const COIN = icon3dSource('coin');
+const SPIN = require('../../../../assets/fx/coin-spin.png');
+/** Frames of a half turn in the sheet (the sheet holds a whole turn of 16; the coin looks the same every half turn). */
+const HALF = 8;
+const SHEET = 16;
+
+/**
+ * The sheet's offset for a coin turning `halves` half turns over its stretch [a, b] of the show: a staircase, so each
+ * frame holds until the next (no sliding between frames).
+ */
+function frameSteps(a: number, b: number, halves: number, size: number) {
+  const n = Math.max(1, Math.round(halves * HALF));
+  const inputRange: number[] = [];
+  const outputRange: number[] = [];
+  for (let j = 0; j < n; j++) {
+    const t0 = a + ((b - a) * j) / n;
+    const t1 = a + ((b - a) * (j + 1)) / n;
+    const x = -(j % HALF) * size;
+    inputRange.push(t0, Math.max(t0, t1 - 1e-6));
+    outputRange.push(x, x);
+  }
+  return { inputRange, outputRange, extrapolate: 'clamp' as const };
+}
 
 export function Coins({
   kind,
@@ -58,12 +82,22 @@ export function Coins({
             : kind === 'burst'
               ? v.interpolate({ inputRange: [a, a + q, b], outputRange: [from * height, (from + (p.dy ?? 0) * 0.62) * height, (from + (p.dy ?? 0)) * height], ...clamp })
               : v.interpolate({ inputRange: [a, a + 1.5 * q, b], outputRange: [from * height, (from - p.rise * 0.8) * height, height + 36], ...clamp });
-        // A coin turning in the air shows its edge twice.
-        const flip = v.interpolate({ inputRange: [a, a + q, a + 2 * q, a + 3 * q, b], outputRange: [1, 0.12, 1, 0.12, 1], ...clamp });
-        const rotate = v.interpolate({ inputRange: [a, b], outputRange: ['0deg', `${Math.round(p.turns * 120)}deg`], ...clamp });
+        const real = source === COIN;
+        // A flat coin turning in the air shows its edge twice; the 3D one turns in its own frames, a little tilted.
+        const flip = real ? 1 : v.interpolate({ inputRange: [a, a + q, a + 2 * q, a + 3 * q, b], outputRange: [1, 0.12, 1, 0.12, 1], ...clamp });
+        const rotate = v.interpolate({ inputRange: [a, b], outputRange: ['0deg', `${Math.round(p.turns * (real ? 40 : 120))}deg`], ...clamp });
         const opacity = v.interpolate({ inputRange: [a, a + 0.02, b - 0.03, b], outputRange: [0, 1, 1, 0], ...clamp });
         // A burst's coin comes at the viewer: small at the middle, big at the edge.
         const near = kind === 'burst' ? v.interpolate({ inputRange: [a, b], outputRange: [0.45, 1.7], ...clamp }) : 1;
+        if (real) {
+          // Bigger than the flat picture: the 3D coin fills less of its frame and is the show's star.
+          const size = Math.round(p.size * 1.25);
+          return (
+            <Animated.View key={i} style={{ position: 'absolute', left: -size / 2, top: -size / 2, width: size, height: size, overflow: 'hidden', opacity, transform: [{ translateX: x }, { translateY: y }, { rotate }, { scale: near }] }}>
+              <Animated.Image source={SPIN} style={{ width: size * SHEET, height: size, transform: [{ translateX: v.interpolate(frameSteps(a, b, 2 + p.turns * 2, size)) }] }} />
+            </Animated.View>
+          );
+        }
         return (
           <Animated.Image
             key={i}

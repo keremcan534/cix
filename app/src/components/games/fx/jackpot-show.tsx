@@ -14,6 +14,7 @@ import { Shine } from '@/components/fx/surface';
 import { Coins } from '@/components/games/fx/coins';
 import { DivineFx } from '@/components/games/fx/divine-fx';
 import { useGameQuake } from '@/components/games/fx/quake';
+import { FitBox, GoldText } from '@/components/games/fx/gold-text';
 import { SALON } from '@/components/games/fx/salon';
 import { salonArt } from '@/components/games/fx/salon-art';
 import { SkinOverlay, type SlotSkin } from '@/components/games/fx/slot-skin';
@@ -287,16 +288,20 @@ function JackpotShow({ skin, kind, amount, bet, onDone }: { skin: SlotSkin; kind
                 <View style={{ width: plaqueW, height: plaqueH, justifyContent: 'center' }}>
                   <Image source={BIG_PLAQUE} style={[s.abs, { left: 0, top: (plaqueH - plaqueW / BIG_ASPECT) / 2, width: plaqueW, height: plaqueW / BIG_ASPECT }]} resizeMode="contain" />
                   <Animated.View style={{ transform: [{ scale: step }] }}>
-                    <Text style={[s.title, { fontSize: Math.round(plaqueW * 0.085), marginHorizontal: plaqueW * 0.12 }]} numberOfLines={1} adjustsFontSizeToFit>
-                      {title}
-                    </Text>
+                    <FitBox width={plaqueW * 0.7} style={{ alignSelf: 'center' }}>
+                      <GoldText size={Math.round(plaqueW * 0.085)} face="casinoTitle" spacing={0.05}>
+                        {title}
+                      </GoldText>
+                    </FitBox>
                   </Animated.View>
                 </View>
               ) : (
                 <Animated.View style={{ height: plaqueH, justifyContent: 'center', transform: [{ scale: step }] }}>
-                  <Text style={[s.title, { fontSize: Math.round(plaqueW * 0.11) }]} numberOfLines={1} adjustsFontSizeToFit>
-                    {title}
-                  </Text>
+                  <FitBox width={plaqueW * 0.9} style={{ alignSelf: 'center' }}>
+                    <GoldText size={Math.round(plaqueW * 0.11)} face="casinoTitle" spacing={0.05}>
+                      {title}
+                    </GoldText>
+                  </FitBox>
                 </Animated.View>
               )}
             </Animated.View>
@@ -304,9 +309,9 @@ function JackpotShow({ skin, kind, amount, bet, onDone }: { skin: SlotSkin; kind
               <View style={{ width: plateW, height: plateH }}>
                 <Image source={skin.plate.src} style={{ width: plateW, height: plateH }} resizeMode="contain" />
                 <View style={[s.abs, s.center, { left: plateW * 0.15, right: plateW * 0.15, top: plateH * 0.26, bottom: plateH * 0.22 }]}>
-                  <Text style={[s.amount, { fontSize: Math.round(plateH * 0.38), lineHeight: Math.round(plateH * 0.46) }]} numberOfLines={1} adjustsFontSizeToFit>
-                    +{fmt(count)}
-                  </Text>
+                  <FitBox width={plateW * 0.66}>
+                    <GoldText size={Math.round(plateH * 0.36)}>{`+${fmt(count)}`}</GoldText>
+                  </FitBox>
                 </View>
               </View>
               <Text style={s.unit}>jeton{x >= 2 ? ` · bahsin ${fmt(x)} katı` : ''}</Text>

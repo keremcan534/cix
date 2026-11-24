@@ -2,7 +2,12 @@
 """Game sound effects, made from code (no recording, no download): short tones, clicks and noise sweeps written as
 22.05 kHz mono WAV files into assets/sfx. The wins (win, win-big, jackpot, levelup, impact, coins, riser) are layered:
 drums, a brass-like section, bells, coins and a hall round them. They are stand-ins a sound designer's set can replace
-file for file (lib/game-sound.ts names them). Run: python3 scripts/make-sfx.py [name ...] (no names: all of them)."""
+file for file (lib/game-sound.ts names them).
+
+Most of them have been replaced by real recordings (scripts/kenney-sfx.py, Kenney's packs, CC0): the names in
+RECORDED. This script leaves those files alone, so running it never puts a stand-in back over a recording; it writes
+the others (tease, turn, shot, splash). Run: python3 scripts/make-sfx.py [name ...] (no names: all it writes);
+python3 scripts/make-sfx.py --force <name ...> writes the named stand-ins over their recordings."""
 import os
 import wave
 
@@ -303,18 +308,33 @@ SOUNDS = {
     'riser': riser,
 }
 
+# Made from real recordings by scripts/kenney-sfx.py: left alone here unless named with --force.
+RECORDED = {
+    'tap', 'chip', 'spin', 'tick', 'stop', 'coin', 'card', 'dice', 'move', 'capture', 'coins',
+    'win', 'win-big', 'jackpot', 'fanfare', 'levelup', 'lose', 'impact', 'riser', 'launch', 'boom', 'cashout',
+}
+
 if __name__ == '__main__':
     import sys
 
-    only = set(sys.argv[1:])
+    force = '--force' in sys.argv[1:]
+    only = {a for a in sys.argv[1:] if a != '--force'}
+    if only - set(SOUNDS):
+        sys.exit(f'unknown: {", ".join(sorted(only - set(SOUNDS)))}')
     os.makedirs(OUT, exist_ok=True)
-    total = 0
+    total, written, kept = 0, 0, []
     for name, make in SOUNDS.items():
         # Every sound is made, in order, so each draws the same noise however many are written.
         y = make()
         if only and name not in only:
             continue
+        if name in RECORDED and not (force and name in only):
+            kept.append(name)
+            continue
         sec = save(name, y)
         total += sec
+        written += 1
         print(f'{name:10s} {sec:5.2f} s')
-    print(f'{len(only) or len(SOUNDS)} sounds, {total:.1f} s')
+    print(f'{written} sounds, {total:.1f} s')
+    if kept:
+        print(f'left alone (recordings, scripts/kenney-sfx.py; --force <name> to overwrite): {" ".join(kept)}')

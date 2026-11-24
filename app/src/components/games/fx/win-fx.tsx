@@ -17,6 +17,7 @@ import { Shine } from '@/components/fx/surface';
 import { Coins } from '@/components/games/fx/coins';
 import { DivineFx } from '@/components/games/fx/divine-fx';
 import { useGameQuake } from '@/components/games/fx/quake';
+import { FitBox, GoldText } from '@/components/games/fx/gold-text';
 import { salonArt } from '@/components/games/fx/salon-art';
 import { Text } from '@/components/text';
 import { playSfx } from '@/lib/game-sound';
@@ -299,7 +300,7 @@ function WinCelebration({ amount, bet, tier, title, onDone }: WinShow & { tier: 
         {!reduceMotion && !effectsOff && gameFx && box.w > 0 && <DivineFx tier="small" pulse={1} width={box.w} height={box.h} cx={box.w / 2} cy={box.h * 0.42} />}
         {!reduceMotion && <Coins kind="fountain" count={WIN_SHOW.small.coins} width={box.w} height={box.h} ms={ms} from={0.42} />}
         <Animated.View style={[s.floatWrap, { opacity: inV.interpolate({ inputRange: [0, 0.12, 0.75, 1], outputRange: [0, 1, 1, 0] }), transform: [{ translateY: inV.interpolate({ inputRange: [0, 1], outputRange: [10, -46] }) }] }]}>
-          <Text style={s.float}>+{fmt(amount)}</Text>
+          <GoldText size={30}>{`+${fmt(amount)}`}</GoldText>
         </Animated.View>
       </View>
     );
@@ -358,17 +359,19 @@ function WinCelebration({ amount, bet, tier, title, onDone }: WinShow & { tier: 
             <Animated.View style={{ transform: [{ scale: pop }] }}>
               <LinearGradient colors={look.ribbon} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.ribbon}>
                 <LinearGradient colors={['rgba(255,255,255,0.35)', 'rgba(255,255,255,0)']} style={s.ribbonGloss} />
-                <Text style={[s.title, { color: look.ink }]} numberOfLines={1} adjustsFontSizeToFit>
-                  {title ?? WIN_TITLE[big]}
-                </Text>
+                <FitBox width={Math.max(160, box.w * 0.72)}>
+                  <GoldText size={26} face="casinoTitle" spacing={0.05}>
+                    {title ?? WIN_TITLE[big]}
+                  </GoldText>
+                </FitBox>
                 {!effectsOff && <Shine radius={999} every={900} />}
               </LinearGradient>
             </Animated.View>
             {/* The amount on its plate: it shivers while a climbing win counts and lands with a bump. */}
             <Animated.View style={[s.plate, { borderColor: look.ribbon[0], transform: [{ translateX: shiver }, { scale: slam.interpolate({ inputRange: [0, 1], outputRange: [1, 1.22] }) }] }]}>
-              <Text style={s.amount} numberOfLines={1} adjustsFontSizeToFit>
-                +{fmt(count)}
-              </Text>
+              <FitBox width={Math.max(160, box.w * 0.78)}>
+                <GoldText size={52}>{`+${fmt(count)}`}</GoldText>
+              </FitBox>
             </Animated.View>
             <Text style={s.unit}>jeton{x >= 2 ? ` · bahsin ${fmt(x)} katı` : ''}</Text>
           </Animated.View>

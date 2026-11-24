@@ -8,6 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from 'react';
 import { Animated, Easing, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
+import { Sparkle } from '@/components/games/fx/sparkle';
 import { SETTLE_BACK, fillerOf, type ReelPace, type ReelRun } from '@/lib/reel-plan';
 
 export type ReelHandle = {
@@ -36,6 +37,8 @@ export function Reel({
   pulse,
   shade = 'rgba(0,0,0,0.5)',
   litStyle,
+  pop = 0,
+  popDelay = 0,
 }: {
   ref?: Ref<ReelHandle>;
   /** The window at rest before the first run (top to bottom). */
@@ -55,6 +58,9 @@ export function Reel({
   shade?: string;
   /** A winning cell's look instead of the yellow box (a skinned machine's, fx/slot-skin). */
   litStyle?: StyleProp<ViewStyle>;
+  /** Counts real wins: each new one makes the winning symbols jump out once (after `popDelay` ms) before they beat. */
+  pop?: number;
+  popDelay?: number;
 }) {
   const rows = symbols.length;
   const step = cell + gap;
@@ -66,6 +72,8 @@ export function Reel({
   const anim = useRef<Animated.CompositeAnimation | null>(null);
   const offset = useRef(0);
   const alive = useRef(true);
+  // Running (or settling): a reel that starts from rest first pulls back a little, as a real drum does.
+  const running = useRef(false);
   useEffect(
     () => () => {
       alive.current = false;
@@ -73,6 +81,13 @@ export function Reel({
     },
     [],
   );
+
+  /** A quarter symbol up and back to where it was, before a run from rest. */
+  const windUp = (y: Animated.Value, from: number) =>
+    Animated.sequence([
+      Animated.timing(y, { toValue: from - step * 0.26, duration: 110, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      Animated.timing(y, { toValue: from, duration: 70, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+    ]);
 
   const start = (col: string[], from: number): Run => {
     anim.current?.stop();
@@ -91,7 +106,9 @@ export function Reel({
       const r = start([...fly, ...seen], -WAIT_SYMBOLS * step);
       setMoving(true);
       setFast(true);
-      anim.current = Animated.timing(r.y, { toValue: 0, duration: (WAIT_SYMBOLS * step) / pace.speed, easing: Easing.linear, useNativeDriver: true });
+      const run = Animated.timing(r.y, { toValue: 0, duration: (WAIT_SYMBOLS * step) / pace.speed, easing: Easing.linear, useNativeDriver: true });
+      anim.current = running.current ? run : Animated.sequence([windUp(r.y, -WAIT_SYMBOLS * step), run]);
+      running.current = true;
       anim.current.start();
     },
     land(to, plan, pace, still) {
@@ -100,6 +117,7 @@ export function Reel({
           start(to, 0);
           setMoving(false);
           setFast(false);
+          running.current = false;
           return resolve();
         }
         // At rest the window is the top of the column; mid-run it is somewhere in it, and at that speed nobody
@@ -114,7 +132,10 @@ export function Reel({
         setFast(true);
         // The run at full speed, then the settle, the symbols sharp again for it.
         const settleRun = Animated.timing(r.y, { toValue: 0, duration: Math.max(1, plan.settleMs), easing: Easing.out(Easing.back(SETTLE_BACK)), useNativeDriver: true });
-        anim.current = Animated.timing(r.y, { toValue: -settle, duration: Math.max(1, plan.runMs), easing: Easing.linear, useNativeDriver: true });
+        const run = Animated.timing(r.y, { toValue: -settle, duration: Math.max(1, plan.runMs), easing: Easing.linear, useNativeDriver: true });
+        // From rest (the round was answered before the reels had to wait for it) the drum pulls back first.
+        anim.current = running.current ? run : Animated.sequence([windUp(r.y, -travel), run]);
+        running.current = true;
         anim.current.start(({ finished }) => {
           // Stopped (a newer run took over, or the screen closed): that one answers for the reel now.
           if (!alive.current || !finished || at.current.id !== r.id) return resolve();
@@ -122,13 +143,31 @@ export function Reel({
           anim.current = settleRun;
           settleRun.start(({ finished: rested }) => {
             if (!alive.current) return resolve();
-            if (rested && at.current.id === r.id) setMoving(false);
+            if (rested && at.current.id === r.id) {
+              setMoving(false);
+              running.current = false;
+            }
             resolve();
           });
         });
       });
     },
   }));
+
+  const [jump] = useState(() => new Animated.Value(1));
+  useEffect(() => {
+    if (!pop) return;
+    jump.setValue(1);
+    const a = Animated.sequence([
+      Animated.delay(popDelay),
+      Animated.timing(jump, { toValue: 1.34, duration: 150, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      Animated.spring(jump, { toValue: 1, friction: 4, tension: 170, useNativeDriver: true }),
+    ]);
+    a.start();
+    return () => a.stop();
+    // A new win only; the delay is the reel's own and never changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pop, jump]);
 
   const beat = pulse?.interpolate({ inputRange: [0, 1], outputRange: [1, 1.13] });
   // Lit only while the symbols beat: a game beats them for a real win, never for money back under the stake.
@@ -140,10 +179,12 @@ export function Reel({
           const rest = !moving && i < rows;
           const on = rest && !!lit?.[i];
           return (
-            <Animated.View key={`${run.id}-${i}`} style={[s.cell, { height: cell, marginBottom: gap }, on && (litStyle ?? s.on), rest && dim && !on && s.dim, on && beat ? { transform: [{ scale: beat }] } : null, fast && s.streak]}>
+            <Animated.View key={`${run.id}-${i}`} style={[s.cell, { height: cell, marginBottom: gap }, on && (litStyle ?? s.on), rest && dim && !on && s.dim, on && beat ? { transform: [{ scale: beat }, { scale: jump }] } : null, fast && s.streak]}>
               {/* The win's light behind the symbol, breathing with the beat. */}
               {on && glow && <Animated.View pointerEvents="none" style={[s.halo, { opacity: glow }]} />}
               {render(sym, moving)}
+              {/* A star glints on the symbol as it jumps out. */}
+              {on && pop > 0 && <Sparkle key={`glint-${pop}`} size={Math.round(cell * 0.62)} delay={popDelay + 90} style={{ right: -cell * 0.08, top: -cell * 0.06 }} />}
             </Animated.View>
           );
         })}
