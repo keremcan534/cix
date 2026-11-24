@@ -152,3 +152,11 @@ Panelde bir çerçeveyi **Düzenle › Bölüm › Ses halkası** ile Ses halkas
 - Bir eşya bir kez taşınır, geri alınmaz. Denetim kaydına yazılır.
 - Sahiplerin isteğiyle **Çerçeveler › Ses Halkası** bu şekilde Ses halkası bölümüne taşındı (turkuaz, yayılan halka, 150 jeton, 7 gün).
 
+## Binekler (25 Kasım 2026)
+
+Çarşı'da giriş efektleriyle duran binekler (Scooter, Spor Araba, Özel Jet) uygulamanın kendisinindir ve artık panelde **Mağaza › Binekler** sekmesinde yönetilir: adı, fiyatı, süresi, VIP seviyesi, sırası ve satışta olup olmadığı. Yeni binek eklenmez (uygulama her birini kendisi çizer).
+
+- Sahiplerin isteğiyle üçü de **satıştan kaldırıldı**; panelden "Satışa çıkar" ile geri açılır.
+- Alanlar süresi bitene kadar bineğiyle odaya girmeye devam eder.
+- Eski APK'da Çarşı'da görünmeye devam eder ama satın alınamaz ("Bu ürün artık satışta değil"). Yeni APK sunucunun listesine göre gösterir.
+

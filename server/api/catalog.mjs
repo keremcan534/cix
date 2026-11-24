@@ -117,6 +117,8 @@ export const BOND_GIFTS = new Set([...GIFTS.keys()].filter((id) => id.startsWith
 export const SHOP_PAUSED_DEFAULT = [
   ...['en-sparkle', 'en-thunder', 'en-comet'],
   ...['en-roket', 'en-ayicik', 'en-panda', 'en-tac', 'en-tekboynuz', 'en-anka', 'en-gemi', 'en-saray', 'en-otomobil', 'en-aslan'],
+  // Binekler (owners, 25 Nov 2026): off the shelf; Yönetim › Mağaza › Binekler puts one back.
+  ...['rd-scooter', 'rd-sport', 'rd-jet'],
 ];
 export const SHOP_PAUSED = new Set(
   process.env.SHOP_PAUSED === undefined ? SHOP_PAUSED_DEFAULT : process.env.SHOP_PAUSED.split(',').map((x) => x.trim()).filter(Boolean),

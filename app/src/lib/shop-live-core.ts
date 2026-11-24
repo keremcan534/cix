@@ -66,8 +66,8 @@ export type WaveLook = { style: WaveStyle; colors: readonly string[]; art?: { ur
  * side. None (not measured yet, an older server): the whole square is drawn, as before.
  */
 export type FrameReach = { x: number; top: number; bottom: number };
-/** The kinds the shop's list covers; the others stay the app's own. */
-export const SHOP_LIST_KINDS = ['frame', 'entry', 'bubble', 'wave'] as const;
+/** The kinds the shop's list covers; the others stay the app's own. Rides: the app's own only (a newer server's). */
+export const SHOP_LIST_KINDS = ['frame', 'entry', 'bubble', 'wave', 'ride'] as const;
 type ListKind = (typeof SHOP_LIST_KINDS)[number];
 export type ShopItem = {
   sku: string;
@@ -282,6 +282,8 @@ export function parseLiveShop(raw: unknown): LiveShop | null {
     if (!builtin && kind === 'entry' && r.video !== true) continue;
     if (!builtin && kind === 'bubble' && !bubble) continue;
     if (!builtin && kind === 'wave' && !wave) continue;
+    // A ride is always the app's own (the app draws it).
+    if (!builtin && kind === 'ride') continue;
     seen.add(r.sku);
     // Its other durations (Güncelleme 8): a malformed one is left out (the main term still sells).
     const plans = days !== null && Array.isArray(r.plans) ? parsePlans(r.plans, days) : [];
@@ -307,7 +309,7 @@ export function parseLiveShop(raw: unknown): LiveShop | null {
   return { items, seats };
 }
 
-const OWN_EMOJI: Record<ListKind, string> = { frame: '🖼️', entry: '✨', bubble: '💬', wave: '🔊' };
+const OWN_EMOJI: Record<ListKind, string> = { frame: '🖼️', entry: '✨', bubble: '💬', wave: '🔊', ride: '🛵' };
 /**
  * The shop's frames, entry effects, bubbles and waves as the server has them, as the app's Cosmetics: the app's own
  * with the server's name, price, days, VIP level and shelf (their art stays), the admins' own with `remote` (their

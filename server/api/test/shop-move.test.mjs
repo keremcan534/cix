@@ -72,4 +72,22 @@ describe('Çarşı: çerçeveyi Ses halkasına taşı', () => {
     assert.equal(a.actor, adm.user.id);
     assert.equal(a.detail.from, 'fr-ocean');
   });
+
+  // Binekler (owners, 25 Nov 2026): the app's rides in Yönetim › Mağaza, managed like the app's frames; none added.
+  test('binekler panelde: listede, satıştan kaldırılır ve fiyatı değişir; yenisi eklenmez', async () => {
+    const adm = await signUp('Binek Yöneticisi');
+    await h.sql.query("UPDATE users SET role = 'admin' WHERE id = $1", [adm.user.id]);
+    const list = (await ok(call('GET', '/api/admin/shop', null, adm.session), 'liste')).items.filter((x) => x.kind === 'ride');
+    assert.deepEqual(list.map((x) => x.id).sort(), ['rd-jet', 'rd-scooter', 'rd-sport']);
+    assert.equal(await status(call('POST', '/api/admin/shop', { kind: 'ride', name: 'Bisiklet', price: 10, days: 7 }, adm.session)), 400);
+    await ok(call('POST', '/api/admin/shop/update', { id: 'rd-sport', enabled: false }, adm.session), 'kapat');
+    await ok(call('POST', '/api/admin/shop/update', { id: 'rd-scooter', price: 300 }, adm.session), 'fiyat');
+    const u = await signUp('Binekçi');
+    const items = await shelf(u.session);
+    assert.equal(items.find((x) => x.sku === 'rd-sport').off, true);
+    assert.equal(items.find((x) => x.sku === 'rd-scooter').price, 300);
+    await h.credit(u.user.id, 5000);
+    assert.notEqual(await status(call('POST', '/api/shop/buy', { sku: 'rd-sport', price: 1200, days: 30, ref: `b1-${Date.now()}` }, u.session)), 200, 'kapalı binek satılmaz');
+    await ok(call('POST', '/api/shop/buy', { sku: 'rd-scooter', price: 300, days: 7, ref: `b2-${Date.now()}` }, u.session), 'yeni fiyatla al');
+  });
 });

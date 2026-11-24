@@ -218,9 +218,9 @@ describe('Yönetim › Mağaza', () => {
     await refused(call('GET', '/api/admin/shop', null, u.session), 403);
     await refused(call('POST', '/api/admin/shop/update', { id: 'fr-neon', price: 1 }, u.session), 403);
     const items = await panel();
-    const appOnes = [...SHOP.values()].filter((x) => ['frame', 'entry', 'bubble', 'wave'].includes(x.kind));
+    const appOnes = [...SHOP.values()].filter((x) => ['frame', 'entry', 'bubble', 'wave', 'ride'].includes(x.kind));
     assert.ok(appOnes.some((x) => x.kind === 'bubble') && appOnes.some((x) => x.kind === 'wave'));
-    // The rooms' seat colors are on the list too (room-seat-color.test.mjs).
+    // The rooms' seat colors are on the list too (room-seat-color.test.mjs), and the app's rides (Binekler).
     assert.deepEqual(items.map((x) => x.id).sort(), [...appOnes.map((x) => x.sku), ...SEAT_COLORS.keys()].sort());
     const neon = items.find((x) => x.id === 'fr-neon');
     assert.deepEqual([neon.builtin, neon.name, neon.price, neon.days, neon.changed], [true, SHOP.get('fr-neon').name, SHOP.get('fr-neon').price, SHOP.get('fr-neon').days, []]);

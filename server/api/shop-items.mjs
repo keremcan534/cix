@@ -84,8 +84,10 @@ const REACH_TOOL = path.join(import.meta.dirname, 'tools', 'frame-reach.py');
  * `seat`: a room's seat color (room-seat-color.mjs). A room's owner buys it for the room, not a person for themselves:
  * the shop a person buys from (shopItem, ownShopSkus: economy.mjs) never has it; seatItem has.
  */
-export const SHOP_KINDS = Object.freeze(['frame', 'entry', 'bubble', 'wave', 'seat']);
-const KIND_NAME = { frame: 'Çerçeve', entry: 'Giriş efekti', bubble: 'Sohbet balonu', wave: 'Ses dalgası', seat: 'Koltuk rengi' };
+// ride (Binek: Scooter, Spor Araba, Özel Jet; Çarşı shows them with the entry effects): the app's own only, managed
+// like the app's frames (name, price, days, VIP level, on the shelf, order; owners 25 Nov 2026), never added here.
+export const SHOP_KINDS = Object.freeze(['frame', 'entry', 'bubble', 'wave', 'seat', 'ride']);
+const KIND_NAME = { frame: 'Çerçeve', entry: 'Giriş efekti', bubble: 'Sohbet balonu', wave: 'Ses dalgası', seat: 'Koltuk rengi', ride: 'Binek' };
 /** An admin's item's id: this and a number. */
 const PREFIX = { frame: 'sf', entry: 'se', bubble: 'sb', wave: 'sw', seat: 'sc' };
 /** The color a new seat color starts with until the panel changes it (the default's). */
@@ -447,7 +449,7 @@ const audited = (c, a, action, detail, req) =>
   c.query('INSERT INTO audit_events (actor, action, target, detail, ip) VALUES ($1, $2, NULL, $3, $4)', [a.id, action, JSON.stringify({ ...detail, ...panelDetail(a) }), clientIp(req)]);
 
 const kindOf = (v) => {
-  if (!SHOP_KINDS.includes(v)) throw bad('Tür çerçeve (frame), giriş efekti (entry), sohbet balonu (bubble), ses dalgası (wave) ya da koltuk rengi (seat) olmalı');
+  if (!SHOP_KINDS.includes(v)) throw bad('Tür çerçeve (frame), giriş efekti (entry), sohbet balonu (bubble), ses dalgası (wave), koltuk rengi (seat) ya da binek (ride) olmalı');
   return v;
 };
 /** A seat color's look: the cushion's color (the app tints the seat with it, the gold stays). */
@@ -1061,6 +1063,7 @@ export const shopRoutes = {
     writeLimit(a);
     const b = await readJson(req, 8192);
     const kind = kindOf(b.kind);
+    if (kind === 'ride') throw bad('Binekler uygulamanın kendisinin: yenisi eklenmez, var olanlar düzenlenir');
     const name = nameOf(b.name);
     const price = priceOf(b.price);
     const days = daysOf(b.days);
