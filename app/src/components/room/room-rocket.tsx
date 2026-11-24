@@ -78,6 +78,31 @@ export const ROCKET_HUES = ['#FF5FA2', '#FF8A3D', '#3D9BFF', '#A855F7', '#F6BD60
 const hueOf = (level: number) => ROCKET_HUES[(level - 1) % ROCKET_HUES.length];
 const KIND_EMOJI: Record<string, string> = { frame: '🖼️', entry: '✨', ride: '🏎️', bubble: '💬', wave: '🔊' };
 
+/**
+ * The room's right-side shortcut, just above the Rüzgâr Gülü (owners, 25 Nov 2026): the level filling now as its own
+ * launching rocket (RocketArt: that level's launch video, else the picture), a thin bar of how full it is and its level.
+ */
+export function RocketShortcut({ rocket, onPress, style }: { rocket: RoomRocket; onPress: () => void; style?: object }) {
+  const l = rocket.levels[shownLevel(rocket) - 1];
+  const pct = rocketPct(l);
+  const hue = hueOf(l.level);
+  const done = rocket.current === null;
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[s.shortcut, style]}
+      accessibilityRole="button"
+      accessibilityLabel={done ? 'Oda roketi: bugünün beş seviyesi kalktı' : `Oda roketi, Lv.${l.level}, ${pctText(pct)} dolu`}
+    >
+      <RocketArt level={l.level} size={46} />
+      <View style={s.shortcutTrack}>
+        <View style={[s.shortcutFill, { width: `${done ? 100 : pct}%`, backgroundColor: hue }]} />
+      </View>
+      <Text style={s.shortcutText}>{done ? `Lv.5 ✓` : `Lv.${l.level}`}</Text>
+    </Pressable>
+  );
+}
+
 /** The pill under the room's name: the level filling now and how full it is (✓ once all five launched today). */
 export function RocketPill({ rocket, onPress }: { rocket: RoomRocket; onPress: () => void }) {
   const l = rocket.levels[shownLevel(rocket) - 1];
@@ -310,6 +335,10 @@ function RocketPhase({ news, still, muted, onDone }: { news: RocketNews; still?:
 }
 
 const s = StyleSheet.create({
+  shortcut: { alignItems: 'center', gap: 3, width: 54 },
+  shortcutTrack: { width: 44, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.22)', overflow: 'hidden' },
+  shortcutFill: { height: 4, borderRadius: 2 },
+  shortcutText: { color: '#fff', fontSize: 10, fontWeight: '800', textShadowColor: 'rgba(0,0,0,0.7)', textShadowRadius: 3 },
   pill: { flexDirection: 'row', alignItems: 'center', gap: 3, height: 20, paddingLeft: 2, paddingRight: 7, borderRadius: 999, borderWidth: 1, backgroundColor: 'rgba(8,15,30,0.55)' },
   pillArt: { width: 16, height: 16 },
   pillText: { color: '#fff', fontSize: 11, fontWeight: '700' },
