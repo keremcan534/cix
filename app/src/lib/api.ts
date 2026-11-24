@@ -72,6 +72,8 @@ export type ErrorData = {
   appealSession?: string;
   /** Çevir, 409 rate_changed: the server's rate now and what the same diamonds give at it (check before use). */
   usdTry?: unknown;
+  coinValueTl?: unknown;
+  diamondsPerUsd?: unknown;
   coins?: unknown;
   /** Canlı ayarlar, 409 stale: the settings version now; 409 confirm_needed: the preview to confirm. */
   v?: number;
@@ -488,6 +490,14 @@ export const sendGift = (to: string, giftId: string, count: number, room?: strin
 /** Gelir's sources: the diamonds earned in the period, by where they came from (server wallet.mjs). */
 export type IncomeSource = { key: string; label: string; diamonds: number; count: number; live: boolean };
 export type IncomePeriod = 'day' | 'week' | 'month' | 'all';
+/** Yayıncı Merkezi "Bu hafta": this week's diamonds day by day, Monday first, Türkiye time (server wallet.mjs). */
+export const myWeek = () => call<unknown>('GET', '/api/wallet/week');
+/** Yayıncı haftalık bonusu: this week's earnings, the tier reached and the next (server/api/host-bonus.mjs). */
+export const myHostBonus = () => call<unknown>('GET', '/api/wallet/host-bonus');
+/** VIP aylık değerlendirme: my month (server/api/vip-month.mjs). */
+export const myVipMonth = () => call<unknown>('GET', '/api/vip/month');
+/** Yükseltme koruma dönemi: `price` is what the screen showed (a moved price is a 409 price_changed). */
+export const extendVip = (price: number, ref = newRef()) => call<{ user: ServerUser; replay: boolean; month: unknown }>('POST', '/api/vip/extend', { price, ref });
 export const incomeSources = (period: IncomePeriod) => call<{ period: IncomePeriod; total: number; sources: IncomeSource[] }>('GET', `/api/wallet/income?period=${period}`);
 export const rankings = (board: 'wealth' | 'charm', period: 'day' | 'week' | 'month') =>
   call<{ rows: RankingRow[] }>('GET', `/api/rankings?board=${board}&period=${period}`).then((r) => r.rows);
@@ -1096,8 +1106,15 @@ export const economy = () => call<unknown>('GET', '/api/economy');
 export const equipShop = (slot: string, sku: string | null) => call<{ economy: unknown }>('POST', '/api/shop/equip', { slot, sku });
 /** Çevir. `usdTry`: the rate the screen showed; the server never gives less than it, and answers 409 rate_changed
  *  (nothing taken) when its own rate is lower now. */
-export const exchange = (diamonds: number, ref = newRef(), usdTry?: number) =>
-  call<{ user: ServerUser; replay: boolean; coins: number }>('POST', '/api/wallet/exchange', { diamonds, ref, ...(usdTry === undefined ? {} : { usdTry }) });
+/** `usdTry` and `coinValueTl`: what the screen worked with (server/api/index.mjs refuses an amount it can't keep). */
+export const exchange = (diamonds: number, ref = newRef(), usdTry?: number, coinValueTl?: number, diamondsPerUsd?: number) =>
+  call<{ user: ServerUser; replay: boolean; coins: number }>('POST', '/api/wallet/exchange', {
+    diamonds,
+    ref,
+    ...(usdTry === undefined ? {} : { usdTry }),
+    ...(coinValueTl === undefined ? {} : { coinValueTl }),
+    ...(diamondsPerUsd === undefined ? {} : { diamondsPerUsd }),
+  });
 
 // Gizlilik, who may reach me and Arkadaşlarım (server/api/privacy.mjs); call history, heart points, the call figures and
 // the call task (server/api/call-log.mjs).

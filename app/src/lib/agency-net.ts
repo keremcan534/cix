@@ -10,6 +10,7 @@ import { publicIdOf } from '@/data/profile';
 import { AGENCY_LEDGER_LABEL } from '@/lib/admin-format';
 import { ApiError, apiEnabled, apiRequest, discover, ensureSignedIn, followingList, lookup, newRef } from '@/lib/api';
 import { showAlert } from '@/lib/alert';
+import { trDate, trDateTime } from '@/lib/tr';
 import { refusalTitle } from '@/lib/contact-filter';
 import { parseInviteInput, pickByPublicId } from '@/lib/invite-target';
 
@@ -87,8 +88,10 @@ export type Notice = { id: number; kind: string; title: string; body: string; cr
 
 export type Overview = {
   agency: AgencyCard;
-  /** Aday ajans / aktif ajans with its progress; raw, read with lib/agency-activity parseAgencyActivity. */
+  /** Aday ajans / aktif ajans with its progress (ended 24 Nov 2026: null); raw, read with lib/agency-activity parseAgencyActivity. */
   activity?: unknown;
+  /** Haftalık seviye (server/api/agency-levels.mjs); raw, read with lib/agency-level parseAgencyLevel. An older server sends none. */
+  level?: unknown;
   owner: Named | null;
   viewer: Viewer;
   perms: string[];
@@ -161,7 +164,7 @@ export type SubAgency = AgencyCard & {
   rank: number | null;
 };
 
-export type LedgerKind = 'direct' | 'difference' | 'transition' | 'transfer_fee' | 'adjustment' | 'reversal' | 'bd' | 'assistant';
+export type LedgerKind = 'direct' | 'difference' | 'transition' | 'transfer_fee' | 'adjustment' | 'reversal' | 'bd' | 'assistant' | 'level';
 export type LedgerRow = {
   id: number;
   kind: LedgerKind;
@@ -574,14 +577,15 @@ export async function runAction(demo: boolean, fn: () => Promise<unknown>, done?
 }
 
 // --- Labels and formatting ------------------------------------------------------------------------------------
-/** 5000 diamonds = 1 USD (the server's DIAMONDS_PER_USD); shown next to amounts, computed there too. */
-export const DIAMONDS_PER_USD = 5000;
+/** 1 USD = ? 💎 (owners, 24 Nov 2026: 1.000; the server's Canlı ayarlar › diamonds_per_usd): shown next to amounts, computed there too. */
+export const DIAMONDS_PER_USD = 1000;
 export const fmtD = (v: number | null | undefined) => (v === null || v === undefined ? '—' : Number(v).toLocaleString('tr-TR', { maximumFractionDigits: Math.abs(v) < 100 ? 2 : 0 }));
 export const fmtUsd = (v: number | null | undefined) => (v === null || v === undefined ? '—' : `$${Number(v).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
 export const usdOf = (diamonds: number) => diamonds / DIAMONDS_PER_USD;
 export const fmtPct = (r: number | null | undefined) => (r === null || r === undefined ? '—' : `%${(r * 100).toLocaleString('tr-TR', { maximumFractionDigits: 2 })}`);
-export const fmtDate = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' }) : '—');
-export const fmtDateTime = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—');
+/** Dates in Türkiye's time (lib/tr): "pazartesi 00:00'dan geçerli" is Monday on a phone abroad too. */
+export const fmtDate = (iso: string | null | undefined) => (iso && Number.isFinite(Date.parse(iso)) ? trDate(Date.parse(iso)) : '—');
+export const fmtDateTime = (iso: string | null | undefined) => (iso && Number.isFinite(Date.parse(iso)) ? trDateTime(Date.parse(iso)) : '—');
 export const fmtScore = (v: number | null | undefined) => (v === null || v === undefined ? '—' : v.toLocaleString('tr-TR', { maximumFractionDigits: 1 }));
 
 export const STATUS_TEXT: Record<AgencyStatus, string> = { draft: 'Taslak', pending: 'Onay bekliyor', approved: 'Aktif', rejected: 'Reddedildi', suspended: 'Askıda', closed: 'Kapatıldı' };

@@ -120,13 +120,13 @@ describe('Turkish numbers', () => {
       const first = (registry.impactOf('exchange_usd_try', b, a) as string).split('). ')[0];
       assert.equal(rateLine(b, a), impactText(first.endsWith('.') ? first : `${first}).`));
     }
-    assert.equal(rateLine(49.8, 50.8), '10.000 elmas = 4.220 → 4.305 jeton (+%2,0).');
+    assert.equal(rateLine(49.8, 50.8), '10.000 elmas = 2.263 → 2.309 jeton (+%2,0).');
   });
 
   test('coins per 10.000 diamonds equal the server exchangeCoins at every rate', () => {
     const exchangeCoins = server.exchangeCoins as (d: number, r?: number) => number;
     for (let c = 4000; c <= 7500; c += 37) assert.equal(coinsPer10k(c / 100), exchangeCoins(10_000, c / 100), `rate ${c / 100}`);
-    assert.equal(coinsPer10k(49.8), 4220);
+    assert.equal(coinsPer10k(49.8), 2263);
   });
 
   test('the server preview reads without the emoji', () => {
@@ -207,10 +207,10 @@ describe('local checks match the server', () => {
     assert.equal(parseWhole('1.200.000'), 1_200_000);
     assert.equal(parseWhole('-5'), null);
     const max = registry.REGISTRY.withdraw_max_diamonds.bounds as { min: number; max: number; step: number };
-    for (const v of [50_000, 60_000, 65_000, 5_000_000, 5_010_000, 40_000]) {
+    for (const v of [10_000, 60_000, 65_000, 1_000_000, 1_010_000, 5_000]) {
       assert.equal(wholeError(v, max, 'Tek talep sınırı', ' elmas') === null, !refuses(() => registry.validate('withdraw_max_diamonds', v)), String(v));
     }
-    assert.equal(wholeError(65_000, max, 'Tek talep sınırı', ' elmas'), "Tek talep sınırı 50.000–5.000.000 elmas arasında, 10.000'in katı olmalı.");
+    assert.equal(wholeError(65_000, max, 'Tek talep sınırı', ' elmas'), "Tek talep sınırı 10.000–1.000.000 elmas arasında, 10.000'in katı olmalı.");
     const otp = registry.REGISTRY.otp_global_per_hour.bounds as { min: number; max: number; step: number };
     for (const v of [0, 1, 1000, 2000, 2001]) assert.equal(wholeError(v, otp, 'Saatlik SMS sınırı') === null, !refuses(() => registry.validate('otp_global_per_hour', v)), String(v));
   });
@@ -235,10 +235,10 @@ describe('local checks match the server', () => {
 
   test('the example line uses the server campaignBonus', () => {
     for (const p of [5, 10, 15, 20, 25, 30, 35, 40, 45, 50]) {
-      const coins = (registry.campaignBonus as (c: number, k: object, at: number) => number)(100_000, camp(p), NOW);
-      assert.equal(campaignExample(p), `100.000 jetonluk paket alan +${coins.toLocaleString('tr-TR')} kampanya jetonu alır.`);
+      const coins = (registry.campaignBonus as (c: number, k: object, at: number) => number)(50_000, camp(p), NOW);
+      assert.equal(campaignExample(p), `50.000 jetonluk paket alan +${coins.toLocaleString('tr-TR')} kampanya jetonu alır.`);
     }
-    assert.equal(campaignExample(20), '100.000 jetonluk paket alan +20.000 kampanya jetonu alır.');
+    assert.equal(campaignExample(20), '50.000 jetonluk paket alan +10.000 kampanya jetonu alır.');
     assert.equal(campaignWhen(camp(20), NOW), 'Bitiş: 8 Kasım 15:00');
     assert.equal(campaignWhen({ ...camp(20), startsAt: '2026-11-06T17:00:00Z' }, NOW), 'Başlangıç: 6 Kasım 20:00 · Bitiş: 8 Kasım 15:00');
   });
@@ -303,7 +303,7 @@ describe('values as the admin reads them', () => {
 
   test('the server preview sentences need no emoji to read', () => {
     const sentence = impactText(registry.impactOf('exchange_usd_try', 49.8, 45) as string);
-    assert.ok(sentence.startsWith('10.000 elmas = 4.220 → '), sentence);
+    assert.ok(sentence.startsWith('10.000 elmas = 2.263 → '), sentence);
     assert.ok(sentence.includes('uygulamayı güncelle'), sentence);
     const off = registry.impactOf('features_off', [], ['gifts'], { env: { featuresOff: [] }, raw: ['gifts'] }) as string;
     assert.equal(off, 'Yeni hediye gönderimi durur. Eski uygulamalar "Bu özellik geçici olarak kapalı" mesajı görür.');

@@ -11,6 +11,8 @@
 //        | payouts/decide | transfers/decide | transition | roles | staff/set | staff/remove | bd | ops-score
 //        | violation | appeals/decide | simulate | jobs/run
 import { HttpError, REF, UUID, auth, db, env, readJson, text, tx } from './core.mjs';
+import { payoutTl } from './catalog.mjs';
+import { live } from './live-settings.mjs';
 import {
   AGENCY_PERMS,
   CRITERIA,
@@ -43,6 +45,8 @@ import {
   validateSetting,
 } from './agency-lib.mjs';
 import { activityJobs } from './agency-activity.mjs';
+import { levelName, settleLevels } from './agency-levels.mjs';
+import { levelFor } from './agency-level-rules.mjs';
 import {
   approveAgency,
   approveTransfer,
@@ -125,16 +129,9 @@ export async function runJobs(now = new Date()) {
       out.closed.push(period);
     }
   }
-  const key = cadenceKey(now, s.performance.cadence);
-  const done = await db.query('SELECT 1 FROM agency_perf_runs WHERE cadence_key = $1', [key]);
-  if (!done.rowCount) {
-    try {
-      const r = await tx((c) => runPerformance(c, { cadenceKey: key, note: 'Otomatik dönem değerlendirmesi' }));
-      out.performance = { runId: r.runId, agencies: r.rows.length };
-    } catch (e) {
-      if (e.code !== '23505') throw e; // another process ran it
-    }
-  }
+  // Ajans seviyeleri (agency-levels.mjs): the week that ended is settled once. They replaced the performance
+  // engine's monthly run, which no longer sets any rate (24 Nov 2026).
+  out.levels = await settleLevels(now);
   // Transfer timeouts: the agency a streamer leaves did not answer in time → its approval is given by the rule.
   const late = await db.query(
     `SELECT id FROM agency_transfers WHERE status = 'pending' AND kind IN ('streamer_move', 'streamer_leave') AND 'from' = ANY(needs)
@@ -152,8 +149,8 @@ export async function runJobs(now = new Date()) {
   }
   out.expired = (await db.query("UPDATE agency_transfers SET status = 'cancelled', decided_at = now(), decision_note = 'Süresi doldu' WHERE status = 'pending' AND created_at < now() - make_interval(days => greatest(30, $1::int + 1))", [s.transfer_policy.decision_days])).rowCount;
   Object.assign(out, await streamerPolicyJobs(s));
-  // Aday ajans / aktif ajans, the 90-day rule and the month's rule (agency-activity.mjs).
-  Object.assign(out, await tx((c) => activityJobs(c, now)));
+  // The 60-day rule and returns (agency-activity.mjs).
+  Object.assign(out, await tx((c) => activityJobs(c)));
   return out;
 }
 
@@ -234,10 +231,11 @@ export const agencyAdminRoutes = {
         level: a.level,
         status: a.status,
         owner: a.owner_name,
-        tier: a.tier,
-        tierName: tierName(x.s, a.tier),
+        tier: a.level_key ?? null,
+        tierName: levelName(x.s, a.level_key),
         // Aday ajans / aktif ajans as the agency job last worked it out (agency-activity.mjs).
-        activity: a.activity,
+        // Aday ajans ended (24 Nov 2026): none, so no card shows it.
+        activity: null,
         streamers: a.streamers,
         volume30: n(a.volume30),
         orgVolume30: n(a.org_volume30),
@@ -339,9 +337,10 @@ export const agencyAdminRoutes = {
         contact: { name: a.contact_name, phone: a.contact_phone, email: a.contact_email },
         expectedStreamers: a.expected_streamers,
         description: a.description,
-        tier: a.tier,
-        tierName: tierName(x.s, a.tier),
-        activity: a.activity,
+        tier: a.level_key ?? null,
+        tierName: levelName(x.s, a.level_key),
+        // Aday ajans ended (24 Nov 2026): none, so no card shows it.
+        activity: null,
         createdAt: a.created_at,
       })),
     };
@@ -413,6 +412,8 @@ export const agencyAdminRoutes = {
     const b = await readJson(req);
     return tx(async (c) => {
       const x = await center(c, req, 'agencies.rates');
+      // Ajans seviyeleri (24 Nov 2026): the week's level sets the rate.
+      if (x) throw new HttpError(409, 'Komisyon oranı artık haftalık ajans seviyesinden gelir; elle oran ve kademe verilmez (Ajans seviyeleri)');
       const a = await agencyRow(c, uuid(b.id, 'ajans'), true);
       if (!['approved', 'suspended'].includes(a.status)) throw new HttpError(409, 'Ajans açık değil');
       const rate = rate4(b.rate, x.s.pool_cap, 'Oran (havuz sınırı)');
@@ -437,6 +438,7 @@ export const agencyAdminRoutes = {
     const b = await readJson(req);
     return tx(async (c) => {
       const x = await center(c, req, 'agencies.rates');
+      if (x) throw new HttpError(409, 'Komisyon oranı artık haftalık ajans seviyesinden gelir; elle oran ve kademe verilmez (Ajans seviyeleri)');
       const a = await agencyRow(c, uuid(b.id, 'ajans'), true);
       if (!a.parent_id || !['approved', 'suspended'].includes(a.status)) throw new HttpError(409, 'Kademe yalnızca açık alt ajanslarda');
       if (!x.s.tiers.some((t) => t.key === b.tier)) bad('Kademe bulunamadı');
@@ -501,6 +503,8 @@ export const agencyAdminRoutes = {
   async 'POST /api/admin/agency/performance/run'(req) {
     const b = await readJson(req);
     const x = await center(db, req, 'agencies.performance');
+    // The performance engine set rates by score; the weekly levels replaced it (agency-levels.mjs).
+    if (x) throw new HttpError(409, 'Komisyon oranı artık haftalık ajans seviyesinden gelir; elle oran ve kademe verilmez (Ajans seviyeleri)');
     await tx((c) => calcPending(c));
     const r = await tx((c) =>
       runPerformance(c, {
@@ -638,13 +642,19 @@ export const agencyAdminRoutes = {
     );
     // payable: false = commission on a server with play money; it can't be approved or paid (agency.mjs PLAY_PAYOUT).
     const playMoney = await playMoneyOn(db);
+    // The TL to send now, at the payout rate in effect (Canlı ayarlar › payout_usd_try); paid ones keep theirs.
+    const rate = live().payoutUsdTry;
     return {
       playMoney,
+      payUsdTry: rate,
       payouts: r.rows.map((p) => ({
         id: Number(p.id),
         agency: { id: p.agency_id, name: p.agency_name, code: p.code, status: p.agency_status },
         amount: d4(p.amount),
         usd: n(p.usd),
+        tlNow: payoutTl(n(p.usd), rate),
+        payUsdTry: p.pay_usd_try === null ? null : n(p.pay_usd_try),
+        payTl: p.pay_tl === null ? null : n(p.pay_tl),
         currency: p.currency,
         status: p.status,
         statusLabel: STATUS_LABEL[p.status],
@@ -683,8 +693,15 @@ export const agencyAdminRoutes = {
           if (await playMoneyOn(c)) throw new HttpError(409, PLAY_PAYOUT);
           if (x.s.payout_policy.two_person && p.approved_by === x.u.id) throw new HttpError(403, 'Onaylayan kişi ödendi olarak işaretleyemez (iki kişili onay)');
           const paymentRef = text(b.paymentRef, 3, 100, 'Ödeme referansı');
+          // At the payout rate in effect, which must be the one the panel showed (payUsdTry); else nothing changes.
+          const rate = live().payoutUsdTry;
+          if (b.payUsdTry !== undefined && b.payUsdTry !== null && !(typeof b.payUsdTry === 'number' && Math.round(b.payUsdTry * 100) === Math.round(rate * 100))) {
+            throw Object.assign(new HttpError(409, 'Ödeme kuru değişti; yeni TL tutarını kontrol et'), { extra: { code: 'rate_changed', payUsdTry: rate, tl: payoutTl(n(p.usd), rate) } });
+          }
+          const tl = payoutTl(n(p.usd), rate);
           await payoutStep(c, p, 'paid', x.u.id, note, { paymentRef });
-          await notice(c, p.agency_id, 'payout', 'Ödemen yapıldı', `${d4(p.amount)} elmas (${n(p.usd)} USD), referans ${paymentRef}`);
+          await c.query('UPDATE agency_payouts SET pay_usd_try = $2, pay_tl = $3 WHERE id = $1', [p.id, rate, tl]);
+          await notice(c, p.agency_id, 'payout', 'Ödemen yapıldı', `${d4(p.amount)} elmas (${n(p.usd)} USD = ${tl.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL, kur ${rate.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}), referans ${paymentRef}`);
           break;
         }
         case 'reject':
@@ -914,28 +931,30 @@ export const agencyAdminRoutes = {
   },
 
   /** How a base would be split now: for an agency's current chain, or for hypothetical rates. Nothing is written. */
+  /**
+   * What a week's diamonds give (Ajans seviyeleri): `base` diamonds, `active` streamers (default enough), `isNew`.
+   * The old fields stay (one direct share, the pool the level's rate).
+   */
   async 'POST /api/admin/agency/simulate'(req) {
     const b = await readJson(req);
     const x = await center(db, req, 'agencies.view');
     if (!Number.isSafeInteger(b.base) || b.base <= 0 || b.base > 1e12) bad('Matrah pozitif tam sayı (elmas)');
-    let eff;
-    let names;
-    if (b.agencyId) {
-      const now = new Date();
-      const chain = await chainAt(db, uuid(b.agencyId, 'ajans'), now);
-      eff = (await effectiveChain(db, chain, now, x.s)).eff;
-      names = (await db.query('SELECT id, name FROM agencies WHERE id = ANY($1::uuid[])', [chain])).rows.reduce((m, r) => ({ ...m, [r.id]: r.name }), {});
-      names = chain.map((id) => names[id]);
-    } else {
-      const top = Math.min(e4(rate4(b.topRate ?? x.s.top_rate, 1, 'Üst oran')), e4(x.s.pool_cap));
-      const floor = e4(parentFloor(x.s, b.tier ?? x.s.tiers[0].key));
-      const sub = Math.max(0, Math.min(e4(rate4(b.subRate ?? 0, 1, 'Alt oran')), top - floor));
-      eff = b.subRate === undefined ? [top] : [sub, top];
-      names = b.subRate === undefined ? ['Üst ajans'] : ['Alt ajans', 'Üst ajans'];
-    }
-    const shares = eff.map((r, i) => ({ agency: names[i], kind: i === 0 ? 'direct' : 'difference', rate: (i === 0 ? r : r - eff[i - 1]) / 1e4, amount: d4((b.base * (i === 0 ? r : r - eff[i - 1])) / 1e4) }));
-    const pool = d4((b.base * eff.at(-1)) / 1e4);
-    return { base: b.base, poolCap: x.s.pool_cap, totalRate: eff.at(-1) / 1e4, pool, shares, platformKeeps: d4(b.base - pool), usd: { base: usdOf(b.base), pool: usdOf(pool) } };
+    const lv = x.s.weekly_levels;
+    const active = Number.isSafeInteger(b.active) && b.active >= 0 ? b.active : lv.min_active;
+    const { level, reason } = levelFor({ base: b.base, active, isNew: b.isNew === true }, lv);
+    const pool = d4(b.base * level.rate);
+    return {
+      base: b.base,
+      active,
+      level: { key: level.key, name: level.name, rate: level.rate },
+      reason,
+      poolCap: lv.levels.at(-1).rate,
+      totalRate: level.rate,
+      pool,
+      shares: [{ agency: 'Ajans', kind: 'direct', rate: level.rate, amount: pool }],
+      platformKeeps: d4(b.base - pool),
+      usd: { base: usdOf(b.base), pool: usdOf(pool) },
+    };
   },
 
   /** Report (§12): filters from, to, top, sub, streamer; BD sees their agencies only. */
@@ -990,11 +1009,24 @@ export const agencyAdminRoutes = {
         [from, to],
       )
     ).rows[0];
-    const commission = d4(n(tot.direct) + n(tot.difference) + n(tot.transition));
+    // Ajans seviyeleri: the weeks' level rows (agency-levels.mjs) by when they were written, for the agencies filtered
+    // (none for one streamer: a level row is the agency's week, not a streamer's).
+    const lvVals = [from, to];
+    const lvWhere = ["l.kind = 'level'", 'l.created_at >= $1', 'l.created_at < $2'];
+    const lvAgency = (id) => {
+      const i = lvVals.push(id);
+      return `(l.agency_id = $${i} OR l.agency_id IN (SELECT id FROM agencies WHERE parent_id = $${i}))`;
+    };
+    if (q.get('top')) lvWhere.push(lvAgency(uuid(q.get('top'))));
+    if (q.get('agency')) lvWhere.push(lvAgency(uuid(q.get('agency'))));
+    if (q.get('sub')) lvWhere.push(`l.agency_id = $${lvVals.push(uuid(q.get('sub')))}`);
+    if (!all) lvWhere.push(`l.agency_id = ANY($${lvVals.push([...x.acc.bd])}::uuid[])`);
+    const level = q.get('streamer') ? 0 : n((await db.query(`SELECT coalesce(sum(l.amount), 0) AS s FROM agency_ledger l WHERE ${lvWhere.join(' AND ')}`, lvVals)).rows[0].s);
+    const commission = d4(n(tot.direct) + n(tot.difference) + n(tot.transition) + level);
     return {
       from,
       to,
-      totals: { base: n(tot.base), commission, direct: d4(tot.direct), difference: d4(tot.difference), transition: d4(tot.transition), bd: d4(tot.bd), events: tot.events, streamers: tot.streamers, platformKeeps: d4(n(tot.base) - commission), usd: { base: usdOf(tot.base), commission: usdOf(commission), bd: usdOf(tot.bd) } },
+      totals: { base: n(tot.base), commission, level: d4(level), direct: d4(tot.direct), difference: d4(tot.difference), transition: d4(tot.transition), bd: d4(tot.bd), events: tot.events, streamers: tot.streamers, platformKeeps: d4(n(tot.base) - commission), usd: { base: usdOf(tot.base), commission: usdOf(commission), bd: usdOf(tot.bd) } },
       ...(all ? { activity: { newStreamers: misc.new_streamers, transfers: misc.transfers, newAgencies: misc.new_agencies, paid: d4(misc.paid), openPayouts: d4(misc.open_payouts) } } : {}),
       byTop: byTop.rows.map((r) => ({ id: r.id, name: r.name, base: n(r.base), commission: d4(r.commission), subs: r.subs, streamers: r.streamers })),
       bySub: bySub.rows.map((r) => ({ id: r.id, name: r.name, parent: r.parent_name, base: n(r.base), own: d4(r.own), toParent: d4(r.to_parent), streamers: r.streamers })),

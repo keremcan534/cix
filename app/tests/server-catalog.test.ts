@@ -156,8 +156,10 @@ describe('Sunucu kataloğu uygulamayla aynı', () => {
   test('elmas → jeton çevirisi: aynı kur, aynı alt sınır, aynı yuvarlama', () => {
     const ex = server.EXCHANGE as { diamondsPerUsd: number; usdTry: number; minDiamonds: number };
     assert.deepEqual([ex.diamondsPerUsd, ex.usdTry, ex.minDiamonds], [RULES.diamondsPerUsd, RULES.usdTry, RULES.exchangeMinDiamonds]);
-    const best = (server.PACKS as (ServerPack & { tl: number })[]).at(-1)!;
-    assert.equal(best.coins / best.tl, RULES.coinsBankRetailCoinsPerTl, 'en iyi paketin fiyatı');
+    assert.equal(server.COIN_VALUE_TL, RULES.coinValueTl, '1.000 jetonun TL değeri');
+    assert.equal(1000 / (server.COIN_VALUE_TL as number), RULES.coinsBankRetailCoinsPerTl, 'TL başına jeton');
+    for (const p of server.PACKS as (ServerPack & { tl: number })[])
+      assert.equal(p.tl, RECHARGE_PACKS.find((q) => q.id === p.id)?.tl, `${p.id} fiyatı`);
     for (const d of [100, 101, 999, 5_000, 88_959, 1_000_000, 123_456_789]) {
       const q = exchangeOwnDiamonds(d, d);
       assert.ok(q.ok);
@@ -165,25 +167,27 @@ describe('Sunucu kataloğu uygulamayla aynı', () => {
     }
   });
 
-  test('Çevir canlı kurla: uygulamanın gösterdiği jeton sunucunun verdiğiyle aynı (yanlış "kur değişti" olmaz)', () => {
-    const coinsAt = server.exchangeCoins as (n: number, usdTry?: number) => number;
-    for (const usdTry of [40, 49.8, 55.55, 75]) {
-      const rules = { ...RULES, usdTry };
-      for (const d of [100, 101, 999, 5_000, 88_959, 1_000_000, 123_456_789]) {
-        const shown = Math.floor(d * selfExchangeRate(rules));
-        assert.equal(coinsAt(d, usdTry), shown, `${d} elmas, kur ${usdTry}`);
-        const q = exchangeOwnDiamonds(d, d, rules);
-        assert.ok(q.ok);
-        if (q.ok) assert.equal(q.coins, shown, `${d} elmas, kur ${usdTry} (Çevir ekranı)`);
+  test('Çevir canlı kur ve jeton değeriyle: uygulamanın gösterdiği jeton sunucunun verdiğiyle aynı (yanlış "kur değişti" olmaz)', () => {
+    const coinsAt = server.exchangeCoins as (n: number, usdTry?: number, coinValueTl?: number) => number;
+    for (const usdTry of [40, 49.8, 50.62, 55.55, 75])
+      for (const value of [1, 23.6, 199.99, 220, 250.5, 5000]) {
+        const rules = { ...RULES, usdTry, coinValueTl: value, coinsBankRetailCoinsPerTl: 1000 / value };
+        for (const d of [100, 101, 999, 5_000, 88_959, 1_000_000, 123_456_789]) {
+          const shown = Math.floor(d * selfExchangeRate(rules));
+          assert.equal(coinsAt(d, usdTry, value), shown, `${d} elmas, kur ${usdTry}, jeton değeri ${value}`);
+          const q = exchangeOwnDiamonds(d, d, rules);
+          assert.ok(q.ok);
+          if (q.ok) assert.equal(q.coins, shown, `${d} elmas, kur ${usdTry}, jeton değeri ${value} (Çevir ekranı)`);
+        }
       }
-    }
     // Without a rate the server uses the compiled one, as before.
     assert.equal(coinsAt(10_000), coinsAt(10_000, RULES.usdTry));
   });
 
   test('Jeton Noktası: elmas bozdurma ve toptan fiyat sunucuyla aynı', () => {
-    const ex = server.EXCHANGE as { bankFee: number; wholesaleFee: number };
-    assert.deepEqual([ex.bankFee, ex.wholesaleFee], [RULES.coinsBankExchangeFee, RULES.coinsBankWholesaleFee]);
+    const ex = server.EXCHANGE as unknown as { bankFee: number };
+    assert.equal(ex.bankFee, RULES.coinsBankExchangeFee);
+    assert.equal(server.WHOLESALE_TL, RULES.coinsBankWholesaleTlPer1000, 'toptan fiyat');
     const num = (f: unknown) => f as (n: number) => number;
     for (const d of [100, 101, 999, 5_000, 88_959, 1_000_000, 123_456_789]) {
       const q = convertDiamonds('coins_bank_main', d);

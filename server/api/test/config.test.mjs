@@ -71,7 +71,7 @@ describe('switched-off features', () => {
       ['POST', '/api/gifts/send', { to: b.user.id, giftId: 'g1', count: 1, ref: rnd(6) }],
       ['POST', '/api/wallet/gift', { to: b.user.id, amount: 10, ref: rnd(6) }],
       ['POST', '/api/wallet/purchase', { platform: 'test', productId: 'coins_1000', transactionId: rnd(6) }],
-      ['POST', '/api/wallet/exchange', { diamonds: 1000, ref: rnd(6) }],
+      ['POST', '/api/wallet/exchange', { usdTry: 50.62, coinValueTl: 220, diamonds: 1000, ref: rnd(6) }],
       ['POST', '/api/jeton/transfer', { to: b.user.id, coins: 10, ref: rnd(6) }],
       ['POST', '/api/jeton/sell-diamonds', { bank: b.user.id, diamonds: 1000, ref: rnd(6) }],
       ['POST', '/api/messages', { to: b.user.id, text: 'selam', ref: rnd(6) }],

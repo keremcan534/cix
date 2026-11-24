@@ -10,12 +10,15 @@ import { Art, type ArtName } from '@/components/Art';
 import { Card, GradientButton, Header, TextLink } from '@/components/ui';
 import { AGENCIES } from '@/data/agency';
 import { hostLevel } from '@/data/economy';
+import { liveRules } from '@/lib/live/catalog-live';
 import { diamondValueTl } from '@/lib/coins-bank';
 import { userById } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import { IS_DEMO } from '@/lib/build';
 import { liveMode, oneOnOneOpen } from '@/lib/live';
-import { useLiveCallStats } from '@/lib/live/call-log';
+import { useLiveCallStats, useLiveHostBonus, useLiveWeek } from '@/lib/live/call-log';
+import { demoHostBonus, type HostBonus } from '@/lib/host-bonus';
+import { WEEK_DAYS, weekFromTally, type WeekDays } from '@/lib/week';
 import { useLiveEarnings } from '@/lib/live/earnings';
 import { useServerWithdrawals } from '@/lib/live/withdraw';
 import { offersCashOut } from '@/lib/withdraw-rules';
@@ -25,7 +28,20 @@ import { makeStyles, useTheme } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
 import { MessageToolsCard } from '@/components/message-tools-card';
 
-const DAYS = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Bugün'];
+/**
+ * "Bu hafta": the app's week (owners, 24 Nov 2026), Monday 00:00 to Sunday 23:59:59, Türkiye time. Live: the
+ * server's days (lib/live/call-log useLiveWeek); the demo lays its own tally on the week.
+ */
+function useWeek(tally: number[]): WeekDays {
+  const server = useLiveWeek(liveMode());
+  return liveMode() && server ? server : weekFromTally(tally);
+}
+
+/** Yayıncı haftalık bonusu: live, the server's (null until read: no card); the demo counts its own week. */
+function useHostBonus(weekTotal: number, agency: boolean, held: boolean): HostBonus | null {
+  const server = useLiveHostBonus(liveMode());
+  return liveMode() ? server : demoHostBonus(weekTotal, agency, held);
+}
 
 const PERKS: { icon: string; art?: ArtName; title: string; text: string }[] = [
   { icon: '🎁', art: 'finans-hediyelerden-kazan', title: 'Hediyelerden kazan', text: 'Gelen her hediye elmasa dönüşür.' },
@@ -113,16 +129,18 @@ function Dashboard() {
   const joinDaysLeft = Math.max(0, RULES.hostAgencyJoinDays - joinedDays);
   const { current, next } = hostLevel(totalDiamonds);
   const progress = next ? (totalDiamonds - current.min) / (next.min - current.min) : 1;
-  const max = Math.max(...weekly, 1);
-  const weekTotal = weekly.reduce((a, b) => a + b, 0);
+  const week = useWeek(weekly);
+  const max = Math.max(...week.days, 1);
+  const weekTotal = week.days.reduce((a, b) => a + b, 0);
   const agency = AGENCIES.find((a) => a.id === agencyId);
+  const bonus = useHostBonus(weekTotal, !!agency, joinDaysLeft === 0);
   const { colors, semantic, gradient } = useTheme();
   const styles = useStyles();
 
   const exchange = () =>
     // Diamonds turn into coins only in the main Coins Bank account (lib/coins-bank); hosts cash out instead.
     // Only the withdrawable part: locked diamonds (lib/diamond-locks) wait for their lock.
-    showAlert('Anında bozdur', `Jeton Noktası çekilebilir elmasını resmi değerinden hemen öder: ${free.toLocaleString('tr-TR')} elmas ≈ ${Math.floor(diamondValueTl(free)).toLocaleString('tr-TR')} TL. Senden ücret kesilmez.${locked > 0 ? `\n\n${locked.toLocaleString('tr-TR')} elmasın kilidi henüz açılmadı.` : ''}`, [
+    showAlert('Anında bozdur', `Jeton Noktası çekilebilir elmasını resmi değerinden hemen öder: ${free.toLocaleString('tr-TR')} elmas ≈ ${Math.floor(diamondValueTl(free, liveRules())).toLocaleString('tr-TR')} TL. Senden ücret kesilmez.${locked > 0 ? `\n\n${locked.toLocaleString('tr-TR')} elmasın kilidi henüz açılmadı.` : ''}`, [
       { text: 'Kapat', style: 'cancel' },
       { text: "Jeton Noktası'na git", onPress: () => router.push('/coins-bank') },
     ]);
@@ -177,7 +195,7 @@ function Dashboard() {
           )}
           <Text style={{ color: colors.textDim, fontSize: 12, lineHeight: 17 }}>
             {agency
-              ? `${RULES.agencyHostInactiveDays} gün çevrimiçi olmaz ve çekim yapmazsan ajanstan düşer, yönetim hesabına aktarılırsın. Kazancın etkilenmez.`
+              ? `${RULES.agencyHostInactiveDays} gün çevrimiçi olmazsan ajanstan düşersin. Döndüğünde ${RULES.hostAgencyJoinDays} gün içinde bir ajansa katılabilirsin; katılmazsan yönetim yayıncısı olursun. Kazancın etkilenmez.`
               : `Kayıttan itibaren ${RULES.hostAgencyJoinDays} gün içinde bir ajansa katılmazsan yönetim hesabına (platform) bağlanırsın: kazancını almaya ve para çekmeye sorunsuz devam edersin, sadece senin üzerinden ajans komisyonu oluşmaz. ${joinDaysLeft > 0 ? `Kalan süre: ${joinDaysLeft} gün.` : 'Bu süre doldu: yönetim yayıncısısın. Bir ajansa artık kodla katılamazsın, yalnız ajansın ve merkezin onayladığı transfer talebiyle geçebilirsin.'}`}
           </Text>
           {!agency && (
@@ -206,22 +224,24 @@ function Dashboard() {
             <Text style={{ color: semantic.diamondText, fontWeight: '700' }}>💎 {weekTotal.toLocaleString('tr-TR')}</Text>
           </View>
           <View style={styles.chart}>
-            {weekly.map((v, i) => (
+            {week.days.map((v, i) => (
               <View key={i} style={styles.barCol}>
                 <Text style={styles.barValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
                   {v >= 1000 ? `${(v / 1000).toLocaleString('tr-TR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}k` : v}
                 </Text>
-                <View style={[styles.bar, { height: Math.max(4, (v / max) * 110) }, i === 6 && { backgroundColor: semantic.action }]} />
+                <View style={[styles.bar, { height: Math.max(4, (v / max) * 110) }, i === week.today && { backgroundColor: semantic.action }]} />
                 <Text style={styles.barLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-                  {DAYS[i]}
+                  {i === week.today ? 'Bugün' : WEEK_DAYS[i]}
                 </Text>
               </View>
             ))}
           </View>
         </Card>
 
+        {bonus?.on && <BonusCard b={bonus} joinDaysLeft={joinDaysLeft} />}
+
         <View style={{ flexDirection: 'row', gap: 12 }}>
-          <Stat label="Bugünkü kazanç" value={`💎 ${weekly[6].toLocaleString('tr-TR')}`} />
+          <Stat label="Bugünkü kazanç" value={`💎 ${week.days[week.today].toLocaleString('tr-TR')}`} />
           <Stat label="Para çekme" value={`${withdrawals.length} talep`} />
         </View>
 
@@ -230,7 +250,7 @@ function Dashboard() {
             <Text style={{ fontSize: 28 }}>{agency?.logo ?? '🏢'}</Text>
             <View style={{ flex: 1 }}>
               <Text style={styles.perkTitle}>{agency ? agency.name : 'Bir ajansa katıl'}</Text>
-              <Text style={styles.dim}>{agency ? `Ajansa ${pct(RULES.agencyCommission)} komisyon ayrıca ödenir — senden kesilmez` : 'Ajansa bağlı yayıncılar ekstra bonus kazanır'}</Text>
+              <Text style={styles.dim}>{agency ? `Ajansa ${pct(RULES.agencyCommission)} komisyon ayrıca ödenir — senden kesilmez` : 'Ajansın desteğiyle daha çok kazan'}</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
           </Card>
@@ -265,6 +285,7 @@ function Dashboard() {
 
 function Analytics() {
   const { earnings, agencyId, weekly } = useApp();
+  const week = useWeek(weekly);
   const { colors } = useTheme();
   const styles = useStyles();
   const sum = (src: string) => earnings.filter((e) => e.source === src).reduce((x, e) => x + e.amount, 0);
@@ -273,7 +294,8 @@ function Analytics() {
   const live = liveMode();
   const server = useLiveCallStats(live && oneOnOneOpen());
   const serverCalls = live ? (server?.diamonds ?? 0) : 0;
-  const gifts = Math.max(0, sum('Hediye') + weekly.slice(0, 6).reduce((a, b) => a + b, 0) - serverCalls);
+  // Live: the server's week holds every diamond of the week (gifts, paid minutes, assistant shares): less the calls.
+  const gifts = live ? Math.max(0, week.days.reduce((a, b) => a + b, 0) - serverCalls) : Math.max(0, sum('Hediye') + weekly.slice(0, 6).reduce((a, b) => a + b, 0) - serverCalls);
   const ownerBonus = sum('Oda sahibi bonusu');
   const familyBonus = sum('Aile bonusu');
   const callBonus = live ? serverCalls : sum('Arama bonusu') + sum('Arama');
@@ -282,16 +304,16 @@ function Analytics() {
   // Only figures the app actually records: this week's daily diamonds and the earning rows. Stream time and
   // audience numbers need the server's room logs, so they are left out rather than estimated.
   const fmt = (n: number) => n.toLocaleString('tr-TR');
-  const weekTotal = weekly.reduce((a, b) => a + b, 0);
-  const activeDays = weekly.filter((v) => v > 0).length;
-  const best = weekly.reduce((bi, v, i) => (v > weekly[bi] ? i : bi), 0);
+  const weekTotal = week.days.reduce((a, b) => a + b, 0);
+  const activeDays = week.days.filter((v) => v > 0).length;
+  const best = week.days.reduce((bi, v, i) => (v > week.days[bi] ? i : bi), 0);
   const giftRows = earnings.filter((e) => e.source === 'Hediye');
   const senders = new Set(giftRows.map((e) => e.fromId).filter(Boolean)).size;
   const calls = live ? (server?.calls ?? 0) : earnings.filter((e) => e.source === 'Arama').length;
   const metrics = [
-    ['Aktif gün', `${activeDays} / 7`],
-    ['En iyi gün', weekly[best] > 0 ? `${DAYS[best]} · ${fmt(weekly[best])}` : '—'],
-    ['Günlük ortalama', `${fmt(Math.round(weekTotal / 7))} elmas`],
+    ['Aktif gün', `${activeDays} / ${week.today + 1}`],
+    ['En iyi gün', week.days[best] > 0 ? `${best === week.today ? 'Bugün' : WEEK_DAYS[best]} · ${fmt(week.days[best])}` : '—'],
+    ['Günlük ortalama', `${fmt(Math.round(weekTotal / (week.today + 1)))} elmas`],
     ['Hediye gönderen', fmt(senders)],
     ['Gelen hediye', fmt(giftRows.reduce((n, e) => n + (e.gift?.count ?? 1), 0))],
     ...(oneOnOneOpen() ? [['Ücretli arama', fmt(calls)]] : []),
@@ -319,7 +341,7 @@ function Analytics() {
       <Line label="Net hak edişin" value={`💎 ${net.toLocaleString('tr-TR')} · ${usd(net)}`} bold />
       {agencyId && <Line label={`Ajans komisyonu (${pct(RULES.agencyCommission)}, ayrıca ödenir)`} value={`${commission.toLocaleString('tr-TR')} · ${usd(commission)}`} dim />}
       <Text style={styles.dim}>
-        {RULES.diamondsPerUsd.toLocaleString('tr-TR')} elmas = 1 USD. Komisyon ve bonuslar senin kazancından kesilmez; iade edilen işlemler dökümden çıkarılır.
+        {liveRules().diamondsPerUsd.toLocaleString('tr-TR')} elmas = 1 USD. Komisyon ve bonuslar senin kazancından kesilmez; iade edilen işlemler dökümden çıkarılır.
       </Text>
     </Card>
   );
@@ -350,6 +372,50 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 // The hero and balance cards are colored gradients in both schemes, so the white on them stays.
+const n = (x: number) => x.toLocaleString('tr-TR');
+/**
+ * Haftalık bonus: this week's earnings, the bonus reached and what the next tier needs. Paid every Monday 00:00 to
+ * agency streamers and yönetim yayıncıları, in diamonds, with a SimilarClub Sistem notice (server/api/host-bonus.mjs).
+ */
+function BonusCard({ b, joinDaysLeft }: { b: HostBonus; joinDaysLeft: number }) {
+  const { colors, semantic, gradient } = useTheme();
+  const styles = useStyles();
+  const base = b.tier?.from ?? 0;
+  const progress = b.next ? Math.min(1, Math.max(0, (b.earned - base) / (b.next.from - base))) : 1;
+  return (
+    <Card style={{ gap: 10 }}>
+      <View style={styles.rowBetween}>
+        <Text style={[styles.cardTitle, { flex: 1, marginRight: 8 }]}>🎁 Haftalık bonus</Text>
+        {b.eligible && (
+          <Text style={{ color: semantic.diamondText, fontWeight: '800', flexShrink: 0 }} numberOfLines={1}>
+            {b.tier ? `💎 ${n(b.tier.bonus)}` : 'Baremin altında'}
+          </Text>
+        )}
+      </View>
+      {b.eligible ? (
+        <>
+          <View style={styles.track}>
+            <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.fill, { width: `${progress * 100}%` }]} />
+          </View>
+          <Text style={{ color: colors.text, fontSize: 13, lineHeight: 18 }}>
+            {b.next
+              ? `Bu hafta ${n(b.earned)} elmas kazandın. ${n(b.next.left)} elmas daha kazanırsan bonusun ${n(b.next.bonus)} elmas olur.`
+              : `Bu hafta ${n(b.earned)} elmas kazandın: en yüksek baremdesin.`}
+          </Text>
+          <Text style={styles.dim}>Hafta Pazar 23:59’da kapanır; bonus Pazartesi 00:00’da elmas olarak yüklenir ve SimilarClub Sistem’den bildirilir.{b.kind === 'agency' ? ' Bonustan ajans komisyonu kesilmez.' : ''}</Text>
+          {b.last && <Text style={styles.dim}>{b.last.reversed ? `Geçen haftanın bonusu (${n(b.last.bonus)} elmas) geri alındı.` : `Geçen hafta ${n(b.last.bonus)} elmas bonus aldın.`}</Text>}
+        </>
+      ) : (
+        <Text style={styles.dim}>
+          {joinDaysLeft > 0
+            ? `Haftalık bonus ajansa bağlı yayıncılara ve yönetim yayıncılarına verilir. Bir ajansa katıldığında ya da ${joinDaysLeft} gün sonra yönetim yayıncısı olduğunda bonus başlar; haftalık kazancına göre her Pazartesi elmas olarak hesabına yüklenir.`
+            : 'Haftalık bonus ajansa bağlı yayıncılara ve yönetim yayıncılarına verilir; haftalık kazancına göre her Pazartesi elmas olarak hesabına yüklenir.'}
+        </Text>
+      )}
+    </Card>
+  );
+}
+
 const useStyles = makeStyles(({ colors, lift }) => ({
   safe: { flex: 1, backgroundColor: colors.bg },
   hero: { borderRadius: 20, padding: 24, alignItems: 'center', gap: 8 },

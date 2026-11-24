@@ -228,6 +228,17 @@ export async function exportOf(c, uid) {
       at: x.created_at,
       decidedAt: x.decided_at,
     })),
+    // Yayıncı haftalık bonusu (host-bonus.mjs): the weeks I got one, and any taken back.
+    hostBonuses: await all('SELECT week_start::text AS week, earned, tier_from, bonus, created_at, reversed_at, reversed_amount, reverse_reason FROM host_bonuses WHERE user_id = $1 ORDER BY week_start', (x) => ({
+      week: x.week,
+      earned: num(x.earned),
+      tier: num(x.tier_from),
+      bonus: num(x.bonus),
+      at: x.created_at,
+      reversedAt: x.reversed_at ?? null,
+      reversedDiamonds: x.reversed_amount === null ? null : num(x.reversed_amount),
+      reverseReason: x.reverse_reason ?? null,
+    })),
     shopItems: await all('SELECT sku, kind, tier, price, starts_at, ends_at, source, origin, revoked_at, revoked_why, created_at FROM entitlements WHERE user_id = $1 ORDER BY id', (x) => ({
       sku: x.sku,
       kind: x.kind,
@@ -242,6 +253,20 @@ export async function exportOf(c, uid) {
       at: x.created_at,
     })),
     // Seviye düşmesi (levels-admin.mjs): each drop, and the Cömertlik / Yankı points the drops took off.
+    // VIP aylık değerlendirme (vip-month.mjs): every point with its time, each month's decision, the protection periods bought.
+    vipPoints: await all('SELECT amount, source, at FROM vip_points WHERE user_id = $1 ORDER BY id', (x) => ({ amount: num(x.amount), source: x.source, at: x.at })),
+    vipMonths: await all('SELECT period_start, eval_at, level_start, level_end, period_points, keep_points, result, level_after, misses FROM vip_evaluations WHERE user_id = $1 ORDER BY id', (x) => ({
+      from: x.period_start,
+      at: x.eval_at,
+      levelStart: x.level_start,
+      levelReached: x.level_end,
+      points: num(x.period_points),
+      keep: num(x.keep_points),
+      result: x.result,
+      levelAfter: x.level_after,
+      missesInARow: x.misses,
+    })),
+    vipExtensions: await all('SELECT days, price, eval_before, eval_after, created_at FROM vip_extensions WHERE user_id = $1 ORDER BY id', (x) => ({ days: x.days, price: num(x.price), evalBefore: x.eval_before, evalAfter: x.eval_after, at: x.created_at })),
     levelDrops: await all('SELECT system, from_level, to_level, points_before, points_after, idle_days, created_at FROM level_drops WHERE user_id = $1 ORDER BY id', (x) => ({
       system: x.system,
       fromLevel: x.from_level,

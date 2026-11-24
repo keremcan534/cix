@@ -56,6 +56,8 @@ export const MAX_OPEN_PER_ROOM = 10;
 /** Ended events stay in the list's Tamamlandı this long. */
 export const ENDED_LISTED_DAYS = 30;
 
+/** Türkiye's offset in minutes (UTC+3 all year since 2016): the app's week is counted in it. */
+const TR_OFFSET = 180;
 /** A time-zone offset (minutes east of UTC, e.g. 180 for Türkiye) from a query value; Türkiye's when missing or unreadable. */
 export function offsetOf(v) {
   // Number(null) and Number('') are 0: without this, a request with no tz would count its days in UTC.
@@ -74,7 +76,12 @@ export function windowOf(when, now, off) {
   if (when === 'now') return { from: null, to: null, running: true, onlyRunning: true };
   if (when === 'today') return { from: dayStart(now, off), to: dayStart(now, off, 1), running: true };
   if (when === 'tomorrow') return { from: dayStart(now, off, 1), to: dayStart(now, off, 2), running: false };
-  if (when === 'week') return { from: dayStart(now, off), to: dayStart(now, off, 7), running: true };
+  // "Bu Hafta": today to the end of Sunday, the app's week (owners, 24 Nov 2026: Monday 00:00 – Sunday 23:59:59,
+  // Turkey time), whatever the phone's own offset.
+  if (when === 'week') {
+    const dow = new Date(now + TR_OFFSET * MINUTE).getUTCDay(); // 0 Sunday … 6 Saturday, in Turkey
+    return { from: dayStart(now, TR_OFFSET), to: dayStart(now, TR_OFFSET, dow === 0 ? 1 : 8 - dow), running: true };
+  }
   const m = typeof when === 'string' ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(when) : null;
   if (m) {
     const t = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));

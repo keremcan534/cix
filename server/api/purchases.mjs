@@ -34,10 +34,11 @@
 //
 // The VIP subscription (Abonelik) goes through the same stores and helpers, with the same rules: vip.mjs.
 import { bonusNotice } from './system-notices.mjs';
+import { addVipPoints } from './vip-month.mjs';
 import crypto from 'node:crypto';
 
 import { HttpError, auth, db, env, readJson, selfUser, sha, tx } from './core.mjs';
-import { PACK_BY_PRODUCT, packsSetUp } from './catalog.mjs';
+import { PACK_BY_PRODUCT, packsSetUp, tlOfCoins } from './catalog.mjs';
 import { campaignBonus, campaignRef } from './live-registry.mjs';
 import { campaignAt, live } from './live-settings.mjs';
 import { TEST_DAILY, creditCoins, playCoinsToday } from './wallet.mjs';
@@ -52,6 +53,11 @@ const APPLE_API = local(env.APPLE_API_URL, 'https://api.storekit.itunes.apple.co
 const APPLE_SANDBOX_API = local(env.APPLE_SANDBOX_API_URL, 'https://api.storekit-sandbox.itunes.apple.com');
 /** The coin channel of each store (wallet.mjs CHANNELS): where the coins came from, in every record. */
 const STORE_CHANNEL = { android: 'google', ios: 'apple', test: 'test' };
+/**
+ * The price written on a purchase (migration 119): a pack on sale at the coin value in effect (Canlı ayarlar ›
+ * coin_value_tl, the price the stores are set to); a retired pack at the price it had.
+ */
+const priceOf = (pack) => (pack.retired ? pack.tl : tlOfCoins(pack.coins, live().coinValueTl));
 const PACKAGE = env.GOOGLE_PLAY_PACKAGE ?? 'com.similarclub.app';
 const BUNDLE = env.APPLE_BUNDLE_ID ?? 'com.similarclub.app';
 /**
@@ -190,7 +196,8 @@ async function credit(u, platform, pack, transactionId, play, purchaseTime) {
     // The first-purchase gift can be switched off live (rewards_off, referrals.mjs GET /api/rewards tells the app);
     // the switch as it is when the purchase is verified.
     // The pack as the panel set it up when the purchase is verified (Canlı ayarlar › Jeton paketleri).
-    const setUp = packsSetUp(live().packSetup).find((p) => p.id === pack.id);
+    // A retired pack (catalog.mjs RETIRED_PACKS, no longer in the panel's setup) as it was: its coins, no extra coins.
+    const setUp = packsSetUp(live().packSetup).find((p) => p.id === pack.id) ?? { ...pack, extra: 0 };
     const bonus = first && !live().rewardsOff.has('first_purchase') ? setUp.firstBonus : 0;
     const extra = setUp.extra;
     const sandbox = play && platform !== 'test';
@@ -202,8 +209,8 @@ async function credit(u, platform, pack, transactionId, play, purchaseTime) {
     // Play coins share one daily cap with test top-ups (index.mjs), so test purchases can't mint more.
     if (play && (await playCoinsToday(c, u.id)) + pack.coins + bonus + extra + kampanya > TEST_DAILY) throw new HttpError(429, `Günlük test yükleme sınırı: ${TEST_DAILY.toLocaleString('tr-TR')} jeton`);
     const p = await c.query(
-      'INSERT INTO purchases (user_id, platform, product_id, transaction_id, coins, bonus, sandbox, campaign_bonus, campaign_ref, extra) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id',
-      [u.id, platform, pack.productId, transactionId, pack.coins, bonus, sandbox, kampanya, kampanya ? campaignRef(campaign) : null, extra],
+      'INSERT INTO purchases (user_id, platform, product_id, transaction_id, coins, bonus, sandbox, campaign_bonus, campaign_ref, extra, price_tl) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id',
+      [u.id, platform, pack.productId, transactionId, pack.coins, bonus, sandbox, kampanya, kampanya ? campaignRef(campaign) : null, extra, priceOf(pack)],
     );
     const purchaseId = Number(p.rows[0].id);
     const gifts = [bonus && `+${bonus} ilk alım hediyesi`, extra && `+${extra} ek jeton`, kampanya && `+${kampanya} kampanya`].filter(Boolean);
@@ -224,7 +231,7 @@ async function credit(u, platform, pack, transactionId, play, purchaseTime) {
       { detail: { purchase: purchaseId, platform, product: pack.productId, transaction: transactionId, ...(sandbox && { sandbox }) } },
     );
     // SVIP points are for coins someone paid for: the pack only, not the first-purchase or campaign gift.
-    if (!sandbox) await c.query('UPDATE users SET svip_xp = svip_xp + $2 WHERE id = $1', [u.id, pack.coins]);
+    if (!sandbox) await addVipPoints(c, u.id, pack.coins, 'store', ref);
     return { replay: false, coins: pack.coins, bonus, campaignBonus: kampanya, extra };
   }).catch(taken);
   // SimilarClub Sistem: the gifts on top of the pack (first purchase, campaign), once the coins are committed.

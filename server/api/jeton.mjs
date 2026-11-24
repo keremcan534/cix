@@ -26,8 +26,10 @@
 // unlocked are reported as unrecovered. The agency commission those gifts earned is reversed. Admin only:
 // moderators don't touch money. Google Play refunds also arrive on their own (refunds.mjs).
 import { HttpError, assertClean, auth, blockedBetween, claimRef, clientIp, db, int, move, once, readJson, selfUser, text, tx, userId } from './core.mjs';
+import { addVipPoints } from './vip-month.mjs';
 import { EXCHANGE, bankExchangeCoins, diamondValueTl, wholesaleTl } from './catalog.mjs';
 import { CHANNELS, creditCoins, diamondState, spendCoins, spendDiamonds } from './wallet.mjs';
+import { live } from './live-settings.mjs';
 import { recordIncome } from './agency-lib.mjs';
 import { voidRefundedBonds } from './bonds.mjs';
 import { refundItems } from './economy.mjs';
@@ -227,7 +229,7 @@ export async function refundPurchase(c, id, { actor = null, ip = '', source = 'a
     unrecoveredDiamonds += amount - take;
   }
   await c.query("UPDATE purchases SET status = 'refunded' WHERE id = $1", [id]);
-  await c.query('UPDATE users SET svip_xp = greatest(0, svip_xp - $2) WHERE id = $1', [p.user_id, p.coins]);
+  await addVipPoints(c, p.user_id, -Number(p.coins), 'store_refund', `refund:${id}`);
   // Coins already spent on shop items can't come back as coins: the buyer's items go, others' go to staff review.
   const { revokedItems, reviewItems } = await refundItems(c, { purchase: Number(id), buyer: p.user_id, lots: lots.map((l) => l.id), held, actor, ip });
   await audit(c, actor, 'purchase.refund', p.user_id, { purchase: id, platform: p.platform, transaction: p.transaction_id, coins, escrowCoins, diamonds, unrecoveredDiamonds, commissionDiamonds, revokedItems, reviewItems, source }, ip);
@@ -276,6 +278,8 @@ export const jetonRoutes = {
       // Each portion keeps the longer lock of where the bank got it (a store purchase stays 7 days).
       const portions = parts.map((p) => ({ channel: 'jeton_noktasi', amount: p.amount, lockHours: p.lockHours, transferId: transfer, sourceLot: p.lot, sourceUser: u.id }));
       await creditCoins(c, to, portions, 'Jeton Noktası yüklemesi', `${b.ref}-in`, u.id, { actor: u.id, detail });
+      // VIP points (owners, 24 Nov 2026): coins bought at a Jeton Noktası count as a store purchase does.
+      await addVipPoints(c, to, coins, 'jeton_noktasi', b.ref);
     });
     return { ...out, transfer: await findTransfer(u.id, b.ref) };
   },
@@ -291,8 +295,11 @@ export const jetonRoutes = {
     if (bank === u.id) throw new HttpError(400, 'Kendi Jeton Noktana bozduramazsın');
     const diamonds = int(b.diamonds, EXCHANGE.minDiamonds, DIAMONDS_MAX);
     if (!diamonds) throw new HttpError(400, `En az ${EXCHANGE.minDiamonds} elmas bozdurulabilir`);
-    const coins = bankExchangeCoins(diamonds);
-    const valueTl = diamondValueTl(diamonds);
+    // The host is paid at the payout rate (Canlı ayarlar › payout_usd_try); the bank's coins, at the coin value in
+    // effect, are worth what it pays plus its fee.
+    const s = live();
+    const coins = bankExchangeCoins(diamonds, s.coinValueTl, s.payoutUsdTry, s.diamondsPerUsd);
+    const valueTl = diamondValueTl(diamonds, s.payoutUsdTry, s.diamondsPerUsd);
     if (await blockedBetween(u.id, bank)) throw new HttpError(403, 'Bu Jeton Noktası ile işlem yapamazsın');
     const ip = clientIp(req);
     const out = await once(u.id, 'diamond', b.ref, async (c) => {
@@ -364,8 +371,8 @@ export const jetonRoutes = {
     const paymentRef = text(b.paymentRef, 1, 100, 'Ödeme referansı');
     const note = optional(b.note, 200, 'Not');
     // What management books for these coins: the price it gives (Yönetim jeton yüklemesi, the panel's "üretim"), or
-    // the wholesale formula's.
-    const priceTl = b.priceTl === undefined || b.priceTl === null || b.priceTl === '' ? wholesaleTl(coins) : tlOf(b.priceTl, 'Toptan fiyat');
+    // the wholesale price the panel set (Canlı ayarlar › jeton_wholesale_tl).
+    const priceTl = b.priceTl === undefined || b.priceTl === null || b.priceTl === '' ? wholesaleTl(coins, live().wholesaleTl) : tlOf(b.priceTl, 'Toptan fiyat');
     const ip = clientIp(req);
     const out = await once(bank, 'coin', b.ref, async (c) => {
       const rows = await lockUsers(c, [bank]);
@@ -396,7 +403,7 @@ export const jetonRoutes = {
     return {
       loads: loads.rows.map(loadOf),
       banks: banks.rows.map((x) => ({ id: x.id, name: x.name, publicNo: x.public_no === null ? null : String(x.public_no), coins: Number(x.coins) })),
-      rateTl: wholesaleTl(1000),
+      rateTl: wholesaleTl(1000, live().wholesaleTl),
     };
   },
 
@@ -431,6 +438,8 @@ export const jetonRoutes = {
       const parts = await spendCoins(c, bank, coins, 'Yönetim jeton yüklemesi', b.ref, to, { actor: a.id, detail, capped: false });
       const portions = parts.map((p) => ({ channel: 'jeton_noktasi', amount: p.amount, lockHours: p.lockHours, transferId: transfer, sourceLot: p.lot, sourceUser: bank }));
       await creditCoins(c, to, portions, 'Jeton yüklemesi (yönetim)', `${b.ref}-in`, bank, { actor: a.id, detail });
+      // VIP points (owners, 24 Nov 2026): a management load counts too; taking it back takes them back (reverse).
+      await addVipPoints(c, to, coins, 'admin_load', b.ref);
       await audit(c, a.id, 'jeton.admin_load', to, { transfer, bank, coins, valueTl, paymentRef }, ip);
     });
     const t = await db.query(`${LOADS_SELECT} AND t.from_user = $1 AND t.ref = $2`, [bank, b.ref]);
@@ -475,6 +484,8 @@ export const jetonRoutes = {
       // Server refs (':'): no phone can take them first.
       await move(c, load.to_user, 'coin', -coins, 'Yanlış jeton yüklemesi geri alındı', `jeton-geri:${id}`, load.from_user, { channel: 'jeton_noktasi', actor: a.id, detail: { ...detail, lots: taken } });
       await creditCoins(c, load.from_user, [{ channel: 'toptan', amount: coins, transferId: back }], 'Geri alınan yönetim yüklemesi', `jeton-geri:${id}-in`, load.to_user, { actor: a.id, detail });
+      // A wrong load gives no VIP points: all of it comes off, spent coins too (never below 0).
+      await addVipPoints(c, load.to_user, -Number(load.coins), 'admin_reverse', `geri:${id}`);
       await audit(c, a.id, 'jeton.admin_reverse', load.to_user, { load: id, transfer: back, coins, spent: Number(load.coins) - coins, reason }, ip);
       return { coins, spent: Number(load.coins) - coins, transfer: Number(back) };
     });

@@ -103,7 +103,7 @@ export default function IncomeScreen() {
   const instant = () =>
     showAlert(
       'Anında bozdur',
-      `Jeton Noktası çekilebilir elmasını resmi değerinden hemen öder: ${fmt(free)} 💎 ≈ ${fmt(Math.floor(diamondValueTl(free)))} TL. Senden ücret kesilmez. Haftalık ödemeyi beklemek istersen Para Çek'i kullan.${lockedNote}`,
+      `Jeton Noktası çekilebilir elmasını resmi değerinden hemen öder: ${fmt(free)} 💎 ≈ ${fmt(Math.floor(diamondValueTl(free, liveRules())))} TL. Senden ücret kesilmez. Haftalık ödemeyi beklemek istersen Para Çek'i kullan.${lockedNote}`,
       [
         { text: 'Kapat', style: 'cancel' },
         { text: "Jeton Noktası'na git", onPress: () => router.push('/coins-bank') },
@@ -113,7 +113,7 @@ export default function IncomeScreen() {
   const info = () =>
     showAlert(
       'Elmasların',
-      `${fmt(RULES.diamondsPerUsd)} elmas = 1 USD. Toplam ${fmt(diamonds)} elmasın yaklaşık ${usd(diamonds)} değerindedir.\n\nÇekilebilir: hemen çekebileceğin, bozdurabileceğin ya da jetona çevirebileceğin elmaslar.\nKilitli: Google Play veya App Store'dan alınan jetonla gelen hediyeler ${RULES.pendingDays} gün, Jeton Noktası jetonuyla gelenler ${RULES.jetonPendingDays} gün kilitli kalır (iade süresi). Süre dolunca kendiliğinden çekilebilir kazanca geçer.\n\nPara çekmek için en az ${fmt(RULES.minWithdrawDiamonds)} elmas (${usd(RULES.minWithdrawDiamonds)}) gerekir.`,
+      `${fmt(liveRules().diamondsPerUsd)} elmas = 1 USD. Toplam ${fmt(diamonds)} elmasın yaklaşık ${usd(diamonds)} değerindedir.\n\nÇekilebilir: hemen çekebileceğin, bozdurabileceğin ya da jetona çevirebileceğin elmaslar.\nKilitli: Google Play veya App Store'dan alınan jetonla gelen hediyeler ${RULES.pendingDays} gün, Jeton Noktası jetonuyla gelenler ${RULES.jetonPendingDays} gün kilitli kalır (iade süresi). Süre dolunca kendiliğinden çekilebilir kazanca geçer.\n\nPara çekmek için en az ${fmt(RULES.minWithdrawDiamonds)} elmas (${usd(RULES.minWithdrawDiamonds)}) gerekir.`,
     );
 
   return (

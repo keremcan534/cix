@@ -134,7 +134,7 @@ async function impactOf(system, next) {
       if (after < before) out.down++;
       out.levels[after] = (out.levels[after] ?? 0) + 1;
     }
-    if (next.decay?.on) out.decayToday = (await decayCandidates(system, next.decay, docs)).length;
+    if (next.decay?.on && system !== 'vip') out.decayToday = (await decayCandidates(system, next.decay, docs)).length;
   } else if (system === 'noble') {
     const r = await db.query(
       `SELECT tier, count(DISTINCT user_id)::int AS n FROM entitlements
@@ -210,6 +210,8 @@ export async function runLevelDecay() {
     const docs = docsNow();
     const out = {};
     for (const system of DECAYING) {
+      // VIP: the monthly keep rule (vip-month.mjs, owners 24 Nov 2026) replaced the inactivity drop.
+      if (system === 'vip') continue;
       const rule = docs[system].decay;
       if (!rule?.on) continue;
       let n = 0;

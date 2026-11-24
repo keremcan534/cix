@@ -40,8 +40,8 @@ describe('para çekme', () => {
   });
 
   test('kurallar: en az, en çok, yöntem, hesap bilgisi', async () => {
-    assert.equal((await withdraw(iban(49_999)))[0], 400, 'en az 50.000');
-    assert.equal((await withdraw(iban(5_000_001)))[0], 400, 'en çok 5.000.000');
+    assert.equal((await withdraw(iban(9_999)))[0], 400, 'en az 10.000');
+    assert.equal((await withdraw(iban(1_000_001)))[0], 400, 'en çok 1.000.000');
     assert.equal((await withdraw({ ...iban(50_000), method: 'paypal' }))[0], 400, 'yöntem');
     assert.equal((await withdraw({ ...iban(50_000), details: { holder: 'Ada', account: 'TR330006100519786457841327' } }))[0], 400, 'IBAN kontrol basamağı');
     assert.equal((await withdraw({ ...iban(50_000), details: { holder: 'A', account: IBAN } }))[0], 400, 'ad kısa');
@@ -67,7 +67,7 @@ describe('para çekme', () => {
     assert.equal(j.user.diamonds, 39_995);
     assert.deepEqual(
       { diamonds: first.diamonds, usd: first.usd, method: first.method, holder: first.holder, account: first.account, status: first.status, statusLabel: first.statusLabel },
-      { diamonds: 60_000, usd: 12, method: 'iban', holder: 'Ada Yılmaz', account: IBAN, status: 'pending', statusLabel: 'Beklemede' },
+      { diamonds: 60_000, usd: 60, method: 'iban', holder: 'Ada Yılmaz', account: IBAN, status: 'pending', statusLabel: 'Beklemede' },
     );
     const again = await ok(withdraw(iban(60_000, r)));
     assert.equal(again.replay, true);
@@ -83,11 +83,11 @@ describe('para çekme', () => {
     assert.equal(st, 409, 'bekleyen talep varken');
     assert.match(e.error, /Bekleyen/);
     // The held diamonds can't be spent a second time.
-    assert.equal((await call('POST', '/api/wallet/exchange', { diamonds: 40_000, ref: ref() }, host.session))[0], 409);
+    assert.equal((await call('POST', '/api/wallet/exchange', { usdTry: 50.62, coinValueTl: 220, diamonds: 40_000, ref: ref() }, host.session))[0], 409);
     const list = await ok(call('GET', '/api/wallet/withdrawals', null, host.session));
     assert.equal(list.withdrawals[0].id, first.id);
     assert.equal(list.withdrawable, 39_995);
-    assert.equal(list.rules.minDiamonds, 50_000);
+    assert.equal(list.rules.minDiamonds, 10_000);
     assert.equal(list.rules.weekUsed, 60_000);
     assert.equal((await ok(call('GET', '/api/wallet/withdrawals', null, other.session))).withdrawals.length, 0, 'başkasının talepleri görünmez');
   });
@@ -141,7 +141,31 @@ describe('para çekme', () => {
     await h.sql.query("INSERT INTO withdrawals (user_id, diamonds, usd, method, holder, account, status, ref) VALUES ($1, 9980000, 1996, 'other', 'Ada Yılmaz', 'önceki ödeme', 'paid', $2)", [host.user.id, ref()]);
     const [st, e] = await withdraw(iban(50_000));
     assert.equal(st, 409);
-    assert.match(e.error, /7 günde en çok 10\.000\.000 elmas/);
+    assert.match(e.error, /Bu hafta en çok 10\.000\.000 elmas çekilebilir; kalan 20\.000 elmas\. Sınır Pazartesi 00:00'da yenilenir/);
     assert.equal(await diamonds(), 99_995);
+
+    // The week is Monday 00:00 – Sunday 23:59:59, Turkey time (owners, 24 Nov 2026): a payment from before this
+    // Monday 00:00 is last week's and leaves this week's limit whole; one a second after it counts.
+    const monday = (await h.sql.query("SELECT date_trunc('week', now() AT TIME ZONE 'Europe/Istanbul') AT TIME ZONE 'Europe/Istanbul' AS t")).rows[0].t;
+    await h.sql.query("UPDATE withdrawals SET created_at = $2::timestamptz - interval '1 second' WHERE user_id = $1 AND diamonds = 9980000", [host.user.id, monday]);
+    assert.equal((await ok(call('GET', '/api/wallet/withdrawals', null, host.session))).rules.weekUsed, 0, 'geçen haftanın ödemesi bu haftaya sayılmaz');
+    await h.sql.query("UPDATE withdrawals SET created_at = $2::timestamptz WHERE user_id = $1 AND diamonds = 9980000", [host.user.id, monday]);
+    assert.equal((await ok(call('GET', '/api/wallet/withdrawals', null, host.session))).rules.weekUsed, 9_980_000, 'Pazartesi 00:00 bu haftanın');
+  });
+
+  test('Yayıncı Merkezi "Bu hafta": haftanın günleri Pazartesi–Pazar, Türkiye saatiyle; geçen haftanın geliri girmez', async () => {
+    const w = await ok(call('GET', '/api/wallet/week', null, host.session));
+    const [{ monday, today }] = (
+      await h.sql.query(
+        "SELECT to_char(date_trunc('week', now() AT TIME ZONE 'Europe/Istanbul'), 'YYYY-MM-DD') AS monday, extract(isodow FROM now() AT TIME ZONE 'Europe/Istanbul')::int - 1 AS today",
+      )
+    ).rows;
+    assert.deepEqual([w.start, w.today, w.days.length], [monday, today, 7]);
+    assert.equal(w.days[today], 99_995, 'bugünkü hediye');
+    assert.equal(w.days.reduce((a, b) => a + b, 0), 99_995);
+    // The same gift moved to a second before this Monday: last week's, so not on the chart.
+    await h.sql.query("UPDATE gift_events SET created_at = date_trunc('week', now() AT TIME ZONE 'Europe/Istanbul') AT TIME ZONE 'Europe/Istanbul' - interval '1 second' WHERE recipient = $1", [host.user.id]);
+    assert.deepEqual((await ok(call('GET', '/api/wallet/week', null, host.session))).days, [0, 0, 0, 0, 0, 0, 0]);
+    assert.equal((await call('GET', '/api/wallet/week', null, null))[0], 401);
   });
 });

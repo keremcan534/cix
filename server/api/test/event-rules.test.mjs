@@ -29,4 +29,19 @@ describe('Etkinlik zaman filtresi', () => {
     const w = windowOf('tomorrow', now, offsetOf(null));
     assert.equal(start >= w.from && start < w.to, false);
   });
+
+  test('"Bu Hafta": bugünden Pazar 23:59:59’a kadar, Türkiye saatiyle, telefonun saat dilimi ne olursa olsun', () => {
+    const at = (y, m, d, h, mi) => Date.UTC(y, m - 1, d, h, mi);
+    // Tuesday 24 November 2026, 13:00 Türkiye: Tuesday 00:00 to Monday 30th 00:00 (Sunday 23:59:59 the last second).
+    for (const off of [180, 0, 60, -300]) {
+      const w = windowOf('week', at(2026, 11, 24, 10, 0), off);
+      assert.deepEqual([iso(w.from), iso(w.to), w.running], ['2026-11-23T21:00:00.000Z', '2026-11-29T21:00:00.000Z', true], String(off));
+    }
+    // Sunday 23:59 Türkiye: only what is left of Sunday.
+    let w = windowOf('week', at(2026, 11, 29, 20, 59), 0);
+    assert.deepEqual([iso(w.from), iso(w.to)], ['2026-11-28T21:00:00.000Z', '2026-11-29T21:00:00.000Z']);
+    // Monday 00:00 Türkiye: the new week, to the next Sunday.
+    w = windowOf('week', at(2026, 11, 29, 21, 0), 0);
+    assert.deepEqual([iso(w.from), iso(w.to)], ['2026-11-29T21:00:00.000Z', '2026-12-06T21:00:00.000Z']);
+  });
 });

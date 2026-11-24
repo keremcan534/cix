@@ -39,8 +39,9 @@ export const AUTO_PART_OFF = {
 };
 
 /** SimilarClub Sistem's categories (system-notices.mjs); each one can be switched off (system_notices_off). */
-export const NOTICE_CATEGORIES = ['voice_call', 'video_call', 'call_paid', 'message_summary', 'message_reward', 'pk', 'rocket', 'event_reward', 'bag_gift', 'bonus', 'performance', 'quota', 'bond'];
+export const NOTICE_CATEGORIES = ['voice_call', 'video_call', 'call_paid', 'message_summary', 'message_reward', 'pk', 'rocket', 'event_reward', 'bag_gift', 'bonus', 'performance', 'quota', 'bond', 'vip'];
 export const NOTICE_LABEL = {
+  vip: 'VIP aylık değerlendirmesi',
   voice_call: 'Sesli arama kazancı',
   video_call: 'Görüntülü arama kazancı',
   call_paid: 'Görüşme işlem bilgisi (ödeyen)',

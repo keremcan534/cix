@@ -9,7 +9,7 @@ import { after, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 
-import { BOND_GIFTS, EXCHANGE, GIFTS, GIFTS_PAUSED, PACKS, exchangeCoins } from '../catalog.mjs';
+import { BOND_GIFTS, COIN_VALUE_TL, EXCHANGE, GIFTS, GIFTS_PAUSED, PACKS, PAYOUT_USD_TRY, exchangeCoins } from '../catalog.mjs';
 import { MARK_GIFTS } from '../profile-mark-rules.mjs';
 import { eventsOf } from '../finance-sync.mjs';
 import { campaignRef } from '../live-registry.mjs';
@@ -93,7 +93,7 @@ describe('Canlı ayarlar para uçlarında', () => {
     // Nor Kaka and Su to an app without Profil izleri (profile-mark-rules.mjs MARK_GIFTS).
     assert.equal(cat.gifts.length, GIFTS.size - GIFTS_PAUSED.size - BOND_GIFTS.size - MARK_GIFTS.size);
     assert.equal(cat.packs.length, PACKS.length);
-    assert.deepEqual(cat.exchange, { usdTry: EXCHANGE.usdTry, minDiamonds: EXCHANGE.minDiamonds });
+    assert.deepEqual(cat.exchange, { usdTry: EXCHANGE.usdTry, coinValueTl: COIN_VALUE_TL, payoutUsdTry: PAYOUT_USD_TRY, diamondsPerUsd: EXCHANGE.diamondsPerUsd, minDiamonds: EXCHANGE.minDiamonds });
     assert.equal(cat.campaign, null);
     assert.equal(cat.v, 0);
   });
@@ -129,7 +129,7 @@ describe('Canlı ayarlar para uçlarında', () => {
     await ok(call('POST', '/api/gifts/send', { to: r.user.id, giftId: 'g6', count: 1, ref: rnd(8) }, s.session));
   });
 
-  test('Çevir canlı kurla: yükselen kur daha çok verir, düşen kur ekranda görüneni korur, tekrar ilk tutarı verir', async () => {
+  test('Çevir canlı kur ve jeton değeriyle: yükselen kur daha çok verir, düşen kur ya da artan jeton değeri ekranda görüneni korur, tekrar ilk tutarı verir; eski uygulamalar güncelleme ister', async () => {
     const fan = await h.signUp('Hayran');
     const host = await h.signUp('Yayıncı');
     await ok(call('POST', '/api/wallet/purchase', { platform: 'test', productId: 'coins_100000', transactionId: rnd(8) }, fan.session));
@@ -137,47 +137,67 @@ describe('Canlı ayarlar para uçlarında', () => {
     await unlock(host.user.id);
     const n = 10_000;
     const exchange = (body) => call('POST', '/api/wallet/exchange', { diamonds: n, ref: rnd(8), ...body }, host.session);
+    const NOW = { usdTry: EXCHANGE.usdTry, coinValueTl: COIN_VALUE_TL };
+    const OLD = { error: 'Çevirme kuru değişti. Güncel tutar için uygulamayı güncelle', code: 'update_required' };
 
-    // The compiled rate: old apps (no usdTry) and new ones get the same.
-    assert.equal((await ok(exchange({}))).coins, exchangeCoins(n));
-    assert.equal((await ok(exchange({ usdTry: EXCHANGE.usdTry }))).coins, exchangeCoins(n));
+    // The compiled values: an app that sends both gets the compiled sum. Apps from before 24 Nov 2026 priced coins
+    // like the old best pack and send no coin value: refused, whatever their rate, nothing moves.
+    assert.equal((await ok(exchange(NOW))).coins, exchangeCoins(n));
+    let before = await balance(host.user.id);
+    for (const old of [{}, { usdTry: EXCHANGE.usdTry }, { coinValueTl: COIN_VALUE_TL }]) {
+      const [st, j] = await exchange(old);
+      assert.equal(st, 409, JSON.stringify(old));
+      assert.deepEqual(j, OLD);
+    }
+    assert.deepEqual(await balance(host.user.id), before, 'eski uygulamadan hiçbir şey alınmadı');
 
     await setLive({ exchange_usd_try: 52 });
     assert.equal((await catalog()).exchange.usdTry, 52);
     const up = exchangeCoins(n, 52);
     assert.ok(up > exchangeCoins(n));
-    assert.equal((await ok(exchange({}))).coins, up, 'eski uygulama yüksek kurdan alır');
-    assert.equal((await ok(exchange({ usdTry: EXCHANGE.usdTry }))).coins, up, 'ekranda eski kur görünse de yenisi verilir');
+    assert.equal((await ok(exchange(NOW))).coins, up, 'ekranda eski kur görünse de yenisi verilir');
     const kept = rnd(8);
-    const first = await ok(call('POST', '/api/wallet/exchange', { diamonds: n, ref: kept, usdTry: 52 }, host.session));
+    const first = await ok(call('POST', '/api/wallet/exchange', { diamonds: n, ref: kept, usdTry: 52, coinValueTl: COIN_VALUE_TL }, host.session));
     assert.deepEqual([first.replay, first.coins], [false, up]);
     const [row] = await q("SELECT detail FROM ledger WHERE user_id = $1 AND currency = 'diamond' AND ref = $2", [host.user.id, kept]);
-    assert.deepEqual([row.detail.coins, row.detail.usdTry], [up, 52]);
+    assert.deepEqual([row.detail.coins, row.detail.usdTry, row.detail.coinValueTl], [up, 52, COIN_VALUE_TL]);
 
     // The screen showed more than the server gives now: refused, nothing moves.
-    let before = await balance(host.user.id);
-    let [st, j] = await exchange({ usdTry: 55 });
+    before = await balance(host.user.id);
+    let [st, j] = await exchange({ usdTry: 55, coinValueTl: COIN_VALUE_TL });
     assert.equal(st, 409);
-    assert.deepEqual(j, { error: 'Kur değişti, yeni tutarı kontrol et', code: 'rate_changed', usdTry: 52, coins: up });
-    [st, j] = await exchange({ usdTry: '52' });
+    assert.deepEqual(j, { error: 'Kur değişti, yeni tutarı kontrol et', code: 'rate_changed', usdTry: 52, coinValueTl: COIN_VALUE_TL, diamondsPerUsd: EXCHANGE.diamondsPerUsd, coins: up });
+    [st, j] = await exchange({ usdTry: '52', coinValueTl: COIN_VALUE_TL });
     assert.equal(st, 409, 'sayı olmayan kur');
+    assert.equal(j.code, 'rate_changed');
+    [st, j] = await exchange({ usdTry: 52, coinValueTl: '220' });
+    assert.equal(st, 409, 'sayı olmayan jeton değeri');
     assert.equal(j.code, 'rate_changed');
     assert.deepEqual(await balance(host.user.id), before);
 
-    await setLive({ exchange_usd_try: 47 });
-    before = await balance(host.user.id);
-    [st, j] = await exchange({});
+    // A dearer coin gives fewer coins: the screen that showed the cheaper one is refused with the new amount.
+    await setLive({ coin_value_tl: 250 });
+    assert.equal((await catalog()).exchange.coinValueTl, 250);
+    const dear = exchangeCoins(n, 52, 250);
+    assert.ok(dear < up);
+    [st, j] = await exchange({ usdTry: 52, coinValueTl: COIN_VALUE_TL });
     assert.equal(st, 409);
-    assert.deepEqual(j, { error: 'Çevirme kuru değişti. Güncel tutar için uygulamayı güncelle', code: 'update_required' });
-    assert.deepEqual(await balance(host.user.id), before, 'eski uygulamadan hiçbir şey alınmadı');
-    assert.equal((await ok(exchange({ usdTry: 47 }))).coins, exchangeCoins(n, 47));
+    assert.deepEqual(j, { error: 'Kur değişti, yeni tutarı kontrol et', code: 'rate_changed', usdTry: 52, coinValueTl: 250, diamondsPerUsd: EXCHANGE.diamondsPerUsd, coins: dear });
+    assert.deepEqual(await balance(host.user.id), before);
+    assert.equal((await ok(exchange({ usdTry: 52, coinValueTl: 250 }))).coins, dear);
+    // A cheaper coin gives more: the screen's amount is kept or beaten.
+    await setLive({ coin_value_tl: 200 });
+    assert.equal((await ok(exchange({ usdTry: 52, coinValueTl: 250 }))).coins, exchangeCoins(n, 52, 200));
+    await setLive({ coin_value_tl: null });
+
+    await setLive({ exchange_usd_try: 47 });
+    assert.equal((await ok(exchange({ usdTry: 47, coinValueTl: COIN_VALUE_TL }))).coins, exchangeCoins(n, 47));
 
     // The ref that went through at 52: its own coins, not today's amount or body.
-    const again = await ok(call('POST', '/api/wallet/exchange', { diamonds: 20_000, ref: kept, usdTry: 47 }, host.session));
+    const again = await ok(call('POST', '/api/wallet/exchange', { diamonds: 20_000, ref: kept, usdTry: 47, coinValueTl: COIN_VALUE_TL }, host.session));
     assert.deepEqual([again.replay, again.coins], [true, up]);
-    // Old apps work again once the rate is back at the compiled one.
     await setLive({ exchange_usd_try: null });
-    assert.equal((await ok(exchange({}))).coins, exchangeCoins(n));
+    assert.equal((await ok(exchange(NOW))).coins, exchangeCoins(n));
   });
 
   test('gizlenen paket katalogda yok, satın alınmışsa yine yüklenir', async () => {
@@ -195,14 +215,15 @@ describe('Canlı ayarlar para uçlarında', () => {
 
   test('jeton paketleri: ek jeton, ilk alım hediyesi ve sıra panelden; ek jeton her alımda verilir, iadede geri alınır', async () => {
     // p2 first, p1 second, the rest as they were.
-    const setup = Object.fromEntries(PACKS.map((p, i) => [p.id, { extra: 0, first: null, order: i + 1 }]));
+    const rest = PACKS.filter((p) => p.id !== 'p1' && p.id !== 'p2');
+    const setup = Object.fromEntries(rest.map((p, i) => [p.id, { extra: 0, first: null, order: i + 3 }]));
     setup.p2 = { extra: 500, first: 1_000, order: 1 };
     setup.p1 = { extra: 0, first: null, order: 2 };
     await setLive({ pack_setup: setup });
     const cat = await catalog();
     assert.equal(cat.packs[0].id, 'p2');
     assert.deepEqual([cat.packs[0].extra, cat.packs[0].firstBonus], [500, 1_000]);
-    assert.equal(cat.packs.at(-1).id, 'p9');
+    assert.equal(cat.packs.at(-1).id, PACKS.at(-1).id);
     const u = await h.signUp('Ek jetonlu');
     const first = await ok(call('POST', '/api/wallet/purchase', { platform: 'test', productId: 'coins_5000', transactionId: rnd(8) }, u.session));
     assert.deepEqual([first.coins, first.bonus, first.extra], [5_000, 1_000, 500]);
@@ -234,11 +255,11 @@ describe('Canlı ayarlar para uçlarında', () => {
 
     await setLive({ withdraw_weekly_diamonds: 60_000 });
     let rules = (await ok(call('GET', '/api/wallet/withdrawals', null, host.session))).rules;
-    assert.deepEqual(rules, { minDiamonds: 50_000, maxDiamonds: 5_000_000, weeklyDiamonds: 60_000, weekUsed: 0 });
+    assert.deepEqual(rules, { minDiamonds: 10_000, maxDiamonds: 1_000_000, weeklyDiamonds: 60_000, weekUsed: 0 });
     const before = await balance(host.user.id);
     let [st, j] = await ask(70_000);
     assert.equal(st, 400);
-    assert.equal(j.error, '7 günde en çok 60.000 elmas çekilebilir');
+    assert.equal(j.error, 'Haftada (Pazartesi–Pazar) en çok 60.000 elmas çekilebilir');
     assert.deepEqual(await balance(host.user.id), before);
 
     const ref = rnd(8);
@@ -247,17 +268,17 @@ describe('Canlı ayarlar para uçlarında', () => {
 
     await setLive({ withdraw_max_diamonds: 50_000 });
     rules = (await ok(call('GET', '/api/wallet/withdrawals', null, host.session))).rules;
-    assert.deepEqual(rules, { minDiamonds: 50_000, maxDiamonds: 50_000, weeklyDiamonds: 60_000, weekUsed: 60_000 });
+    assert.deepEqual(rules, { minDiamonds: 10_000, maxDiamonds: 50_000, weeklyDiamonds: 60_000, weekUsed: 60_000 });
     // The request made under the old limit: a retry is its replay, not a 400.
     const again = await ok(ask(60_000, ref));
     assert.deepEqual([again.replay, again.withdrawal.id], [true, w.withdrawal.id]);
     [st, j] = await ask(55_000);
     assert.equal(st, 400);
-    assert.equal(j.error, 'Tek seferde en az 50.000, en çok 50.000 elmas çekilebilir');
+    assert.equal(j.error, 'Tek seferde en az 10.000, en çok 50.000 elmas çekilebilir');
 
     await setLive({ withdraw_max_diamonds: null, withdraw_weekly_diamonds: null });
     rules = (await ok(call('GET', '/api/wallet/withdrawals', null, host.session))).rules;
-    assert.deepEqual([rules.maxDiamonds, rules.weeklyDiamonds], [5_000_000, 10_000_000]);
+    assert.deepEqual([rules.maxDiamonds, rules.weeklyDiamonds], [1_000_000, 10_000_000]);
   });
 
   test('saatlik SMS sınırı 0: kod gönderimi 503, geri açınca çalışır', async () => {

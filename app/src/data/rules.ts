@@ -8,13 +8,17 @@ export const LUCKY_RECIPIENT_SHARE = 0.2;
 
 export type Rules = {
   version: number;
-  diamondsPerUsd: number; // 5.000 elmas = 1 USD
+  diamondsPerUsd: number; // 1 USD = ? elmas (owners, 24 Nov 2026: 1.000; Canlı ayarlar › diamonds_per_usd)
   /** TL per USD used for TL values of diamonds (Coins Bank conversion); updated with the pack prices. */
   usdTry: number;
-  /** Coins Bank's selling price, coins per TL (the 1.000.000-coin pack: 23.599,99 TL). */
+  /** What 1.000 coins are worth in TL (Canlı ayarlar › coin_value_tl; owners, 24 Nov 2026: 220 TL). */
+  coinValueTl: number;
+  /** Ödeme kuru: the TL a USD is paid at to hosts and agencies (Canlı ayarlar › payout_usd_try; 24 Nov 2026: 49). */
+  payoutUsdTry: number;
+  /** Coins per TL at the coin value (1.000 / coinValueTl): Çevir's and the Coins Bank's selling price. */
   coinsBankRetailCoinsPerTl: number;
-  /** Coins Bank margin when it buys coins from management (wholesale). */
-  coinsBankWholesaleFee: number;
+  /** What the Coins Bank pays management for 1.000 coins (Canlı ayarlar › jeton_wholesale_tl; 24 Nov 2026: 220 TL). */
+  coinsBankWholesaleTlPer1000: number;
   /** Coins Bank margin when it pays a host/agency their diamonds and turns them into coins (main account only). */
   coinsBankExchangeFee: number;
   /** Lucky gifts: share of the gift value written to the recipient as diamonds (the rest funds the rewards). */
@@ -45,7 +49,7 @@ export type Rules = {
   bonusCashable: number; // 0 = bonus credits can never be withdrawn
   // Host & agency lifecycle
   hostAgencyJoinDays: number; // unaffiliated host moves to the management account after N days
-  agencyHostInactiveDays: number; // inactive + no withdrawal for N days → host leaves the agency
+  agencyHostInactiveDays: number; // offline for N days → host leaves the agency (owners 24 Nov 2026: 60, fixed)
   agencyActivationHosts: number; // hosts needed to become an active agency
   agencyActivationEarners: number; // of which at least N must earn ≥ agencyActivationEarnUsd
   agencyActivationEarnUsd: number;
@@ -57,10 +61,12 @@ export type Rules = {
 
 export const DEFAULT_RULES: Rules = {
   version: 1,
-  diamondsPerUsd: 5_000,
-  usdTry: 49.8,
-  coinsBankRetailCoinsPerTl: 1_000_000 / 23_599.99,
-  coinsBankWholesaleFee: 0.02,
+  diamondsPerUsd: 1_000,
+  usdTry: 50.62,
+  coinValueTl: 220,
+  payoutUsdTry: 49,
+  coinsBankRetailCoinsPerTl: 1_000 / 220,
+  coinsBankWholesaleTlPer1000: 220,
   coinsBankExchangeFee: 0.03,
   luckyHostShare: LUCKY_RECIPIENT_SHARE,
   agencyCommission: 0.4,
@@ -71,21 +77,21 @@ export const DEFAULT_RULES: Rules = {
   videoCallBonus: 0.05,
   roomEventBonus: 0.02,
   bonusCapPerWeek: 500_000,
-  minWithdrawDiamonds: 50_000,
+  minWithdrawDiamonds: 10_000,
   exchangeMinDiamonds: 100,
   inviteUnitsPerPurchase: 1,
   inviteIncomeShare: 0.08,
   inviteRechargeShare: 0.04,
   creatorDiamondsPerCoin: 1,
   bdCommission: 0.05,
-  maxWithdrawDiamonds: 5_000_000,
+  maxWithdrawDiamonds: 1_000_000,
   weeklyWithdrawLimitDiamonds: 10_000_000,
   autoApproveUnderDiamonds: 250_000,
   pendingDays: 7,
   jetonPendingDays: 1,
   bonusCashable: 0,
   hostAgencyJoinDays: 3,
-  agencyHostInactiveDays: 90,
+  agencyHostInactiveDays: 60,
   agencyActivationHosts: 20,
   agencyActivationEarners: 10,
   agencyActivationEarnUsd: 10,

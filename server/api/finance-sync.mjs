@@ -43,7 +43,7 @@
 //   and their refunds (held coins; an accepted bond is a gift), diamond debits other than refunds (withdrawals
 //   included: the panel has no payout event type and records payouts itself), game coins.
 import { HttpError, auth, db, env } from './core.mjs';
-import { PACK_BY_PRODUCT } from './catalog.mjs';
+import { PACK_BY_PRODUCT, PACK_TL_BEFORE } from './catalog.mjs';
 import { dayMinutes } from './media-minutes.mjs';
 
 const KEY = env.FINANCE_API_KEY ?? '';
@@ -80,7 +80,9 @@ export function eventsOf(r) {
     if (d.purchase && store) {
       const pack = PACK_BY_PRODUCT.get(r.product_id);
       const out = [];
-      if (pack) out.push({ type: 'purchase', idempotency_key: `purchase-${d.purchase}`, occurred_at: at, user_ref: r.user_id, channel: store, amount: money(pack.tl), currency: 'TRY', coins: Number(r.p_coins), product_ref: r.product_id });
+      // The price written on the purchase (migration 119); one without it, at its pack's price before 24 Nov 2026.
+      const priceTl = r.p_price_tl !== null && r.p_price_tl !== undefined ? Number(r.p_price_tl) : (PACK_TL_BEFORE[r.product_id] ?? pack?.tl);
+      if (pack) out.push({ type: 'purchase', idempotency_key: `purchase-${d.purchase}`, occurred_at: at, user_ref: r.user_id, channel: store, amount: money(priceTl), currency: 'TRY', coins: Number(r.p_coins), product_ref: r.product_id });
       if (Number(r.p_bonus) > 0) out.push({ type: 'bonus_grant', idempotency_key: `purchase-${d.purchase}-bonus`, occurred_at: at, user_ref: r.user_id, coins: Number(r.p_bonus), campaign_ref: 'ilk_alim_hediyesi' });
       // A pack's extra coins (Canlı ayarlar › Jeton paketleri), a gift like the first-purchase one.
       if (Number(r.p_extra) > 0) out.push({ type: 'bonus_grant', idempotency_key: `purchase-${d.purchase}-ek`, occurred_at: at, user_ref: r.user_id, coins: Number(r.p_extra), campaign_ref: 'paket_ek_jeton' });
@@ -162,7 +164,7 @@ export async function syncOnce() {
   const rows = (
     await db.query(
       `SELECT l.id, l.user_id, l.currency, l.amount, l.reason, l.ref, l.counterparty, l.channel, l.detail, l.created_at,
-              p.platform, p.product_id, p.coins AS p_coins, p.bonus AS p_bonus, p.sandbox AS p_sandbox,
+              p.platform, p.product_id, p.coins AS p_coins, p.bonus AS p_bonus, p.sandbox AS p_sandbox, p.price_tl AS p_price_tl,
               p.campaign_bonus AS p_campaign_bonus, p.campaign_ref AS p_campaign_ref, p.extra AS p_extra, g.gift_id, g.room AS gift_room
          FROM ledger l
          LEFT JOIN purchases p ON p.id = (l.detail->>'purchase')::bigint

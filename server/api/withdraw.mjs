@@ -23,7 +23,7 @@
 // on a database that ever held play coins, requests can be made, cancelled and rejected but never paid.
 // Finance Control gets no event for this: its ingest has no payout type, and payouts are booked there.
 import { HttpError, auth, claimRef, clientIp, db, int, move, once, readJson, selfUser, text, tx } from './core.mjs';
-import { WITHDRAW, diamondValueUsd } from './catalog.mjs';
+import { WITHDRAW, diamondValueUsd, payoutTl } from './catalog.mjs';
 import { live } from './live-settings.mjs';
 import { notify } from './push.mjs';
 import { assertCashOut, cashOutOf } from './streamer-rule.mjs';
@@ -58,6 +58,9 @@ const view = (w) => ({
   id: Number(w.id),
   diamonds: Number(w.diamonds),
   usd: Number(w.usd),
+  // Paid: the payout rate and the TL written on it when it was marked paid (migration 120).
+  payUsdTry: w.pay_usd_try === null || w.pay_usd_try === undefined ? null : Number(w.pay_usd_try),
+  payTl: w.pay_tl === null || w.pay_tl === undefined ? null : Number(w.pay_tl),
   method: w.method,
   holder: w.holder,
   account: w.account,
@@ -76,12 +79,17 @@ async function admin(req) {
 const audit = (c, actor, action, target, detail, ip) =>
   c.query('INSERT INTO audit_events (actor, action, target, detail, ip) VALUES ($1,$2,$3,$4,$5)', [actor, action, target, JSON.stringify(detail), ip]);
 
-/** The rules in effect now: the compiled minimum, the live largest request and 7-day limit. */
+/** The rules in effect now: the compiled minimum, the live largest request and weekly limit. */
 const rulesNow = (s = live()) => ({ minDiamonds: WITHDRAW.minDiamonds, maxDiamonds: s.withdrawMax, weeklyDiamonds: s.withdrawWeekly });
 
-/** Diamonds in requests open or paid in the last 7 days. */
+/**
+ * Diamonds in requests open or paid this week: the app's week (owners, 24 Nov 2026), Monday 00:00 to Sunday
+ * 23:59:59, Turkey time. The limit starts again every Monday 00:00.
+ */
 const weekUsed = async (c, userId) =>
-  Number((await c.query("SELECT coalesce(sum(diamonds), 0) AS n FROM withdrawals WHERE user_id = $1 AND status IN ('pending', 'paid') AND created_at > now() - interval '7 days'", [userId])).rows[0].n);
+  Number(
+    (await c.query(`SELECT coalesce(sum(diamonds), 0) AS n FROM withdrawals WHERE user_id = $1 AND status IN ('pending', 'paid') AND created_at >= (date_trunc('week', now() AT TIME ZONE 'Europe/Istanbul') AT TIME ZONE 'Europe/Istanbul')`, [userId])).rows[0].n,
+  );
 
 /** Locks the owner's account row, then the request, and returns the request (still pending or not). */
 async function lockRequest(c, id, owner = null) {
@@ -103,7 +111,8 @@ export const withdrawRoutes = {
     const n = int(b.diamonds, WITHDRAW.minDiamonds, WITHDRAW.maxDiamonds);
     if (!n) throw new HttpError(400, range);
     const { method, holder, account } = payoutDetails(b.method, b.details);
-    const usd = diamondValueUsd(n);
+    // At the diamond's value in effect (Canlı ayarlar › diamonds_per_usd); the request keeps it.
+    const usd = diamondValueUsd(n, live().diamondsPerUsd);
     const ip = clientIp(req);
     const out = await once(u.id, 'diamond', b.ref, async (c) => {
       // A second copy of the same request waits on the row, then finds the ref (a replay).
@@ -112,12 +121,13 @@ export const withdrawRoutes = {
       // Who may take money out, and the live limits, after the ref check: a retry of a request that went through replays.
       await assertCashOut(c, u.id);
       if (n > rules.maxDiamonds) throw new HttpError(400, range);
-      if (n > rules.weeklyDiamonds) throw new HttpError(400, `7 günde en çok ${fmt(rules.weeklyDiamonds)} elmas çekilebilir`);
+      if (n > rules.weeklyDiamonds) throw new HttpError(400, `Haftada (Pazartesi–Pazar) en çok ${fmt(rules.weeklyDiamonds)} elmas çekilebilir`);
       if ((await c.query("SELECT 1 FROM withdrawals WHERE user_id = $1 AND status = 'pending'", [u.id])).rowCount) {
         throw new HttpError(409, 'Bekleyen bir çekim talebin var; sonuçlanınca yenisini açabilirsin');
       }
       const used = await weekUsed(c, u.id);
-      if (used + n > rules.weeklyDiamonds) throw new HttpError(409, `7 günde en çok ${fmt(rules.weeklyDiamonds)} elmas çekilebilir; kalan ${fmt(Math.max(0, rules.weeklyDiamonds - used))} elmas`);
+      if (used + n > rules.weeklyDiamonds)
+        throw new HttpError(409, `Bu hafta en çok ${fmt(rules.weeklyDiamonds)} elmas çekilebilir; kalan ${fmt(Math.max(0, rules.weeklyDiamonds - used))} elmas. Sınır Pazartesi 00:00'da yenilenir`);
       const w = await c.query(
         'INSERT INTO withdrawals (user_id, diamonds, usd, method, holder, account, play, ref, ip) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id',
         [u.id, n, usd, method, holder, account, PLAY_MONEY, b.ref, ip],
@@ -171,9 +181,19 @@ export const withdrawRoutes = {
       [status],
     );
     const playMoney = PLAY_MONEY || (await everHadPlayMoney(db));
+    // The TL to send now, at the payout rate in effect (Canlı ayarlar › payout_usd_try); the decision sends it back.
+    const rate = live().payoutUsdTry;
     return {
       playMoney,
-      rows: r.rows.map((w) => ({ ...view(w), user: { id: w.user_id, name: w.name, phone: w.phone ?? null }, play: w.play, payable: w.status === 'pending' && !w.play && !playMoney, decidedBy: w.decided_by })),
+      payUsdTry: rate,
+      rows: r.rows.map((w) => ({
+        ...view(w),
+        tlNow: payoutTl(Number(w.usd), rate),
+        user: { id: w.user_id, name: w.name, phone: w.phone ?? null },
+        play: w.play,
+        payable: w.status === 'pending' && !w.play && !playMoney,
+        decidedBy: w.decided_by,
+      })),
     };
   },
 
@@ -195,9 +215,23 @@ export const withdrawRoutes = {
         throw new HttpError(409, 'Bu sunucuda test jetonu var; çekim ödenemez, yalnızca reddedilebilir');
       }
       const status = b.approve ? 'paid' : 'rejected';
-      const done = (await c.query('UPDATE withdrawals SET status = $2, note = $3, decided_by = $4, decided_at = now() WHERE id = $1 RETURNING *', [id, status, note, a.id])).rows[0];
+      // Paid: at the payout rate in effect, which must be the one the panel showed (payUsdTry); else nothing changes.
+      const rate = live().payoutUsdTry;
+      if (b.approve && b.payUsdTry !== undefined && b.payUsdTry !== null && !(typeof b.payUsdTry === 'number' && Math.round(b.payUsdTry * 100) === Math.round(rate * 100))) {
+        throw Object.assign(new HttpError(409, 'Ödeme kuru değişti; yeni TL tutarını kontrol et'), { extra: { code: 'rate_changed', payUsdTry: rate, tl: payoutTl(Number(w.usd), rate) } });
+      }
+      const done = (
+        await c.query('UPDATE withdrawals SET status = $2, note = $3, decided_by = $4, decided_at = now(), pay_usd_try = $5, pay_tl = $6 WHERE id = $1 RETURNING *', [
+          id,
+          status,
+          note,
+          a.id,
+          b.approve ? rate : null,
+          b.approve ? payoutTl(Number(w.usd), rate) : null,
+        ])
+      ).rows[0];
       if (!b.approve) await giveBack(c, w, 'Para çekme talebi reddedildi', a.id);
-      await audit(c, a.id, b.approve ? 'withdrawal.paid' : 'withdrawal.reject', w.user_id, { withdrawal: id, diamonds: Number(w.diamonds), usd: Number(w.usd), note }, ip);
+      await audit(c, a.id, b.approve ? 'withdrawal.paid' : 'withdrawal.reject', w.user_id, { withdrawal: id, diamonds: Number(w.diamonds), usd: Number(w.usd), ...(b.approve && { payUsdTry: rate, payTl: Number(done.pay_tl) }), note }, ip);
       return done;
     });
     notify([w.user_id], {

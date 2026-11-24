@@ -17,6 +17,7 @@ export const EXPORTED = [
   'events', 'event_reservations', 'event_participants', 'event_reminders_sent', 'event_reminder_optout',
   'agency_assistants', 'agency_assistant_ledger', 'level_drops', 'level_offsets', 'guards', 'guard_settings',
   'message_holds', 'auto_templates', 'auto_quota', 'auto_sends', 'profile_marks', 'private_album_photos', 'private_album_unlocks',
+  'host_bonuses', 'vip_points', 'vip_evaluations', 'vip_extensions',
 ];
 
 /** Tables that point at an account but are not that person's to receive, with the reason. */
@@ -54,6 +55,7 @@ export const NOT_EXPORTED = {
   agency_parents: 'an agency’s own records',
   agency_payout_history: 'an agency’s own records',
   agency_payouts: 'an agency’s own records',
+  host_bonus_runs: 'one row per week of the streamer bonus; paid_by names the staff member who paid a skipped week (the person’s own bonuses are in host_bonuses)',
   agency_perf_runs: 'an agency’s own records',
   agency_periods: 'an agency’s own records',
   agency_rates: 'an agency’s own records',

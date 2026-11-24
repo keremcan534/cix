@@ -439,7 +439,8 @@ export function levelsPayload() {
   return {
     rev: snap.rev,
     perks: PERKS.filter((p) => p.ready).map(({ key, name }) => ({ key, name })),
-    vip: { levels: d.vip.levels, perks: shown(d.vip.perks), decay: decay(d.vip.decay) },
+    // VIP's drop is the monthly keep rule (vip-month.mjs), not the inactivity one: none here.
+    vip: { levels: d.vip.levels, perks: shown(d.vip.perks), decay: null },
     noble: { levels: d.noble.levels, perks: shown(d.noble.perks) },
     wealth: { points: d.wealth.levels.map((l) => l.points), groups: d.wealth.groups, perks: shown(d.wealth.perks), decay: decay(d.wealth.decay) },
     charm: { points: d.charm.levels.map((l) => l.points), groups: d.charm.groups, perks: shown(d.charm.perks), decay: decay(d.charm.decay) },

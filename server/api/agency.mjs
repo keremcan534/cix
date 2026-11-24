@@ -51,7 +51,7 @@ import {
   usdOf,
   viewerOf,
 } from './agency-lib.mjs';
-import { activityOf, candidatePayoutText } from './agency-activity.mjs';
+import { levelName, levelView } from './agency-levels.mjs';
 import {
   HELD_MSG,
   LEAVE_MSG,
@@ -140,10 +140,9 @@ const card = (a, s) => ({
   level: a.level,
   status: a.status,
   parentId: a.parent_id,
-  tier: a.tier,
-  tierName: tierName(s, a.tier),
-  // Aday ajans / aktif ajans (agency-activity.mjs), as last worked out; an older app ignores it.
-  activity: a.activity ?? 'candidate',
+  // The last closed week's level (agency-levels.mjs); its name only for a level the app shows (Bronz and up).
+  tier: a.level_key ?? null,
+  tierName: levelName(s, a.level_key),
   country: a.country,
   region: a.region,
   createdAt: a.created_at,
@@ -406,10 +405,11 @@ export const agencyRoutes = {
       const e = (
         await db.query(
           `SELECT coalesce(sum(amount) FILTER (WHERE created_at >= date_trunc('day', now() AT TIME ZONE 'Europe/Istanbul') AT TIME ZONE 'Europe/Istanbul'), 0) AS today,
-                  coalesce(sum(amount) FILTER (WHERE created_at > now() - interval '7 days'), 0) AS week,
+                  -- The app's week (owners, 24 Nov 2026): Monday 00:00 to Sunday 23:59:59, Turkey time.
+                  coalesce(sum(amount) FILTER (WHERE created_at >= (date_trunc('week', now() AT TIME ZONE 'Europe/Istanbul') AT TIME ZONE 'Europe/Istanbul')), 0) AS week,
                   coalesce(sum(amount) FILTER (WHERE created_at > now() - interval '30 days'), 0) AS month,
                   coalesce(sum(amount) FILTER (WHERE created_at > now() - interval '60 days' AND created_at <= now() - interval '30 days'), 0) AS prev_month,
-                  coalesce(sum(amount) FILTER (WHERE kind = 'direct' AND created_at > now() - interval '30 days'), 0) AS direct30,
+                  coalesce(sum(amount) FILTER (WHERE kind IN ('direct', 'level') AND created_at > now() - interval '30 days'), 0) AS direct30,
                   coalesce(sum(amount) FILTER (WHERE kind = 'difference' AND created_at > now() - interval '30 days'), 0) AS difference30,
                   coalesce(sum(amount) FILTER (WHERE kind = 'transition' AND created_at > now() - interval '30 days'), 0) AS transition30,
                   coalesce(sum(amount) FILTER (WHERE kind = 'assistant' AND created_at > now() - interval '30 days'), 0) AS assistant30
@@ -443,10 +443,14 @@ export const agencyRoutes = {
       parent,
       request: indep.rowCount ? transferView(indep.rows[0], await namesFor(db, indep.rows)) : null,
       notices: ['owner', 'staff'].includes(viewerOf(x.acc, a)) ? notices.rows.map((r) => ({ id: Number(r.id), kind: r.kind, title: r.title, body: r.body, createdAt: r.created_at })) : [],
+      // Older apps draw these (the retired tiers and pool); the weekly levels the app shows are `levels`.
       tiers: x.s.tiers,
       poolCap: x.s.pool_cap,
-      // Aday ajans / aktif ajans with its progress (agency-activity.mjs): streamers, earners, this month's new ones.
-      activity: a.status === 'approved' ? await activityOf(db, a) : null,
+      levels: x.s.weekly_levels.levels.filter((l) => l.shown).map((l) => ({ key: l.key, name: l.name, rate: l.rate, from: l.from })),
+      // Aday ajans / aktif ajans ended (24 Nov 2026): none, so an app hides its card.
+      activity: null,
+      // This week's level so far and last week's (agency-levels.mjs levelView).
+      level: a.status === 'approved' || a.status === 'suspended' ? await levelView(db, a, x.s) : null,
     };
   },
 
@@ -607,7 +611,7 @@ export const agencyRoutes = {
       return { csv: [head.join(','), ...lines].join('\n'), rows: rows.length };
     }
     const sum = (k) => d4(rows.filter((x) => x.kind === k).reduce((s, x) => s + x.amount, 0));
-    return { rows, totals: { direct: sum('direct'), difference: sum('difference'), transition: sum('transition'), assistant: sum('assistant'), fees: sum('transfer_fee'), adjustments: d4(sum('adjustment') + sum('reversal')) } };
+    return { rows, totals: { direct: d4(sum('direct') + sum('level')), level: sum('level'), difference: sum('difference'), transition: sum('transition'), assistant: sum('assistant'), fees: sum('transfer_fee'), adjustments: d4(sum('adjustment') + sum('reversal')) } };
   },
 
   async 'GET /api/agency/performance'(req, url) {
@@ -675,7 +679,7 @@ export const agencyRoutes = {
     if (permsOn(x.acc, a, x.s).has('reports.commission')) {
       const r = await db.query(
         // direct: what the agency keeps of its own streamers' commission, after an agency assistant's share.
-        `SELECT ${bucket.replace('%s', 'created_at')} AS b, coalesce(sum(amount) FILTER (WHERE kind IN ('direct', 'assistant')), 0) AS direct, coalesce(sum(amount) FILTER (WHERE kind = 'difference'), 0) AS difference,
+        `SELECT ${bucket.replace('%s', 'created_at')} AS b, coalesce(sum(amount) FILTER (WHERE kind IN ('direct', 'assistant', 'level')), 0) AS direct, coalesce(sum(amount) FILTER (WHERE kind = 'difference'), 0) AS difference,
                 coalesce(sum(amount) FILTER (WHERE kind = 'transition'), 0) AS transition, coalesce(sum(amount), 0) AS total
            FROM agency_ledger WHERE agency_id = $1 AND created_at >= $2 AND created_at < $3 GROUP BY 1 ORDER BY 1`,
         [a.id, from, to],
@@ -958,9 +962,6 @@ export const agencyRoutes = {
       const total = d4(rows.rows.reduce((s, l) => s + Number(l.amount), 0));
       if (total <= 0) throw new HttpError(409, 'Ödenebilir kazanç yok (dönem kapanınca ödenebilir olur)');
       if (total < x.s.payout_policy.min_diamonds) throw new HttpError(409, `Ödeme alt limiti ${x.s.payout_policy.min_diamonds.toLocaleString('tr-TR')} elmas`);
-      // Aday ajans: its commission is kept, a payout waits until it is active (agency-activity.mjs).
-      const act = await activityOf(c, a, { save: true, actor: x.u.id });
-      if (act.status !== 'active') throw Object.assign(new HttpError(409, candidatePayoutText(act)), { extra: { code: 'agency_candidate' } });
       const p = await c.query('INSERT INTO agency_payouts (agency_id, ref, amount, usd, currency, requested_by) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *', [a.id, r0, total, usdOf(total), b.currency, x.u.id]);
       await c.query('UPDATE agency_ledger SET payout_id = $1 WHERE id = ANY($2::bigint[])', [p.rows[0].id, rows.rows.map((l) => l.id)]);
       await c.query("INSERT INTO agency_payout_history (payout_id, from_status, to_status, actor_id) VALUES ($1, NULL, 'pending', $2)", [p.rows[0].id, x.u.id]);

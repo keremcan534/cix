@@ -129,15 +129,15 @@ describe('Ödeme talebi kontrolleri (validatePayout)', () => {
   });
 
   test('haftalık limit açık + ödenmiş talepleri sayar; kalan tutar doğru yazılır', () => {
-    // 4M paid + 3M open count; the rejected/failed ones and another scope's request do not.
-    const payouts = [po(4_000_000, 'Ödendi'), po(2_000_000, 'Onaylandı'), po(1_000_000, 'Manuel inceleme'), po(3_000_000, 'Reddedildi'), po(2_500_000, 'Başarısız'), po(4_500_000, 'Onaylandı', 'agency')];
+    // 9M paid + 0,5M open count; the rejected/failed ones and another scope's request do not.
+    const payouts = [po(9_000_000, 'Ödendi'), po(300_000, 'Onaylandı'), po(200_000, 'Manuel inceleme'), po(3_000_000, 'Reddedildi'), po(2_500_000, 'Başarısız'), po(4_500_000, 'Onaylandı', 'agency')];
     const s = st(payouts);
-    assert.equal(weeklyUsedFor(s, 'creator'), 7_000_000);
-    const remaining = WEEK - 7_000_000;
+    assert.equal(weeklyUsedFor(s, 'creator'), 9_500_000);
+    const remaining = WEEK - 9_500_000;
     assert.equal(validatePayout(s, 'creator', remaining, 10 * MAX), null, 'tam kalan tutar geçer');
     assert.equal(validatePayout(s, 'creator', remaining + 1, 10 * MAX), `Haftalık limit aşılıyor. Bu hafta kalan: ${fmt(remaining)} 💎.`);
     // Requests from before the session (legacyWeekly) also count.
-    assert.equal(validatePayout(s, 'creator', remaining, 10 * MAX, 1_000_000), `Haftalık limit aşılıyor. Bu hafta kalan: ${fmt(remaining - 1_000_000)} 💎.`);
+    assert.equal(validatePayout(s, 'creator', remaining, 10 * MAX, 100_000), `Haftalık limit aşılıyor. Bu hafta kalan: ${fmt(remaining - 100_000)} 💎.`);
     assert.equal(validatePayout(s, 'creator', MIN, 10 * MAX, WEEK), 'Haftalık limit aşılıyor. Bu hafta kalan: 0 💎.', 'kalan eksiye düşmez');
   });
 
@@ -190,12 +190,12 @@ describe('Ödeme talebi oluşturma (createPayout)', () => {
   });
 
   test('bloke tutar haftalık limitten düşer; hatalı talep hiçbir kayıt bırakmaz', () => {
-    assert.ok(createPayout({ scope: 'creator', diamonds: MAX, available: 3 * MAX, key: 'big-1' }).ok);
-    assert.ok(createPayout({ scope: 'creator', diamonds: MAX - 1_000_000, available: 2 * MAX, key: 'big-2' }).ok);
+    // Ten requests of the most one may ask (1.000.000) fill the week's 10.000.000.
+    for (let i = 0; i < 10; i++) assert.ok(createPayout({ scope: 'creator', diamonds: MAX, available: 20 * MAX, key: `big-${i}` }).ok, `big-${i}`);
     const before = bank();
-    assert.equal(blockedFor(before, 'creator'), 2 * MAX - 1_000_000);
-    const over = createPayout({ scope: 'creator', diamonds: 1_000_001, available: MAX, key: 'big-3' });
-    assert.deepEqual(over, { ok: false, error: `Haftalık limit aşılıyor. Bu hafta kalan: ${fmt(WEEK - (2 * MAX - 1_000_000))} 💎.` });
+    assert.equal(blockedFor(before, 'creator'), WEEK);
+    const over = createPayout({ scope: 'creator', diamonds: MIN, available: 20 * MAX, key: 'big-over' });
+    assert.deepEqual(over, { ok: false, error: 'Haftalık limit aşılıyor. Bu hafta kalan: 0 💎.' });
     const noAccount = createPayout({ scope: 'agency', diamonds: MIN, available: MAX, key: 'ag-1' });
     assert.deepEqual(noAccount, { ok: false, error: 'Önce bir ödeme hesabı ekle.' });
     assert.equal(bank(), before, 'durum değişmedi');

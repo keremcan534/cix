@@ -10,6 +10,7 @@ import { Text, TextInput } from '@/components/text';
 import { Button, Card, Header } from '@/components/ui';
 import { RULES, usd } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
+import { liveRules } from '@/lib/live/catalog-live';
 import { diamondValueTl } from '@/lib/coins-bank';
 import { liveMode, message } from '@/lib/live';
 import { cancelWithdraw, liveWithdraw, loadBanks, sellToBank, useServerWithdrawals, type JetonBank, type ServerWithdrawal } from '@/lib/live/withdraw';
@@ -89,7 +90,7 @@ export default function Withdraw() {
     if (!limits) return null;
     if (!Number.isSafeInteger(d) || d < limits.minDiamonds) return `En az ${fmt(limits.minDiamonds)} elmas çekebilirsin.`;
     if (d > limits.maxDiamonds) return `Tek talepte en çok ${fmt(limits.maxDiamonds)} elmas çekebilirsin.`;
-    if (d > weekLeft) return `7 günde en çok ${fmt(limits.weeklyDiamonds)} elmas çekilebilir; kalan ${fmt(weekLeft)} elmas.`;
+    if (d > weekLeft) return `Bu hafta en çok ${fmt(limits.weeklyDiamonds)} elmas çekilebilir; kalan ${fmt(weekLeft)} elmas. Sınır Pazartesi 00:00'da yenilenir.`;
     if (d > diamonds) return 'Çekilebilir elmasın yetmiyor. Kilitli elmaslar süresi dolunca eklenir.';
     return null;
   };
@@ -107,14 +108,14 @@ export default function Withdraw() {
     if (!bank) return showAlert('Jeton Noktası seç', 'Elmaslarını aktaracağın Jeton Noktasını seç.');
     if (!Number.isSafeInteger(n) || n < jetonMin) return showAlert('Hata', `En az ${fmt(jetonMin)} elmas aktarabilirsin.`);
     if (n > diamonds) return showAlert('Hata', 'Çekilebilir elmasın yetmiyor. Kilitli elmaslar süresi dolunca eklenir.');
-    showAlert(`${bank.name} Jeton Noktası`, `${fmt(n)} elmas hemen ${bank.name} hesabına geçer. Karşılığı yaklaşık ${tl(diamondValueTl(n))}; ödemeyi Jeton Noktası uygulama dışında yapar. Onaylıyor musun?`, [
+    showAlert(`${bank.name} Jeton Noktası`, `${fmt(n)} elmas hemen ${bank.name} hesabına geçer. Karşılığı yaklaşık ${tl(diamondValueTl(n, liveRules()))}; ödemeyi Jeton Noktası uygulama dışında yapar. Onaylıyor musun?`, [
       { text: 'Vazgeç', style: 'cancel' },
       {
         text: 'Aktar',
         onPress: () => {
           setBusy(true);
           sellToBank(bank.id, n)
-            .then((t) => showAlert('Aktarıldı', `${fmt(t.diamonds ?? n)} elmas ${bank.name} hesabına geçti. Sana ödeyeceği tutar: ${tl(t.valueTl ?? diamondValueTl(n))}. Ödeme için Jeton Noktası ile görüş.`))
+            .then((t) => showAlert('Aktarıldı', `${fmt(t.diamonds ?? n)} elmas ${bank.name} hesabına geçti. Sana ödeyeceği tutar: ${tl(t.valueTl ?? diamondValueTl(n, liveRules()))}. Ödeme için Jeton Noktası ile görüş.`))
             .catch((e) => showAlert('Aktarılamadı', message(e)))
             .finally(() => setBusy(false));
         },
@@ -194,7 +195,7 @@ export default function Withdraw() {
           <Text style={styles.dim}>≈ {usd(diamonds)} · Minimum {minD.toLocaleString('tr-TR')} elmas</Text>
           {limits && (
             <Text style={[styles.dim, { textAlign: 'center' }]}>
-              Tek talepte en çok {fmt(limits.maxDiamonds)} elmas · 7 günde en çok {fmt(limits.weeklyDiamonds)} elmas (kalan {fmt(weekLeft)})
+              Tek talepte en çok {fmt(limits.maxDiamonds)} elmas · Haftada (Pzt–Paz) en çok {fmt(limits.weeklyDiamonds)} elmas (kalan {fmt(weekLeft)})
             </Text>
           )}
           {locked > 0 && (
@@ -227,13 +228,13 @@ export default function Withdraw() {
           )}
         </View>
         {jeton ? (
-          jetonOk && <Text style={styles.receive}>Jeton Noktası sana ödeyecek: ≈ {tl(diamondValueTl(n))}</Text>
+          jetonOk && <Text style={styles.receive}>Jeton Noktası sana ödeyecek: ≈ {tl(diamondValueTl(n, liveRules()))}</Text>
         ) : !enough ? (
           <Text style={styles.dim}>
             Para çekmek için en az {fmt(RULES.minWithdrawDiamonds)} çekilebilir elmas gerekli; {fmt(RULES.minWithdrawDiamonds - diamonds)} elmas daha biriktirmelisin.
           </Text>
         ) : (
-          payable && <Text style={styles.receive}>Hesabına geçecek: {live ? money(withdrawUsd(n)) : usd(n)}</Text>
+          payable && <Text style={styles.receive}>Hesabına geçecek: {live ? money(withdrawUsd(n, liveRules().diamondsPerUsd)) : usd(n)}</Text>
         )}
 
         {live && (

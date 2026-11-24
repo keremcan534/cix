@@ -86,10 +86,17 @@ export const PANEL_ROUTES = new Set([
   // Para çekme (withdraw.mjs).
   'GET /api/admin/withdrawals',
   'POST /api/admin/withdrawals/decide',
+  // Yayıncı haftalık bonusu (host-bonus.mjs): the weeks, one week's bonuses, a skipped week paid, a bonus taken back.
+  'GET /api/admin/host-bonus',
+  'POST /api/admin/host-bonus/pay',
+  'POST /api/admin/host-bonus/reverse',
   // Ajans ödemeleri (agency-admin.mjs) and the payout policy they follow.
   'GET /api/admin/agency/payouts',
   'POST /api/admin/agency/payouts/decide',
   'GET /api/admin/agency/settings',
+  // Ajans seviyeleri (agency-levels.mjs): every agency's week, and closing the last week now.
+  'GET /api/admin/agency/levels',
+  'POST /api/admin/agency/levels/run',
   // İadeler and the wallet audit (refunds.mjs, jeton.mjs).
   'GET /api/admin/purchases',
   'POST /api/admin/purchases/refund',

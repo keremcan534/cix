@@ -60,6 +60,14 @@ describe('Para: aynı anda rastgele işlemler', () => {
         if (x !== u) return x;
       }
     };
+    // VIP yükseltme koruma dönemi (vip-month.mjs): on at 1.000 coins; half of them VIP 4 two days before their
+    // evaluation with the month's keep loaded and not moved up, so it is offered to them (once each).
+    const live0 = await ok(call('GET', '/api/admin/live-settings', null, admin.session), 'canlı ayarlar');
+    await ok(call('POST', '/api/admin/live-settings', { changes: { vip_extend_price: 1000, vip_extend_offer_days: 15 }, reason: 'Para testi', baseV: live0.v, confirm: true }, admin.session), 'VIP koruma açık');
+    for (const p of people.slice(0, 5)) {
+      await q("UPDATE users SET svip_xp = 200000, vip_period_start = now() - interval '20 days', vip_eval_at = now() + interval '2 days', vip_period_level = 4, vip_first = false WHERE id = $1", [p.user.id]);
+      await q("INSERT INTO vip_points (user_id, amount, source, at) VALUES ($1, 80000, 'test', now() - interval '1 day')", [p.user.id]);
+    }
     // Şanslı hediye is for adults (lucky.mjs); Cömertlik Lv.2 comes with what they spend here.
     await h.sql.query("UPDATE users SET birth_date = '1990-01-01' WHERE id = ANY($1::uuid[])", [people.map((x) => x.user.id)]);
     /** What Şanslı sheets showed (GET /api/lucky): its version and the packages' prices; an older one is a sheet left open. */
@@ -95,7 +103,7 @@ describe('Para: aynı anda rastgele işlemler', () => {
       [2, async (u) => ['takip', 'POST', '/api/follow', { to: other(u).user.id, follow: random() < 0.7 }, u.session]],
       [4, async (u) => ['özel albüm', 'POST', '/api/user/private-album/unlock', { user: pick(albumOwners).user.id, price: random() < 0.15 ? 450 : 500, ref: rnd(6) }, u.session]],
       [6, async (u) => ['test hediyesi', 'POST', '/api/wallet/gift', { to: other(u).user.id, amount: 1 + Math.floor(random() * 500), ref: rnd(6) }, u.session]],
-      [8, async (u) => ['çevir', 'POST', '/api/wallet/exchange', { diamonds: pick([100, 500, 1000]), ref: rnd(6) }, u.session]],
+      [8, async (u) => ['çevir', 'POST', '/api/wallet/exchange', { usdTry: 50.62, coinValueTl: 220, diamonds: pick([100, 500, 1000]), ref: rnd(6) }, u.session]],
       [5, async (u) => ['bağ isteği', 'POST', '/api/bonds/request', { to: other(u).user.id, kind: pick(['kardes', 'kanka']), ref: rnd(6) }, u.session]],
       [5, async (u) => {
         const id = pick(await bondIds());
@@ -183,6 +191,7 @@ describe('Para: aynı anda rastgele işlemler', () => {
       [4, async (u) => ['jeton noktası satışı', 'POST', '/api/jeton/transfer', { to: u.user.id, coins: pick([500, 1500]), paymentRef: 'HAVALE-1', ref: rnd(6) }, bank.session]],
       [4, async (u) => ['elmas bozdurma', 'POST', '/api/jeton/sell-diamonds', { bank: bank.user.id, diamonds: pick([500, 1000]), ref: rnd(6) }, u.session]],
       // Yönetim jeton yüklemesi: management's bank to a person, and a load taken back while they spend it.
+      [3, async (u) => ['VIP koruma dönemi', 'POST', '/api/vip/extend', { price: random() < 0.15 ? 900 : 1000, ref: rnd(6) }, u.session]],
       [3, async (u) => ['yönetim yüklemesi', 'POST', '/api/admin/jeton/load', { bank: bank.user.id, to: u.user.id, coins: pick([500, 1500]), valueTl: 25, ref: rnd(6) }, admin.session]],
       [2, async () => {
         const t = pick(await q("SELECT id FROM coin_transfers WHERE kind = 'admin_load'"));

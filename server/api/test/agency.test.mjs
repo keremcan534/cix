@@ -1,5 +1,6 @@
 // Agency network against a real Postgres (harness.mjs): the acceptance criteria of both agency specs, end to
-// end over HTTP. Ş1-n = "Üst Ajans, Alt Ajans ve Çok Katmanlı Ajans Yönetim Sistemi" test n; Ş2-n = "Performansa
+// end over HTTP, under the weekly levels (owners, 24 Nov 2026: agency-levels.mjs) that replaced the pool, the
+// parent's difference and the performance engine's rates. Ş1-n = "Üst Ajans, Alt Ajans ve Çok Katmanlı Ajans Yönetim Sistemi" test n; Ş2-n = "Performansa
 // Dayalı Dinamik Komisyon" test n. The steps share one network and run in order: T (top agency), S and S2 (its
 // sub-agencies), streamers tA (T), sA sB sC (S), s2A (S2). Background jobs are off (AGENCY_JOBS=0); the tests
 // run the engine through the centre's routes. The server sells no play money (ALLOW_TEST_TOPUP=0), so payouts
@@ -9,7 +10,7 @@ import assert from 'node:assert/strict';
 
 import { rnd, startApi } from './harness.mjs';
 
-const h = startApi({ AGENCY_JOBS: '0', ALLOW_TEST_TOPUP: '0', AGENCY_INVITES: '1' }); // the invite flow, closed by default (agency-invite-closed.test.mjs)
+const h = startApi({ AGENCY_JOBS: '0', ALLOW_TEST_TOPUP: '0', AGENCY_INVITES: '1', AGENCY_LEVELS_TEST_CLOCK: '1' }); // the invite flow, closed by default (agency-invite-closed.test.mjs)
 const { call, signUp } = h;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -43,6 +44,20 @@ const income = async (streamer, diamonds, type = 'gift') => ok(await admin.post(
 const commissionsOf = (streamer) => q('SELECT * FROM agency_commissions WHERE streamer_id = $1 ORDER BY id', [streamer.id]);
 const ledgerOf = (commissionId) => q('SELECT agency_id, kind, amount, rate FROM agency_ledger WHERE commission_id = $1 ORDER BY id', [commissionId]);
 const setting = async (key, value) => ok(await admin.post('/api/admin/agency/settings', { key, value, reason: 'Test ayarı' }), `ayar ${key}`);
+/** The weekly levels with small numbers (the owners' table: agency-level-rules.mjs); `newWeeks` 0: no new agencies. */
+const LEVELS = (newWeeks = 0) => ({
+  min_active: 2,
+  active_usd: 1,
+  new_weeks: newWeeks,
+  new_level: 'baslangic',
+  levels: [
+    { key: 'gonul_bagi', name: 'Gönül Bağı', rate: 0.35, from: 0, shown: false },
+    { key: 'baslangic', name: 'Başlangıç', rate: 0.5, from: 20000, shown: false },
+    { key: 'bronz', name: 'Bronz', rate: 0.6, from: 40000, shown: true },
+  ],
+});
+/** Closes this week now (the test clock: as if it were next Monday). */
+const closeWeek = () => admin.post('/api/admin/agency/levels/run', { at: new Date(Date.now() + 7 * 86400e3).toISOString() });
 
 describe('Ajans ağı: kurulum ve hiyerarşi', () => {
   test('hesaplar', async () => {
@@ -56,15 +71,7 @@ describe('Ajans ağı: kurulum ve hiyerarşi', () => {
     roles = Object.fromEntries(ok(await admin.get('/api/agency/roles')).roles.map((r) => [r.name, r.id]));
     assert.ok(roles['Yayıncı asistanı'] && roles['BD yöneticisi'] && roles['Finans sorumlusu']);
     // The rules the tests rely on, set through the centre's settings (each change is kept with a reason).
-    await setting('weights', { volume: 40, active: 40, average: 0, growth: 0, retention: 0, acquisition: 0, operations: 0, reliability: 20 });
-    await setting('performance', { window_months: 1, min_active_streamers: 1, promotion_min_periods: 2, demotion_min_periods: 1, max_step: 3 });
-    await setting('tiers', [
-      { key: 'start', name: 'Başlangıç', min_score: 0, sub_rate: 0.25, min_active: 0 },
-      { key: 'growing', name: 'Gelişen', min_score: 40, sub_rate: 0.3, min_active: 1 },
-      { key: 'successful', name: 'Başarılı', min_score: 60, sub_rate: 0.35, min_active: 2 },
-      { key: 'overtook', name: 'Üst ajansı geçmiş', min_score: 60, sub_rate: 0.38, min_active: 2, overtake: true },
-      { key: 'elite', name: 'Çok yüksek performans', min_score: 80, sub_rate: 0.39, min_active: 10, overtake: true },
-    ]);
+    await setting('weekly_levels', LEVELS());
     await setting('payout_policy', { min_diamonds: 1000 });
     // These tests follow a parent into its sub-agencies; by default it sees them by name only (agency-subs-hidden.test.mjs).
     await setting('parent_sees_subs', true);
@@ -191,7 +198,7 @@ describe('Ajans ağı: kurulum ve hiyerarşi', () => {
 
 describe('Komisyon motoru', () => {
   let giftRef;
-  test('[Ş1-8] gerçek hediye: alt ajans %25, üst ajans fark %15, toplam %40; elmaslar dokunulmaz', async () => {
+  test('[Ş1-8] gerçek hediye: yalnız yayıncının ajansı, hafta içinde 0. seviye %35; üst ajans pay almaz; elmaslar dokunulmaz', async () => {
     await storeCoins(gifter, 10000);
     giftRef = ref();
     const g = ok(await gifter.post('/api/gifts/send', { to: sA.id, giftId: 'g5', count: 10, ref: giftRef }));
@@ -200,48 +207,55 @@ describe('Komisyon motoru', () => {
     assert.equal(me.user.diamonds, 5000, 'yayıncının elması tam: komisyon platformdan, ondan kesilmez');
     const [k] = await commissionsOf(sA);
     assert.equal(num(k.base_diamonds), 5000);
-    assert.equal(num(k.total_rate), 0.4);
-    assert.equal(num(k.agency_rate), 0.25);
-    assert.equal(num(k.parent_rate), 0.15);
-    assert.equal(num(k.agency_amount), 1250);
-    assert.equal(num(k.parent_amount), 750);
-    assert.equal(num(k.usd), 0.4, 'komisyon 2000 elmas; 5000 elmas = 1 USD → 0,4 USD');
+    assert.equal(num(k.total_rate), 0.35);
+    assert.equal(num(k.agency_rate), 0.35);
+    assert.equal(num(k.parent_rate), 0);
+    assert.equal(num(k.agency_amount), 1750);
+    assert.equal(num(k.parent_amount), 0);
+    assert.equal(num(k.usd), 1.75, 'komisyon 1750 elmas; 1000 elmas = 1 USD');
     assert.equal(k.agency_id, S.id);
-    assert.equal(k.parent_agency_id, T.id);
+    assert.equal(k.parent_agency_id, T.id, 'ağaçtaki yeri raporlar için kayıtta');
     assert.match(k.txn, /^AKM-\d+$/);
-    assert.match(k.rule_version, /^cap#\d+\|r#/);
+    assert.match(k.rule_version, /^lv#\d+\|w\d{4}-\d{2}-\d{2}$/);
+    assert.ok(k.level_week, 'haftanın seviyesini bekler');
     const l = await ledgerOf(k.id);
-    assert.deepEqual(l.map((x) => [x.agency_id, x.kind, num(x.amount)]), [
-      [S.id, 'direct', 1250],
-      [T.id, 'difference', 750],
-    ]);
+    assert.deepEqual(l.map((x) => [x.agency_id, x.kind, num(x.amount)]), [[S.id, 'direct', 1750]]);
     // More income for the scenario below.
     await income(tA, 10000);
     await income(sB, 20000);
     await income(sC, 20000);
     await income(s2A, 1000);
     const [kt] = await commissionsOf(tA);
-    assert.equal(num(kt.agency_amount), 4000, 'üst ajansın doğrudan yayıncısı: tam %40');
+    assert.equal(num(kt.agency_amount), 3500, 'üst ajansın doğrudan yayıncısı: %35');
     assert.equal(kt.parent_agency_id, null);
 
     // The top agency's panel: today / this week / this month per sub-agency, and per streamer.
     const subS = ok(await tOwner.get(`/api/agency/subagencies?id=${T.id}`)).subagencies.find((x) => x.id === S.id);
     assert.deepEqual(subS.gifts, { day: 45000, week: 45000, month: 45000 });
-    assert.deepEqual(subS.mine, { day: 6750, week: 6750, month: 6750 }, 'üst ajansa geçen fark: 45000 × %15');
+    assert.deepEqual(subS.mine, { day: 0, week: 0, month: 0 }, 'üst ajans alt ajansından fark almaz');
     const rowA = ok(await tOwner.get(`/api/agency/streamers?id=${T.id}&scope=sub`)).streamers.find((x) => x.id === sA.id);
     assert.equal(rowA.week, 5000);
     assert.equal(rowA.month, 5000);
   });
 
-  test('[Ş1-9][Ş2-7] havuz sınırı: hiçbir kayıt %40ı aşmaz; aşan oran ve ayar reddedilir', async () => {
+  test('[Ş1-9][Ş2-7] her kayıt payların toplamı; seviye tablosu %100’ü aşamaz; elle oran ve kademe kapalı', async () => {
     const all = await q('SELECT k.*, (SELECT sum(amount) FROM agency_ledger l WHERE l.commission_id = k.id) AS paid FROM agency_commissions k');
     for (const k of all) {
       assert.ok(num(k.total_rate) <= num(k.pool_cap));
-      assert.equal(num(k.paid), Math.round(num(k.base_diamonds) * num(k.total_rate) * 1e4) / 1e4, `kayıt ${k.txn}: paylar toplamı = matrah × toplam oran`);
+      assert.equal(num(k.paid), Math.round(num(k.base_diamonds) * num(k.total_rate) * 1e4) / 1e4, `kayıt ${k.txn}: paylar toplamı = matrah × oran`);
     }
-    refused(await admin.post('/api/admin/agency/settings', { key: 'top_rate', value: 0.5, reason: 'Deneme' }), 400, 'üst oran > havuz');
-    refused(await admin.post('/api/admin/agency/settings', { key: 'tiers', value: [{ key: 'start', name: 'Başlangıç', sub_rate: 0.45 }], reason: 'Deneme' }), 400, 'kademe > havuz');
-    refused(await admin.post('/api/admin/agency/rate', { id: S.id, rate: 0.395, reason: 'Deneme' }), 400, 'alt oran > üst oran − asgari pay');
+    const bad = LEVELS();
+    bad.levels[2].rate = 1.2;
+    refused(await admin.post('/api/admin/agency/settings', { key: 'weekly_levels', value: bad, reason: 'Deneme' }), 400, '%100 üstü');
+    const down = LEVELS();
+    down.levels[2].rate = 0.4;
+    refused(await admin.post('/api/admin/agency/settings', { key: 'weekly_levels', value: down, reason: 'Deneme' }), 400, 'üst seviye alttakinden düşük');
+    const order = LEVELS();
+    order.levels[2].from = 10000;
+    refused(await admin.post('/api/admin/agency/settings', { key: 'weekly_levels', value: order, reason: 'Deneme' }), 400, 'eşik sırası');
+    refused(await admin.post('/api/admin/agency/rate', { id: S.id, rate: 0.3, reason: 'Deneme' }), 409, 'elle oran');
+    refused(await admin.post('/api/admin/agency/tier', { id: S.id, tier: 'start', reason: 'Deneme' }), 409, 'elle kademe');
+    refused(await admin.post('/api/admin/agency/performance/run', {}), 409, 'performans değerlendirmesi oran vermez');
     await assert.rejects(
       q(
         `WITH e AS (INSERT INTO income_events (streamer_id, source_type, source_ref, diamonds, occurred_at) VALUES ($2, 'gift', $3, 1, now()) RETURNING id)
@@ -276,66 +290,79 @@ describe('Komisyon motoru', () => {
     assert.equal(c.status, 'excluded');
     assert.equal(c.commission, null);
     const r = ok(await admin.post('/api/admin/agency/income', { streamer: sB.id, type: 'refund', diamonds: -100, ref: ref() }));
-    assert.equal(r.commission.agencyAmount, -25);
-    assert.equal(r.commission.parentAmount, -15);
+    assert.equal(r.commission.agencyAmount, -35);
+    assert.equal(r.commission.parentAmount, 0);
     refused(await admin.post('/api/admin/agency/income', { streamer: sB.id, type: 'refund', diamonds: 100, ref: ref() }), 400, 'pozitif iade');
   });
 });
 
-describe('Performans ve dinamik komisyon', () => {
+describe('Haftalık ajans seviyesi', () => {
   let firstSA;
-  test('[Ş2-4] alt ajans performansta üst ajansını geçer; ikisine bildirim gider', async () => {
+  test('hafta kapanınca seviye: eşik ve aktif yayıncı; farkı tek satır; üst ajans pay almaz; bir kez', async () => {
     firstSA = (await commissionsOf(sA))[0];
-    const r1 = ok(await admin.post('/api/admin/agency/performance/run', { effectiveFrom: new Date().toISOString(), note: 'Test 1' }));
-    const s1 = r1.rows.find((x) => x.agencyId === S.id);
-    const t1 = r1.rows.find((x) => x.agencyId === T.id);
-    assert.ok(s1.score > t1.score, `alt ${s1.score} > üst ${t1.score}`);
-    assert.equal(s1.overtakes, true);
-    assert.equal(s1.qualified, 'overtook');
-    assert.equal(s1.change, 'waiting', 'tek dönem yetmez: art arda 2 değerlendirme gerekir');
-    assert.equal(s1.streak, 1);
-    assert.ok(r1.rows.find((x) => x.agencyId === T.id).flags.includes('overtaken'));
-    // Criteria beyond revenue are measured.
-    assert.equal(s1.metrics.active, 3);
-    assert.equal(t1.metrics.active, 1);
-    assert.equal(s1.metrics.volume, 45000);
-    assert.equal(t1.metrics.volume, 10000);
-    assert.equal(t1.metrics.org_volume, 10000 + 45000 + 1000, 'organizasyon hacmi ayrı tutulur, puana girmez');
+    // T: 50.000 elmas (Bronz eşiği) ama tek aktif yayıncı: 0. seviye.
+    await income(tA, 40000);
+    const r = ok(await closeWeek(), 'hafta kapandı');
+    assert.ok(r.agencies >= 3);
+    const weeks = Object.fromEntries((await q('SELECT * FROM agency_level_weeks')).map((w) => [w.agency_id, w]));
+    assert.deepEqual([weeks[S.id].level_key, num(weeks[S.id].base), weeks[S.id].active, weeks[S.id].reason], ['bronz', 45000, 3, 'threshold']);
+    assert.equal(num(weeks[S.id].adjustment), 11250, '45.000 × (%60 − %35)');
+    assert.deepEqual([weeks[T.id].level_key, num(weeks[T.id].base), weeks[T.id].active, weeks[T.id].reason], ['gonul_bagi', 50000, 1, 'active']);
+    assert.equal(num(weeks[T.id].adjustment), 0);
+    assert.equal(weeks[S2.id].level_key, 'gonul_bagi');
+    const rows = await q("SELECT agency_id, amount, rate FROM agency_ledger WHERE kind = 'level'");
+    assert.deepEqual(rows.map((x) => [x.agency_id, num(x.amount), num(x.rate)]), [[S.id, 11250, 0.6]]);
+    assert.equal((await q("SELECT count(*)::int AS n FROM agency_ledger WHERE kind = 'difference'"))[0].n, 0, 'üst ajansa fark yazılmaz');
+    // The cards: a level the app shows by name (Bronz), the lower ones without.
+    assert.equal(ok(await sOwner.get(`/api/agency/overview?id=${S.id}`)).agency.tierName, 'Bronz');
+    assert.equal(ok(await tOwner.get(`/api/agency/overview?id=${T.id}`)).agency.tierName, null);
     const ns = ok(await sOwner.get(`/api/agency/notices?id=${S.id}`)).notices;
+    assert.ok(ns.some((n) => n.kind === 'tier' && /Bronz \(%60\)/.test(n.title)));
     const nt = ok(await tOwner.get(`/api/agency/notices?id=${T.id}`)).notices;
-    assert.ok(ns.some((n) => n.kind === 'overtake'));
-    assert.ok(nt.some((n) => n.kind === 'overtake'));
+    assert.ok(nt.some((n) => n.kind === 'tier' && /%35/.test(n.title) && /2 aktif yayıncı şartı/.test(n.body)));
+    // Once.
+    assert.equal(ok(await closeWeek()).agencies, 0);
+    assert.equal((await q("SELECT count(*)::int AS n FROM agency_ledger WHERE kind = 'level'"))[0].n, 1);
+    // The panel's list of the week.
+    const wk = (await q('SELECT week_start::text AS w FROM agency_level_weeks LIMIT 1'))[0].w;
+    const list = ok(await admin.get(`/api/admin/agency/levels?week=${wk}`));
+    assert.equal(list.preview, false);
+    assert.equal(list.rows.find((x) => x.agencyId === S.id).levelName, 'Bronz');
+    refused(await sOwner.get('/api/admin/agency/levels'), 403, 'ajans sahibi listeyi göremez');
   });
 
-  test('[Ş2-5][Ş2-6][Ş2-8] kademe yükselir, oran güncellenir, üst ajansın payı azalır; alt ajans bağlı kalır', async () => {
-    const r2 = ok(await admin.post('/api/admin/agency/performance/run', { effectiveFrom: new Date().toISOString(), note: 'Test 2' }));
-    const s2 = r2.rows.find((x) => x.agencyId === S.id);
-    assert.equal(s2.change, 'up');
-    assert.equal(s2.assigned, 'overtook');
-    const ov = ok(await sOwner.get(`/api/agency/overview?id=${S.id}`));
-    assert.equal(ov.agency.tier, 'overtook');
-    assert.equal(ov.rate.rate, 0.38);
-    assert.equal(ov.rate.parentShare, 0.02);
-    assert.equal(ov.agency.parentId, T.id, 'geçse de bağlı kalır');
-    assert.equal(ov.agency.level, 2);
-    await income(sA, 10000);
+  test('kapanmış haftaya geç gelen gelir o haftanın oranıyla yazılır', async () => {
+    await income(sA, 1000);
     const k = (await commissionsOf(sA)).at(-1);
-    assert.equal(num(k.agency_amount), 3800);
-    assert.equal(num(k.parent_amount), 200);
-    assert.equal(num(k.total_rate), 0.4);
-    const perf = ok(await tOwner.get(`/api/agency/performance?id=${T.id}`));
-    assert.equal(perf.subagencies[0].id, S.id, 'üst ajans panelinde alt ajans sıralaması');
-    const ph = ok(await sOwner.get(`/api/agency/performance?id=${S.id}`));
-    assert.ok(ph.tierHistory.some((t) => t.to === 'overtook' && t.source === 'engine'));
+    assert.deepEqual([num(k.agency_rate), num(k.agency_amount), k.level_week], [0.6, 600, null]);
+  });
+
+  test('yeni ajans: ilk haftalarında seviyesi sabit (Başlangıç %50), haftanın sonunda fark yok', async () => {
+    await setting('weekly_levels', LEVELS(4));
+    const nOwner = await account('Yeni Sahip');
+    const N = ok(await admin.post('/api/admin/agency/create', { name: `Yeni Ajans ${rnd(3)}`, owner: nOwner.id })).agency;
+    const nA = await account('Yayıncı nA');
+    await q("UPDATE users SET gender = 'Kadın' WHERE id = $1", [nA.id]);
+    const code = (await q('SELECT code FROM agencies WHERE id = $1', [N.id]))[0].code;
+    ok(await nA.post('/api/agency/join', { code }), 'katıl');
+    await income(nA, 1000);
+    const k = (await commissionsOf(nA)).at(-1);
+    assert.deepEqual([num(k.agency_rate), num(k.agency_amount), k.level_week], [0.5, 500, null]);
+    const ov = ok(await nOwner.get(`/api/agency/overview?id=${N.id}`));
+    assert.equal(ov.level.isNew, true);
+    assert.equal(ov.level.level.rate, 0.5);
+    assert.ok(ov.level.newUntil);
+    assert.equal(ov.level.level.name, null, 'Başlangıç uygulamada adıyla görünmez');
+    await setting('weekly_levels', LEVELS());
   });
 
   test('[Ş2-11][Ş2-12][Ş1-11] üst ajansın doğrudan komisyonu korunur; geçmiş kazançlar değişmez', async () => {
     await income(tA, 10000);
     const kt = (await commissionsOf(tA)).at(-1);
-    assert.equal(num(kt.agency_amount), 4000);
+    assert.equal(num(kt.agency_amount), 3500, 'kapanmış haftanın oranı %35');
     const again = (await commissionsOf(sA))[0];
-    assert.deepEqual(again, firstSA, 'ilk kayıt aynen duruyor (oran değişikliği geriye işlemez)');
-    assert.equal(num(again.agency_amount), 1250);
+    assert.deepEqual(again, firstSA, 'ilk kayıt aynen duruyor (seviye farkı ayrı satır)');
+    assert.equal(num(again.agency_amount), 1750);
   });
 
   test('[Ş1-12] transferler: yayıncı ayrılır, alt ajanstan üst ajansa geçer; geçmiş kayıtlar eski ajansta kalır', async () => {
@@ -371,27 +398,7 @@ describe('Performans ve dinamik komisyon', () => {
     const ks = await commissionsOf(sC);
     assert.equal(ks[0].agency_id, S.id, 'eski gelir eski ajansta');
     assert.equal(ks.at(-1).agency_id, T.id);
-    assert.equal(num(ks.at(-1).agency_amount), 4000);
-  });
-
-  test('[Ş2-10][Ş2-9] performans düşünce kademe iner; yeni oran bir sonraki dönemden geçerli', async () => {
-    const r = ok(await admin.post('/api/admin/agency/performance/run', { note: 'Test 3' }));
-    const s = r.rows.find((x) => x.agencyId === S.id);
-    assert.equal(s.metrics.active, 1);
-    assert.equal(s.overtakes, false);
-    assert.equal(s.change, 'down');
-    assert.equal(s.assigned, 'growing');
-    assert.ok(s.flags.includes('decline'));
-    const eff = new Date(r.effectiveFrom);
-    assert.ok(eff > new Date(), 'yürürlük gelecekte');
-    assert.equal(eff.toISOString(), (await q('SELECT effective_from FROM agency_rates WHERE agency_id = $1 ORDER BY id DESC LIMIT 1', [S.id]))[0].effective_from.toISOString());
-    // Earnings until then keep the current rate.
-    await income(sA, 1000);
-    const k = (await commissionsOf(sA)).at(-1);
-    assert.equal(num(k.agency_amount), 380);
-    const ov = ok(await sOwner.get(`/api/agency/overview?id=${S.id}`));
-    assert.equal(ov.rate.rate, 0.38);
-    assert.equal(ov.rate.upcoming.rate, 0.3);
+    assert.equal(num(ks.at(-1).agency_amount), 3500);
   });
 
   test('[Ş2-18] üst ajans alt ajansın puanını, kademesini, oranını değiştiremez', async () => {
@@ -401,20 +408,9 @@ describe('Performans ve dinamik komisyon', () => {
     refused(await tOwner.post('/api/admin/agency/performance/run', {}), 403, 'değerlendirme');
   });
 
-  test('[Ş2-16] merkezin elle değişikliği: kim, ne zaman, eski, yeni, gerekçe kayıtlı; geçmiş tarih reddedilir', async () => {
-    refused(await admin.post('/api/admin/agency/rate', { id: S.id, rate: 0.3, reason: 'Geriye dönük', effectiveFrom: '2026-01-01T00:00:00Z' }), 400, 'geçmiş tarih');
-    refused(await admin.post('/api/admin/agency/rate', { id: S.id, rate: 0.3 }), 400, 'gerekçesiz');
+  test('[Ş2-16] kurallar gerekçesiyle değişir; elle oran yok; geçmiş kayıtlara dokunulmaz', async () => {
     const before = await q('SELECT * FROM agency_commissions ORDER BY id');
-    const r = ok(await admin.post('/api/admin/agency/rate', { id: S.id, rate: 0.33, reason: 'Bölge kampanyası düzeltmesi' }));
-    assert.equal(r.rate, 0.33);
-    const a = (await q("SELECT * FROM agency_audit WHERE action = 'agency.rate' AND target_id = $1 ORDER BY id DESC LIMIT 1", [S.id]))[0];
-    assert.equal(a.actor_id, admin.id);
-    assert.equal(a.reason, 'Bölge kampanyası düzeltmesi');
-    assert.equal(a.before.rate, 0.38);
-    assert.equal(a.after.rate, 0.33);
-    assert.ok(a.created_at);
-    const th = (await q("SELECT * FROM agency_tier_history WHERE agency_id = $1 AND source = 'manual' ORDER BY id DESC LIMIT 1", [S.id]))[0];
-    assert.equal(th.actor_id, admin.id);
+    refused(await admin.post('/api/admin/agency/rate', { id: S.id, rate: 0.33, reason: 'Bölge kampanyası düzeltmesi' }), 409, 'elle oran');
     assert.deepEqual(await q('SELECT * FROM agency_commissions ORDER BY id'), before, 'geçmiş kayıtlara dokunulmadı');
     const settingsHist = ok(await admin.get('/api/admin/agency/settings')).history;
     assert.ok(settingsHist.length >= 5 && settingsHist.every((x) => x.reason && x.set_by));
@@ -448,23 +444,23 @@ describe('Bağımsızlaşma', () => {
 
     await income(s2A, 1000);
     const k1 = (await commissionsOf(s2A)).at(-1);
-    assert.equal(num(k1.total_rate), 0.4);
-    assert.equal(num(k1.agency_amount), 350);
+    assert.equal(num(k1.total_rate), 0.35);
+    assert.equal(num(k1.agency_amount), 300);
     assert.equal(num(k1.transition_amount), 50);
     assert.deepEqual((await ledgerOf(k1.id)).map((l) => [l.agency_id, l.kind, num(l.amount)]), [
-      [S2.id, 'direct', 350],
+      [S2.id, 'direct', 300],
       [T.id, 'transition', 50],
     ]);
     await sleep(Math.max(0, new Date(endsAt).getTime() - Date.now()) + 400);
     await income(s2A, 1000);
     const k2 = (await commissionsOf(s2A)).at(-1);
-    assert.equal(num(k2.agency_amount), 400, 'süre bitti: tam oran bağımsız ajansın');
+    assert.equal(num(k2.agency_amount), 350, 'süre bitti: tam oran bağımsız ajansın');
     assert.equal(num(k2.transition_amount), 0);
     assert.deepEqual((await ledgerOf(k2.id)).map((l) => l.agency_id), [S2.id]);
     // The earlier commission under T stays as it was.
     const k0 = (await commissionsOf(s2A))[0];
     assert.equal(k0.parent_agency_id, T.id);
-    assert.equal(num(k0.parent_amount), 150);
+    assert.equal(num(k0.parent_amount), 0, 'üst ajans o zaman da fark almadı');
   });
 });
 
@@ -492,7 +488,7 @@ describe('Askı, personel, BD, ödemeler, raporlar', () => {
     assert.equal(byId[T.id].streamers, 2);
     assert.ok(byId[T.id].orgVolume30 > byId[T.id].volume30);
     const ov = ok(await admin.get('/api/admin/agency/overview'));
-    assert.equal(ov.tops, 2);
+    assert.equal(ov.tops, 3, 'Yıldız, bağımsızlaşan Güneş ve yeni ajans');
     assert.equal(ov.subs, 1);
     // The finance panel's lists: every agency with its code and rate, its upper agency, every streamer with their agency.
     const roster = ok(await admin.get('/api/admin/agency/finance-roster'));
@@ -528,11 +524,11 @@ describe('Askı, personel, BD, ödemeler, raporlar', () => {
     const k = (await commissionsOf(tA)).at(-1);
     const bd = await q('SELECT * FROM bd_ledger WHERE commission_id = $1', [k.id]);
     assert.equal(bd.length, 1);
-    assert.equal(num(bd[0].amount), (10000 + 4000) * 0.05, 'BD: (matrah + havuz) × %5');
-    assert.equal(num(k.agency_amount), 4000, 'ajans payı BD yüzünden azalmaz');
+    assert.equal(num(bd[0].amount), (10000 + 3500) * 0.05, 'BD: (matrah + ajans payı) × %5');
+    assert.equal(num(k.agency_amount), 3500, 'ajans payı BD yüzünden azalmaz');
     const rep = ok(await bdU.get('/api/admin/agency/bd-report'));
     assert.deepEqual(rep.agencies.map((a) => a.id), [T.id]);
-    assert.equal(rep.ledger[0].amount, 700);
+    assert.equal(rep.ledger[0].amount, 675);
   });
 
   test('[Ş1-16] ödeme: kapanan dönem, tek açık talep, aynı istek tekrarı, iki kişili onay, benzersiz ödeme referansı', async () => {
@@ -541,17 +537,12 @@ describe('Askı, personel, BD, ödemeler, raporlar', () => {
     const period = (await q('SELECT DISTINCT period FROM agency_ledger'))[0].period;
     refused(await admin.post('/api/admin/agency/periods/close', { period }), 400, 'bitmemiş dönem kapanmaz');
     await q('INSERT INTO agency_periods (period) VALUES ($1)', [period]);
-    // Aday ajans (agency-activity.mjs): fewer than 20 streamers, the commission waits; the rule off, it is paid.
-    const cand = refused(await tOwner.post('/api/agency/payouts/request', { id: T.id, currency: 'USD', ref: ref() }), 409, 'aday ajans');
-    assert.equal(cand.code, 'agency_candidate');
-    assert.match(cand.error, /Aday ajans ödeme alamaz/);
-    const view0 = ok(await admin.get('/api/admin/live-settings'));
-    ok(await admin.post('/api/admin/live-settings', { changes: { agency_activation_hosts: 0 }, reason: 'Ödeme testi', baseV: view0.v, confirm: true }), 'aday kuralı kapalı');
+    // No aday ajans any more (24 Nov 2026): an agency with a closed period's earnings asks for its payout.
     const r0 = ref();
     const p = ok(await tOwner.post('/api/agency/payouts/request', { id: T.id, currency: 'USD', ref: r0 }));
     const expected = num((await q("SELECT sum(amount) AS s FROM agency_ledger WHERE agency_id = $1", [T.id]))[0].s);
     assert.equal(p.payout.amount, expected);
-    assert.equal(p.payout.usd, Math.round((expected / 5000) * 100) / 100);
+    assert.equal(p.payout.usd, Math.round((expected / 1000) * 100) / 100);
     const replay = ok(await tOwner.post('/api/agency/payouts/request', { id: T.id, currency: 'USD', ref: r0 }));
     assert.equal(replay.replay, true);
     assert.equal(replay.payout.id, p.payout.id);
@@ -565,7 +556,14 @@ describe('Askı, personel, BD, ödemeler, raporlar', () => {
     assert.equal(list.payouts.find((x) => x.id === p.payout.id).payable, true, 'gerçek parayla kazanılan komisyon ödenebilir');
     ok(await fin1.post('/api/admin/agency/payouts/decide', { payoutId: p.payout.id, action: 'approve' }));
     refused(await fin1.post('/api/admin/agency/payouts/decide', { payoutId: p.payout.id, action: 'pay', paymentRef: 'BANKA-0001' }), 403, 'onaylayan ödeyemez');
-    ok(await fin2.post('/api/admin/agency/payouts/decide', { payoutId: p.payout.id, action: 'pay', paymentRef: 'BANKA-0001' }));
+    // Ödeme kuru (24 Nov 2026): the TL to send at 1 USD = 49 TL; a decision made on another rate is refused, nothing changes.
+    const shown = ok(await fin2.get('/api/admin/agency/payouts')).payouts.find((x) => x.id === p.payout.id);
+    assert.equal(shown.tlNow, Math.round(shown.usd * 49 * 100) / 100);
+    const moved = await fin2.post('/api/admin/agency/payouts/decide', { payoutId: p.payout.id, action: 'pay', paymentRef: 'BANKA-0001', payUsdTry: 50 });
+    refused(moved, 409, 'eski kur');
+    ok(await fin2.post('/api/admin/agency/payouts/decide', { payoutId: p.payout.id, action: 'pay', paymentRef: 'BANKA-0001', payUsdTry: 49 }));
+    const paid = ok(await fin2.get('/api/admin/agency/payouts')).payouts.find((x) => x.id === p.payout.id);
+    assert.deepEqual([paid.payUsdTry, paid.payTl], [49, shown.tlNow], 'ödenen kur ve TL ödemeye yazılır');
     refused(await fin2.post('/api/admin/agency/payouts/decide', { payoutId: p.payout.id, action: 'pay', paymentRef: 'BANKA-0002' }), 409, 'ikinci kez ödeme');
     const view = ok(await tOwner.get(`/api/agency/payouts?id=${T.id}`));
     assert.equal(view.payouts[0].status, 'paid');
@@ -586,7 +584,7 @@ describe('Askı, personel, BD, ödemeler, raporlar', () => {
     ok(await admin.post('/api/admin/agency/commissions/reverse', { commissionId: Number(k.id), reason: 'Hediye iadesi' }));
     refused(await admin.post('/api/admin/agency/commissions/reverse', { commissionId: Number(k.id), reason: 'Tekrar' }), 404, 'ikinci ters kayıt');
     const rev = await q("SELECT amount, payout_id FROM agency_ledger WHERE kind = 'reversal' AND agency_id = $1", [T.id]);
-    assert.equal(num(rev[0].amount), -4000);
+    assert.equal(num(rev[0].amount), -3500);
     assert.equal(rev[0].payout_id, null);
   });
 
@@ -594,11 +592,13 @@ describe('Askı, personel, BD, ödemeler, raporlar', () => {
     const rep = ok(await admin.get('/api/admin/agency/report'));
     const db = (await q('SELECT sum(base_diamonds) AS base, sum(agency_amount + parent_amount + transition_amount) AS com, count(*)::int AS n FROM agency_commissions'))[0];
     assert.equal(rep.totals.base, num(db.base));
-    assert.equal(rep.totals.commission, num(db.com));
     assert.equal(rep.totals.events, db.n);
-    const led = (await q("SELECT sum(amount) AS s FROM agency_ledger WHERE kind IN ('direct', 'difference', 'transition')"))[0];
+    const level = num((await q("SELECT coalesce(sum(amount), 0) AS s FROM agency_ledger WHERE kind = 'level'"))[0].s);
+    assert.equal(rep.totals.level, level, 'haftalık seviye farkları');
+    assert.equal(rep.totals.commission, num(db.com) + level);
+    const led = (await q("SELECT sum(amount) AS s FROM agency_ledger WHERE kind IN ('direct', 'difference', 'transition', 'level')"))[0];
     assert.equal(rep.totals.commission, num(led.s), 'rapor = defter');
-    assert.equal(rep.totals.platformKeeps, num(db.base) - num(db.com));
+    assert.equal(rep.totals.platformKeeps, num(db.base) - num(db.com) - level);
     const sub = ok(await admin.get(`/api/admin/agency/report?sub=${S.id}`));
     const dbS = (await q('SELECT sum(agency_amount) AS own, sum(parent_amount) AS up FROM agency_commissions WHERE agency_id = $1', [S.id]))[0];
     assert.equal(sub.bySub[0].own, num(dbS.own));
@@ -609,16 +609,9 @@ describe('Askı, personel, BD, ödemeler, raporlar', () => {
     assert.equal(panel.totals.direct, num((await q("SELECT sum(amount) AS s FROM agency_ledger WHERE agency_id = $1 AND kind = 'direct'", [T.id]))[0].s));
     const csv = ok(await tOwner.get(`/api/agency/commissions?id=${T.id}&format=csv`));
     assert.ok(csv.csv.startsWith('islem,tur,yayinci'));
-    const sim = ok(await admin.post('/api/admin/agency/simulate', { base: 100000, subRate: 0.35 }));
-    assert.deepEqual(sim.shares.map((x) => x.amount), [35000, 5000]);
-    assert.equal(sim.platformKeeps, 60000);
-  });
-
-  test('canlı yayın süresi aktiflik ölçüsüne yazılır', async () => {
-    // LiveKit webhook path is covered in launch.test.mjs; here the row shape the engine reads.
-    await q("INSERT INTO presence_log (user_id, room, joined_at, left_at, seconds) VALUES ($1, 'oda1', now() - interval '1 hour', now(), 3600)", [sB.id]);
-    const r = ok(await admin.post('/api/admin/agency/performance/run', { dryRun: true }));
-    assert.ok(r.rows.length >= 3);
-    assert.equal((await q('SELECT dry_run FROM agency_perf_runs WHERE id = $1', [r.runId]))[0].dry_run, true);
+    const sim = ok(await admin.post('/api/admin/agency/simulate', { base: 100000 }));
+    assert.deepEqual([sim.level.key, sim.shares.map((x) => x.amount), sim.platformKeeps], ['bronz', [60000], 40000]);
+    const few = ok(await admin.post('/api/admin/agency/simulate', { base: 100000, active: 1 }));
+    assert.deepEqual([few.level.key, few.reason, few.pool], ['gonul_bagi', 'active', 35000]);
   });
 });

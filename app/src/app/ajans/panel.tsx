@@ -135,7 +135,7 @@ function Overview() {
           {st.missedMonthly && st.status === 'Aktif ajans' ? ` (aylık hedef tutmadı, −${pct(RULES.agencyCommissionPenalty)})` : ''}
         </Text>
         <Text style={styles.dim}>
-          {RULES.agencyHostInactiveDays} gün çevrimiçi olmayan ve çekim yapmayan yayıncı ajanstan düşer ve yönetim hesabına aktarılır. Süreler yönetim panelinden değiştirilir.
+          {RULES.agencyHostInactiveDays} gün çevrimiçi olmayan yayıncı ajanstan düşer. Döndüğünde {RULES.hostAgencyJoinDays} gün içinde bir ajansa katılabilir; katılmazsa yönetim yayıncısı olur.
         </Text>
       </Card>
       <View style={styles.grid}>

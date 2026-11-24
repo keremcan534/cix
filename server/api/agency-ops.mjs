@@ -64,7 +64,8 @@ export const LEAVE_MSG = 'Ajanstan transfer talebi olmadan ayrılamazsın; başk
 /**
  * Where a user stands under streamer_policy: may they be a streamer at all (eligible), are they held by the
  * centre (no open agency and either the pick window is over or they were in one before: they move only by a
- * transfer the centre approves), and when the window ends. `at` = the moment that counts (an invite's or an
+ * transfer the centre approves), and when the window ends. A streamer dropped for inactivity (agency-activity.mjs)
+ * gets the window again from her return (owners, 24 Nov 2026), as streamer-rule.mjs heldWomanAtSql. `at` = the moment that counts (an invite's or an
  * application's time, so an agency deciding late does not lock the streamer out).
  */
 export async function streamerState(c, userId, s, at = new Date()) {
@@ -72,19 +73,26 @@ export async function streamerState(c, userId, s, at = new Date()) {
   const r = await c.query(
     `SELECT u.gender, u.created_at,
         (SELECT agency_id FROM agency_streamers WHERE streamer_id = u.id AND ended_at IS NULL) AS open,
-        EXISTS (SELECT 1 FROM agency_streamers WHERE streamer_id = u.id) AS before
+        EXISTS (SELECT 1 FROM agency_streamers WHERE streamer_id = u.id) AS before,
+        (SELECT l.end_reason FROM agency_streamers l WHERE l.streamer_id = u.id ORDER BY l.joined_at DESC LIMIT 1) AS last_reason,
+        (SELECT l.returned_at FROM agency_streamers l WHERE l.streamer_id = u.id ORDER BY l.joined_at DESC LIMIT 1) AS returned_at
        FROM users u WHERE u.id = $1`,
     [userId],
   );
   const u = r.rows[0];
   if (!u) throw new HttpError(404, 'Kullanıcı bulunamadı');
-  const pickUntil = p.pick_days > 0 ? new Date(new Date(u.created_at).getTime() + p.pick_days * 86400e3) : null;
+  const days = p.pick_days * 86400e3;
+  // Dropped for inactivity: the window runs from her return (none yet: not held, she can't be here offline anyway).
+  const dropped = !u.open && u.before && u.last_reason === 'inactive';
+  const from = dropped ? (u.returned_at ? new Date(u.returned_at) : null) : new Date(u.created_at);
+  const pickUntil = p.pick_days > 0 && from ? new Date(from.getTime() + days) : null;
+  const held = u.open ? false : dropped ? !!u.returned_at && new Date(at) >= new Date(new Date(u.returned_at).getTime() + days) : pickUntil !== null && (u.before || new Date(at) >= pickUntil);
   return {
     gender: u.gender,
     eligible: !p.women_only || u.gender === 'Kadın',
     open: u.open,
-    held: !u.open && pickUntil !== null && (u.before || new Date(at) >= pickUntil),
-    pickUntil,
+    held,
+    pickUntil: dropped && !u.returned_at ? null : pickUntil,
   };
 }
 

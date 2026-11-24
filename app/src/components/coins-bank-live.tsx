@@ -20,6 +20,7 @@ import { RULES, usd } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
 import type { JetonTransfer, UserCard } from '@/lib/api';
 import { bankSaleError, diamondSaleError, diamondValueTl, transferLine } from '@/lib/coins-bank';
+import { liveRules } from '@/lib/live/catalog-live';
 import { message, myServerId, rememberUser } from '@/lib/live';
 import { useLiveEarnings } from '@/lib/live/earnings';
 import { jetonNow, refreshJeton, sellCoins, sellDiamonds, useJeton, type JetonStock } from '@/lib/live/jeton';
@@ -187,7 +188,7 @@ function DiamondSale({ banks }: { banks: UserCard[] }) {
     if (busy || blockedFeature('jeton')) return;
     if (!bank) return showAlert('Jeton Noktası seç', 'Elmaslarını bozduracağın Jeton Noktası’nı seç.');
     if (error) return showAlert('Bozdurulamaz', error);
-    showAlert(`${bank.name} Jeton Noktası`, `${fmt(n)} elmas hemen ${bank.name} hesabına geçer. Karşılığı yaklaşık ${tl(diamondValueTl(n))}; ödemeyi Jeton Noktası uygulama dışında yapar. Onaylıyor musun?`, [
+    showAlert(`${bank.name} Jeton Noktası`, `${fmt(n)} elmas hemen ${bank.name} hesabına geçer. Karşılığı yaklaşık ${tl(diamondValueTl(n, liveRules()))}; ödemeyi Jeton Noktası uygulama dışında yapar. Onaylıyor musun?`, [
       { text: 'Vazgeç', style: 'cancel' },
       {
         text: 'Bozdur',
@@ -195,7 +196,7 @@ function DiamondSale({ banks }: { banks: UserCard[] }) {
           setBusy(true);
           sellDiamonds(bank.id, n)
             .then((t) => {
-              showAlert('Bozduruldu', `${fmt(t.diamonds ?? n)} elmas ${bank.name} hesabına geçti. Sana ödeyeceği tutar: ${tl(t.valueTl ?? diamondValueTl(n))}. Ödeme için Jeton Noktası ile mesajlaş.`);
+              showAlert('Bozduruldu', `${fmt(t.diamonds ?? n)} elmas ${bank.name} hesabına geçti. Sana ödeyeceği tutar: ${tl(t.valueTl ?? diamondValueTl(n, liveRules()))}. Ödeme için Jeton Noktası ile mesajlaş.`);
               setAmount('');
               server.reload();
             })
@@ -227,7 +228,7 @@ function DiamondSale({ banks }: { banks: UserCard[] }) {
         {free >= RULES.exchangeMinDiamonds && <Chip label="Tümü" on={n === free} onPress={() => setAmount(String(free))} />}
       </View>
       <TextInput value={amount} onChangeText={(t) => setAmount(digits(t))} keyboardType="number-pad" placeholder={`En az ${fmt(RULES.exchangeMinDiamonds)} elmas`} placeholderTextColor={colors.textDim} style={styles.input} />
-      {n > 0 && <Text style={[styles.dim, { color: error ? colors.red : colors.green }]}>{error ?? `Jeton Noktası sana ödeyecek: ≈ ${tl(diamondValueTl(n))}`}</Text>}
+      {n > 0 && <Text style={[styles.dim, { color: error ? colors.red : colors.green }]}>{error ?? `Jeton Noktası sana ödeyecek: ≈ ${tl(diamondValueTl(n, liveRules()))}`}</Text>}
       <Button title={busy ? 'Gönderiliyor…' : "Jeton Noktası'na bozdur"} icon="flash-outline" onPress={sell} disabled={busy || !bank || !!error || banks.length === 0} />
     </Card>
   );

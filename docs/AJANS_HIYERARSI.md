@@ -1,4 +1,40 @@
-# Ajans hiyerarşisi ve performansa dayalı dinamik komisyon
+# Ajans hiyerarşisi ve ajans komisyonu
+
+## Ajans seviyeleri (24 Kasım 2026, sahiplerin tablosu): geçerli komisyon kuralı
+
+Bu bölüm aşağıdaki "Komisyon formülü" ve "Performans motoru" bölümlerinin **yerine geçer**: havuz sınırı, kademeler,
+performans puanına göre oran ve üst ajans farkı artık komisyon yazmaz (kayıtları ve ekranları geçmiş için durur).
+
+| Seviye | Komisyon | Haftalık elmas eşiği | Uygulamada |
+| --- | --- | --- | --- |
+| 0 · Gönül Bağı | %35 | — (avantaj seviyesi) | görünmez |
+| 1 · Başlangıç | %50 | 200.000 – 299.999 | görünmez |
+| 2 · Bronz | %60 | 300.000 – 499.999 | görünür |
+| 3 · Gümüş | %70 | 500.000 – 749.999 | görünür |
+| 4 · Altın | %80 | 750.000 – 999.999 | görünür |
+| 5 · Platin | %90 | 1.000.000 – 1.499.999 | görünür |
+| 6 · Elmas | %100 | 1.500.000 ve üstü | görünür |
+
+- **Hafta:** Pazartesi 00:00 – Pazar 23:59:59 (Türkiye). Eşik, ajansın **kendi** yayıncılarının o hafta kazandığı
+  elmastır (komisyon matrahı: hediye, şans hediyesi, ücretli mesaj ve arama; iade düşer). Eşiği tamamlayamayan bir
+  önceki seviyeyi alır.
+- **Aktif yayıncı şartı:** seviye 1 ve üstü için o hafta bu ajansta en az 10 USD (10.000 elmas) kazanan 20 yayıncı.
+  Tutmazsa ajans Gönül Bağı (%35) alır.
+- **Yeni ajans:** onaydan itibaren ilk 4 hafta hiçbir şart aranmaz, komisyon sabit Başlangıç %50.
+- **Üst ve alt ajans:** her ajans yalnız kendi yayıncılarıyla değerlendirilir; üst ajans alt ajanstan pay almaz.
+- **Hesap:** hafta içinde her gelir %35'le yazılır (ajans bunu anında görür). Pazartesi 00:00'da hafta kapanır, ulaşılan
+  seviyenin farkı tek "Haftalık seviye" satırı olarak eklenir; asistan bu farktan da payını (elmas) alır, BD kendi
+  oranını. Kapanmış haftaya geç gelen gelir o haftanın oranıyla yazılır. Haftanın kararı bir kez yazılır, sonradan
+  değişen tablo onu değiştirmez.
+- **Ekranlar:** uygulama › Ajans ofisi › Özet "Bu hafta" kartı (elmas, aktif yayıncı, sonraki seviyeye kalan, geçen
+  hafta); panel › Ajans merkezi › Haftalık seviyeler (her ajansın haftası, süren haftanın önizlemesi) ve Defter ve
+  kurallar › Haftalık ajans seviyeleri (tablo). Elle oran ve kademe verilmez.
+- **Ekonomi notu:** en üst seviyede 1.000 jetonluk hediye (220 TL) yayıncıya 1 USD (49 TL), ajansa 1 USD daha, BD'ye
+  (matrah + ajans payı) × %5 = 0,1 USD bırakır; haftalık yayıncı bonusuyla birlikte en çok ~2,6 USD ≈ 127 TL.
+- Kod: `server/api/agency-levels.mjs`, `agency-level-rules.mjs`, `agency-lib.mjs` (`calcEvent`), migration 122;
+  testler `test/agency-levels.test.mjs`, `test/agency.test.mjs`.
+
+## Eski kural (24 Kasım 2026'ya kadar)
 
 Bu belge iki şartnameyi birlikte uygular: **"Üst Ajans, Alt Ajans ve Çok Katmanlı Ajans Yönetim Sistemi"** (Ş1) ve
 **"Performansa Dayalı Dinamik Komisyon"** (Ş2). İkisi çeliştiğinde Ş2 geçerlidir (aşağıda "Çelişkiler").

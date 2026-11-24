@@ -370,8 +370,8 @@ export function wholeError(v: number | null, { min, max, step }: IntBounds, what
 export const CAMPAIGN_DAYS = [1, 3, 7, 14];
 export const CAMPAIGN_PERCENT = { min: 5, max: 50, step: 5, big: 25 };
 export type CampaignDraft = { percent: number; label: string; start: 'now' | { day: number; hour: number }; days: number };
-/** '100.000 jetonluk paket alan +20.000 kampanya jetonu alır.' */
-export const campaignExample = (percent: number) => `100.000 jetonluk paket alan +${fmtNum(campaignCoins(100_000, percent))} kampanya jetonu alır.`;
+/** '50.000 jetonluk paket alan +10.000 kampanya jetonu alır.' (the biggest pack, server/api/catalog.mjs PACKS) */
+export const campaignExample = (percent: number) => `50.000 jetonluk paket alan +${fmtNum(campaignCoins(50_000, percent))} kampanya jetonu alır.`;
 /** The campaign to save from the draft, its start taken at `now` for 'Şimdi'. */
 export function campaignOf(d: CampaignDraft, now = Date.now()): CatalogCampaign {
   const start = d.start === 'now' ? Math.floor(now / 60_000) * 60_000 : istanbulAt(now, d.start.day, d.start.hour);

@@ -15,6 +15,7 @@ import { SCENES } from '@/components/fx/scenes';
 import { ChoiceChips, ListGroup, ListRow } from '@/components/list';
 import { NoAccess } from '@/components/no-access';
 import { Text, TextInput } from '@/components/text';
+import { liveRules } from '@/lib/live/catalog-live';
 import { Button, Header } from '@/components/ui';
 import { DEMO_TIERS, demoAdminList, demoAdminOverview, demoAdminPayouts, demoAdminPerf, demoAdminSettings, demoAdminTransfers, demoAudit, demoTree } from '@/data/agency-net-demo';
 import {
@@ -155,7 +156,7 @@ function GeneralTab({ name, ov, ask }: { name: string; ov: Loaded<ReturnType<typ
                 sub={o.calc_pending ? 'Komisyon işi bekliyor' : 'Hepsi hesaplandı'}
               />
             </KpiGrid>
-            <Text style={st.foot}>Komisyon havuzu sınırı {fmtPct(o.poolCap)}. Tutarlar sunucuda hesaplanır; 5000 elmas = 1 USD.</Text>
+            <Text style={st.foot}>Komisyon havuzu sınırı {fmtPct(o.poolCap)}. Tutarlar sunucuda hesaplanır; {liveRules().diamondsPerUsd.toLocaleString('tr-TR')} elmas = 1 USD.</Text>
           </Section>
         )}
       </NetState>

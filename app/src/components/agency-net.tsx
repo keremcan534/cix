@@ -16,6 +16,7 @@ import { Text, TextInput } from '@/components/text';
 import { Button } from '@/components/ui';
 import { contactRefusal } from '@/lib/contact-filter';
 import { activityText, type AgencyActivity } from '@/lib/agency-activity';
+import { levelLines, levelText, pctText, type AgencyLevel } from '@/lib/agency-level';
 import { fmtD, fmtPct, fmtScore, fmtUsd, usdOf, type Loaded, type Tier } from '@/lib/agency-net';
 import { SCRIM, colors, edge, fonts, radius, semantic, space } from '@/theme';
 
@@ -215,6 +216,28 @@ export function AgencyStatusCard({ a }: { a: AgencyActivity }) {
       {active && a.need.monthlyNew > 0 && <GoalBar label="Bu ay yeni yayıncı" value={a.newThisMonth} target={a.need.monthlyNew} />}
       {a.penalty > 0 && <Text style={[s.legendText, { color: semantic.danger }]}>{`Geçen ay yeni yayıncı şartı tutmadığı için bu ay komisyonun ${Math.round(a.penalty * 100)} puan düşük.`}</Text>}
       <Text style={s.legendText}>{activityText(a)}</Text>
+    </Panel>
+  );
+}
+
+/**
+ * Haftalık seviye (server/api/agency-levels.mjs, lib/agency-level): this week's level so far, the bars to the next
+ * level's diamonds and to the active streamers, the sentences, last week's level.
+ */
+export function AgencyLevelCard({ v, date }: { v: AgencyLevel; date: (iso: string) => string }) {
+  return (
+    <Panel>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <Ionicons name={v.isNew ? 'sparkles-outline' : 'podium-outline'} size={20} color={colors.gold} />
+        <Text style={[s.legendValue, { flex: 1, fontSize: 16 }]}>{v.isNew ? `Yeni ajans · ${pctText(v.level.rate)}` : `Bu hafta: ${levelText(v.level)}`}</Text>
+      </View>
+      {!v.isNew && v.next && <GoalBar label={v.next.name ? `${v.next.name} için haftalık elmas` : 'Sonraki seviye için haftalık elmas'} value={v.base} target={v.next.from} />}
+      {!v.isNew && v.minActive > 0 && <GoalBar label={`Aktif yayıncı (haftada ${v.activeUsd} USD)`} value={v.active} target={v.minActive} />}
+      {levelLines(v, date).map((t) => (
+        <Text key={t} style={s.legendText}>
+          {t}
+        </Text>
+      ))}
     </Panel>
   );
 }

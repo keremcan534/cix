@@ -42,6 +42,7 @@ import { serverLoadRoutes, startServerLoad, stopServerLoad } from './server-load
 import { CONFIG_CACHE, configRoutes, gate } from './features.mjs';
 import { agencyRoutes } from './agency.mjs';
 import { agencyAdminRoutes } from './agency-admin.mjs';
+import { agencyLevelRoutes } from './agency-levels.mjs';
 import { agencyChatRoutes } from './agency-chat.mjs';
 import { agencyAssistantRoutes } from './agency-assistants.mjs';
 import { recordIncome } from './agency-lib.mjs';
@@ -123,6 +124,8 @@ import { TEST_DAILY, charmPoints, creditCoins, giftCoins, playCoinsToday, spendD
 import { whatsappRoutes } from './whatsapp.mjs';
 import { closeLines, lineRoutes, openLine } from './live-line.mjs';
 import { withdrawRoutes } from './withdraw.mjs';
+import { hostBonusRoutes, startHostBonus, stopHostBonus } from './host-bonus.mjs';
+import { startVipMonth, stopVipMonth, vipMonthRoutes } from './vip-month.mjs';
 import { refundSyncRoutes, startRefundSync, stopRefundSync } from './refunds.mjs';
 import { refreshOwnSubscription, startVipRecheck, stopVipRecheck, vipRoutes } from './vip.mjs';
 import { referralRoutes } from './referrals.mjs';
@@ -279,22 +282,26 @@ const walletRoutes = {
   /**
    * Gelir > Çevir: the user's own unlocked diamonds become coins at the server's rate (catalog.mjs
    * exchangeCoins), the live one from Canlı ayarlar (live-settings.mjs). The client sends the diamond amount
-   * and the rate its screen showed (usdTry; old apps send none and showed the compiled rate); the coins are
-   * worked out here. A live rate below the shown one is a 409: rate_changed with the new rate and coins for
-   * new apps, update_required for old ones. Both moves share one transaction and the ref, so a retry is
+   * and what its screen worked with: the rate (usdTry) and the coin value (coinValueTl, TL per 1.000 coins). The
+   * coins are worked out here. A live rate below the shown one, or a coin value above it, is a 409: rate_changed
+   * with the new values and coins. An app that sends no coin value (every app before 24 Nov 2026, when 1.000 coins
+   * became 220 TL) priced coins like the old best pack and would show about nine times the coins: update_required. Both moves share one transaction and the ref, so a retry is
    * applied once and a short balance (409) changes nothing. Locked diamonds (wallet.mjs) can't be exchanged.
    */
   async 'POST /api/wallet/exchange'(req) {
     const u = await auth(req);
     // Read once: a request that read the old rate completes at it, the rate the user saw.
     const s = live();
-    const { diamonds, ref, usdTry } = await readJson(req);
+    const { diamonds, ref, usdTry, coinValueTl, diamondsPerUsd } = await readJson(req);
     const n = int(diamonds, EXCHANGE.minDiamonds, EXCHANGE_MAX);
     if (!n) throw new HttpError(400, `En az ${EXCHANGE.minDiamonds} elmas çevrilebilir`);
     // The rate the screen showed: new apps send it, old ones send nothing and showed the compiled rate.
     const newApp = usdTry !== undefined && usdTry !== null;
     const shown = newApp ? (typeof usdTry === 'number' ? usdTry : NaN) : EXCHANGE.usdTry;
-    const coins = exchangeCoins(n, s.usdTry);
+    // The coin value the screen showed: only apps from 24 Nov 2026 on send it.
+    const current = coinValueTl !== undefined && coinValueTl !== null;
+    const shownValue = current && typeof coinValueTl === 'number' ? coinValueTl : NaN;
+    const coins = exchangeCoins(n, s.usdTry, s.coinValueTl, s.diamondsPerUsd);
     const r = await once(u.id, 'diamond', ref, async (c) => {
       // A second copy of the same request waits on the row, then finds the ref (a replay) before the
       // balance check (a false "not enough").
@@ -302,12 +309,14 @@ const walletRoutes = {
       await claimRef(c, u.id, 'diamond', ref);
       // After the ref check, so a retry of one that went through gets its replay. Never fewer coins than the
       // screen showed: a lower live rate is refused, nothing moves; a higher one simply gives more.
-      if (!exchangeOk(s.usdTry, shown)) {
-        throw newApp
-          ? Object.assign(new HttpError(409, 'Kur değişti, yeni tutarı kontrol et'), { extra: { code: 'rate_changed', usdTry: s.usdTry, coins } })
-          : Object.assign(new HttpError(409, 'Çevirme kuru değişti. Güncel tutar için uygulamayı güncelle'), { extra: { code: 'update_required' } });
+      if (!current || !newApp) throw Object.assign(new HttpError(409, 'Çevirme kuru değişti. Güncel tutar için uygulamayı güncelle'), { extra: { code: 'update_required' } });
+      // The diamond's value (1 USD = ? 💎, Canlı ayarlar › diamonds_per_usd): more diamonds per USD give fewer coins.
+      // An app that sends none worked with the compiled one.
+      const shownPer = diamondsPerUsd === undefined || diamondsPerUsd === null ? EXCHANGE.diamondsPerUsd : diamondsPerUsd;
+      if (!exchangeOk(s.usdTry, shown) || !(Math.round(s.coinValueTl * 100) <= Math.round(shownValue * 100)) || !(typeof shownPer === 'number' && s.diamondsPerUsd <= shownPer)) {
+        throw Object.assign(new HttpError(409, 'Kur değişti, yeni tutarı kontrol et'), { extra: { code: 'rate_changed', usdTry: s.usdTry, coinValueTl: s.coinValueTl, diamondsPerUsd: s.diamondsPerUsd, coins } });
       }
-      await spendDiamonds(c, u.id, n, 'Jetona çevrildi', ref, null, { channel: 'cevir', detail: { coins, usdTry: s.usdTry } });
+      await spendDiamonds(c, u.id, n, 'Jetona çevrildi', ref, null, { channel: 'cevir', detail: { coins, usdTry: s.usdTry, coinValueTl: s.coinValueTl, diamondsPerUsd: s.diamondsPerUsd } });
       await creditCoins(c, u.id, [{ channel: 'cevir', amount: coins }], 'Elmastan çevrildi', ref, null, { detail: { diamonds: n } });
     });
     if (!r.replay) return { ...r, coins };
@@ -329,6 +338,8 @@ const routes = {
   ...levelRewardRoutes,
   ...taskRewardRoutes,
   ...withdrawRoutes,
+  ...hostBonusRoutes,
+  ...vipMonthRoutes,
   ...jetonRoutes,
   ...refundSyncRoutes,
   ...authRoutes,
@@ -396,6 +407,7 @@ const routes = {
   ...financeSyncRoutes,
   ...agencyRoutes,
   ...agencyAdminRoutes,
+  ...agencyLevelRoutes,
   ...agencyChatRoutes,
   ...agencyAssistantRoutes,
   ...configRoutes,
@@ -562,6 +574,8 @@ function shutdown(signal) {
   stopLuckyArt();
   stopMarkKinds();
   stopBondLooks();
+  stopHostBonus();
+  stopVipMonth();
   server.close();
   const started = Date.now();
   const wait = setInterval(async () => {
@@ -608,6 +622,10 @@ startCustomGifts();
 startEmoji();
 startLevels();
 startLevelDecay();
+// Yayıncı haftalık bonusu: closes the week that ended every Monday 00:00 (host-bonus.mjs).
+startHostBonus();
+// VIP aylık değerlendirme: every account's month judged on the 1st 00:00 (vip-month.mjs).
+startVipMonth();
 startGuardSweep();
 startServerLoad();
 startShopItems();

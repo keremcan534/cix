@@ -5,18 +5,19 @@
 // changes nothing. The table, the in-memory snapshot and the admin routes are in live-settings.mjs.
 //
 // Never here, by design (they change only with a deploy or elsewhere): level thresholds, perks and the Cömertlik gate
-// of the coin games (Seviye ayarları, levels.mjs), casino visibility, the age limits, diamondsPerUsd and the 1:1 coin-to-diamond ratio, diamond lock
+// of the coin games (Seviye ayarları, levels.mjs), casino visibility, the age limits and the 1:1 coin-to-diamond ratio, diamond lock
 // hours, test and sandbox flags, TEST_DAILY, pack coins / product ids / TL prices (Play Console owns the price),
 // gift prices (installed apps show the compiled price), the SMS provider and every secret.
 //
 // Values: null always means "back to the default". A set (features_off, gifts_hidden, shop_hidden, packs_hidden, rewards_off) is kept in
 // its options' order, and an empty set is stored as null. Money rules: the exchange rate moves at most ±10 % per
 // save, withdrawal limits can only go down from today's values.
-import { EXCHANGE, GIFTS, PACKS, SHOP, WITHDRAW, exchangeCoins, packsSetUp } from './catalog.mjs';
+import { COIN_VALUE_TL, EXCHANGE, GIFTS, PACKS, PAYOUT_USD_TRY, SHOP, WHOLESALE_TL, WITHDRAW, exchangeCoins, packsSetUp, payoutTl, tlOfCoins, wholesaleTl } from './catalog.mjs';
 import { DAILY_ROUNDS as CASINO_DAILY_ROUNDS, GAMES as CASINO_GAMES, STAKES as CASINO_STAKES } from './casino-rules.mjs';
 import { REMINDER_KINDS, REMINDER_LABEL } from './event-rules.mjs';
 import { CHEST_MIN_CONTRIBUTION, FAMILY_CHESTS, FAMILY_TASKS, FAMILY_THEMES } from './family-rules.mjs';
 import { MEDAL_RULES, TITLE_RULES } from './profile-rules.mjs';
+import { HOST_BONUS_DEFAULT } from './host-bonus-rules.mjs';
 import { MARK_HOURS } from './profile-mark-rules.mjs';
 import { HOUSE_PCT as ROCKET_HOUSE_PCT } from './rocket-live-rules.mjs';
 import { LEVELS as BOND_LEVELS, levelsOf as bondLevelsOf } from './bond-rules.mjs';
@@ -101,6 +102,11 @@ export function defaultsOf(e = process.env) {
     packs_hidden: [],
     pack_setup: null,
     exchange_usd_try: EXCHANGE.usdTry,
+    coin_value_tl: COIN_VALUE_TL,
+    jeton_wholesale_tl: WHOLESALE_TL,
+    payout_usd_try: PAYOUT_USD_TRY,
+    diamonds_per_usd: EXCHANGE.diamondsPerUsd,
+    host_weekly_bonus: HOST_BONUS_DEFAULT,
     withdraw_max_diamonds: WITHDRAW.maxDiamonds,
     withdraw_weekly_diamonds: WITHDRAW.weeklyDiamonds,
     otp_global_per_hour: perHourOf(e.OTP_GLOBAL_PER_HOUR),
@@ -128,8 +134,6 @@ export function defaultsOf(e = process.env) {
     bond_levels: BOND_LEVELS.join(', '),
     // Aile's game (FAMILY_AMOUNTS): family-rules.mjs's numbers.
     ...Object.fromEntries(Object.entries(FAMILY_AMOUNTS).map(([k, x]) => [k, x.default])),
-    // Ajans statüsü (AGENCY_AMOUNTS): the owners' numbers.
-    ...Object.fromEntries(Object.entries(AGENCY_AMOUNTS).map(([k, x]) => [k, x.default])),
     // Oda seviyeleri and Vitrin (ROOM_LEVEL_AMOUNTS, BADGE_AMOUNTS): room-rules.mjs's and profile-rules.mjs's numbers.
     ...Object.fromEntries(Object.entries(ROOM_LEVEL_AMOUNTS).map(([k, x]) => [k, x.default])),
     ...Object.fromEntries(Object.entries(BADGE_AMOUNTS).map(([k, x]) => [k, x.default])),
@@ -383,6 +387,12 @@ const ROOM_AMOUNTS = {
   // Özel albüm (private-album.mjs, owners 24 Nov 2026): one price for every streamer's album; its coins become the
   // streamer's diamonds as a gift's do. 0 closes it.
   private_album_price: { group: 'Özel albüm', field: 'privateAlbumPrice', label: 'Özel albüm fiyatı', default: 500, bounds: { min: 0, max: 100_000, step: 10, money: true }, unit: ' jeton', help: 'Ajanstaki onaylı bir yayıncının özel albümünü açmanın fiyatı. Jeton hediye gibi yayıncıya elmas olarak geçer, ajans komisyonu hediye gibi işler. Açan kişi albümü (sonradan eklenenler dahil) hep görür. 0: özel albüm kapalı; kimse açamaz, yayıncılar fotoğraf ekleyemez (önceden açanlar görmeye devam eder).', text: (a, b) => (b === 0 ? `Özel albüm kapatıldı (${a} jetondu).` : a === 0 ? `Özel albüm ${b} jetonla açıldı.` : `Özel albüm fiyatı ${a} → ${b} jeton.`) },
+  // VIP yükseltme koruma dönemi (vip-month.mjs, owners 24 Nov 2026): an account that kept its VIP level but didn't move
+  // up may put the month's evaluation off by `vip_extend_days` for `vip_extend_price` coins, in the last
+  // `vip_extend_offer_days` days. Price 0: not offered (until the owners set it).
+  vip_extend_price: { group: 'VIP', field: 'vipExtendPrice', label: 'VIP yükseltme koruma dönemi fiyatı', default: 0, bounds: { min: 0, max: 10_000_000, step: 100, money: true }, unit: ' jeton', help: 'Seviyesini koruyup yükseltemeyen VIP üye, ay sonuna yaklaşınca bu fiyatla değerlendirme tarihini aşağıdaki gün kadar erteler (ayda bir kez). 0: teklif edilmez.', text: (a, b) => (b === 0 ? `VIP koruma dönemi kapatıldı (${a} jetondu).` : `VIP koruma dönemi fiyatı ${a} → ${b} jeton.`) },
+  vip_extend_days: { group: 'VIP', field: 'vipExtendDays', label: 'VIP yükseltme koruma dönemi süresi', default: 7, bounds: { min: 1, max: 31, step: 1 }, unit: ' gün', help: 'Satın alınınca VIP değerlendirmesi bu kadar gün ertelenir.', text: (a, b) => `VIP koruma dönemi ${a} → ${b} gün.` },
+  vip_extend_offer_days: { group: 'VIP', field: 'vipExtendOfferDays', label: 'VIP koruma dönemi: kaç gün kala teklif edilir', default: 3, bounds: { min: 1, max: 15, step: 1 }, unit: ' gün', help: 'Değerlendirmeye bu kadar gün kala, seviyesini koruyup yükseltemeyen VIP üyeye koruma dönemi teklif edilir.', text: (a, b) => `VIP koruma dönemi teklifi ${a} → ${b} gün kala.` },
   // Bağlar (bonds.mjs, docs/BAGLAR.md): how many bonds of a kind one person may have, the requests and their days.
   bond_max_cift: { group: 'Bağlar', field: 'bondMaxCift', label: 'Çift bağı: kişi başına en fazla', default: 1, bounds: { min: 1, max: 5, step: 1 }, unit: ' bağ', help: 'Bir kişinin aynı anda kaç Çift bağı olabilir. Kurulmuş bağlar sınır düşse de sürer; yalnız yenisi kurulamaz.', text: (a, b) => `Kişi başına Çift bağı ${a} → ${b}.` },
   bond_max_kin: { group: 'Bağlar', field: 'bondMaxKin', label: 'Aile bağları: türü başına en fazla', default: 1000, bounds: { min: 1, max: 1000, step: 1 }, unit: ' bağ', help: 'Kardeş, Bacı, Ağabey, Abla, Yenge ve Enişte bağlarının her birinden bir kişinin aynı anda kaç tane olabilir. 1000: pratikte sınırsız (sahiplerin kararı, Güncelleme 7). Kurulmuş bağlar sürer.', text: (a, b) => `Kardeş, Bacı, Ağabey, Abla, Yenge, Enişte: türü başına ${a} → ${b} bağ.` },
@@ -487,28 +497,9 @@ export function roomNumbersOf(s) {
     caps: ROOM_CAPS_DEFAULT.map((n, i) => v(`roomCapLv${i + 1}`, n)),
   };
 }
-/**
- * Ajans statüsü (agency-activity.mjs, docs/AJANS_STATUSU.md, the owners' rule of 19 Nov 2026): an agency is a
- * candidate until it has `agency_activation_hosts` streamers and `agency_activation_earners` of them earned
- * `agency_activation_earn_usd` each in it; an active agency falls back to candidate below `agency_demote_below`
- * streamers. A candidate's commission is kept but not paid out. An active agency that brought fewer than
- * `agency_monthly_new_hosts` new streamers in a month gets `agency_monthly_penalty_pct` points less of its own share
- * the next month. A streamer neither signed in nor withdrew for `agency_inactive_days` leaves the agency (0: never).
- */
-const AGENCY_GROUP = 'Ajans statüsü';
-const AGENCY_AMOUNTS = {
-  agency_activation_hosts: { group: AGENCY_GROUP, field: 'agencyActivationHosts', label: 'Aktif ajans için yayıncı', default: 20, bounds: { min: 0, max: 1_000, step: 1 }, unit: ' yayıncı', help: 'Ajans bu kadar yayıncıya (ve aşağıdaki kazanç şartına) ulaşınca aday ajanstan aktif ajansa geçer. Aday ajansın komisyonu birikir ama ödenmez. 0: kural kapalı, her ajans aktif.', text: (a, b) => `Aktif ajans için ${a} → ${b} yayıncı.` },
-  agency_activation_earners: { group: AGENCY_GROUP, field: 'agencyActivationEarners', label: 'Aktif ajans için kazanan yayıncı', default: 10, bounds: { min: 0, max: 1_000, step: 1 }, unit: ' yayıncı', help: 'Aktif olmak için yayıncılardan en az bu kadarının bu ajanstayken aşağıdaki kadar kazanmış olması gerekir. 0: kazanç şartı yok.', text: (a, b) => `Kazanan yayıncı şartı ${a} → ${b}.` },
-  agency_activation_earn_usd: { group: AGENCY_GROUP, field: 'agencyActivationEarnUsd', label: 'Kazanan yayıncı: en az kazanç (USD)', default: 10, bounds: { min: 0, max: 10_000, step: 1 }, unit: ' USD', help: 'Bir yayıncının "kazanan" sayılması için bu ajanstayken kazandığı en az tutar (elması USD olarak).', text: (a, b) => `Kazanan yayıncı için en az ${a} → ${b} USD.` },
-  agency_demote_below: { group: AGENCY_GROUP, field: 'agencyDemoteBelow', label: 'Aday ajansa düşme: yayıncı bunun altına inerse', default: 20, bounds: { min: 0, max: 1_000, step: 1 }, unit: ' yayıncı', help: 'Aktif ajansın yayıncı sayısı bunun altına inerse (örneğin 90 gün pasif kalanlar düşünce) yeniden aday ajans olur.', text: (a, b) => `Aktif ajans ${a} → ${b} yayıncının altında adaya düşer.` },
-  agency_monthly_new_hosts: { group: AGENCY_GROUP, field: 'agencyMonthlyNewHosts', label: 'Aylık yeni yayıncı şartı', default: 5, bounds: { min: 0, max: 1_000, step: 1 }, unit: ' yayıncı', help: 'Aktif ajans bir ayda bu kadar yeni yayıncı getirmezse bir sonraki ay komisyonu aşağıdaki kadar düşer. 0: şart yok.', text: (a, b) => `Aylık yeni yayıncı şartı ${a} → ${b}.` },
-  agency_monthly_penalty_pct: { group: AGENCY_GROUP, field: 'agencyMonthlyPenaltyPct', label: 'Aylık şart tutmazsa komisyon düşüşü (puan)', default: 5, bounds: { min: 0, max: 40, step: 1, money: true }, unit: ' puan', help: 'Aylık yeni yayıncı şartını tutmayan ajansın kendi komisyon oranı bir sonraki ay bu kadar puan düşer (%40 ise %35). Düşen kısım platformda kalır; üst ajansın payı değişmez.', text: (a, b) => `Aylık şart tutmazsa komisyon ${a} → ${b} puan düşer.` },
-  agency_inactive_days: { group: AGENCY_GROUP, field: 'agencyInactiveDays', label: 'Pasif yayıncı ajanstan düşer (gün)', default: 90, bounds: { min: 0, max: 3_650, step: 1 }, unit: ' gün', help: 'Bu kadar gün uygulamaya girmeyen ve para çekmeyen yayıncı ajanstan düşer ve yönetim yayıncısı olur; kazancı ve çekimi sürer. 0: kimse düşmez.', text: (a, b) => `Pasif yayıncı ${a} → ${b} günde ajanstan düşer.` },
-};
-/** The agency status rule as Canlı ayarlar has it (snapshot `s`). */
-export function agencyRuleOf(s) {
-  return Object.fromEntries(Object.entries(AGENCY_AMOUNTS).map(([, x]) => [x.field.replace(/^agency/, '').replace(/^./, (c) => c.toLowerCase()), Number.isSafeInteger(s?.[x.field]) ? s[x.field] : x.default]));
-}
+// Ajans statüsü (aday / aktif ajans, the monthly penalty, the inactive days) left Canlı ayarlar on 24 Nov 2026: the
+// weekly levels replaced the first two (agency-levels.mjs) and the owners fixed the inactive days at 60
+// (agency-activity.mjs). A stored value of those keys is ignored.
 
 /** Vitrin (profiles.mjs): what earns a medal or a title. Earned ones come and go with the rule. */
 const BADGES = 'Profil rozetleri';
@@ -645,12 +636,37 @@ export const exchangeOk = (liveRate, clientRate) => Number.isFinite(clientRate) 
 // --- Turkish text --------------------------------------------------------------------------------------------
 const fmt = (n) => n.toLocaleString('tr-TR');
 const rateText = (r) => r.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+/** TL per 1.000 coins: 1,00–5.000,00 with at most two decimals. */
+function tlPer1000Of(v, what) {
+  if (typeof v !== 'number' || !Number.isFinite(v)) bad(`${what} bir sayı olmalı`);
+  if (Math.abs(cents(v) - v * 100) > 1e-6) bad(`${what} en çok 2 ondalık basamaklı olabilir`);
+  const r = cents(v) / 100;
+  if (r < 1 || r > 5000) bad(`${what} 1,00 ile 5.000,00 TL arasında olmalı`);
+  return r;
+}
+/** A TL-per-1.000 setting moves at most 50 % in one save (a slipped digit is a tenfold price). */
+function stepCheck(before, after, what) {
+  const b = cents(before);
+  if (Math.abs(cents(after) - b) * 2 <= b) return;
+  bad(`${what} bir kayıtta en çok %50 değişebilir: şimdi ${rateText(before)} TL, yeni değer ${rateText(Math.ceil(b / 2) / 100)}–${rateText(Math.floor((b * 3) / 2) / 100)} TL arasında olmalı`);
+}
 const pctText = (x) => `${x >= 0 ? '+' : '-'}%${Math.abs(x).toLocaleString('tr-TR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}`;
 const when = (iso) => new Date(iso).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
 const some = (xs) => (xs.length > 6 ? `${xs.slice(0, 6).join(', ')} ve ${xs.length - 6} tane daha` : xs.join(', '));
 const giftName = (id) => GIFTS.get(id)?.name ?? id;
 const shopName = (sku) => SHOP.get(sku)?.name ?? sku;
 const packName = (id) => `${fmt(PACKS.find((p) => p.id === id)?.coins ?? 0)} jeton`;
+/**
+ * A stored pack setup against today's packs: entries of packs no longer sold are dropped, a pack it doesn't name joins
+ * with no extra coins and its compiled first-purchase gift, and the places run 1… in the stored order (new packs by
+ * size after the others), so a setup saved before the packs changed still reads.
+ */
+function storedPackSetup(v) {
+  const kept = PACKS.map((p, i) => ({ id: p.id, i, x: v[p.id] && typeof v[p.id] === 'object' ? v[p.id] : null }));
+  const rank = (e) => (e.x && Number.isFinite(Number(e.x.order)) ? Number(e.x.order) : 1_000 + e.i);
+  kept.sort((a, b) => rank(a) - rank(b) || a.i - b.i);
+  return Object.fromEntries(kept.map((e, k) => [e.id, { extra: e.x?.extra ?? 0, first: e.x ? (e.x.first ?? null) : null, order: k + 1 }]));
+}
 const added = (before, after) => after.filter((x) => !before.includes(x));
 
 /** The sentence each newly switched-off feature adds to the preview. */
@@ -863,7 +879,7 @@ export const REGISTRY = {
       if (!after) return before ? 'Kampanya biter. Önceden verilen kampanya jetonları geri alınmaz.' : 'Kampanya yok.';
       const ended = Date.parse(after.endsAt) <= (ctx.now ?? Date.now());
       return [
-        `%${after.percent} kampanya "${after.label}": 100.000 jetonluk paket alan +${fmt(campaignBonus(100_000, after, after.startsAt))} kampanya jetonu alır.`,
+        `%${after.percent} kampanya "${after.label}": 50.000 jetonluk paket alan +${fmt(campaignBonus(50_000, after, after.startsAt))} kampanya jetonu alır.`,
         `${when(after.startsAt)} – ${when(after.endsAt)} (İstanbul saati).`,
         ended ? 'Bitiş zamanı geçmiş; kimse kampanya jetonu almaz.' : 'Eski uygulamalar kampanyayı göstermez; duyuru da yaz.',
       ].join(' ');
@@ -912,7 +928,9 @@ export const REGISTRY = {
     help: 'Gizlenen jeton paketi mağazada görünmez. En az bir paket açık kalmalı; satışı durdurmak için Jeton satın almayı kapat.',
     type: 'set',
     bounds: { options: PACKS.map((p) => p.id), labels: Object.fromEntries(PACKS.map((p) => [p.id, packName(p.id)])), max: PACKS.length - 1 },
-    parse(v) {
+    parse(v, ctx = {}) {
+      // A stored list from before the packs changed (24 Nov 2026) may name a retired pack: it is no longer sold anyway.
+      if (ctx.stored && Array.isArray(v)) v = v.filter((id) => PACKS.some((p) => p.id === id));
       if (Array.isArray(v) && v.length >= PACKS.length) bad('En az bir paket mağazada kalmalı; satışı durdurmak için Jeton satın almayı kapat');
       return setOf(v, REGISTRY.packs_hidden.bounds, 'Gizli paketler');
     },
@@ -933,8 +951,11 @@ export const REGISTRY = {
     help: 'Her paketin ek jetonu (her alımda paketin üstüne), ilk alım hediyesi ve listedeki sırası. Paketin kendi jetonu ve fiyatı Google Play ürününe bağlıdır, buradan değişmez. Ek jeton ve hediye ayrı tutulur; satın alma iade edilirse geri alınır. Eski uygulamalar ek jetonu göstermez ama verilir.',
     type: 'packs',
     bounds: { packs: PACKS.map((p) => ({ id: p.id, coins: p.coins, firstBonus: p.firstBonus, tl: p.tl, label: packName(p.id) })), maxShare: 1, bigShare: 0.5 },
-    parse(v) {
+    parse(v, ctx = {}) {
       if (!v || typeof v !== 'object' || Array.isArray(v)) bad('Paket ayarı eksik');
+      // A setup saved before the packs changed (24 Nov 2026): the retired packs drop out, the new ones take the next
+      // places with no extra coins, and the order closes up, so the panel's extra coins and gifts are kept.
+      if (ctx.stored) v = storedPackSetup(v);
       const out = {};
       const orders = new Set();
       for (const [id, x] of Object.entries(v)) {
@@ -986,6 +1007,112 @@ export const REGISTRY = {
       return out.join(' ');
     },
   },
+  coin_value_tl: {
+    field: 'coinValueTl',
+    group: 'Jeton değeri',
+    label: '1.000 jeton = ? TL',
+    help: 'Jetonun TL değeri: paketlerin liste fiyatı (1.000 jeton bu kadar TL), Çevir (elmas → jeton) ve Jeton Noktası bozdurma hesapları buradan. Kullanıcının ödediği fiyatı Google Play belirler: Play Console’daki paket fiyatlarını aynı gün bu değere göre güncelle. 1,00–5.000,00 TL; bir kayıtta en çok %50 değişir.',
+    type: 'number',
+    bounds: { min: 1, max: 5000, decimals: 2, maxStepPct: 50, bigStepPct: 5 },
+    parse: (v) => tlPer1000Of(v, 'Jeton değeri'),
+    change: (before, after) => stepCheck(before, after, 'Jeton değeri'),
+    big: (before, after) => after !== null && Math.abs(cents(after) - cents(before)) * 100 > cents(before) * REGISTRY.coin_value_tl.bounds.bigStepPct,
+    impact(before, after, ctx) {
+      const usdTry = ctx.next?.usdTry ?? EXCHANGE.usdTry;
+      return [
+        `1.000 jeton ${rateText(before)} → ${rateText(after)} TL (${pctText(((after - before) / before) * 100)}); 50.000 jetonluk paket ${rateText(tlOfCoins(50_000, before))} → ${rateText(tlOfCoins(50_000, after))} TL.`,
+        `Çevir: 10.000 💎 = ${fmt(exchangeCoins(10_000, usdTry, before))} → ${fmt(exchangeCoins(10_000, usdTry, after))} jeton.`,
+        'Play Console’daki paket fiyatlarını da güncelle. Eski uygulamalar Çevir’de "uygulamayı güncelle" uyarısı alır.',
+      ].join(' ');
+    },
+  },
+  jeton_wholesale_tl: {
+    field: 'wholesaleTl',
+    group: 'Jeton Noktası',
+    label: 'Toptan: 1.000 jeton = ? TL',
+    help: 'Jeton Noktası’nın yönetimden jeton alırken ödediği fiyat; Yönetim jeton yükleme ve jeton üretimi bu orandan başlar (o işlemde elle değiştirilebilir). Yapılmış satışlar değişmez. 1,00–5.000,00 TL; bir kayıtta en çok %50 değişir.',
+    type: 'number',
+    bounds: { min: 1, max: 5000, decimals: 2, maxStepPct: 50, bigStepPct: 5 },
+    parse: (v) => tlPer1000Of(v, 'Toptan fiyat'),
+    change: (before, after) => stepCheck(before, after, 'Toptan fiyat'),
+    big: (before, after) => after !== null && Math.abs(cents(after) - cents(before)) * 100 > cents(before) * REGISTRY.jeton_wholesale_tl.bounds.bigStepPct,
+    impact: (before, after) =>
+      `1.000 jeton toptan ${rateText(before)} → ${rateText(after)} TL (${pctText(((after - before) / before) * 100)}); 100.000 jeton ${rateText(wholesaleTl(100_000, before))} → ${rateText(wholesaleTl(100_000, after))} TL. Yapılmış satışlar değişmez.`,
+  },
+  host_weekly_bonus: {
+    field: 'hostBonus',
+    group: 'Ödemeler',
+    label: 'Yayıncı haftalık bonusu',
+    help: 'Ajansa bağlı yayıncı, haftada (Pazartesi 00:00 – Pazar 23:59:59, Türkiye saati) kazandığı elmasa göre ulaştığı baremin bonusunu alır; bir sonraki baremi tamamlayamayan bulunduğu baremin bonusunu alır. Her Pazartesi 00:00’da biten hafta için elmas olarak yüklenir, SimilarClub Sistem’den bildirilir; ajansa komisyon doğurmaz. Kapatılırsa o hafta ödenmez. Barem: "şu kadar elmastan itibaren, şu kadar bonus"; en üst baremin üstü en üst baremin bonusunu alır.',
+    type: 'tiers',
+    bounds: { maxTiers: 30, max: 1_000_000_000 },
+    parse(v) {
+      if (!v || typeof v !== 'object' || Array.isArray(v)) bad('Bonus ayarı eksik');
+      if (typeof v.on !== 'boolean') bad('Bonus: açık / kapalı seçimi geçersiz');
+      if (!Array.isArray(v.tiers) || v.tiers.length < 1 || v.tiers.length > 30) bad('Bonus: 1–30 barem olmalı');
+      let last = 0;
+      let lastBonus = 0;
+      const tiers = v.tiers.map((t, i) => {
+        const from = t && Number.isSafeInteger(t.from) && t.from >= 1 && t.from <= 1_000_000_000 ? t.from : null;
+        const bonus = t && Number.isSafeInteger(t.bonus) && t.bonus >= 0 && t.bonus <= 1_000_000_000 ? t.bonus : null;
+        if (from === null || bonus === null) bad(`Bonus ${i + 1}. barem: elmas ve bonus tam sayı olmalı (1 elmastan itibaren)`);
+        if (from <= last) bad(`Bonus baremleri küçükten büyüğe ve her biri bir öncekinden büyük olmalı (${i + 1}. barem)`);
+        if (bonus < lastBonus) bad(`Bonus ${i + 1}. barem: bonus bir öncekinden az olamaz`);
+        last = from;
+        lastBonus = bonus;
+        return Object.freeze({ from, bonus });
+      });
+      return Object.freeze({ on: v.on, tiers: Object.freeze(tiers) });
+    },
+    big: (before, after) => !!after && (after.on !== before.on || JSON.stringify(after.tiers) !== JSON.stringify(before.tiers)),
+    impact(before, after) {
+      if (!after.on) return 'Yayıncı haftalık bonusu kapanır: kapalıyken biten haftalar için bonus ödenmez.';
+      const t = after.tiers;
+      return `${t.length} barem: ${fmt(t[0].from)} elmastan ${fmt(t[0].bonus)} bonus … ${fmt(t.at(-1).from)} elmas ve üstü ${fmt(t.at(-1).bonus)} bonus. Değişiklik bir sonraki hafta kapanışında (Pazartesi 00:00) ödenen bonuslarda geçerli; ödenmiş bonuslar değişmez.`;
+    },
+  },
+  diamonds_per_usd: {
+    field: 'diamondsPerUsd',
+    group: 'Ödemeler',
+    label: 'Elmas değeri: 1 USD = ? elmas',
+    help: 'Yayıncının elmasının değeri: para çekmede, ajans komisyonunun USD karşılığında, Jeton Noktası bozdurmasında ve Çevir\'de (elmas → jeton) kullanılır. Açık talepler oluşturuldukları andaki USD ile kalır. 100–100.000; bir kayıtta en çok %25 değişir.',
+    type: 'int',
+    bounds: { min: 100, max: 100_000, step: 1, maxStepPct: 25, bigStepPct: 5 },
+    parse: (v) => wholeOf(v, REGISTRY.diamonds_per_usd.bounds, 'Elmas değeri', ' elmas'),
+    change(before, after) {
+      if (Math.abs(after - before) * 4 <= before) return;
+      bad(`Elmas değeri bir kayıtta en çok %25 değişebilir: şimdi 1 USD = ${fmt(before)} elmas, yeni değer ${fmt(Math.ceil((before * 3) / 4))}–${fmt(Math.floor((before * 5) / 4))} arasında olmalı`);
+    },
+    big: (before, after) => after !== null && Math.abs(after - before) * 100 > before * REGISTRY.diamonds_per_usd.bounds.bigStepPct,
+    impact: (before, after, ctx) => {
+      const rate = ctx.next?.payoutUsdTry ?? PAYOUT_USD_TRY;
+      const usd = (per) => Math.floor((1_000_000 / per) * 100) / 100;
+      return `1.000.000 💎 = ${rateText(usd(before))} → ${rateText(usd(after))} USD (ödeme kuruyla ${rateText(payoutTl(usd(before), rate))} → ${rateText(payoutTl(usd(after), rate))} TL). Açık talepler kendi USD'leriyle kalır; eski uygulamalar USD tahminlerini eski değerle gösterir.`;
+    },
+  },
+  payout_usd_try: {
+    field: 'payoutUsdTry',
+    group: 'Ödemeler',
+    label: 'Ödeme kuru: 1 USD = ? TL',
+    help: 'Yayıncılara ve ajanslara ödeme yaparken baz alınan kur: para çekme ve ajans ödemelerinde gönderilecek TL, Jeton Noktası bozdurmasında yayıncıya ödenecek TL bu kurla hesaplanır. Ödendi işaretlenen ödemeye o anki kur yazılır; sonradan değişmez. 30,00–100,00; bir kayıtta en çok %10 değişir.',
+    type: 'number',
+    bounds: { min: 30, max: 100, decimals: 2, maxStepPct: 10, bigStepPct: 3 },
+    parse(v) {
+      if (typeof v !== 'number' || !Number.isFinite(v)) bad('Ödeme kuru bir sayı olmalı');
+      if (Math.abs(cents(v) - v * 100) > 1e-6) bad('Ödeme kuru en çok 2 ondalık basamaklı olabilir');
+      const r = cents(v) / 100;
+      if (r < 30 || r > 100) bad('Ödeme kuru 30,00 ile 100,00 arasında olmalı');
+      return r;
+    },
+    change(before, after) {
+      const b = cents(before);
+      if (Math.abs(cents(after) - b) * 10 <= b) return;
+      bad(`Ödeme kuru bir kayıtta en çok %10 değişebilir: şimdi ${rateText(before)}, yeni değer ${rateText(Math.ceil((b * 9) / 10) / 100)}–${rateText(Math.floor((b * 11) / 10) / 100)} arasında olmalı`);
+    },
+    big: (before, after) => after !== null && Math.abs(cents(after) - cents(before)) * 100 > cents(before) * REGISTRY.payout_usd_try.bounds.bigStepPct,
+    impact: (before, after) =>
+      `1 USD ${rateText(before)} → ${rateText(after)} TL (${pctText(((after - before) / before) * 100)}): 1.000 USD'lik ödeme ${rateText(payoutTl(1000, before))} → ${rateText(payoutTl(1000, after))} TL. Ödenmiş ödemeler değişmez.`,
+  },
   withdraw_max_diamonds: {
     field: 'withdrawMax',
     group: 'Para çekme sınırları',
@@ -1004,14 +1131,14 @@ export const REGISTRY = {
     field: 'withdrawWeekly',
     group: 'Para çekme sınırları',
     label: 'Haftalık en çok',
-    help: '7 günde istenebilecek en çok elmas. Yalnız bugünkü değerden aşağı çekilebilir.',
+    help: 'Bir haftada (Pazartesi 00:00 – Pazar 23:59:59, Türkiye saati) istenebilecek en çok elmas; her Pazartesi 00:00\'da yenilenir. Yalnız bugünkü değerden aşağı çekilebilir.',
     type: 'int',
     bounds: { min: WITHDRAW.minDiamonds, max: WITHDRAW.weeklyDiamonds, step: 10_000 },
     parse: (v) => wholeOf(v, REGISTRY.withdraw_weekly_diamonds.bounds, 'Haftalık sınır', ' elmas'),
     big: () => false,
     impact(before, after, ctx) {
       const max = ctx.next?.withdraw_max_diamonds;
-      return `7 günde en çok ${fmt(before)} → ${fmt(after)} 💎 istenebilir. Bekleyen talepler etkilenmez.${after < max ? ' Tek talep sınırından düşük olduğu için tek talepte de en çok bu kadar istenebilir.' : ''}`;
+      return `Haftada en çok ${fmt(before)} → ${fmt(after)} 💎 istenebilir. Bekleyen talepler etkilenmez.${after < max ? ' Tek talep sınırından düşük olduğu için tek talepte de en çok bu kadar istenebilir.' : ''}`;
     },
   },
   otp_global_per_hour: {
@@ -1161,7 +1288,6 @@ export const REGISTRY = {
     impact: (before, after) => `Lv2 ${fmt(bondLevelsOf(before)?.[1] ?? 0)} → ${fmt(bondLevelsOf(after)?.[1] ?? 0)}, Lv10 ${fmt(bondLevelsOf(before)?.[9] ?? 0)} → ${fmt(bondLevelsOf(after)?.[9] ?? 0)}, Lv20 ${fmt(bondLevelsOf(before)?.[19] ?? 0)} → ${fmt(bondLevelsOf(after)?.[19] ?? 0)} puan.`,
   },
   ...roomEntries(FAMILY_AMOUNTS),
-  ...roomEntries(AGENCY_AMOUNTS),
   ...roomEntries(ROOM_LEVEL_AMOUNTS),
   ...roomEntries(BADGE_AMOUNTS),
   ...eventEntries(),
@@ -1289,6 +1415,11 @@ export function snapshotOf(rows = [], e = process.env, { v = 0 } = {}) {
     packSetup: val('pack_setup') && Object.freeze({ ...val('pack_setup') }),
     campaign: campaign && Object.freeze({ ...campaign }),
     usdTry: val('exchange_usd_try'),
+    coinValueTl: val('coin_value_tl'),
+    wholesaleTl: val('jeton_wholesale_tl'),
+    payoutUsdTry: val('payout_usd_try'),
+    diamondsPerUsd: val('diamonds_per_usd'),
+    hostBonus: val('host_weekly_bonus'),
     withdrawMax: val('withdraw_max_diamonds'),
     withdrawWeekly: val('withdraw_weekly_diamonds'),
     otpPerHour: val('otp_global_per_hour'),
@@ -1307,7 +1438,6 @@ export function snapshotOf(rows = [], e = process.env, { v = 0 } = {}) {
     // As written ("0, 10, 30"); bonds.mjs reads it with bond-rules.mjs levelsOf.
     bondLevels: val('bond_levels'),
     ...Object.fromEntries(Object.entries(FAMILY_AMOUNTS).map(([k, x]) => [x.field, val(k)])),
-    ...Object.fromEntries(Object.entries(AGENCY_AMOUNTS).map(([k, x]) => [x.field, val(k)])),
     ...Object.fromEntries(Object.entries(ROOM_LEVEL_AMOUNTS).map(([k, x]) => [x.field, val(k)])),
     ...Object.fromEntries(Object.entries(BADGE_AMOUNTS).map(([k, x]) => [x.field, val(k)])),
     ...Object.fromEntries(Object.entries(EVENT_RULES).map(([k, x]) => [x.field, val(k)])),
