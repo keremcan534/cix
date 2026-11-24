@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
-import { BackHandler, Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useEffect, useRef, useState, type ComponentRef } from 'react';
+import { BackHandler, Image, PanResponder, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -20,6 +20,20 @@ import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 
 const KIND_NAME: Record<PanelKind, string> = { sabit: 'Sabit', vip: 'VIP' };
+
+/** The panel's sideways swipe (as the gift sheet's ShelfSwipe): made once, it calls the latest handler; up and down stays the list's scroll. */
+class TabSwipe {
+  private on?: (dir: 1 | -1) => void;
+  set(on: (dir: 1 | -1) => void) {
+    this.on = on;
+  }
+  readonly pan = PanResponder.create({
+    onMoveShouldSetPanResponderCapture: (_, g) => Math.abs(g.dx) > 18 && Math.abs(g.dx) > Math.abs(g.dy) * 2,
+    onPanResponderRelease: (_, g) => {
+      if (Math.abs(g.dx) > 50 || Math.abs(g.vx) > 0.5) this.on?.(g.dx < 0 ? 1 : -1);
+    },
+  });
+}
 
 /**
  * Inline emoji picker, in two parts (lib/emoji-panel). Sabit: Emoji (the animated faces, then Müzik and, in a room,
@@ -68,6 +82,21 @@ export function EmojiPanel({ onPick, hint, onAnimate, onClose, fill }: { onPick:
   const switchKind = (k: PanelKind) => {
     if (k !== kind) choose(tabs.find((x) => x.kind === k) ?? tabs[0]);
   };
+  // A swipe left or right over the list goes to the next or previous tab, from Sabit's last on into VIP's first and
+  // back (owners, 24 Nov 2026). Only a clearly sideways move takes the touch: an up-down one still scrolls the list,
+  // and a tap still picks. The tab strip follows, so the tab shown is in sight.
+  const strip = useRef<ComponentRef<typeof ScrollView>>(null);
+  const tabX = useRef(new Map<string, number>());
+  const step = (by: 1 | -1) => {
+    const next = tabs[tabs.findIndex((x) => x.id === tab.id) + by];
+    if (!next) return;
+    choose(next);
+    // The strip shows one kind's tabs; its new tab is placed once it is drawn.
+    requestAnimationFrame(() => strip.current?.scrollTo({ x: Math.max(0, (tabX.current.get(next.id) ?? 0) - 40), animated: true }));
+  };
+  // The responder is made once (TabSwipe); it calls the newest step (the tab it starts from changes with every swipe).
+  const [swipe] = useState(() => new TabSwipe());
+  useEffect(() => swipe.set(step));
 
   const pick = (e: string) => {
     if (locked) return;
@@ -218,7 +247,7 @@ export function EmojiPanel({ onPick, hint, onAnimate, onClose, fill }: { onPick:
       {hint && <Text style={styles.hint}>{hint}</Text>}
       {/* Over a room's chat every row counts: the switch rides in the tab strip, the mic effects scroll with the list. */}
       {!fill && kindSwitch}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[{ flexGrow: 0, flexShrink: 0 }, fill && styles.strip]} contentContainerStyle={[{ gap: 6, paddingHorizontal: 8 }, fill && styles.stripIn]}>
+      <ScrollView ref={strip} horizontal showsHorizontalScrollIndicator={false} style={[{ flexGrow: 0, flexShrink: 0 }, fill && styles.strip]} contentContainerStyle={[{ gap: 6, paddingHorizontal: 8 }, fill && styles.stripIn]}>
         {fill && kindSwitch}
         {tabs
           .filter((x) => x.kind === kind)
@@ -228,6 +257,7 @@ export function EmojiPanel({ onPick, hint, onAnimate, onClose, fill }: { onPick:
               <Pressable
                 key={x.id}
                 onPress={() => choose(x)}
+                onLayout={(e) => tabX.current.set(x.id, e.nativeEvent.layout.x)}
                 hitSlop={fill ? { top: 8, bottom: 8 } : undefined}
                 style={[styles.tab, fill ? styles.tabInline : styles.tabTall, tab.id === x.id && styles.tabActive]}
                 accessibilityRole="tab"
@@ -244,7 +274,8 @@ export function EmojiPanel({ onPick, hint, onAnimate, onClose, fill }: { onPick:
             );
           })}
       </ScrollView>
-      {(tab.id === 'animated' || tab.id === 'animated-free') && onAnimate ? (
+      <View style={fill ? { flex: 1 } : { flexShrink: 1 }} {...swipe.pan.panHandlers}>
+        {(tab.id === 'animated' || tab.id === 'animated-free') && onAnimate ? (
         <View style={[{ paddingHorizontal: 8, gap: 6 }, fill ? { flex: 1 } : { flexShrink: 1 }]}>
           {!fill && micEffects}
           <ScrollView style={list} contentContainerStyle={fill ? { gap: 6 } : undefined} nestedScrollEnabled>
@@ -273,7 +304,8 @@ export function EmojiPanel({ onPick, hint, onAnimate, onClose, fill }: { onPick:
         <ScrollView style={list} nestedScrollEnabled>
           <View style={[styles.grid, locked && { opacity: 0.4 }]}>{pack.stickers.map((x) => (pack.roomOnly ? moveCell(x) : stickerCell(x)))}</View>
         </ScrollView>
-      ) : null}
+        ) : null}
+      </View>
       {locked && pack && (
         <Pressable
           style={styles.unlock}
