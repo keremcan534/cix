@@ -231,6 +231,8 @@ const weekOf = (v) => {
 const rowView = (x) => ({
   id: Number(x.id),
   userId: x.user_id,
+  // The person's ID in the app (12 digits): what staff read; userId stays for the calls.
+  publicNo: x.public_no === null || x.public_no === undefined ? null : String(x.public_no),
   name: x.name,
   kind: x.kind,
   agencyId: x.agency_id,
@@ -279,18 +281,20 @@ export const hostBonusRoutes = {
     const base = { on: !!s.on, tiers: s.tiers, current, currentLabel: weekText(current), week, label: weekText(week), weeks };
     if (week >= current) {
       const list = await earnersOf(db, current, s.tiers);
-      const names = new Map((await db.query('SELECT id, name FROM users WHERE id = ANY($1::uuid[])', [list.map((e) => e.userId)])).rows.map((x) => [x.id, x.name]));
+      const people = new Map((await db.query('SELECT id, name, public_no FROM users WHERE id = ANY($1::uuid[])', [list.map((e) => e.userId)])).rows.map((x) => [x.id, x]));
+      const names = new Map([...people].map(([id, x]) => [id, x.name]));
+      const nos = new Map([...people].map(([id, x]) => [id, x.public_no === null ? null : String(x.public_no)]));
       const agencies = new Map((await db.query('SELECT id, name FROM agencies WHERE id = ANY($1::uuid[])', [list.map((e) => e.agencyId).filter(Boolean)])).rows.map((x) => [x.id, x.name]));
       return {
         ...base,
         preview: true,
-        rows: list.map((e) => ({ userId: e.userId, name: names.get(e.userId) ?? '', kind: e.kind, agencyId: e.agencyId, agency: agencies.get(e.agencyId) ?? '', earned: e.earned, tierFrom: e.tier.from, bonus: e.tier.bonus })),
+        rows: list.map((e) => ({ userId: e.userId, publicNo: nos.get(e.userId) ?? null, name: names.get(e.userId) ?? '', kind: e.kind, agencyId: e.agencyId, agency: agencies.get(e.agencyId) ?? '', earned: e.earned, tierFrom: e.tier.from, bonus: e.tier.bonus })),
         total: list.reduce((n, e) => n + e.tier.bonus, 0),
       };
     }
     const rows = (
       await db.query(
-        `SELECT b.*, u.name, a.name AS agency, r.name AS reversed_by_name FROM host_bonuses b
+        `SELECT b.*, u.name, u.public_no, a.name AS agency, r.name AS reversed_by_name FROM host_bonuses b
            JOIN users u ON u.id = b.user_id LEFT JOIN agencies a ON a.id = b.agency_id LEFT JOIN users r ON r.id = b.reversed_by
           WHERE b.week_start = $1 ORDER BY b.bonus DESC, b.earned DESC, b.id LIMIT 5000`,
         [week],

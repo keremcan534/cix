@@ -155,6 +155,7 @@ describe('Yayıncı haftalık bonusu', () => {
       v.rows.map((r) => [r.userId, r.kind, r.earned, r.bonus]),
       [[held.id, 'management', 45_000, 20_000], [s1.id, 'agency', 25_000, 10_000]],
     );
+    assert.ok(v.rows.every((r) => /^\d{12}$/.test(r.publicNo)), 'panelde kişinin uygulama ID’si (UUID değil)');
     const w = v.weeks.find((x) => x.week === week);
     assert.deepEqual([w.on, w.people, w.diamonds], [true, 2, 30_000]);
     refused(await admin.get('/api/admin/host-bonus?week=2026-11-25'), 400, 'Pazartesi değil');

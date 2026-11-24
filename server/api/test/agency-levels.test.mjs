@@ -62,7 +62,9 @@ describe('Haftalık seviye farkı: asistan, BD, iade', () => {
     assert.equal(ok(await owner.get(`/api/agency/overview?id=${A.id}`)).rate.rate, 0.5, 'eski uygulamaların oranı: bu haftanın seviyesi');
     const list = ok(await admin.get('/api/admin/agency/levels?week=' + v.week));
     assert.equal(list.preview, true);
-    assert.equal(list.rows.find((r) => r.agencyId === A.id).levelKey, 'ust');
+    const row = list.rows.find((r) => r.agencyId === A.id);
+    assert.deepEqual([row.levelKey, row.levelName, row.minActive, row.next], ['ust', 'Üst', 1, null], 'yönetim için ad, şart ve sonraki seviye (en üstte yok)');
+    assert.equal(ok(await admin.get('/api/admin/agency/levels')).week, v.week, 'varsayılan: süren hafta');
   });
 
   test('hafta kapanınca: fark ajansa, payı asistana (elmas), BD’ye; bir kez', async () => {

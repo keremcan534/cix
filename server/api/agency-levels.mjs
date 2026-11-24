@@ -201,7 +201,7 @@ export const levelName = (s, key) => {
 export const agencyLevelRoutes = {
   /**
    * Staff: every agency's week. `week` a Monday; the week still running gives what would be settled now (nothing
-   * written). Default: the last closed week.
+   * written). Default: the week running.
    */
   async 'GET /api/admin/agency/levels'(req, url) {
     const u = await auth(req);
@@ -211,7 +211,8 @@ export const agencyLevelRoutes = {
     const current = weekStartOf();
     const q = url.searchParams.get('week');
     if (q !== null && (!/^\d{4}-\d{2}-\d{2}$/.test(q) || weekStartOf(Date.parse(`${q}T12:00:00+03:00`)) !== q)) throw new HttpError(400, 'Hafta bir Pazartesi tarihi olmalı (YYYY-AA-GG)');
-    const week = q ?? addDays(current, -7);
+    // Default: the week running (what staff ask most: where each agency stands now).
+    const week = q ?? current;
     const weeks = (await db.query('SELECT week_start::text AS week, done_at, agencies FROM agency_level_runs ORDER BY week_start DESC LIMIT 26')).rows.map((r) => ({ week: r.week, label: weekText(r.week), doneAt: r.done_at, agencies: r.agencies }));
     const base = { levels: s.weekly_levels, current, currentLabel: weekText(current), week, label: weekText(week), weeks };
     // A week not closed yet (the one running): what would be settled now.
@@ -221,7 +222,29 @@ export const agencyLevelRoutes = {
       const rows = [];
       for (const a of all) {
         const v = await levelView(db, a, s);
-        rows.push({ agencyId: a.id, name: a.name, code: a.code, levelKey: v.level.key, levelName: s.weekly_levels.levels.find((l) => l.key === v.level.key)?.name, shown: v.level.shown, rate: v.level.rate, base: v.base, active: v.active, reason: v.reason, isNew: v.isNew, adjustment: null });
+        // For staff every level has its name; the next level and what it still needs, the level the diamonds reached
+        // but the active streamers held back.
+        const lv = s.weekly_levels;
+        const next = v.isNew ? null : nextLevelOf(v.base, lv);
+        const reached = v.reason === 'active' ? levelFor({ base: v.base, active: lv.min_active, isNew: false }, lv).level : null;
+        rows.push({
+          agencyId: a.id,
+          name: a.name,
+          code: a.code,
+          levelKey: v.level.key,
+          levelName: lv.levels.find((l) => l.key === v.level.key)?.name,
+          shown: v.level.shown,
+          rate: v.level.rate,
+          base: v.base,
+          active: v.active,
+          minActive: lv.min_active,
+          reason: v.reason,
+          isNew: v.isNew,
+          newUntil: v.newUntil,
+          next: next ? { name: next.name, rate: next.rate, from: next.from, left: next.left } : null,
+          reached: reached ? { name: reached.name, rate: reached.rate } : null,
+          adjustment: null,
+        });
       }
       return { ...base, preview: true, rows: rows.sort((x, y) => y.base - x.base) };
     }

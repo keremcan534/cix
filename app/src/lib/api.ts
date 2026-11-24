@@ -34,6 +34,8 @@ import type { XoxMove, XoxState } from '@/lib/room-games/xox';
 export type ServerUser = {
   id: string; name: string; coins: number; diamonds: number; gameCoins: number; createdAt: string; phone?: string | null; svipXp?: number; wealthXp?: number; charmXp?: number; paidGames?: boolean;
   vipSubUntil?: string | null;
+  /** The person's ID in the app (12 digits, server/api/public-no.mjs); the account's server id above is never shown. */
+  publicNo?: string | null;
   // Only in GET/PATCH /api/me and the sign-in and add-address answers; wallet answers leave them out.
   email?: string | null; identities?: string[]; phoneVerified?: boolean;
 };

@@ -135,7 +135,7 @@ async function findPurchases(q) {
       : term
         ? ['p.transaction_id = $1', [term]]
         : ['TRUE', []];
-  const r = await db.query(`SELECT p.*, u.name FROM purchases p JOIN users u ON u.id = p.user_id WHERE ${where} ORDER BY p.id DESC LIMIT 50`, args);
+  const r = await db.query(`SELECT p.*, u.name, u.public_no FROM purchases p JOIN users u ON u.id = p.user_id WHERE ${where} ORDER BY p.id DESC LIMIT 50`, args);
   return r.rows.map((p) => ({
     id: Number(p.id),
     platform: p.platform,
@@ -148,7 +148,7 @@ async function findPurchases(q) {
     status: p.status,
     sandbox: p.sandbox,
     createdAt: p.created_at,
-    user: { id: p.user_id, name: p.name },
+    user: { id: p.user_id, name: p.name, publicNo: p.public_no === null || p.public_no === undefined ? null : String(p.public_no) },
   }));
 }
 
