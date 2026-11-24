@@ -123,6 +123,7 @@ import { TEST_DAILY, charmPoints, creditCoins, giftCoins, playCoinsToday, spendD
 import { whatsappRoutes } from './whatsapp.mjs';
 import { closeLines, lineRoutes, openLine } from './live-line.mjs';
 import { withdrawRoutes } from './withdraw.mjs';
+import { hostBonusRoutes, startHostBonus, stopHostBonus } from './host-bonus.mjs';
 import { refundSyncRoutes, startRefundSync, stopRefundSync } from './refunds.mjs';
 import { refreshOwnSubscription, startVipRecheck, stopVipRecheck, vipRoutes } from './vip.mjs';
 import { referralRoutes } from './referrals.mjs';
@@ -335,6 +336,7 @@ const routes = {
   ...levelRewardRoutes,
   ...taskRewardRoutes,
   ...withdrawRoutes,
+  ...hostBonusRoutes,
   ...jetonRoutes,
   ...refundSyncRoutes,
   ...authRoutes,
@@ -568,6 +570,7 @@ function shutdown(signal) {
   stopLuckyArt();
   stopMarkKinds();
   stopBondLooks();
+  stopHostBonus();
   server.close();
   const started = Date.now();
   const wait = setInterval(async () => {
@@ -614,6 +617,8 @@ startCustomGifts();
 startEmoji();
 startLevels();
 startLevelDecay();
+// Yayıncı haftalık bonusu: closes the week that ended every Monday 00:00 (host-bonus.mjs).
+startHostBonus();
 startGuardSweep();
 startServerLoad();
 startShopItems();

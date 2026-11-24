@@ -7,6 +7,7 @@ import path from 'node:path';
 
 import { EXCHANGE, GIFTS, PACKS, SHOP, WITHDRAW, exchangeCoins } from '../catalog.mjs';
 import { DEFAULT_OPENERS, DEFAULT_QUICK, DEFAULT_TEMPLATES } from '../auto-chat-rules.mjs';
+import { HOST_BONUS_TIERS } from '../host-bonus-rules.mjs';
 import {
   DEFAULTS,
   FEATURES,
@@ -48,6 +49,7 @@ describe('defaults are today', () => {
       exchange_usd_try: EXCHANGE.usdTry,
       coin_value_tl: 220,
       jeton_wholesale_tl: 220,
+      host_weekly_bonus: { on: true, tiers: HOST_BONUS_TIERS },
       diamonds_per_usd: 1000,
       payout_usd_try: 49,
       withdraw_max_diamonds: WITHDRAW.maxDiamonds,
@@ -238,6 +240,7 @@ describe('defaults are today', () => {
       'exchange_usd_try',
       'coin_value_tl',
       'jeton_wholesale_tl',
+      'host_weekly_bonus',
       'diamonds_per_usd',
       'payout_usd_try',
       'withdraw_max_diamonds',

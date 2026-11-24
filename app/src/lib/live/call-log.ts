@@ -7,6 +7,7 @@ import { taskItemNames } from '@/lib/bag-core';
 import { refreshBag } from '@/lib/live/bag';
 import { focusStore } from '@/lib/live/focus-store';
 import { parseWeek } from '@/lib/week';
+import { parseHostBonus } from '@/lib/host-bonus';
 
 // --- Aramalar ------------------------------------------------------------------------------------------------
 type CallPage = { calls: api.ServerCallLog[]; next: number | null };
@@ -52,6 +53,9 @@ export const useLiveCallStats = (on = true) => stats.useData(on);
 const week = focusStore(async () => parseWeek(await api.myWeek()));
 /** This week's diamonds day by day (Monday first, Türkiye time), or null until read or when the answer was malformed. */
 export const useLiveWeek = (on = true) => week.useData(on);
+const bonus = focusStore(async () => parseHostBonus(await api.myHostBonus()));
+/** Yayıncı haftalık bonusu: this week's tier and the next, or null until read or when the answer was malformed. */
+export const useLiveHostBonus = (on = true) => bonus.useData(on);
 
 // --- Görevler -----------------------------------------------------------------------------------------------
 const task = focusStore(api.myCallTask);

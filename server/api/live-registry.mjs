@@ -17,6 +17,7 @@ import { DAILY_ROUNDS as CASINO_DAILY_ROUNDS, GAMES as CASINO_GAMES, STAKES as C
 import { REMINDER_KINDS, REMINDER_LABEL } from './event-rules.mjs';
 import { CHEST_MIN_CONTRIBUTION, FAMILY_CHESTS, FAMILY_TASKS, FAMILY_THEMES } from './family-rules.mjs';
 import { MEDAL_RULES, TITLE_RULES } from './profile-rules.mjs';
+import { HOST_BONUS_DEFAULT } from './host-bonus-rules.mjs';
 import { MARK_HOURS } from './profile-mark-rules.mjs';
 import { HOUSE_PCT as ROCKET_HOUSE_PCT } from './rocket-live-rules.mjs';
 import { LEVELS as BOND_LEVELS, levelsOf as bondLevelsOf } from './bond-rules.mjs';
@@ -105,6 +106,7 @@ export function defaultsOf(e = process.env) {
     jeton_wholesale_tl: WHOLESALE_TL,
     payout_usd_try: PAYOUT_USD_TRY,
     diamonds_per_usd: EXCHANGE.diamondsPerUsd,
+    host_weekly_bonus: HOST_BONUS_DEFAULT,
     withdraw_max_diamonds: WITHDRAW.maxDiamonds,
     withdraw_weekly_diamonds: WITHDRAW.weeklyDiamonds,
     otp_global_per_hour: perHourOf(e.OTP_GLOBAL_PER_HOUR),
@@ -1052,6 +1054,38 @@ export const REGISTRY = {
     impact: (before, after) =>
       `1.000 jeton toptan ${rateText(before)} → ${rateText(after)} TL (${pctText(((after - before) / before) * 100)}); 100.000 jeton ${rateText(wholesaleTl(100_000, before))} → ${rateText(wholesaleTl(100_000, after))} TL. Yapılmış satışlar değişmez.`,
   },
+  host_weekly_bonus: {
+    field: 'hostBonus',
+    group: 'Ödemeler',
+    label: 'Yayıncı haftalık bonusu',
+    help: 'Ajansa bağlı yayıncı, haftada (Pazartesi 00:00 – Pazar 23:59:59, Türkiye saati) kazandığı elmasa göre ulaştığı baremin bonusunu alır; bir sonraki baremi tamamlayamayan bulunduğu baremin bonusunu alır. Her Pazartesi 00:00’da biten hafta için elmas olarak yüklenir, SimilarClub Sistem’den bildirilir; ajansa komisyon doğurmaz. Kapatılırsa o hafta ödenmez. Barem: "şu kadar elmastan itibaren, şu kadar bonus"; en üst baremin üstü en üst baremin bonusunu alır.',
+    type: 'tiers',
+    bounds: { maxTiers: 30, max: 1_000_000_000 },
+    parse(v) {
+      if (!v || typeof v !== 'object' || Array.isArray(v)) bad('Bonus ayarı eksik');
+      if (typeof v.on !== 'boolean') bad('Bonus: açık / kapalı seçimi geçersiz');
+      if (!Array.isArray(v.tiers) || v.tiers.length < 1 || v.tiers.length > 30) bad('Bonus: 1–30 barem olmalı');
+      let last = 0;
+      let lastBonus = 0;
+      const tiers = v.tiers.map((t, i) => {
+        const from = t && Number.isSafeInteger(t.from) && t.from >= 1 && t.from <= 1_000_000_000 ? t.from : null;
+        const bonus = t && Number.isSafeInteger(t.bonus) && t.bonus >= 0 && t.bonus <= 1_000_000_000 ? t.bonus : null;
+        if (from === null || bonus === null) bad(`Bonus ${i + 1}. barem: elmas ve bonus tam sayı olmalı (1 elmastan itibaren)`);
+        if (from <= last) bad(`Bonus baremleri küçükten büyüğe ve her biri bir öncekinden büyük olmalı (${i + 1}. barem)`);
+        if (bonus < lastBonus) bad(`Bonus ${i + 1}. barem: bonus bir öncekinden az olamaz`);
+        last = from;
+        lastBonus = bonus;
+        return Object.freeze({ from, bonus });
+      });
+      return Object.freeze({ on: v.on, tiers: Object.freeze(tiers) });
+    },
+    big: (before, after) => !!after && (after.on !== before.on || JSON.stringify(after.tiers) !== JSON.stringify(before.tiers)),
+    impact(before, after) {
+      if (!after.on) return 'Yayıncı haftalık bonusu kapanır: kapalıyken biten haftalar için bonus ödenmez.';
+      const t = after.tiers;
+      return `${t.length} barem: ${fmt(t[0].from)} elmastan ${fmt(t[0].bonus)} bonus … ${fmt(t.at(-1).from)} elmas ve üstü ${fmt(t.at(-1).bonus)} bonus. Değişiklik bir sonraki hafta kapanışında (Pazartesi 00:00) ödenen bonuslarda geçerli; ödenmiş bonuslar değişmez.`;
+    },
+  },
   diamonds_per_usd: {
     field: 'diamondsPerUsd',
     group: 'Ödemeler',
@@ -1401,6 +1435,7 @@ export function snapshotOf(rows = [], e = process.env, { v = 0 } = {}) {
     wholesaleTl: val('jeton_wholesale_tl'),
     payoutUsdTry: val('payout_usd_try'),
     diamondsPerUsd: val('diamonds_per_usd'),
+    hostBonus: val('host_weekly_bonus'),
     withdrawMax: val('withdraw_max_diamonds'),
     withdrawWeekly: val('withdraw_weekly_diamonds'),
     otpPerHour: val('otp_global_per_hour'),

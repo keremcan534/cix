@@ -492,6 +492,8 @@ export type IncomeSource = { key: string; label: string; diamonds: number; count
 export type IncomePeriod = 'day' | 'week' | 'month' | 'all';
 /** Yayıncı Merkezi "Bu hafta": this week's diamonds day by day, Monday first, Türkiye time (server wallet.mjs). */
 export const myWeek = () => call<unknown>('GET', '/api/wallet/week');
+/** Yayıncı haftalık bonusu: this week's earnings, the tier reached and the next (server/api/host-bonus.mjs). */
+export const myHostBonus = () => call<unknown>('GET', '/api/wallet/host-bonus');
 export const incomeSources = (period: IncomePeriod) => call<{ period: IncomePeriod; total: number; sources: IncomeSource[] }>('GET', `/api/wallet/income?period=${period}`);
 export const rankings = (board: 'wealth' | 'charm', period: 'day' | 'week' | 'month') =>
   call<{ rows: RankingRow[] }>('GET', `/api/rankings?board=${board}&period=${period}`).then((r) => r.rows);

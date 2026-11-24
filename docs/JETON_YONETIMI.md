@@ -30,6 +30,17 @@
 >   (10.000 USD). Ajans "kazanan yayıncı" eşiği 10 USD kaldı (artık 10.000 elmas). 1.000 jetonluk hediye (220 TL)
 >   yayıncıya 1 USD = 49 TL bırakır. Eski uygulamalar USD tahminlerini eski değerle (5 kat düşük) gösterir; ödenen
 >   tutarı sunucu hesaplar.
+> - **Yayıncı haftalık bonusu (24 Kasım 2026):** Ajansa bağlı yayıncı ve yönetim yayıncısı (kayıttan sonraki 3 günde
+>   ajansa katılmayan ya da ajanstan düşen; yayıncı kendi isteğiyle ayrılamaz, yalnız transfer olur), haftada (Pazartesi 00:00 – Pazar 23:59:59)
+>   kazandığı bütün elmasla ulaştığı baremin bonusunu her Pazartesi 00:00'da **elmas olarak** alır; eşiği tamamlayamayan
+>   bir önceki baremin bonusunu alır. Baremler: 10.000 → 5.000, 20.000 → 10.000, 40.000 → 20.000, 70.000 → 35.000,
+>   100.000 → 50.000, 140.000 → 70.000, 200.000 → 100.000, 300.000 → 150.000, 500.000 → 250.000, 1.000.000 → 500.000,
+>   2.000.000 → 1.000.000, 5.000.000 ve üstü → 2.500.000 (bonus kazancın yarısı). Bildirim SimilarClub Sistem'den.
+>   İlk 3 gününde ajansı olmayan yayıncı almaz. Bonustan ajans komisyonu çıkmaz; bonus elması bir sonraki haftanın kazancına sayılmaz. Panel: Canlı ayarlar ›
+>   Ödemeler › **Yayıncı haftalık bonusu** (baremler, aç/kapa) ve Ajanslar › **Yayıncı haftalık bonusu** sayfası
+>   (haftalar, ödenenler, süren haftanın önizlemesi, atlanan haftayı öde, bonusu geri al; yetki `app.host_bonus`).
+>   Uygulama: Yayıncı Merkezi'nde "Haftalık bonus" kartı (bu haftaki kazanç, ulaşılan bonus, sonraki bareme kalan).
+>   Eski uygulamalar kartı göstermez; bonus onlara da yüklenir ve bildirim gider.
 > - **Sonraki adımlar (sahiplerle):** jetonla fiyatlanan her şey (hediyeler, VIP eşikleri, Rütbe, mağaza, oyunlar) ayrı
 >   ayrı konuşulacak; şimdilik jeton sayıları aynı.
 

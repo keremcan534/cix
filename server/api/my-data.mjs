@@ -228,6 +228,17 @@ export async function exportOf(c, uid) {
       at: x.created_at,
       decidedAt: x.decided_at,
     })),
+    // Yayıncı haftalık bonusu (host-bonus.mjs): the weeks I got one, and any taken back.
+    hostBonuses: await all('SELECT week_start::text AS week, earned, tier_from, bonus, created_at, reversed_at, reversed_amount, reverse_reason FROM host_bonuses WHERE user_id = $1 ORDER BY week_start', (x) => ({
+      week: x.week,
+      earned: num(x.earned),
+      tier: num(x.tier_from),
+      bonus: num(x.bonus),
+      at: x.created_at,
+      reversedAt: x.reversed_at ?? null,
+      reversedDiamonds: x.reversed_amount === null ? null : num(x.reversed_amount),
+      reverseReason: x.reverse_reason ?? null,
+    })),
     shopItems: await all('SELECT sku, kind, tier, price, starts_at, ends_at, source, origin, revoked_at, revoked_why, created_at FROM entitlements WHERE user_id = $1 ORDER BY id', (x) => ({
       sku: x.sku,
       kind: x.kind,

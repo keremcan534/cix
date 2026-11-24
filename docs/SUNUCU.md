@@ -198,7 +198,7 @@ Odadaki boş ve kilitli mikrofonların rengi; odadaki herkes aynı rengi görür
 
 | Çağrı | Ne yapar |
 |---|---|
-| `POST /api/wallet/withdraw` `{diamonds, method, details: {holder, account}, ref}` | Talep: en az 50.000, en çok 5.000.000 elmas, 7 günde en çok 10.000.000; yalnız kilidi açılmış elmas; aynı anda tek bekleyen talep. `method`: `iban` (her ülkenin IBAN'ı, kontrol basamağıyla) veya `other` (serbest hesap bilgisi, 5–120 harf). `holder`: hesap sahibinin adı (3–80). Değer: 5.000 elmas = 1 USD. `FEATURES_OFF=withdraw` yeni talebi kapatır; iptal ve liste açık kalır. |
+| `POST /api/wallet/withdraw` `{diamonds, method, details: {holder, account}, ref}` | Talep: en az 10.000, en çok 1.000.000 elmas (Canlı ayarlar), haftada (Pazartesi–Pazar) en çok 10.000.000; yalnız kilidi açılmış elmas; aynı anda tek bekleyen talep. `method`: `iban` (her ülkenin IBAN'ı, kontrol basamağıyla) veya `other` (serbest hesap bilgisi, 5–120 harf). `holder`: hesap sahibinin adı (3–80). Değer: 1.000 elmas = 1 USD (Canlı ayarlar › Elmas değeri). `FEATURES_OFF=withdraw` yeni talebi kapatır; iptal ve liste açık kalır. |
 | `GET /api/wallet/withdrawals` | Kendi taleplerim (durum: Beklemede / Ödendi / Reddedildi / İptal edildi), çekilebilir elmas ve kurallar. |
 | `POST /api/wallet/withdrawals/cancel` `{id}` | Yalnız beklemedeyken; elmas geri gelir. |
 | `GET /api/wallet/cash-out` | Bu hesap para çekebilir mi: `{allowed, code, why}` ([`YAYINCI_KURALLARI.md`](YAYINCI_KURALLARI.md)). |
@@ -210,6 +210,16 @@ Odadaki boş ve kilitli mikrofonların rengi; odadaki herkes aynı rengi görür
 | `GET\|HEAD /api/fx/l/<id>.mp4` | Herkese açık: Şanslı paketinin videosu (satıştan kalkmış paketinki de, panel önizlemesi için). |
 | `GET /api/admin/withdrawals?status=pending\|paid\|rejected\|cancelled\|all` | Yalnız yönetici: talepler, hesap ve `payable` (ödenebilir mi). `playMoney: true` ise bu sunucuda hiçbir talep ödenemez. |
 | `POST /api/admin/withdrawals/decide` `{id, approve, note}` | Yalnız yönetici, kendi talebine değil: `approve: true` ödendi (önce dışarıda ödenir), `false` ret (not zorunlu, elmas geri). Denetim kaydı ve kişiye bildirim. |
+
+**Yayıncı haftalık bonusu (`host-bonus.mjs`, sahipler 24 Kasım 2026)**: her Pazartesi 00:00 (Türkiye) biten hafta bir kez kapanır (`host_bonus_runs`); hafta sonunda onaylı bir ajansa bağlı her yayıncı ve her yönetim yayıncısı (`streamer-rule.mjs`: ajansı olmayan, kayıttan sonraki seçim süresi, 3 gün, geçmiş ya da ajanstan düşmüş kadın; yayıncı kendi isteğiyle ajanstan ayrılamaz, yalnız transfer olur), haftada başkalarından kazandığı elmasla (hediye, ücretli mesaj ve dakika, özel albüm; iadeyle geri alınan düşülür, Yankı'nın saydığı gibi) ulaştığı en yüksek baremin bonusunu elmas olarak alır (`host_bonuses`, `kind`: `agency` / `management`, defterde "Haftalık yayıncı bonusu", kanal `yayinci_bonus`, ref `hbonus:<hafta>:<kişi>`, karşı taraf yok: bonus ertesi haftanın kazancına sayılmaz). İlk günlerindeki ajanssız yayıncı almaz. Ajans komisyonu çıkmaz (gelir olayı yazılmaz). SimilarClub Sistem'den `bonus` bildirimi gider. Baremler ve aç/kapa Canlı ayarlar › Ödemeler › `host_weekly_bonus` (`{on, tiers: [{from, bonus}]}`, en çok 30 barem, küçükten büyüğe, bonus azalamaz). Kapalıyken biten hafta "atlandı" yazılır; yönetim sonradan ödeyebilir. Zamanlayıcı 10 dakikada bir ve açılıştan 1 dakika sonra bakar (`HOST_BONUS_JOBS=0` kapatır); yarım kalan ödeme tamamlanır, kimseye iki kez ödenmez.
+
+| Çağrı | Ne yapar |
+|---|---|
+| `GET /api/wallet/host-bonus` | Yayıncı Merkezi kartı: `{on, week, eligible, kind, earned, tier, next: {from, bonus, left}, tiers, last}` (bu hafta şu ana kadar). |
+| `GET /api/admin/host-bonus?week=YYYY-MM-DD` | Yönetici: son 26 hafta, bir haftanın bonusları (geri alınanlarla) ve toplam; süren hafta için önizleme (`preview: true`, kimse ödenmedi). Hafta verilmezse geçen hafta. |
+| `POST /api/admin/host-bonus/pay` `{week, reason}` | Yönetici: kapalıyken atlanan haftayı şimdiki baremlerle öder. Kapanmamış hafta 404, ödenmiş hafta 409. `audit_events` `host_bonus.pay`. |
+| `POST /api/admin/host-bonus/reverse` `{id, reason}` | Yönetici: bir bonusu geri alır; hesapta çekilebilir (kilitsiz) elmas kadarı düşer, kalanı kişide kalır. İkinci kez 409. Kişiye bildirim; `audit_events` `host_bonus.reverse`. |
+| `POST /api/admin/host-bonus/run` | Yönetici: geçen hafta kapanmadıysa şimdi kapatır (zamanlayıcının yaptığı). Testlerde `HOST_BONUS_TEST_CLOCK=1` ile `at` saati verilir. |
 
 **Test jetonu hiçbir zaman paraya dönmez:** jeton ve elmas hediye, Çevir ve Jeton Noktası üzerinden birbirine karıştığı için elmasın tek tek nereden geldiği güvenilir izlenemez. Bu yüzden kural sunucu çapında: `ALLOW_TEST_TOPUP=1` veya `ALLOW_SANDBOX_PURCHASES=1` iken, ya da veritabanında bir kez bile test jetonu (test yüklemesi, test satın alması, mağaza test satın alması) olduysa hiçbir talep "ödendi" yapılamaz, yalnızca reddedilir. Yayın sunucusu test verisi olmayan temiz bir veritabanıyla açılmalı. Çekimler finans paneline gitmez (panelde ödeme türü yok); mağaza test satın alması panele satış değil promosyon olarak gider.
 

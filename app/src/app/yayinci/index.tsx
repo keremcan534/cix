@@ -16,7 +16,8 @@ import { userById } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import { IS_DEMO } from '@/lib/build';
 import { liveMode, oneOnOneOpen } from '@/lib/live';
-import { useLiveCallStats, useLiveWeek } from '@/lib/live/call-log';
+import { useLiveCallStats, useLiveHostBonus, useLiveWeek } from '@/lib/live/call-log';
+import { demoHostBonus, type HostBonus } from '@/lib/host-bonus';
 import { WEEK_DAYS, weekFromTally, type WeekDays } from '@/lib/week';
 import { useLiveEarnings } from '@/lib/live/earnings';
 import { useServerWithdrawals } from '@/lib/live/withdraw';
@@ -34,6 +35,12 @@ import { MessageToolsCard } from '@/components/message-tools-card';
 function useWeek(tally: number[]): WeekDays {
   const server = useLiveWeek(liveMode());
   return liveMode() && server ? server : weekFromTally(tally);
+}
+
+/** Yayıncı haftalık bonusu: live, the server's (null until read: no card); the demo counts its own week. */
+function useHostBonus(weekTotal: number, agency: boolean, held: boolean): HostBonus | null {
+  const server = useLiveHostBonus(liveMode());
+  return liveMode() ? server : demoHostBonus(weekTotal, agency, held);
 }
 
 const PERKS: { icon: string; art?: ArtName; title: string; text: string }[] = [
@@ -126,6 +133,7 @@ function Dashboard() {
   const max = Math.max(...week.days, 1);
   const weekTotal = week.days.reduce((a, b) => a + b, 0);
   const agency = AGENCIES.find((a) => a.id === agencyId);
+  const bonus = useHostBonus(weekTotal, !!agency, joinDaysLeft === 0);
   const { colors, semantic, gradient } = useTheme();
   const styles = useStyles();
 
@@ -230,6 +238,8 @@ function Dashboard() {
           </View>
         </Card>
 
+        {bonus?.on && <BonusCard b={bonus} joinDaysLeft={joinDaysLeft} />}
+
         <View style={{ flexDirection: 'row', gap: 12 }}>
           <Stat label="Bugünkü kazanç" value={`💎 ${week.days[week.today].toLocaleString('tr-TR')}`} />
           <Stat label="Para çekme" value={`${withdrawals.length} talep`} />
@@ -240,7 +250,7 @@ function Dashboard() {
             <Text style={{ fontSize: 28 }}>{agency?.logo ?? '🏢'}</Text>
             <View style={{ flex: 1 }}>
               <Text style={styles.perkTitle}>{agency ? agency.name : 'Bir ajansa katıl'}</Text>
-              <Text style={styles.dim}>{agency ? `Ajansa ${pct(RULES.agencyCommission)} komisyon ayrıca ödenir — senden kesilmez` : 'Ajansa bağlı yayıncılar ekstra bonus kazanır'}</Text>
+              <Text style={styles.dim}>{agency ? `Ajansa ${pct(RULES.agencyCommission)} komisyon ayrıca ödenir — senden kesilmez` : 'Ajansın desteğiyle daha çok kazan'}</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
           </Card>
@@ -362,6 +372,50 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 // The hero and balance cards are colored gradients in both schemes, so the white on them stays.
+const n = (x: number) => x.toLocaleString('tr-TR');
+/**
+ * Haftalık bonus: this week's earnings, the bonus reached and what the next tier needs. Paid every Monday 00:00 to
+ * agency streamers and yönetim yayıncıları, in diamonds, with a SimilarClub Sistem notice (server/api/host-bonus.mjs).
+ */
+function BonusCard({ b, joinDaysLeft }: { b: HostBonus; joinDaysLeft: number }) {
+  const { colors, semantic, gradient } = useTheme();
+  const styles = useStyles();
+  const base = b.tier?.from ?? 0;
+  const progress = b.next ? Math.min(1, Math.max(0, (b.earned - base) / (b.next.from - base))) : 1;
+  return (
+    <Card style={{ gap: 10 }}>
+      <View style={styles.rowBetween}>
+        <Text style={[styles.cardTitle, { flex: 1, marginRight: 8 }]}>🎁 Haftalık bonus</Text>
+        {b.eligible && (
+          <Text style={{ color: semantic.diamondText, fontWeight: '800', flexShrink: 0 }} numberOfLines={1}>
+            {b.tier ? `💎 ${n(b.tier.bonus)}` : 'Baremin altında'}
+          </Text>
+        )}
+      </View>
+      {b.eligible ? (
+        <>
+          <View style={styles.track}>
+            <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.fill, { width: `${progress * 100}%` }]} />
+          </View>
+          <Text style={{ color: colors.text, fontSize: 13, lineHeight: 18 }}>
+            {b.next
+              ? `Bu hafta ${n(b.earned)} elmas kazandın. ${n(b.next.left)} elmas daha kazanırsan bonusun ${n(b.next.bonus)} elmas olur.`
+              : `Bu hafta ${n(b.earned)} elmas kazandın: en yüksek baremdesin.`}
+          </Text>
+          <Text style={styles.dim}>Hafta Pazar 23:59’da kapanır; bonus Pazartesi 00:00’da elmas olarak yüklenir ve SimilarClub Sistem’den bildirilir.{b.kind === 'agency' ? ' Bonustan ajans komisyonu kesilmez.' : ''}</Text>
+          {b.last && <Text style={styles.dim}>{b.last.reversed ? `Geçen haftanın bonusu (${n(b.last.bonus)} elmas) geri alındı.` : `Geçen hafta ${n(b.last.bonus)} elmas bonus aldın.`}</Text>}
+        </>
+      ) : (
+        <Text style={styles.dim}>
+          {joinDaysLeft > 0
+            ? `Haftalık bonus ajansa bağlı yayıncılara ve yönetim yayıncılarına verilir. Bir ajansa katıldığında ya da ${joinDaysLeft} gün sonra yönetim yayıncısı olduğunda bonus başlar; haftalık kazancına göre her Pazartesi elmas olarak hesabına yüklenir.`
+            : 'Haftalık bonus ajansa bağlı yayıncılara ve yönetim yayıncılarına verilir; haftalık kazancına göre her Pazartesi elmas olarak hesabına yüklenir.'}
+        </Text>
+      )}
+    </Card>
+  );
+}
+
 const useStyles = makeStyles(({ colors, lift }) => ({
   safe: { flex: 1, backgroundColor: colors.bg },
   hero: { borderRadius: 20, padding: 24, alignItems: 'center', gap: 8 },

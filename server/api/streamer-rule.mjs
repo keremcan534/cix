@@ -28,6 +28,16 @@ export const heldWomanSql = (x) =>
               AND (EXISTS (SELECT 1 FROM agency_streamers l WHERE l.streamer_id = w.id)
                    OR (${PICK_DAYS} > 0 AND w.created_at <= now() - make_interval(days => ${PICK_DAYS}))))`;
 
+/**
+ * heldWomanSql at instant `at` (an SQL expression): in no agency then, and by then past her days to pick one or
+ * dropped from one (Yayıncı haftalık bonusu reads who was a yönetim yayıncısı when the week ended, host-bonus.mjs).
+ */
+export const heldWomanAtSql = (x, at) =>
+  `EXISTS (SELECT 1 FROM users w WHERE w.id = ${x} AND w.gender = 'Kadın' AND w.deleted_at IS NULL
+              AND NOT EXISTS (SELECT 1 FROM agency_streamers l WHERE l.streamer_id = w.id AND l.joined_at < ${at} AND (l.ended_at IS NULL OR l.ended_at >= ${at}))
+              AND (EXISTS (SELECT 1 FROM agency_streamers l WHERE l.streamer_id = w.id AND l.joined_at < ${at})
+                   OR (${PICK_DAYS} > 0 AND w.created_at <= ${at} - make_interval(days => ${PICK_DAYS}))))`;
+
 /** Whether account `x` (an SQL expression) is a streamer now. */
 export const streamerSql = (x) =>
   `(EXISTS (SELECT 1 FROM agency_streamers s WHERE s.streamer_id = ${x} AND s.ended_at IS NULL AND s.contract = 'approved')
