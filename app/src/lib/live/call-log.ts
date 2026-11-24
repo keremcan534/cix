@@ -6,6 +6,7 @@ import { applyServerUser, rememberUser, toLocal } from '@/lib/live';
 import { taskItemNames } from '@/lib/bag-core';
 import { refreshBag } from '@/lib/live/bag';
 import { focusStore } from '@/lib/live/focus-store';
+import { parseWeek } from '@/lib/week';
 
 // --- Aramalar ------------------------------------------------------------------------------------------------
 type CallPage = { calls: api.ServerCallLog[]; next: number | null };
@@ -48,6 +49,9 @@ export const useLiveHearts = (on: boolean) => hearts.useData(on);
 const stats = focusStore(api.myCallStats);
 /** This week's paid calls and matches I earned from, or null until read. */
 export const useLiveCallStats = (on = true) => stats.useData(on);
+const week = focusStore(async () => parseWeek(await api.myWeek()));
+/** This week's diamonds day by day (Monday first, Türkiye time), or null until read or when the answer was malformed. */
+export const useLiveWeek = (on = true) => week.useData(on);
 
 // --- Görevler -----------------------------------------------------------------------------------------------
 const task = focusStore(api.myCallTask);

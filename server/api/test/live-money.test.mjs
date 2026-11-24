@@ -259,7 +259,7 @@ describe('Canlı ayarlar para uçlarında', () => {
     const before = await balance(host.user.id);
     let [st, j] = await ask(70_000);
     assert.equal(st, 400);
-    assert.equal(j.error, '7 günde en çok 60.000 elmas çekilebilir');
+    assert.equal(j.error, 'Haftada (Pazartesi–Pazar) en çok 60.000 elmas çekilebilir');
     assert.deepEqual(await balance(host.user.id), before);
 
     const ref = rnd(8);

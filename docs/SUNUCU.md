@@ -2,6 +2,13 @@
 
 İlk aşamanın tek sunucusu: sesli odalar (LiveKit), HTTPS (Caddy), API (giriş, cüzdan, ses token'ı) ve veritabanı (Postgres). Aylık ücret 0.
 
+> **Haftalık döngü (sahipler, 24 Kasım 2026):** Uygulamanın haftası **Pazartesi 00:00 – Pazar 23:59:59, Türkiye saati**.
+> Sıralamalar, bonuslar, aile haftası, ajans haftalık rakamları, asistan payı, para çekmenin haftalık sınırı (her Pazartesi
+> 00:00'da yenilenir), Yayıncı Merkezi "Bu hafta" grafiği (`GET /api/wallet/week`) ve Etkinlikler "Bu Hafta" filtresi
+> (bugünden Pazar sonuna) bu düzende. Uygulamadaki tarih yazıları telefonun saat diliminden bağımsız Türkiye saatiyle;
+> finans panelinde günler Türkiye gece yarısında döner (hakedişte "Bu hafta / Geçen hafta" seçimi). Profil ziyaretçileri,
+> popüler Anlar, spam ve mesaj sınırları gibi "son 7 gün" süreleri bilerek yuvarlanan pencere olarak kaldı.
+
 | | |
 |---|---|
 | Adres | `130.61.230.94` · HTTPS: `https://130-61-230-94.sslip.io` (alan adı alınınca değişecek) |
@@ -105,6 +112,7 @@ Her jeton yüklemesi bir **parti** olur: kanal (Google Play, App Store, İlk al�
 | Çağrı | Ne yapar |
 |---|---|
 | `GET /api/wallet/earnings` | Gelir: toplam elmas, **çekilebilir**, **kilitli** ve kilitlerin listesi (miktar, kanal, kimden (`from: {id, name, avatarUrl}`), hangi hediye, açılış zamanı). |
+| `GET /api/wallet/week` | Yayıncı Merkezi "Bu hafta": bu haftanın her günü kazanılan elmas (hediye, ücretli mesaj ve dakika, asistan payı). Hafta Pazartesi 00:00 – Pazar 23:59:59, Türkiye saati. `{start: 'YYYY-MM-DD' (Pazartesi), today: 0–6, days: [7]}`. |
 | `GET /api/wallet/coins` | Jetonlarım nereden geldi: kanal başına kalan, son 50 parti (Jeton Noktası partisinde satan `from: {id, name, avatarUrl}`). |
 | `POST /api/wallet/exchange` `{diamonds, ref, usdTry, coinValueTl}` | Gelir > Çevir: yalnız çekilebilir elmas; çıkan jeton "Elmastan çevrildi" partisi (1 gün kilit). Ekranın kullandığı kur ve jeton değeri (1.000 jeton = ? TL) gelir; canlı kur düşükse ya da jeton değeri yüksekse `409 rate_changed`. `coinValueTl` göndermeyen (24 Kasım 2026 öncesi) uygulamalar `409 update_required` alır. |
 | `GET /api/jeton/banks` · `GET /api/jeton/transfers` | Jeton Noktası hesapları; benim gönderdiğim/aldığım aktarımlar. |

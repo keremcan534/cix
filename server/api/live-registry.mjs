@@ -1068,14 +1068,14 @@ export const REGISTRY = {
     field: 'withdrawWeekly',
     group: 'Para çekme sınırları',
     label: 'Haftalık en çok',
-    help: '7 günde istenebilecek en çok elmas. Yalnız bugünkü değerden aşağı çekilebilir.',
+    help: 'Bir haftada (Pazartesi 00:00 – Pazar 23:59:59, Türkiye saati) istenebilecek en çok elmas; her Pazartesi 00:00\'da yenilenir. Yalnız bugünkü değerden aşağı çekilebilir.',
     type: 'int',
     bounds: { min: WITHDRAW.minDiamonds, max: WITHDRAW.weeklyDiamonds, step: 10_000 },
     parse: (v) => wholeOf(v, REGISTRY.withdraw_weekly_diamonds.bounds, 'Haftalık sınır', ' elmas'),
     big: () => false,
     impact(before, after, ctx) {
       const max = ctx.next?.withdraw_max_diamonds;
-      return `7 günde en çok ${fmt(before)} → ${fmt(after)} 💎 istenebilir. Bekleyen talepler etkilenmez.${after < max ? ' Tek talep sınırından düşük olduğu için tek talepte de en çok bu kadar istenebilir.' : ''}`;
+      return `Haftada en çok ${fmt(before)} → ${fmt(after)} 💎 istenebilir. Bekleyen talepler etkilenmez.${after < max ? ' Tek talep sınırından düşük olduğu için tek talepte de en çok bu kadar istenebilir.' : ''}`;
     },
   },
   otp_global_per_hour: {

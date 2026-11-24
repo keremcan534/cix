@@ -269,6 +269,36 @@ export const walletRoutes = {
   },
 
   /**
+   * Yayıncı Merkezi's "Bu hafta": the diamonds I earned on each day of this week, the app's week (owners, 24 Nov 2026:
+   * Monday 00:00 to Sunday 23:59:59, Turkey time), as Gelir counts them (gifts, paid messages and minutes, assistant
+   * shares). `start` is the Monday (Turkey's date), `today` today's place (0 Monday … 6 Sunday).
+   */
+  async 'GET /api/wallet/week'(req) {
+    const u = await auth(req);
+    const r = await db.query(
+      `WITH w AS (SELECT date_trunc('week', now() AT TIME ZONE 'Europe/Istanbul') AS start)
+       SELECT to_char(w.start, 'YYYY-MM-DD') AS start, ((now() AT TIME ZONE 'Europe/Istanbul')::date - w.start::date) AS today,
+              x.day, coalesce(sum(e.amount), 0) AS diamonds
+         FROM w LEFT JOIN (
+                SELECT (g.created_at AT TIME ZONE 'Europe/Istanbul')::date AS on_day, g.total AS amount FROM gift_events g, w
+                 WHERE g.recipient = $1 AND g.created_at >= w.start AT TIME ZONE 'Europe/Istanbul'
+                UNION ALL
+                SELECT (p.created_at AT TIME ZONE 'Europe/Istanbul')::date, p.coins FROM paid_events p, w
+                 WHERE p.earner = $1 AND p.created_at >= w.start AT TIME ZONE 'Europe/Istanbul'
+                UNION ALL
+                SELECT (a.created_at AT TIME ZONE 'Europe/Istanbul')::date, a.wallet FROM agency_assistant_ledger a, w
+                 WHERE a.user_id = $1 AND a.created_at >= w.start AT TIME ZONE 'Europe/Istanbul'
+              ) e ON true
+         CROSS JOIN LATERAL (SELECT e.on_day - w.start::date AS day) x
+        GROUP BY w.start, x.day`,
+      [u.id],
+    );
+    const days = [0, 0, 0, 0, 0, 0, 0];
+    for (const x of r.rows) if (x.day !== null && x.day >= 0 && x.day < 7) days[x.day] += Number(x.diamonds);
+    return { start: r.rows[0].start, today: Number(r.rows[0].today), days };
+  },
+
+  /**
    * Gelir's sources: the diamonds I earned in the period (day, week, month by Turkey's calendar, or all), by where
    * they came from. Gifts by place (a room, a chat, a moment, a profile, the family chat; Şanslı hediye on its own), then paid
    * messages and paid call or match minutes (one-on-one.mjs, paid_events).

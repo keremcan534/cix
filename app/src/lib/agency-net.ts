@@ -10,6 +10,7 @@ import { publicIdOf } from '@/data/profile';
 import { AGENCY_LEDGER_LABEL } from '@/lib/admin-format';
 import { ApiError, apiEnabled, apiRequest, discover, ensureSignedIn, followingList, lookup, newRef } from '@/lib/api';
 import { showAlert } from '@/lib/alert';
+import { trDate, trDateTime } from '@/lib/tr';
 import { refusalTitle } from '@/lib/contact-filter';
 import { parseInviteInput, pickByPublicId } from '@/lib/invite-target';
 
@@ -580,8 +581,9 @@ export const fmtD = (v: number | null | undefined) => (v === null || v === undef
 export const fmtUsd = (v: number | null | undefined) => (v === null || v === undefined ? '—' : `$${Number(v).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
 export const usdOf = (diamonds: number) => diamonds / DIAMONDS_PER_USD;
 export const fmtPct = (r: number | null | undefined) => (r === null || r === undefined ? '—' : `%${(r * 100).toLocaleString('tr-TR', { maximumFractionDigits: 2 })}`);
-export const fmtDate = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' }) : '—');
-export const fmtDateTime = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—');
+/** Dates in Türkiye's time (lib/tr): "pazartesi 00:00'dan geçerli" is Monday on a phone abroad too. */
+export const fmtDate = (iso: string | null | undefined) => (iso && Number.isFinite(Date.parse(iso)) ? trDate(Date.parse(iso)) : '—');
+export const fmtDateTime = (iso: string | null | undefined) => (iso && Number.isFinite(Date.parse(iso)) ? trDateTime(Date.parse(iso)) : '—');
 export const fmtScore = (v: number | null | undefined) => (v === null || v === undefined ? '—' : v.toLocaleString('tr-TR', { maximumFractionDigits: 1 }));
 
 export const STATUS_TEXT: Record<AgencyStatus, string> = { draft: 'Taslak', pending: 'Onay bekliyor', approved: 'Aktif', rejected: 'Reddedildi', suspended: 'Askıda', closed: 'Kapatıldı' };

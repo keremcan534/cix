@@ -15,7 +15,8 @@ import { userById } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import { IS_DEMO } from '@/lib/build';
 import { liveMode, oneOnOneOpen } from '@/lib/live';
-import { useLiveCallStats } from '@/lib/live/call-log';
+import { useLiveCallStats, useLiveWeek } from '@/lib/live/call-log';
+import { WEEK_DAYS, weekFromTally, type WeekDays } from '@/lib/week';
 import { useLiveEarnings } from '@/lib/live/earnings';
 import { useServerWithdrawals } from '@/lib/live/withdraw';
 import { offersCashOut } from '@/lib/withdraw-rules';
@@ -25,7 +26,14 @@ import { makeStyles, useTheme } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
 import { MessageToolsCard } from '@/components/message-tools-card';
 
-const DAYS = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Bugün'];
+/**
+ * "Bu hafta": the app's week (owners, 24 Nov 2026), Monday 00:00 to Sunday 23:59:59, Türkiye time. Live: the
+ * server's days (lib/live/call-log useLiveWeek); the demo lays its own tally on the week.
+ */
+function useWeek(tally: number[]): WeekDays {
+  const server = useLiveWeek(liveMode());
+  return liveMode() && server ? server : weekFromTally(tally);
+}
 
 const PERKS: { icon: string; art?: ArtName; title: string; text: string }[] = [
   { icon: '🎁', art: 'finans-hediyelerden-kazan', title: 'Hediyelerden kazan', text: 'Gelen her hediye elmasa dönüşür.' },
@@ -113,8 +121,9 @@ function Dashboard() {
   const joinDaysLeft = Math.max(0, RULES.hostAgencyJoinDays - joinedDays);
   const { current, next } = hostLevel(totalDiamonds);
   const progress = next ? (totalDiamonds - current.min) / (next.min - current.min) : 1;
-  const max = Math.max(...weekly, 1);
-  const weekTotal = weekly.reduce((a, b) => a + b, 0);
+  const week = useWeek(weekly);
+  const max = Math.max(...week.days, 1);
+  const weekTotal = week.days.reduce((a, b) => a + b, 0);
   const agency = AGENCIES.find((a) => a.id === agencyId);
   const { colors, semantic, gradient } = useTheme();
   const styles = useStyles();
@@ -206,14 +215,14 @@ function Dashboard() {
             <Text style={{ color: semantic.diamondText, fontWeight: '700' }}>💎 {weekTotal.toLocaleString('tr-TR')}</Text>
           </View>
           <View style={styles.chart}>
-            {weekly.map((v, i) => (
+            {week.days.map((v, i) => (
               <View key={i} style={styles.barCol}>
                 <Text style={styles.barValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
                   {v >= 1000 ? `${(v / 1000).toLocaleString('tr-TR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}k` : v}
                 </Text>
-                <View style={[styles.bar, { height: Math.max(4, (v / max) * 110) }, i === 6 && { backgroundColor: semantic.action }]} />
+                <View style={[styles.bar, { height: Math.max(4, (v / max) * 110) }, i === week.today && { backgroundColor: semantic.action }]} />
                 <Text style={styles.barLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-                  {DAYS[i]}
+                  {i === week.today ? 'Bugün' : WEEK_DAYS[i]}
                 </Text>
               </View>
             ))}
@@ -221,7 +230,7 @@ function Dashboard() {
         </Card>
 
         <View style={{ flexDirection: 'row', gap: 12 }}>
-          <Stat label="Bugünkü kazanç" value={`💎 ${weekly[6].toLocaleString('tr-TR')}`} />
+          <Stat label="Bugünkü kazanç" value={`💎 ${week.days[week.today].toLocaleString('tr-TR')}`} />
           <Stat label="Para çekme" value={`${withdrawals.length} talep`} />
         </View>
 
@@ -265,6 +274,7 @@ function Dashboard() {
 
 function Analytics() {
   const { earnings, agencyId, weekly } = useApp();
+  const week = useWeek(weekly);
   const { colors } = useTheme();
   const styles = useStyles();
   const sum = (src: string) => earnings.filter((e) => e.source === src).reduce((x, e) => x + e.amount, 0);
@@ -273,7 +283,8 @@ function Analytics() {
   const live = liveMode();
   const server = useLiveCallStats(live && oneOnOneOpen());
   const serverCalls = live ? (server?.diamonds ?? 0) : 0;
-  const gifts = Math.max(0, sum('Hediye') + weekly.slice(0, 6).reduce((a, b) => a + b, 0) - serverCalls);
+  // Live: the server's week holds every diamond of the week (gifts, paid minutes, assistant shares): less the calls.
+  const gifts = live ? Math.max(0, week.days.reduce((a, b) => a + b, 0) - serverCalls) : Math.max(0, sum('Hediye') + weekly.slice(0, 6).reduce((a, b) => a + b, 0) - serverCalls);
   const ownerBonus = sum('Oda sahibi bonusu');
   const familyBonus = sum('Aile bonusu');
   const callBonus = live ? serverCalls : sum('Arama bonusu') + sum('Arama');
@@ -282,16 +293,16 @@ function Analytics() {
   // Only figures the app actually records: this week's daily diamonds and the earning rows. Stream time and
   // audience numbers need the server's room logs, so they are left out rather than estimated.
   const fmt = (n: number) => n.toLocaleString('tr-TR');
-  const weekTotal = weekly.reduce((a, b) => a + b, 0);
-  const activeDays = weekly.filter((v) => v > 0).length;
-  const best = weekly.reduce((bi, v, i) => (v > weekly[bi] ? i : bi), 0);
+  const weekTotal = week.days.reduce((a, b) => a + b, 0);
+  const activeDays = week.days.filter((v) => v > 0).length;
+  const best = week.days.reduce((bi, v, i) => (v > week.days[bi] ? i : bi), 0);
   const giftRows = earnings.filter((e) => e.source === 'Hediye');
   const senders = new Set(giftRows.map((e) => e.fromId).filter(Boolean)).size;
   const calls = live ? (server?.calls ?? 0) : earnings.filter((e) => e.source === 'Arama').length;
   const metrics = [
-    ['Aktif gün', `${activeDays} / 7`],
-    ['En iyi gün', weekly[best] > 0 ? `${DAYS[best]} · ${fmt(weekly[best])}` : '—'],
-    ['Günlük ortalama', `${fmt(Math.round(weekTotal / 7))} elmas`],
+    ['Aktif gün', `${activeDays} / ${week.today + 1}`],
+    ['En iyi gün', week.days[best] > 0 ? `${best === week.today ? 'Bugün' : WEEK_DAYS[best]} · ${fmt(week.days[best])}` : '—'],
+    ['Günlük ortalama', `${fmt(Math.round(weekTotal / (week.today + 1)))} elmas`],
     ['Hediye gönderen', fmt(senders)],
     ['Gelen hediye', fmt(giftRows.reduce((n, e) => n + (e.gift?.count ?? 1), 0))],
     ...(oneOnOneOpen() ? [['Ücretli arama', fmt(calls)]] : []),

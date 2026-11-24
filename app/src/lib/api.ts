@@ -489,6 +489,8 @@ export const sendGift = (to: string, giftId: string, count: number, room?: strin
 /** Gelir's sources: the diamonds earned in the period, by where they came from (server wallet.mjs). */
 export type IncomeSource = { key: string; label: string; diamonds: number; count: number; live: boolean };
 export type IncomePeriod = 'day' | 'week' | 'month' | 'all';
+/** Yayıncı Merkezi "Bu hafta": this week's diamonds day by day, Monday first, Türkiye time (server wallet.mjs). */
+export const myWeek = () => call<unknown>('GET', '/api/wallet/week');
 export const incomeSources = (period: IncomePeriod) => call<{ period: IncomePeriod; total: number; sources: IncomeSource[] }>('GET', `/api/wallet/income?period=${period}`);
 export const rankings = (board: 'wealth' | 'charm', period: 'day' | 'week' | 'month') =>
   call<{ rows: RankingRow[] }>('GET', `/api/rankings?board=${board}&period=${period}`).then((r) => r.rows);

@@ -406,7 +406,8 @@ export const agencyRoutes = {
       const e = (
         await db.query(
           `SELECT coalesce(sum(amount) FILTER (WHERE created_at >= date_trunc('day', now() AT TIME ZONE 'Europe/Istanbul') AT TIME ZONE 'Europe/Istanbul'), 0) AS today,
-                  coalesce(sum(amount) FILTER (WHERE created_at > now() - interval '7 days'), 0) AS week,
+                  -- The app's week (owners, 24 Nov 2026): Monday 00:00 to Sunday 23:59:59, Turkey time.
+                  coalesce(sum(amount) FILTER (WHERE created_at >= (date_trunc('week', now() AT TIME ZONE 'Europe/Istanbul') AT TIME ZONE 'Europe/Istanbul')), 0) AS week,
                   coalesce(sum(amount) FILTER (WHERE created_at > now() - interval '30 days'), 0) AS month,
                   coalesce(sum(amount) FILTER (WHERE created_at > now() - interval '60 days' AND created_at <= now() - interval '30 days'), 0) AS prev_month,
                   coalesce(sum(amount) FILTER (WHERE kind = 'direct' AND created_at > now() - interval '30 days'), 0) AS direct30,
