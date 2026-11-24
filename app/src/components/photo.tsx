@@ -20,6 +20,9 @@ export function FadeImage({ style, onLoadEnd, ...rest }: Omit<ImageProps, 'style
   const [o] = useState(() => new Animated.Value(reduceMotion ? 1 : 0));
   return (
     <Animated.Image
+      // Decoded at about the size it is drawn: an 800 px room cover in an 84 dp box, a 640 px face in a 44 dp ring
+      // were decoded whole on Android (megabytes each, every row that scrolls in).
+      resizeMethod="resize"
       {...rest}
       style={[style, { opacity: o }]}
       onLoadEnd={() => {

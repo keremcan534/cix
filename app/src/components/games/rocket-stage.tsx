@@ -6,17 +6,25 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { memo, useMemo } from 'react';
 import { Animated, Image, StyleSheet, View } from 'react-native';
 
-import { artSource } from '@/components/Art';
-import { salonArt } from '@/components/games/fx/salon-art';
 import { climbSeconds, driftRanges, orbitY, pathAt, pathSamples, routeMarks, scatter, type FlightPlan, type Geo } from '@/components/games/rocket-flight';
 import { Text } from '@/components/text';
 
 const GLOW = require('../../../assets/fx/glow.png');
-// The game's own rocket once it is delivered (fx/salon-art); the cover's rocket until then.
-const ROCKET = salonArt('yorunge-roket') ?? artSource('oyun-roket');
+// Yörünge's own set (25 Kasım 2026, made with OpenAI image generation in the Kızıl Yedi look; oyun-gorselleri/yorunge-v2):
+// the rocket on its square (nose up), its flame (root at the top), the blast and smoke, the sky, the planet and the ramp.
+const ROCKET = require('../../../assets/games/yorunge/roket.png');
+const FLAME = require('../../../assets/games/yorunge/alev.png');
+const BLAST = require('../../../assets/games/yorunge/patlama.webp');
+const SMOKE = require('../../../assets/games/yorunge/duman.webp');
+const SKY = require('../../../assets/games/yorunge/uzay.jpg');
+const PLANET = require('../../../assets/games/yorunge/gezegen.webp');
+const RAMP = require('../../../assets/games/yorunge/rampa.png');
+/** The planet picture's width to height, and the ramp's. */
+const PLANET_ASPECT = 1080 / 267;
+const RAMP_ASPECT = 300 / 273;
 
 /** The rocket's box on the stage (px); the picture points straight up and is turned along the path. */
-export const ROCKET_SIZE = 58;
+export const ROCKET_SIZE = 66;
 export const ORBIT = '#67E8F9';
 
 export type Flight = {
@@ -49,9 +57,11 @@ const SLANT_DEG = (Math.atan(SLANT) * 180) / Math.PI;
 
 /**
  * The sky. In a flight each layer drifts against the rocket, slowly at first and streaking by the end (the nearest
- * layer also draws speed lines); between flights it stands where the last one left it.
+ * layer also draws speed lines); between flights it stands where the last one left it. Canlı Yörünge, whose climb has
+ * no planned end, gives `cruise` instead: a 0 → 1 loop while the rocket is in the air, over which each layer moves a
+ * whole tile (far one tile, middle two, near four), so the stars stream past at three depths and the loop never shows.
  */
-export const Space = memo(function Space({ geo, flight, still, breathe }: { geo: Geo; flight: Flight | null; still: boolean; breathe: Animated.Value }) {
+export const Space = memo(function Space({ geo, flight, still, breathe, cruise }: { geo: Geo; flight: Flight | null; still: boolean; breathe: Animated.Value; cruise?: Animated.Value | null }) {
   const period = geo.h;
   const fields = useMemo(
     () =>
@@ -66,26 +76,28 @@ export const Space = memo(function Space({ geo, flight, still, breathe }: { geo:
   const drift = useMemo(
     () =>
       STAR_LAYERS.map((l, li) => {
-        if (!flight || still) return null;
+        if (still) return null;
+        if (!flight && cruise) {
+          const n = [1, 2, 4][li] ?? 1;
+          return {
+            x: cruise.interpolate({ inputRange: [0, 1], outputRange: [0, -n * SLANT * period] }),
+            y: cruise.interpolate({ inputRange: [0, 1], outputRange: [0, n * period] }),
+          };
+        }
+        if (!flight) return null;
         const r = driftRanges(climbSeconds(flight.plan.target), l.speed, period, flight.from[li] ?? 0);
         return {
           x: flight.u.interpolate({ inputRange: r.input, outputRange: r.output.map((s) => -s * SLANT * period), ...clamp }),
           y: flight.u.interpolate({ inputRange: r.input, outputRange: r.output.map((s) => s * period), ...clamp }),
         };
       }),
-    [flight, still, period],
+    [flight, still, period, cruise],
   );
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      <LinearGradient colors={['#04051A', '#0D0F3A', '#1D1554', '#2A1B5E']} locations={[0, 0.45, 0.85, 1]} style={StyleSheet.absoluteFill} />
-      <Image source={GLOW} style={[st.nebula, { width: geo.w * 1.2, height: geo.w * 1.2, right: -geo.w * 0.45, top: -geo.w * 0.5, tintColor: '#7C3AED', opacity: 0.42 }]} />
-      <Image source={GLOW} style={[st.nebula, { width: geo.w * 0.9, height: geo.w * 0.9, left: -geo.w * 0.4, top: geo.h * 0.1, tintColor: '#2563EB', opacity: 0.3 }]} />
-      {/* A far moon, so the sky has a place in it. */}
-      <View style={[st.moon, { left: geo.w * 0.8, top: geo.h * 0.66 }]}>
-        <LinearGradient colors={['#E0E7FF', '#A5B4FC', '#4F46E5']} start={{ x: 0.2, y: 0 }} end={{ x: 0.9, y: 1 }} style={StyleSheet.absoluteFill} />
-        <View style={[st.crater, { left: 7, top: 8, width: 8, height: 8 }]} />
-        <View style={[st.crater, { left: 17, top: 17, width: 5, height: 5 }]} />
-      </View>
+      {/* The painted sky (nebulas at the sides, a calm dark middle for the multiplier); the drifting stars over it. */}
+      <Image source={SKY} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors />
+      <Image source={GLOW} style={[st.nebula, { width: geo.w * 1.1, height: geo.w * 1.1, right: -geo.w * 0.5, top: -geo.w * 0.45, tintColor: '#7C3AED', opacity: 0.22 }]} />
       {fields.map((f, li) => {
         const d = drift[li];
         return (
@@ -100,6 +112,12 @@ export const Space = memo(function Space({ geo, flight, still, breathe }: { geo:
                   <View key={`${j}-${i}`} style={[st.star, style]} />
                 );
               }),
+            )}
+            {!flight && cruise && !still && f.lines.length > 0 && (
+              // Speed lines while the live rocket is in the air.
+              <View style={[StyleSheet.absoluteFill, { opacity: 0.55 }]}>
+                {[-1, 0].map((j) => f.lines.map((s, i) => <View key={`${j}-${i}`} style={[st.line, { left: s.x - j * SLANT * period, top: s.y + j * period, height: s.len, transform: [{ rotate: `${SLANT_DEG}deg` }] }]} />))}
+              </View>
             )}
             {flight && !still && f.lines.length > 0 && (
               // Speed lines: they come up as the climb gains speed and go out with the flight.
@@ -122,25 +140,24 @@ export const Space = memo(function Space({ geo, flight, still, breathe }: { geo:
 export const Planet = memo(function Planet({ geo }: { geo: Geo }) {
   const a = pathAt(geo, 0);
   const rad = (a.deg * Math.PI) / 180;
-  // Along the rocket and across it (to its underside).
-  const along = { x: Math.sin(rad), y: -Math.cos(rad) };
+  // Across the rocket, to its underside: where the ramp's rail meets it.
   const under = { x: Math.cos(rad), y: Math.sin(rad) };
-  const rail = { x: geo.ax + under.x * 21, y: geo.ay + under.y * 21 };
-  const legs = [-22, 20].map((d) => ({ x: rail.x + along.x * d, y: rail.y + along.y * d }));
+  const rail = { x: geo.ax + under.x * 11, y: geo.ay + under.y * 11 };
   const r = geo.planet;
+  const planetW = geo.w * 1.6;
+  const rampW = Math.round(Math.min(geo.w * 0.42, 190));
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      {legs.map((p, i) => (
-        <View key={i} style={[st.leg, { left: p.x - 2.5, top: p.y, height: 60 }]} />
-      ))}
-      <View style={[st.air, { left: geo.cx - r - 9, top: geo.cy - r - 9, width: (r + 9) * 2, height: (r + 9) * 2, borderRadius: r + 9 }]} />
-      <View style={[st.planet, { left: geo.cx - r, top: geo.cy - r, width: r * 2, height: r * 2, borderRadius: r }]}>
-        <LinearGradient colors={['#FDBA74', '#EA580C', '#7C2D12']} locations={[0, 0.07, 0.2]} style={StyleSheet.absoluteFill} />
-      </View>
-      <LinearGradient
-        colors={['#E2E8F0', '#64748B']}
-        style={[st.rail, { left: rail.x - 40, top: rail.y - 3.5, transform: [{ rotate: `${a.deg - 90}deg` }] }]}
+      {/* The planet: its top arc's crown where the drawn planet's top stood, wide enough to run off both sides. */}
+      <Image
+        source={PLANET}
+        style={{ position: 'absolute', left: geo.cx - planetW / 2, top: geo.cy - r - planetW * 0.012, width: planetW, height: planetW / PLANET_ASPECT }}
+        resizeMode="contain"
+        accessibilityIgnoresInvertColors
       />
+      {/* The launch ramp: its rail (in the picture from 12 %, 77 % to 83 %, 27 %, rising about 33°, as the rocket lies)
+          passes under the rocket's belly halfway up, so the whole rocket lies on it. */}
+      <Image source={RAMP} style={{ position: 'absolute', left: rail.x - rampW * 0.475, top: rail.y - (rampW / RAMP_ASPECT) * 0.52, width: rampW, height: rampW / RAMP_ASPECT }} resizeMode="contain" accessibilityIgnoresInvertColors />
     </View>
   );
 });
@@ -188,9 +205,11 @@ export function RocketSprite({ power, flick }: { power: Animated.AnimatedInterpo
   return (
     <View style={{ width: ROCKET_SIZE, height: ROCKET_SIZE }}>
       <Animated.Image source={GLOW} style={[st.burn, { opacity: power, transform: [{ scale: flick.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1.15] }) }] }]} />
-      <Animated.View style={[st.flame, { opacity: power, transform: [{ scaleY: flick.interpolate({ inputRange: [0, 1], outputRange: [0.75, 1.2] }) }] }]}>
-        <LinearGradient colors={['#FFFBEB', '#FDBA74', 'rgba(234,88,12,0)']} locations={[0, 0.35, 1]} style={StyleSheet.absoluteFill} />
-      </Animated.View>
+      {/* The flame from the nozzle, flickering in length from its root. */}
+      <Animated.Image
+        source={FLAME}
+        style={[st.flame, { opacity: power, transformOrigin: 'top', transform: [{ scaleY: flick.interpolate({ inputRange: [0, 1], outputRange: [0.82, 1.18] }) }, { scaleX: flick.interpolate({ inputRange: [0, 1], outputRange: [1.06, 0.94] }) }] }]}
+      />
       <Image source={ROCKET} style={{ width: ROCKET_SIZE, height: ROCKET_SIZE }} accessibilityIgnoresInvertColors />
     </View>
   );
@@ -204,13 +223,14 @@ export function ReadyRocket({ geo, arm, ignite, flick }: { geo: Geo; arm: Animat
     <View style={[st.rocketBox, { transform: [{ translateX: a.x - half }, { translateY: a.y - half }, { rotate: `${a.deg}deg` }] }]} pointerEvents="none">
       {/* The smoke the engine blows back along the ramp as it lights. */}
       {[0, 1, 2].map((i) => (
-        <Animated.View
+        <Animated.Image
           key={i}
+          source={SMOKE}
           style={[
             st.puff,
             {
               opacity: ignite.interpolate({ inputRange: [0, 0.15 + i * 0.12, 1], outputRange: [0, 0.55, 0] }),
-              transform: [{ translateY: ignite.interpolate({ inputRange: [0, 1], outputRange: [half + 4, half + 26 + i * 12] }) }, { translateX: (i - 1) * 7 }, { scale: ignite.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1.3 + i * 0.25] }) }],
+              transform: [{ translateY: ignite.interpolate({ inputRange: [0, 1], outputRange: [half + 4, half + 26 + i * 12] }) }, { translateX: (i - 1) * 9 }, { scale: ignite.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1.4 + i * 0.3] }) }],
             },
           ]}
         />
@@ -305,7 +325,7 @@ export function Explosion({ x, y, fx }: { x: number; y: number; fx: Animated.Val
       {[0, 1, 2].map((i) => (
         <Animated.Image
           key={`s${i}`}
-          source={GLOW}
+          source={SMOKE}
           style={[
             st.smoke,
             {
@@ -317,7 +337,9 @@ export function Explosion({ x, y, fx }: { x: number; y: number; fx: Animated.Val
           ]}
         />
       ))}
-      <Animated.Image source={GLOW} style={[st.blast, { tintColor: '#FDBA74', opacity: fx.interpolate({ inputRange: [0, 0.06, 0.45, 1], outputRange: [0, 1, 0.45, 0] }), transform: [{ scale: fx.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0.2, 1.15, 1.5] }) }] }]} />
+      <Animated.Image source={GLOW} style={[st.blast, { tintColor: '#FDBA74', opacity: fx.interpolate({ inputRange: [0, 0.06, 0.45, 1], outputRange: [0, 0.8, 0.3, 0] }), transform: [{ scale: fx.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0.2, 1.15, 1.5] }) }] }]} />
+      {/* The fireball itself: it bursts out, swells and burns away into its smoke. */}
+      <Animated.Image source={BLAST} style={[st.fireball, { opacity: fx.interpolate({ inputRange: [0, 0.03, 0.4, 0.85], outputRange: [0, 1, 0.95, 0], ...clamp }), transform: [{ scale: fx.interpolate({ inputRange: [0, 0.12, 1], outputRange: [0.2, 0.95, 1.35], ...clamp }) }, { rotate: fx.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '25deg'] }) }] }]} />
       <Animated.Image source={GLOW} style={[st.blast, { tintColor: '#FFFFFF', opacity: fx.interpolate({ inputRange: [0, 0.05, 0.3], outputRange: [0, 1, 0], ...clamp }), transform: [{ scale: fx.interpolate({ inputRange: [0, 0.3], outputRange: [0.15, 0.75], ...clamp }) }] }]} />
       <Animated.View style={[st.ring, { borderColor: '#FDE68A', opacity: fx.interpolate({ inputRange: [0, 0.08, 0.7], outputRange: [0, 0.95, 0], ...clamp }), transform: [{ scale: fx.interpolate({ inputRange: [0, 0.7], outputRange: [0.15, 1.5], ...clamp }) }] }]} />
       <Animated.View style={[st.ring, { borderColor: '#FB7185', borderWidth: 2, opacity: fx.interpolate({ inputRange: [0.1, 0.2, 1], outputRange: [0, 0.8, 0], ...clamp }), transform: [{ scale: fx.interpolate({ inputRange: [0.1, 1], outputRange: [0.2, 2.2], ...clamp }) }] }]} />
@@ -388,12 +410,14 @@ const st = StyleSheet.create({
   tagHead: { color: ORBIT, fontSize: 10, fontWeight: '900', letterSpacing: 1.2 },
   tagValue: { color: '#fff', fontSize: 14, fontWeight: '900', fontVariant: ['tabular-nums'] },
   rocketBox: { position: 'absolute', left: 0, top: 0, width: ROCKET_SIZE, height: ROCKET_SIZE },
-  burn: { position: 'absolute', left: ROCKET_SIZE / 2 - 30, top: ROCKET_SIZE - 26, width: 60, height: 60, tintColor: '#FB923C' },
-  flame: { position: 'absolute', left: ROCKET_SIZE / 2 - 7, top: ROCKET_SIZE - 14, width: 14, height: 40, borderRadius: 7, overflow: 'hidden' },
-  puff: { position: 'absolute', left: ROCKET_SIZE / 2 - 11, top: 0, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(226,232,240,0.7)' },
+  burn: { position: 'absolute', left: ROCKET_SIZE / 2 - 30, top: ROCKET_SIZE - 24, width: 60, height: 60, tintColor: '#FB923C' },
+  // The rocket fills 80 % of its square's height: the nozzle ends at 90 %, where the flame's root is.
+  flame: { position: 'absolute', left: ROCKET_SIZE / 2 - ROCKET_SIZE * 0.13, top: ROCKET_SIZE * 0.86, width: ROCKET_SIZE * 0.26, height: ROCKET_SIZE * 1.0 },
+  puff: { position: 'absolute', left: ROCKET_SIZE / 2 - 14, top: 0, width: 28, height: 28, opacity: 0.8 },
+  fireball: { position: 'absolute', left: -80, top: -80, width: 160, height: 160 },
   trail: { position: 'absolute', justifyContent: 'center' },
   trailGlow: { ...StyleSheet.absoluteFill, opacity: 0.2 },
-  smoke: { position: 'absolute', width: 80, height: 80, tintColor: '#94A3B8' },
+  smoke: { position: 'absolute', width: 80, height: 80 },
   blast: { position: 'absolute', left: -90, top: -90, width: 180, height: 180 },
   ring: { position: 'absolute', left: -45, top: -45, width: 90, height: 90, borderRadius: 45, borderWidth: 3 },
   sparkArm: { position: 'absolute', left: 0, top: 0, width: 0, height: 0 },

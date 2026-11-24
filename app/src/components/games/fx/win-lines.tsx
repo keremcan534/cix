@@ -7,6 +7,7 @@ import { Animated, Easing, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/text';
 import { playSfx } from '@/lib/game-sound';
+import { tapHaptic } from '@/lib/haptics';
 import { fonts } from '@/theme';
 
 export type WinLine = {
@@ -45,6 +46,7 @@ export function WinLines({ lines, color = '#FFE08A', still }: { lines: WinLine[]
       setStep({ sig, i });
       draw();
       playSfx('tick', 0.55);
+      tapHaptic();
       timer = setTimeout(next, EACH_MS);
     };
     draw();

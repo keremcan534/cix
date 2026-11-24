@@ -435,8 +435,21 @@ let rooms: Room[] = [];
 let roomsState: LoadState = 'loading';
 const roomListeners = new Set<() => void>();
 const emitRooms = () => roomListeners.forEach((l) => l());
+/**
+ * The room list from a read: a room that hasn't changed keeps its object (its row doesn't redraw), and a list that
+ * hasn't changed at all wakes no screen. The list is read every 6 s and was redrawn in full each time.
+ */
 const setRooms = (next: Room[]) => {
-  rooms = next;
+  const was = new Map(rooms.map((r) => [r.id, { room: r, json: JSON.stringify(r) }]));
+  let same = next.length === rooms.length;
+  const merged = next.map((r, i) => {
+    const old = was.get(r.id);
+    const keep = old && old.json === JSON.stringify(r) ? old.room : r;
+    if (keep !== rooms[i]) same = false;
+    return keep;
+  });
+  if (same) return;
+  rooms = merged;
   emitRooms();
 };
 /** Open server rooms, fullest first; password rooms too (the lists show a lock, the room asks for it). */
@@ -449,8 +462,11 @@ export async function loadRooms() {
     emitRooms();
     throw e;
   }
+  const wasReady = roomsState === 'ready';
   roomsState = 'ready';
   setRooms(list.filter((r) => !r.closed).map(roomOf));
+  // A list that came back after a failure is shown even when it is the same as before.
+  if (!wasReady) emitRooms();
   return rooms;
 }
 /** Reads the room list again (the "Tekrar dene" button); a failure only shows in the state. */

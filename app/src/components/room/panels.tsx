@@ -108,7 +108,21 @@ export type MusicState = { queue: Track[]; playing: boolean; position: number };
 /** What plays in the room. The staff and DJs pause it (Durdur) or stop it for everyone (Kapat: the bar goes). */
 export function MusicBar({ music, canControl, onOpen, onToggle, onClose }: { music: MusicState; canControl: boolean; onOpen: () => void; onToggle: () => void; onClose: () => void }) {
   const track = music.queue[0];
+  // The clock counts here, on its own, from the position the room last gave: the room doesn't redraw every second.
+  const [shown, setShown] = useState({ from: music.position, pos: music.position });
+  useEffect(() => {
+    const start = Date.now();
+    const base = music.position;
+    const step = () => setShown({ from: base, pos: music.playing ? base + (Date.now() - start) / 1000 : base });
+    const first = setTimeout(step, 0);
+    const t = music.playing ? setInterval(step, 1000) : null;
+    return () => {
+      clearTimeout(first);
+      if (t) clearInterval(t);
+    };
+  }, [music.position, music.playing]);
   if (!track) return null;
+  const position = Math.min(track.seconds, shown.from === music.position ? shown.pos : music.position);
   return (
     // Everyone opens the music: the list and their own volume; only the room's staff and DJs change what plays.
     <Pressable style={styles.musicBar} onPress={onOpen} accessibilityRole="button" accessibilityLabel={`Çalan parça: ${track.title}. Müziği aç`}>
@@ -118,11 +132,11 @@ export function MusicBar({ music, canControl, onOpen, onToggle, onClose }: { mus
           {track.title} · {track.artist}
         </Text>
         <View style={styles.musicTrack}>
-          <View style={{ height: 3, backgroundColor: colors.primary, width: `${(music.position / track.seconds) * 100}%` }} />
+          <View style={{ height: 3, backgroundColor: colors.primary, width: `${(position / track.seconds) * 100}%` }} />
         </View>
       </View>
       <Text style={styles.dim}>
-        {mmss(music.position)}/{mmss(track.seconds)}
+        {mmss(position)}/{mmss(track.seconds)}
       </Text>
       {canControl && (
         <>

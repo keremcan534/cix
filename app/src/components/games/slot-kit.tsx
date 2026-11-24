@@ -37,7 +37,7 @@ export const fmt = (n: number) => Math.floor(n).toLocaleString('tr-TR');
 const compact = (n: number) => (n >= 1_000_000 ? `${(Math.floor(n / 100_000) / 10).toLocaleString('tr-TR')}M` : n >= 100_000 ? `${Math.floor(n / 1_000)}K` : fmt(n));
 /** A pill at least this wide inside its gold frame (px) has room for every digit of the balance, with its avatar or without. */
 const ROOMY = 196;
-const ROOMY_BARE = 120;
+const ROOMY_BARE = 140;
 /** A pill narrower than this (px) gives its avatar's place to the digits. */
 const NO_AVATAR = 196;
 

@@ -110,7 +110,9 @@ function RootStack() {
     <>
       <Stack
         // Pushed screens slide in from the right on both platforms; screens with their own animation keep it.
-        screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg }, animation: 'ios_from_right' }}
+        // A screen under the one in front is frozen (freezeOnBlur): the app's shared state changes all the time (coins,
+        // messages, a room's seconds) and every screen in the stack used to redraw with it, unseen, on the JS thread.
+        screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg }, animation: 'ios_from_right', freezeOnBlur: true }}
         // A screen whose feature the server switched off shows a calm notice instead (components/remote-control).
         screenLayout={({ children }) => (
           <ScreenEnter>

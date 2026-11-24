@@ -84,9 +84,28 @@ function hear(view: api.RocketView) {
   if (turned || (seat && seat.c !== null && state.mine?.cashed === null)) void readRocket();
 }
 
+/**
+ * Development only (the web preview with `?rocketsim` in its address, lib/live/rocket-sim): rounds played on this
+ * device instead of the server, so the live screen can be looked at without one. Never set in a release build.
+ */
+export type RocketSim = {
+  open: (patch: (p: Partial<RocketState>) => void, now: () => RocketState) => () => void;
+  fuel: (bet: number, auto: number | null) => boolean;
+  escape: () => { x: number; payout: number } | null;
+};
+let sim: RocketSim | null = null;
+export function setRocketSim(s: RocketSim | null) {
+  sim = s;
+}
+export const rocketSimOn = () => sim !== null;
+
 let users = 0;
 /** Canlı Yörünge's screen while it is open: the first read now, then the line and the reads. Returns the stop. */
 export function openRocket(): () => void {
+  if (sim) {
+    const stop = sim.open(set, () => state);
+    return stop;
+  }
   users += 1;
   if (users === 1) set({ ...EMPTY, history: state.history });
   void readRocket();
@@ -116,6 +135,7 @@ const fmt = (n: number) => n.toLocaleString('tr-TR');
 
 /** Fuel into the open round: `bet` coins, `auto` the automatic escape in hundredths (null: none). */
 export async function addFuel(bet: number, auto: number | null, entry: Entry): Promise<boolean> {
+  if (sim) return sim.fuel(bet, auto);
   const round = state.view?.round;
   if (!round || round.phase !== 'bet' || state.busy) return false;
   set({ busy: true, note: null });
@@ -136,6 +156,7 @@ export async function addFuel(bet: number, auto: number | null, entry: Entry): P
 
 /** I leave the rocket now: everything of mine on board pays the multiplier at the moment the server gets it. */
 export async function escapeNow(): Promise<{ x: number; payout: number } | null> {
+  if (sim) return sim.escape();
   const round = state.view?.round;
   if (!round || state.busy) return null;
   set({ busy: true, note: null });

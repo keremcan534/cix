@@ -68,16 +68,20 @@ function probeSeconds(uri: string) {
 
 /**
  * Plays the room's music on this phone at the point the room's clock gives (`enabled` off or volume 0: silent
- * here only, and no file is loaded). Answers what plays now, read again every second while something does.
+ * here only, and no file is loaded). Answers what plays now. It is read again when the track ends and every 10 s
+ * (the player is kept on the room's clock then); every second only while `watching` (the music sheet is open). It used
+ * to be read every second always, and the whole room redrew with it; the bar's clock counts on its own (MusicBar).
  */
-export function useRoomMusicPlayer(music: RoomMusic | null, enabled: boolean, volume: number) {
+export function useRoomMusicPlayer(music: RoomMusic | null, enabled: boolean, volume: number, watching = false) {
   const [tick, setTick] = useState(0);
   const active = !!music && music.tracks.length > 0 && music.startedAt !== null;
   useEffect(() => {
     if (!active) return;
-    const t = setInterval(() => setTick((n) => n + 1), 1000);
-    return () => clearInterval(t);
-  }, [active]);
+    const now = playingNow(music);
+    const left = now && !now.paused ? (now.track.seconds - now.position) * 1000 : Infinity;
+    const t = setTimeout(() => setTick((n) => n + 1), watching ? 1000 : Math.max(250, Math.min(10_000, left + 60)));
+    return () => clearTimeout(t);
+  }, [active, music, tick, watching]);
   // `tick` reads the clock again each second.
   const np = useMemo(() => (tick >= 0 ? playingNow(music) : null), [music, tick]);
 
