@@ -103,7 +103,7 @@ export default function IncomeScreen() {
   const instant = () =>
     showAlert(
       'Anında bozdur',
-      `Jeton Noktası çekilebilir elmasını resmi değerinden hemen öder: ${fmt(free)} 💎 ≈ ${fmt(Math.floor(diamondValueTl(free)))} TL. Senden ücret kesilmez. Haftalık ödemeyi beklemek istersen Para Çek'i kullan.${lockedNote}`,
+      `Jeton Noktası çekilebilir elmasını resmi değerinden hemen öder: ${fmt(free)} 💎 ≈ ${fmt(Math.floor(diamondValueTl(free, liveRules())))} TL. Senden ücret kesilmez. Haftalık ödemeyi beklemek istersen Para Çek'i kullan.${lockedNote}`,
       [
         { text: 'Kapat', style: 'cancel' },
         { text: "Jeton Noktası'na git", onPress: () => router.push('/coins-bank') },

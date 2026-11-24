@@ -17,6 +17,12 @@
 > - **Kur:** varsayılan 50,62. Canlı ayarlar'da elle kaydedilmiş bir kur varsa o geçerlidir; panelden 50,62 yapılmalı.
 > - **Finans paneli:** panel migration 012, yüklendiği gün USD/TRY 50,62 kuru ve 1 jeton = 0,22 TRY gelir karşılığını
 >   (komisyon matrahı) yazar.
+> - **Ödeme kuru (24 Kasım 2026):** Yayıncılara ve ajanslara ödeme yaparken baz alınan kur, Canlı ayarlar › Ödemeler ›
+>   **Ödeme kuru: 1 USD = ? TL** (varsayılan 49, elle değişir, bir kayıtta en çok %10). Panelin Para çekme ve Ajans
+>   ödemeleri sayfaları gönderilecek TL'yi (USD × ödeme kuru) gösterir; "Ödendi" işaretlenince o anki kur ve TL ödemeye
+>   yazılır (migration 120), sonradan değişmez. Panelin gördüğü kur ile o anki kur farklıysa işaret konmaz, yeni tutar
+>   gösterilir. Jeton Noktası anında bozdurmada yayıncıya ödenecek TL de bu kurla; çevirme ve finans raporları 50,62 ile
+>   kalır (aradaki fark ödemelerde şirkette kalır).
 > - **Sonraki adımlar (sahiplerle):** elmasın değeri (5.000 elmas = 1 USD) ve jetonla fiyatlanan her şey (hediyeler,
 >   VIP eşikleri, Rütbe, mağaza, oyunlar) ayrı ayrı konuşulacak; şimdilik jeton sayıları aynı.
 

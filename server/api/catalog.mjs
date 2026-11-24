@@ -233,14 +233,21 @@ const coinsPerTl = (coinValueTl = COIN_VALUE_TL) => 1000 / coinValueTl;
 export const exchangeCoins = (diamonds, usdTry = EXCHANGE.usdTry, coinValueTl = COIN_VALUE_TL) =>
   Math.floor(diamonds * ((1 / EXCHANGE.diamondsPerUsd) * usdTry * coinsPerTl(coinValueTl)));
 
-/** What diamonds are worth in TL (5.000 💎 = 1 USD at USD_TRY): what a Jeton Noktası pays a host for them. */
-export const diamondValueTl = (diamonds) => Math.round((diamonds / EXCHANGE.diamondsPerUsd) * EXCHANGE.usdTry * 100) / 100;
 /**
- * A host sells diamonds to a Jeton Noktası: the bank gets coins worth their value plus its fee (3 %) at the coin
- * value, rounded down. Same sum as app/src/lib/coins-bank.ts convertDiamonds.
+ * Ödeme kuru (owners, 24 Nov 2026): the TL a USD is paid at to hosts and agencies (withdrawals, agency payouts, a
+ * Jeton Noktası buying a host's diamonds). Canlı ayarlar › payout_usd_try sets it by hand; this is its default.
  */
-export const bankExchangeCoins = (diamonds, coinValueTl = COIN_VALUE_TL) =>
-  Math.floor(diamonds * ((1 / EXCHANGE.diamondsPerUsd) * EXCHANGE.usdTry * coinsPerTl(coinValueTl) * (1 + EXCHANGE.bankFee)));
+export const PAYOUT_USD_TRY = 49;
+/** TL for `usd` at the payout rate, to the kuruş. */
+export const payoutTl = (usd, rate = PAYOUT_USD_TRY) => Math.round(usd * rate * 100) / 100;
+/** What diamonds are paid in TL (5.000 💎 = 1 USD at the payout rate): what a Jeton Noktası pays a host for them. */
+export const diamondValueTl = (diamonds, rate = PAYOUT_USD_TRY) => Math.round((diamonds / EXCHANGE.diamondsPerUsd) * rate * 100) / 100;
+/**
+ * A host sells diamonds to a Jeton Noktası: the bank pays their value at the payout rate and gets coins worth that plus
+ * its fee (3 %) at the coin value, rounded down. Same sum as app/src/lib/coins-bank.ts convertDiamonds.
+ */
+export const bankExchangeCoins = (diamonds, coinValueTl = COIN_VALUE_TL, rate = PAYOUT_USD_TRY) =>
+  Math.floor(diamonds * ((1 / EXCHANGE.diamondsPerUsd) * rate * coinsPerTl(coinValueTl) * (1 + EXCHANGE.bankFee)));
 /**
  * What a Jeton Noktası pays management for coins: the wholesale price the panel sets (Canlı ayarlar ›
  * jeton_wholesale_tl, TL per 1.000 coins; owners, 24 Nov 2026: "elle girebilelim, şu an 220₺").

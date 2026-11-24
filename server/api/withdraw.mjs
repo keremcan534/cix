@@ -23,7 +23,7 @@
 // on a database that ever held play coins, requests can be made, cancelled and rejected but never paid.
 // Finance Control gets no event for this: its ingest has no payout type, and payouts are booked there.
 import { HttpError, auth, claimRef, clientIp, db, int, move, once, readJson, selfUser, text, tx } from './core.mjs';
-import { WITHDRAW, diamondValueUsd } from './catalog.mjs';
+import { WITHDRAW, diamondValueUsd, payoutTl } from './catalog.mjs';
 import { live } from './live-settings.mjs';
 import { notify } from './push.mjs';
 import { assertCashOut, cashOutOf } from './streamer-rule.mjs';
@@ -58,6 +58,9 @@ const view = (w) => ({
   id: Number(w.id),
   diamonds: Number(w.diamonds),
   usd: Number(w.usd),
+  // Paid: the payout rate and the TL written on it when it was marked paid (migration 120).
+  payUsdTry: w.pay_usd_try === null || w.pay_usd_try === undefined ? null : Number(w.pay_usd_try),
+  payTl: w.pay_tl === null || w.pay_tl === undefined ? null : Number(w.pay_tl),
   method: w.method,
   holder: w.holder,
   account: w.account,
@@ -177,9 +180,19 @@ export const withdrawRoutes = {
       [status],
     );
     const playMoney = PLAY_MONEY || (await everHadPlayMoney(db));
+    // The TL to send now, at the payout rate in effect (Canlı ayarlar › payout_usd_try); the decision sends it back.
+    const rate = live().payoutUsdTry;
     return {
       playMoney,
-      rows: r.rows.map((w) => ({ ...view(w), user: { id: w.user_id, name: w.name, phone: w.phone ?? null }, play: w.play, payable: w.status === 'pending' && !w.play && !playMoney, decidedBy: w.decided_by })),
+      payUsdTry: rate,
+      rows: r.rows.map((w) => ({
+        ...view(w),
+        tlNow: payoutTl(Number(w.usd), rate),
+        user: { id: w.user_id, name: w.name, phone: w.phone ?? null },
+        play: w.play,
+        payable: w.status === 'pending' && !w.play && !playMoney,
+        decidedBy: w.decided_by,
+      })),
     };
   },
 
@@ -201,9 +214,23 @@ export const withdrawRoutes = {
         throw new HttpError(409, 'Bu sunucuda test jetonu var; çekim ödenemez, yalnızca reddedilebilir');
       }
       const status = b.approve ? 'paid' : 'rejected';
-      const done = (await c.query('UPDATE withdrawals SET status = $2, note = $3, decided_by = $4, decided_at = now() WHERE id = $1 RETURNING *', [id, status, note, a.id])).rows[0];
+      // Paid: at the payout rate in effect, which must be the one the panel showed (payUsdTry); else nothing changes.
+      const rate = live().payoutUsdTry;
+      if (b.approve && b.payUsdTry !== undefined && b.payUsdTry !== null && !(typeof b.payUsdTry === 'number' && Math.round(b.payUsdTry * 100) === Math.round(rate * 100))) {
+        throw Object.assign(new HttpError(409, 'Ödeme kuru değişti; yeni TL tutarını kontrol et'), { extra: { code: 'rate_changed', payUsdTry: rate, tl: payoutTl(Number(w.usd), rate) } });
+      }
+      const done = (
+        await c.query('UPDATE withdrawals SET status = $2, note = $3, decided_by = $4, decided_at = now(), pay_usd_try = $5, pay_tl = $6 WHERE id = $1 RETURNING *', [
+          id,
+          status,
+          note,
+          a.id,
+          b.approve ? rate : null,
+          b.approve ? payoutTl(Number(w.usd), rate) : null,
+        ])
+      ).rows[0];
       if (!b.approve) await giveBack(c, w, 'Para çekme talebi reddedildi', a.id);
-      await audit(c, a.id, b.approve ? 'withdrawal.paid' : 'withdrawal.reject', w.user_id, { withdrawal: id, diamonds: Number(w.diamonds), usd: Number(w.usd), note }, ip);
+      await audit(c, a.id, b.approve ? 'withdrawal.paid' : 'withdrawal.reject', w.user_id, { withdrawal: id, diamonds: Number(w.diamonds), usd: Number(w.usd), ...(b.approve && { payUsdTry: rate, payTl: Number(done.pay_tl) }), note }, ip);
       return done;
     });
     notify([w.user_id], {

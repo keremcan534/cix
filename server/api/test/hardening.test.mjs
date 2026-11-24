@@ -97,14 +97,21 @@ describe('yayın sunucusu', () => {
     assert.equal(list.playMoney, false);
     const row = list.rows.find((x) => x.id === w.id);
     assert.equal(row.payable, true);
-    const d = await ok(call('POST', '/api/admin/withdrawals/decide', { id: w.id, approve: true, note: 'Havale yapıldı' }, admin.session));
+    // Ödeme kuru (24 Nov 2026): the panel shows the TL to send at 1 USD = 49 TL; a decision made on another rate is
+    // refused with the new amount and nothing changes.
+    assert.deepEqual([list.payUsdTry, row.tlNow, row.payUsdTry, row.payTl], [49, 490, null, null]);
+    const [st, j] = await call('POST', '/api/admin/withdrawals/decide', { id: w.id, approve: true, note: 'Havale yapıldı', payUsdTry: 48 }, admin.session);
+    assert.deepEqual([st, j.code, j.payUsdTry, j.tl], [409, 'rate_changed', 49, 490]);
+    const d = await ok(call('POST', '/api/admin/withdrawals/decide', { id: w.id, approve: true, note: 'Havale yapıldı', payUsdTry: 49 }, admin.session));
     assert.equal(d.withdrawal.status, 'paid');
+    assert.deepEqual([d.withdrawal.payUsdTry, d.withdrawal.payTl], [49, 490], 'ödenen kur ve TL talebe yazılır');
     assert.equal(d.withdrawal.statusLabel, 'Ödendi');
     assert.equal((await me(host.session)).diamonds, 49_999);
     assert.equal((await call('POST', '/api/wallet/withdrawals/cancel', { id: w.id }, host.session))[0], 409, 'ödenmiş talep iptal edilmez');
     const [a] = await q("SELECT actor, detail FROM audit_events WHERE action = 'withdrawal.paid'");
     assert.equal(a.actor, admin.user.id);
     assert.equal(a.detail.withdrawal, w.id);
+    assert.deepEqual([a.detail.payUsdTry, a.detail.payTl], [49, 490]);
     assert.equal((await ok(call('GET', '/api/wallet/withdrawals', null, host.session))).withdrawals[0].status, 'paid');
   });
 

@@ -204,7 +204,7 @@ describe('Jeton Noktası', () => {
     assert.equal((await me(bank.session)).coins, bankExchangeCoins(1000));
     const t = out.transfer;
     assert.deepEqual([t.kind, t.from.id, t.to.id, t.diamonds, t.coins, t.valueTl], ['diamond_sale', host.user.id, bank.user.id, 1000, bankExchangeCoins(1000), diamondValueTl(1000)]);
-    assert.equal(t.valueTl, 10.12, '1.000 elmas = 0,2 USD × 50,62');
+    assert.equal(t.valueTl, 9.8, '1.000 elmas = 0,2 USD × 49 (ödeme kuru)');
     assert.deepEqual((await coinLots(bank.session)).lots.map((l) => [l.channel, l.from.id]), [['bozdurma', host.user.id]]);
   });
 });

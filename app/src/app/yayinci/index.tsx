@@ -10,6 +10,7 @@ import { Art, type ArtName } from '@/components/Art';
 import { Card, GradientButton, Header, TextLink } from '@/components/ui';
 import { AGENCIES } from '@/data/agency';
 import { hostLevel } from '@/data/economy';
+import { liveRules } from '@/lib/live/catalog-live';
 import { diamondValueTl } from '@/lib/coins-bank';
 import { userById } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
@@ -131,7 +132,7 @@ function Dashboard() {
   const exchange = () =>
     // Diamonds turn into coins only in the main Coins Bank account (lib/coins-bank); hosts cash out instead.
     // Only the withdrawable part: locked diamonds (lib/diamond-locks) wait for their lock.
-    showAlert('Anında bozdur', `Jeton Noktası çekilebilir elmasını resmi değerinden hemen öder: ${free.toLocaleString('tr-TR')} elmas ≈ ${Math.floor(diamondValueTl(free)).toLocaleString('tr-TR')} TL. Senden ücret kesilmez.${locked > 0 ? `\n\n${locked.toLocaleString('tr-TR')} elmasın kilidi henüz açılmadı.` : ''}`, [
+    showAlert('Anında bozdur', `Jeton Noktası çekilebilir elmasını resmi değerinden hemen öder: ${free.toLocaleString('tr-TR')} elmas ≈ ${Math.floor(diamondValueTl(free, liveRules())).toLocaleString('tr-TR')} TL. Senden ücret kesilmez.${locked > 0 ? `\n\n${locked.toLocaleString('tr-TR')} elmasın kilidi henüz açılmadı.` : ''}`, [
       { text: 'Kapat', style: 'cancel' },
       { text: "Jeton Noktası'na git", onPress: () => router.push('/coins-bank') },
     ]);

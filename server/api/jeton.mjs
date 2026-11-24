@@ -292,9 +292,11 @@ export const jetonRoutes = {
     if (bank === u.id) throw new HttpError(400, 'Kendi Jeton Noktana bozduramazsın');
     const diamonds = int(b.diamonds, EXCHANGE.minDiamonds, DIAMONDS_MAX);
     if (!diamonds) throw new HttpError(400, `En az ${EXCHANGE.minDiamonds} elmas bozdurulabilir`);
-    // At the coin value in effect (Canlı ayarlar › coin_value_tl): the bank's coins are worth what it pays.
-    const coins = bankExchangeCoins(diamonds, live().coinValueTl);
-    const valueTl = diamondValueTl(diamonds);
+    // The host is paid at the payout rate (Canlı ayarlar › payout_usd_try); the bank's coins, at the coin value in
+    // effect, are worth what it pays plus its fee.
+    const s = live();
+    const coins = bankExchangeCoins(diamonds, s.coinValueTl, s.payoutUsdTry);
+    const valueTl = diamondValueTl(diamonds, s.payoutUsdTry);
     if (await blockedBetween(u.id, bank)) throw new HttpError(403, 'Bu Jeton Noktası ile işlem yapamazsın');
     const ip = clientIp(req);
     const out = await once(u.id, 'diamond', b.ref, async (c) => {

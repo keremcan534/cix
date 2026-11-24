@@ -9,7 +9,7 @@ import { after, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 
-import { BOND_GIFTS, COIN_VALUE_TL, EXCHANGE, GIFTS, GIFTS_PAUSED, PACKS, exchangeCoins } from '../catalog.mjs';
+import { BOND_GIFTS, COIN_VALUE_TL, EXCHANGE, GIFTS, GIFTS_PAUSED, PACKS, PAYOUT_USD_TRY, exchangeCoins } from '../catalog.mjs';
 import { MARK_GIFTS } from '../profile-mark-rules.mjs';
 import { eventsOf } from '../finance-sync.mjs';
 import { campaignRef } from '../live-registry.mjs';
@@ -93,7 +93,7 @@ describe('Canlı ayarlar para uçlarında', () => {
     // Nor Kaka and Su to an app without Profil izleri (profile-mark-rules.mjs MARK_GIFTS).
     assert.equal(cat.gifts.length, GIFTS.size - GIFTS_PAUSED.size - BOND_GIFTS.size - MARK_GIFTS.size);
     assert.equal(cat.packs.length, PACKS.length);
-    assert.deepEqual(cat.exchange, { usdTry: EXCHANGE.usdTry, coinValueTl: COIN_VALUE_TL, minDiamonds: EXCHANGE.minDiamonds });
+    assert.deepEqual(cat.exchange, { usdTry: EXCHANGE.usdTry, coinValueTl: COIN_VALUE_TL, payoutUsdTry: PAYOUT_USD_TRY, minDiamonds: EXCHANGE.minDiamonds });
     assert.equal(cat.campaign, null);
     assert.equal(cat.v, 0);
   });

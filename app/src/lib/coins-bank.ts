@@ -17,10 +17,10 @@ import { RULES, type Rules } from '@/data/rules';
 export type AccountKind = 'standard' | 'coins_bank_main';
 export type Quote<T extends object> = ({ ok: true } & T) | { ok: false; reason: string };
 
-/** What diamonds are worth in TL under the payout rule (e.g. 1.000.000 💎 = 200 USD). */
-export const diamondValueTl = (diamonds: number, r: Rules = RULES) => (diamonds / r.diamondsPerUsd) * r.usdTry;
-/** Coins per diamond for the Coins Bank: value × its selling price × (1 + fee). */
-export const exchangeRate = (r: Rules = RULES) => (1 / r.diamondsPerUsd) * r.usdTry * r.coinsBankRetailCoinsPerTl * (1 + r.coinsBankExchangeFee);
+/** What diamonds are paid in TL: 5.000 💎 = 1 USD at the payout rate (Ödeme kuru; e.g. 1.000.000 💎 = 200 USD = 9.800 TL). */
+export const diamondValueTl = (diamonds: number, r: Rules = RULES) => (diamonds / r.diamondsPerUsd) * r.payoutUsdTry;
+/** Coins per diamond for the Coins Bank: what it pays (at the payout rate) × its selling price × (1 + fee). */
+export const exchangeRate = (r: Rules = RULES) => (1 / r.diamondsPerUsd) * r.payoutUsdTry * r.coinsBankRetailCoinsPerTl * (1 + r.coinsBankExchangeFee);
 
 /** Coins per diamond for Çevir: value × the best pack's coins per TL (no fee). Pass liveRules() for the live rate. */
 export const selfExchangeRate = (r: Rules = RULES) => (1 / r.diamondsPerUsd) * r.usdTry * r.coinsBankRetailCoinsPerTl;
@@ -30,7 +30,7 @@ export function exchangeOwnDiamonds(diamonds: number, balance: number, r: Rules 
   if (!Number.isInteger(diamonds) || diamonds <= 0) return { ok: false, reason: 'Geçerli bir elmas miktarı gir.' };
   if (diamonds < r.exchangeMinDiamonds) return { ok: false, reason: `En az ${r.exchangeMinDiamonds.toLocaleString('tr-TR')} elmas çevirebilirsin.` };
   if (diamonds > balance) return { ok: false, reason: 'Yetersiz elmas bakiyesi.' };
-  return { ok: true, coins: Math.floor(diamonds * selfExchangeRate(r)), valueTl: diamondValueTl(diamonds, r) };
+  return { ok: true, coins: Math.floor(diamonds * selfExchangeRate(r)), valueTl: (diamonds / r.diamondsPerUsd) * r.usdTry };
 }
 
 /**

@@ -78,6 +78,8 @@ export type LiveCatalog = {
   usdTry: number | null;
   /** TL per 1.000 coins (Canlı ayarlar › coin_value_tl); null: the app's own (RULES.coinValueTl). */
   coinValueTl: number | null;
+  /** Ödeme kuru (Canlı ayarlar › payout_usd_try); null: the app's own (RULES.payoutUsdTry). */
+  payoutUsdTry?: number | null;
   /** The videos the server hands out (server/api/fx.mjs); null when it didn't say (an older server). */
   fx: FxVideo[] | null;
   /** The admins' gifts the server lists, in its order; [] from an older server. */
@@ -136,6 +138,8 @@ const version = (v: unknown) => (typeof v === 'number' && Number.isSafeInteger(v
 export const validRate = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x) && x >= RATE_MIN && x <= RATE_MAX;
 /** A coin value the server may send: 1,00–5.000,00 TL per 1.000 coins (server/api/live-registry.mjs coin_value_tl). */
 export const validCoinValue = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x) && x >= 1 && x <= 5000;
+/** A payout rate the server may send: 30–100 TL per USD (server/api/live-registry.mjs payout_usd_try). */
+export const validPayoutRate = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x) && x >= 30 && x <= 100;
 
 /** A list of gift ids; null when it is empty or any entry is malformed (then nothing is hidden). */
 function idList(list: unknown, idOf: (x: unknown) => unknown): string[] | null {
@@ -275,6 +279,7 @@ export function parseLiveCatalog(raw: unknown): LiveCatalog {
   const r = obj(raw);
   const rate = obj(r.exchange).usdTry;
   const coinValue = obj(r.exchange).coinValueTl;
+  const payout = obj(r.exchange).payoutUsdTry;
   const remote = parseRemoteGifts(r.gifts);
   // The server said it all (gifts=2): what is on the shelves, in which order, and what the app's own gifts are now.
   const app = r.giftsFormat === 2 ? parseAppGifts(r.gifts) : {};
@@ -285,6 +290,7 @@ export function parseLiveCatalog(raw: unknown): LiveCatalog {
     campaign: campaignOf(r.campaign),
     usdTry: validRate(rate) ? rate : null,
     coinValueTl: validCoinValue(coinValue) ? coinValue : null,
+    ...(validPayoutRate(payout) ? { payoutUsdTry: payout } : {}),
     fx: parseFxList(r.fx),
     remote,
     shelf: r.giftsFormat === 2 ? shelfOf(r.gifts, app, remote) : null,
@@ -332,6 +338,7 @@ export function parseSavedLiveCatalog(raw: string | null): { catalog: LiveCatalo
       campaign: campaignOf(r.campaign),
       usdTry: validRate(r.usdTry) ? r.usdTry : null,
       coinValueTl: validCoinValue(r.coinValueTl) ? r.coinValueTl : null,
+      ...(validPayoutRate(r.payoutUsdTry) ? { payoutUsdTry: r.payoutUsdTry } : {}),
       fx: parseFxList(r.fx),
       remote,
       shelf,
@@ -477,15 +484,16 @@ export const markKinds = (c: LiveCatalog | null = current): Record<string, MarkK
 /** A gift's icon address when the server gave one (an admin's gift, or one of the app's whose icon was replaced). */
 export const remoteIconOf = (id: string, c: LiveCatalog | null = current): string | undefined => c?.app[id]?.icon ?? c?.remote.find((g) => g.id === id)?.icon;
 
-let rulesMemo: { rate: number; value: number; rules: Rules } | null = null;
+let rulesMemo: { rate: number; value: number; payout: number; rules: Rules } | null = null;
 /** The rules with the server's Çevir rate and coin value (lib/coins-bank selfExchangeRate / exchangeOwnDiamonds);
  *  the app's own for what the server didn't say or said out of range. The same object until they change. */
 export function liveRules(c: LiveCatalog | null = current): Rules {
   const rate = validRate(c?.usdTry) ? c.usdTry : RULES.usdTry;
   const value = validCoinValue(c?.coinValueTl) ? c.coinValueTl : RULES.coinValueTl;
-  if (rate === RULES.usdTry && value === RULES.coinValueTl) return RULES;
-  if (rulesMemo?.rate !== rate || rulesMemo.value !== value)
-    rulesMemo = { rate, value, rules: { ...RULES, usdTry: rate, coinValueTl: value, coinsBankRetailCoinsPerTl: 1000 / value } };
+  const payout = validPayoutRate(c?.payoutUsdTry) ? c.payoutUsdTry : RULES.payoutUsdTry;
+  if (rate === RULES.usdTry && value === RULES.coinValueTl && payout === RULES.payoutUsdTry) return RULES;
+  if (rulesMemo?.rate !== rate || rulesMemo.value !== value || rulesMemo.payout !== payout)
+    rulesMemo = { rate, value, payout, rules: { ...RULES, usdTry: rate, coinValueTl: value, coinsBankRetailCoinsPerTl: 1000 / value, payoutUsdTry: payout } };
   return rulesMemo.rules;
 }
 

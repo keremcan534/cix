@@ -11,6 +11,8 @@
 //        | payouts/decide | transfers/decide | transition | roles | staff/set | staff/remove | bd | ops-score
 //        | violation | appeals/decide | simulate | jobs/run
 import { HttpError, REF, UUID, auth, db, env, readJson, text, tx } from './core.mjs';
+import { payoutTl } from './catalog.mjs';
+import { live } from './live-settings.mjs';
 import {
   AGENCY_PERMS,
   CRITERIA,
@@ -638,13 +640,19 @@ export const agencyAdminRoutes = {
     );
     // payable: false = commission on a server with play money; it can't be approved or paid (agency.mjs PLAY_PAYOUT).
     const playMoney = await playMoneyOn(db);
+    // The TL to send now, at the payout rate in effect (Canlı ayarlar › payout_usd_try); paid ones keep theirs.
+    const rate = live().payoutUsdTry;
     return {
       playMoney,
+      payUsdTry: rate,
       payouts: r.rows.map((p) => ({
         id: Number(p.id),
         agency: { id: p.agency_id, name: p.agency_name, code: p.code, status: p.agency_status },
         amount: d4(p.amount),
         usd: n(p.usd),
+        tlNow: payoutTl(n(p.usd), rate),
+        payUsdTry: p.pay_usd_try === null ? null : n(p.pay_usd_try),
+        payTl: p.pay_tl === null ? null : n(p.pay_tl),
         currency: p.currency,
         status: p.status,
         statusLabel: STATUS_LABEL[p.status],
@@ -683,8 +691,15 @@ export const agencyAdminRoutes = {
           if (await playMoneyOn(c)) throw new HttpError(409, PLAY_PAYOUT);
           if (x.s.payout_policy.two_person && p.approved_by === x.u.id) throw new HttpError(403, 'Onaylayan kişi ödendi olarak işaretleyemez (iki kişili onay)');
           const paymentRef = text(b.paymentRef, 3, 100, 'Ödeme referansı');
+          // At the payout rate in effect, which must be the one the panel showed (payUsdTry); else nothing changes.
+          const rate = live().payoutUsdTry;
+          if (b.payUsdTry !== undefined && b.payUsdTry !== null && !(typeof b.payUsdTry === 'number' && Math.round(b.payUsdTry * 100) === Math.round(rate * 100))) {
+            throw Object.assign(new HttpError(409, 'Ödeme kuru değişti; yeni TL tutarını kontrol et'), { extra: { code: 'rate_changed', payUsdTry: rate, tl: payoutTl(n(p.usd), rate) } });
+          }
+          const tl = payoutTl(n(p.usd), rate);
           await payoutStep(c, p, 'paid', x.u.id, note, { paymentRef });
-          await notice(c, p.agency_id, 'payout', 'Ödemen yapıldı', `${d4(p.amount)} elmas (${n(p.usd)} USD), referans ${paymentRef}`);
+          await c.query('UPDATE agency_payouts SET pay_usd_try = $2, pay_tl = $3 WHERE id = $1', [p.id, rate, tl]);
+          await notice(c, p.agency_id, 'payout', 'Ödemen yapıldı', `${d4(p.amount)} elmas (${n(p.usd)} USD = ${tl.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL, kur ${rate.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}), referans ${paymentRef}`);
           break;
         }
         case 'reject':

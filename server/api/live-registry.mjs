@@ -12,7 +12,7 @@
 // Values: null always means "back to the default". A set (features_off, gifts_hidden, shop_hidden, packs_hidden, rewards_off) is kept in
 // its options' order, and an empty set is stored as null. Money rules: the exchange rate moves at most ±10 % per
 // save, withdrawal limits can only go down from today's values.
-import { COIN_VALUE_TL, EXCHANGE, GIFTS, PACKS, SHOP, WHOLESALE_TL, WITHDRAW, exchangeCoins, packsSetUp, tlOfCoins, wholesaleTl } from './catalog.mjs';
+import { COIN_VALUE_TL, EXCHANGE, GIFTS, PACKS, PAYOUT_USD_TRY, SHOP, WHOLESALE_TL, WITHDRAW, exchangeCoins, packsSetUp, payoutTl, tlOfCoins, wholesaleTl } from './catalog.mjs';
 import { DAILY_ROUNDS as CASINO_DAILY_ROUNDS, GAMES as CASINO_GAMES, STAKES as CASINO_STAKES } from './casino-rules.mjs';
 import { REMINDER_KINDS, REMINDER_LABEL } from './event-rules.mjs';
 import { CHEST_MIN_CONTRIBUTION, FAMILY_CHESTS, FAMILY_TASKS, FAMILY_THEMES } from './family-rules.mjs';
@@ -103,6 +103,7 @@ export function defaultsOf(e = process.env) {
     exchange_usd_try: EXCHANGE.usdTry,
     coin_value_tl: COIN_VALUE_TL,
     jeton_wholesale_tl: WHOLESALE_TL,
+    payout_usd_try: PAYOUT_USD_TRY,
     withdraw_max_diamonds: WITHDRAW.maxDiamonds,
     withdraw_weekly_diamonds: WITHDRAW.weeklyDiamonds,
     otp_global_per_hour: perHourOf(e.OTP_GLOBAL_PER_HOUR),
@@ -1050,6 +1051,29 @@ export const REGISTRY = {
     impact: (before, after) =>
       `1.000 jeton toptan ${rateText(before)} → ${rateText(after)} TL (${pctText(((after - before) / before) * 100)}); 100.000 jeton ${rateText(wholesaleTl(100_000, before))} → ${rateText(wholesaleTl(100_000, after))} TL. Yapılmış satışlar değişmez.`,
   },
+  payout_usd_try: {
+    field: 'payoutUsdTry',
+    group: 'Ödemeler',
+    label: 'Ödeme kuru: 1 USD = ? TL',
+    help: 'Yayıncılara ve ajanslara ödeme yaparken baz alınan kur: para çekme ve ajans ödemelerinde gönderilecek TL, Jeton Noktası bozdurmasında yayıncıya ödenecek TL bu kurla hesaplanır. Ödendi işaretlenen ödemeye o anki kur yazılır; sonradan değişmez. 30,00–100,00; bir kayıtta en çok %10 değişir.',
+    type: 'number',
+    bounds: { min: 30, max: 100, decimals: 2, maxStepPct: 10, bigStepPct: 3 },
+    parse(v) {
+      if (typeof v !== 'number' || !Number.isFinite(v)) bad('Ödeme kuru bir sayı olmalı');
+      if (Math.abs(cents(v) - v * 100) > 1e-6) bad('Ödeme kuru en çok 2 ondalık basamaklı olabilir');
+      const r = cents(v) / 100;
+      if (r < 30 || r > 100) bad('Ödeme kuru 30,00 ile 100,00 arasında olmalı');
+      return r;
+    },
+    change(before, after) {
+      const b = cents(before);
+      if (Math.abs(cents(after) - b) * 10 <= b) return;
+      bad(`Ödeme kuru bir kayıtta en çok %10 değişebilir: şimdi ${rateText(before)}, yeni değer ${rateText(Math.ceil((b * 9) / 10) / 100)}–${rateText(Math.floor((b * 11) / 10) / 100)} arasında olmalı`);
+    },
+    big: (before, after) => after !== null && Math.abs(cents(after) - cents(before)) * 100 > cents(before) * REGISTRY.payout_usd_try.bounds.bigStepPct,
+    impact: (before, after) =>
+      `1 USD ${rateText(before)} → ${rateText(after)} TL (${pctText(((after - before) / before) * 100)}): 1.000 USD'lik ödeme ${rateText(payoutTl(1000, before))} → ${rateText(payoutTl(1000, after))} TL. Ödenmiş ödemeler değişmez.`,
+  },
   withdraw_max_diamonds: {
     field: 'withdrawMax',
     group: 'Para çekme sınırları',
@@ -1355,6 +1379,7 @@ export function snapshotOf(rows = [], e = process.env, { v = 0 } = {}) {
     usdTry: val('exchange_usd_try'),
     coinValueTl: val('coin_value_tl'),
     wholesaleTl: val('jeton_wholesale_tl'),
+    payoutUsdTry: val('payout_usd_try'),
     withdrawMax: val('withdraw_max_diamonds'),
     withdrawWeekly: val('withdraw_weekly_diamonds'),
     otpPerHour: val('otp_global_per_hour'),

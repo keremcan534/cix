@@ -13,6 +13,8 @@ export type Rules = {
   usdTry: number;
   /** What 1.000 coins are worth in TL (Canlı ayarlar › coin_value_tl; owners, 24 Nov 2026: 220 TL). */
   coinValueTl: number;
+  /** Ödeme kuru: the TL a USD is paid at to hosts and agencies (Canlı ayarlar › payout_usd_try; 24 Nov 2026: 49). */
+  payoutUsdTry: number;
   /** Coins per TL at the coin value (1.000 / coinValueTl): Çevir's and the Coins Bank's selling price. */
   coinsBankRetailCoinsPerTl: number;
   /** What the Coins Bank pays management for 1.000 coins (Canlı ayarlar › jeton_wholesale_tl; 24 Nov 2026: 220 TL). */
@@ -62,6 +64,7 @@ export const DEFAULT_RULES: Rules = {
   diamondsPerUsd: 5_000,
   usdTry: 50.62,
   coinValueTl: 220,
+  payoutUsdTry: 49,
   coinsBankRetailCoinsPerTl: 1_000 / 220,
   coinsBankWholesaleTlPer1000: 220,
   coinsBankExchangeFee: 0.03,

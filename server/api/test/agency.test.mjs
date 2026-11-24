@@ -565,7 +565,14 @@ describe('Askı, personel, BD, ödemeler, raporlar', () => {
     assert.equal(list.payouts.find((x) => x.id === p.payout.id).payable, true, 'gerçek parayla kazanılan komisyon ödenebilir');
     ok(await fin1.post('/api/admin/agency/payouts/decide', { payoutId: p.payout.id, action: 'approve' }));
     refused(await fin1.post('/api/admin/agency/payouts/decide', { payoutId: p.payout.id, action: 'pay', paymentRef: 'BANKA-0001' }), 403, 'onaylayan ödeyemez');
-    ok(await fin2.post('/api/admin/agency/payouts/decide', { payoutId: p.payout.id, action: 'pay', paymentRef: 'BANKA-0001' }));
+    // Ödeme kuru (24 Nov 2026): the TL to send at 1 USD = 49 TL; a decision made on another rate is refused, nothing changes.
+    const shown = ok(await fin2.get('/api/admin/agency/payouts')).payouts.find((x) => x.id === p.payout.id);
+    assert.equal(shown.tlNow, Math.round(shown.usd * 49 * 100) / 100);
+    const moved = await fin2.post('/api/admin/agency/payouts/decide', { payoutId: p.payout.id, action: 'pay', paymentRef: 'BANKA-0001', payUsdTry: 50 });
+    refused(moved, 409, 'eski kur');
+    ok(await fin2.post('/api/admin/agency/payouts/decide', { payoutId: p.payout.id, action: 'pay', paymentRef: 'BANKA-0001', payUsdTry: 49 }));
+    const paid = ok(await fin2.get('/api/admin/agency/payouts')).payouts.find((x) => x.id === p.payout.id);
+    assert.deepEqual([paid.payUsdTry, paid.payTl], [49, shown.tlNow], 'ödenen kur ve TL ödemeye yazılır');
     refused(await fin2.post('/api/admin/agency/payouts/decide', { payoutId: p.payout.id, action: 'pay', paymentRef: 'BANKA-0002' }), 409, 'ikinci kez ödeme');
     const view = ok(await tOwner.get(`/api/agency/payouts?id=${T.id}`));
     assert.equal(view.payouts[0].status, 'paid');
