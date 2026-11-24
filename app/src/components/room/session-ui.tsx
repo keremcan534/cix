@@ -6,7 +6,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, usePathname } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Animated, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions, type LayoutRectangle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MIC_RING, UiIcon } from '@/components/UiIcon';
@@ -83,49 +83,6 @@ export function sessionStatus(s: RoomSession, invited = false): { text: string; 
   return { text: 'Dinliyorsun', tone: 'live', icon: 'headset' };
 }
 
-// --- Two-choice sheet -----------------------------------------------------------------------------------
-type Choice = { label: string; desc: string; icon: keyof typeof Ionicons.glyphMap; onPress: () => void };
-/** Primary (filled turquoise) and exit (outlined red) never look alike, so a wrong tap is unlikely. */
-function ChoiceSheet({ visible, title, primary, exit, extra, onCancel, top = false }: { visible: boolean; title: string; primary: Choice; exit: Choice; /** A rarer third choice, shown as a quiet text button. */ extra?: Choice; onCancel: () => void; /** Opens under the top edge, near the room's close button, instead of from the bottom. */ top?: boolean }) {
-  const insets = useSafeAreaInsets();
-  const backdrop = <Pressable style={s.backdrop} onPress={onCancel} accessibilityLabel="Vazgeç" />;
-  return (
-    <Modal visible={visible} transparent animationType={top ? 'fade' : 'slide'} onRequestClose={onCancel}>
-      {!top && backdrop}
-      <View style={top ? [s.sheet, s.sheetTop, { paddingTop: space.md + insets.top }] : [s.sheet, { paddingBottom: space.xl + insets.bottom }]} accessibilityViewIsModal>
-        {!top && <View style={s.handle} />}
-        <Text style={s.sheetTitle} accessibilityRole="header">
-          {title}
-        </Text>
-        <Pressable style={({ pressed }) => [s.choice, s.choicePrimary, pressed && { opacity: 0.85 }]} onPress={primary.onPress} accessibilityRole="button" accessibilityLabel={`${primary.label}. ${primary.desc}`}>
-          <Ionicons name={primary.icon} size={24} color={semantic.actionInk} />
-          <View style={{ flex: 1 }}>
-            <Text style={[s.choiceLabel, { color: semantic.actionInk }]}>{primary.label}</Text>
-            <Text style={[s.choiceDesc, { color: semantic.actionInk }]}>{primary.desc}</Text>
-          </View>
-        </Pressable>
-        <Pressable style={({ pressed }) => [s.choice, s.choiceExit, pressed && { backgroundColor: 'rgba(255,122,130,0.12)' }]} onPress={exit.onPress} accessibilityRole="button" accessibilityLabel={`${exit.label}. ${exit.desc}`}>
-          <Ionicons name={exit.icon} size={24} color={semantic.danger} />
-          <View style={{ flex: 1 }}>
-            <Text style={[s.choiceLabel, { color: semantic.danger }]}>{exit.label}</Text>
-            <Text style={s.choiceDesc}>{exit.desc}</Text>
-          </View>
-        </Pressable>
-        {extra && (
-          <Pressable style={s.cancel} onPress={extra.onPress} accessibilityRole="button" accessibilityLabel={`${extra.label}. ${extra.desc}`}>
-            <Text style={[s.cancelText, { color: semantic.danger }]}>{extra.label}</Text>
-          </Pressable>
-        )}
-        <Pressable style={s.cancel} onPress={onCancel} accessibilityRole="button">
-          <Text style={s.cancelText}>Vazgeç</Text>
-        </Pressable>
-        {top && <View style={s.handle} />}
-      </View>
-      {top && backdrop}
-    </Modal>
-  );
-}
-
 // --- Mini room ------------------------------------------------------------------------------------------
 const TAB_PATHS = ['/', '/kesfet', '/anlar', '/mesajlar', '/profil'];
 /** Tabs with a floating button in the bottom-right corner. */
@@ -137,9 +94,52 @@ const DENSE = [/^\/arama\//, /^\/tanis/, /^\/eslesme/];
 const TAB_BAR = 64;
 
 /**
+ * The mini room's drag (owners, 25 Nov 2026): it follows the finger anywhere and stays where it is let go, kept 8 px
+ * inside the screen (under the status bar, above the home bar); a quick fling to the right hides it. `xy` is the
+ * offset from its own place (bottom right, or top on chat screens); `box` its place and size without it (onLayout).
+ */
+class MiniDrag {
+  readonly xy = new Animated.ValueXY();
+  private box: LayoutRectangle | null = null;
+  private screen = { w: 0, h: 0, top: 0, bottom: 0 };
+  setBox(b: LayoutRectangle) {
+    this.box = b;
+  }
+  setScreen(w: number, h: number, top: number, bottom: number) {
+    this.screen = { w, h, top, bottom };
+  }
+  private off = { x: 0, y: 0 };
+  reset() {
+    this.off = { x: 0, y: 0 };
+    this.xy.setValue(this.off);
+  }
+  readonly pan = PanResponder.create({
+    onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 8 || Math.abs(g.dy) > 8,
+    onPanResponderMove: (_, g) => this.xy.setValue({ x: this.off.x + g.dx, y: this.off.y + g.dy }),
+    onPanResponderRelease: (_, g) => {
+      if (g.vx > 1.2 && g.dx > 60 && Math.abs(g.dy) < 80) {
+        this.xy.setValue(this.off);
+        return setMiniHidden(true);
+      }
+      const b = this.box;
+      const r = this.screen;
+      let x = this.off.x + g.dx;
+      let y = this.off.y + g.dy;
+      if (b && r.w > 0) {
+        x = Math.min(Math.max(x, 8 - b.x), r.w - 8 - b.width - b.x);
+        y = Math.min(Math.max(y, r.top + 8 - b.y), r.h - r.bottom - 8 - b.height - b.y);
+      }
+      this.off = { x, y };
+      Animated.spring(this.xy, { toValue: { x, y }, useNativeDriver: Platform.OS !== 'web', friction: 7 }).start();
+    },
+    onPanResponderTerminate: () => this.xy.setValue(this.off),
+  });
+}
+
+/**
  * The room while the user is elsewhere in the app. Tap: back to the full room (same session). Mic button:
- * the same mic as in the room. X: choose between hiding the card (the room keeps running, the edge tab
- * brings it back) and leaving. Swipe right hides it, swipe up/down moves it out of the way.
+ * the same mic as in the room. X: leaves the room at once (owners, 25 Nov 2026; it asked before). It is dragged anywhere on the screen with a finger (owners, 25 Nov 2026: up and down
+ * only before) and stays where it is let go, kept inside the screen; a quick fling to the right hides it.
  */
 export function MiniRoom({ session }: { session: RoomSession }) {
   const path = usePathname();
@@ -148,10 +148,8 @@ export function MiniRoom({ session }: { session: RoomSession }) {
   const keyboard = useKeyboardOpen();
   // The room may not be seeded yet right after a restart; read it defensively.
   const room = useRoomLive(session.roomId).room as ReturnType<typeof useRoomLive>['room'] | undefined;
-  const [closeAsk, setCloseAsk] = useState(false);
-  // null: placed by the screen (top on chat screens); a swipe up or down pins it there.
-  const [pinTop, setPinTop] = useState<boolean | null>(null);
-  const atTop = pinTop ?? CHAT.some((r) => r.test(path));
+  // Placed by the screen (top on chat screens); the finger moves it from there (drag below).
+  const atTop = CHAT.some((r) => r.test(path));
   const invited = !!room?.invites.some((i) => i.toId === 'me' && i.status === 'pending');
   const ended = session.status === 'ended';
   const st = sessionStatus(session, invited);
@@ -161,16 +159,12 @@ export function MiniRoom({ session }: { session: RoomSession }) {
   const compact = !ended && (session.miniHidden || forced);
 
   const bottom = TAB_PATHS.includes(path) ? TAB_BAR + insets.bottom + (FAB_TABS.includes(path) ? 84 : 10) : insets.bottom + 84;
-  const [pan] = useState(() =>
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 10 || Math.abs(g.dy) > 10,
-      onPanResponderRelease: (_, g) => {
-        if (g.dx > 60 && Math.abs(g.dy) < 50) return setMiniHidden(true);
-        if (g.dy < -40) setPinTop(true);
-        else if (g.dy > 40) setPinTop(false);
-      },
-    }),
-  );
+  // Where the finger moved it (MiniDrag): kept while the card is shown, from its own place again on another screen.
+  const [drag] = useState(() => new MiniDrag());
+  useEffect(() => {
+    drag.setScreen(win.width, win.height, insets.top, insets.bottom);
+  }, [drag, win.width, win.height, insets.top, insets.bottom]);
+  useEffect(() => drag.reset(), [atTop, drag]);
 
   if (compact)
     return (
@@ -186,10 +180,14 @@ export function MiniRoom({ session }: { session: RoomSession }) {
       </Pressable>
     );
 
-  const exitChoice: Choice = { label: 'Odadan çık', desc: 'Canlı odadan ayrılacaksın.', icon: 'exit-outline', onPress: () => (setCloseAsk(false), endRoom('left')) };
   return (
     <>
-      <View {...pan.panHandlers} style={[s.mini, { width: Math.min(260, win.width - 32) }, atTop ? { top: insets.top + 64 } : { bottom }]} accessibilityLiveRegion="polite">
+      <Animated.View
+        {...drag.pan.panHandlers}
+        onLayout={(e) => drag.setBox(e.nativeEvent.layout)}
+        style={[s.mini, { width: Math.min(260, win.width - 32), transform: drag.xy.getTranslateTransform() }, atTop ? { top: insets.top + 64 } : { bottom }]}
+        accessibilityLiveRegion="polite"
+      >
         <Pressable
           style={s.miniMain}
           onPress={() => (ended ? dismissEnded() : expandRoom(session.roomId))}
@@ -249,29 +247,15 @@ export function MiniRoom({ session }: { session: RoomSession }) {
         )}
         <Pressable
           style={s.miniClose}
-          onPress={() => (ended ? dismissEnded() : setCloseAsk(true))}
+          // Leaves the room at once (owners, 25 Nov 2026: no question); hiding the card is a fling to the right.
+          onPress={() => (ended ? dismissEnded() : endRoom('left'))}
           accessibilityRole="button"
-          accessibilityLabel={ended ? 'Kapat' : 'Mini oda seçenekleri: gizle veya odadan çık'}
+          accessibilityLabel={ended ? 'Kapat' : 'Odadan çık'}
           hitSlop={8}
         >
           <Ionicons name="close" size={18} color={colors.textDim} />
         </Pressable>
-      </View>
-      <ChoiceSheet
-        visible={closeAsk && !ended}
-        title={session.title}
-        primary={{
-          label: 'Odayı küçültülmüş görünümden kaldır',
-          desc: 'Oda bağlantın ve mikrofon durumun aynen sürer. Sağ kenardaki sekmeden odaya dönebilirsin.',
-          icon: 'eye-off-outline',
-          onPress: () => {
-            setCloseAsk(false);
-            setMiniHidden(true);
-          },
-        }}
-        exit={exitChoice}
-        onCancel={() => setCloseAsk(false)}
-      />
+      </Animated.View>
     </>
   );
 }
