@@ -40,6 +40,8 @@ import { hasPerk } from './levels.mjs';
 import { statusOf } from './economy.mjs';
 // music.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
 import { clearRoomMusic, roomMusic } from './music.mjs';
+// dj-live.mjs imports this file too; endDjLive is only used inside a handler.
+import { endDjLive } from './dj-live.mjs';
 // room-social.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
 import { withRoomBadges } from './room-social.mjs';
 // room-follow.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
@@ -549,8 +551,9 @@ export const roomRoutes = {
        ON CONFLICT (room_id, user_id) DO UPDATE SET super = coalesce($3::boolean, room_admins.super) RETURNING super`,
       [room.id, target, b.super ?? null],
     );
-    // An admin plays music anyway: no DJ seat kept for them.
-    await db.query('DELETE FROM room_djs WHERE room_id = $1 AND user_id = $2', [room.id, target]);
+    // An admin plays music anyway: no DJ seat kept for them (and so out of DJ modu, dj-live.mjs, which is the DJs').
+    const wasDj = (await db.query('DELETE FROM room_djs WHERE room_id = $1 AND user_id = $2', [room.id, target])).rowCount > 0;
+    if (wasDj) endDjLive(room.id, target);
     announceRoom(liveKitName(room.id));
     return { admin: true, super: r.rows[0].super };
   },

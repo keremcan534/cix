@@ -22,6 +22,7 @@
 //     stop                   the music stops for everyone, the list stays (the bar's "Kapat")
 //     clear                  the list empties and the music stops ("Listeyi boşalt"; older apps' "Kapat")
 //   POST /api/rooms/dj { room, user, dj }    → { dj }                   (owner only; DJ_LIMITS by the room's level)
+//   DJ modu (a mixer sent live from the mic by the owner or a DJ): dj-live.mjs.
 //
 // The room's list is room_music_queue in `pos` order; rooms.music_current is the row playing, from
 // music_started_at (pauses taken out; while paused, since music_paused_at). A row stays on the list after it has
@@ -44,6 +45,7 @@
 import { HttpError, UUID, auth, db, env, int, limit, publicText, readJson, tx, userId } from './core.mjs';
 import { mayKeepMusic, removeFiles, verifyUpload } from './media.mjs';
 // rooms.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
+import { endDjLive } from './dj-live.mjs';
 import { announceRoom } from './live.mjs';
 import { ROOM_MAX_LEVEL, liveKitName, pushRoomMeta, roomLevel } from './rooms.mjs';
 
@@ -400,6 +402,8 @@ export const musicRoutes = {
     if (typeof b.dj !== 'boolean') throw new HttpError(400, 'DJ açık ya da kapalı olmalı');
     if (!b.dj) {
       await db.query('DELETE FROM room_djs WHERE room_id = $1 AND user_id = $2', [room.id, target]);
+      // Out of DJ modu at once too (dj-live.mjs): their phone follows its attribute.
+      endDjLive(room.id, target);
       // The phones in the room read who plays music again at once (rooms.mjs does the same for admins).
       announceRoom(liveKitName(room.id));
       return { dj: false };

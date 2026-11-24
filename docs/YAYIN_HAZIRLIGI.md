@@ -28,6 +28,7 @@ Bunlar olmadan ilgili mühendislik işi bitemez. Sıra, yayına etkisine göre.
 | 13 | **Görsel kaynakları:** arka plan fotoğraflarının kaynağı ve lisansı | Kaynağı bilinmeyen görsel yayına çıkmaz. Liste: [`docs/VARLIK_KAYNAKLARI.md`](VARLIK_KAYNAKLARI.md). | ⛔ |
 | 14 | **Sunucuyu büyütmek:** Oracle'da makineyi 4 OCPU / 24 GB yapmak | Yük testinde bugünkü tek çekirdek, bir dolu oda ve birkaç yüz aktif kullanıcıyla doldu ([`YUK_TESTI.md`](YUK_TESTI.md)). Ücretsiz sınırın içinde, birkaç dakika sürer. | ⛔ |
 | 15 | **Oda kişi üst sınırı kararı** | Odanın seviyesine göre kişi sınırı 5000'e kadar çıkıyor, tek makine bunu taşımaz. Önerimiz: ses sunucusu ayrılana kadar geçici olarak en çok 500 kişi. | ⛔ |
+| 16 | **Odada müzik telifi:** odanın çalma listesi ve DJ modu (mikserden canlı) kamuya açık yayındır | Türkiye'de MESAM/MSG (eser) ve MÜYAP/MÜYORBİR (kayıt) lisansı gerekir; mağazalar da telifli müzik yayınını sorar. Uygulama kullanıcıya "yalnızca yayın hakkın olan müziği çal" der, bu yetmez. Önerimiz: yayından önce lisans ya da avukat görüşü; olmazsa Canlı ayarlar `dj_live_kbps` 0 ile DJ modu kapatılır. [`DJ_MODU.md`](DJ_MODU.md) | ⛔ |
 
 ---
 

@@ -88,6 +88,8 @@ describe('defaults are today', () => {
       room_staff_away_minutes: 5,
       boss_seat_coins: 25_000,
       boss_seat_minutes: 10,
+      dj_live_kbps: 96,
+      dj_live_per_room: 1,
       family_cashout_members: 10,
       family_rejoin_days: 90,
       private_album_price: 500,
@@ -276,6 +278,8 @@ describe('defaults are today', () => {
       'room_staff_away_minutes',
       'boss_seat_coins',
       'boss_seat_minutes',
+      'dj_live_kbps',
+      'dj_live_per_room',
       'family_cashout_members',
       'family_rejoin_days',
       'private_album_price',
@@ -620,7 +624,17 @@ describe('Oda süslemesi', () => {
 
 describe('Odalar', () => {
   test('yetkilisiz oda 1–60 dakika; patron koltuğu binlik jeton ve 1–60 dakika', () => {
-    for (const k of ['room_staff_away_minutes', 'boss_seat_coins', 'boss_seat_minutes']) assert.equal(REGISTRY[k].group, 'Odalar', k);
+    for (const k of ['room_staff_away_minutes', 'boss_seat_coins', 'boss_seat_minutes', 'dj_live_kbps', 'dj_live_per_room']) assert.equal(REGISTRY[k].group, 'Odalar', k);
+    // DJ modu: 0 turns it off; at most 192 kbps, at most 4 at once in a room.
+    assert.equal(validate('dj_live_kbps', 0), 0);
+    refused(() => validate('dj_live_kbps', 256), /DJ modu/);
+    refused(() => validate('dj_live_per_room', 0), /DJ modu/);
+    assert.equal(impactOf('dj_live_kbps', 96, 0), 'DJ modu kapatıldı (96 kbps idi).');
+    assert.equal(impactOf('dj_live_kbps', 0, 128), 'DJ modu 128 kbps ile açıldı.');
+    // The same 0 for the other prices that close something.
+    assert.equal(impactOf('private_album_price', 500, 0), 'Özel albüm kapatıldı (500 jetondu).');
+    assert.equal(impactOf('vip_extend_price', 0, 5000), 'VIP koruma dönemi fiyatı 0 → 5.000 jeton.');
+    assert.equal(impactOf('vip_extend_price', 5000, 0), 'VIP koruma dönemi kapatıldı (5.000 jetondu).');
     assert.equal(validate('room_staff_away_minutes', 1), 1);
     for (const v of [0, 61, 2.5, '5']) refused(() => validate('room_staff_away_minutes', v), /Yetkilisiz oda/);
     assert.equal(validate('boss_seat_coins', 50_000), 50_000);

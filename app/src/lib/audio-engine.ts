@@ -9,6 +9,11 @@
 //  - the microphone track is published only while setPublishing(true).
 
 export type AudioRoute = 'speaker' | 'bluetooth';
+/**
+ * DJ modu (lib/live/dj-live): the mic sent without any voice processing at `kbps`, from a picked input: `nativeInput`
+ * (Android, modules/similar-dj-input) or `deviceId` (the browser's).
+ */
+export type DjMode = { kbps: number; nativeInput?: number; deviceId?: string };
 export type EngineCapabilities = {
   /** Plays and captures real audio. The prototype engine doesn't. */
   realAudio: boolean;
@@ -47,6 +52,8 @@ export interface AudioEngine {
   setNoiseSuppression?(on: boolean): void;
   /** "Ham mikrofon": no voice processing at all (no noise suppression, echo cancellation or gain control), for singing. */
   setRawMic?(on: boolean): void;
+  /** DJ modu on (only while on a mic in a room; the server allowed it first) or off. Engines without a real mic skip it. */
+  setDjMode?(dj: DjMode | null): void;
   /** How loud the other people in the room play on this phone, 0 (room sound off) to 1. */
   setPlaybackVolume?(volume: number): void;
   /** My camera in a Video layout's camera seat (görüntülü yuva); engines without real media skip it. */

@@ -104,6 +104,7 @@ import { myDataRoutes } from './my-data.mjs';
 import { spendLimitRoutes } from './spend-limit.mjs';
 import { teamRoutes } from './team.mjs';
 import { TEST_ADMIN } from './test-admin.mjs';
+import { djLiveRoutes } from './dj-live.mjs';
 import { musicRoutes } from './music.mjs';
 import { roomVideoRoutes } from './room-video.mjs';
 import { roomSeatColorRoutes, startSeatColorSweep } from './room-seat-color.mjs';
@@ -389,6 +390,7 @@ const routes = {
   ...momentRoutes,
   ...teamRoutes,
   ...musicRoutes,
+  ...djLiveRoutes,
   ...roomVideoRoutes,
   ...roomSeatColorRoutes,
   ...roomFxRoutes,

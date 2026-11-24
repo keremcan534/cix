@@ -29,7 +29,7 @@ export type ModLog = { id: string; time: string; actor: string; action: string; 
 
 /** `foot`: the sheet's main action (a start or send button, a composer), under the list. Over a room the sheet stops
  *  at the Balkon line (lib/sheet-space): the list scrolls, the title and the foot stay in sight. */
-function Sheet({ visible, onClose, title, art, children, foot }: { visible: boolean; onClose: () => void; title: string; art?: number; children: React.ReactNode; foot?: React.ReactNode }) {
+export function Sheet({ visible, onClose, title, art, children, foot }: { visible: boolean; onClose: () => void; title: string; art?: number; children: React.ReactNode; foot?: React.ReactNode }) {
   const sheetBottom = useSheetBottom();
   const maxHeight = useSheetMax(0.8);
   const { top } = useSafeAreaInsets();

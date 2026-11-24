@@ -143,6 +143,8 @@ export const ROOM_NUMBER_KEYS: { key: RoomKey; unit: string }[] = [
   { key: 'room_staff_away_minutes', unit: ' dakika' },
   { key: 'boss_seat_coins', unit: ' jeton' },
   { key: 'boss_seat_minutes', unit: ' dakika' },
+  { key: 'dj_live_kbps', unit: ' kbps' },
+  { key: 'dj_live_per_room', unit: ' DJ' },
 ];
 
 /** Oyun Salonu's numbers in the order the admin card shows them, with each one's unit. */
@@ -297,6 +299,10 @@ export function valueText(key: LiveKey, v: LiveValue, { stored = false, names = 
       return typeof v === 'number' ? `Tek seferde ${fmtNum(v)} jeton` : String(v);
     case 'boss_seat_minutes':
       return typeof v === 'number' ? `${fmtNum(v)} dakika` : String(v);
+    case 'dj_live_kbps':
+      return typeof v === 'number' ? (v === 0 ? 'DJ modu kapalı' : `${fmtNum(v)} kbps`) : String(v);
+    case 'dj_live_per_room':
+      return typeof v === 'number' ? `Aynı anda ${fmtNum(v)} DJ` : String(v);
     case 'event_min_room_level':
       return typeof v === 'number' ? `Oda Lv.${v} ve üstü` : String(v);
     case 'event_min_lead_minutes':

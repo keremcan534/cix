@@ -17,6 +17,8 @@ export function setupVoice(name: () => string) {
       },
       onError: (m) => console.warn(`[ses] ${m}`),
       onEvent: engineEvent,
+      // DJ modu sends a stereo mixer in stereo (a browser records it so).
+      stereoCapture: true,
     }),
   );
 }
