@@ -64,15 +64,19 @@ export function stageGeo(w: number, h: number): Geo {
   return { w, h, ax, ay, bx, by, cx, cy, planet, orbit: Math.hypot(bx - cx, by - cy) };
 }
 
-const rise = (u: number) => (Math.exp(BEND * u) - 1) / (Math.exp(BEND) - 1);
-const slope = (u: number) => (BEND * Math.exp(BEND * u)) / (Math.exp(BEND) - 1);
-
-/** The rocket `u` of the way up (0 ramp … 1 orbit): its place on the stage and where its nose points (degrees clockwise from straight up). */
+/**
+ * The rocket `u` of the way up (0 ramp … 1 orbit): its place on the stage and where its nose points (degrees clockwise
+ * from straight up). A worklet too: the live stage moves the rocket on the UI thread (rocket-live).
+ */
 export function pathAt(g: Geo, u: number): { x: number; y: number; deg: number } {
+  'worklet';
+  const e = Math.exp(BEND) - 1;
+  const rise = (Math.exp(BEND * u) - 1) / e;
+  const slope = (BEND * Math.exp(BEND * u)) / e;
   return {
     x: g.ax + (g.bx - g.ax) * u,
-    y: g.ay - (g.ay - g.by) * rise(u),
-    deg: (Math.atan2(g.bx - g.ax, (g.ay - g.by) * slope(u)) * 180) / Math.PI,
+    y: g.ay - (g.ay - g.by) * rise,
+    deg: (Math.atan2(g.bx - g.ax, (g.ay - g.by) * slope) * 180) / Math.PI,
   };
 }
 

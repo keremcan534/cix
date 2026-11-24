@@ -6,8 +6,9 @@
 // (rocket-stage); the scale on its right grows with the climb, so the rocket keeps rising toward the top. Nothing here
 // decides a round: the server's view leads, and this phone's clock only moves the climb between two of its messages.
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, Easing, Modal, Pressable, ScrollView, StyleSheet, View, type StyleProp, type TextStyle } from 'react-native';
+import Reanimated, { useAnimatedStyle, useFrameCallback, useSharedValue, type SharedValue } from 'react-native-reanimated';
 
 import { Text } from '@/components/text';
 import { CasinoLock } from '@/components/games/casino';
@@ -25,7 +26,7 @@ import { errorHaptic, pressHaptic, tapHaptic } from '@/lib/haptics';
 import { liveMode } from '@/lib/live';
 import { BANDS, bandCounts, momentOf, type Moment } from '@/lib/live/rocket-live-core';
 import { addFuel, escapeNow, useRocketLive, useRocketState } from '@/lib/live/rocket-live';
-import { AUTO_CHOICES, mulText, payoutOf, reachChance } from '@/lib/rocket-live';
+import { AUTO_CHOICES, multAt, mulText, payoutOf, reachChance } from '@/lib/rocket-live';
 import { useApp } from '@/store';
 import { SCRIM } from '@/theme';
 
@@ -309,19 +310,65 @@ export function LiveRocketPlayer({ entry }: { entry: Entry }) {
 const chipTone = (x: number) => (x >= 1000 ? s.chipHot : x >= 200 ? s.chipMid : null);
 
 /**
- * The climb, redrawn every animation frame while the rocket is in the air: the scale on the right edge, the trail of
- * light behind the rocket, the rocket itself (on the ramp before the launch), the big multiplier, and the explosion.
+ * The climb on the UI thread: while the rocket is in the air its multiplier (hundredths) is worked out every frame
+ * there from the server's clock, so the rocket and its trail glide even while the JS thread is busy with a message.
+ * Before the launch it is 1×, after the crash the crash point. With motion reduced it steps twice a second instead.
+ */
+function useClimb(view: RocketView | null, offset: number, still: boolean): SharedValue<number> {
+  const r = view?.round;
+  const phase = r?.phase;
+  const launch = r ? (r.launchAt ?? r.betUntil) : 0;
+  const rate = view?.rate;
+  const crash = r?.crash ?? 100;
+  const x = useSharedValue(100);
+  const p = useSharedValue({ launch, rate: rate ?? 0, offset });
+  const flying = phase === 'fly';
+  const frame = useFrameCallback(() => {
+    'worklet';
+    const q = p.get();
+    x.set(multAt(Date.now() + q.offset - q.launch, q.rate || undefined));
+  }, false);
+  useEffect(() => {
+    p.set({ launch, rate: rate ?? 0, offset });
+    frame.setActive(flying && !still);
+    // Stopped first, so no last frame of the climb lands after the crash point.
+    if (!flying) x.set(phase === 'done' ? crash : 100);
+    if (!flying || !still) return;
+    const step = () => {
+      x.set(multAt(Date.now() + offset - launch, rate));
+    };
+    step();
+    const id = setInterval(step, 500);
+    return () => clearInterval(id);
+  }, [frame, p, x, flying, still, phase, crash, offset, launch, rate]);
+  return x;
+}
+
+/** The top of the scale and how far up the path a climb at `x` stands, on the UI thread (the same as topOf / uOf). */
+function climbU(x: number) {
+  'worklet';
+  const top = Math.max(200, Math.ceil(x * 1.6));
+  return x <= 100 ? 0 : Math.min(1, Math.log(x / 100) / Math.log(top / 100));
+}
+
+/**
+ * The climb: the scale on the right edge, the trail of light behind the rocket, the rocket itself (on the ramp before
+ * the launch), the big multiplier, and the explosion. The rocket and the trail move on the UI thread (useClimb); the
+ * numbers are small parts of their own that count on their own clock, so nothing big is redrawn while it flies.
  */
 const Sky = memo(function Sky({ geo, view, offset, still, flick }: { geo: Geo; view: RocketView | null; offset: number; still: boolean; flick: Animated.Value }) {
-  const phase = view?.round?.phase;
-  const t = useServerTime(offset, phase === 'fly' && !still, still ? 500 : 120);
+  // Fast enough for the countdown's seconds and the ignition; the flight itself doesn't wait for it.
+  const t = useServerTime(offset, false, still ? 500 : 150);
   const m = momentOf(view, t || view?.now || 0);
+  const climb = useClimb(view, offset, still);
   const x = xOf(m);
-  const top = topOf(x);
-  const u = uOf(x, top);
-  const p = pathAt(geo, u);
+  const p = pathAt(geo, uOf(x));
   const samples = useMemo(() => pathSamples(geo, TRAIL), [geo]);
   const half = ROCKET_SIZE / 2;
+  const rocketStyle = useAnimatedStyle(() => {
+    const q = pathAt(geo, climbU(climb.get()));
+    return { transform: [{ translateX: q.x - half }, { translateY: q.y - half }, { rotate: `${q.deg}deg` }] };
+  });
   const [arm] = useState(() => new Animated.Value(1));
   const [ignite] = useState(() => new Animated.Value(0));
   const lighting = m.kind === 'ignite';
@@ -337,7 +384,7 @@ const Sky = memo(function Sky({ geo, view, offset, still, flick }: { geo: Geo; v
     Animated.timing(ignite, { toValue: 1, duration: 600, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
   }, [lighting, still, ignite]);
   const color = m.kind === 'done' ? RED : m.kind === 'fly' ? CLIMB : '#EEF2FF';
-  const big = m.kind === 'bet' ? `${Math.ceil(m.left / 1000)}` : m.kind === 'ignite' ? '1,00×' : m.kind === 'idle' ? '' : mulText(x);
+  const big = m.kind === 'bet' ? `${Math.ceil(m.left / 1000)}` : m.kind === 'ignite' ? '1,00×' : m.kind === 'idle' || m.kind === 'fly' ? '' : mulText(x);
   const sub =
     m.kind === 'bet'
       ? 'saniye · yakıt al'
@@ -353,30 +400,24 @@ const Sky = memo(function Sky({ geo, view, offset, still, flick }: { geo: Geo; v
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
       {/* The scale: four marks on the right edge, at the heights the path passes them. */}
-      {MARKS.map((v) => {
-        const at = pathAt(geo, v);
-        return (
-          <Text key={v} style={[tabular, s.mark, { top: at.y - 8 }]}>
-            {mulText(Math.round(100 * (top / 100) ** v))}
-          </Text>
-        );
-      })}
-      {(m.kind === 'fly' || m.kind === 'done') &&
-        samples
-          .filter((q) => q.u > 0.02 && q.u <= u)
-          .map((q, i) => <View key={i} style={[s.trailDot, { left: q.x - 2.5, top: q.y - 2.5, opacity: 0.35 + 0.65 * (q.u / Math.max(u, 0.01)), backgroundColor: m.kind === 'done' ? '#FDA4AF' : '#FDE68A' }]} />)}
+      <Marks geo={geo} view={view} offset={offset} fly={m.kind === 'fly'} />
+      {(m.kind === 'fly' || m.kind === 'done') && <Trail samples={samples} climb={climb} done={m.kind === 'done'} />}
       {(m.kind === 'bet' || m.kind === 'ignite' || m.kind === 'idle') && <ReadyRocket geo={geo} arm={arm} ignite={ignite} flick={flick} />}
       {m.kind === 'fly' && (
-        <View style={[s.rocketBox, { transform: [{ translateX: p.x - half }, { translateY: p.y - half }, { rotate: `${p.deg}deg` }] }]}>
+        <Reanimated.View style={[s.rocketBox, rocketStyle]}>
           <RocketSprite power={1} flick={flick} />
-        </View>
+        </Reanimated.View>
       )}
       {m.kind === 'done' && view?.round && <Blast key={view.round.id} x={p.x} y={p.y} still={still} />}
-      {!!big && (
+      {(!!big || m.kind === 'fly') && (
         <View style={s.readout} accessibilityLiveRegion="polite">
-          <Text style={[s.mult, { color }]} numberOfLines={1}>
-            {big}
-          </Text>
+          {m.kind === 'fly' ? (
+            <ClimbText view={view} offset={offset} style={[s.mult, { color }]} format={mulText} />
+          ) : (
+            <Text style={[s.mult, { color }]} numberOfLines={1}>
+              {big}
+            </Text>
+          )}
           <Text style={s.sub} numberOfLines={1}>
             {sub}
           </Text>
@@ -385,6 +426,52 @@ const Sky = memo(function Sky({ geo, view, offset, still, flick }: { geo: Geo; v
     </View>
   );
 });
+
+/** A climb's number, counted 30 times a second on its own (only this text is redrawn): the multiplier, or Kaç's payout. */
+function ClimbText({ view, offset, style, format }: { view: RocketView | null; offset: number; style: StyleProp<TextStyle>; format: (x: number) => string }) {
+  const t = useServerTime(offset, false, 33);
+  const m = momentOf(view, t || view?.now || 0);
+  return (
+    <Text style={style} numberOfLines={1}>
+      {format(xOf(m))}
+    </Text>
+  );
+}
+
+/** The scale's four marks: the top grows with the climb, so their numbers change; read five times a second while it flies. */
+const Marks = memo(function Marks({ geo, view, offset, fly }: { geo: Geo; view: RocketView | null; offset: number; fly: boolean }) {
+  const t = useServerTime(offset, false, fly ? 200 : 1000);
+  const top = topOf(xOf(momentOf(view, t || view?.now || 0)));
+  return (
+    <>
+      {MARKS.map((v) => {
+        const at = pathAt(geo, v);
+        return (
+          <Text key={v} style={[tabular, s.mark, { top: at.y - 8 }]}>
+            {mulText(Math.round(100 * (top / 100) ** v))}
+          </Text>
+        );
+      })}
+    </>
+  );
+});
+
+/** The trail of light behind the rocket: each dot lights once the climb has passed it, brighter near the rocket. */
+const Trail = memo(function Trail({ samples, climb, done }: { samples: { u: number; x: number; y: number }[]; climb: SharedValue<number>; done: boolean }) {
+  return (
+    <>
+      {samples.map((q, i) => (q.u > 0.02 ? <TrailDot key={i} q={q} climb={climb} color={done ? '#FDA4AF' : '#FDE68A'} /> : null))}
+    </>
+  );
+});
+
+function TrailDot({ q, climb, color }: { q: { u: number; x: number; y: number }; climb: SharedValue<number>; color: string }) {
+  const style = useAnimatedStyle(() => {
+    const u = climbU(climb.get());
+    return { opacity: q.u <= u ? 0.35 + 0.65 * (q.u / Math.max(u, 0.01)) : 0 };
+  });
+  return <Reanimated.View style={[s.trailDot, { left: q.x - 2.5, top: q.y - 2.5, backgroundColor: color }, style]} />;
+}
 
 /** The rocket blowing up where it stopped, once per round. */
 function Blast({ x, y, still }: { x: number; y: number; still: boolean }) {
@@ -602,18 +689,23 @@ function Action({
   );
 }
 
-/** Kaç: what my fuel on board pays now, counted every frame; a tap leaves the rocket. */
+/**
+ * Kaç: what my fuel on board pays now, counted 30 times a second by its text alone (the gold button itself stays
+ * still, so its glow and press never stutter); a tap leaves the rocket.
+ */
 function EscapeButton({ fuel, offset, busy, ready, onPress }: { fuel: number; offset: number; busy: boolean; ready: boolean; onPress: () => void }) {
-  const t = useServerTime(offset, ready);
   const { view } = useRocketState();
-  const m = momentOf(view, t || view?.now || 0);
-  const x = m.kind === 'fly' ? m.x : 100;
+  const pays = useCallback((x: number) => `KAÇ · ${fmt(payoutOf(fuel, x))}`, [fuel]);
   return (
-    <WideAction onPress={onPress} disabled={busy || !ready} label={`Kaç, ${mulText(x)}, ${fmt(payoutOf(fuel, x))} jeton`} style={s.escape}>
+    <WideAction onPress={onPress} disabled={busy || !ready} label={`Kaç, ${fmt(fuel)} jeton yakıtla`} style={s.escape}>
       <Ionicons name="rocket" size={20} color={SALON.goldInk} />
-      <Text style={[tabular, s.escapeText, wideInk()]} numberOfLines={1}>
-        {ready ? `KAÇ · ${fmt(payoutOf(fuel, x))}` : 'Kalkıyor…'}
-      </Text>
+      {ready ? (
+        <ClimbText view={view} offset={offset} style={[tabular, s.escapeText, wideInk()]} format={pays} />
+      ) : (
+        <Text style={[tabular, s.escapeText, wideInk()]} numberOfLines={1}>
+          Kalkıyor…
+        </Text>
+      )}
     </WideAction>
   );
 }

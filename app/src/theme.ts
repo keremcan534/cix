@@ -308,7 +308,15 @@ export const type = { caption: 12, body: 14, bodyL: 16, title: 18, h2: 22, amoun
  * big numbers, bold for tabs and labels. All other text gets the same family through components/text, which
  * picks the weight file from fontWeight. Set no fontWeight with these: the face is the weight.
  */
-export const fonts = { display: 'JakartaExtraBold', displayBold: 'JakartaBold' } as const;
+export const fonts = {
+  display: 'JakartaExtraBold',
+  displayBold: 'JakartaBold',
+  /** Oyun Salonu: numbers and words of a win, the controls' labels (Cinzel; Turkish capitals included). */
+  casino: 'CasinoBlack',
+  casinoBold: 'CasinoBold',
+  /** Oyun Salonu: the big titles of a win (BÜYÜK KAZANÇ, JACKPOT), with swash capitals (Cinzel Decorative). */
+  casinoTitle: 'CasinoTitle',
+} as const;
 
 /**
  * The pink glass of the owner's designs (Ana Sayfa, the profile, the bottom bar), the same in either scheme: deep

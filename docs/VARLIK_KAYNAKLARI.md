@@ -1,6 +1,6 @@
 # Varlık kaynakları
 
-Uygulamada kullanılan görsellerin, yazı tipinin ve kütüphanelerin nereden geldiğini kayıt altına alır. Mağaza yayınından önce her satırın "Durum" sütunu "doğrulandı" olmalı (bkz. [YAYIN_HAZIRLIGI.md](YAYIN_HAZIRLIGI.md) madde 13).
+Uygulamada kullanılan görsellerin, seslerin, yazı tipinin ve kütüphanelerin nereden geldiğini kayıt altına alır. Mağaza yayınından önce her satırın "Durum" sütunu "doğrulandı" olmalı (bkz. [YAYIN_HAZIRLIGI.md](YAYIN_HAZIRLIGI.md) madde 13).
 
 ## 1. Sahne fotoğrafları (`app/assets/bg/`)
 
@@ -49,6 +49,24 @@ Plus Jakarta Sans, `@expo-google-fonts/plus-jakarta-sans` paketiyle gelir. Lisan
 
 Çalışma zamanı bağımlılıkları ve lisansları aynı ekranda listeleniyor. Liste `app/src/data/licenses.ts` dosyasında; bağımlılık değişince `app/` içinden `node scripts/licenses.mjs` ile yeniden üretilmeli. Şu an paketlerin çoğu MIT, `livekit-client` Apache-2.0.
 
+## 4b. Oyun Salonu yazı tipi ve 3D jeton
+
+- **Cinzel ve Cinzel Decorative** (telif: The Cinzel Project Authors; Decorative: Natanael Gama, ayrılmış ad "Cinzel"; yazı tiplerini değiştirmiyoruz), `@expo-google-fonts/cinzel` ve `@expo-google-fonts/cinzel-decorative` paketleriyle gelir. Lisans SIL Open Font License 1.1 (Plus Jakarta Sans ile aynı lisans): uygulamaya gömülerek ticari kullanılabilir, yazı tipi tek başına satılamaz. Oyun Salonu'nun kazanç yazıları ve düğme etiketleri. Durum: doğrulandı (paketlerin `LICENSE_FONT` dosyası OFL 1.1, 2026-11-24).
+- **3D altın jeton ve yıldız parıltısı** (`app/assets/fx/coin-spin.png`, `sparkle-burst.png`): bizim çizimimiz. Jeton Blender'da modellenip çizildi (taç ve elmas bizim işaretimiz, kimsenin logosu değil); parıltı kodla üretildi. Dış kaynak yok. Durum: doğrulandı.
+
 ## 5. Kişi fotoğrafları
 
 Örnek kullanıcılar için gerçek yüz fotoğrafı kullanılmıyor. Mağaza derlemesinde (`EXPO_PUBLIC_DEMO=0`) örnek veride hiç dış görsel yok; demo derlemesinde oda kapakları ve anlar picsum.photos'tan rastgele manzara görselleridir.
+
+## 6. Oyun sesleri (`app/assets/sfx/`)
+
+27 kısa oyun sesinin 23'ü Kenney'in ses paketlerinden gerçek kayıt: `app/scripts/kenney-sfx.py` kayıtları kesip, üst üste koyup ses düzeylerini eşitliyor. Kalan 4'ü (`tease`, `turn`, `shot`, `splash`) kodla üretildi (`app/scripts/make-sfx.py`), lisans gerekmez; bu betik kayıtların üzerine yazmaz. Kenney paketleri CC0 (kamu malı): ticari kullanım serbest, isim vermek gerekmez. Paketler OpenGameArt'tan indirildi; depoda paketlerin kendisi değil, yalnız onlardan üretilen `.wav` dosyaları var. Yeniden üretmek için paketler bir klasöre açılır ve `app/` içinden `python scripts/kenney-sfx.py <klasör>` çalıştırılır (ffmpeg gerekir).
+
+| Paket | Kaynak | Lisans | Kullanıldığı sesler | Durum |
+| --- | --- | --- | --- | --- |
+| Casino Audio (Kenney) | [opengameart.org/content/54-casino-sound-effects-cards-dice-chips](https://opengameart.org/content/54-casino-sound-effects-cards-dice-chips) | CC0 | `chip`, `tick`, `card`, `dice`, `move`, `capture`; `stop` (makara durması) içindeki fiş; `coins` altındaki fişler | doğrulandı (sayfa ve paketteki lisans dosyası CC0, 2026-11-24). İlk kez kenney.nl'den alınmıştı; OpenGameArt'taki paket aynı dosyaları birebir veriyor. |
+| 85 Short music jingles (Kenney) | [opengameart.org/content/85-short-music-jingles](https://opengameart.org/content/85-short-music-jingles) | CC0 | `win`, `win-big`, `jackpot`, `fanfare`, `levelup`, `lose`, `cashout` | doğrulandı (sayfa ve paketteki lisans dosyası CC0, 2026-11-24) |
+| Sci-Fi Sounds (Kenney) | [opengameart.org/content/sci-fi-sounds](https://opengameart.org/content/sci-fi-sounds) | CC0 | `launch`, `boom`, `impact`, `riser`; `win-big`, `jackpot`, `levelup` içindeki darbe; `stop`, `spin`, `lever` içindeki metal gövde sesi | doğrulandı (sayfa ve paketteki lisans dosyası CC0, 2026-11-24) |
+| 50 RPG sound effects (Kenney) | [opengameart.org/content/50-rpg-sound-effects](https://opengameart.org/content/50-rpg-sound-effects) | CC0 | `coin`, `coins`, `cashout`; `win-big` ve `jackpot` içindeki jetonlar; `lever` (kol çekme: mandal, tık, gerilen yay) ve `spin` içindeki mandal ve tıklar | doğrulandı (sayfa ve paketteki lisans dosyası CC0, 2026-11-24) |
+| Interface Sounds (Kenney) | [opengameart.org/content/interface-sounds](https://opengameart.org/content/interface-sounds) | CC0 | `tap` (düğme basışı); `coin` ve `cashout` içindeki cam çınlaması | doğrulandı (sayfa ve paketteki lisans dosyası CC0, 2026-11-24) |
+| 51 UI sound effects (Kenney) | [opengameart.org/content/51-ui-sound-effects-buttons-switches-and-clicks](https://opengameart.org/content/51-ui-sound-effects-buttons-switches-and-clicks) | CC0 | `spin` ve `lever` içindeki cırcır (makara dişlisi) tıkları | doğrulandı (OpenGameArt sayfası CC0; paketteki readme ticari kullanıma izin veriyor, 2026-11-24) |

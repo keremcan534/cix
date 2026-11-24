@@ -27,8 +27,11 @@ export function reachChance(x: number, retPct: number): number {
   return Math.min(LIVE_DRAW, Math.floor((retPct * LIVE_DRAW) / Math.max(x, 100))) / LIVE_DRAW;
 }
 
-/** The multiplier in hundredths `ms` after launch, never rounded up. */
-export const multAt = (ms: number, rate = RATE) => (ms <= 0 ? 100 : Math.floor(100 * Math.exp((rate * ms) / 1000) + 1e-9));
+/** The multiplier in hundredths `ms` after launch, never rounded up. A worklet too: the stage climbs on the UI thread. */
+export function multAt(ms: number, rate = RATE): number {
+  'worklet';
+  return ms <= 0 ? 100 : Math.floor(100 * Math.exp((rate * ms) / 1000) + 1e-9);
+}
 
 /** The first whole millisecond after launch at which the climb has reached `x` hundredths. */
 export function msTo(x: number, rate = RATE): number {

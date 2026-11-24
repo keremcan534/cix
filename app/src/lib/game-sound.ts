@@ -34,6 +34,8 @@ const SRC = {
   impact: require('../../assets/sfx/impact.wav'),
   coins: require('../../assets/sfx/coins.wav'),
   riser: require('../../assets/sfx/riser.wav'),
+  // A reel machine's pull lever latching (components/games/fx/slot-lever).
+  lever: require('../../assets/sfx/lever.wav'),
 } as const;
 export type Sfx = keyof typeof SRC;
 export const SFX_NAMES = Object.keys(SRC) as Sfx[];

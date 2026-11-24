@@ -10,8 +10,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { memo, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Animated, Easing, Image, Pressable, StyleSheet, View, type LayoutChangeEvent, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 
+import { GoldText } from '@/components/games/fx/gold-text';
 import { InfoButton } from '@/components/games/fx/info-sheet';
 import { Text } from '@/components/text';
+import { playSfx } from '@/lib/game-sound';
+import { tapHaptic } from '@/lib/haptics';
 import { rollAt } from '@/lib/motion';
 import { useSettings } from '@/store';
 import { fonts, radius, semantic, space } from '@/theme';
@@ -263,24 +266,33 @@ export const tabular: TextStyle = { fontFamily: fonts.display, fontVariant: ['ta
  * A number that counts up from zero to `value` (at once with "Animasyonları azalt"). It counts once, when it is
  * mounted: give it `key={value}` to count again for a new value.
  */
-export function CountUp({ value, ms = 900, format = (n: number) => Math.floor(n).toLocaleString('tr-TR'), style, numberOfLines = 1 }: { value: number; ms?: number; format?: (n: number) => string; style?: StyleProp<TextStyle>; numberOfLines?: number }) {
+export function CountUp({ value, ms = 900, format = (n: number) => Math.floor(n).toLocaleString('tr-TR'), style, numberOfLines = 1, render }: { value: number; ms?: number; format?: (n: number) => string; style?: StyleProp<TextStyle>; numberOfLines?: number; /** Draws the text itself (GoldText) instead of a plain Text. */ render?: (text: string) => ReactNode }) {
   const { still } = useSalonFx();
-  const [shown, setShown] = useState(0);
+  const [shown, setShown] = useState('');
+  const fmt = useRef(format);
+  useEffect(() => {
+    fmt.current = format;
+  });
   useEffect(() => {
     if (still || value <= 0) return;
     const start = Date.now();
     let frame = 0;
+    let last = '';
     const step = () => {
       const t = Math.min(1, (Date.now() - start) / ms);
-      setShown(rollAt(0, value, t));
+      // Redrawn only when the digits change: a small count settles in a few frames instead of sixty.
+      const text = fmt.current(rollAt(0, value, t));
+      if (text !== last) setShown((last = text));
       if (t < 1) frame = requestAnimationFrame(step);
     };
     frame = requestAnimationFrame(step);
     return () => cancelAnimationFrame(frame);
   }, [value, ms, still]);
+  const text = still || value <= 0 || !shown ? format(still || value <= 0 ? value : 0) : shown;
+  if (render) return <>{render(text)}</>;
   return (
     <Text style={[tabular, style]} numberOfLines={numberOfLines}>
-      {format(still || value <= 0 ? value : shown)}
+      {text}
     </Text>
   );
 }
@@ -327,11 +339,23 @@ export function FundPlaque({ name, children, style }: { name: string; children: 
 /** The digits inside a FundPlaque. */
 export const plaqueValue: TextStyle = { ...glowNumber, fontSize: 26, lineHeight: 30, letterSpacing: 1 };
 
-/** A press that sinks and springs back (native driver). */
-function usePress(to: number) {
+/**
+ * A press that sinks and springs back (native driver), with the feel of a real button the moment the finger lands: a
+ * soft click, and for the big action buttons a light tick in the hand. The game's own handler keeps its feedback for
+ * the release (the round's thump, the error buzz), so down and up feel like two halves of one key.
+ */
+function usePress(to: number, feel: 'action' | 'soft' = 'soft') {
   const [scale] = useState(() => new Animated.Value(1));
   const spring = (toValue: number) => Animated.spring(scale, { toValue, speed: 40, bounciness: toValue === 1 ? 10 : 0, useNativeDriver: true }).start();
-  return { scale, onPressIn: () => spring(to), onPressOut: () => spring(1) };
+  return {
+    scale,
+    onPressIn: () => {
+      spring(to);
+      playSfx('tap', feel === 'action' ? 0.75 : 0.45);
+      if (feel === 'action') tapHaptic();
+    },
+    onPressOut: () => spring(1),
+  };
 }
 
 /** 0 → 1 → 0 slowly while `on`: the idle breathing of an action button. */
@@ -413,15 +437,23 @@ function usePressRings(color: string, size: number, radius: number) {
 
 export function ActionButton({ onPress, disabled, busy, count, icon = 'sync', look = ACTION, size = SALON.action, label, art }: { onPress: () => void; disabled?: boolean; busy?: boolean; count?: number | null; icon?: keyof typeof Ionicons.glyphMap; look?: ActionLook; size?: number; label: string; /** A picture of the whole button (a skinned machine's, fx/slot-skin) instead of the ring and core. */ art?: number }) {
   const { still, quiet } = useSalonFx();
-  const press = usePress(0.9);
+  const press = usePress(0.9, 'action');
   const breath = useBreath(!quiet && !busy && !disabled && count == null);
   const turn = useTurn(!!busy && !still && count == null);
   const core = Math.round(size * 0.8);
   const burst = usePressRings(look.ring[1], size, size / 2);
+  // A pressed picture button turns once round, fast then easing off, like a wheel given a shove.
+  const [whirl] = useState(() => new Animated.Value(0));
+  const spinArt = () => {
+    if (still || art === undefined) return;
+    whirl.setValue(0);
+    Animated.timing(whirl, { toValue: 1, duration: 620, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+  };
   return (
     <Pressable
       onPress={() => {
         burst.fire();
+        spinArt();
         onPress();
       }}
       onPressIn={press.onPressIn}
@@ -438,9 +470,13 @@ export function ActionButton({ onPress, disabled, busy, count, icon = 'sync', lo
         <View style={st.halo} pointerEvents="none">
           <Animated.Image source={GLOW} style={{ width: size * 2, height: size * 2, tintColor: look.ring[1], opacity: breath.interpolate({ inputRange: [0, 1], outputRange: [quiet ? 0.32 : 0.28, 0.6] }) }} />
         </View>
+        {/* While the round runs, a comet of light circles the button. */}
+        {!!busy && !quiet && count == null && (
+          <Animated.View pointerEvents="none" style={[st.comet, { width: size * 1.16, height: size * 1.16, borderRadius: size * 0.58, transform: [{ rotate: turn }] }]} />
+        )}
         {art !== undefined ? (
           <View style={[st.artButton, { width: size, height: size }, disabled && !busy && { opacity: 0.6 }]}>
-            <Image source={art} resizeMode="contain" style={{ width: size * 1.08, height: size * 1.08 }} accessibilityIgnoresInvertColors />
+            <Animated.Image source={art} resizeMode="contain" style={{ width: size * 1.08, height: size * 1.08, transform: [{ rotate: whirl.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }] }} accessibilityIgnoresInvertColors />
             {count != null && (
               <View style={[st.artCount, { width: size * 0.5, height: size * 0.5, borderRadius: size * 0.25 }]}>
                 <Text style={[tabular, st.count, { color: look.ink, fontSize: Math.round(size * 0.3), lineHeight: Math.round(size * 0.36) }]}>{count}</Text>
@@ -472,7 +508,7 @@ export function ActionButton({ onPress, disabled, busy, count, icon = 'sync', lo
  */
 export function WideAction({ onPress, disabled, off, label, children, style }: { onPress: () => void; disabled?: boolean; off?: boolean; label: string; children: ReactNode; style?: StyleProp<ViewStyle> }) {
   const { quiet } = useSalonFx();
-  const press = usePress(0.96);
+  const press = usePress(0.96, 'action');
   const breath = useBreath(!quiet && !disabled && !off);
   return (
     <Pressable onPress={onPress} onPressIn={press.onPressIn} onPressOut={press.onPressOut} disabled={disabled} style={style} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled: !!disabled }}>
@@ -508,23 +544,51 @@ function WideShine() {
   );
 }
 
-/** A side button of the controls (Turbo, Oto, Tekrar, Temizle): navy glass, gold when on. */
+/** The metal of a control's rim, light at the top edge, deep in the middle, a bright line where the light comes back. */
+const RIM: Colors = ['#FFF6D2', '#F6C766', '#B9761F', '#6A3A07', '#C98A2C', '#FFE2A0'];
+const RIM_AT = [0, 0.18, 0.45, 0.62, 0.86, 1] as const;
+/** A control's face: deep royal enamel; lit, molten amber. */
+const FACE: Colors = ['#2C3A72', '#151C44', '#090D26'];
+const FACE_ON: Colors = ['#8A4C08', '#4C2604', '#241102'];
+
+/**
+ * The frame every control is cast in: a bevelled gold rim (light top edge, dark band, bright return), a deep
+ * enamel face with its own inner shadow and a glass gloss over its top half, standing on a drop shadow. `on` lights
+ * it from inside (a selected Turbo, a chosen chip). Children are laid out in the face.
+ */
+export function LuxFrame({ radius: r = SALON.controlRadius, on, style, face, children }: { radius?: number; on?: boolean; style?: StyleProp<ViewStyle>; face?: StyleProp<ViewStyle>; children?: ReactNode }) {
+  const inner = Math.max(2, r - RIM_W);
+  return (
+    <LinearGradient colors={RIM} locations={RIM_AT} style={[st.lux, { borderRadius: r }, on && st.luxOn, style]}>
+      <LinearGradient colors={on ? FACE_ON : FACE} style={[st.luxFace, { borderRadius: inner }, face]}>
+        <LinearGradient colors={['rgba(255,255,255,0.26)', 'rgba(255,255,255,0.04)']} style={[st.luxGloss, { borderTopLeftRadius: inner, borderTopRightRadius: inner }]} pointerEvents="none" />
+        {children}
+      </LinearGradient>
+    </LinearGradient>
+  );
+}
+const RIM_W = 2.5;
+
+/** A side button of the controls (Turbo, Oto, Tekrar, Temizle): enamel in a gold rim (LuxFrame), lit when on. */
 export function SideButton({ onPress, on, disabled, icon, pic, label, sub, a11y, style, compact }: { onPress: () => void; on?: boolean; disabled?: boolean; icon?: keyof typeof Ionicons.glyphMap; /** A round picture of the control (fx/salon-art) in place of the icon. */ pic?: number; label?: string; sub?: string; a11y: string; style?: StyleProp<ViewStyle>; /** Icon only, square. */ compact?: boolean }) {
   const press = usePress(0.94);
-  const ink = on ? SALON.goldInk : SALON.win;
+  const ink = SALON.win;
   return (
     <Pressable onPress={onPress} onPressIn={press.onPressIn} onPressOut={press.onPressOut} disabled={disabled} style={[compact ? null : { flex: 1 }, style]} accessibilityRole="button" accessibilityLabel={a11y} accessibilityState={{ selected: !!on, disabled: !!disabled }}>
       <Animated.View style={{ transform: [{ scale: press.scale }], opacity: disabled ? 0.45 : 1 }}>
-        <LinearGradient colors={on ? ['#FFE7B0', '#F6BD60', '#D9952F'] : SALON.glass} style={[st.side, compact && st.sideCompact, on && st.sideOn]}>
-          <LinearGradient colors={['rgba(255,255,255,0.16)', 'rgba(255,255,255,0)']} style={st.sideGloss} />
+        <LuxFrame on={on} style={compact ? st.sideCompact : st.sideFrame} face={[st.side, compact && st.sideFaceCompact]}>
           {pic !== undefined ? <Image source={pic} style={compact ? st.sidePicCompact : st.sidePic} accessibilityIgnoresInvertColors /> : icon && <Ionicons name={icon} size={compact ? 20 : 16} color={ink} />}
           {(!!label || !!sub) && (
             <View style={{ alignItems: 'center' }}>
-              {!!label && <Text style={[st.sideText, { color: ink }]}>{label}</Text>}
-              {!!sub && <Text style={[tabular, st.sideSub, { color: on ? SALON.goldInk : SALON.dim }]}>{sub}</Text>}
+              {!!label && (
+                <GoldText size={15} face="casino" spacing={0.06} glow={!!on}>
+                  {label}
+                </GoldText>
+              )}
+              {!!sub && <Text style={[tabular, st.sideSub, { color: on ? SALON.goldHi : SALON.dim }]}>{sub}</Text>}
             </View>
           )}
-        </LinearGradient>
+        </LuxFrame>
       </Animated.View>
     </Pressable>
   );
@@ -536,15 +600,15 @@ export function ChoiceChip({ on, onPress, disabled, children, label, style }: { 
   return (
     <Pressable onPress={onPress} onPressIn={press.onPressIn} onPressOut={press.onPressOut} disabled={disabled} style={style} accessibilityRole="radio" accessibilityState={{ selected: on, disabled: !!disabled }} accessibilityLabel={label}>
       <Animated.View style={{ transform: [{ scale: press.scale }], opacity: disabled && !on ? 0.45 : 1 }}>
-        <LinearGradient colors={on ? ['#FFE7B0', '#F6BD60', '#D9952F'] : SALON.glass} style={[st.choice, on && st.sideOn]}>
+        <LuxFrame on={on} radius={SALON.controlRadius - 4} face={st.choice}>
           {children}
-        </LinearGradient>
+        </LuxFrame>
       </Animated.View>
     </Pressable>
   );
 }
 /** Ink of a ChoiceChip's text. */
-export const choiceInk = (on: boolean): TextStyle => ({ color: on ? SALON.goldInk : SALON.ink });
+export const choiceInk = (on: boolean): TextStyle => ({ color: on ? SALON.goldHi : SALON.ink });
 
 const st = StyleSheet.create({
   outer: { borderRadius: SALON.stageRadius, boxShadow: '0 14px 30px rgba(0,0,0,0.55), 0 2px 0 rgba(255,231,176,0.08)' },
@@ -589,14 +653,18 @@ const st = StyleSheet.create({
   wideOff: { borderColor: 'rgba(255,255,255,0.12)', boxShadow: 'none' },
   wideGloss: { position: 'absolute', left: 0, right: 0, top: 0, height: '50%' },
   wideShine: { position: 'absolute', top: -20, bottom: -20, width: 46 },
-  side: { height: SALON.control, borderRadius: SALON.controlRadius, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 12, borderWidth: 1, borderColor: SALON.glassRim, overflow: 'hidden', boxShadow: '0 4px 10px rgba(0,0,0,0.35)' },
-  sideCompact: { width: SALON.control, paddingHorizontal: 0 },
+  comet: { position: 'absolute', borderWidth: 3, borderTopColor: '#FFF6D2', borderRightColor: 'rgba(246,189,96,0.85)', borderBottomColor: 'rgba(246,189,96,0)', borderLeftColor: 'rgba(246,189,96,0.2)', boxShadow: '0 0 14px rgba(255,200,90,0.8)' },
+  lux: { padding: RIM_W, boxShadow: '0 6px 14px rgba(0,0,0,0.6), 0 1px 0 rgba(255,236,180,0.25)' },
+  luxOn: { boxShadow: '0 0 18px rgba(255,190,70,0.9), 0 6px 14px rgba(0,0,0,0.6)' },
+  luxFace: { flexGrow: 1, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(40,20,0,0.85)', boxShadow: 'inset 0 2px 5px rgba(255,255,255,0.16), inset 0 -8px 12px rgba(0,0,0,0.55)' },
+  luxGloss: { position: 'absolute', left: 1, right: 1, top: 1, height: '48%' },
+  sideFrame: { height: SALON.control },
+  side: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 10 },
+  sideCompact: { width: SALON.control, height: SALON.control },
+  sideFaceCompact: { paddingHorizontal: 0 },
   sidePic: { width: 32, height: 32, marginLeft: -4 },
   sidePicCompact: { width: 40, height: 40 },
-  sideOn: { borderColor: '#FFF1C9', boxShadow: '0 0 14px rgba(246,189,96,0.55)' },
-  sideGloss: { position: 'absolute', left: 0, right: 0, top: 0, height: '50%' },
-  sideText: { fontFamily: fonts.displayBold, fontSize: 14, lineHeight: 18, letterSpacing: 0.8 },
   sideSub: { fontSize: 10, lineHeight: 12 },
-  choice: { height: 40, borderRadius: SALON.controlRadius - 4, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 8, borderWidth: 1, borderColor: SALON.glassRim, overflow: 'hidden' },
+  choice: { height: 40 - 2 * RIM_W, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 8 },
 });
 

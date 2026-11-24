@@ -9,13 +9,16 @@ import { createContext, type ReactNode } from 'react';
 import { Image, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { salonArt, type SalonArtName } from '@/components/games/fx/salon-art';
-import { CountUp, SALON, glowNumber, type StatusTone } from '@/components/games/fx/salon';
+import { FitBox, GoldText } from '@/components/games/fx/gold-text';
+import { CountUp, SALON, type StatusTone } from '@/components/games/fx/salon';
 import { Text } from '@/components/text';
 import type { LineSlotId } from '@/lib/casino-odds';
 import { fonts } from '@/theme';
 
 /** A picture with the shape it is drawn in (width / height). */
 export type SkinPic = { src: number; aspect: number };
+export type PlateWindow = { top: number; bottom: number; left: number; right: number };
+const PLATE_WINDOW: PlateWindow = { top: 0.3, bottom: 0.26, left: 0.15, right: 0.15 };
 
 export type SlotSkin = {
   /** Behind the whole game panel, under `veil` so the controls read. */
@@ -34,8 +37,11 @@ export type SlotSkin = {
   /** Every symbol of the machine as a picture. */
   symbols: Record<string, number>;
   spin: SkinPic;
-  /** The win plate: the status line and a win's amount are written in its empty middle. */
-  plate: SkinPic;
+  /**
+   * The win plate: the status line and a win's amount are written in its empty middle. `window`: where that dark
+   * middle is, as parts of the picture from each edge (measured from the pictures), so the words sit in it.
+   */
+  plate: SkinPic & { window?: PlateWindow };
   /**
    * The win shows (fx/jackpot-show), by how many stakes a round paid. A machine with a JACKPOT fund keeps the name
    * for the fund (`jackpotX` Infinity): a big line win is a Büyük Kazanç there, never called a JACKPOT.
@@ -86,7 +92,7 @@ export const SLOT_SKINS: Partial<Record<LineSlotId | 'goldtree', SlotSkin>> = {
       seven: pic('slot-yedi'),
     },
     spin: { src: pic('kizil-yedi-cevir'), aspect: 296 / 320 },
-    plate: { src: pic('kizil-yedi-kazanc'), aspect: 900 / 299 },
+    plate: { src: pic('kizil-yedi-kazanc'), aspect: 900 / 299, window: { top: 0.4, bottom: 0.27, left: 0.11, right: 0.11 } },
     // Three 7s on a line pay 100 line stakes = 20.6 stakes of the round (5 lines): the JACKPOT. Nothing else on
     // this machine reaches 20 stakes; a round of 10 stakes or more (two diamond lines and up) is a Büyük Kazanç.
     show: { jackpotX: 20, bigX: 10, ...SHARED },
@@ -107,7 +113,7 @@ export const SLOT_SKINS: Partial<Record<LineSlotId | 'goldtree', SlotSkin>> = {
       wild: pic('slot-77-wild'),
     },
     spin: { src: pic('hazine-kulesi-cevir'), aspect: 251 / 288 },
-    plate: { src: pic('hazine-kulesi-kazanc'), aspect: 768 / 228 },
+    plate: { src: pic('hazine-kulesi-kazanc'), aspect: 768 / 228, window: { top: 0.24, bottom: 0.12, left: 0.08, right: 0.08 } },
     show: FUND_SHOW,
   },
   jungle: {
@@ -128,7 +134,7 @@ export const SLOT_SKINS: Partial<Record<LineSlotId | 'goldtree', SlotSkin>> = {
       wild: pic('patika-aslan-wild'),
     },
     spin: { src: pic('vahsi-patika-cevir'), aspect: 284 / 288 },
-    plate: { src: pic('vahsi-patika-kazanc'), aspect: 768 / 260 },
+    plate: { src: pic('vahsi-patika-kazanc'), aspect: 768 / 260, window: { top: 0.26, bottom: 0.21, left: 0.1, right: 0.1 } },
     show: FUND_SHOW,
   },
   pinata: {
@@ -150,7 +156,7 @@ export const SLOT_SKINS: Partial<Record<LineSlotId | 'goldtree', SlotSkin>> = {
       wild: pic('konfeti-pinata-wild'),
     },
     spin: { src: pic('konfeti-kutusu-cevir'), aspect: 288 / 286 },
-    plate: { src: pic('konfeti-kutusu-kazanc'), aspect: 768 / 287 },
+    plate: { src: pic('konfeti-kutusu-kazanc'), aspect: 768 / 287, window: { top: 0.46, bottom: 0.17, left: 0.12, right: 0.12 } },
     show: FUND_SHOW,
   },
   spellbook: {
@@ -171,7 +177,7 @@ export const SLOT_SKINS: Partial<Record<LineSlotId | 'goldtree', SlotSkin>> = {
       book: pic('parsomen-kitap'),
     },
     spin: { src: pic('kayip-parsomen-cevir'), aspect: 288 / 286 },
-    plate: { src: pic('kayip-parsomen-kazanc'), aspect: 768 / 258 },
+    plate: { src: pic('kayip-parsomen-kazanc'), aspect: 768 / 258, window: { top: 0.35, bottom: 0.17, left: 0.15, right: 0.15 } },
     show: FUND_SHOW,
   },
   neon: {
@@ -190,7 +196,7 @@ export const SLOT_SKINS: Partial<Record<LineSlotId | 'goldtree', SlotSkin>> = {
       wild: pic('neon-wild'),
     },
     spin: { src: pic('neon-bulvar-cevir'), aspect: 286 / 288 },
-    plate: { src: pic('neon-bulvar-kazanc'), aspect: 768 / 249 },
+    plate: { src: pic('neon-bulvar-kazanc'), aspect: 768 / 249, window: { top: 0.27, bottom: 0.15, left: 0.15, right: 0.14 } },
     show: FUND_SHOW,
   },
   // Bereket Ağacı (games/gold-tree): 3 reels, the middle row pays. Three trees (188 stakes) are its JACKPOT, three
@@ -207,7 +213,7 @@ export const SLOT_SKINS: Partial<Record<LineSlotId | 'goldtree', SlotSkin>> = {
       green: pic('bereket-para-yesil'),
     },
     spin: { src: pic('bereket-agaci-cevir'), aspect: 234 / 288 },
-    plate: { src: pic('bereket-agaci-kazanc'), aspect: 768 / 277 },
+    plate: { src: pic('bereket-agaci-kazanc'), aspect: 768 / 277, window: { top: 0.4, bottom: 0.2, left: 0.08, right: 0.08 } },
     show: { jackpotX: 100, bigX: 10, ...SHARED },
   },
 };
@@ -309,22 +315,34 @@ export function SkinBackdrop({ skin }: { skin: SlotSkin }) {
 export function SkinPlate({ skin, width, text, tone, amount, label, style }: { skin: SlotSkin; width: number; text: string; tone?: StatusTone; amount?: number; label?: string; style?: StyleProp<ViewStyle> }) {
   const h = Math.round(width / skin.plate.aspect);
   const won = amount !== undefined && amount > 0 && (tone === 'win' || tone === 'jackpot');
-  const size = Math.max(14, Math.round(h * 0.3));
+  const win = skin.plate.window ?? PLATE_WINDOW;
+  // The words fill most of the window's height; the line is shrunk to its width (FitBox).
+  const room = h * (1 - win.top - win.bottom);
+  const size = Math.max(14, Math.round(room * 0.62));
+  const fitW = width * (1 - win.left - win.right) * 0.9;
   return (
     <View style={[{ width, height: h }, style]} accessibilityLiveRegion="polite">
       <Image source={skin.plate.src} style={{ width, height: h }} resizeMode="contain" accessibilityIgnoresInvertColors />
-      <View style={[p.text, { left: width * 0.15, right: width * 0.15, top: h * 0.3, bottom: h * 0.26 }]}>
+      <View style={[p.text, { left: width * win.left, right: width * win.right, top: h * win.top, bottom: h * win.bottom }]}>
         {won ? (
-          <View style={p.row}>
-            <Text style={[p.label, { fontSize: Math.round(size * 0.52), lineHeight: Math.round(size * 0.7) }]} numberOfLines={1}>
+          // The label and the counting number in metal, shrunk as one line to the plate's window: never over its edge.
+          <FitBox width={fitW}>
+            <GoldText size={Math.round(size * 0.56)} face="casinoBold" spacing={0.08} glow={false}>
               {label ?? 'KAZANÇ'}
-            </Text>
-            <CountUp key={amount} value={amount} format={(n) => `+${Math.floor(n).toLocaleString('tr-TR')}`} style={[glowNumber, p.amount, { fontSize: size, lineHeight: Math.round(size * 1.2) }]} />
-          </View>
-        ) : (
-          <Text style={[p.status, { fontSize: Math.round(size * 0.62), lineHeight: Math.round(size * 0.82) }, tone === 'err' && p.err]} numberOfLines={2} adjustsFontSizeToFit>
+            </GoldText>
+            <View style={{ width: Math.round(size * 0.35) }} />
+            <CountUp key={amount} value={amount} format={(n) => `+${Math.floor(n).toLocaleString('tr-TR')}`} render={(t) => <GoldText size={size}>{t}</GoldText>} />
+          </FitBox>
+        ) : tone === 'err' ? (
+          <Text style={[p.status, p.err, { fontSize: Math.round(size * 0.62), lineHeight: Math.round(size * 0.82) }]} numberOfLines={2} adjustsFontSizeToFit>
             {text}
           </Text>
+        ) : (
+          <FitBox width={fitW}>
+            <GoldText size={Math.round(size * 0.6)} face="casinoBold" spacing={0.06} glow={false} metal={tone === 'win' || tone === 'jackpot' ? 'gold' : 'silver'}>
+              {text}
+            </GoldText>
+          </FitBox>
         )}
       </View>
     </View>
@@ -334,9 +352,6 @@ export function SkinPlate({ skin, width, text, tone, amount, label, style }: { s
 const p = StyleSheet.create({
   rim: { position: 'absolute', borderRadius: 18, borderWidth: 4, boxShadow: '0 8px 18px rgba(0,0,0,0.55), inset 0 2px 8px rgba(0,0,0,0.6)' },
   text: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
-  row: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
-  label: { color: SALON.goldHi, fontFamily: fonts.displayBold, letterSpacing: 1.6, textShadowColor: 'rgba(0,0,0,0.7)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
-  amount: { color: '#FFE08A', textShadowColor: 'rgba(60,10,0,0.9)', textShadowRadius: 6 },
   status: { color: '#FFF1C9', fontFamily: fonts.displayBold, letterSpacing: 1.2, textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.75)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   err: { color: '#FFE3D6', letterSpacing: 0 },
 });
