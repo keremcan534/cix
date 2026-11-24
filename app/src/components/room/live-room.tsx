@@ -3354,7 +3354,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         // Müzik is the room's staff's and its DJs' (they play it); everyone else just hears it.
         ...(canControlMusic ? [{ key: 'music', label: 'Müzik', emoji: '🎵', art: ROOM_ICON_ART.music, colors: ['#C93C4F', '#D02E78'] as [string, string], onPress: () => setPanel('music') }] : []),
         // DJ modu: the owner's and the DJs' mixer live from the mic (not admins: they are not DJs).
-        ...(mayDj ? [{ key: 'dj', label: 'DJ modu', emoji: '🎧', art: ROOM_ICON_ART.music, colors: ['#7C3AED', '#DB2777'] as [string, string], onPress: () => setPanel('dj') }] : []),
+        ...(mayDj ? [{ key: 'dj', label: 'DJ modu', emoji: '🎧', art: ROOM_ICON_ART.dj, colors: ['#7C3AED', '#DB2777'] as [string, string], onPress: () => setPanel('dj') }] : []),
       ],
     },
     // The free room games are opened by the room's staff (owner and admins); everyone else joins the table they open.
