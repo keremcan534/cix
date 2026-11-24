@@ -20,6 +20,7 @@ import { HttpError, ageOf, allow, assertClean, auth, blockedBetween, countRefusa
 import { CATEGORIES } from './contact-filter.mjs';
 import { withSignIn } from './auth.mjs';
 import { notify } from './push.mjs';
+import { line } from './live-line.mjs';
 import { autoFromReports } from './sanctions.mjs';
 import { announceLook, looksOf, revokeAllForDelete, statusOf } from './economy.mjs';
 import { hasPerk } from './levels.mjs';
@@ -106,6 +107,9 @@ async function recordVisit(owner, me) {
     [owner, me.id],
   );
   if (r.rows[0]?.tell) tellVisit(owner, me).catch((e) => console.error('visit notice', String(e).slice(0, 200)));
+  // Every other visit too (owners, 25 Nov 2026: the lists are to follow at once): no notice or push, only a quiet sign on
+  // the owner's open app, which reads its visitors again (Mesajlar and Ziyaretçiler). At most 20 a minute per owner.
+  else if (r.rowCount && allow(`visit-line:${owner}`, 20)) line([owner], 'visitors');
   if (Date.now() - visitsPrunedAt > 3_600_000) {
     visitsPrunedAt = Date.now();
     await db.query("DELETE FROM profile_visits WHERE last_at < now() - interval '8 days'").catch((e) => console.error('visits prune', e.message));
