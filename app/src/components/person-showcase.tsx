@@ -34,7 +34,9 @@ export const SHOW = {
 /** "♥ N" on the crowned pill: their Yankı level (no "Lv.", owners 24 Nov 2026). */
 export function LevelPill({ level, h = LEVEL_H }: { level: number; h?: number }) {
   return (
-    <View style={[s.levelWrap, { marginVertical: -Math.round(h * 0.18) }]} accessibilityLabel={`Yankı seviyesi ${level}`}>
+    // The crown makes the picture taller above its pink pill than below: the margins put the pill itself on the row's
+    // middle line, level with the badges beside it (owners, 24 Nov 2026).
+    <View style={[s.levelWrap, { marginTop: -Math.round(h * 0.305), marginBottom: -Math.round(h * 0.055) }]} accessibilityLabel={`Yankı seviyesi ${level}`}>
       <CardArt name="seviye-rozet" h={h} />
       {/* The pink part of the picture, under its crown. */}
       <View style={s.level}>
