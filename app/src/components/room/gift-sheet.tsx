@@ -23,7 +23,7 @@ import { Text } from '@/components/text';
 import { Avatar, Button } from '@/components/ui';
 import { BOND_KINDS, bondGiftMode, bondPointsOf, type RoomBond } from '@/data/bonds';
 import { GIFTS, isBondGift, userById, type Gift, type GiftCat } from '@/data/mock';
-import { LUCKY_RECIPIENT_SHARE, pct } from '@/data/rules';
+import { luckyShare, pctOf } from '@/data/rules';
 import { bagCounts, bagLabel, bagNeed as needOf, bagShort as shortOf } from '@/lib/backpack';
 import { gamblingLevelOk } from '@/lib/games';
 import { pressHaptic, tapHaptic } from '@/lib/haptics';
@@ -63,10 +63,13 @@ const SHELVES: { key: Shelf; label: string; icon?: keyof typeof Ionicons.glyphMa
 /** The shelves that are a gift category: one with no gift left on it (all off the shelf for now) isn't shown. */
 const CATEGORY_SHELVES = new Set<Shelf>(['hot', 'couple', 'family', 'gameplay', 'privilege']);
 /** One neutral line that explains the shelf; no countdowns, no "spend more" nudges. */
+/** Şanslı's line, with the recipient's share as the server set it now. */
+const luckyNote = () => `Her gönderimde bir çekiliş yapılır; olasılıklar aşağıda. Ödül garanti değildir. Alıcıya ve PK puanına hediye değerinin ${pctOf(luckyShare())} yazılır.`;
 const SHELF_NOTE: Record<Shelf, string> = {
   hot: 'En çok gönderilen hediyeler.',
   // How it is played and where its odds are, nothing about what can be won (the owners, Güncelleme 7).
-  lucky: `Her gönderimde bir çekiliş yapılır; olasılıklar aşağıda. Ödül garanti değildir. Alıcıya ve PK puanına hediye değerinin ${pct(LUCKY_RECIPIENT_SHARE)}’si yazılır.`,
+  // The recipient's share is the server's (luckyShare): written when the shelf shows (luckyNote).
+  lucky: '',
   // While gifts here leave a profile mark (Kaka Şakası, Terlik Geldi!), the note says so instead (lib/live/marks-live marksShelfNote).
   gameplay: 'Atılan hediye alıcının koltuğuna düşer. Fiyat sabit, sürpriz ödül yok.',
   couple: 'Sevdiğine özel hediyeler.',
@@ -524,7 +527,7 @@ export function GiftSheet({
           {/* A swipe left or right over the gifts: the next or the previous shelf (owners, 21 Nov 2026). */}
           <View style={g.grid} {...swipe.pan.panHandlers}>
           {/* Şanslı's disclaimer, the bond gifts' refund rule and Global's announcement: always in full, atop their shelf. */}
-          {(shelf === 'lucky' || shelf === 'family' || shelf === 'global') && <Text style={[g.dim, g.shelfNote]}>{SHELF_NOTE[shelf]}</Text>}
+          {(shelf === 'lucky' || shelf === 'family' || shelf === 'global') && <Text style={[g.dim, g.shelfNote]}>{shelf === 'lucky' ? luckyNote() : SHELF_NOTE[shelf]}</Text>}
           {/* Muzip with gifts that leave a profile mark: what they do, what cleans them, that anyone chooses who marks them. */}
           {shelf === 'gameplay' && muzipNote && <Text style={[g.dim, g.shelfNote]}>{muzipNote}</Text>}
           {isLucky ? (

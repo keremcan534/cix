@@ -1,7 +1,7 @@
 // Lucky gift module (spec "LUCKY HEDİYE VE ÇARPANLI COIN KAZANMA MODÜLÜ").
 // The sender pays the gift price; the server draws a multiplier from the published odds and, on a win,
 // credits price × multiplier to the sender. The recipient earns only part of the gift value
-// (LUCKY_RECIPIENT_SHARE, 20 %) as diamonds, and the same 20 % is what the gift scores in PK; the rest of
+// (luckyShare: the panel's, 10 % by the owners' rule) as diamonds, and the same share is what the gift scores in PK; the rest of
 // the price funds the rewards. Both are recorded on the send.
 //
 // Rewards are game coins: they can only be played in the Oyun Salonu, never gifted, exchanged or withdrawn.
@@ -122,7 +122,7 @@ export const oddsLabel = (weight: number) => `%${(weight / 1000).toLocaleString(
 export const oddsSum = (t: LuckyTier[]) => t.reduce((n, x) => n + x.weight, 0);
 export const maxMult = (g: LuckyGift) => Math.max(0, ...g.tiers.filter((t) => t.weight > 0).map((t) => t.mult));
 export const luckyGift = (id: string) => state.config.gifts.find((g) => g.id === id);
-/** PK points a Lucky send scores for its recipient: the same 20 % the recipient is credited, never the reward. */
+/** PK points a Lucky send scores for its recipient: the same share the recipient is credited, never the reward. */
 export const luckyPkPoints = (r: Pick<LuckyRecord, 'price'>) => luckyHostDiamonds(r.price);
 export { LUCKY_RECIPIENT_SHARE };
 

@@ -12,7 +12,7 @@ import { IncomeSources } from '@/components/income-sources';
 import { LoadError } from '@/components/load-error';
 import { Card, Header } from '@/components/ui';
 import { userById } from '@/data/mock';
-import { LUCKY_RECIPIENT_SHARE, RULES, pct, usd } from '@/data/rules';
+import { RULES, luckyShare, pct, usd } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
 import { callsAvailable, liveMode } from '@/lib/live';
 import { liveRules, useLiveCatalog } from '@/lib/live/catalog-live';
@@ -44,7 +44,7 @@ export const incomeDetail = (e: Earning) => {
   if (e.source === 'Hediye') {
     // Older rows have no gift stored; the price alone can't tell which gift it was.
     const g = e.gift;
-    return g ? `${g.emoji} ${g.name} x${g.count}${g.lucky ? ` · Şanslı (${pct(LUCKY_RECIPIENT_SHARE)})` : ''}` : '🎁 Hediye';
+    return g ? `${g.emoji} ${g.name} x${g.count}${g.lucky ? ` · Şanslı (${pct(luckyShare())})` : ''}` : '🎁 Hediye';
   }
   if (e.source === 'Oda sahibi bonusu') return `Bonus ${pct(RULES.roomOwnerBonus)}`;
   if (e.source === 'Arama') return 'Görüntülü arama';

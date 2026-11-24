@@ -9,9 +9,8 @@ import { Text } from '@/components/text';
 import { Card, Header } from '@/components/ui';
 import { userById } from '@/data/mock';
 import { resolve } from '@/data/rbac';
-import { pct } from '@/data/rules';
+import { luckyShare, pct, pctOf } from '@/data/rules';
 import {
-  LUCKY_RECIPIENT_SHARE,
   ODDS_TOTAL,
   getLucky,
   maxMult,
@@ -166,7 +165,7 @@ export default function LuckyAdmin() {
               <Chips value={config.dailyPayoutLimit} options={[1_000_000, 5_000_000, 20_000_000, 100_000_000].map((n) => [n, fmt(n)] as [number, string])} onChange={(v) => updateConfig({ dailyPayoutLimit: v })} />
               <Text style={s.label}>Odada duyurulan en düşük çarpan</Text>
               <Chips value={config.announceFrom} options={[20, 50, 100, 500].map((n) => [n, `×${n}`] as [number, string])} onChange={(v) => updateConfig({ announceFrom: v })} />
-              <Text style={s.dim}>Kullanıcı başına gönderim sınırı yok; jetonu yettiği kadar gönderebilir. Alıcıya hediye değerinin {pct(LUCKY_RECIPIENT_SHARE)}’si elmas olarak yazılır; PK’da da aynı {pct(LUCKY_RECIPIENT_SHARE)} puan sayılır (ödül sayılmaz).</Text>
+              <Text style={s.dim}>Kullanıcı başına gönderim sınırı yok; jetonu yettiği kadar gönderebilir. Alıcıya hediye değerinin {pctOf(luckyShare())} elmas olarak yazılır; PK’da da aynı {pct(luckyShare())} puan sayılır (ödül sayılmaz).</Text>
             </Card>
             <Card style={{ gap: 8 }}>
               <Text style={s.title}>Test araçları</Text>

@@ -100,7 +100,7 @@ import { AGENCIES } from '@/data/agency';
 import { COSMETICS, MUSIC_CATALOG, STANDARD_EMOJI, adminCapacity, cosmeticById, djCapacity, micCapacity, roomIdText, roomLevel, ROOM_LEVEL_REWARDS, type RoomTheme, type Track } from '@/data/catalog';
 import { FAMILIES, INCOMING_GIFT_POOL, vipTier } from '@/data/economy';
 import { GATES, nobleInfo } from '@/data/status';
-import { LUCKY_RECIPIENT_SHARE, RULES, luckyHostDiamonds, pct } from '@/data/rules';
+import { RULES, luckyHostDiamonds, luckyShare, pctOf } from '@/data/rules';
 import { BOT_LINES, GIFTS, ME, ROOMS, USERS, isServerId, roomById, serverRoomCode, userById, type Gift } from '@/data/mock';
 import { swipeRoom } from '@/lib/room-picks';
 import { roomPassword } from '@/lib/live/room-password';
@@ -1910,7 +1910,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       if (!fans.length) return;
       const from = userById(pick(fans));
       const tx = `BOT-${msgId()}`;
-      // Now and then a fan sends a Lucky gift: I earn 20 % of its value (no owner bonus) and PK scores the same.
+      // Now and then a fan sends a Lucky gift: I earn its share of its value (luckyShare) (no owner bonus) and PK scores the same.
       const lk = Math.random() < 0.25 ? pick(getLucky().config.gifts.filter((g) => g.enabled && g.price <= 100)) : undefined;
       if (lk) {
         const earned = luckyHostDiamonds(lk.price);
@@ -1919,7 +1919,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         addContrib(from.id, lk.price);
         logGift(from.id, 'me', { id: lk.id, name: lk.name, emoji: lk.emoji, price: lk.price }, 1);
         flyGift(lk.emoji, 1, ['me'], giftMiddle(), lk.id, GIFT_HOLD_MS);
-        addMsg({ id: `gift:${tx}`, system: true, text: `🍀 ${from.name} sana ${lk.emoji} ${lk.name} (Şanslı) gönderdi! (+${earned} 💎 · değerin ${pct(LUCKY_RECIPIENT_SHARE)}’si)`, gift: { fromId: from.id, toIds: ['me'], emoji: lk.emoji, name: lk.name, count: 1, lucky: true, giftId: lk.id } });
+        addMsg({ id: `gift:${tx}`, system: true, text: `🍀 ${from.name} sana ${lk.emoji} ${lk.name} (Şanslı) gönderdi! (+${earned} 💎 · değerin ${pctOf(luckyShare())})`, gift: { fromId: from.id, toIds: ['me'], emoji: lk.emoji, name: lk.name, count: 1, lucky: true, giftId: lk.id } });
         scorePk(tx, from.id, 'me', lk.id, luckyPkPoints(lk));
         return;
       }

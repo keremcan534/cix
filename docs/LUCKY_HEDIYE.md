@@ -2,7 +2,7 @@
 
 Kaynak: *LUCKY HEDİYE VE ÇARPANLI COIN KAZANMA MODÜLÜ*.
 
-Kullanıcı Uğurlu kategorisinden bir hediye gönderir. Sunucu yayımlanmış olasılıklara göre bir çarpan çeker. Kazanırsa **hediye bedeli × çarpan** kadar jeton gönderenin bakiyesine eklenir. Hediyeyi alan kişiye hediye değerinin **%20'si** elmas olarak yazılır (`LUCKY_RECIPIENT_SHARE`, `src/data/rules.ts`); PK'da da aynı %20 puan sayılır. Gönderenin ödülü bundan ayrı hesaplanır.
+Kullanıcı Uğurlu kategorisinden bir hediye gönderir. Sunucu yayımlanmış olasılıklara göre bir çarpan çeker. Kazanırsa **hediye bedeli × çarpan** kadar jeton gönderenin bakiyesine eklenir. Hediyeyi alan kişiye hediye değerinin **%10'u** elmas olarak yazılır (sahiplerin kuralı, 24 Kasım 2026; önceden sabit %20'ydi). Oran yönetim panelinde **Şanslı hediye › Alıcı payı** alanından değiştirilir (%1–%50, `lucky_config.sharePct`); uygulama payı sunucudan okur (`GET /api/lucky` `share`). PK'da da aynı pay puan sayılır. Gönderenin ödülü bundan ayrı hesaplanır.
 
 ## Dosyalar
 
@@ -28,7 +28,7 @@ Kullanıcı Uğurlu kategorisinden bir hediye gönderir. Sunucu yayımlanmış o
 - **Gönderim akışı:**
   1. Panelde fiyat, her çarpanın olasılığı ve ödülü gösterilir (olasılık tablosu; Google Play ve Apple satın almadan
      önce olasılıkların gösterilmesini ister). Rafın notu yalnız nasıl oynandığını söyler: "Her gönderimde bir çekiliş
-     yapılır; olasılıklar aşağıda. Ödül garanti değildir. Alıcıya ve PK puanına hediye değerinin %20'si yazılır."
+     yapılır; olasılıklar aşağıda. Ödül garanti değildir. Alıcıya ve PK puanına hediye değerinin %10'u yazılır." (oran panelin Alıcı payı'dır)
      Gönder düğmesinin üstünde en yüksek ödül ve tutarı yazmaz (Güncelleme 7, sahip kararı: kazanç tutarını anlatan
      yazı yok); yerine "Ödül garanti değildir · Olasılıklar" yazar, dokununca seçili paketin olasılık tablosu açılır.
      Eski APK'lar eski yazıyı güncellenene kadar gösterir.
@@ -51,7 +51,7 @@ Kullanıcı Uğurlu kategorisinden bir hediye gönderir. Sunucu yayımlanmış o
 - **Ayar sürümü:** Her değişiklik sürümü artırır. Her kayıt, çekildiği olasılık tablosunu ve sürümü saklar.
 - **Gönderim sınırı yok:** Kullanıcı jetonu yettiği kadar Uğurlu hediye gönderebilir; günlük ya da dakikalık kullanıcı sınırı yoktur.
   - Yaş sınırı 18; kişi kendine Uğurlu hediye gönderemez.
-- **Alıcı ve PK:** Alıcıya hediye değerinin %20'si elmas yazılır (aşağı yuvarlanır). PK'da alıcının (Takım PK'da takımının) puanına da aynı %20 eklenir; gönderenin kazandığı ödül PK'ya hiç sayılmaz. Normal hediyeler değişmedi (tam değer).
+- **Alıcı ve PK:** Alıcıya hediye değerinin Alıcı payı kadarı (%10) elmas yazılır (aşağı yuvarlanır). PK'da alıcının (Takım PK'da takımının) puanına da aynı pay eklenir; gönderenin kazandığı ödül PK'ya hiç sayılmaz. Normal hediyeler değişmedi (tam değer).
 - **Cömertlik puanı:** Harcanan jeton sayılır, kazanılan ödül sayılmaz.
 - **Duyuru:** Herhangi bir odada biri kazanç elde edince (Uğurlu veya Oyun Merkezi) **tüm odalarda** üst ortada ışıltılı bir bant çıkar: "X kazandı! Uğurlu › Uğur Böceği ×10 · +1.000 jeton · oda adı".
   - Bantlar sırayla gösterilir (en fazla 6 bekler); 30 saniyeden eski duyuru gösterilmez. Aynı kişinin aynı hediyedeki kazançları bant beklerken tek bantta birleşir (en yüksek çarpan, toplam ödül, kazanç sayısı).
@@ -108,7 +108,7 @@ Kullanıcı Uğurlu kategorisinden bir hediye gönderir. Sunucu yayımlanmış o
 ## Karar bekleyenler
 
 - **Ödül kaynağı:** Rezerv payı (%70) ve günlük limit.
-- **Alıcının geliri (karar verildi):** Uğurlu hediyede alıcıya hediye değerinin %20'si elmas olarak yazılır (`RULES.luckyHostShare`, aşağı yuvarlanır); kalan kısım ödülleri karşılar. Her gönderimin kaydında `hostDiamonds` alanı tutulur.
+- **Alıcının geliri (karar verildi, 24 Kasım 2026'da %10):** Uğurlu hediyede alıcıya hediye değerinin %10'u elmas olarak yazılır (panelde Alıcı payı, aşağı yuvarlanır; her paket alıcıya en az 1 elmas vermeli, %10'da en düşük fiyat 10 jeton); kalan kısım ödülleri karşılar. Her gönderimin kaydında `hostDiamonds` alanı tutulur.
 - **Hukuk:** Mevzuat, mağaza kuralları ve yaş sınırı incelemesi. 19 Kasım 2026'da sahipler hukuk görüşünü beklemeden yeni paket, ikon ve video özelliğini istedi (yukarıda); soru açık.
   - Jetonlar nakde çevrilemez.
   - Gerçek para karşılığı ödül, hukuki onay olmadan eklenmeyecek.
