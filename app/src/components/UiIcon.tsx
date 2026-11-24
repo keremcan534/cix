@@ -6,6 +6,9 @@ import { Image, View, type ImageStyle, type StyleProp } from 'react-native';
 
 type Glyph = keyof typeof Ionicons.glyphMap;
 
+// The mic pair is the owners' neon set (24 Nov 2026): a whole round button (glass, pink neon ring and glow), the ring
+// MIC_RING of the picture's width; the room's mic button draws it as the button itself (room/parts MicBtn).
+export const MIC_RING = 0.87;
 const SRC = {
   micOn: require('../../assets/icons/ui/mic-acik.png'),
   micOff: require('../../assets/icons/ui/mic-kapali.png'),
