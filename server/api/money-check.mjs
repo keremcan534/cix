@@ -18,6 +18,8 @@
 //   holds    every paid message that waited for an answer (message_holds) took its coins from the payer (`{ref}`);
 //            once answered in time it paid the streamer as much (`{ref}-in`, and a paid_events row), once ended
 //            without that it gave back what it says it did (`{ref}:iade`), and while it waits it did neither
+//   album    every opened Özel albüm (private_album_unlocks, private-album.mjs) took its price from the viewer (`{ref}`)
+//            and gave the streamer as much in diamonds (`{ref}-in`)
 //
 // `since` (a ledger id): only the accounts with a ledger row after it, and only those rows for `chain` and `moved`.
 // 0 checks everything. The live server watches from migration 071 on (money_check_from); its earlier rows, the test
@@ -98,6 +100,15 @@ export const MONEY_CHECKS = {
                   OR (h.status IN ('expired', 'withdrawn') AND (r.amount IS NOT NULL OR p.coins IS NOT NULL OR coalesce(b.amount, 0) <> h.returned))
                   OR (h.status = 'expired' AND h.returned <> h.coins)
                   OR (h.status = 'pending' AND (r.amount IS NOT NULL OR b.amount IS NOT NULL OR p.coins IS NOT NULL)))`,
+  },
+  album: {
+    message: (n) => `${n} özel albüm açışında ödenen jeton ile yayıncının aldığı elmas tutmuyor`,
+    sql: `SELECT a.id, a.viewer, a.owner, a.coins, a.ref, -s.amount AS paid, r.amount AS got
+            FROM private_album_unlocks a
+            LEFT JOIN ledger s ON s.user_id = a.viewer AND s.currency = 'coin' AND s.ref = a.ref
+            LEFT JOIN ledger r ON r.user_id = a.owner AND r.currency = 'diamond' AND r.ref = a.ref || '-in'
+           WHERE ($1::bigint = 0 OR a.viewer IN (SELECT user_id FROM ledger WHERE id > $1) OR a.owner IN (SELECT user_id FROM ledger WHERE id > $1))
+             AND (s.amount IS DISTINCT FROM -a.coins OR r.amount IS DISTINCT FROM a.coins)`,
   },
 };
 

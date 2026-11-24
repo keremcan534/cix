@@ -35,6 +35,7 @@ import { removeFiles, verifyUpload } from './media.mjs';
 import { live } from './live-settings.mjs';
 import { ALBUM_MAX, COUNTRIES, EDUCATION, EXTRA_LIMITS as L, LANGUAGES, MEDAL_RULES as MEDAL_DEFAULTS, RELATIONSHIP, TAGS, TITLE_RULES as TITLE_DEFAULTS, ZODIACS } from './profile-rules.mjs';
 import { roomLevel } from './rooms.mjs';
+import { voiceView } from './voice-intro.mjs';
 import { charmPointsOf } from './wallet.mjs';
 import { wealthPointsOf } from './wheel.mjs';
 
@@ -164,12 +165,14 @@ export async function profileMore(u, self = false, { gifts = true, fresh = true 
     staff: STAFF[u.role] ?? null,
     extras: extrasView(extras.rows[0]),
     photos,
+    // Ses tanıtımı (voice-intro.mjs): their clip, or null; an added field an older app doesn't read.
+    voice: voiceView(u),
     ...(self && { levelsHidden: { wealth: levels[u.id].wealth === null, charm: levels[u.id].charm === null } }),
   };
 }
 
-/** profileMore as someone a private profile doesn't follow sees it: no personal extras, no album. */
-export const privateMore = (more) => ({ ...more, extras: { ...EMPTY }, photos: [] });
+/** profileMore as someone a private profile doesn't follow sees it: no personal extras, no album, no voice clip. */
+export const privateMore = (more) => ({ ...more, extras: { ...EMPTY }, photos: [], voice: null });
 
 /** A choice from `list`, or null for an empty one; anything else is a 400 naming `label`. */
 const oneOf = (v, list, label) => {

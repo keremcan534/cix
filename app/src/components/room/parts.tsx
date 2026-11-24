@@ -37,7 +37,7 @@ import { BounceBadge } from '@/components/fx/bounce-badge';
 import { AssetView } from '@/components/fx/anim-player';
 import { ShopBubble } from '@/components/fx/shop-bubble';
 import type { Asset } from '@/data/animations';
-import { GlyphIcon } from '@/components/UiIcon';
+import { GlyphIcon, MIC_RING, UiIcon } from '@/components/UiIcon';
 
 export type ChatMsg = FeedMsg;
 export type RoomRole = 'owner' | 'admin' | 'member';
@@ -612,6 +612,8 @@ export function ChatLine({
  * the narrowest phones (their touch area stays 44), so the chat's field between them has room for words.
  */
 export const BAR_BTN = Dimensions.get('window').width < 360 ? 40 : 44;
+/** The neon mic picture's size: its ring as wide as the bar's buttons (UiIcon MIC_RING), its glow past them. */
+const NEON_MIC = Math.round(BAR_BTN / MIC_RING);
 
 export function RoundBtn({
   icon,
@@ -674,6 +676,7 @@ const MIC_LOOK: Record<MicState, { icon: keyof typeof Ionicons.glyphMap; caption
  */
 export function MicBtn({ state, queuePos, caption: captionOverride, hint, onPress }: { state: MicState; queuePos?: number; caption?: string; hint?: string; onPress: () => void }) {
   const look = MIC_LOOK[state];
+  const neon = state === 'on' || state === 'off' || state === 'held';
   const press = useSpringPress(0.88);
   const caption = captionOverride ?? (state === 'queued' && queuePos !== undefined ? `SIRA ${queuePos + 1}` : state === 'queued' || state === 'held' ? look.caption : null);
   return (
@@ -691,10 +694,18 @@ export function MicBtn({ state, queuePos, caption: captionOverride, hint, onPres
       aria-checked={state === 'on' || state === 'held'}
     >
       <Animated.View style={{ transform: [{ scale: press.scale }] }}>
-        <View style={[styles.round, { backgroundColor: look.bg, borderWidth: 1, borderColor: look.edge === 'transparent' ? 'rgba(255,255,255,0.12)' : look.edge }, state === 'on' && styles.micGlowOn, state === 'hand' && styles.micGlowHand]}>
-          <Gloss strength={0.32} />
-          <GlyphIcon name={look.icon} size={22} color={look.fg} scale={1.2} plain={state === 'held'} />
-        </View>
+        {neon ? (
+          // The owners' neon mic (24 Nov 2026): the picture is the whole button, its ring as wide as the bar's buttons
+          // and its glow around it. A held mic (on, but no sound going out) is the lit one, dimmed, with its tag.
+          <View style={styles.neonBox}>
+            <UiIcon name={state === 'off' ? 'micOff' : 'micOn'} size={NEON_MIC} style={[styles.neonArt, state === 'held' && { opacity: 0.55 }]} />
+          </View>
+        ) : (
+          <View style={[styles.round, { backgroundColor: look.bg, borderWidth: 1, borderColor: look.edge === 'transparent' ? 'rgba(255,255,255,0.12)' : look.edge }, state === 'hand' && styles.micGlowHand]}>
+            <Gloss strength={0.32} />
+            <GlyphIcon name={look.icon} size={22} color={look.fg} scale={1.2} />
+          </View>
+        )}
         {caption && (
           <View style={styles.tagWrap} pointerEvents="none">
             <Text style={[styles.tag, state === 'on' && { color: semantic.live }, state === 'held' && { color: colors.gold }]} numberOfLines={1}>
@@ -841,10 +852,11 @@ const styles = StyleSheet.create({
   // Dark glass: keeps white text readable over the stage, with a lit top edge.
   chatGlass: { backgroundColor: 'rgba(12,22,40,0.62)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)', borderTopColor: 'rgba(255,255,255,0.16)' },
   round: { width: BAR_BTN, height: BAR_BTN, borderRadius: BAR_BTN / 2, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  neonBox: { width: BAR_BTN, height: BAR_BTN },
+  neonArt: { position: 'absolute', left: (BAR_BTN - NEON_MIC) / 2, top: (BAR_BTN - NEON_MIC) / 2 },
   giftRound: { backgroundColor: 'rgba(246,189,96,0.16)', borderWidth: 2, borderColor: semantic.money, overflow: 'hidden', boxShadow: '0 0 16px rgba(246,189,96,0.45)' },
   glassRound: { backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', borderTopColor: 'rgba(255,255,255,0.28)' },
   soundRoundOff: { backgroundColor: 'rgba(252,165,165,0.14)', borderColor: 'rgba(252,165,165,0.45)' },
-  micGlowOn: { boxShadow: '0 4px 16px rgba(255,95,162,0.6)' },
   micGlowHand: { boxShadow: '0 4px 16px rgba(8,122,128,0.7)' },
   tagWrap: { position: 'absolute', left: -18, right: -18, bottom: -7, alignItems: 'center' },
   tag: { color: '#fff', fontSize: 8, lineHeight: 12, fontWeight: '800', letterSpacing: 0.3, paddingHorizontal: 5, borderRadius: 6, overflow: 'hidden', backgroundColor: 'rgba(12,8,20,0.92)' },

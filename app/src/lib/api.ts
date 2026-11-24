@@ -532,7 +532,7 @@ export const unregisterPush = (token: string) => call<{ registered: boolean }>('
 
 /** A signed address to PUT a photo or video to (with exactly `headers`); save `publicUrl` afterwards. */
 export const uploadUrl = (
-  kind: 'avatar' | 'moment' | 'dm' | 'album' | 'notice' | 'music' | 'ticket' | 'roombg' | 'roomcover' | 'eventcover' | 'gifticon' | 'giftvideo' | 'giftsource',
+  kind: 'avatar' | 'moment' | 'dm' | 'album' | 'voice' | 'private' | 'notice' | 'music' | 'ticket' | 'roombg' | 'roomcover' | 'eventcover' | 'gifticon' | 'giftvideo' | 'giftsource',
   contentType: string,
   size: number,
 ) =>
@@ -572,6 +572,8 @@ export type CityDistance = { km: number; sameCity: boolean };
 export type PublicUser = { id: string; name: string } & ServerProfile & { followers: number; following: number; oneWay?: { followers: number; following: number }; isFollowing: boolean; blockedByMe: boolean } & Partial<ProfileMore> & { distance?: CityDistance | null } & {
   /** Asked with `card` (userProfile): their medal ids; unchecked, lib/person-card medalIds reads them. */
   medals?: unknown;
+  /** Ses tanıtımı (server/api/voice-intro.mjs): their clip or null; an older server sends none. Unchecked: lib/voice-intro-core parseVoice. */
+  voice?: unknown;
 };
 export type UserCard = { id: string; name: string; avatarUrl: string | null; publicNo?: string | null };
 /** `level` / `xp`: the owner's room level, earned on the server from gifts in their room. `micCount` / `layoutId`:
@@ -1200,6 +1202,19 @@ export type ProfileMore = {
 /** Vitrin: catalog gifts received (by id), the rides and entry effects owned now (shop skus), medals and titles earned. */
 export type Showcase = { gifts: { id: string; count: number }[]; rides: string[]; entries: string[]; medals: string[]; titles: string[] };
 export const showcase = (id: string) => call<Showcase>('GET', `/api/user/showcase?id=${encodeURIComponent(id)}`);
+/** Özel albüm (server/api/private-album.mjs): someone's album as I may see it. Unchecked: lib/private-album-core parseAlbum. */
+export const privateAlbum = (id: string) => call<unknown>('GET', `/api/user/private-album?id=${encodeURIComponent(id)}`);
+/** Adds a photo already in the storage (kind 'private') to my album; the answer is my album. */
+export const addPrivatePhoto = (url: string) => call<unknown>('POST', '/api/me/private-album', { url });
+/** Takes a photo out of my album (its file goes); the answer is my album. */
+export const removePrivatePhoto = (id: number) => call<unknown>('POST', '/api/me/private-album/remove', { id });
+/** Opens `user`'s album for the price the screen showed (409 price_changed with the price now when it moved). */
+export const unlockPrivateAlbum = (user: string, price: number, ref: string) =>
+  call<{ album: unknown; user: ServerUser; replay: boolean; coins: number }>('POST', '/api/user/private-album/unlock', { user, price, ref });
+/** Ses tanıtımı: a clip already in the storage (kind 'voice', an .m4a); the server reads and checks it. Unchecked answer. */
+export const saveVoice = (url: string) => call<{ voice: unknown }>('POST', '/api/me/voice', { url }).then((r) => r.voice);
+/** Takes my clip off my profile (its file goes). */
+export const removeVoice = () => call<{ voice: null }>('POST', '/api/me/voice/remove', {});
 /** Only the fields sent change; null, '' or [] clears one. Hiding a level needs VIP (403 otherwise). */
 export type ExtrasPatch = Partial<ServerExtras> & { genderHidden?: boolean; hideWealth?: boolean; hideCharm?: boolean };
 export const saveExtras = (p: ExtrasPatch) =>

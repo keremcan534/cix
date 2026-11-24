@@ -27,6 +27,7 @@ Bunların hepsi otomatik testlerle denendi.
 | Kilit | Kilitli elmas, hesaptaki elmastan fazla değil |
 | Hediye | Her hediyede alıcıya tam tutarda elmas geçti. Anında ödenen hediyede gönderenden tam tutarda jeton düştü |
 | Ücretli | Her ücretli mesajda ve arama dakikasında ödenen jeton, kazanılan elmasa eşit |
+| Özel albüm | Her açılan özel albümde açandan fiyat kadar jeton düştü, yayıncıya aynı tutarda elmas geçti |
 
 ## Nasıl denetleniyor
 

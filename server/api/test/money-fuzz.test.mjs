@@ -1,6 +1,6 @@
 // Many people moving money at once, in random order (docs/PARA_DENETIMI.md): top-ups, purchases, gifts, Çevir,
 // bonds (requests, answers, bond gifts again in and out of the room, ends, the nightly end, blocks), the room owner's
-// polls beside the room's gifts, Şanslı çanta, Şanslı hediye (a stale sheet's price and version too), paid messages waiting for the streamer's answer (answers, quick replies, time running out), the shop, Oyun Salonu (Canlı Yörünge's fuel and escapes too), Jeton Noktası sales and diamond
+// polls beside the room's gifts, Özel albüm unlocks, Şanslı çanta, Şanslı hediye (a stale sheet's price and version too), paid messages waiting for the streamer's answer (answers, quick replies, time running out), the shop, Oyun Salonu (Canlı Yörünge's fuel and escapes too), Jeton Noktası sales and diamond
 // sales, store refunds, with some
 // requests sent twice at the same moment. Whatever the order, no request may fail with a server error, and the
 // harness's money checks after this file (money-check.mjs) must find every coin and diamond where the ledger says.
@@ -70,6 +70,14 @@ describe('Para: aynı anda rastgele işlemler', () => {
     const activeBond = async () => (await q("SELECT id, a, b, kind FROM bonds WHERE status = 'active' ORDER BY random() LIMIT 1"))[0];
     const personOf = (id) => people.find((p) => p.user.id === id);
     const bagIds = async () => (await q("SELECT id FROM lucky_bags WHERE status = 'open'")).map((r) => Number(r.id));
+    // Özel albüm (private-album.mjs): three of them are approved agency streamers with a photo each; the others open
+    // their albums at the price the sheet showed (sometimes an old one), each once, beside everything else.
+    const [ag] = await q("INSERT INTO agencies (code, name, level, status) VALUES ($1, 'Fuzz Ajans', 1, 'approved') RETURNING id", [`F${rnd(3).toUpperCase()}`]);
+    const albumOwners = people.slice(1, 4);
+    for (const o of albumOwners) {
+      await h.sql.query("INSERT INTO agency_streamers (streamer_id, agency_id, method) VALUES ($1, $2, 'admin')", [o.user.id, ag.id]);
+      await h.sql.query('INSERT INTO private_album_photos (user_id, url) VALUES ($1, $2)', [o.user.id, `https://cdn.example.com/private/${o.user.id}/a.jpg`]);
+    }
 
     /** One random request: [label, method, path, body, session], built when it runs. */
     const MIX = [
@@ -85,6 +93,7 @@ describe('Para: aynı anda rastgele işlemler', () => {
       // decide it, racing the marks.
       [2, async (u) => ['iz tercihi', 'PATCH', '/api/me/privacy', random() < 0.3 ? { profileMarks: random() < 0.5 } : { marksFrom: pick(['everyone', 'following', 'nobody']) }, u.session]],
       [2, async (u) => ['takip', 'POST', '/api/follow', { to: other(u).user.id, follow: random() < 0.7 }, u.session]],
+      [4, async (u) => ['özel albüm', 'POST', '/api/user/private-album/unlock', { user: pick(albumOwners).user.id, price: random() < 0.15 ? 450 : 500, ref: rnd(6) }, u.session]],
       [6, async (u) => ['test hediyesi', 'POST', '/api/wallet/gift', { to: other(u).user.id, amount: 1 + Math.floor(random() * 500), ref: rnd(6) }, u.session]],
       [8, async (u) => ['çevir', 'POST', '/api/wallet/exchange', { diamonds: pick([100, 500, 1000]), ref: rnd(6) }, u.session]],
       [5, async (u) => ['bağ isteği', 'POST', '/api/bonds/request', { to: other(u).user.id, kind: pick(['kardes', 'kanka']), ref: rnd(6) }, u.session]],

@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react';
 import { Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { UiIcon } from '@/components/UiIcon';
+import { MIC_RING, UiIcon } from '@/components/UiIcon';
 import { Text } from '@/components/text';
 import { micHaptic, tapHaptic } from '@/lib/haptics';
 import { useKeyboardOpen } from '@/lib/keyboard-open';
@@ -233,7 +233,8 @@ export function MiniRoom({ session }: { session: RoomSession }) {
         )}
         {!ended && session.seated && session.status === 'connected' && (
           <Pressable
-            style={[s.miniBtn, session.micWant && { backgroundColor: micSending(session) ? semantic.live : 'rgba(246,189,96,0.25)' }]}
+            // The neon mic is a whole round button (UiIcon micOn / micOff), so no colored circle behind it.
+            style={[s.miniBtn, { backgroundColor: 'transparent' }]}
             onPress={() => {
               micHaptic();
               setMicWant(!session.micWant);
@@ -243,7 +244,7 @@ export function MiniRoom({ session }: { session: RoomSession }) {
             accessibilityLabel={session.micWant ? 'Mikrofonu kapat' : 'Mikrofonu aç'}
             hitSlop={4}
           >
-            <UiIcon name={session.micWant ? 'micOn' : 'micOff'} size={22} style={session.micWant && !micSending(session) ? { opacity: 0.55 } : undefined} />
+            <UiIcon name={session.micWant ? 'micOn' : 'micOff'} size={Math.round(36 / MIC_RING)} style={[{ margin: -4 }, session.micWant && !micSending(session) ? { opacity: 0.55 } : undefined]} />
           </Pressable>
         )}
         <Pressable

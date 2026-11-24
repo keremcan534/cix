@@ -208,6 +208,10 @@ describe('Defter satırı → panel olayı', () => {
     const [e] = eventsOf(row({ currency: 'coin', amount: -500, reason: 'Sesli eşleşme · 1. dakika', detail: { oneOnOne: 'match_voice' } }));
     assert.deepEqual([e.type, e.coins, e.item_ref], ['coin_spend', 500, 'match_voice'], 'kimse kazanmazsa harcama');
     assert.deepEqual(eventsOf(row({ currency: 'diamond', amount: 240, counterparty: 'u1', reason: 'Mesaj ücreti', ref: 'msg:5-in' })), []);
+    // Özel albüm (private-album.mjs): a gift to the streamer named 'ozel_album'; the streamer's diamond row isn't sent again.
+    const [a] = eventsOf(row({ currency: 'coin', amount: -500, counterparty: 'star', reason: 'Özel albüm: Yıldız', ref: 'alb1', detail: { privateAlbum: 'star' } }));
+    assert.deepEqual([a.type, a.sender_ref, a.publisher_ref, a.coins, a.gift_ref], ['gift', 'u1', 'star', 500, 'ozel_album']);
+    assert.deepEqual(eventsOf(row({ currency: 'diamond', amount: 500, counterparty: 'u1', reason: 'Özel albüm açıldı: Kaan', ref: 'alb1-in' })), []);
   });
 
   test('ödül jetonu kampanya, geri alınması harcama; uygulama içi harcamalar ve çanta hediyesi gider', () => {

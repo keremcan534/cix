@@ -130,7 +130,8 @@ async function tellVisit(owner, visitor) {
 export async function eraseAccount(c, id, phone) {
     await c.query(
       `UPDATE users SET name = 'Silinmiş hesap', username = NULL, gender = NULL, birth_date = NULL, city = NULL, bio = '',
-         interests = '{}', avatar_url = NULL, device_key_hash = NULL, phone = NULL, equipped = '{}', deleted_at = now() WHERE id = $1`,
+         interests = '{}', avatar_url = NULL, voice_url = NULL, voice_ms = NULL, voice_at = NULL, device_key_hash = NULL, phone = NULL, equipped = '{}',
+         deleted_at = now() WHERE id = $1`,
       [id],
     );
     // Shop items are revoked (a special ID is free again); the rows stay as accounting records.
@@ -155,6 +156,8 @@ export async function eraseAccount(c, id, phone) {
     // Profile extras, the album rows (their files go with removeUserFiles) and the gender choice (profiles.mjs).
     await c.query('DELETE FROM profile_extras WHERE user_id = $1', [id]);
     await c.query('DELETE FROM profile_photos WHERE user_id = $1', [id]);
+    // Özel albüm: the photos go (their files with the account's, media.mjs removeUserFiles); the unlocks stay as money records.
+    await c.query('DELETE FROM private_album_photos WHERE user_id = $1', [id]);
     await c.query('UPDATE users SET gender_hidden = false WHERE id = $1', [id]);
     await c.query('DELETE FROM messages WHERE sender = $1 OR recipient = $1', [id]);
     // Their own wording of the automatic messages (auto-chat.mjs). The rights used and the sends stay as records; a
