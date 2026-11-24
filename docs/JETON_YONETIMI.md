@@ -49,6 +49,10 @@
 >   750.000 · VIP7 2.000.000 · VIP8 5.000.000 · VIP9 10.500.000 · VIP10 20.000.000 puan; 1 yüklenen jeton = 1 puan
 >   (mağaza, Jeton Noktası, yönetim yüklemesi; toptan stok sayılmaz; geri alınan yükleme puanını götürür). VIP10 ≈
 >   4.400.000 TL yükleme. Eski APK'lar kendi VIP'ini eski eşiklerle gösterir; sunucunun denetimleri yeni eşiklerle.
+> - **VIP aylık koruma (24 Kasım 2026):** her ayın 1'i 00:00'da önceki ay değerlendirilir; seviyenin aylık koruma
+>   puanı (VIP1 25.000 … VIP10 9.500.000) yüklenmezse bir seviye düşer, ertesi ay da tutmazsa VIP sıfırlanır; ay içinde
+>   yükselen yeni seviyede kalır; ilk VIP ayı değerlendirilmez. Ücretli "yükseltme koruma dönemi" Canlı ayarlar'dan
+>   (fiyat girilene kadar kapalı). Ayrıntı: `SEVIYE_AYARLARI.md`.
 > - **Sonraki adımlar (sahiplerle):** jetonla fiyatlanan her şey (hediyeler, VIP eşikleri, Rütbe, mağaza, oyunlar) ayrı
 >   ayrı konuşulacak; şimdilik jeton sayıları aynı.
 

@@ -28,7 +28,7 @@ Hepsi kodda sabit: eşikler hem uygulamada hem sunucuda var, testler ikisinin ay
 
 | Sistem | Puan | Eşik / fiyat (sunucu) | Uygulama |
 |---|---|---|---|
-| VIP | `users.svip_xp`: yüklenen jeton (1 jeton = 1 puan): mağaza alımı, Jeton Noktası satışı ve yönetim yüklemesi (24 Kasım 2026); bonus, kampanya, toptan stok ve hediye gelen jeton sayılmaz; iade ve geri alınan yükleme puanını götürür. Eşikler (24 Kasım 2026): VIP1 25.000 · VIP2 62.500 · VIP3 125.000 · VIP4 200.000 · VIP5 375.000 · VIP6 750.000 · VIP7 2.000.000 · VIP8 5.000.000 · VIP9 10.500.000 · VIP10 20.000.000 (migration 123 panelde kayıtlı tabloyu da bu puanlara geçirir) | `catalog.mjs` `SVIP_XP` (10 seviye) | `data/status.ts` `SVIP_LEVELS` |
+| VIP | `users.svip_xp`: yüklenen jeton (1 jeton = 1 puan): mağaza alımı, Jeton Noktası satışı ve yönetim yüklemesi (24 Kasım 2026); bonus, kampanya, toptan stok ve hediye gelen jeton sayılmaz; iade ve geri alınan yükleme puanını götürür. Eşikler (24 Kasım 2026): VIP1 25.000 · VIP2 62.500 · VIP3 125.000 · VIP4 200.000 · VIP5 375.000 · VIP6 750.000 · VIP7 2.000.000 · VIP8 5.000.000 · VIP9 10.500.000 · VIP10 20.000.000 (migration 123 panelde kayıtlı tabloyu da bu puanlara geçirir). **Aylık koruma (24 Kasım 2026, `vip-month.mjs`):** bkz. aşağıdaki "VIP aylık değerlendirme" | `catalog.mjs` `SVIP_XP` (10 seviye) | `data/status.ts` `SVIP_LEVELS` |
 | Rütbe | Satın alınır, 30 gün | `catalog.mjs` `SHOP_ROWS` noble-1..5 (fiyat, gün) | `status.ts` `NOBLE_TIERS` |
 | Cömertlik | Harcanan jeton, defterden toplanır (sütun yok) | `profile-rules.mjs` `WEALTH_XP` (Lv.0–50) | `data/wealth.ts` |
 | Yankı | Karşı taraftan gelen elmas, defterden toplanır | `profile-rules.mjs` `CHARM_XP` (Lv.0–50) | `data/charm.ts` |
@@ -170,3 +170,38 @@ Nasıl işler:
 | Düşüşte bildirim | Evet, uygulama içi bildirim |
 | Düşme kuralı varsayılanı | Kapalı |
 | Bugünkü değerler | Ayarlar bugünkü kodun değerleriyle başlar; hiçbir şey kendiliğinden değişmez |
+
+## VIP aylık değerlendirme (24 Kasım 2026, sahipler)
+
+Kod: `server/api/vip-month.mjs`, migration 124; uygulama `components/vip/vip-month.tsx` (VIP sekmesi: "Bu ay" kartı ve
+"Seviye koruma tablosu"). Panelin VIP "seviye düşmesi" (hareketsizlik) kuralı VIP için kalktı; bu kural yerine geçti.
+
+| VIP | Toplam puan | Aylık koruma | Sonraki seviye için |
+| --- | --- | --- | --- |
+| 1 | 25.000 | 25.000 | 37.500 |
+| 2 | 62.500 | 37.500 | 62.500 |
+| 3 | 125.000 | 62.500 | 75.000 |
+| 4 | 200.000 | 75.000 | 175.000 |
+| 5 | 375.000 | 175.000 | 375.000 |
+| 6 | 750.000 | 375.000 | 1.250.000 |
+| 7 | 2.000.000 | 1.250.000 | 3.000.000 |
+| 8 | 5.000.000 | 3.000.000 | 5.500.000 |
+| 9 | 10.500.000 | 5.500.000 | 9.500.000 |
+| 10 | 20.000.000 | 9.500.000 | — |
+
+- **Dönem:** takvim ayı (Türkiye). Her ayın 1'i 00:00'da önceki ay değerlendirilir (iş 5 dakikada bir bakar).
+- **Puan:** 1 yüklenen jeton = 1 puan (mağaza, Jeton Noktası, yönetim yüklemesi); iade ve geri alınan yükleme düşer.
+  Her puan zamanıyla yazılır (`vip_points`), ayın puanı kesin hesaplanır.
+- **Karar:** ay içinde yükselen yeni seviyesinde kalır; seviyesinin aylık koruma puanını yükleyen korur; yüklemeyen ya da
+  yetmeyen **bir seviye düşer**; bir sonraki ay da tutmazsa **VIP sıfırlanır** (baştan başlar). Tutan bir ay sayacı sıfırlar.
+- **Her ay** seviyenin kendi puanından başlar (`users.svip_xp` = seviyenin eşiği): bir üst seviyeye geçmek için o ay
+  tablodaki "sonraki seviye için" kadar yüklenir.
+- **İlk VIP ayı** değerlendirilmez; puanı ve seviyesi sonraki aya taşınır, sonraki ayın sonunda birlikte değerlendirilir.
+  Dağıtım günü VIP olan herkes için bu ay ilk aydır.
+- **Bildirim:** her karar SimilarClub Sistem'den (`vip` kategorisi; panelden kapatılabilir). Düşüşler `level_drops`'a da yazılır.
+- **Yükseltme koruma dönemi:** seviyesini koruyup yükseltemeyen üye, değerlendirmeye `vip_extend_offer_days` gün kala,
+  `vip_extend_price` jetona değerlendirmeyi `vip_extend_days` gün erteler (ayda bir). Canlı ayarlar › VIP; fiyat 0 iken
+  kapalı (sahipler fiyatı girecek). `GET /api/vip/month`, `POST /api/vip/extend {price, ref}` (fiyat değiştiyse 409
+  `price_changed`). Yönetici: `POST /api/admin/vip/month/run`.
+- **VIP 0** iken (henüz VIP 1'e ulaşmamış) puan aylar boyunca birikir; VIP 1'e ulaşınca ilk ayı başlar.
+- **Eski APK'lar:** "Bu ay" kartını ve tabloyu göstermez; kararlar sunucuda verilir, bildirim gider.

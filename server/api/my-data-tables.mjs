@@ -17,7 +17,7 @@ export const EXPORTED = [
   'events', 'event_reservations', 'event_participants', 'event_reminders_sent', 'event_reminder_optout',
   'agency_assistants', 'agency_assistant_ledger', 'level_drops', 'level_offsets', 'guards', 'guard_settings',
   'message_holds', 'auto_templates', 'auto_quota', 'auto_sends', 'profile_marks', 'private_album_photos', 'private_album_unlocks',
-  'host_bonuses',
+  'host_bonuses', 'vip_points', 'vip_evaluations', 'vip_extensions',
 ];
 
 /** Tables that point at an account but are not that person's to receive, with the reason. */

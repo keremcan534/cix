@@ -330,37 +330,21 @@ describe('Seviye düşmesi', () => {
   };
   const off = (system) => edit(system, (d) => (d.decay = { ...d.decay, on: false }));
 
-  test('VIP: jeton yüklemeyen düşer, yükleyen düşmez; önce onay, bir kez, kayıt ve listeler', async () => {
+  test('VIP: hareketsizlik düşmesi uygulanmaz; VIP aylık koruma kuralıyla düşer (vip-month.mjs)', async () => {
     await freshAdmin();
     const idle = await signUp('Yüklemeyen');
     await setSvip(idle, 30_000);
-    await h.sql.query("UPDATE users SET created_at = now() - interval '10 days' WHERE id = $1", [idle.user.id]);
-    const active = await signUp('Yükleyen');
-    await ok(call('POST', '/api/wallet/purchase', { platform: 'test', productId: 'coins_1000', transactionId: `txn_${rnd(6)}` }, active.session), 'yükleme');
-    await setSvip(active, 30_000);
-
+    await h.sql.query("UPDATE users SET created_at = now() - interval '400 days' WHERE id = $1", [idle.user.id]);
     const v = await view('vip');
     const doc = { ...structuredClone(v.doc), decay: { on: true, idleDays: 300, drop: 1, everyDays: 365, floor: 0 } };
     const pre = await ok(call('POST', '/api/admin/levels/preview', { system: 'vip', doc }, admin.session), 'önizleme');
-    assert.ok(pre.impact.decayToday >= 1);
-    const [st, j] = await save('vip', doc, v.rev);
-    assert.deepEqual([st, j.code], [409, 'confirm']);
-    assert.match(j.error, /seviye düşmesi bugün/);
-    await ok(save('vip', doc, v.rev, { confirm: true }), 'kural açık');
-
-    assert.deepEqual((await dropsOf(idle)).map((d) => [d.system, d.from, d.to]), [['vip', 1, 0]]);
-    assert.equal((await me(idle)).svipXp, 0);
-    assert.equal((await me(active)).svipXp, 30_000, 'yükleyen düşmez');
-    assert.deepEqual(await dropsOf(active, 1, 0), []);
+    assert.equal(pre.impact.decayToday, 0, 'VIP için hareketsizlik düşmesi yok');
+    await ok(save('vip', doc, v.rev), 'onaysız kaydedilir: kimse düşmez');
+    await sleep(1500);
+    assert.deepEqual(await dropsOf(idle, 1, 0), []);
+    assert.equal((await me(idle)).svipXp, 30_000);
     const [, cat] = await call('GET', '/api/catalog?levels=1');
-    assert.deepEqual(cat.levels.vip.decay, { idleDays: 300, drop: 1, everyDays: 365, floor: 0 }, 'telefonlar kuralı yazar');
-    const list = await ok(call('GET', '/api/admin/levels/drops?system=vip', null, admin.session), 'düşüşler');
-    assert.ok(list.drops.some((d) => d.userId === idle.user.id && d.name === 'Yüklemeyen' && d.pointsBefore === 30_000 && d.pointsAfter === 0 && d.idleDays >= 300));
-
-    // Back at VIP 1 and still not topping up: not again within everyDays.
-    await setSvip(idle, 30_000);
-    await sleep(1000);
-    assert.equal((await dropsOf(idle, 2, 0)).length, 1, 'aralık dolmadan tekrar düşmez');
+    assert.equal(cat.levels.vip.decay, null, 'telefonlar hareketsizlik kuralı yazmaz');
     await off('vip');
   });
 

@@ -26,6 +26,7 @@
 // unlocked are reported as unrecovered. The agency commission those gifts earned is reversed. Admin only:
 // moderators don't touch money. Google Play refunds also arrive on their own (refunds.mjs).
 import { HttpError, assertClean, auth, blockedBetween, claimRef, clientIp, db, int, move, once, readJson, selfUser, text, tx, userId } from './core.mjs';
+import { addVipPoints } from './vip-month.mjs';
 import { EXCHANGE, bankExchangeCoins, diamondValueTl, wholesaleTl } from './catalog.mjs';
 import { CHANNELS, creditCoins, diamondState, spendCoins, spendDiamonds } from './wallet.mjs';
 import { live } from './live-settings.mjs';
@@ -228,7 +229,7 @@ export async function refundPurchase(c, id, { actor = null, ip = '', source = 'a
     unrecoveredDiamonds += amount - take;
   }
   await c.query("UPDATE purchases SET status = 'refunded' WHERE id = $1", [id]);
-  await c.query('UPDATE users SET svip_xp = greatest(0, svip_xp - $2) WHERE id = $1', [p.user_id, p.coins]);
+  await addVipPoints(c, p.user_id, -Number(p.coins), 'store_refund', `refund:${id}`);
   // Coins already spent on shop items can't come back as coins: the buyer's items go, others' go to staff review.
   const { revokedItems, reviewItems } = await refundItems(c, { purchase: Number(id), buyer: p.user_id, lots: lots.map((l) => l.id), held, actor, ip });
   await audit(c, actor, 'purchase.refund', p.user_id, { purchase: id, platform: p.platform, transaction: p.transaction_id, coins, escrowCoins, diamonds, unrecoveredDiamonds, commissionDiamonds, revokedItems, reviewItems, source }, ip);
@@ -278,7 +279,7 @@ export const jetonRoutes = {
       const portions = parts.map((p) => ({ channel: 'jeton_noktasi', amount: p.amount, lockHours: p.lockHours, transferId: transfer, sourceLot: p.lot, sourceUser: u.id }));
       await creditCoins(c, to, portions, 'Jeton Noktası yüklemesi', `${b.ref}-in`, u.id, { actor: u.id, detail });
       // VIP points (owners, 24 Nov 2026): coins bought at a Jeton Noktası count as a store purchase does.
-      await c.query('UPDATE users SET svip_xp = svip_xp + $2 WHERE id = $1', [to, coins]);
+      await addVipPoints(c, to, coins, 'jeton_noktasi', b.ref);
     });
     return { ...out, transfer: await findTransfer(u.id, b.ref) };
   },
@@ -438,7 +439,7 @@ export const jetonRoutes = {
       const portions = parts.map((p) => ({ channel: 'jeton_noktasi', amount: p.amount, lockHours: p.lockHours, transferId: transfer, sourceLot: p.lot, sourceUser: bank }));
       await creditCoins(c, to, portions, 'Jeton yüklemesi (yönetim)', `${b.ref}-in`, bank, { actor: a.id, detail });
       // VIP points (owners, 24 Nov 2026): a management load counts too; taking it back takes them back (reverse).
-      await c.query('UPDATE users SET svip_xp = svip_xp + $2 WHERE id = $1', [to, coins]);
+      await addVipPoints(c, to, coins, 'admin_load', b.ref);
       await audit(c, a.id, 'jeton.admin_load', to, { transfer, bank, coins, valueTl, paymentRef }, ip);
     });
     const t = await db.query(`${LOADS_SELECT} AND t.from_user = $1 AND t.ref = $2`, [bank, b.ref]);
@@ -484,7 +485,7 @@ export const jetonRoutes = {
       await move(c, load.to_user, 'coin', -coins, 'Yanlış jeton yüklemesi geri alındı', `jeton-geri:${id}`, load.from_user, { channel: 'jeton_noktasi', actor: a.id, detail: { ...detail, lots: taken } });
       await creditCoins(c, load.from_user, [{ channel: 'toptan', amount: coins, transferId: back }], 'Geri alınan yönetim yüklemesi', `jeton-geri:${id}-in`, load.to_user, { actor: a.id, detail });
       // A wrong load gives no VIP points: all of it comes off, spent coins too (never below 0).
-      await c.query('UPDATE users SET svip_xp = greatest(0, svip_xp - $2) WHERE id = $1', [load.to_user, Number(load.coins)]);
+      await addVipPoints(c, load.to_user, -Number(load.coins), 'admin_reverse', `geri:${id}`);
       await audit(c, a.id, 'jeton.admin_reverse', load.to_user, { load: id, transfer: back, coins, spent: Number(load.coins) - coins, reason }, ip);
       return { coins, spent: Number(load.coins) - coins, transfer: Number(back) };
     });

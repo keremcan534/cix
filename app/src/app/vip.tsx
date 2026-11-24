@@ -6,7 +6,7 @@ import { Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions 
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
-import { decayLineOf, subPlansOf, subRightsOf, vipLevelsOf, vipRightsOf } from '@/lib/levels-live-core';
+import { subPlansOf, subRightsOf, vipLevelsOf, vipRightsOf } from '@/lib/levels-live-core';
 import { useLevels } from '@/lib/live/levels-live';
 import { goBack } from '@/lib/nav';
 import { showAlert } from '@/lib/alert';
@@ -32,6 +32,9 @@ import { SubCompare } from '@/components/vip/sub-compare';
 import { SubHideLevels } from '@/components/vip/sub-hide-levels';
 import { NoblePage } from '@/components/vip/noble-page';
 import { useVipSetPreview } from '@/components/vip/vip-set-preview';
+import { VipKeepTable, VipMonthCard } from '@/components/vip/vip-month';
+import { extendVipLive, useLiveVipMonth } from '@/lib/live/vip-month';
+import { VIP_MONTH_RULE, demoVipMonth } from '@/lib/vip-month';
 
 type Tab = 'svip' | 'vip' | 'noble';
 
@@ -57,7 +60,6 @@ export default function PrivilegeCenter() {
 
 function Center({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
   const styles = useStyles();
-  const levels = useLevels();
   const { dark } = useTheme();
   const night = tab === 'svip';
   const pink = tab === 'vip';
@@ -75,7 +77,7 @@ function Center({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
         onHelp={() =>
           showAlert(
             'Ayrıcalıklar',
-            `VIP: yüklediğin her jeton 1 puan${decayLineOf(levels, 'vip') ? '; uzun süre yükleme yapmazsan seviyen düşebilir' : ', seviyen hiç düşmez'}.\nAbonelik: seçtiğin süre kadar geçerli.\nRütbe: jetonla alınır, kademenin süresi kadar geçerli.\nTüm ayrıcalıklar sunucuda doğrulanır.`,
+            `VIP: yüklediğin her jeton 1 puan; her ay seviyenin koruma puanını yüklemezsen seviyen bir düşer, iki ay üst üste tutmazsa VIP sıfırlanır.\nAbonelik: seçtiğin süre kadar geçerli.\nRütbe: jetonla alınır, kademenin süresi kadar geçerli.\nTüm ayrıcalıklar sunucuda doğrulanır.`,
           )
         }
       />
@@ -110,7 +112,29 @@ function Svip({ onLevel }: { onLevel: (level: number) => void }) {
   const list = vipLevelsOf(levels);
   // VIP seti: the level's own badge and frame on their cards, and its chat bubble and entry effect added.
   const rights = withSetRights(vipRightsOf(levels));
-  const decay = decayLineOf(levels, 'vip');
+  // VIP's drop is the monthly keep rule (server/api/vip-month.mjs), the same in the demo.
+  const decay = VIP_MONTH_RULE;
+  const live = liveMode();
+  const serverMonth = useLiveVipMonth(live);
+  const month = live ? serverMonth : demoVipMonth(svipLevel, svipXp, list);
+  const [extending, setExtending] = useState(false);
+  const extend = () => {
+    const x = month?.extension;
+    if (!x?.offered || extending) return;
+    showAlert('Yükseltme koruma dönemi', `${x.price.toLocaleString('tr-TR')} jetonla bu ayın VIP değerlendirmesi ${x.days} gün ertelenir; bu sürede bir üst seviyeye geçmeye çalışabilirsin. Ayda bir kez alınır.`, [
+      { text: 'Vazgeç', style: 'cancel' },
+      {
+        text: 'Satın al',
+        onPress: () => {
+          setExtending(true);
+          extendVipLive(x.price)
+            .then((m) => m?.evalAt && showAlert('Ertelendi', `VIP değerlendirmen ${new Date(m.evalAt).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', timeZone: 'Europe/Istanbul' })} tarihine ertelendi.`))
+            .catch((e) => showAlert('Alınamadı', message(e)))
+            .finally(() => setExtending(false));
+        },
+      },
+    ]);
+  };
   const nameOf = (level: number) => list.find((x) => x.level === level)?.name ?? `VIP ${level}`;
   const { width, fontScale } = useWindowDimensions();
   const contentW = Math.min(width, VIP_MAX_W);
@@ -154,6 +178,8 @@ function Svip({ onLevel }: { onLevel: (level: number) => void }) {
       />
       {setPreview.view}
       <VipPointsInfo decay={decay} width={contentW} level={lv.level} />
+      {month && <VipMonthCard m={month} level={lv.level} onExtend={live ? extend : undefined} busy={extending} />}
+      <VipKeepTable levels={list} mine={svipLevel} level={lv.level} />
     </ScrollView>
   );
 }

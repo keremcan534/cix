@@ -221,6 +221,14 @@ Odadaki boş ve kilitli mikrofonların rengi; odadaki herkes aynı rengi görür
 | `POST /api/admin/host-bonus/reverse` `{id, reason}` | Yönetici: bir bonusu geri alır; hesapta çekilebilir (kilitsiz) elmas kadarı düşer, kalanı kişide kalır. İkinci kez 409. Kişiye bildirim; `audit_events` `host_bonus.reverse`. |
 | `POST /api/admin/host-bonus/run` | Yönetici: geçen hafta kapanmadıysa şimdi kapatır (zamanlayıcının yaptığı). Testlerde `HOST_BONUS_TEST_CLOCK=1` ile `at` saati verilir. |
 
+**VIP aylık değerlendirme (`vip-month.mjs`, sahipler 24 Kasım 2026)**: her ayın 1'i 00:00'da (Türkiye) VIP hesapların önceki ayı değerlendirilir: ay içinde yükselen yeni seviyede kalır, seviyenin aylık koruma puanını (seviyenin puanı eksi bir alttakinin) yükleyen korur, yüklemeyen ya da yetmeyen bir seviye düşer, ertesi ay da tutmazsa VIP 0; ilk VIP ayı değerlendirilmez (puanı sonraki aya taşınır). Her ay seviyenin kendi puanından başlar. Puanlar zamanıyla `vip_points`'te (mağaza, Jeton Noktası, yönetim yüklemesi; iade ve geri alma eksi). Kararlar `vip_evaluations`, düşüşler `level_drops`, bildirim SimilarClub Sistem `vip` kategorisi. İş 5 dakikada bir (`VIP_MONTH_JOBS=0` kapatır). Ayrıntı: [`SEVIYE_AYARLARI.md`](SEVIYE_AYARLARI.md).
+
+| Çağrı | Ne yapar |
+|---|---|
+| `GET /api/vip/month` | VIP sekmesi: `{active, level, periodLevel, first, periodStart, evalAt, points, keep, kept, misses, next: {level, need}, extension: {offered, price, days, bought}}`. |
+| `POST /api/vip/extend` `{price, ref}` | Yükseltme koruma dönemi: seviyesini koruyup yükseltemeyen üye, son günlerde, değerlendirmeyi jetonla erteler (ayda bir). Fiyat/süre/teklif günü Canlı ayarlar › VIP (`vip_extend_price` 0 iken kapalı). Değişen fiyat 409 `price_changed`, sunulmuyorsa 409 `vip_extend_unavailable`. |
+| `POST /api/admin/vip/month/run` | Yönetici: vadesi gelenleri şimdi değerlendirir (testte `VIP_MONTH_TEST_CLOCK=1` ile `at`). |
+
 **Test jetonu hiçbir zaman paraya dönmez:** jeton ve elmas hediye, Çevir ve Jeton Noktası üzerinden birbirine karıştığı için elmasın tek tek nereden geldiği güvenilir izlenemez. Bu yüzden kural sunucu çapında: `ALLOW_TEST_TOPUP=1` veya `ALLOW_SANDBOX_PURCHASES=1` iken, ya da veritabanında bir kez bile test jetonu (test yüklemesi, test satın alması, mağaza test satın alması) olduysa hiçbir talep "ödendi" yapılamaz, yalnızca reddedilir. Yayın sunucusu test verisi olmayan temiz bir veritabanıyla açılmalı. Çekimler finans paneline gitmez (panelde ödeme türü yok); mağaza test satın alması panele satış değil promosyon olarak gider.
 
 Kim yükledi, kim aldı, kim aktardı, kimin adına, hangi IP'den, hangi dekontla: aktarımlar `coin_transfers`'ta, yönetici işlemleri `audit_events`'te, her bakiye değişikliği `ledger`'da (kanal, işlemi yapan, ayrıntı). Bu üç tablo **değiştirilemez ve silinemez** (veritabanı tetikleyicisi; API dahil).

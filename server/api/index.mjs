@@ -125,6 +125,7 @@ import { whatsappRoutes } from './whatsapp.mjs';
 import { closeLines, lineRoutes, openLine } from './live-line.mjs';
 import { withdrawRoutes } from './withdraw.mjs';
 import { hostBonusRoutes, startHostBonus, stopHostBonus } from './host-bonus.mjs';
+import { startVipMonth, stopVipMonth, vipMonthRoutes } from './vip-month.mjs';
 import { refundSyncRoutes, startRefundSync, stopRefundSync } from './refunds.mjs';
 import { refreshOwnSubscription, startVipRecheck, stopVipRecheck, vipRoutes } from './vip.mjs';
 import { referralRoutes } from './referrals.mjs';
@@ -338,6 +339,7 @@ const routes = {
   ...taskRewardRoutes,
   ...withdrawRoutes,
   ...hostBonusRoutes,
+  ...vipMonthRoutes,
   ...jetonRoutes,
   ...refundSyncRoutes,
   ...authRoutes,
@@ -573,6 +575,7 @@ function shutdown(signal) {
   stopMarkKinds();
   stopBondLooks();
   stopHostBonus();
+  stopVipMonth();
   server.close();
   const started = Date.now();
   const wait = setInterval(async () => {
@@ -621,6 +624,8 @@ startLevels();
 startLevelDecay();
 // Yayıncı haftalık bonusu: closes the week that ended every Monday 00:00 (host-bonus.mjs).
 startHostBonus();
+// VIP aylık değerlendirme: every account's month judged on the 1st 00:00 (vip-month.mjs).
+startVipMonth();
 startGuardSweep();
 startServerLoad();
 startShopItems();

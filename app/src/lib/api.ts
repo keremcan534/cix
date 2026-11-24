@@ -494,6 +494,10 @@ export type IncomePeriod = 'day' | 'week' | 'month' | 'all';
 export const myWeek = () => call<unknown>('GET', '/api/wallet/week');
 /** Yayıncı haftalık bonusu: this week's earnings, the tier reached and the next (server/api/host-bonus.mjs). */
 export const myHostBonus = () => call<unknown>('GET', '/api/wallet/host-bonus');
+/** VIP aylık değerlendirme: my month (server/api/vip-month.mjs). */
+export const myVipMonth = () => call<unknown>('GET', '/api/vip/month');
+/** Yükseltme koruma dönemi: `price` is what the screen showed (a moved price is a 409 price_changed). */
+export const extendVip = (price: number, ref = newRef()) => call<{ user: ServerUser; replay: boolean; month: unknown }>('POST', '/api/vip/extend', { price, ref });
 export const incomeSources = (period: IncomePeriod) => call<{ period: IncomePeriod; total: number; sources: IncomeSource[] }>('GET', `/api/wallet/income?period=${period}`);
 export const rankings = (board: 'wealth' | 'charm', period: 'day' | 'week' | 'month') =>
   call<{ rows: RankingRow[] }>('GET', `/api/rankings?board=${board}&period=${period}`).then((r) => r.rows);

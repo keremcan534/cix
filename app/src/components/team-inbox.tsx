@@ -42,6 +42,8 @@ const CATEGORY: Record<string, { icon: keyof typeof Ionicons.glyphMap; color: st
   performance: { icon: 'warning', color: '#EA580C', label: 'Uyarı' },
   quota: { icon: 'notifications', color: '#64748B', label: 'Bilgi' },
   bond: { icon: 'link', color: '#DB2777', label: 'Bağlar' },
+  // VIP aylık değerlendirme (server/api/vip-month.mjs).
+  vip: { icon: 'diamond', color: '#B45309', label: 'VIP' },
 };
 
 const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();

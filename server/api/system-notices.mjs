@@ -18,9 +18,9 @@ import { notify } from './push.mjs';
 
 export const SYSTEM_NAME = 'SimilarClub Sistem';
 /** The Similar Ekibi kind an older APK draws each category with (its icon and label). */
-const KIND = { event_reward: 'event', performance: 'notice', quota: 'notice', bond: 'notice' };
+const KIND = { event_reward: 'event', performance: 'notice', quota: 'notice', bond: 'notice', vip: 'notice' };
 /** Categories that also ring the phone; the rest only wait in the chat. */
-const PUSH = new Set(['voice_call', 'video_call', 'message_reward', 'pk', 'rocket', 'event_reward', 'bag_gift', 'bonus', 'performance']);
+const PUSH = new Set(['voice_call', 'video_call', 'message_reward', 'pk', 'rocket', 'event_reward', 'bag_gift', 'bonus', 'performance', 'vip']);
 
 const fmt = (n) => Number(n).toLocaleString('tr-TR');
 /** "4 dk 05 sn", "45 sn", "1 sa 02 dk". */

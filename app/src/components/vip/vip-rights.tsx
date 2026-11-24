@@ -225,7 +225,40 @@ export function VipPointsInfo({ decay, width, level = 0 }: { decay: string | nul
   );
 }
 
+/**
+ * The points panel's frame (gold rim, the level's glass and sheens, the inner line) for any VIP-tab panel: the
+ * monthly card and the keep table (components/vip/vip-month) use it, so they read as the design's.
+ */
+export function VipPanel({ level = 0, title, children }: { level?: number; title?: string; children: React.ReactNode }) {
+  const tint = tintOfLevel(level);
+  return (
+    <View style={s.infoGlow}>
+      <LinearGradient colors={tint?.infoRim ?? ['#f4dccb', '#d9b2b4', '#b98b9e', '#d3a9a6', '#fde6cd']} locations={[0, 0.15, 0.5, 0.85, 1]} style={s.infoRim}>
+        <LinearGradient colors={tint?.info ?? ['#4c336b', '#372452', '#221535', '#170c26', '#170b25', '#1e0f30']} locations={[0, 0.12, 0.32, 0.5, 0.8, 1]} style={[s.info, s.panel]}>
+          <Image source={SOFT_GLOW} resizeMode="stretch" style={[s.infoSheen, tint && { tintColor: tint.glow }]} />
+          <Image source={SOFT_GLOW} resizeMode="stretch" style={[s.infoSheenLow, tint && { tintColor: tint.glow }]} />
+          <Image source={SOFT_GLOW} resizeMode="stretch" style={s.infoSheenLeft} />
+          <LinearGradient colors={['rgba(255,226,195,0)', 'rgba(255,232,205,0.4)', 'rgba(255,226,195,0)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.infoTopLight} />
+          <View style={s.infoInner} pointerEvents="none" />
+          {title && (
+            <View style={s.panelHead}>
+              <Image source={DECO.infoCrown.source} style={{ width: DECO.infoCrown.w * PX * 0.7, height: DECO.infoCrown.h * PX * 0.7 }} resizeMode="contain" />
+              <GoldText bands={HEADING_BANDS} stops={HEADING_STOPS} shadow="rgba(20,8,0,0.6)" fit wrap={{ flexShrink: 1 }} style={s.panelTitle}>
+                {title}
+              </GoldText>
+            </View>
+          )}
+          {children}
+        </LinearGradient>
+      </LinearGradient>
+    </View>
+  );
+}
+
 const s = StyleSheet.create({
+  panel: { flexDirection: 'column', alignItems: 'stretch', gap: 8, paddingLeft: 14, paddingRight: 14, paddingVertical: 13 },
+  panelHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  panelTitle: { fontSize: 16, lineHeight: 21, fontWeight: '800' },
   heading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 16 },
   headingText: { fontSize: 17.5, lineHeight: 24, fontWeight: '800' },
   rim: { flex: 1, boxShadow: '0 2px 6px rgba(5,0,15,0.4)' },

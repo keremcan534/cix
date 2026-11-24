@@ -34,6 +34,7 @@
 //
 // The VIP subscription (Abonelik) goes through the same stores and helpers, with the same rules: vip.mjs.
 import { bonusNotice } from './system-notices.mjs';
+import { addVipPoints } from './vip-month.mjs';
 import crypto from 'node:crypto';
 
 import { HttpError, auth, db, env, readJson, selfUser, sha, tx } from './core.mjs';
@@ -230,7 +231,7 @@ async function credit(u, platform, pack, transactionId, play, purchaseTime) {
       { detail: { purchase: purchaseId, platform, product: pack.productId, transaction: transactionId, ...(sandbox && { sandbox }) } },
     );
     // SVIP points are for coins someone paid for: the pack only, not the first-purchase or campaign gift.
-    if (!sandbox) await c.query('UPDATE users SET svip_xp = svip_xp + $2 WHERE id = $1', [u.id, pack.coins]);
+    if (!sandbox) await addVipPoints(c, u.id, pack.coins, 'store', ref);
     return { replay: false, coins: pack.coins, bonus, campaignBonus: kampanya, extra };
   }).catch(taken);
   // SimilarClub Sistem: the gifts on top of the pack (first purchase, campaign), once the coins are committed.
