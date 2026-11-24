@@ -167,7 +167,7 @@ export const giftRoutes = {
       purchases: purchaseOptions(),
       // Only while it runs by the server's clock; a purchase gets it by the store's purchase time (purchases.mjs).
       campaign: c && Date.parse(c.startsAt) <= now && now < Date.parse(c.endsAt) ? { percent: c.percent, startsAt: c.startsAt, endsAt: c.endsAt, label: c.label } : null,
-      exchange: { usdTry: s.usdTry, coinValueTl: s.coinValueTl, payoutUsdTry: s.payoutUsdTry, minDiamonds: EXCHANGE.minDiamonds },
+      exchange: { usdTry: s.usdTry, coinValueTl: s.coinValueTl, payoutUsdTry: s.payoutUsdTry, diamondsPerUsd: s.diamondsPerUsd, minDiamonds: EXCHANGE.minDiamonds },
       // The gift and entry videos the phones download and keep (fx.mjs, and the admins' gifts'); an older app ignores it.
       // Şanslı packages' videos (lucky-art.mjs) only for an app that plays them (lucky=1).
       fx: [...fxCatalog(s.giftsHidden, replacedClips()), ...giftFx(s.giftsHidden, family), ...shopFx(), ...rocketFx(), ...(url?.searchParams.get('lucky') === '1' ? luckyFx() : [])],

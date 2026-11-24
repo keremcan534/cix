@@ -113,7 +113,7 @@ export default function IncomeScreen() {
   const info = () =>
     showAlert(
       'Elmasların',
-      `${fmt(RULES.diamondsPerUsd)} elmas = 1 USD. Toplam ${fmt(diamonds)} elmasın yaklaşık ${usd(diamonds)} değerindedir.\n\nÇekilebilir: hemen çekebileceğin, bozdurabileceğin ya da jetona çevirebileceğin elmaslar.\nKilitli: Google Play veya App Store'dan alınan jetonla gelen hediyeler ${RULES.pendingDays} gün, Jeton Noktası jetonuyla gelenler ${RULES.jetonPendingDays} gün kilitli kalır (iade süresi). Süre dolunca kendiliğinden çekilebilir kazanca geçer.\n\nPara çekmek için en az ${fmt(RULES.minWithdrawDiamonds)} elmas (${usd(RULES.minWithdrawDiamonds)}) gerekir.`,
+      `${fmt(liveRules().diamondsPerUsd)} elmas = 1 USD. Toplam ${fmt(diamonds)} elmasın yaklaşık ${usd(diamonds)} değerindedir.\n\nÇekilebilir: hemen çekebileceğin, bozdurabileceğin ya da jetona çevirebileceğin elmaslar.\nKilitli: Google Play veya App Store'dan alınan jetonla gelen hediyeler ${RULES.pendingDays} gün, Jeton Noktası jetonuyla gelenler ${RULES.jetonPendingDays} gün kilitli kalır (iade süresi). Süre dolunca kendiliğinden çekilebilir kazanca geçer.\n\nPara çekmek için en az ${fmt(RULES.minWithdrawDiamonds)} elmas (${usd(RULES.minWithdrawDiamonds)}) gerekir.`,
     );
 
   return (

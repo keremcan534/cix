@@ -23,8 +23,15 @@
 >   yazılır (migration 120), sonradan değişmez. Panelin gördüğü kur ile o anki kur farklıysa işaret konmaz, yeni tutar
 >   gösterilir. Jeton Noktası anında bozdurmada yayıncıya ödenecek TL de bu kurla; çevirme ve finans raporları 50,62 ile
 >   kalır (aradaki fark ödemelerde şirkette kalır).
-> - **Sonraki adımlar (sahiplerle):** elmasın değeri (5.000 elmas = 1 USD) ve jetonla fiyatlanan her şey (hediyeler,
->   VIP eşikleri, Rütbe, mağaza, oyunlar) ayrı ayrı konuşulacak; şimdilik jeton sayıları aynı.
+> - **Elmas değeri (24 Kasım 2026):** **1.000 elmas = 1 USD** (önce 5.000). Canlı ayarlar › Ödemeler › **Elmas değeri: 1 USD
+>   = ? elmas** (varsayılan 1.000, elle değişir, bir kayıtta en çok %25). Para çekme, ajans komisyonunun USD karşılığı,
+>   Jeton Noktası bozdurma ve Çevir bununla hesaplanır; açık talepler oluşturuldukları andaki USD ile kalır. Para çekme
+>   sınırları: en az 10.000 elmas (10 USD), tek talepte en çok 1.000.000 (1.000 USD), haftada en çok 10.000.000
+>   (10.000 USD). Ajans "kazanan yayıncı" eşiği 10 USD kaldı (artık 10.000 elmas). 1.000 jetonluk hediye (220 TL)
+>   yayıncıya 1 USD = 49 TL bırakır. Eski uygulamalar USD tahminlerini eski değerle (5 kat düşük) gösterir; ödenen
+>   tutarı sunucu hesaplar.
+> - **Sonraki adımlar (sahiplerle):** jetonla fiyatlanan her şey (hediyeler, VIP eşikleri, Rütbe, mağaza, oyunlar) ayrı
+>   ayrı konuşulacak; şimdilik jeton sayıları aynı.
 
 Tarih: 22 Kasım 2026. Sahiplerin "Yönetim Paneli Güncelleme" listesindeki 4. ve 5. maddeler.
 

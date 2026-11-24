@@ -8,7 +8,7 @@
 // gets fewer points of its own share the next month (agency_month_rules, read by agency-lib.mjs calcEvent).
 // A streamer who neither used the app nor withdrew for `inactiveDays` leaves the agency (the agency job) and stays a
 // streamer under management (streamer-rule.mjs, "yönetim yayıncısı").
-import { DIAMONDS_PER_USD, audit, notice } from './agency-lib.mjs';
+import { audit, diamondsPerUsd, notice } from './agency-lib.mjs';
 import { agencyRuleOf } from './live-registry.mjs';
 import { live } from './live-settings.mjs';
 
@@ -34,7 +34,7 @@ export const agencyRule = (s = live()) => agencyRuleOf(s);
  * month, and its status by the rule. `save`: write a changed status (with a notice to the agency and an audit row).
  */
 export async function activityOf(c, a, { rule = agencyRule(), save = false, actor = null } = {}) {
-  const earnDiamonds = rule.activationEarnUsd * DIAMONDS_PER_USD;
+  const earnDiamonds = rule.activationEarnUsd * diamondsPerUsd();
   const month = monthOf();
   const r = (
     await c.query(

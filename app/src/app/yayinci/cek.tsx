@@ -234,7 +234,7 @@ export default function Withdraw() {
             Para çekmek için en az {fmt(RULES.minWithdrawDiamonds)} çekilebilir elmas gerekli; {fmt(RULES.minWithdrawDiamonds - diamonds)} elmas daha biriktirmelisin.
           </Text>
         ) : (
-          payable && <Text style={styles.receive}>Hesabına geçecek: {live ? money(withdrawUsd(n)) : usd(n)}</Text>
+          payable && <Text style={styles.receive}>Hesabına geçecek: {live ? money(withdrawUsd(n, liveRules().diamondsPerUsd)) : usd(n)}</Text>
         )}
 
         {live && (

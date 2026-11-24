@@ -227,11 +227,12 @@ export const VIP_SUB_BY_PRODUCT = new Map(VIP_SUBS.map((p) => [p.productId, p]))
  * `usdTry` and `coinValueTl` are the values in effect: Çevir passes the live ones (live-settings.mjs, Canlı ayarlar);
  * the defaults are the compiled ones. Owners, 24 Nov 2026: USD_TRY 50,62.
  */
-export const EXCHANGE = { diamondsPerUsd: 5_000, usdTry: 50.62, minDiamonds: 100, bankFee: 0.03 };
+// Owners, 24 Nov 2026: 1.000 💎 = 1 USD (was 5.000); the live value is Canlı ayarlar › diamonds_per_usd.
+export const EXCHANGE = { diamondsPerUsd: 1_000, usdTry: 50.62, minDiamonds: 100, bankFee: 0.03 };
 /** Coins one TL buys at `coinValueTl` TL per 1.000 coins. */
 const coinsPerTl = (coinValueTl = COIN_VALUE_TL) => 1000 / coinValueTl;
-export const exchangeCoins = (diamonds, usdTry = EXCHANGE.usdTry, coinValueTl = COIN_VALUE_TL) =>
-  Math.floor(diamonds * ((1 / EXCHANGE.diamondsPerUsd) * usdTry * coinsPerTl(coinValueTl)));
+export const exchangeCoins = (diamonds, usdTry = EXCHANGE.usdTry, coinValueTl = COIN_VALUE_TL, perUsd = EXCHANGE.diamondsPerUsd) =>
+  Math.floor(diamonds * ((1 / perUsd) * usdTry * coinsPerTl(coinValueTl)));
 
 /**
  * Ödeme kuru (owners, 24 Nov 2026): the TL a USD is paid at to hosts and agencies (withdrawals, agency payouts, a
@@ -241,13 +242,13 @@ export const PAYOUT_USD_TRY = 49;
 /** TL for `usd` at the payout rate, to the kuruş. */
 export const payoutTl = (usd, rate = PAYOUT_USD_TRY) => Math.round(usd * rate * 100) / 100;
 /** What diamonds are paid in TL (5.000 💎 = 1 USD at the payout rate): what a Jeton Noktası pays a host for them. */
-export const diamondValueTl = (diamonds, rate = PAYOUT_USD_TRY) => Math.round((diamonds / EXCHANGE.diamondsPerUsd) * rate * 100) / 100;
+export const diamondValueTl = (diamonds, rate = PAYOUT_USD_TRY, perUsd = EXCHANGE.diamondsPerUsd) => Math.round((diamonds / perUsd) * rate * 100) / 100;
 /**
  * A host sells diamonds to a Jeton Noktası: the bank pays their value at the payout rate and gets coins worth that plus
  * its fee (3 %) at the coin value, rounded down. Same sum as app/src/lib/coins-bank.ts convertDiamonds.
  */
-export const bankExchangeCoins = (diamonds, coinValueTl = COIN_VALUE_TL, rate = PAYOUT_USD_TRY) =>
-  Math.floor(diamonds * ((1 / EXCHANGE.diamondsPerUsd) * rate * coinsPerTl(coinValueTl) * (1 + EXCHANGE.bankFee)));
+export const bankExchangeCoins = (diamonds, coinValueTl = COIN_VALUE_TL, rate = PAYOUT_USD_TRY, perUsd = EXCHANGE.diamondsPerUsd) =>
+  Math.floor(diamonds * ((1 / perUsd) * rate * coinsPerTl(coinValueTl) * (1 + EXCHANGE.bankFee)));
 /**
  * What a Jeton Noktası pays management for coins: the wholesale price the panel sets (Canlı ayarlar ›
  * jeton_wholesale_tl, TL per 1.000 coins; owners, 24 Nov 2026: "elle girebilelim, şu an 220₺").
@@ -259,8 +260,9 @@ export const wholesaleTl = (coins, per1000 = WHOLESALE_TL) => tlOfCoins(coins, p
  * Withdrawals (withdraw.mjs): the smallest and largest request and the most diamonds one person may ask for in
  * 7 days. Same as app/src/data/rules.ts minWithdrawDiamonds, maxWithdrawDiamonds, weeklyWithdrawLimitDiamonds.
  */
-export const WITHDRAW = { minDiamonds: 50_000, maxDiamonds: 5_000_000, weeklyDiamonds: 10_000_000 };
-export const diamondValueUsd = (diamonds) => Math.floor((diamonds / EXCHANGE.diamondsPerUsd) * 100) / 100;
+// Owners, 24 Nov 2026 (with 1.000 💎 = 1 USD): at least 10 USD, at most 1.000 USD a request, 10.000 USD a week.
+export const WITHDRAW = { minDiamonds: 10_000, maxDiamonds: 1_000_000, weeklyDiamonds: 10_000_000 };
+export const diamondValueUsd = (diamonds, perUsd = EXCHANGE.diamondsPerUsd) => Math.floor((diamonds / perUsd) * 100) / 100;
 
 /**
  * SVIP level n needs SVIP_XP[n - 1] points (1 purchased coin = 1 point): the compiled values, as the app has them. The

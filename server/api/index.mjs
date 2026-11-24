@@ -289,7 +289,7 @@ const walletRoutes = {
     const u = await auth(req);
     // Read once: a request that read the old rate completes at it, the rate the user saw.
     const s = live();
-    const { diamonds, ref, usdTry, coinValueTl } = await readJson(req);
+    const { diamonds, ref, usdTry, coinValueTl, diamondsPerUsd } = await readJson(req);
     const n = int(diamonds, EXCHANGE.minDiamonds, EXCHANGE_MAX);
     if (!n) throw new HttpError(400, `En az ${EXCHANGE.minDiamonds} elmas çevrilebilir`);
     // The rate the screen showed: new apps send it, old ones send nothing and showed the compiled rate.
@@ -298,7 +298,7 @@ const walletRoutes = {
     // The coin value the screen showed: only apps from 24 Nov 2026 on send it.
     const current = coinValueTl !== undefined && coinValueTl !== null;
     const shownValue = current && typeof coinValueTl === 'number' ? coinValueTl : NaN;
-    const coins = exchangeCoins(n, s.usdTry, s.coinValueTl);
+    const coins = exchangeCoins(n, s.usdTry, s.coinValueTl, s.diamondsPerUsd);
     const r = await once(u.id, 'diamond', ref, async (c) => {
       // A second copy of the same request waits on the row, then finds the ref (a replay) before the
       // balance check (a false "not enough").
@@ -307,10 +307,13 @@ const walletRoutes = {
       // After the ref check, so a retry of one that went through gets its replay. Never fewer coins than the
       // screen showed: a lower live rate is refused, nothing moves; a higher one simply gives more.
       if (!current || !newApp) throw Object.assign(new HttpError(409, 'Çevirme kuru değişti. Güncel tutar için uygulamayı güncelle'), { extra: { code: 'update_required' } });
-      if (!exchangeOk(s.usdTry, shown) || !(Math.round(s.coinValueTl * 100) <= Math.round(shownValue * 100))) {
-        throw Object.assign(new HttpError(409, 'Kur değişti, yeni tutarı kontrol et'), { extra: { code: 'rate_changed', usdTry: s.usdTry, coinValueTl: s.coinValueTl, coins } });
+      // The diamond's value (1 USD = ? 💎, Canlı ayarlar › diamonds_per_usd): more diamonds per USD give fewer coins.
+      // An app that sends none worked with the compiled one.
+      const shownPer = diamondsPerUsd === undefined || diamondsPerUsd === null ? EXCHANGE.diamondsPerUsd : diamondsPerUsd;
+      if (!exchangeOk(s.usdTry, shown) || !(Math.round(s.coinValueTl * 100) <= Math.round(shownValue * 100)) || !(typeof shownPer === 'number' && s.diamondsPerUsd <= shownPer)) {
+        throw Object.assign(new HttpError(409, 'Kur değişti, yeni tutarı kontrol et'), { extra: { code: 'rate_changed', usdTry: s.usdTry, coinValueTl: s.coinValueTl, diamondsPerUsd: s.diamondsPerUsd, coins } });
       }
-      await spendDiamonds(c, u.id, n, 'Jetona çevrildi', ref, null, { channel: 'cevir', detail: { coins, usdTry: s.usdTry, coinValueTl: s.coinValueTl } });
+      await spendDiamonds(c, u.id, n, 'Jetona çevrildi', ref, null, { channel: 'cevir', detail: { coins, usdTry: s.usdTry, coinValueTl: s.coinValueTl, diamondsPerUsd: s.diamondsPerUsd } });
       await creditCoins(c, u.id, [{ channel: 'cevir', amount: coins }], 'Elmastan çevrildi', ref, null, { detail: { diamonds: n } });
     });
     if (!r.replay) return { ...r, coins };

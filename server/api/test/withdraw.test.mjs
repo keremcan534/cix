@@ -40,8 +40,8 @@ describe('para çekme', () => {
   });
 
   test('kurallar: en az, en çok, yöntem, hesap bilgisi', async () => {
-    assert.equal((await withdraw(iban(49_999)))[0], 400, 'en az 50.000');
-    assert.equal((await withdraw(iban(5_000_001)))[0], 400, 'en çok 5.000.000');
+    assert.equal((await withdraw(iban(9_999)))[0], 400, 'en az 10.000');
+    assert.equal((await withdraw(iban(1_000_001)))[0], 400, 'en çok 1.000.000');
     assert.equal((await withdraw({ ...iban(50_000), method: 'paypal' }))[0], 400, 'yöntem');
     assert.equal((await withdraw({ ...iban(50_000), details: { holder: 'Ada', account: 'TR330006100519786457841327' } }))[0], 400, 'IBAN kontrol basamağı');
     assert.equal((await withdraw({ ...iban(50_000), details: { holder: 'A', account: IBAN } }))[0], 400, 'ad kısa');
@@ -67,7 +67,7 @@ describe('para çekme', () => {
     assert.equal(j.user.diamonds, 39_995);
     assert.deepEqual(
       { diamonds: first.diamonds, usd: first.usd, method: first.method, holder: first.holder, account: first.account, status: first.status, statusLabel: first.statusLabel },
-      { diamonds: 60_000, usd: 12, method: 'iban', holder: 'Ada Yılmaz', account: IBAN, status: 'pending', statusLabel: 'Beklemede' },
+      { diamonds: 60_000, usd: 60, method: 'iban', holder: 'Ada Yılmaz', account: IBAN, status: 'pending', statusLabel: 'Beklemede' },
     );
     const again = await ok(withdraw(iban(60_000, r)));
     assert.equal(again.replay, true);
@@ -87,7 +87,7 @@ describe('para çekme', () => {
     const list = await ok(call('GET', '/api/wallet/withdrawals', null, host.session));
     assert.equal(list.withdrawals[0].id, first.id);
     assert.equal(list.withdrawable, 39_995);
-    assert.equal(list.rules.minDiamonds, 50_000);
+    assert.equal(list.rules.minDiamonds, 10_000);
     assert.equal(list.rules.weekUsed, 60_000);
     assert.equal((await ok(call('GET', '/api/wallet/withdrawals', null, other.session))).withdrawals.length, 0, 'başkasının talepleri görünmez');
   });

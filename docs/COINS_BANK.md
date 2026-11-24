@@ -18,7 +18,7 @@ Finans yönetimi (kurallar, ödeme onayı/reddi, mutabakat) mobil uygulamada yer
 
 ## Jeton Noktası ana hesabı (`app/src/lib/coins-bank.ts`)
 - **Elmas → jeton yalnızca ana Jeton Noktası hesabında.** Diğer hesaplar (yayıncı, ajans, kullanıcı) sunucuda reddedilir; uygulamadaki "Dönüştür" düğmesi kaldırıldı, yerine "Anında bozdur" bilgisi geldi.
-- **Dönüşüm değere göre ve %3:** Jeton Noktası yayıncıya/ajansa elmasın resmi değerinin tamamını öder (`elmas ÷ diamondsPerUsd × usdTry`) ve karşılığında jeton değerinden (Canlı ayarlar › 1.000 jeton = 220 TL, 24 Kasım 2026) %3 fazla değerde jeton alır: **1 elmas = (1 ÷ 5.000) × 50,62 × (1.000 ÷ 220) × 1,03 ≈ 0,0474 jeton.** Oran sabit sayı değildir; kur, elmas kuralı veya jeton değeri değişince kendiliğinden değişir. Jeton aşağı yuvarlanır, Jeton Noktası %3'ü geçemez.
+- **Dönüşüm değere göre ve %3:** Jeton Noktası yayıncıya/ajansa elmasın resmi değerinin tamamını öder (`elmas ÷ diamondsPerUsd × usdTry`) ve karşılığında jeton değerinden (Canlı ayarlar › 1.000 jeton = 220 TL, 24 Kasım 2026) %3 fazla değerde jeton alır: **1 elmas = (1 ÷ 1.000) × 49 (ödeme kuru) × (1.000 ÷ 220) × 1,03 ≈ 0,229 jeton.** Oran sabit sayı değildir; kur, elmas kuralı veya jeton değeri değişince kendiliğinden değişir. Jeton aşağı yuvarlanır, Jeton Noktası %3'ü geçemez.
 - **Toptan alım:** Jeton Noktası yönetimden jetonu panelin toptan fiyatından alır (Canlı ayarlar › Jeton Noktası › Toptan: 1.000 jeton = ? TL; 24 Kasım 2026: 220 TL). Yönetim jeton yüklemesinde fiyat o işlemde elle değiştirilebilir.
 - Kur (`usdTry`) Finance Control'den güncellenir; testler: `app/tests/economy.test.ts`.
 

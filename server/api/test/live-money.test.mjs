@@ -93,7 +93,7 @@ describe('Canlı ayarlar para uçlarında', () => {
     // Nor Kaka and Su to an app without Profil izleri (profile-mark-rules.mjs MARK_GIFTS).
     assert.equal(cat.gifts.length, GIFTS.size - GIFTS_PAUSED.size - BOND_GIFTS.size - MARK_GIFTS.size);
     assert.equal(cat.packs.length, PACKS.length);
-    assert.deepEqual(cat.exchange, { usdTry: EXCHANGE.usdTry, coinValueTl: COIN_VALUE_TL, payoutUsdTry: PAYOUT_USD_TRY, minDiamonds: EXCHANGE.minDiamonds });
+    assert.deepEqual(cat.exchange, { usdTry: EXCHANGE.usdTry, coinValueTl: COIN_VALUE_TL, payoutUsdTry: PAYOUT_USD_TRY, diamondsPerUsd: EXCHANGE.diamondsPerUsd, minDiamonds: EXCHANGE.minDiamonds });
     assert.equal(cat.campaign, null);
     assert.equal(cat.v, 0);
   });
@@ -166,7 +166,7 @@ describe('Canlı ayarlar para uçlarında', () => {
     before = await balance(host.user.id);
     let [st, j] = await exchange({ usdTry: 55, coinValueTl: COIN_VALUE_TL });
     assert.equal(st, 409);
-    assert.deepEqual(j, { error: 'Kur değişti, yeni tutarı kontrol et', code: 'rate_changed', usdTry: 52, coinValueTl: COIN_VALUE_TL, coins: up });
+    assert.deepEqual(j, { error: 'Kur değişti, yeni tutarı kontrol et', code: 'rate_changed', usdTry: 52, coinValueTl: COIN_VALUE_TL, diamondsPerUsd: EXCHANGE.diamondsPerUsd, coins: up });
     [st, j] = await exchange({ usdTry: '52', coinValueTl: COIN_VALUE_TL });
     assert.equal(st, 409, 'sayı olmayan kur');
     assert.equal(j.code, 'rate_changed');
@@ -182,7 +182,7 @@ describe('Canlı ayarlar para uçlarında', () => {
     assert.ok(dear < up);
     [st, j] = await exchange({ usdTry: 52, coinValueTl: COIN_VALUE_TL });
     assert.equal(st, 409);
-    assert.deepEqual(j, { error: 'Kur değişti, yeni tutarı kontrol et', code: 'rate_changed', usdTry: 52, coinValueTl: 250, coins: dear });
+    assert.deepEqual(j, { error: 'Kur değişti, yeni tutarı kontrol et', code: 'rate_changed', usdTry: 52, coinValueTl: 250, diamondsPerUsd: EXCHANGE.diamondsPerUsd, coins: dear });
     assert.deepEqual(await balance(host.user.id), before);
     assert.equal((await ok(exchange({ usdTry: 52, coinValueTl: 250 }))).coins, dear);
     // A cheaper coin gives more: the screen's amount is kept or beaten.
@@ -255,7 +255,7 @@ describe('Canlı ayarlar para uçlarında', () => {
 
     await setLive({ withdraw_weekly_diamonds: 60_000 });
     let rules = (await ok(call('GET', '/api/wallet/withdrawals', null, host.session))).rules;
-    assert.deepEqual(rules, { minDiamonds: 50_000, maxDiamonds: 5_000_000, weeklyDiamonds: 60_000, weekUsed: 0 });
+    assert.deepEqual(rules, { minDiamonds: 10_000, maxDiamonds: 1_000_000, weeklyDiamonds: 60_000, weekUsed: 0 });
     const before = await balance(host.user.id);
     let [st, j] = await ask(70_000);
     assert.equal(st, 400);
@@ -268,17 +268,17 @@ describe('Canlı ayarlar para uçlarında', () => {
 
     await setLive({ withdraw_max_diamonds: 50_000 });
     rules = (await ok(call('GET', '/api/wallet/withdrawals', null, host.session))).rules;
-    assert.deepEqual(rules, { minDiamonds: 50_000, maxDiamonds: 50_000, weeklyDiamonds: 60_000, weekUsed: 60_000 });
+    assert.deepEqual(rules, { minDiamonds: 10_000, maxDiamonds: 50_000, weeklyDiamonds: 60_000, weekUsed: 60_000 });
     // The request made under the old limit: a retry is its replay, not a 400.
     const again = await ok(ask(60_000, ref));
     assert.deepEqual([again.replay, again.withdrawal.id], [true, w.withdrawal.id]);
     [st, j] = await ask(55_000);
     assert.equal(st, 400);
-    assert.equal(j.error, 'Tek seferde en az 50.000, en çok 50.000 elmas çekilebilir');
+    assert.equal(j.error, 'Tek seferde en az 10.000, en çok 50.000 elmas çekilebilir');
 
     await setLive({ withdraw_max_diamonds: null, withdraw_weekly_diamonds: null });
     rules = (await ok(call('GET', '/api/wallet/withdrawals', null, host.session))).rules;
-    assert.deepEqual([rules.maxDiamonds, rules.weeklyDiamonds], [5_000_000, 10_000_000]);
+    assert.deepEqual([rules.maxDiamonds, rules.weeklyDiamonds], [1_000_000, 10_000_000]);
   });
 
   test('saatlik SMS sınırı 0: kod gönderimi 503, geri açınca çalışır', async () => {

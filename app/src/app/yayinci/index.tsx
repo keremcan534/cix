@@ -331,7 +331,7 @@ function Analytics() {
       <Line label="Net hak edişin" value={`💎 ${net.toLocaleString('tr-TR')} · ${usd(net)}`} bold />
       {agencyId && <Line label={`Ajans komisyonu (${pct(RULES.agencyCommission)}, ayrıca ödenir)`} value={`${commission.toLocaleString('tr-TR')} · ${usd(commission)}`} dim />}
       <Text style={styles.dim}>
-        {RULES.diamondsPerUsd.toLocaleString('tr-TR')} elmas = 1 USD. Komisyon ve bonuslar senin kazancından kesilmez; iade edilen işlemler dökümden çıkarılır.
+        {liveRules().diamondsPerUsd.toLocaleString('tr-TR')} elmas = 1 USD. Komisyon ve bonuslar senin kazancından kesilmez; iade edilen işlemler dökümden çıkarılır.
       </Text>
     </Card>
   );

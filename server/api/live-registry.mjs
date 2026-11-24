@@ -5,7 +5,7 @@
 // changes nothing. The table, the in-memory snapshot and the admin routes are in live-settings.mjs.
 //
 // Never here, by design (they change only with a deploy or elsewhere): level thresholds, perks and the Cömertlik gate
-// of the coin games (Seviye ayarları, levels.mjs), casino visibility, the age limits, diamondsPerUsd and the 1:1 coin-to-diamond ratio, diamond lock
+// of the coin games (Seviye ayarları, levels.mjs), casino visibility, the age limits and the 1:1 coin-to-diamond ratio, diamond lock
 // hours, test and sandbox flags, TEST_DAILY, pack coins / product ids / TL prices (Play Console owns the price),
 // gift prices (installed apps show the compiled price), the SMS provider and every secret.
 //
@@ -104,6 +104,7 @@ export function defaultsOf(e = process.env) {
     coin_value_tl: COIN_VALUE_TL,
     jeton_wholesale_tl: WHOLESALE_TL,
     payout_usd_try: PAYOUT_USD_TRY,
+    diamonds_per_usd: EXCHANGE.diamondsPerUsd,
     withdraw_max_diamonds: WITHDRAW.maxDiamonds,
     withdraw_weekly_diamonds: WITHDRAW.weeklyDiamonds,
     otp_global_per_hour: perHourOf(e.OTP_GLOBAL_PER_HOUR),
@@ -1051,6 +1052,25 @@ export const REGISTRY = {
     impact: (before, after) =>
       `1.000 jeton toptan ${rateText(before)} → ${rateText(after)} TL (${pctText(((after - before) / before) * 100)}); 100.000 jeton ${rateText(wholesaleTl(100_000, before))} → ${rateText(wholesaleTl(100_000, after))} TL. Yapılmış satışlar değişmez.`,
   },
+  diamonds_per_usd: {
+    field: 'diamondsPerUsd',
+    group: 'Ödemeler',
+    label: 'Elmas değeri: 1 USD = ? elmas',
+    help: 'Yayıncının elmasının değeri: para çekmede, ajans komisyonunun USD karşılığında, Jeton Noktası bozdurmasında ve Çevir\'de (elmas → jeton) kullanılır. Açık talepler oluşturuldukları andaki USD ile kalır. 100–100.000; bir kayıtta en çok %25 değişir.',
+    type: 'int',
+    bounds: { min: 100, max: 100_000, step: 1, maxStepPct: 25, bigStepPct: 5 },
+    parse: (v) => wholeOf(v, REGISTRY.diamonds_per_usd.bounds, 'Elmas değeri', ' elmas'),
+    change(before, after) {
+      if (Math.abs(after - before) * 4 <= before) return;
+      bad(`Elmas değeri bir kayıtta en çok %25 değişebilir: şimdi 1 USD = ${fmt(before)} elmas, yeni değer ${fmt(Math.ceil((before * 3) / 4))}–${fmt(Math.floor((before * 5) / 4))} arasında olmalı`);
+    },
+    big: (before, after) => after !== null && Math.abs(after - before) * 100 > before * REGISTRY.diamonds_per_usd.bounds.bigStepPct,
+    impact: (before, after, ctx) => {
+      const rate = ctx.next?.payoutUsdTry ?? PAYOUT_USD_TRY;
+      const usd = (per) => Math.floor((1_000_000 / per) * 100) / 100;
+      return `1.000.000 💎 = ${rateText(usd(before))} → ${rateText(usd(after))} USD (ödeme kuruyla ${rateText(payoutTl(usd(before), rate))} → ${rateText(payoutTl(usd(after), rate))} TL). Açık talepler kendi USD'leriyle kalır; eski uygulamalar USD tahminlerini eski değerle gösterir.`;
+    },
+  },
   payout_usd_try: {
     field: 'payoutUsdTry',
     group: 'Ödemeler',
@@ -1380,6 +1400,7 @@ export function snapshotOf(rows = [], e = process.env, { v = 0 } = {}) {
     coinValueTl: val('coin_value_tl'),
     wholesaleTl: val('jeton_wholesale_tl'),
     payoutUsdTry: val('payout_usd_try'),
+    diamondsPerUsd: val('diamonds_per_usd'),
     withdrawMax: val('withdraw_max_diamonds'),
     withdrawWeekly: val('withdraw_weekly_diamonds'),
     otpPerHour: val('otp_global_per_hour'),

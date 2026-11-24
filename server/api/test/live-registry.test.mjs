@@ -48,6 +48,7 @@ describe('defaults are today', () => {
       exchange_usd_try: EXCHANGE.usdTry,
       coin_value_tl: 220,
       jeton_wholesale_tl: 220,
+      diamonds_per_usd: 1000,
       payout_usd_try: 49,
       withdraw_max_diamonds: WITHDRAW.maxDiamonds,
       withdraw_weekly_diamonds: WITHDRAW.weeklyDiamonds,
@@ -214,7 +215,7 @@ describe('defaults are today', () => {
       system_notices_off: [],
     });
     assert.equal(EXCHANGE.usdTry, 50.62);
-    assert.equal(WITHDRAW.maxDiamonds, 5_000_000);
+    assert.equal(WITHDRAW.maxDiamonds, 1_000_000);
     assert.equal(WITHDRAW.weeklyDiamonds, 10_000_000);
     assert.equal(defaultsOf({ OTP_GLOBAL_PER_HOUR: '120' }).otp_global_per_hour, 120);
     assert.equal(defaultsOf({ OTP_GLOBAL_PER_HOUR: 'çok' }).otp_global_per_hour, 300);
@@ -237,6 +238,7 @@ describe('defaults are today', () => {
       'exchange_usd_try',
       'coin_value_tl',
       'jeton_wholesale_tl',
+      'diamonds_per_usd',
       'payout_usd_try',
       'withdraw_max_diamonds',
       'withdraw_weekly_diamonds',
@@ -403,7 +405,7 @@ describe('defaults are today', () => {
       'system_notices_off',
       'admin_site',
     ]);
-    for (const k of ['need_level', 'need_points', 'min_age', 'lucky_min_age', 'diamonds_per_usd', 'coin_diamond_ratio', 'lock_hours', 'test_daily', 'allow_test_topup', 'gift_prices', 'pack_prices', 'pack_coins', 'product_ids', 'sms_provider', '__proto__', 'constructor', 'toString']) {
+    for (const k of ['need_level', 'need_points', 'min_age', 'lucky_min_age', 'coin_diamond_ratio', 'lock_hours', 'test_daily', 'allow_test_topup', 'gift_prices', 'pack_prices', 'pack_coins', 'product_ids', 'sms_provider', '__proto__', 'constructor', 'toString']) {
       assert.ok(!Object.hasOwn(REGISTRY, k), k);
       refused(() => validate(k, 1), /Bilinmeyen ayar/);
     }
@@ -492,10 +494,10 @@ describe('validate', () => {
   });
 
   test('withdrawal limits: steps of 10,000, never above today', () => {
-    assert.equal(validate('withdraw_max_diamonds', 5_000_000), 5_000_000);
-    assert.equal(validate('withdraw_max_diamonds', 50_000), 50_000);
-    refused(() => validate('withdraw_max_diamonds', 5_010_000), /5\.000\.000/);
-    refused(() => validate('withdraw_max_diamonds', 40_000));
+    assert.equal(validate('withdraw_max_diamonds', 1_000_000), 1_000_000);
+    assert.equal(validate('withdraw_max_diamonds', 10_000), 10_000);
+    refused(() => validate('withdraw_max_diamonds', 1_010_000), /1\.000\.000/);
+    refused(() => validate('withdraw_max_diamonds', 5_000));
     refused(() => validate('withdraw_max_diamonds', 1_234_567), /katı/);
     assert.equal(validate('withdraw_weekly_diamonds', 10_000_000), 10_000_000);
     refused(() => validate('withdraw_weekly_diamonds', 10_010_000));
@@ -746,7 +748,7 @@ describe('snapshot', () => {
     assert.equal(s.giftsHidden.size, 0);
     assert.equal(s.campaign, null);
     assert.equal(s.usdTry, 50.62);
-    assert.equal(s.withdrawMax, 5e6);
+    assert.equal(s.withdrawMax, 1e6);
     assert.equal(s.withdrawWeekly, 1e7);
     assert.equal(s.otpPerHour, 300);
     assert.deepEqual(s.invalid, []);
@@ -783,7 +785,7 @@ describe('snapshot', () => {
     assert.deepEqual([...s.featuresOff], ['dm', 'gifts']);
     assert.equal(s.notice, null);
     assert.equal(s.usdTry, 53.5);
-    assert.equal(s.withdrawMax, 5e6);
+    assert.equal(s.withdrawMax, 1e6);
     assert.equal(s.giftsHidden.size, 0);
     assert.deepEqual([...s.packsHidden], ['p2']);
     assert.equal(s.otpPerHour, 300);

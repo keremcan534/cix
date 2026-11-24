@@ -575,8 +575,8 @@ export async function runAction(demo: boolean, fn: () => Promise<unknown>, done?
 }
 
 // --- Labels and formatting ------------------------------------------------------------------------------------
-/** 5000 diamonds = 1 USD (the server's DIAMONDS_PER_USD); shown next to amounts, computed there too. */
-export const DIAMONDS_PER_USD = 5000;
+/** 1 USD = ? 💎 (owners, 24 Nov 2026: 1.000; the server's Canlı ayarlar › diamonds_per_usd): shown next to amounts, computed there too. */
+export const DIAMONDS_PER_USD = 1000;
 export const fmtD = (v: number | null | undefined) => (v === null || v === undefined ? '—' : Number(v).toLocaleString('tr-TR', { maximumFractionDigits: Math.abs(v) < 100 ? 2 : 0 }));
 export const fmtUsd = (v: number | null | undefined) => (v === null || v === undefined ? '—' : `$${Number(v).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
 export const usdOf = (diamonds: number) => diamonds / DIAMONDS_PER_USD;

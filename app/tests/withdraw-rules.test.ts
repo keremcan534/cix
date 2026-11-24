@@ -15,8 +15,10 @@ describe('Para çekme kuralları', () => {
   test('sınırlar ve elmasın değeri sunucuyla aynı', () => {
     const w = catalog.WITHDRAW as { minDiamonds: number; maxDiamonds: number; weeklyDiamonds: number };
     assert.deepEqual([w.minDiamonds, w.maxDiamonds, w.weeklyDiamonds], [RULES.minWithdrawDiamonds, RULES.maxWithdrawDiamonds, RULES.weeklyWithdrawLimitDiamonds]);
-    for (const n of [50_000, 54_321, 99_995, 5_000_000]) assert.equal(withdrawUsd(n), (catalog.diamondValueUsd as (d: number) => number)(n), String(n));
-    assert.equal(withdrawUsd(99_995), 19.99, 'kuruş aşağı yuvarlanır');
+    for (const n of [10_000, 54_321, 99_995, 1_000_000]) assert.equal(withdrawUsd(n), (catalog.diamondValueUsd as (d: number) => number)(n), String(n));
+    assert.equal(withdrawUsd(99_995), 99.99, 'kuruş aşağı yuvarlanır (1.000 elmas = 1 USD)');
+    assert.equal(withdrawUsd(99_995, 5_000), 19.99, 'panelden başka değer');
+    assert.deepEqual([RULES.minWithdrawDiamonds, RULES.maxWithdrawDiamonds, RULES.weeklyWithdrawLimitDiamonds], [10_000, 1_000_000, 10_000_000], '10 USD, 1.000 USD, haftada 10.000 USD');
   });
 
   test('IBAN: her ülkeden, kontrol basamağıyla', () => {
@@ -28,8 +30,8 @@ describe('Para çekme kuralları', () => {
 
   test('talep denetimi: ilk sorun söylenir', () => {
     assert.equal(checkWithdraw(ok), null);
-    assert.match(checkWithdraw({ ...ok, diamonds: 49_999 }) ?? '', /En az 50\.000/);
-    assert.match(checkWithdraw({ ...ok, diamonds: 5_000_001, withdrawable: 9_000_000 }) ?? '', /en çok 5\.000\.000/);
+    assert.match(checkWithdraw({ ...ok, diamonds: 9_999 }) ?? '', /En az 10\.000/);
+    assert.match(checkWithdraw({ ...ok, diamonds: 1_000_001, withdrawable: 9_000_000 }) ?? '', /en çok 1\.000\.000/);
     assert.match(checkWithdraw({ ...ok, diamonds: 100_001 }) ?? '', /yetmiyor/);
     assert.match(checkWithdraw({ ...ok, holder: ' A ' }) ?? '', /adını/);
     assert.match(checkWithdraw({ ...ok, account: 'GB00 WEST 1234 5698 7654 32' }) ?? '', /IBAN geçersiz/);

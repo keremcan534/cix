@@ -57,8 +57,8 @@ export function maskAccount(method: WithdrawMethod, account: string) {
   return t.length > 24 ? `${t.slice(0, 24)}…` : t;
 }
 
-/** What the server pays for `diamonds`, in USD, cents rounded down (server catalog.mjs diamondValueUsd). */
-export const withdrawUsd = (diamonds: number) => Math.floor((diamonds / RULES.diamondsPerUsd) * 100) / 100;
+/** What the server pays for `diamonds`, in USD, cents rounded down (server catalog.mjs diamondValueUsd); `perUsd`: the live diamond value. */
+export const withdrawUsd = (diamonds: number, perUsd = RULES.diamondsPerUsd) => Math.floor((diamonds / perUsd) * 100) / 100;
 
 export type WithdrawForm = { diamonds: number; withdrawable: number; method: WithdrawMethod; holder: string; account: string };
 

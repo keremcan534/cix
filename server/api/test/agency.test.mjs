@@ -205,7 +205,7 @@ describe('Komisyon motoru', () => {
     assert.equal(num(k.parent_rate), 0.15);
     assert.equal(num(k.agency_amount), 1250);
     assert.equal(num(k.parent_amount), 750);
-    assert.equal(num(k.usd), 0.4, 'komisyon 2000 elmas; 5000 elmas = 1 USD → 0,4 USD');
+    assert.equal(num(k.usd), 2, 'komisyon 2000 elmas; 1000 elmas = 1 USD → 2 USD');
     assert.equal(k.agency_id, S.id);
     assert.equal(k.parent_agency_id, T.id);
     assert.match(k.txn, /^AKM-\d+$/);
@@ -551,7 +551,7 @@ describe('Askı, personel, BD, ödemeler, raporlar', () => {
     const p = ok(await tOwner.post('/api/agency/payouts/request', { id: T.id, currency: 'USD', ref: r0 }));
     const expected = num((await q("SELECT sum(amount) AS s FROM agency_ledger WHERE agency_id = $1", [T.id]))[0].s);
     assert.equal(p.payout.amount, expected);
-    assert.equal(p.payout.usd, Math.round((expected / 5000) * 100) / 100);
+    assert.equal(p.payout.usd, Math.round((expected / 1000) * 100) / 100);
     const replay = ok(await tOwner.post('/api/agency/payouts/request', { id: T.id, currency: 'USD', ref: r0 }));
     assert.equal(replay.replay, true);
     assert.equal(replay.payout.id, p.payout.id);

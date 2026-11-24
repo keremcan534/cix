@@ -8,7 +8,7 @@ export const LUCKY_RECIPIENT_SHARE = 0.2;
 
 export type Rules = {
   version: number;
-  diamondsPerUsd: number; // 5.000 elmas = 1 USD
+  diamondsPerUsd: number; // 1 USD = ? elmas (owners, 24 Nov 2026: 1.000; Canlı ayarlar › diamonds_per_usd)
   /** TL per USD used for TL values of diamonds (Coins Bank conversion); updated with the pack prices. */
   usdTry: number;
   /** What 1.000 coins are worth in TL (Canlı ayarlar › coin_value_tl; owners, 24 Nov 2026: 220 TL). */
@@ -61,7 +61,7 @@ export type Rules = {
 
 export const DEFAULT_RULES: Rules = {
   version: 1,
-  diamondsPerUsd: 5_000,
+  diamondsPerUsd: 1_000,
   usdTry: 50.62,
   coinValueTl: 220,
   payoutUsdTry: 49,
@@ -77,14 +77,14 @@ export const DEFAULT_RULES: Rules = {
   videoCallBonus: 0.05,
   roomEventBonus: 0.02,
   bonusCapPerWeek: 500_000,
-  minWithdrawDiamonds: 50_000,
+  minWithdrawDiamonds: 10_000,
   exchangeMinDiamonds: 100,
   inviteUnitsPerPurchase: 1,
   inviteIncomeShare: 0.08,
   inviteRechargeShare: 0.04,
   creatorDiamondsPerCoin: 1,
   bdCommission: 0.05,
-  maxWithdrawDiamonds: 5_000_000,
+  maxWithdrawDiamonds: 1_000_000,
   weeklyWithdrawLimitDiamonds: 10_000_000,
   autoApproveUnderDiamonds: 250_000,
   pendingDays: 7,

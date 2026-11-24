@@ -172,13 +172,13 @@ export async function liveTopup(coins: number) {
  * now (409 rate_changed) nothing was taken: the new rate reaches the screens and the error says the new amount.
  */
 export async function liveExchange(diamonds: number) {
-  const { usdTry, coinValueTl } = liveRules();
+  const { usdTry, coinValueTl, diamondsPerUsd } = liveRules();
   let r: { user: api.ServerUser; coins: number };
   try {
-    r = applied(await once(`exchange:${diamonds}`, (ref) => api.exchange(diamonds, ref, usdTry, coinValueTl)), 'Elmas → jeton çevirme');
+    r = applied(await once(`exchange:${diamonds}`, (ref) => api.exchange(diamonds, ref, usdTry, coinValueTl, diamondsPerUsd)), 'Elmas → jeton çevirme');
   } catch (e) {
     if (!(e instanceof api.ApiError && e.status === 409 && e.data.code === 'rate_changed')) throw e;
-    noteLiveRate(e.data.usdTry, e.data.coinValueTl);
+    noteLiveRate(e.data.usdTry, e.data.coinValueTl, e.data.diamondsPerUsd);
     void refreshLiveCatalog();
     throw new api.ApiError(409, rateChangedMessage(diamonds, e.data), e.data);
   }

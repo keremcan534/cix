@@ -80,6 +80,8 @@ export type LiveCatalog = {
   coinValueTl: number | null;
   /** Ödeme kuru (Canlı ayarlar › payout_usd_try); null: the app's own (RULES.payoutUsdTry). */
   payoutUsdTry?: number | null;
+  /** 1 USD = ? 💎 (Canlı ayarlar › diamonds_per_usd); null: the app's own (RULES.diamondsPerUsd). */
+  diamondsPerUsd?: number | null;
   /** The videos the server hands out (server/api/fx.mjs); null when it didn't say (an older server). */
   fx: FxVideo[] | null;
   /** The admins' gifts the server lists, in its order; [] from an older server. */
@@ -140,6 +142,8 @@ export const validRate = (x: unknown): x is number => typeof x === 'number' && N
 export const validCoinValue = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x) && x >= 1 && x <= 5000;
 /** A payout rate the server may send: 30–100 TL per USD (server/api/live-registry.mjs payout_usd_try). */
 export const validPayoutRate = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x) && x >= 30 && x <= 100;
+/** A diamond value the server may send: 100–100.000 diamonds per USD, whole (server/api/live-registry.mjs diamonds_per_usd). */
+export const validDiamondValue = (x: unknown): x is number => typeof x === 'number' && Number.isInteger(x) && x >= 100 && x <= 100_000;
 
 /** A list of gift ids; null when it is empty or any entry is malformed (then nothing is hidden). */
 function idList(list: unknown, idOf: (x: unknown) => unknown): string[] | null {
@@ -280,6 +284,7 @@ export function parseLiveCatalog(raw: unknown): LiveCatalog {
   const rate = obj(r.exchange).usdTry;
   const coinValue = obj(r.exchange).coinValueTl;
   const payout = obj(r.exchange).payoutUsdTry;
+  const perUsd = obj(r.exchange).diamondsPerUsd;
   const remote = parseRemoteGifts(r.gifts);
   // The server said it all (gifts=2): what is on the shelves, in which order, and what the app's own gifts are now.
   const app = r.giftsFormat === 2 ? parseAppGifts(r.gifts) : {};
@@ -291,6 +296,7 @@ export function parseLiveCatalog(raw: unknown): LiveCatalog {
     usdTry: validRate(rate) ? rate : null,
     coinValueTl: validCoinValue(coinValue) ? coinValue : null,
     ...(validPayoutRate(payout) ? { payoutUsdTry: payout } : {}),
+    ...(validDiamondValue(perUsd) ? { diamondsPerUsd: perUsd } : {}),
     fx: parseFxList(r.fx),
     remote,
     shelf: r.giftsFormat === 2 ? shelfOf(r.gifts, app, remote) : null,
@@ -339,6 +345,7 @@ export function parseSavedLiveCatalog(raw: string | null): { catalog: LiveCatalo
       usdTry: validRate(r.usdTry) ? r.usdTry : null,
       coinValueTl: validCoinValue(r.coinValueTl) ? r.coinValueTl : null,
       ...(validPayoutRate(r.payoutUsdTry) ? { payoutUsdTry: r.payoutUsdTry } : {}),
+      ...(validDiamondValue(r.diamondsPerUsd) ? { diamondsPerUsd: r.diamondsPerUsd } : {}),
       fx: parseFxList(r.fx),
       remote,
       shelf,
@@ -484,16 +491,17 @@ export const markKinds = (c: LiveCatalog | null = current): Record<string, MarkK
 /** A gift's icon address when the server gave one (an admin's gift, or one of the app's whose icon was replaced). */
 export const remoteIconOf = (id: string, c: LiveCatalog | null = current): string | undefined => c?.app[id]?.icon ?? c?.remote.find((g) => g.id === id)?.icon;
 
-let rulesMemo: { rate: number; value: number; payout: number; rules: Rules } | null = null;
+let rulesMemo: { rate: number; value: number; payout: number; perUsd: number; rules: Rules } | null = null;
 /** The rules with the server's Çevir rate and coin value (lib/coins-bank selfExchangeRate / exchangeOwnDiamonds);
  *  the app's own for what the server didn't say or said out of range. The same object until they change. */
 export function liveRules(c: LiveCatalog | null = current): Rules {
   const rate = validRate(c?.usdTry) ? c.usdTry : RULES.usdTry;
   const value = validCoinValue(c?.coinValueTl) ? c.coinValueTl : RULES.coinValueTl;
   const payout = validPayoutRate(c?.payoutUsdTry) ? c.payoutUsdTry : RULES.payoutUsdTry;
-  if (rate === RULES.usdTry && value === RULES.coinValueTl && payout === RULES.payoutUsdTry) return RULES;
-  if (rulesMemo?.rate !== rate || rulesMemo.value !== value || rulesMemo.payout !== payout)
-    rulesMemo = { rate, value, payout, rules: { ...RULES, usdTry: rate, coinValueTl: value, coinsBankRetailCoinsPerTl: 1000 / value, payoutUsdTry: payout } };
+  const perUsd = validDiamondValue(c?.diamondsPerUsd) ? c.diamondsPerUsd : RULES.diamondsPerUsd;
+  if (rate === RULES.usdTry && value === RULES.coinValueTl && payout === RULES.payoutUsdTry && perUsd === RULES.diamondsPerUsd) return RULES;
+  if (rulesMemo?.rate !== rate || rulesMemo.value !== value || rulesMemo.payout !== payout || rulesMemo.perUsd !== perUsd)
+    rulesMemo = { rate, value, payout, perUsd, rules: { ...RULES, usdTry: rate, coinValueTl: value, coinsBankRetailCoinsPerTl: 1000 / value, payoutUsdTry: payout, diamondsPerUsd: perUsd } };
   return rulesMemo.rules;
 }
 
@@ -511,14 +519,15 @@ const fmt = (n: number) => n.toLocaleString('tr-TR');
  * Çevir after the server's rate changed under the screen (409 rate_changed): nothing was taken; the person sees
  * the new amount and decides again. The server's own amount when it sent one, else the sum at its new rate.
  */
-export function rateChangedMessage(diamonds: number, data: { usdTry?: unknown; coinValueTl?: unknown; coins?: unknown }): string {
+export function rateChangedMessage(diamonds: number, data: { usdTry?: unknown; coinValueTl?: unknown; diamondsPerUsd?: unknown; coins?: unknown }): string {
   const sent = data.coins;
   const value = validCoinValue(data.coinValueTl) ? data.coinValueTl : RULES.coinValueTl;
+  const perUsd = validDiamondValue(data.diamondsPerUsd) ? data.diamondsPerUsd : RULES.diamondsPerUsd;
   const coins =
     typeof sent === 'number' && Number.isSafeInteger(sent) && sent >= 0
       ? sent
       : validRate(data.usdTry)
-        ? Math.floor(diamonds * selfExchangeRate({ ...RULES, usdTry: data.usdTry, coinValueTl: value, coinsBankRetailCoinsPerTl: 1000 / value }))
+        ? Math.floor(diamonds * selfExchangeRate({ ...RULES, usdTry: data.usdTry, coinValueTl: value, coinsBankRetailCoinsPerTl: 1000 / value, diamondsPerUsd: perUsd }))
         : null;
   if (coins === null || !Number.isSafeInteger(diamonds) || diamonds <= 0) return 'Çevirme kuru az önce değişti. Elmasların yerinde; yeni tutara bakıp yeniden dene.';
   return `Çevirme kuru az önce değişti: ${fmt(diamonds)} elmas artık ${fmt(coins)} jeton ediyor. Elmasların yerinde; uygunsa yeniden dene.`;
@@ -610,10 +619,10 @@ export const liveCatalogV = () => current?.v ?? null;
 export const liveCatalogStale = (now = Date.now()) => !current || now - fetchedAt > MAX_AGE_MS;
 
 /** The server named its current Çevir rate and coin value (409 rate_changed): the screens show them before the catalog is read again. */
-export function noteLiveRate(usdTry: unknown, coinValueTl?: unknown) {
+export function noteLiveRate(usdTry: unknown, coinValueTl?: unknown, diamondsPerUsd?: unknown) {
   if (!validRate(usdTry)) return;
   const base = current ?? { v: 0, giftIds: null, packs: [], campaign: null, coinValueTl: null, fx: null, remote: [], shelf: null, app: {}, emoji: null, levels: null, shop: null, guard: null, bonds: null, familyThemes: null, rooms: null, marks: null };
-  publish({ ...base, usdTry, ...(validCoinValue(coinValueTl) ? { coinValueTl } : {}) });
+  publish({ ...base, usdTry, ...(validCoinValue(coinValueTl) ? { coinValueTl } : {}), ...(validDiamondValue(diamondsPerUsd) ? { diamondsPerUsd } : {}) });
 }
 
 const subscribe = (l: () => void) => {

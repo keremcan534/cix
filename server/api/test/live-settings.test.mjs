@@ -102,7 +102,7 @@ describe('nothing saved', () => {
     assert.deepEqual(
       j.settings.map((x) => x.key),
       [
-        ...['features_off', 'notice', 'campaign', 'gifts_hidden', 'shop_hidden', 'packs_hidden', 'pack_setup', 'exchange_usd_try', 'coin_value_tl', 'jeton_wholesale_tl', 'payout_usd_try', 'withdraw_max_diamonds', 'withdraw_weekly_diamonds', 'otp_global_per_hour', 'min_version'],
+        ...['features_off', 'notice', 'campaign', 'gifts_hidden', 'shop_hidden', 'packs_hidden', 'pack_setup', 'exchange_usd_try', 'coin_value_tl', 'jeton_wholesale_tl', 'diamonds_per_usd', 'payout_usd_try', 'withdraw_max_diamonds', 'withdraw_weekly_diamonds', 'otp_global_per_hour', 'min_version'],
         ...['dm_price', 'call_voice_price', 'call_video_price', 'call_free', 'call_free_seconds', 'call_plain_voice_price', 'call_plain_video_price', 'match_voice_price', 'match_video_price', 'match_free', 'match_free_seconds', 'heart_voice_level', 'heart_video_level'],
         ...['heart_msg_points', 'heart_msg_daily', 'heart_grace_days', 'heart_half_days'],
         'backpack_call_task',
@@ -140,7 +140,7 @@ describe('nothing saved', () => {
     assert.equal(by.exchange_usd_try.default, 50.62);
     assert.deepEqual([by.coin_value_tl.effective, by.jeton_wholesale_tl.effective], [220, 220]);
     assert.deepEqual(by.exchange_usd_try.bounds, { min: 40, max: 75, decimals: 2, maxStepPct: 10, bigStepPct: 3 });
-    assert.equal(by.withdraw_max_diamonds.bounds.max, 5_000_000);
+    assert.equal(by.withdraw_max_diamonds.bounds.max, 1_000_000);
     assert.equal(by.withdraw_weekly_diamonds.effective, 10_000_000);
     assert.equal(by.otp_global_per_hour.effective, 300);
     assert.equal(by.campaign.effective, null);
@@ -158,10 +158,10 @@ describe('saving', () => {
       [{ changes: ['notice'], reason: 'Bakım duyurusu', baseV: 0 }, /Değişiklikler eksik/],
       [{ changes: {}, reason: 'Bakım duyurusu', baseV: 0 }, /Değişiklik yok/],
       [{ changes: { need_level: 1 }, reason: 'Seviye düşsün', baseV: 0 }, /Bilinmeyen ayar: need_level/],
-      [{ changes: { diamonds_per_usd: 6000 }, reason: 'Kur', baseV: 0 }, /Bilinmeyen ayar/],
+      [{ changes: { diamonds_per_usd: 6000 }, reason: 'Kur', baseV: 0 }, /en çok %25/],
       [{ changes: { exchange_usd_try: 498 }, reason: 'Kur yanlış', baseV: 0 }, /40,00 ile 75,00/],
       [{ changes: { exchange_usd_try: 56 }, reason: 'Kur çok arttı', baseV: 0 }, /en çok %10/],
-      [{ changes: { withdraw_max_diamonds: 6_000_000 }, reason: 'Sınır artsın', baseV: 0 }, /5\.000\.000/],
+      [{ changes: { withdraw_max_diamonds: 2_000_000 }, reason: 'Sınır artsın', baseV: 0 }, /1\.000\.000/],
       [{ changes: { notice: undefined, features_off: ['casino'] }, reason: 'Kapat', baseV: 0 }, /bilinmeyen seçim/],
       [{ changes: { packs_hidden: ['p1', 'p10', 'p2', 'p11', 'p3', 'p12', 'p4', 'p13', 'p5'] }, reason: 'Hepsini gizle', baseV: 0 }, /En az bir paket/],
     ];
@@ -181,7 +181,7 @@ describe('saving', () => {
     assert.equal(j.preview.length, 1);
     const [p] = j.preview;
     assert.deepEqual({ ...p, impact: undefined }, { key: 'exchange_usd_try', label: 'Çevirme kuru', before: 50.62, after: 51, reset: false, impact: undefined, big: false });
-    assert.match(p.impact, /^10\.000 💎 = 460 → 463 jeton \(\+%0,8\)\.$/);
+    assert.match(p.impact, /^10\.000 💎 = 2\.300 → 2\.318 jeton \(\+%0,8\)\.$/);
     assert.equal(await rows(), 0);
   });
 

@@ -12,15 +12,15 @@ import { convertDiamonds, diamondValueTl, exchangeOwnDiamonds, exchangeRate, sel
 const close = (a: number, b: number, tol = 1e-9) => Math.abs(a - b) <= tol;
 
 describe('Kurallar', () => {
-  test('5.000 elmas = 1 USD; 1.000 jeton = 220 TL, toptan 220 TL; Coins Bank %3 dönüşüm; Lucky yayıncı payı %20', () => {
-    assert.equal(RULES.diamondsPerUsd, 5_000);
+  test('1.000 elmas = 1 USD; 1.000 jeton = 220 TL, toptan 220 TL; Coins Bank %3 dönüşüm; Lucky yayıncı payı %20', () => {
+    assert.equal(RULES.diamondsPerUsd, 1_000);
     assert.equal(RULES.coinValueTl, 220);
     assert.ok(close(RULES.coinsBankRetailCoinsPerTl, 1_000 / 220));
     assert.equal(RULES.coinsBankWholesaleTlPer1000, 220);
     assert.equal(RULES.coinsBankExchangeFee, 0.03);
     assert.equal(RULES.luckyHostShare, 0.2);
     assert.equal(RULES.payoutUsdTry, 49);
-    assert.ok(close(diamondValueTl(1_000_000), 9_800, 1e-6), '1.000.000 💎 = 200 USD = 9.800 TL (ödeme kuru 49)');
+    assert.ok(close(diamondValueTl(1_000_000), 49_000, 1e-6), '1.000.000 💎 = 1.000 USD = 49.000 TL (ödeme kuru 49)');
   });
 });
 
@@ -60,13 +60,13 @@ describe('Coins Bank', () => {
   });
   test('dönüşüm değere göre: 1 elmas = değeri × satış fiyatı × 1,03', () => {
     const rate = exchangeRate();
-    assert.ok(close(rate, (1 / 5_000) * 49 * (1_000 / 220) * 1.03));
-    assert.ok(close(rate, 0.0459, 1e-3), `oran ${rate}`);
+    assert.ok(close(rate, (1 / 1_000) * 49 * (1_000 / 220) * 1.03));
+    assert.ok(close(rate, 0.2294, 1e-3), `oran ${rate}`);
     const q = convertDiamonds('coins_bank_main', 1_000_000);
     assert.ok(q.ok);
     if (!q.ok) return;
     assert.equal(q.coins, Math.floor(1_000_000 * rate));
-    assert.ok(close(q.paidTl, 9_800, 1e-6), 'yayıncıya ödeme kuruyla değerin tamamı');
+    assert.ok(close(q.paidTl, 49_000, 1e-6), 'yayıncıya ödeme kuruyla değerin tamamı');
   });
   test('Coins Bank dönüşümde %3’ten fazla kazanamaz; jeton aşağı yuvarlanır', () => {
     for (const d of [1, 999, 50_000, 1_000_000, 123_456_789]) {
@@ -79,7 +79,7 @@ describe('Coins Bank', () => {
     }
   });
   test('kur veya elmas kuralı değişince oran kendiliğinden değişir (sabit sayı değil)', () => {
-    const other = { ...DEFAULT_RULES, diamondsPerUsd: 10_000 };
+    const other = { ...DEFAULT_RULES, diamondsPerUsd: 2_000 };
     assert.ok(close(exchangeRate(other), exchangeRate() / 2));
     const fx = { ...DEFAULT_RULES, payoutUsdTry: 60 };
     assert.ok(close(exchangeRate(fx) / exchangeRate(), 60 / 49));
@@ -104,11 +104,11 @@ describe('Coins Bank', () => {
 
 describe('Gelir > Çevir (elmas → jeton)', () => {
   test('kur: elmasın değeri × jeton değeri (1.000 jeton = 220 TL), ücret yok', () => {
-    assert.ok(close(selfExchangeRate(), (1 / 5_000) * 50.62 * (1_000 / 220)));
-    assert.ok(close(selfExchangeRate(), 0.046, 1e-3), `oran ${selfExchangeRate()}`);
+    assert.ok(close(selfExchangeRate(), (1 / 1_000) * 50.62 * (1_000 / 220)));
+    assert.ok(close(selfExchangeRate(), 0.2301, 1e-3), `oran ${selfExchangeRate()}`);
     const q = exchangeOwnDiamonds(88_959, 88_959);
     assert.ok(q.ok);
-    if (q.ok) assert.equal(q.coins, 4_093);
+    if (q.ok) assert.equal(q.coins, Math.floor(88_959 * (1 / 1_000) * 50.62 * (1_000 / 220)));
   });
   test('jeton, elmasın nakit değerinin mağazada aldığından fazla olamaz; aşağı yuvarlanır', () => {
     for (const d of [100, 137, 999, 50_000, 1_000_000, 123_456_789]) {
@@ -117,7 +117,7 @@ describe('Gelir > Çevir (elmas → jeton)', () => {
       if (!q.ok) continue;
       assert.ok(q.coins / RULES.coinsBankRetailCoinsPerTl <= q.valueTl + 1e-9, `${d}`);
       assert.ok(q.coins > d * selfExchangeRate() - 1);
-      assert.ok(close(q.valueTl, (d / 5_000) * 50.62), 'Çevir elmasın piyasa değeri (çevirme kuru)');
+      assert.ok(close(q.valueTl, (d / 1_000) * 50.62), 'Çevir elmasın piyasa değeri (çevirme kuru)');
     }
   });
   test('alt sınır, bakiye ve geçersiz miktarlar reddedilir', () => {

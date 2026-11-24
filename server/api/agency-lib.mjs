@@ -7,10 +7,12 @@
 import crypto from 'node:crypto';
 
 import { HttpError, db, move } from './core.mjs';
+import { live } from './live-settings.mjs';
 import { LOCK_HOURS, diamondState } from './wallet.mjs';
 import { penaltyAt } from './agency-activity.mjs';
 
-export const DIAMONDS_PER_USD = 5000;
+/** 1 USD = ? 💎 now (Canlı ayarlar › diamonds_per_usd; owners, 24 Nov 2026: 1.000). */
+export const diamondsPerUsd = () => live().diamondsPerUsd;
 /** The first release runs two agency levels (top, sub). The data model allows more; settings can't exceed this. */
 export const MAX_LEVELS_V1 = 2;
 // 'message' and 'call': 1v1 paid messages and call or match minutes (one-on-one.mjs).
@@ -248,7 +250,7 @@ export const fmt4 = (n) => {
   return `${s}${Math.floor(a / 1e4)}.${String(a % 1e4).padStart(4, '0')}`;
 };
 export const d4 = (x) => Math.round(Number(x ?? 0) * 1e4) / 1e4;
-export const usdOf = (diamonds) => Math.round((Number(diamonds) / DIAMONDS_PER_USD) * 100) / 100;
+export const usdOf = (diamonds, perUsd = diamondsPerUsd()) => Math.round((Number(diamonds) / perUsd) * 100) / 100;
 
 // --- Periods (Europe/Istanbul: UTC+3 all year) ---------------------------------------------------------------
 const TZ_MS = 3 * 3600e3;
@@ -568,7 +570,7 @@ export async function calcEvent(c, eventId) {
   const ins = await c.query(
     `INSERT INTO agency_commissions (income_event_id, txn, streamer_id, agency_id, parent_agency_id, top_agency_id, chain, base_diamonds, income_type,
        pool_cap, total_rate, agency_rate, parent_rate, transition_rate, agency_amount, parent_amount, transition_amount, usd, period, rule_version, occurred_at, assistant_amount, penalty_rate)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18::numeric / ${DIAMONDS_PER_USD}, $19, $20, $21, $22, $23)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18::numeric / ${diamondsPerUsd()}, $19, $20, $21, $22, $23)
      ON CONFLICT (income_event_id) DO NOTHING RETURNING *`,
     [
       ev.id,

@@ -295,8 +295,8 @@ export const jetonRoutes = {
     // The host is paid at the payout rate (Canlı ayarlar › payout_usd_try); the bank's coins, at the coin value in
     // effect, are worth what it pays plus its fee.
     const s = live();
-    const coins = bankExchangeCoins(diamonds, s.coinValueTl, s.payoutUsdTry);
-    const valueTl = diamondValueTl(diamonds, s.payoutUsdTry);
+    const coins = bankExchangeCoins(diamonds, s.coinValueTl, s.payoutUsdTry, s.diamondsPerUsd);
+    const valueTl = diamondValueTl(diamonds, s.payoutUsdTry, s.diamondsPerUsd);
     if (await blockedBetween(u.id, bank)) throw new HttpError(403, 'Bu Jeton Noktası ile işlem yapamazsın');
     const ip = clientIp(req);
     const out = await once(u.id, 'diamond', b.ref, async (c) => {

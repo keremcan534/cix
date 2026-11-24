@@ -111,7 +111,8 @@ export const withdrawRoutes = {
     const n = int(b.diamonds, WITHDRAW.minDiamonds, WITHDRAW.maxDiamonds);
     if (!n) throw new HttpError(400, range);
     const { method, holder, account } = payoutDetails(b.method, b.details);
-    const usd = diamondValueUsd(n);
+    // At the diamond's value in effect (Canlı ayarlar › diamonds_per_usd); the request keeps it.
+    const usd = diamondValueUsd(n, live().diamondsPerUsd);
     const ip = clientIp(req);
     const out = await once(u.id, 'diamond', b.ref, async (c) => {
       // A second copy of the same request waits on the row, then finds the ref (a replay).

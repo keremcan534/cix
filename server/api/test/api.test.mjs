@@ -56,19 +56,19 @@ describe('Giriş ve cüzdan', () => {
     const ref = rnd(6);
     const both = await Promise.all([1, 2].map(() => call('POST', '/api/wallet/exchange', { usdTry: 50.62, coinValueTl: 220, diamonds: 1000, ref, coins: 999999 }, b.session)));
     for (const [st, j] of both) assert.equal(st, 200, j.error);
-    assert.equal(both[0][1].coins, 46, 'jetonu sunucu hesaplar; istemcinin yazdığı sayılmaz (1.000 elmas = 10,12 TL, 1.000 jeton = 220 TL)');
+    assert.equal(both[0][1].coins, 230, 'jetonu sunucu hesaplar; istemcinin yazdığı sayılmaz (1.000 elmas = 1 USD = 50,62 TL, 1.000 jeton = 220 TL)');
     const [, mine] = await call('GET', '/api/me', null, b.session);
-    assert.deepEqual([mine.user.diamonds, mine.user.coins], [200, 46]);
+    assert.deepEqual([mine.user.diamonds, mine.user.coins], [200, 230]);
     assert.equal((await call('POST', '/api/wallet/exchange', { usdTry: 50.62, coinValueTl: 220, diamonds: 201, ref: rnd(6) }, b.session))[0], 409);
     assert.equal((await call('POST', '/api/wallet/exchange', { usdTry: 50.62, coinValueTl: 220, diamonds: 99, ref: rnd(6) }, b.session))[0], 400);
     assert.equal((await call('POST', '/api/wallet/exchange', { usdTry: 50.62, coinValueTl: 220, diamonds: 150.5, ref: rnd(6) }, b.session))[0], 400);
     const [, after] = await call('GET', '/api/me', null, b.session);
-    assert.deepEqual([after.user.diamonds, after.user.coins], [200, 46], 'reddedilen istek bakiyeye dokunmaz');
+    assert.deepEqual([after.user.diamonds, after.user.coins], [200, 230], 'reddedilen istek bakiyeye dokunmaz');
     // An app from before the coin value (no coinValueTl) is told to update; nothing moves.
     const [old, oldWhy] = await call('POST', '/api/wallet/exchange', { diamonds: 100, ref: rnd(6), usdTry: 50.62 }, b.session);
     assert.deepEqual([old, oldWhy.code], [409, 'update_required']);
     const [, still] = await call('GET', '/api/me', null, b.session);
-    assert.deepEqual([still.user.diamonds, still.user.coins], [200, 46]);
+    assert.deepEqual([still.user.diamonds, still.user.coins], [200, 230]);
   });
 });
 
