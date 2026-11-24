@@ -1,8 +1,9 @@
 // The emoji panel's tabs and its memory on this phone (components/EmojiPanel, in rooms and chats).
 //
-//  - Tabs, under two headings. Sabit, what everyone has: Emoji (the Duygular faces, then Müzik and, in a room, Hamle),
-//    Favoriler and, in a room, the free Hareketli. VIP: in a room the paid Hareketli, then every sticker pack sold in
-//    the shop or opened by VIP (bought ones open, the rest show a preview). Temel is retired (data/catalog).
+//  - Tabs, under three headings (owners, 25 Nov 2026): Sabit, what everyone has: Emoji (the Duygular faces, then Müzik
+//    and, in a room, Hamle); Favoriler, right beside it; VIP: every sticker pack sold in the shop or opened by VIP, all
+//    "Yakında" for now (a pack someone already has stays theirs). Hareketli is gone from the panel. Temel is retired
+//    (data/catalog).
 //  - The tab it was last on: the panel opens there again (one a panel doesn't have, a chat's Hareketli say, opens Emoji).
 //  - How often each item was picked: Favoriler shows the most used first (equal counts: the latest first).
 //
@@ -19,7 +20,7 @@ export const USE_KEEP = 40;
 /** How many Favoriler shows. */
 export const FAV_MAX = 24;
 
-export type PanelKind = 'sabit' | 'vip';
+export type PanelKind = 'sabit' | 'fav' | 'vip';
 export type PanelTab = { id: string; kind: PanelKind; pack?: StickerPack };
 
 /** The packs drawn inside the Emoji tab, in this order (Hamle only in a room: its picks act on the mics). */
@@ -32,16 +33,16 @@ export const isVipPack = (p: StickerPack) => p.price > 0 || !!p.minVip;
 export const emojiTabPacks = (room: boolean, packs: readonly StickerPack[] = STICKER_PACKS) =>
   EMOJI_TAB_PACKS.map((id) => packs.find((p) => p.id === id)).filter((p): p is StickerPack => !!p && !p.retired && p.stickers.length > 0 && (!p.roomOnly || room));
 
-/** The panel's tabs, Sabit first. `room`: a room's panel (Hareketli and Hamle); a chat's has neither. */
+/** VIP's packs are "Yakında" (owners, 25 Nov 2026): shown, not sold or opened; one someone already has stays theirs. */
+export const VIP_SOON = true;
+/** The panel's tabs: Sabit, Favoriler, VIP. `room`: a room's panel (Hamle); a chat's has none. */
 export function panelTabs(room: boolean, packs: readonly StickerPack[] = STICKER_PACKS): PanelTab[] {
   const shown = packs.filter((p) => !p.retired && p.stickers.length > 0 && (!p.roomOnly || room) && !inEmojiTab(p.id));
   return [
     { id: 'emoji', kind: 'sabit' },
-    { id: 'fav', kind: 'sabit' },
-    ...(room ? [{ id: 'animated-free', kind: 'sabit' as const }] : []),
     // A free pack added later gets a tab of its own here.
     ...shown.filter((p) => !isVipPack(p)).map((pack) => ({ id: pack.id, kind: 'sabit' as const, pack })),
-    ...(room ? [{ id: 'animated', kind: 'vip' as const }] : []),
+    { id: 'fav', kind: 'fav' },
     ...shown.filter(isVipPack).map((pack) => ({ id: pack.id, kind: 'vip' as const, pack })),
   ];
 }

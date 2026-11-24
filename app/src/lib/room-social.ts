@@ -101,3 +101,8 @@ export function roomInviteNotices(invites: readonly FollowerRoomInvite[], seen: 
  * link: links don't pass the contact filter in messages; the sender's own chat shows the room card.
  */
 export const roomShareText = (title: string, code: string) => `${roomInviteText(title)} Oda ID: ${code}`;
+/** The room ID in a shared room's message (roomShareText), for the family and agency chats' "Odaya git"; null in any other text. */
+export function sharedRoomCode(text: string): string | null {
+  const m = /Oda ID: (\d{12})(?!\d)/.exec(text);
+  return m ? m[1] : null;
+}

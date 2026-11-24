@@ -59,6 +59,8 @@ export const ROOM_ICON_ART = {
   goal: require('../../assets/room/oda-topluluk-hedefi.png'),
   questions: require('../../assets/room/oda-sorular.png'),
   music: require('../../assets/room/oda-muzik.png'),
+  // DJ modu (components/room/dj-live): the owners' picture, 24 Nov 2026.
+  dj: require('../../assets/room/oda-dj-modu.png'),
   agency: require('../../assets/room/oda-ajans-odasi.png'),
   bossSeat: require('../../assets/room/oda-patron-koltugu.png'),
   diceDuel: require('../../assets/room/oda-zar-duellosu.png'),

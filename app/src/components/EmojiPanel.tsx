@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
-import { BackHandler, Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useEffect, useRef, useState, type ComponentRef } from 'react';
+import { BackHandler, Image, PanResponder, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -11,7 +11,7 @@ import { EMOJI_PACKS_ICON, REACTION_TAB_ANIMATED, StickerArt } from '@/component
 import { DISPLAY_LABEL, type Animation } from '@/data/animations';
 import { type Sticker } from '@/data/catalog';
 import { isLive, isSentAnim, useAnimations } from '@/lib/animations';
-import { animIdOf, animKey, emojiTabPacks, favourites, lastTab, notePick, openTab, panelTabs, pickCounts, setLastTab, type PanelKind, type PanelTab } from '@/lib/emoji-panel';
+import { VIP_SOON, animIdOf, animKey, emojiTabPacks, favourites, lastTab, notePick, openTab, panelTabs, pickCounts, setLastTab, type PanelKind, type PanelTab } from '@/lib/emoji-panel';
 import { useLiveCatalog } from '@/lib/live/catalog-live';
 import { livePackOf, livePacks, liveSticker } from '@/lib/live/emoji-live';
 import { stickerIdOf, stickerToken } from '@/lib/stickers';
@@ -19,7 +19,21 @@ import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 
-const KIND_NAME: Record<PanelKind, string> = { sabit: 'Sabit', vip: 'VIP' };
+const KIND_NAME: Record<PanelKind, string> = { sabit: 'Sabit', fav: 'Favoriler', vip: 'VIP' };
+
+/** The panel's sideways swipe (as the gift sheet's ShelfSwipe): made once, it calls the latest handler; up and down stays the list's scroll. */
+class TabSwipe {
+  private on?: (dir: 1 | -1) => void;
+  set(on: (dir: 1 | -1) => void) {
+    this.on = on;
+  }
+  readonly pan = PanResponder.create({
+    onMoveShouldSetPanResponderCapture: (_, g) => Math.abs(g.dx) > 18 && Math.abs(g.dx) > Math.abs(g.dy) * 2,
+    onPanResponderRelease: (_, g) => {
+      if (Math.abs(g.dx) > 50 || Math.abs(g.vx) > 0.5) this.on?.(g.dx < 0 ? 1 : -1);
+    },
+  });
+}
 
 /**
  * Inline emoji picker, in two parts (lib/emoji-panel). Sabit: Emoji (the animated faces, then Müzik and, in a room,
@@ -68,7 +82,24 @@ export function EmojiPanel({ onPick, hint, onAnimate, onClose, fill }: { onPick:
   const switchKind = (k: PanelKind) => {
     if (k !== kind) choose(tabs.find((x) => x.kind === k) ?? tabs[0]);
   };
+  // A swipe left or right over the list goes to the next or previous tab, from Sabit's last on into VIP's first and
+  // back (owners, 24 Nov 2026). Only a clearly sideways move takes the touch: an up-down one still scrolls the list,
+  // and a tap still picks. The tab strip follows, so the tab shown is in sight.
+  const strip = useRef<ComponentRef<typeof ScrollView>>(null);
+  const tabX = useRef(new Map<string, number>());
+  const step = (by: 1 | -1) => {
+    const next = tabs[tabs.findIndex((x) => x.id === tab.id) + by];
+    if (!next) return;
+    choose(next);
+    // The strip shows one kind's tabs; its new tab is placed once it is drawn.
+    requestAnimationFrame(() => strip.current?.scrollTo({ x: Math.max(0, (tabX.current.get(next.id) ?? 0) - 40), animated: true }));
+  };
+  // The responder is made once (TabSwipe); it calls the newest step (the tab it starts from changes with every swipe).
+  const [swipe] = useState(() => new TabSwipe());
+  useEffect(() => swipe.set(step));
 
+  // VIP's packs are "Yakında" (lib/emoji-panel VIP_SOON): one I don't have yet is shown, never opened or bought.
+  const soon = VIP_SOON && kind === 'vip' && locked;
   const pick = (e: string) => {
     if (locked) return;
     rememberEmoji(e);
@@ -87,9 +118,9 @@ export function EmojiPanel({ onPick, hint, onAnimate, onClose, fill }: { onPick:
     const id = animIdOf(key);
     return id ? catalog.find((a) => a.animation_id === id) : undefined;
   };
-  /** A favourite this panel can still send: a sticker of an open pack shown here, or a live Hareketli in a room. */
+  /** A favourite this panel can still send: a sticker of an open pack shown here (Hareketli is gone from the panel). */
   const canSend = (key: string) => {
-    if (animIdOf(key)) return sendable(animOf(key));
+    if (animIdOf(key)) return false;
     const id = stickerIdOf(key);
     const p = id ? livePackOf(id) : undefined;
     return !!p && !p.retired && p.stickers.some((s) => s.id === id) && (!p.roomOnly || room) && packUnlocked(p.id);
@@ -179,7 +210,7 @@ export function EmojiPanel({ onPick, hint, onAnimate, onClose, fill }: { onPick:
   const list = fill ? styles.fillScroll : styles.stickerScroll;
   const kindSwitch = (
     <View style={[styles.kinds, fill && styles.kindsInline]} accessibilityRole="tablist">
-      {(['sabit', 'vip'] as const).map((k) => (
+      {(['sabit', 'fav', 'vip'] as const).filter((k) => tabs.some((x) => x.kind === k)).map((k) => (
         <Pressable key={k} onPress={() => switchKind(k)} hitSlop={{ top: 8, bottom: 8 }} style={[styles.kind2, fill && styles.kind2Inline, kind === k && styles.kindOn]} accessibilityRole="tab" accessibilityState={{ selected: kind === k }}>
           <Text style={[styles.kindText, kind === k && styles.kindTextOn]}>{KIND_NAME[k]}</Text>
         </Pressable>
@@ -218,16 +249,18 @@ export function EmojiPanel({ onPick, hint, onAnimate, onClose, fill }: { onPick:
       {hint && <Text style={styles.hint}>{hint}</Text>}
       {/* Over a room's chat every row counts: the switch rides in the tab strip, the mic effects scroll with the list. */}
       {!fill && kindSwitch}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[{ flexGrow: 0, flexShrink: 0 }, fill && styles.strip]} contentContainerStyle={[{ gap: 6, paddingHorizontal: 8 }, fill && styles.stripIn]}>
+      <ScrollView ref={strip} horizontal showsHorizontalScrollIndicator={false} style={[{ flexGrow: 0, flexShrink: 0 }, fill && styles.strip]} contentContainerStyle={[{ gap: 6, paddingHorizontal: 8 }, fill && styles.stripIn]}>
         {fill && kindSwitch}
         {tabs
-          .filter((x) => x.kind === kind)
+          // Favoriler is one list: its heading is enough, no tab of its own under it.
+          .filter((x) => x.kind === kind && x.kind !== 'fav')
           .map((x) => {
             const l = tabLabel(x);
             return (
               <Pressable
                 key={x.id}
                 onPress={() => choose(x)}
+                onLayout={(e) => tabX.current.set(x.id, e.nativeEvent.layout.x)}
                 hitSlop={fill ? { top: 8, bottom: 8 } : undefined}
                 style={[styles.tab, fill ? styles.tabInline : styles.tabTall, tab.id === x.id && styles.tabActive]}
                 accessibilityRole="tab"
@@ -244,7 +277,8 @@ export function EmojiPanel({ onPick, hint, onAnimate, onClose, fill }: { onPick:
             );
           })}
       </ScrollView>
-      {(tab.id === 'animated' || tab.id === 'animated-free') && onAnimate ? (
+      <View style={fill ? { flex: 1 } : { flexShrink: 1 }} {...swipe.pan.panHandlers}>
+        {(tab.id === 'animated' || tab.id === 'animated-free') && onAnimate ? (
         <View style={[{ paddingHorizontal: 8, gap: 6 }, fill ? { flex: 1 } : { flexShrink: 1 }]}>
           {!fill && micEffects}
           <ScrollView style={list} contentContainerStyle={fill ? { gap: 6 } : undefined} nestedScrollEnabled>
@@ -273,8 +307,14 @@ export function EmojiPanel({ onPick, hint, onAnimate, onClose, fill }: { onPick:
         <ScrollView style={list} nestedScrollEnabled>
           <View style={[styles.grid, locked && { opacity: 0.4 }]}>{pack.stickers.map((x) => (pack.roomOnly ? moveCell(x) : stickerCell(x)))}</View>
         </ScrollView>
-      ) : null}
-      {locked && pack && (
+        ) : null}
+      </View>
+      {soon && (
+        <View style={[styles.unlock, { opacity: 0.85 }]} accessibilityRole="text">
+          <Text style={{ color: '#fff', fontWeight: '700' }}>Yakında</Text>
+        </View>
+      )}
+      {locked && pack && !soon && (
         <Pressable
           style={styles.unlock}
           onPress={() => {

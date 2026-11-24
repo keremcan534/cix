@@ -8,6 +8,7 @@ import { FlatList, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmojiText } from '@/components/ReactionArt';
+import { RoomShareChip } from '@/components/room-share-chip';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { Text, TextInput } from '@/components/text';
 import { Avatar, GradientButton, Header, StateIcon } from '@/components/ui';
@@ -225,6 +226,7 @@ export function LiveAgencyChat() {
                       <View style={[styles.bubble, { backgroundColor: mine ? colors.primary : colors.card }]}>
                         {!mine && <Text style={styles.author}>{m.author.name}</Text>}
                         <EmojiText text={m.text} style={[styles.msgText, mine && { color: '#fff' }]} />
+                        <RoomShareChip text={m.text} mine={mine} />
                       </View>
                     </View>
                   );
