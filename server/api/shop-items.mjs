@@ -38,6 +38,11 @@
 //        (fields: any of name, price, days, minVip, enabled, sort; none: all but its place)
 //   POST /api/admin/shop/delete { id }            an admin's item nobody has now → { deleted }
 //   POST /api/admin/shop/order  { kind, ids }     the shop's order of that kind, every item of it → { items }
+//   POST /api/admin/shop/move   { id, to: 'wave', look? }  a frame to Ses halkası → { item, from }
+//        (Düzenle › Bölüm, owners 24 Nov 2026: a frame and a voice wave are drawn differently, a picture round the
+//        photo and a ring the app draws, so the move is a new voice wave with the frame's name, price, days, VIP
+//        level and durations, `look` its style and colours (a ripple in the frame's colour if none is sent), and the
+//        frame taken off the shelf: whoever has it keeps wearing it till it runs out. shop_moves (125) records it.)
 // days: 0 sells it for good.
 //
 // What the phones get: GET /api/catalog?shop=1 → `shop: { items }` (shopCatalog): every frame, entry effect, chat bubble
@@ -888,6 +893,55 @@ async function setRow(c, id, cols, actor) {
   sets.push(`updated_by = $${vals.length}`, 'updated_at = now()', "rev = nextval('shop_item_rev')");
   return (await c.query(`UPDATE shop_items SET ${sets.join(', ')} WHERE id = $1 RETURNING *`, vals)).rows[0];
 }
+/** The voice wave a frame becomes when none is chosen: a ripple, in the app frame's own colour (catalog.mjs SHOP). */
+const moveLookOf = (cur) => ({ style: 'ripple', colors: [cur.builtin ? (APP_BY_ID.get(cur.sku)?.color?.[0] ?? '#13D9DF') : '#13D9DF'] });
+/**
+ * A frame moved to Ses halkası (POST /api/admin/shop/move): a new voice wave with its name, price, days, VIP level and
+ * durations, first on the shelf, and the frame off the shelf. In the caller's transaction; returns the wave's id.
+ */
+async function moveToWave(c, cur, look, actor) {
+  if (cur.kind !== 'frame') throw bad('Yalnız çerçeve Ses halkası bölümüne taşınır');
+  if ((await c.query('SELECT to_id FROM shop_moves WHERE from_id = $1', [cur.sku])).rowCount) throw new HttpError(409, `${cur.name} zaten Ses halkası bölümüne taşındı`);
+  nameFree('wave', cur.name, null);
+  const id = `${PREFIX.wave}${(await c.query("SELECT nextval('shop_item_no') AS n")).rows[0].n}`;
+  const r = await c.query(
+    `INSERT INTO shop_items (id, kind, name, price, days, min_vip, enabled, sort, look, plans, created_by, updated_by)
+     VALUES ($1, 'wave', $2, $3, $4, $5, true, $6, $7, $8, $9, $9) RETURNING *`,
+    [id, cur.name, cur.price, cur.days ?? 0, cur.minVip ?? 0, firstSort('wave'), JSON.stringify(look), cur.plans?.length ? JSON.stringify(cur.plans) : null, actor],
+  );
+  if (cur.builtin) await appRow(c, cur.sku, actor);
+  const was = (await c.query('SELECT * FROM shop_items WHERE id = $1', [cur.sku])).rows[0];
+  const off = (
+    await c.query("UPDATE shop_items SET enabled = false, updated_by = $2, updated_at = now(), rev = nextval('shop_item_rev') WHERE id = $1 RETURNING *", [cur.sku, actor])
+  ).rows[0];
+  await c.query('INSERT INTO shop_moves (from_id, to_id, moved_by) VALUES ($1, $2, $3)', [cur.sku, id, actor]);
+  return { id, wave: r.rows[0], was, off };
+}
+
+/**
+ * The owners' moves done once at start (owners, 24 Nov 2026): Çerçeveler's "Ses Halkası" (fr-neon) to Ses halkası, as
+ * the panel's move would. A move already recorded (shop_moves) is skipped, so it runs once; SHOP_OWNER_MOVES=0 turns it
+ * off (the tests, which sell that frame).
+ */
+export async function ownerShopMoves() {
+  if (env.SHOP_OWNER_MOVES === '0') return;
+  const cur = itemOf('fr-neon');
+  if (!cur) return;
+  const moved = await tx(async (c) => {
+    await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', ['shop_owner_moves']);
+    if ((await c.query('SELECT 1 FROM shop_moves WHERE from_id = $1', ['fr-neon'])).rowCount) return null;
+    const m = await moveToWave(c, cur, moveLookOf(cur), null);
+    await c.query("INSERT INTO audit_events (actor, action, target, detail) VALUES (NULL, 'shop.move', NULL, $1)", [
+      JSON.stringify({ item: m.id, from: 'fr-neon', to: m.id, why: 'Sahiplerin kararı (24 Kasım 2026): Çerçeveler › Ses Halkası, Ses halkası bölümüne', before: auditOf(m.was), after: auditOf(m.wave) }),
+    ]);
+    return m.id;
+  });
+  if (moved) {
+    await refreshShopItems();
+    console.log(`shop: fr-neon moved to ${moved}`);
+  }
+}
+
 /** The row for one of the app's items, made the first time anything about it changes (every column null). */
 const appRow = (c, id, actor) =>
   c.query('INSERT INTO shop_items (id, builtin, kind, created_by, updated_by) VALUES ($1, true, $2, $3, $3) ON CONFLICT (id) DO NOTHING', [id, APP_BY_ID.get(id).kind, actor]);
@@ -1253,6 +1307,26 @@ export const shopRoutes = {
     removeFiles(files.filter(Boolean));
     await refreshShopItems();
     return { deleted: true };
+  },
+
+  /** A frame to Ses halkası (Düzenle › Bölüm): a new voice wave like it, the frame off the shelf (moveToWave). */
+  async 'POST /api/admin/shop/move'(req) {
+    const a = await admin(req);
+    writeLimit(a);
+    const b = await readJson(req, 4096);
+    const id = idOf(b.id);
+    const cur = liveItem(id);
+    if (b.to !== 'wave') throw bad('Eşya yalnız Ses halkası bölümüne taşınabilir');
+    const look = b.look === undefined || b.look === null ? moveLookOf(cur) : waveLookOf(b.look);
+    const out = await saving(() =>
+      tx(async (c) => {
+        const m = await moveToWave(c, cur, look, a.id);
+        await audited(c, a, 'shop.move', { item: m.id, from: id, before: auditOf(m.was), after: auditOf(m.wave) }, req);
+        return m.id;
+      }),
+    );
+    await refreshShopItems();
+    return { item: await oneItem(out), from: await oneItem(id) };
   },
 
   /** The shop's order of one kind: `ids` is every item of it, first to last. */

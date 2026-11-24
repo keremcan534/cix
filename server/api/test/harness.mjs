@@ -52,6 +52,8 @@ export function startApi(extraEnv = {}, { moneyCheck = true } = {}) {
       // Boards read fresh after each gift (gifts.mjs keeps them RANKINGS_CACHE_MS); test/rankings-cache.test.mjs keeps them.
       RANKINGS_CACHE_MS: '0',
       PUSH_ENABLED: '0',
+      // The owners' one-time shop move (shop-items.mjs ownerShopMoves) would take fr-neon, which tests sell, off the shelf.
+      SHOP_OWNER_MOVES: '0',
       ALLOW_DEV_AUTH: '1',
       // The storage is a stand-in address in most tests: an uploaded file isn't looked up there (media.mjs).
       UPLOAD_VERIFY: '0',

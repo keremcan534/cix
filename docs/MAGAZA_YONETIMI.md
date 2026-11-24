@@ -142,3 +142,13 @@ Beş sekme var: **Giriş efektleri**, **Çerçeveler**, **Sohbet balonları**, *
 
 - ~~**Seviyeye bağlı ödül**~~ yapıldı: VIP, Cömertlik ve Yankı seviyelerine çerçeve, giriş efekti, binek, balon ve dalga (Seviye ve VIP › Seviye ve görev ödülleri, [`CANTA.md`](CANTA.md)). Rütbe satın alınan bir kademe olduğu için ödülü yok.
 - **Binek ve özel numara:** istenirse aynı sayfaya.
+
+## Bölüm değiştirme (24 Kasım 2026)
+
+Panelde bir çerçeveyi **Düzenle › Bölüm › Ses halkası** ile Ses halkası bölümüne taşıyabilirsin. Çerçeve bir resim, ses halkası ise uygulamanın konuşunca çizdiği halka olduğu için taşıma şöyle olur:
+
+- Çerçevenin adı, fiyatı, süresi, VIP seviyesi ve süre paketleriyle Ses halkası bölümünde **yeni bir ses halkası** açılır, en başta durur. Stilini ve rengini Düzenle penceresinde seçersin.
+- Çerçeve **satıştan kalkar**; satın almış olanlar süresi bitene kadar takmaya devam eder.
+- Bir eşya bir kez taşınır, geri alınmaz. Denetim kaydına yazılır.
+- Sahiplerin isteğiyle **Çerçeveler › Ses Halkası** bu şekilde Ses halkası bölümüne taşındı (turkuaz, yayılan halka, 150 jeton, 7 gün).
+

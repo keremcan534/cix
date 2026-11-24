@@ -64,7 +64,7 @@ import { customGiftRoutes, refreshCustomGifts, sendCustomFx, startCustomGifts, s
 import { emojiRoutes, refreshEmoji, startEmoji, stopEmoji } from './emoji.mjs';
 import { refreshLevels, startLevels, stopLevels, topPoints } from './levels.mjs';
 import { levelRoutes, startLevelDecay, stopLevelDecay } from './levels-admin.mjs';
-import { refreshShopItems, sendShopFx, shopRoutes, startShopItems, stopShopItems } from './shop-items.mjs';
+import { ownerShopMoves, refreshShopItems, sendShopFx, shopRoutes, startShopItems, stopShopItems } from './shop-items.mjs';
 import { addVipSet } from './vip-set.mjs';
 import { guardRoutes, startGuardSweep, stopGuardSweep } from './guards.mjs';
 import { FX_PATH, sendFx } from './fx.mjs';
@@ -631,6 +631,8 @@ startVipMonth();
 startGuardSweep();
 startServerLoad();
 startShopItems();
+// Çarşı: the owners' moves (Çerçeveler › Ses Halkası to Ses halkası), once (shop-items.mjs).
+ownerShopMoves().catch((e) => console.error('shop owner moves', String(e?.message ?? e).slice(0, 200)));
 // VIP seti: the client's VIP 1–10 frames, bubbles and entry effects as bag rewards, added once (vip-set.mjs).
 addVipSet().catch((e) => console.error('vip set', String(e?.message ?? e).slice(0, 200)));
 startLuckyArt();
