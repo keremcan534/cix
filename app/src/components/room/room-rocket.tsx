@@ -9,7 +9,7 @@ import { Animated, Easing, Image, Modal, Pressable, ScrollView, StyleSheet, View
 
 import { Halo } from '@/components/fx/float';
 import { frameArtOf } from '@/components/fx/frame-art';
-import { VideoFx, entryClipOf, type FxMedia } from '@/components/fx/video-fx';
+import { VideoFx, entryClipOf } from '@/components/fx/video-fx';
 import { Icon3D } from '@/components/Icon3D';
 import { roomStyles, useSheetBottom } from '@/components/room/parts';
 import { storeArtOf } from '@/components/StoreArt';
@@ -19,60 +19,25 @@ import { toLocal } from '@/lib/live';
 import type { RocketNews } from '@/lib/live/room-bus';
 import { pctText, pillText, prizeLabel, rocketPct, shownLevel, type RocketPrize, type RoomRocket } from '@/lib/room-rocket-core';
 import { LAUNCH_MS, PAID_MS } from '@/lib/rocket-stage';
-import { useFxState } from '@/lib/fx-videos';
-import { fxSafetyMs } from '@/lib/fx-videos-core';
 import { useSheetMax } from '@/lib/sheet-space';
-import { useSettings } from '@/store';
-import { AlphaVideoView } from '../../../modules/similar-alpha-video';
 import { SCRIM, colors } from '@/theme';
 
 const ROCKET_ART = require('../../../assets/gifts/192/hediye-roket.png');
 
-/**
- * A level's rocket as the room sees it launch (owners, 25 Nov 2026: the sheet's rocket is the launching one): its launch
- * video (Oda roketi in the panel, rocket-<level>) playing round and round, muted, once it is on the phone; until then,
- * on a phone that can't play it, with Hareketi azalt or Düşük veri, the Roket gift's picture.
- */
+/** Each level's own rocket (owners, 25 Nov 2026: their five pictures, in the order they sent them, Lv.1 to Lv.5). */
+const LEVEL_ART = [
+  require('../../../assets/rocket/oda-roketi-lv1.png'),
+  require('../../../assets/rocket/oda-roketi-lv2.png'),
+  require('../../../assets/rocket/oda-roketi-lv3.png'),
+  require('../../../assets/rocket/oda-roketi-lv4.png'),
+  require('../../../assets/rocket/oda-roketi-lv5.png'),
+];
+export const rocketArtOf = (level: number) => LEVEL_ART[Math.min(Math.max(level, 1), LEVEL_ART.length) - 1] ?? ROCKET_ART;
+/** A level's rocket picture (the shortcut, the sheet, the pill); its launch video plays only when it launches. */
 function RocketArt({ level, size, label }: { level: number; size: number; label?: string }) {
-  useFxState();
-  const { reduceMotion, lowData } = useSettings();
-  const media = reduceMotion || lowData ? null : entryClipOf({ clip: `rocket-${level}` });
-  const [failed, setFailed] = useState<string | null>(null);
-  const play = media && failed !== media.uri ? media : null;
-  return (
-    <View style={{ width: size, height: size }} accessibilityLabel={label}>
-      {play ? <RocketLoop key={play.uri} media={play} onFail={() => setFailed(play.uri)} /> : <Image source={ROCKET_ART} style={{ width: size, height: size }} />}
-    </View>
-  );
+  return <Image source={rocketArtOf(level)} style={{ width: size, height: size }} resizeMode="contain" accessibilityLabel={label} />;
 }
-/** The launch video started again each time it ends; the picture stays under it until it is ready. */
-function RocketLoop({ media, onFail }: { media: FxMedia; onFail: () => void }) {
-  const [round, setRound] = useState(0);
-  const [ready, setReady] = useState(false);
-  const fail = useRef(onFail);
-  useEffect(() => {
-    fail.current = onFail;
-  });
-  useEffect(() => {
-    const t = setTimeout(() => (ready ? setRound((r) => r + 1) : fail.current()), ready ? fxSafetyMs(media.ms) : 4000);
-    return () => clearTimeout(t);
-  }, [ready, round, media.ms]);
-  return (
-    <>
-      {!ready && <Image source={ROCKET_ART} style={StyleSheet.absoluteFill} />}
-      <AlphaVideoView
-        source={media.uri}
-        muted
-        restartKey={round}
-        style={StyleSheet.absoluteFill}
-        pointerEvents="none"
-        onReady={() => setReady(true)}
-        onEnd={() => setRound((r) => r + 1)}
-        onError={() => fail.current()}
-      />
-    </>
-  );
-}
+
 /** Each level's colour: pink, orange, blue, purple, gold. */
 export const ROCKET_HUES = ['#FF5FA2', '#FF8A3D', '#3D9BFF', '#A855F7', '#F6BD60'] as const;
 const hueOf = (level: number) => ROCKET_HUES[(level - 1) % ROCKET_HUES.length];
@@ -115,7 +80,7 @@ export function RocketPill({ rocket, onPress }: { rocket: RoomRocket; onPress: (
       style={[s.pill, { borderColor: `${hueOf(l.level)}99` }]}
       accessibilityRole="button"
       accessibilityLabel={done ? 'Oda roketi: bugünün beş seviyesi kalktı' : `Oda roketi, Lv.${l.level}, ${pctText(pct)} dolu`}>
-      <Image source={ROCKET_ART} style={s.pillArt} />
+      <Image source={rocketArtOf(l.level)} style={s.pillArt} resizeMode="contain" />
       <Text style={s.pillText} numberOfLines={1}>
         {pillText(rocket)}
       </Text>
@@ -323,7 +288,7 @@ function RocketPhase({ news, still, muted, onDone }: { news: RocketNews; still?:
           ]}>
           <View style={{ width: 140, height: 140 }}>
             <Halo size={140} hue={hue} strength={0.7} />
-            <Image source={ROCKET_ART} style={{ width: 140, height: 140 }} />
+            <Image source={rocketArtOf(news.level)} style={{ width: 140, height: 140 }} resizeMode="contain" />
           </View>
         </Animated.View>
       )}
