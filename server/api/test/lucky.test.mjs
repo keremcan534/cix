@@ -1,12 +1,12 @@
 // Şanslı hediyeler (lucky.mjs) against a real Postgres: Cömertlik Lv.2 and 18 years, one charge per request,
-// the recipient's 20 % as diamonds and the rest a coin_spend, rewards as coins that never count for Cömertlik,
+// the recipient's share (10 %, the panel's Alıcı payı) as diamonds and the rest a coin_spend, rewards as coins that never count for Cömertlik,
 // replays, the daily
 // limit and the admins' settings (checked, versioned, audited).
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { rnd, startApi } from './harness.mjs';
-import { DEFAULT_CONFIG, ODDS_TOTAL, checkConfig, drawMult } from '../lucky-rules.mjs';
+import { DEFAULT_CONFIG, ODDS_TOTAL, checkConfig, drawMult, shareOf } from '../lucky-rules.mjs';
 
 const h = startApi();
 const { call, signUp } = h;
@@ -63,6 +63,23 @@ describe('Şanslı kuralları', () => {
     assert.throws(() => checkConfig({ ...DEFAULT_CONFIG, gifts: [{ ...g, price: 4 }] }), /fiyat/);
     assert.throws(() => checkConfig({ ...DEFAULT_CONFIG, gifts: [g, g] }), /iki kez/);
   });
+
+  // Alıcı payı (owners, 24 Nov 2026): 10 % by default, set in the panel (1–50 %); every package must give at least one
+  // whole diamond; a save without it (an older panel) keeps the share in force.
+  test('alıcı payı: varsayılan %10, sınırlar, en az 1 elmas, eski panel payı korur', () => {
+    assert.equal(DEFAULT_CONFIG.sharePct, 10);
+    assert.equal(shareOf(DEFAULT_CONFIG), 0.1);
+    assert.equal(shareOf({}), 0.1, 'payı olmayan eski kayıt');
+    const g = DEFAULT_CONFIG.gifts[0];
+    assert.equal(checkConfig({ ...DEFAULT_CONFIG, sharePct: 25 }).sharePct, 25);
+    const { sharePct: _, ...old } = DEFAULT_CONFIG;
+    assert.equal(checkConfig(old, 30).sharePct, 30, 'eski panel kaydı payı korur');
+    assert.throws(() => checkConfig({ ...DEFAULT_CONFIG, sharePct: 0 }), /Alıcı payı/);
+    assert.throws(() => checkConfig({ ...DEFAULT_CONFIG, sharePct: 51 }), /Alıcı payı/);
+    assert.throws(() => checkConfig({ ...DEFAULT_CONFIG, sharePct: 12.5 }), /Alıcı payı/);
+    assert.throws(() => checkConfig({ ...DEFAULT_CONFIG, gifts: [{ ...g, price: 9 }] }), /en az 10 jeton/);
+    assert.equal(checkConfig({ ...DEFAULT_CONFIG, sharePct: 20, gifts: [{ ...g, price: 5 }] }).gifts[0].price, 5);
+  });
 });
 
 describe('Şanslı hediyeler sunucuda', () => {
@@ -83,7 +100,7 @@ describe('Şanslı hediyeler sunucuda', () => {
     assert.equal((await me(a.session)).coins, 1000);
   });
 
-  test('bir gönderim: alıcıya %20 elmas, kalan uygulama içi harcama, ödül jeton; tekrar tek sefer', async () => {
+  test('bir gönderim: alıcıya %10 elmas, kalan uygulama içi harcama, ödül jeton; tekrar tek sefer', async () => {
     const a = await player('Gönderen', 1000);
     const b = await signUp('Alıcı');
     const ref = rnd(8);
@@ -91,30 +108,30 @@ describe('Şanslı hediyeler sunucuda', () => {
     assert.equal(st, 200, j.error);
     assert.equal(j.replay, false);
     assert.equal(j.send.cost, 500);
-    assert.equal(j.send.shared, 100);
+    assert.equal(j.send.shared, 50);
     assert.equal(j.send.draws.length, 5);
     assert.equal(j.send.payout, j.send.draws.reduce((n, m) => n + m * 100, 0));
     assert.equal(j.user.coins, 500 + j.send.payout);
     assert.equal(j.user.gameCoins, 0);
-    assert.equal((await me(b.session)).diamonds, 100);
+    assert.equal((await me(b.session)).diamonds, 50);
     const ev = (await h.sql.query('SELECT gift_id, count, unit_price, total FROM gift_events WHERE sender = $1', [a.user.id])).rows;
-    assert.deepEqual(ev, [{ gift_id: 'lk2', count: 5, unit_price: '100', total: '100' }]);
+    assert.deepEqual(ev, [{ gift_id: 'lk2', count: 5, unit_price: '100', total: '50' }]);
     const spend = (await h.sql.query("SELECT amount, reason, channel FROM ledger WHERE user_id = $1 AND currency = 'coin' AND ref LIKE 'lucky:%' ORDER BY id", [a.user.id])).rows;
     assert.deepEqual(
       spend.map((r) => Number(r.amount)),
-      [-100, -400, ...(j.send.payout ? [j.send.payout] : [])],
+      [-50, -450, ...(j.send.payout ? [j.send.payout] : [])],
     );
     assert.match(spend[1].reason, /^Uygulama içi: Şanslı hediye/);
     if (j.send.payout) assert.deepEqual([spend[2].channel, spend[2].reason.startsWith('Şanslı ödülü')], ['ugurlu', true]);
     const income = (await h.sql.query("SELECT source_type, diamonds FROM income_events WHERE streamer_id = $1", [b.user.id])).rows;
-    assert.deepEqual(income, [{ source_type: 'lucky_gift', diamonds: '100' }]);
+    assert.deepEqual(income, [{ source_type: 'lucky_gift', diamonds: '50' }]);
 
     const [st2, again] = await send(a.session, { giftId: 'lk2', to: [b.user.id], count: 5, ref });
     assert.equal(st2, 200);
     assert.equal(again.replay, true);
     assert.deepEqual(again.send.draws, j.send.draws);
     assert.equal((await me(a.session)).coins, 500 + j.send.payout);
-    assert.equal((await me(b.session)).diamonds, 100);
+    assert.equal((await me(b.session)).diamonds, 50);
   });
 
   test('birden çok alıcı, kendine, engelli ve yetersiz jeton', async () => {
@@ -126,8 +143,8 @@ describe('Şanslı hediyeler sunucuda', () => {
     assert.equal(j.send.draws.length, 2);
     const coins = 960 + j.send.payout;
     assert.equal(j.user.coins, coins);
-    assert.equal((await me(b.session)).diamonds, 4);
-    assert.equal((await me(c.session)).diamonds, 4);
+    assert.equal((await me(b.session)).diamonds, 2);
+    assert.equal((await me(c.session)).diamonds, 2);
 
     [st, j] = await send(a.session, { giftId: 'lk1', to: [a.user.id] });
     assert.equal(st, 400);
@@ -143,7 +160,7 @@ describe('Şanslı hediyeler sunucuda', () => {
     assert.match(j.error, /Yetersiz/);
     assert.equal((await me(poor.session)).coins, 1000);
     assert.equal((await me(a.session)).coins, coins);
-    assert.equal((await me(b.session)).diamonds, 4);
+    assert.equal((await me(b.session)).diamonds, 2);
     assert.equal(Number((await h.sql.query('SELECT count(*) AS n FROM gift_events WHERE sender = $1', [a.user.id])).rows[0].n), 2);
   });
 
@@ -155,7 +172,7 @@ describe('Şanslı hediyeler sunucuda', () => {
     let [st, j] = await send(a.session, { giftId: 'lk1', to: [people[0].user.id], count: 777 });
     assert.equal(st, 200, j.error);
     assert.equal(j.send.draws.length, 777);
-    assert.equal((await me(people[0].session)).diamonds, 4 * 777, 'alıcıya %20');
+    assert.equal((await me(people[0].session)).diamonds, 2 * 777, 'alıcıya %10');
     [st, j] = await send(a.session, { giftId: 'lk1', to: people.map((p) => p.user.id), count: 777 });
     assert.equal(st, 200, j.error);
     assert.equal(j.send.draws.length, 777 * 20);
@@ -239,6 +256,26 @@ describe('Şanslı hediyeler sunucuda', () => {
     assert.equal(view.stats.today.paid, before + 2120);
     assert.ok(view.recent.length >= 2);
     assert.equal(view.recent[0].sender.id, a.user.id);
+    // Alıcı payı from the panel: 20 % now, shown to the phones and paid; a save without it (an older panel) keeps it;
+    // the audit has it.
+    assert.equal(view.config.sharePct, 10);
+    [st, j] = await save(adm, (c) => ((c.sharePct = 20), (c.dailyPayoutLimit = 1_000_000_000), c));
+    assert.equal(st, 200, j.error);
+    const rich = await player('Yirmi', 1000);
+    const to = await signUp('Pay Alan');
+    assert.equal((await call('GET', '/api/lucky', null, rich.session))[1].share, 0.2);
+    [st, j] = await send(rich.session, { giftId: 'lk3', to: [to.user.id] });
+    assert.equal(st, 200, j.error);
+    assert.equal(j.send.shared, 100);
+    assert.equal((await me(to.session)).diamonds, 100);
+    [st, j] = await save(adm, (c) => (delete c.sharePct, c));
+    assert.equal(st, 200, j.error);
+    assert.equal(j.config.sharePct, 20, 'eski panel kaydı payı korur');
+    const audited = (await h.sql.query("SELECT detail FROM audit_events WHERE action = 'lucky.config' ORDER BY id DESC LIMIT 1")).rows[0].detail;
+    assert.deepEqual([audited.before.sharePct, audited.after.sharePct], [20, 20]);
+    [st, j] = await save(adm, (c) => ((c.sharePct = 60), c));
+    assert.equal(st, 400);
+    assert.match(j.error, /Alıcı payı/);
     // Put the built-in packages back for any later test.
     [st] = await save(adm, () => DEFAULT_CONFIG);
     assert.equal(st, 200);

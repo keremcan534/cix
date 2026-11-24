@@ -13,7 +13,8 @@
 //   POST /api/admin/lucky/art, /art/remove, /fetch           → a package's icon and video (lucky-art.mjs)          (admins)
 //
 // A send is `count` gifts of one package to each recipient. The sender pays price × count for each (paid coins
-// only, as any gift). Each recipient gets SHARE (20 %) of that as diamonds, a gift like any other: diamond locks,
+// only, as any gift). Each recipient gets the panel's share (config.sharePct, 10 % by the owners' rule; 20 % before
+// 24 Nov 2026) of that as diamonds, a gift like any other: diamond locks,
 // gift_events, agency income ('lucky_gift'), PK points, bond and room XP all count the share. The rest of the
 // price is a coin_spend for the finance panel ("Uygulama içi:"). Every gift is one draw (crypto.randomInt over
 // ODDS_TOTAL); a win pays price × multiplier to the sender in coins, on their own channel ('ugurlu',
@@ -34,7 +35,7 @@ import { addBondCoins } from './bonds.mjs';
 import { GIFT_COUNTS } from './catalog.mjs';
 import { HttpError, REF, ageOf, auth, blockedBetween, clientIp, db, filesOut, limit, readJson, selfUser, tx, userId } from './core.mjs';
 import { ROOM, announceGift, liveKitRoom } from './gifts.mjs';
-import { DEFAULT_CONFIG, MIN_AGE, ODDS_TOTAL, SHARE, checkConfig, checkShownLucky, drawMult, maxMult, shownOf, sinceOf, withSince } from './lucky-rules.mjs';
+import { DEFAULT_CONFIG, MIN_AGE, ODDS_TOTAL, SHARE_PCT, checkConfig, checkShownLucky, drawMult, maxMult, shareDiamonds, shareOf, shownOf, sinceOf, withSince } from './lucky-rules.mjs';
 import { luckyArtAdmin, luckyArtOf, luckyArtRoutes, refreshLuckyArt } from './lucky-art.mjs';
 import { announceRoom } from './live.mjs';
 import { lineWin } from './live-line.mjs';
@@ -142,7 +143,7 @@ export const luckyRoutes = {
       version: cur.version,
       gifts: config.gifts.filter((g) => g.enabled).map((g) => ({ ...g, since: sinceOf(g, cur.version), open: paid + g.price * maxMult(g) <= config.dailyPayoutLimit, ...luckyArtOf(g.id) })),
       announceFrom: config.announceFrom,
-      share: SHARE,
+      share: shareOf(config),
       counts: LUCKY_COUNTS,
       needLevel: casinoNeed().level,
       allowed: points >= casinoNeed().points,
@@ -208,7 +209,7 @@ export const luckyRoutes = {
         if ((await paidToday(c)) + gift.price * maxMult(gift) > cur.config.dailyPayoutLimit) throw new HttpError(409, 'Günlük ödül limiti doldu; bu hediye yarın yeniden açılır');
 
         const cost = gift.price * count * to.length;
-        const share = Math.floor(gift.price * SHARE) * count;
+        const share = shareDiamonds(gift.price, cur.config) * count;
         const label = `${gift.name}${count > 1 ? ` ×${count}` : ''} (Şanslı)`;
         const roomId = liveKitRoom(room)?.slice(4);
         events = [];
@@ -311,7 +312,8 @@ export const luckyRoutes = {
     const num = (r) => Object.fromEntries(Object.entries(r.rows[0]).map(([k, v]) => [k, Number(v)]));
     const withName = (s) => ({ ...sendOut(s), sender: { id: s.user_id, name: s.name, avatarUrl: s.avatar_url ?? null } });
     return {
-      config: cur.config,
+      // sharePct as in force (a configuration saved before it existed has none: 10 %).
+      config: { ...cur.config, sharePct: cur.config.sharePct ?? SHARE_PCT },
       version: cur.version,
       updatedAt: cur.updatedAt,
       stats: { today: num(today), total: num(total) },
@@ -325,12 +327,13 @@ export const luckyRoutes = {
   async 'POST /api/admin/lucky/config'(req) {
     const u = await admin(req);
     const b = await readJson(req);
-    const checked = checkConfig(b.config);
     const out = await tx(async (c) => {
       // One save at a time; a save made on an older copy of the settings is refused instead of undoing the other.
       await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', ['lucky_config']);
       const cur = await current(c);
       if (b.version !== cur.version) throw new HttpError(409, 'Ayarlar bu arada değişti; yenileyip tekrar dene');
+      // An older panel sends no sharePct: the share in force stays.
+      const checked = checkConfig(b.config, cur.config.sharePct ?? SHARE_PCT);
       const version = cur.version + 1;
       const config = { ...checked, gifts: withSince(checked.gifts, cur.config, cur.version, version) };
       const r = await c.query(
@@ -340,7 +343,7 @@ export const luckyRoutes = {
         [JSON.stringify(config), version, u.id],
       );
       const summary = config.gifts.map((g) => ({ id: g.id, price: g.price, enabled: g.enabled, top: maxMult(g) }));
-      await audit(c, { actor: u.id, role: u.role, action: 'lucky_config', detail: { version, gifts: summary, dailyPayoutLimit: config.dailyPayoutLimit, announceFrom: config.announceFrom } });
+      await audit(c, { actor: u.id, role: u.role, action: 'lucky_config', detail: { version, gifts: summary, dailyPayoutLimit: config.dailyPayoutLimit, announceFrom: config.announceFrom, sharePct: config.sharePct } });
       await c.query("INSERT INTO audit_events (actor, action, target, detail, ip) VALUES ($1, 'lucky.config', NULL, $2, $3)", [
         u.id,
         JSON.stringify({ before: { version: cur.version, ...cur.config }, after: { version, ...config }, ...panelDetail(u) }),

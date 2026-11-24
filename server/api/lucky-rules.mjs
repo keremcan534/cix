@@ -5,8 +5,17 @@ import { HttpError, int, text } from './core.mjs';
 /** Odds are whole numbers out of 100,000 (0.001 % steps), so the total check is exact. */
 export const ODDS_TOTAL = 100_000;
 export const MULTS = [2, 5, 10, 20, 50, 100, 200, 500, 1000];
-/** The recipient's part of the price, as diamonds (app/src/data/rules.ts LUCKY_RECIPIENT_SHARE). */
-export const SHARE = 0.2;
+/**
+ * The recipient's part of the price, as diamonds, in whole percent: the panel's "Alıcı payı" (config.sharePct). The
+ * owners' rule (24 Nov 2026) is 10 %; it was a fixed 20 % before. A configuration saved without it keeps 10.
+ * (app/src/data/rules.ts LUCKY_RECIPIENT_SHARE is the app's fallback; newer apps read GET /api/lucky `share`.)
+ */
+export const SHARE_PCT = 10;
+export const SHARE_PCT_MAX = 50;
+/** The share of a configuration as a fraction (0.1 = 10 %). */
+export const shareOf = (config) => (int(config?.sharePct, 1, SHARE_PCT_MAX) ?? SHARE_PCT) / 100;
+/** A recipient's diamonds for one gift of `price` at `config`'s share. */
+export const shareDiamonds = (price, config) => Math.floor((price * (int(config?.sharePct, 1, SHARE_PCT_MAX) ?? SHARE_PCT)) / 100);
 export const MIN_AGE = 18;
 /** A package's id: the app's four (lk1–lk4) and the panel's own (Güncelleme 7 madde 10). */
 export const LUCKY_ID = /^lk[a-z0-9]{1,20}$/;
@@ -30,6 +39,8 @@ export const DEFAULT_CONFIG = {
   dailyPayoutLimit: 20_000_000,
   /** Wins from this multiplier up are announced in the room. */
   announceFrom: 50,
+  /** The recipient's part of the price, in percent (shareOf). */
+  sharePct: SHARE_PCT,
 };
 
 const bad = (m) => {
@@ -43,7 +54,7 @@ function checkGift(g, i) {
   const id = typeof g.id === 'string' && LUCKY_ID.test(g.id) ? g.id : bad(`${i + 1}. paketin kimliği geçersiz`);
   const name = text(g.name, 1, 30, 'paket adı');
   const emoji = typeof g.emoji === 'string' && g.emoji.trim().length >= 1 && g.emoji.trim().length <= 8 ? g.emoji.trim() : bad(`${name}: simge geçersiz`);
-  // At least 5: the recipient's 20 % has to be a whole diamond.
+  // At least 5 here; checkConfig then asks that the recipient's share of it is at least one whole diamond.
   const price = int(g.price, 5, 100_000) ?? bad(`${name}: fiyat 5 ile 100.000 jeton arası olmalı`);
   if (!Array.isArray(g.tiers) || g.tiers.length < 1 || g.tiers.length > MULTS.length + 1) bad(`${name}: olasılık tablosu geçersiz`);
   const seen = new Set();
@@ -61,8 +72,11 @@ function checkGift(g, i) {
   return { id, name, emoji, price, enabled: g.enabled === true, tiers: list.sort((a, b) => a.mult - b.mult) };
 }
 
-/** A whole configuration from input (the admin's save), checked. */
-export function checkConfig(v) {
+/**
+ * A whole configuration from input (the admin's save), checked. `sharePct` missing (an older panel) keeps `prevPct`,
+ * the share in force.
+ */
+export function checkConfig(v, prevPct = SHARE_PCT) {
   if (!v || typeof v !== 'object' || !Array.isArray(v.gifts) || v.gifts.length < 1 || v.gifts.length > 20) bad('Geçersiz ayarlar');
   const gifts = v.gifts.map(checkGift);
   if (new Set(gifts.map((g) => g.id)).size !== gifts.length) bad('Aynı paket iki kez var');
@@ -72,7 +86,11 @@ export function checkConfig(v) {
   if (twice) bad(`“${twice.name}” adında iki paket var; her paketin adı ayrı olmalı`);
   const dailyPayoutLimit = int(v.dailyPayoutLimit, 1, 1_000_000_000_000) ?? bad('Günlük ödül limiti geçersiz');
   const announceFrom = MULTS.includes(v.announceFrom) ? v.announceFrom : bad('Duyuru çarpanı geçersiz');
-  return { gifts, dailyPayoutLimit, announceFrom };
+  const sharePct = v.sharePct === undefined || v.sharePct === null ? prevPct : (int(v.sharePct, 1, SHARE_PCT_MAX) ?? bad(`Alıcı payı %1 ile %${SHARE_PCT_MAX} arası tam sayı olmalı`));
+  // Every package must give the recipient at least one whole diamond.
+  const tooCheap = gifts.find((g) => Math.floor((g.price * sharePct) / 100) < 1);
+  if (tooCheap) bad(`${tooCheap.name}: %${sharePct} alıcı payı 1 elmastan az kalıyor; fiyat en az ${Math.ceil(100 / sharePct)} jeton olmalı`);
+  return { gifts, dailyPayoutLimit, announceFrom, sharePct };
 }
 
 /** One draw: the multiplier `r` (0 ≤ r < ODDS_TOTAL) falls on. */

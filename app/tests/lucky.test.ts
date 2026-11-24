@@ -46,14 +46,14 @@ describe('Lucky: gönderim sınırı yok', () => {
   });
 });
 
-describe('Lucky: alıcıya %20', () => {
-  test('tek sabit: kurallar ve elmas hesabı aynı %20’yi kullanır', () => {
-    assert.equal(LUCKY_RECIPIENT_SHARE, 0.2);
+describe('Lucky: alıcıya %10 (sunucu panelden değiştirebilir)', () => {
+  test('tek sabit: kurallar ve elmas hesabı aynı %10’u kullanır', () => {
+    assert.equal(LUCKY_RECIPIENT_SHARE, 0.1);
     assert.equal(RULES.luckyHostShare, LUCKY_RECIPIENT_SHARE);
-    assert.equal(luckyHostDiamonds(500), 100);
+    assert.equal(luckyHostDiamonds(500), 50);
   });
 
-  test('her pakette alıcının kaydına fiyatın %20’si yazılır; kazanılan ödül alıcıyı etkilemez', () => {
+  test('her pakette alıcının kaydına fiyatın %10’u yazılır; kazanılan ödül alıcıyı etkilemez', () => {
     for (const g of getLucky().config.gifts) {
       setForceNext(1000);
       const wl = wallet(g.price);
@@ -64,7 +64,7 @@ describe('Lucky: alıcıya %20', () => {
   });
 });
 
-describe('Lucky: PK puanı %20', () => {
+describe('Lucky: PK puanı alıcı payı kadar (%10)', () => {
   const R = 'lk-pk-room';
   beforeEach(() => {
     resetPk();
@@ -75,7 +75,7 @@ describe('Lucky: PK puanı %20', () => {
   afterEach(() => mock.timers.reset());
   const pk = () => getPk().sessions[0];
 
-  test('Normal PK: Lucky alıcıya hediye değerinin %20’si kadar puan getirir, ödül sayılmaz', () => {
+  test('Normal PK: Lucky alıcıya hediye değerinin %10’u kadar puan getirir, ödül sayılmaz', () => {
     startRoomPk({ roomId: R, starterId: 'host', durationMin: 15, mode: 'solo' });
     mock.timers.tick(5_000);
     setForceNext(100);
@@ -84,13 +84,13 @@ describe('Lucky: PK puanı %20', () => {
     assert.equal(r.record.reward, 50_000);
     assert.equal(luckyPkPoints(r.record), r.record.hostDiamonds);
     assert.ok(recordGift(R, r.record.txId, 'fan1', 'p1', r.record.giftId, luckyPkPoints(r.record)).ok);
-    assert.equal(pkPointsFor(pk(), R, 'p1'), 100);
+    assert.equal(pkPointsFor(pk(), R, 'p1'), 50);
     // A normal gift still scores its full value next to it.
     assert.ok(recordGift(R, 'normal-1', 'fan2', 'p1', 'g-test', 500).ok);
-    assert.equal(pkPointsFor(pk(), R, 'p1'), 600);
+    assert.equal(pkPointsFor(pk(), R, 'p1'), 550);
   });
 
-  test('Takım PK: alıcının takımına %20 eklenir', () => {
+  test('Takım PK: alıcının takımına %10 eklenir', () => {
     startRoomPk({ roomId: R, starterId: 'host', durationMin: 15, mode: 'team', red: ['host', 'admin'], blue: ['p1', 'p2'] });
     mock.timers.tick(5_000);
     for (let i = 0; i < 3; i++) {
@@ -99,7 +99,7 @@ describe('Lucky: PK puanı %20', () => {
       recordGift(R, r.record.txId, 'fan2', 'p2', r.record.giftId, luckyPkPoints(r.record));
     }
     const blue = pk().teams.find((t) => t.id === 'blue')!;
-    assert.equal(blue.score, 3 * 200);
+    assert.equal(blue.score, 3 * 100);
     assert.equal(pk().teams.find((t) => t.id === 'red')!.score, 0);
   });
 });
