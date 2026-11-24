@@ -249,8 +249,9 @@ function MiniBanner({ show, w, h, still }: { show: EntryShow; w: number; h: numb
 }
 
 const s = StyleSheet.create({
-  box: { borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,57,196,0.5)', backgroundColor: 'rgba(255,255,255,0.06)' },
-  clipBox: { backgroundColor: 'rgba(255,255,255,0.03)' },
+  // No frame or fill of its own (owners, 24 Nov 2026): the effect plays straight on the card, clipped to its place.
+  box: { borderRadius: 16, overflow: 'hidden' },
+  clipBox: {},
   sheen: { position: 'absolute', left: 0, right: 0, top: 0, height: '45%' },
   shade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '50%' },
   sweep: { position: 'absolute', top: -30, bottom: -30, left: 0, width: 34 },
