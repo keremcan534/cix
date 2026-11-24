@@ -1,5 +1,25 @@
 # Jeton yönetimi: yönetim jeton yüklemesi ve jeton paketleri
 
+> **Jeton değeri (24 Kasım 2026):** Sahipler: "1.000 jeton = 220 TL, kur 50,62". Panel › Canlı ayarlar'a iki yeni ayar
+> geldi: **Jeton değeri › 1.000 jeton = ? TL** (varsayılan 220) ve **Jeton Noktası › Toptan: 1.000 jeton = ? TL**
+> (varsayılan 220, elle değiştirilir). Bir kayıtta en çok %50 değişirler (kayan bir rakam on kat fiyat olmasın).
+> - **Paketler:** her pakette 1.000 jeton = 220 TL. Google Play Türkiye'de bir ürüne en çok 11.000 TL verilebildiği
+>   için paketler 1.000–50.000 jeton: 1.000 (220 TL), 2.500 (550), 5.000 (1.100), 7.500 (1.650), 10.000 (2.200),
+>   15.000 (3.300), 20.000 (4.400), 30.000 (6.600), 50.000 (11.000). Play Console'da `coins_2500`, `coins_7500`,
+>   `coins_15000`, `coins_30000` yeni ürün; beş eski ürünün fiyatı değişir; `coins_100000`, `coins_200000`,
+>   `coins_500000`, `coins_1000000` pasife alınır (geç gelen bir satın almaları yine yüklenir). Kullanıcının ödediği
+>   fiyatı Play belirler; uygulama Play'in fiyatını gösterir.
+> - **Satın almanın fiyatı** artık satın almanın üstüne yazılır (migration 119): finans kaydı ve iade ekranı o fiyatı
+>   kullanır; daha önceki satın almalar eski paket fiyatıyla kalır.
+> - **Çevir (elmas → jeton)** jeton değeriyle hesaplanır: 5.000 elmas = 1 USD kalırken 10.000 elmas ≈ 460 jeton (önce
+>   ≈ 4.218). Eski uygulamalar eski orana göre fazla jeton gösterdiği için Çevir'de "uygulamayı güncelle" uyarısı alır,
+>   hiçbir şey taşınmaz. Jeton Noktası bozdurması da aynı değerle (aksi hâlde elmas ucuza alınıp jeton pahalıya satılırdı).
+> - **Kur:** varsayılan 50,62. Canlı ayarlar'da elle kaydedilmiş bir kur varsa o geçerlidir; panelden 50,62 yapılmalı.
+> - **Finans paneli:** panel migration 012, yüklendiği gün USD/TRY 50,62 kuru ve 1 jeton = 0,22 TRY gelir karşılığını
+>   (komisyon matrahı) yazar.
+> - **Sonraki adımlar (sahiplerle):** elmasın değeri (5.000 elmas = 1 USD) ve jetonla fiyatlanan her şey (hediyeler,
+>   VIP eşikleri, Rütbe, mağaza, oyunlar) ayrı ayrı konuşulacak; şimdilik jeton sayıları aynı.
+
 Tarih: 22 Kasım 2026. Sahiplerin "Yönetim Paneli Güncelleme" listesindeki 4. ve 5. maddeler.
 
 ## Yönetim jeton yüklemesi (panel: Para › Yönetim jeton yükleme)

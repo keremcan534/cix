@@ -6,7 +6,7 @@
 //   - Exchange: it pays a host or agency the official value of their diamonds at once and receives coins worth
 //     that value plus its fee (3 %) at its selling price. The rate is derived from value, never a fixed number,
 //     so a diamond can't be sold for more than it is worth when the exchange rate or pack prices change.
-//   - Wholesale: it buys coins from management at its selling price minus its fee (2 %).
+//   - Wholesale: it buys coins from management at the wholesale price the panel sets (TL per 1.000 coins).
 // Every other account is refused, whatever the client sends. Pure functions: the server and the tests run them.
 //
 // Every sum takes the rules as its last argument (RULES when left out). Çevir screens pass liveRules()
@@ -46,12 +46,12 @@ export function convertDiamonds(kind: AccountKind, diamonds: number, r: Rules = 
   return { ok: true, coins, paidTl, feeTl: coins / r.coinsBankRetailCoinsPerTl - paidTl };
 }
 
-/** Price the Coins Bank pays management for coins: its selling price minus its wholesale fee. */
+/** Price the Coins Bank pays management for coins: the wholesale price (TL per 1.000 coins); `feeTl` is its margin at the coin value. */
 export function wholesaleQuote(kind: AccountKind, coins: number, r: Rules = RULES): Quote<{ priceTl: number; retailTl: number; feeTl: number }> {
   if (kind !== 'coins_bank_main') return { ok: false, reason: 'Toptan jeton alımı yalnızca ana Jeton Noktası hesabına açıktır.' };
   if (!Number.isInteger(coins) || coins <= 0) return { ok: false, reason: 'Geçerli bir jeton miktarı gir.' };
   const retailTl = coins / r.coinsBankRetailCoinsPerTl;
-  const priceTl = retailTl * (1 - r.coinsBankWholesaleFee);
+  const priceTl = (coins * r.coinsBankWholesaleTlPer1000) / 1000;
   return { ok: true, priceTl, retailTl, feeTl: retailTl - priceTl };
 }
 

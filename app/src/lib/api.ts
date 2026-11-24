@@ -72,6 +72,7 @@ export type ErrorData = {
   appealSession?: string;
   /** Çevir, 409 rate_changed: the server's rate now and what the same diamonds give at it (check before use). */
   usdTry?: unknown;
+  coinValueTl?: unknown;
   coins?: unknown;
   /** Canlı ayarlar, 409 stale: the settings version now; 409 confirm_needed: the preview to confirm. */
   v?: number;
@@ -1096,8 +1097,14 @@ export const economy = () => call<unknown>('GET', '/api/economy');
 export const equipShop = (slot: string, sku: string | null) => call<{ economy: unknown }>('POST', '/api/shop/equip', { slot, sku });
 /** Çevir. `usdTry`: the rate the screen showed; the server never gives less than it, and answers 409 rate_changed
  *  (nothing taken) when its own rate is lower now. */
-export const exchange = (diamonds: number, ref = newRef(), usdTry?: number) =>
-  call<{ user: ServerUser; replay: boolean; coins: number }>('POST', '/api/wallet/exchange', { diamonds, ref, ...(usdTry === undefined ? {} : { usdTry }) });
+/** `usdTry` and `coinValueTl`: what the screen worked with (server/api/index.mjs refuses an amount it can't keep). */
+export const exchange = (diamonds: number, ref = newRef(), usdTry?: number, coinValueTl?: number) =>
+  call<{ user: ServerUser; replay: boolean; coins: number }>('POST', '/api/wallet/exchange', {
+    diamonds,
+    ref,
+    ...(usdTry === undefined ? {} : { usdTry }),
+    ...(coinValueTl === undefined ? {} : { coinValueTl }),
+  });
 
 // Gizlilik, who may reach me and Arkadaşlarım (server/api/privacy.mjs); call history, heart points, the call figures and
 // the call task (server/api/call-log.mjs).

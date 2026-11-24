@@ -13,7 +13,7 @@
 // The list includes subscriptions (type 1): a refunded or revoked Abonelik ends now, for good (vip.mjs), counted in
 // `subscriptionsEnded`.
 import { HttpError, UUID, auth, db, env, sha, tx } from './core.mjs';
-import { PACK_BY_PRODUCT } from './catalog.mjs';
+import { PACK_BY_PRODUCT, PACK_TL_BEFORE } from './catalog.mjs';
 import { refundPurchase } from './jeton.mjs';
 import { googleAccessToken, googleAppUrl } from './purchases.mjs';
 import { endVoidedSubscription } from './vip.mjs';
@@ -143,7 +143,8 @@ async function findPurchases(q) {
     transactionId: p.transaction_id,
     coins: Number(p.coins),
     bonus: Number(p.bonus),
-    priceTl: PACK_BY_PRODUCT.get(p.product_id)?.tl ?? null,
+    // The price written on the purchase (migration 119), else its pack's price before 24 Nov 2026.
+    priceTl: p.price_tl !== null && p.price_tl !== undefined ? Number(p.price_tl) : (PACK_TL_BEFORE[p.product_id] ?? PACK_BY_PRODUCT.get(p.product_id)?.tl ?? null),
     status: p.status,
     sandbox: p.sandbox,
     createdAt: p.created_at,

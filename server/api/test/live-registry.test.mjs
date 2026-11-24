@@ -46,6 +46,8 @@ describe('defaults are today', () => {
       packs_hidden: [],
       pack_setup: null,
       exchange_usd_try: EXCHANGE.usdTry,
+      coin_value_tl: 220,
+      jeton_wholesale_tl: 220,
       withdraw_max_diamonds: WITHDRAW.maxDiamonds,
       withdraw_weekly_diamonds: WITHDRAW.weeklyDiamonds,
       otp_global_per_hour: 300,
@@ -210,7 +212,7 @@ describe('defaults are today', () => {
       auto_quick_pool: DEFAULT_QUICK.join('\n'),
       system_notices_off: [],
     });
-    assert.equal(EXCHANGE.usdTry, 49.8);
+    assert.equal(EXCHANGE.usdTry, 50.62);
     assert.equal(WITHDRAW.maxDiamonds, 5_000_000);
     assert.equal(WITHDRAW.weeklyDiamonds, 10_000_000);
     assert.equal(defaultsOf({ OTP_GLOBAL_PER_HOUR: '120' }).otp_global_per_hour, 120);
@@ -232,6 +234,8 @@ describe('defaults are today', () => {
       'packs_hidden',
       'pack_setup',
       'exchange_usd_try',
+      'coin_value_tl',
+      'jeton_wholesale_tl',
       'withdraw_max_diamonds',
       'withdraw_weekly_diamonds',
       'otp_global_per_hour',
@@ -511,6 +515,26 @@ describe('validate', () => {
 describe('save rules', () => {
   test('the rate moves at most ±10 % per save, also when going back to the default', () => {
     checkChange('exchange_usd_try', 49.8, 54.78);
+    // Jeton değeri and the wholesale price (24 Nov 2026): TL per 1.000 coins, two decimals, at most 50 % per save.
+    for (const key of ['coin_value_tl', 'jeton_wholesale_tl']) {
+      assert.equal(validate(key, 220), 220);
+      assert.equal(validate(key, 219.99), 219.99);
+      refused(() => validate(key, 220.555), /2 ondalık/);
+      refused(() => validate(key, 0.5), /1,00 ile 5\.000,00/);
+      refused(() => validate(key, '220'), /sayı/);
+      checkChange(key, 220, 330);
+      checkChange(key, 220, 110);
+      refused(() => checkChange(key, 220, 2200), /en çok %50.*110,00–330,00/);
+      refused(() => checkChange(key, 220, 22), /en çok %50/);
+      assert.equal(isBig(key, 220, 231), false);
+      assert.equal(isBig(key, 220, 231.01), true);
+    }
+    // A retired pack is not a choice any more; a stored list or setup that names one still reads.
+    refused(() => validate('packs_hidden', ['p9']), /bilinmeyen seçim/);
+    assert.deepEqual(validate('packs_hidden', ['p9', 'p2'], { stored: true }), ['p2']);
+    const kept = validate('pack_setup', { p2: { extra: 500, first: null, order: 1 }, p1: { extra: 0, first: 0, order: 2 }, p9: { extra: 9, first: null, order: 3 } }, { stored: true });
+    assert.deepEqual(Object.keys(kept), ['p2', 'p1', 'p10', 'p11', 'p3', 'p12', 'p4', 'p13', 'p5']);
+    assert.deepEqual([kept.p2, kept.p1, kept.p13], [{ extra: 500, first: null, order: 1 }, { extra: 0, first: 0, order: 2 }, { extra: 0, first: null, order: 8 }]);
     checkChange('exchange_usd_try', 49.8, 44.82);
     refused(() => checkChange('exchange_usd_try', 49.8, 54.79), /%10.*44,82–54,78/);
     refused(() => checkChange('exchange_usd_try', 49.8, 44.81), /%10/);
@@ -555,13 +579,13 @@ describe('save rules', () => {
 
   test('preview text: numbers from the real exchange sum, the effect of a switch', () => {
     const t = impactOf('exchange_usd_try', 49.8, 54.78);
-    assert.ok(t.startsWith(`10.000 💎 = ${exchangeCoins(10_000).toLocaleString('tr-TR')} → `), t);
+    assert.ok(t.startsWith(`10.000 💎 = ${exchangeCoins(10_000, 49.8).toLocaleString('tr-TR')} → `), t);
     assert.match(t, /\+%10,0/);
     assert.match(impactOf('exchange_usd_try', 49.8, 45), /eski uygulamalar/);
     const off = impactOf('features_off', ['dm'], ['gifts', 'dm'], { env: { featuresOff: ['dm'] }, raw: ['gifts'] });
     assert.match(off, /Yeni hediye gönderimi durur\. Eski uygulamalar "Bu özellik geçici olarak kapalı" mesajı görür\./);
     assert.match(off, /Sunucu ayarında kapalı kalır: Mesajlar/);
-    assert.match(impactOf('campaign', null, validate('campaign', camp(), { now: NOW }), { now: NOW }), /^%20 kampanya "Bayram": 100\.000 jetonluk paket alan \+20\.000 kampanya jetonu alır\./);
+    assert.match(impactOf('campaign', null, validate('campaign', camp(), { now: NOW }), { now: NOW }), /^%20 kampanya "Bayram": 50\.000 jetonluk paket alan \+10\.000 kampanya jetonu alır\./);
     assert.match(impactOf('gifts_hidden', [], ['g1']), /Gizlenir: Gül/);
     assert.match(impactOf('packs_hidden', [], ['p1']), /1\.000 jeton/);
     assert.match(impactOf('shop_hidden', [], ['fr-neon']), /Mağazada gizlenir: Ses Halkası/);
@@ -719,7 +743,7 @@ describe('snapshot', () => {
     assert.equal(s.minVersion, '1.0.1');
     assert.equal(s.giftsHidden.size, 0);
     assert.equal(s.campaign, null);
-    assert.equal(s.usdTry, 49.8);
+    assert.equal(s.usdTry, 50.62);
     assert.equal(s.withdrawMax, 5e6);
     assert.equal(s.withdrawWeekly, 1e7);
     assert.equal(s.otpPerHour, 300);

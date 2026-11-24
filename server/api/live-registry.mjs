@@ -12,7 +12,7 @@
 // Values: null always means "back to the default". A set (features_off, gifts_hidden, shop_hidden, packs_hidden, rewards_off) is kept in
 // its options' order, and an empty set is stored as null. Money rules: the exchange rate moves at most ±10 % per
 // save, withdrawal limits can only go down from today's values.
-import { EXCHANGE, GIFTS, PACKS, SHOP, WITHDRAW, exchangeCoins, packsSetUp } from './catalog.mjs';
+import { COIN_VALUE_TL, EXCHANGE, GIFTS, PACKS, SHOP, WHOLESALE_TL, WITHDRAW, exchangeCoins, packsSetUp, tlOfCoins, wholesaleTl } from './catalog.mjs';
 import { DAILY_ROUNDS as CASINO_DAILY_ROUNDS, GAMES as CASINO_GAMES, STAKES as CASINO_STAKES } from './casino-rules.mjs';
 import { REMINDER_KINDS, REMINDER_LABEL } from './event-rules.mjs';
 import { CHEST_MIN_CONTRIBUTION, FAMILY_CHESTS, FAMILY_TASKS, FAMILY_THEMES } from './family-rules.mjs';
@@ -101,6 +101,8 @@ export function defaultsOf(e = process.env) {
     packs_hidden: [],
     pack_setup: null,
     exchange_usd_try: EXCHANGE.usdTry,
+    coin_value_tl: COIN_VALUE_TL,
+    jeton_wholesale_tl: WHOLESALE_TL,
     withdraw_max_diamonds: WITHDRAW.maxDiamonds,
     withdraw_weekly_diamonds: WITHDRAW.weeklyDiamonds,
     otp_global_per_hour: perHourOf(e.OTP_GLOBAL_PER_HOUR),
@@ -645,12 +647,37 @@ export const exchangeOk = (liveRate, clientRate) => Number.isFinite(clientRate) 
 // --- Turkish text --------------------------------------------------------------------------------------------
 const fmt = (n) => n.toLocaleString('tr-TR');
 const rateText = (r) => r.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+/** TL per 1.000 coins: 1,00–5.000,00 with at most two decimals. */
+function tlPer1000Of(v, what) {
+  if (typeof v !== 'number' || !Number.isFinite(v)) bad(`${what} bir sayı olmalı`);
+  if (Math.abs(cents(v) - v * 100) > 1e-6) bad(`${what} en çok 2 ondalık basamaklı olabilir`);
+  const r = cents(v) / 100;
+  if (r < 1 || r > 5000) bad(`${what} 1,00 ile 5.000,00 TL arasında olmalı`);
+  return r;
+}
+/** A TL-per-1.000 setting moves at most 50 % in one save (a slipped digit is a tenfold price). */
+function stepCheck(before, after, what) {
+  const b = cents(before);
+  if (Math.abs(cents(after) - b) * 2 <= b) return;
+  bad(`${what} bir kayıtta en çok %50 değişebilir: şimdi ${rateText(before)} TL, yeni değer ${rateText(Math.ceil(b / 2) / 100)}–${rateText(Math.floor((b * 3) / 2) / 100)} TL arasında olmalı`);
+}
 const pctText = (x) => `${x >= 0 ? '+' : '-'}%${Math.abs(x).toLocaleString('tr-TR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}`;
 const when = (iso) => new Date(iso).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
 const some = (xs) => (xs.length > 6 ? `${xs.slice(0, 6).join(', ')} ve ${xs.length - 6} tane daha` : xs.join(', '));
 const giftName = (id) => GIFTS.get(id)?.name ?? id;
 const shopName = (sku) => SHOP.get(sku)?.name ?? sku;
 const packName = (id) => `${fmt(PACKS.find((p) => p.id === id)?.coins ?? 0)} jeton`;
+/**
+ * A stored pack setup against today's packs: entries of packs no longer sold are dropped, a pack it doesn't name joins
+ * with no extra coins and its compiled first-purchase gift, and the places run 1… in the stored order (new packs by
+ * size after the others), so a setup saved before the packs changed still reads.
+ */
+function storedPackSetup(v) {
+  const kept = PACKS.map((p, i) => ({ id: p.id, i, x: v[p.id] && typeof v[p.id] === 'object' ? v[p.id] : null }));
+  const rank = (e) => (e.x && Number.isFinite(Number(e.x.order)) ? Number(e.x.order) : 1_000 + e.i);
+  kept.sort((a, b) => rank(a) - rank(b) || a.i - b.i);
+  return Object.fromEntries(kept.map((e, k) => [e.id, { extra: e.x?.extra ?? 0, first: e.x ? (e.x.first ?? null) : null, order: k + 1 }]));
+}
 const added = (before, after) => after.filter((x) => !before.includes(x));
 
 /** The sentence each newly switched-off feature adds to the preview. */
@@ -863,7 +890,7 @@ export const REGISTRY = {
       if (!after) return before ? 'Kampanya biter. Önceden verilen kampanya jetonları geri alınmaz.' : 'Kampanya yok.';
       const ended = Date.parse(after.endsAt) <= (ctx.now ?? Date.now());
       return [
-        `%${after.percent} kampanya "${after.label}": 100.000 jetonluk paket alan +${fmt(campaignBonus(100_000, after, after.startsAt))} kampanya jetonu alır.`,
+        `%${after.percent} kampanya "${after.label}": 50.000 jetonluk paket alan +${fmt(campaignBonus(50_000, after, after.startsAt))} kampanya jetonu alır.`,
         `${when(after.startsAt)} – ${when(after.endsAt)} (İstanbul saati).`,
         ended ? 'Bitiş zamanı geçmiş; kimse kampanya jetonu almaz.' : 'Eski uygulamalar kampanyayı göstermez; duyuru da yaz.',
       ].join(' ');
@@ -912,7 +939,9 @@ export const REGISTRY = {
     help: 'Gizlenen jeton paketi mağazada görünmez. En az bir paket açık kalmalı; satışı durdurmak için Jeton satın almayı kapat.',
     type: 'set',
     bounds: { options: PACKS.map((p) => p.id), labels: Object.fromEntries(PACKS.map((p) => [p.id, packName(p.id)])), max: PACKS.length - 1 },
-    parse(v) {
+    parse(v, ctx = {}) {
+      // A stored list from before the packs changed (24 Nov 2026) may name a retired pack: it is no longer sold anyway.
+      if (ctx.stored && Array.isArray(v)) v = v.filter((id) => PACKS.some((p) => p.id === id));
       if (Array.isArray(v) && v.length >= PACKS.length) bad('En az bir paket mağazada kalmalı; satışı durdurmak için Jeton satın almayı kapat');
       return setOf(v, REGISTRY.packs_hidden.bounds, 'Gizli paketler');
     },
@@ -933,8 +962,11 @@ export const REGISTRY = {
     help: 'Her paketin ek jetonu (her alımda paketin üstüne), ilk alım hediyesi ve listedeki sırası. Paketin kendi jetonu ve fiyatı Google Play ürününe bağlıdır, buradan değişmez. Ek jeton ve hediye ayrı tutulur; satın alma iade edilirse geri alınır. Eski uygulamalar ek jetonu göstermez ama verilir.',
     type: 'packs',
     bounds: { packs: PACKS.map((p) => ({ id: p.id, coins: p.coins, firstBonus: p.firstBonus, tl: p.tl, label: packName(p.id) })), maxShare: 1, bigShare: 0.5 },
-    parse(v) {
+    parse(v, ctx = {}) {
       if (!v || typeof v !== 'object' || Array.isArray(v)) bad('Paket ayarı eksik');
+      // A setup saved before the packs changed (24 Nov 2026): the retired packs drop out, the new ones take the next
+      // places with no extra coins, and the order closes up, so the panel's extra coins and gifts are kept.
+      if (ctx.stored) v = storedPackSetup(v);
       const out = {};
       const orders = new Set();
       for (const [id, x] of Object.entries(v)) {
@@ -985,6 +1017,38 @@ export const REGISTRY = {
       if (cents(after) < cents(EXCHANGE.usdTry)) out.push(`Kur ${rateText(EXCHANGE.usdTry)} altında: eski uygulamalar çevirmede "uygulamayı güncelle" uyarısı alır.`);
       return out.join(' ');
     },
+  },
+  coin_value_tl: {
+    field: 'coinValueTl',
+    group: 'Jeton değeri',
+    label: '1.000 jeton = ? TL',
+    help: 'Jetonun TL değeri: paketlerin liste fiyatı (1.000 jeton bu kadar TL), Çevir (elmas → jeton) ve Jeton Noktası bozdurma hesapları buradan. Kullanıcının ödediği fiyatı Google Play belirler: Play Console’daki paket fiyatlarını aynı gün bu değere göre güncelle. 1,00–5.000,00 TL; bir kayıtta en çok %50 değişir.',
+    type: 'number',
+    bounds: { min: 1, max: 5000, decimals: 2, maxStepPct: 50, bigStepPct: 5 },
+    parse: (v) => tlPer1000Of(v, 'Jeton değeri'),
+    change: (before, after) => stepCheck(before, after, 'Jeton değeri'),
+    big: (before, after) => after !== null && Math.abs(cents(after) - cents(before)) * 100 > cents(before) * REGISTRY.coin_value_tl.bounds.bigStepPct,
+    impact(before, after, ctx) {
+      const usdTry = ctx.next?.usdTry ?? EXCHANGE.usdTry;
+      return [
+        `1.000 jeton ${rateText(before)} → ${rateText(after)} TL (${pctText(((after - before) / before) * 100)}); 50.000 jetonluk paket ${rateText(tlOfCoins(50_000, before))} → ${rateText(tlOfCoins(50_000, after))} TL.`,
+        `Çevir: 10.000 💎 = ${fmt(exchangeCoins(10_000, usdTry, before))} → ${fmt(exchangeCoins(10_000, usdTry, after))} jeton.`,
+        'Play Console’daki paket fiyatlarını da güncelle. Eski uygulamalar Çevir’de "uygulamayı güncelle" uyarısı alır.',
+      ].join(' ');
+    },
+  },
+  jeton_wholesale_tl: {
+    field: 'wholesaleTl',
+    group: 'Jeton Noktası',
+    label: 'Toptan: 1.000 jeton = ? TL',
+    help: 'Jeton Noktası’nın yönetimden jeton alırken ödediği fiyat; Yönetim jeton yükleme ve jeton üretimi bu orandan başlar (o işlemde elle değiştirilebilir). Yapılmış satışlar değişmez. 1,00–5.000,00 TL; bir kayıtta en çok %50 değişir.',
+    type: 'number',
+    bounds: { min: 1, max: 5000, decimals: 2, maxStepPct: 50, bigStepPct: 5 },
+    parse: (v) => tlPer1000Of(v, 'Toptan fiyat'),
+    change: (before, after) => stepCheck(before, after, 'Toptan fiyat'),
+    big: (before, after) => after !== null && Math.abs(cents(after) - cents(before)) * 100 > cents(before) * REGISTRY.jeton_wholesale_tl.bounds.bigStepPct,
+    impact: (before, after) =>
+      `1.000 jeton toptan ${rateText(before)} → ${rateText(after)} TL (${pctText(((after - before) / before) * 100)}); 100.000 jeton ${rateText(wholesaleTl(100_000, before))} → ${rateText(wholesaleTl(100_000, after))} TL. Yapılmış satışlar değişmez.`,
   },
   withdraw_max_diamonds: {
     field: 'withdrawMax',
@@ -1289,6 +1353,8 @@ export function snapshotOf(rows = [], e = process.env, { v = 0 } = {}) {
     packSetup: val('pack_setup') && Object.freeze({ ...val('pack_setup') }),
     campaign: campaign && Object.freeze({ ...campaign }),
     usdTry: val('exchange_usd_try'),
+    coinValueTl: val('coin_value_tl'),
+    wholesaleTl: val('jeton_wholesale_tl'),
     withdrawMax: val('withdraw_max_diamonds'),
     withdrawWeekly: val('withdraw_weekly_diamonds'),
     otpPerHour: val('otp_global_per_hour'),

@@ -83,7 +83,7 @@ describe('para çekme', () => {
     assert.equal(st, 409, 'bekleyen talep varken');
     assert.match(e.error, /Bekleyen/);
     // The held diamonds can't be spent a second time.
-    assert.equal((await call('POST', '/api/wallet/exchange', { diamonds: 40_000, ref: ref() }, host.session))[0], 409);
+    assert.equal((await call('POST', '/api/wallet/exchange', { usdTry: 50.62, coinValueTl: 220, diamonds: 40_000, ref: ref() }, host.session))[0], 409);
     const list = await ok(call('GET', '/api/wallet/withdrawals', null, host.session));
     assert.equal(list.withdrawals[0].id, first.id);
     assert.equal(list.withdrawable, 39_995);

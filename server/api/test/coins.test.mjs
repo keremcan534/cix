@@ -69,14 +69,14 @@ describe('Jeton kaynağı', () => {
     assert.ok(e.locks.every((l) => l.from.id === a.user.id && ['test', 'bonus'].includes(l.channel)));
     assert.ok(e.locks.some((l) => l.gift?.id === 'g5'), 'hediye adı kilitte görünür');
 
-    const [st, j] = await call('POST', '/api/wallet/exchange', { diamonds: 1000, ref: rnd(6) }, host.session);
+    const [st, j] = await call('POST', '/api/wallet/exchange', { usdTry: 50.62, coinValueTl: 220, diamonds: 1000, ref: rnd(6) }, host.session);
     assert.equal(st, 409);
     assert.match(j.error, /2\.000 elmasın kilidi henüz açılmadı; çekilebilir bakiyen 0 elmas/);
 
     await unlock(host);
     e = await earnings(host.session);
     assert.deepEqual([e.locked, e.withdrawable, e.locks.length], [0, 2000, 0]);
-    const x = await ok(call('POST', '/api/wallet/exchange', { diamonds: 1000, ref: rnd(6) }, host.session));
+    const x = await ok(call('POST', '/api/wallet/exchange', { usdTry: 50.62, coinValueTl: 220, diamonds: 1000, ref: rnd(6) }, host.session));
     assert.equal(x.coins, exchangeCoins(1000));
     const w = await coinLots(host.session);
     assert.deepEqual([w.lots[0].channel, w.lots[0].lockDays], ['cevir', 1]);
@@ -121,7 +121,7 @@ describe('Jeton Noktası', () => {
     assert.equal((await me(bank.session)).coins, 1_000_000);
     const t = both[0][1].transfer;
     assert.deepEqual([t.kind, t.from, t.to.id, t.coins, t.valueTl, t.actor], ['wholesale', null, bank.user.id, 1_000_000, wholesaleTl(1_000_000), admin.user.id]);
-    assert.equal(t.valueTl, 23127.99);
+    assert.equal(t.valueTl, 220_000, '1.000.000 jeton, toptan 1.000 jeton = 220 TL');
     assert.match(t.paymentRef, /^DEKONT-/);
     assert.deepEqual((await coinLots(bank.session)).channels, [{ channel: 'toptan', label: 'Toptan alım', remaining: 1_000_000 }]);
     const other = await bankOf(admin, 'Başka banka');
@@ -204,7 +204,7 @@ describe('Jeton Noktası', () => {
     assert.equal((await me(bank.session)).coins, bankExchangeCoins(1000));
     const t = out.transfer;
     assert.deepEqual([t.kind, t.from.id, t.to.id, t.diamonds, t.coins, t.valueTl], ['diamond_sale', host.user.id, bank.user.id, 1000, bankExchangeCoins(1000), diamondValueTl(1000)]);
-    assert.equal(t.valueTl, 9.96);
+    assert.equal(t.valueTl, 10.12, '1.000 elmas = 0,2 USD × 50,62');
     assert.deepEqual((await coinLots(bank.session)).lots.map((l) => [l.channel, l.from.id]), [['bozdurma', host.user.id]]);
   });
 });
@@ -303,7 +303,7 @@ describe('Yönetim paneli: satın alma bulma', () => {
     const byOrder = await ok(find(order));
     assert.equal(byOrder.purchases.length, 1);
     const p = byOrder.purchases[0];
-    assert.deepEqual([p.transactionId, p.productId, p.coins, p.status, p.user.id, p.user.name, p.priceTl], [order, 'coins_5000', 5000, 'credited', buyer.user.id, 'Bulunan Alıcı', 139.99]);
+    assert.deepEqual([p.transactionId, p.productId, p.coins, p.status, p.user.id, p.user.name, p.priceTl], [order, 'coins_5000', 5000, 'credited', buyer.user.id, 'Bulunan Alıcı', 1_100]);
     assert.deepEqual(byOrder.googleSync, { enabled: false, everyMin: 60, lastOkAt: null, lastError: null });
     assert.deepEqual((await ok(find(String(p.id)))).purchases.map((x) => x.id), [p.id]);
     assert.deepEqual((await ok(find(` ${buyer.user.id.toUpperCase()} `))).purchases.map((x) => x.id), [p.id], 'hesap kimliğiyle, boşluk ve büyük harf önemsiz');

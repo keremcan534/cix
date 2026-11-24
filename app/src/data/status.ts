@@ -177,19 +177,19 @@ export const GATES = {
 };
 
 // --- Recharge packs (TRY, store prices) -------------------------------------------------
-// Priced for 5.000 diamonds = 1 USD: small packs cost a little more per coin, big packs cost the least
-// (1.000.000 coins = 23.599,99 TL). Every pack leaves the company a margin even if all its coins are gifted.
-// `tl` is the store price; prices are snapped to the App Store's TRY price points before release.
+// Owners, 24 Nov 2026: 1.000 coins = 220 TL in every pack, and Google Play sells nothing above 11.000 TL in Türkiye,
+// so the nine packs run from 1.000 to 50.000 coins (server/api/catalog.mjs PACKS). `tl` is the list price; a live
+// build shows the store's own price. The ids of the packs that stayed keep their coins; new sizes took new ids.
 const PACK_LIST: { id: string; coins: number; tl: number; firstBonus?: number }[] = [
-  { id: 'p1', coins: 1_000, firstBonus: 1_000, tl: 29.99 },
-  { id: 'p2', coins: 5_000, firstBonus: 2_500, tl: 139.99 },
-  { id: 'p3', coins: 10_000, tl: 269.99 },
-  { id: 'p4', coins: 20_000, tl: 519.99 },
-  { id: 'p5', coins: 50_000, tl: 1_279.99 },
-  { id: 'p6', coins: 100_000, tl: 2_499.99 },
-  { id: 'p7', coins: 200_000, tl: 4_899.99 },
-  { id: 'p8', coins: 500_000, tl: 11_999.99 },
-  { id: 'p9', coins: 1_000_000, tl: 23_599.99 },
+  { id: 'p1', coins: 1_000, firstBonus: 1_000, tl: 220 },
+  { id: 'p10', coins: 2_500, tl: 550 },
+  { id: 'p2', coins: 5_000, firstBonus: 2_500, tl: 1_100 },
+  { id: 'p11', coins: 7_500, tl: 1_650 },
+  { id: 'p3', coins: 10_000, tl: 2_200 },
+  { id: 'p12', coins: 15_000, tl: 3_300 },
+  { id: 'p4', coins: 20_000, tl: 4_400 },
+  { id: 'p13', coins: 30_000, tl: 6_600 },
+  { id: 'p5', coins: 50_000, tl: 11_000 },
 ];
 export const RECHARGE_PACKS = PACK_LIST.map((p) => ({ ...p, price: `${p.tl.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL` }));
 export type RechargePack = (typeof RECHARGE_PACKS)[number] & { bonus?: number };

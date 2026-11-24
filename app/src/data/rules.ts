@@ -11,10 +11,12 @@ export type Rules = {
   diamondsPerUsd: number; // 5.000 elmas = 1 USD
   /** TL per USD used for TL values of diamonds (Coins Bank conversion); updated with the pack prices. */
   usdTry: number;
-  /** Coins Bank's selling price, coins per TL (the 1.000.000-coin pack: 23.599,99 TL). */
+  /** What 1.000 coins are worth in TL (Canlı ayarlar › coin_value_tl; owners, 24 Nov 2026: 220 TL). */
+  coinValueTl: number;
+  /** Coins per TL at the coin value (1.000 / coinValueTl): Çevir's and the Coins Bank's selling price. */
   coinsBankRetailCoinsPerTl: number;
-  /** Coins Bank margin when it buys coins from management (wholesale). */
-  coinsBankWholesaleFee: number;
+  /** What the Coins Bank pays management for 1.000 coins (Canlı ayarlar › jeton_wholesale_tl; 24 Nov 2026: 220 TL). */
+  coinsBankWholesaleTlPer1000: number;
   /** Coins Bank margin when it pays a host/agency their diamonds and turns them into coins (main account only). */
   coinsBankExchangeFee: number;
   /** Lucky gifts: share of the gift value written to the recipient as diamonds (the rest funds the rewards). */
@@ -58,9 +60,10 @@ export type Rules = {
 export const DEFAULT_RULES: Rules = {
   version: 1,
   diamondsPerUsd: 5_000,
-  usdTry: 49.8,
-  coinsBankRetailCoinsPerTl: 1_000_000 / 23_599.99,
-  coinsBankWholesaleFee: 0.02,
+  usdTry: 50.62,
+  coinValueTl: 220,
+  coinsBankRetailCoinsPerTl: 1_000 / 220,
+  coinsBankWholesaleTlPer1000: 220,
   coinsBankExchangeFee: 0.03,
   luckyHostShare: LUCKY_RECIPIENT_SHARE,
   agencyCommission: 0.4,

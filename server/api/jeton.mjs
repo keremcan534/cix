@@ -28,6 +28,7 @@
 import { HttpError, assertClean, auth, blockedBetween, claimRef, clientIp, db, int, move, once, readJson, selfUser, text, tx, userId } from './core.mjs';
 import { EXCHANGE, bankExchangeCoins, diamondValueTl, wholesaleTl } from './catalog.mjs';
 import { CHANNELS, creditCoins, diamondState, spendCoins, spendDiamonds } from './wallet.mjs';
+import { live } from './live-settings.mjs';
 import { recordIncome } from './agency-lib.mjs';
 import { voidRefundedBonds } from './bonds.mjs';
 import { refundItems } from './economy.mjs';
@@ -291,7 +292,8 @@ export const jetonRoutes = {
     if (bank === u.id) throw new HttpError(400, 'Kendi Jeton Noktana bozduramazsın');
     const diamonds = int(b.diamonds, EXCHANGE.minDiamonds, DIAMONDS_MAX);
     if (!diamonds) throw new HttpError(400, `En az ${EXCHANGE.minDiamonds} elmas bozdurulabilir`);
-    const coins = bankExchangeCoins(diamonds);
+    // At the coin value in effect (Canlı ayarlar › coin_value_tl): the bank's coins are worth what it pays.
+    const coins = bankExchangeCoins(diamonds, live().coinValueTl);
     const valueTl = diamondValueTl(diamonds);
     if (await blockedBetween(u.id, bank)) throw new HttpError(403, 'Bu Jeton Noktası ile işlem yapamazsın');
     const ip = clientIp(req);
@@ -364,8 +366,8 @@ export const jetonRoutes = {
     const paymentRef = text(b.paymentRef, 1, 100, 'Ödeme referansı');
     const note = optional(b.note, 200, 'Not');
     // What management books for these coins: the price it gives (Yönetim jeton yüklemesi, the panel's "üretim"), or
-    // the wholesale formula's.
-    const priceTl = b.priceTl === undefined || b.priceTl === null || b.priceTl === '' ? wholesaleTl(coins) : tlOf(b.priceTl, 'Toptan fiyat');
+    // the wholesale price the panel set (Canlı ayarlar › jeton_wholesale_tl).
+    const priceTl = b.priceTl === undefined || b.priceTl === null || b.priceTl === '' ? wholesaleTl(coins, live().wholesaleTl) : tlOf(b.priceTl, 'Toptan fiyat');
     const ip = clientIp(req);
     const out = await once(bank, 'coin', b.ref, async (c) => {
       const rows = await lockUsers(c, [bank]);
@@ -396,7 +398,7 @@ export const jetonRoutes = {
     return {
       loads: loads.rows.map(loadOf),
       banks: banks.rows.map((x) => ({ id: x.id, name: x.name, publicNo: x.public_no === null ? null : String(x.public_no), coins: Number(x.coins) })),
-      rateTl: wholesaleTl(1000),
+      rateTl: wholesaleTl(1000, live().wholesaleTl),
     };
   },
 

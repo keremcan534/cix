@@ -120,13 +120,13 @@ describe('Turkish numbers', () => {
       const first = (registry.impactOf('exchange_usd_try', b, a) as string).split('). ')[0];
       assert.equal(rateLine(b, a), impactText(first.endsWith('.') ? first : `${first}).`));
     }
-    assert.equal(rateLine(49.8, 50.8), '10.000 elmas = 4.220 → 4.305 jeton (+%2,0).');
+    assert.equal(rateLine(49.8, 50.8), '10.000 elmas = 452 → 461 jeton (+%2,0).');
   });
 
   test('coins per 10.000 diamonds equal the server exchangeCoins at every rate', () => {
     const exchangeCoins = server.exchangeCoins as (d: number, r?: number) => number;
     for (let c = 4000; c <= 7500; c += 37) assert.equal(coinsPer10k(c / 100), exchangeCoins(10_000, c / 100), `rate ${c / 100}`);
-    assert.equal(coinsPer10k(49.8), 4220);
+    assert.equal(coinsPer10k(49.8), 452);
   });
 
   test('the server preview reads without the emoji', () => {
@@ -235,10 +235,10 @@ describe('local checks match the server', () => {
 
   test('the example line uses the server campaignBonus', () => {
     for (const p of [5, 10, 15, 20, 25, 30, 35, 40, 45, 50]) {
-      const coins = (registry.campaignBonus as (c: number, k: object, at: number) => number)(100_000, camp(p), NOW);
-      assert.equal(campaignExample(p), `100.000 jetonluk paket alan +${coins.toLocaleString('tr-TR')} kampanya jetonu alır.`);
+      const coins = (registry.campaignBonus as (c: number, k: object, at: number) => number)(50_000, camp(p), NOW);
+      assert.equal(campaignExample(p), `50.000 jetonluk paket alan +${coins.toLocaleString('tr-TR')} kampanya jetonu alır.`);
     }
-    assert.equal(campaignExample(20), '100.000 jetonluk paket alan +20.000 kampanya jetonu alır.');
+    assert.equal(campaignExample(20), '50.000 jetonluk paket alan +10.000 kampanya jetonu alır.');
     assert.equal(campaignWhen(camp(20), NOW), 'Bitiş: 8 Kasım 15:00');
     assert.equal(campaignWhen({ ...camp(20), startsAt: '2026-11-06T17:00:00Z' }, NOW), 'Başlangıç: 6 Kasım 20:00 · Bitiş: 8 Kasım 15:00');
   });
@@ -303,7 +303,7 @@ describe('values as the admin reads them', () => {
 
   test('the server preview sentences need no emoji to read', () => {
     const sentence = impactText(registry.impactOf('exchange_usd_try', 49.8, 45) as string);
-    assert.ok(sentence.startsWith('10.000 elmas = 4.220 → '), sentence);
+    assert.ok(sentence.startsWith('10.000 elmas = 452 → '), sentence);
     assert.ok(sentence.includes('uygulamayı güncelle'), sentence);
     const off = registry.impactOf('features_off', [], ['gifts'], { env: { featuresOff: [] }, raw: ['gifts'] }) as string;
     assert.equal(off, 'Yeni hediye gönderimi durur. Eski uygulamalar "Bu özellik geçici olarak kapalı" mesajı görür.');

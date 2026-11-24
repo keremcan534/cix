@@ -121,7 +121,7 @@ describe('Çantam', () => {
     await q("UPDATE backpack_items SET count = 5 WHERE user_id = $1 AND gift_id = 'g2'", [a.user.id]);
     const five = await ok(send(a, host, room, { count: 5 }), 'beşli');
     assert.equal(five.total, KALP.price * 5);
-    const [st, j] = await call('POST', '/api/wallet/exchange', { diamonds: 100, ref: rnd(6) }, host.session);
+    const [st, j] = await call('POST', '/api/wallet/exchange', { usdTry: 50.62, coinValueTl: 220, diamonds: 100, ref: rnd(6) }, host.session);
     assert.equal(st, 409);
     assert.match(j.error, /kilidi henüz açılmadı; çekilebilir bakiyen 0 elmas/);
   });

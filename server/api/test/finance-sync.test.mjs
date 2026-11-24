@@ -60,7 +60,7 @@ describe('Finans paneline aktarım', () => {
     await call('POST', '/api/wallet/purchase', { platform: 'test', productId: 'coins_1000', transactionId: `txn_${rnd(6)}` }, a.session);
     await call('POST', '/api/wallet/gift', { to: b.user.id, amount: 1500, ref: rnd(6) }, a.session);
     await h.sql.query('UPDATE diamond_locks SET unlock_at = now()');
-    const [st, ex] = await call('POST', '/api/wallet/exchange', { diamonds: 1000, ref: rnd(6) }, b.session);
+    const [st, ex] = await call('POST', '/api/wallet/exchange', { usdTry: 50.62, coinValueTl: 220, diamonds: 1000, ref: rnd(6) }, b.session);
     assert.equal(st, 200, ex.error);
 
     const got = await until(() => (of(b.user.id).some((e) => e.campaign_ref === 'elmas_cevirme') ? of(a.user.id) : null));

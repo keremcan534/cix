@@ -140,19 +140,59 @@ export const GIFTS_PAUSED = new Set([
 /** Gift counts the panel offers; any other count is refused. */
 export const GIFT_COUNTS = [1, 5, 10, 25, 50, 100, 250];
 
-/** Coin packs. The store product id is `coins_<coins>` on both stores; firstBonus is paid on the first purchase of that pack. */
+/**
+ * What 1.000 coins are worth in TL (owners, 24 Nov 2026: "1000 jeton 220₺"): the packs' list price, Çevir's and the
+ * Jeton Noktası's sums. The live value is Canlı ayarlar › coin_value_tl (live-registry.mjs); this is its default.
+ */
+export const COIN_VALUE_TL = 220;
+/** TL for `coins` at `per1000` TL per 1.000 coins, to the kuruş. */
+export const tlOfCoins = (coins, per1000 = COIN_VALUE_TL) => Math.round(coins * per1000 * 100 / 1000) / 100;
+
+/**
+ * Coin packs. The store product id is `coins_<coins>` on both stores; firstBonus is paid on the first purchase of that
+ * pack; `tl` is the list price at the default coin value (Play Console holds the price the buyer pays). Owners, 24 Nov
+ * 2026: 1.000 coins = 220 TL for every pack, and Google Play sells nothing above 11.000 TL in Türkiye, so the nine packs
+ * run from 1.000 to 50.000 coins. The ids of the packs that stayed keep their coins (Canlı ayarlar › pack_setup is
+ * stored by id); the new sizes took new ids.
+ */
 export const PACKS = [
-  { id: 'p1', coins: 1_000, firstBonus: 1_000, tl: 29.99 },
-  { id: 'p2', coins: 5_000, firstBonus: 2_500, tl: 139.99 },
-  { id: 'p3', coins: 10_000, tl: 269.99 },
-  { id: 'p4', coins: 20_000, tl: 519.99 },
-  { id: 'p5', coins: 50_000, tl: 1_279.99 },
+  { id: 'p1', coins: 1_000, firstBonus: 1_000 },
+  { id: 'p10', coins: 2_500 },
+  { id: 'p2', coins: 5_000, firstBonus: 2_500 },
+  { id: 'p11', coins: 7_500 },
+  { id: 'p3', coins: 10_000 },
+  { id: 'p12', coins: 15_000 },
+  { id: 'p4', coins: 20_000 },
+  { id: 'p13', coins: 30_000 },
+  { id: 'p5', coins: 50_000 },
+].map((p) => ({ firstBonus: 0, ...p, tl: tlOfCoins(p.coins), productId: `coins_${p.coins}` }));
+/**
+ * Packs no longer sold (24 Nov 2026: above Google Play's 11.000 TL): never in the catalog, but a purchase of one the
+ * store still delivers (bought before its product was turned off, acknowledged late) is credited, refunded and booked
+ * like any pack, at the price it had.
+ */
+export const RETIRED_PACKS = [
   { id: 'p6', coins: 100_000, tl: 2_499.99 },
   { id: 'p7', coins: 200_000, tl: 4_899.99 },
   { id: 'p8', coins: 500_000, tl: 11_999.99 },
   { id: 'p9', coins: 1_000_000, tl: 23_599.99 },
-].map((p) => ({ firstBonus: 0, ...p, productId: `coins_${p.coins}` }));
-export const PACK_BY_PRODUCT = new Map(PACKS.map((p) => [p.productId, p]));
+].map((p) => ({ firstBonus: 0, ...p, productId: `coins_${p.coins}`, retired: true }));
+export const PACK_BY_PRODUCT = new Map([...PACKS, ...RETIRED_PACKS].map((p) => [p.productId, p]));
+/**
+ * What each pack cost before 24 Nov 2026, by store product: a purchase made before its price was written on it
+ * (migration 119) is booked and refunded at this price.
+ */
+export const PACK_TL_BEFORE = Object.freeze({
+  coins_1000: 29.99,
+  coins_5000: 139.99,
+  coins_10000: 269.99,
+  coins_20000: 519.99,
+  coins_50000: 1_279.99,
+  coins_100000: 2_499.99,
+  coins_200000: 4_899.99,
+  coins_500000: 11_999.99,
+  coins_1000000: 23_599.99,
+});
 /**
  * Jeton paketleri as the panel set them up (Canlı ayarlar › pack_setup, owners, 22 Nov 2026): each pack keeps its
  * store product and its coins (Play Console sells `coins_<coins>`), and gets `extra` coins on every purchase, its own
@@ -181,25 +221,32 @@ export const VIP_SUBS = [
 export const VIP_SUB_BY_PRODUCT = new Map(VIP_SUBS.map((p) => [p.productId, p]));
 
 /**
- * Diamonds → coins (Gelir > Çevir): a diamond's official value (5.000 💎 = 1 USD, at USD_TRY) priced like the
- * best pack, no fee, coins rounded down. The same sum as app/src/lib/coins-bank.ts exchangeOwnDiamonds with
- * the rules in app/src/data/rules.ts; tests/server-catalog.test.ts fails when they drift. `usdTry` is the
- * rate in effect: Çevir passes the live one (live-settings.mjs, Canlı ayarlar); the default is the compiled rate.
+ * Diamonds → coins (Gelir > Çevir): a diamond's official value (5.000 💎 = 1 USD, at USD_TRY) priced at the coin value
+ * (1.000 coins = `coinValueTl` TL), no fee, coins rounded down. The same sum as app/src/lib/coins-bank.ts
+ * exchangeOwnDiamonds with the rules in app/src/data/rules.ts; tests/server-catalog.test.ts fails when they drift.
+ * `usdTry` and `coinValueTl` are the values in effect: Çevir passes the live ones (live-settings.mjs, Canlı ayarlar);
+ * the defaults are the compiled ones. Owners, 24 Nov 2026: USD_TRY 50,62.
  */
-export const EXCHANGE = { diamondsPerUsd: 5_000, usdTry: 49.8, minDiamonds: 100, bankFee: 0.03, wholesaleFee: 0.02 };
-const BEST = PACKS.at(-1);
-const COINS_PER_TL = BEST.coins / BEST.tl;
-export const exchangeCoins = (diamonds, usdTry = EXCHANGE.usdTry) => Math.floor(diamonds * ((1 / EXCHANGE.diamondsPerUsd) * usdTry * COINS_PER_TL));
+export const EXCHANGE = { diamondsPerUsd: 5_000, usdTry: 50.62, minDiamonds: 100, bankFee: 0.03 };
+/** Coins one TL buys at `coinValueTl` TL per 1.000 coins. */
+const coinsPerTl = (coinValueTl = COIN_VALUE_TL) => 1000 / coinValueTl;
+export const exchangeCoins = (diamonds, usdTry = EXCHANGE.usdTry, coinValueTl = COIN_VALUE_TL) =>
+  Math.floor(diamonds * ((1 / EXCHANGE.diamondsPerUsd) * usdTry * coinsPerTl(coinValueTl)));
 
 /** What diamonds are worth in TL (5.000 💎 = 1 USD at USD_TRY): what a Jeton Noktası pays a host for them. */
 export const diamondValueTl = (diamonds) => Math.round((diamonds / EXCHANGE.diamondsPerUsd) * EXCHANGE.usdTry * 100) / 100;
 /**
- * A host sells diamonds to a Jeton Noktası: the bank gets coins worth their value plus its fee (3 %), rounded
- * down. Same sum as app/src/lib/coins-bank.ts convertDiamonds.
+ * A host sells diamonds to a Jeton Noktası: the bank gets coins worth their value plus its fee (3 %) at the coin
+ * value, rounded down. Same sum as app/src/lib/coins-bank.ts convertDiamonds.
  */
-export const bankExchangeCoins = (diamonds) => Math.floor(diamonds * ((1 / EXCHANGE.diamondsPerUsd) * EXCHANGE.usdTry * COINS_PER_TL * (1 + EXCHANGE.bankFee)));
-/** What a Jeton Noktası pays management for coins: the best pack's price minus its fee (2 %). app wholesaleQuote. */
-export const wholesaleTl = (coins) => Math.round((coins / COINS_PER_TL) * (1 - EXCHANGE.wholesaleFee) * 100) / 100;
+export const bankExchangeCoins = (diamonds, coinValueTl = COIN_VALUE_TL) =>
+  Math.floor(diamonds * ((1 / EXCHANGE.diamondsPerUsd) * EXCHANGE.usdTry * coinsPerTl(coinValueTl) * (1 + EXCHANGE.bankFee)));
+/**
+ * What a Jeton Noktası pays management for coins: the wholesale price the panel sets (Canlı ayarlar ›
+ * jeton_wholesale_tl, TL per 1.000 coins; owners, 24 Nov 2026: "elle girebilelim, şu an 220₺").
+ */
+export const WHOLESALE_TL = 220;
+export const wholesaleTl = (coins, per1000 = WHOLESALE_TL) => tlOfCoins(coins, per1000);
 
 /**
  * Withdrawals (withdraw.mjs): the smallest and largest request and the most diamonds one person may ask for in
