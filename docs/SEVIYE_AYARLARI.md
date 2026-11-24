@@ -28,7 +28,7 @@ Hepsi kodda sabit: eşikler hem uygulamada hem sunucuda var, testler ikisinin ay
 
 | Sistem | Puan | Eşik / fiyat (sunucu) | Uygulama |
 |---|---|---|---|
-| VIP | `users.svip_xp`: mağazadan alınan jeton (1 jeton = 1 puan); bonus, kampanya ve Jeton Noktası sayılmaz | `catalog.mjs` `SVIP_XP` (10 seviye) | `data/status.ts` `SVIP_LEVELS` |
+| VIP | `users.svip_xp`: yüklenen jeton (1 jeton = 1 puan): mağaza alımı, Jeton Noktası satışı ve yönetim yüklemesi (24 Kasım 2026); bonus, kampanya, toptan stok ve hediye gelen jeton sayılmaz; iade ve geri alınan yükleme puanını götürür. Eşikler (24 Kasım 2026): VIP1 25.000 · VIP2 62.500 · VIP3 125.000 · VIP4 200.000 · VIP5 375.000 · VIP6 750.000 · VIP7 2.000.000 · VIP8 5.000.000 · VIP9 10.500.000 · VIP10 20.000.000 (migration 123 panelde kayıtlı tabloyu da bu puanlara geçirir) | `catalog.mjs` `SVIP_XP` (10 seviye) | `data/status.ts` `SVIP_LEVELS` |
 | Rütbe | Satın alınır, 30 gün | `catalog.mjs` `SHOP_ROWS` noble-1..5 (fiyat, gün) | `status.ts` `NOBLE_TIERS` |
 | Cömertlik | Harcanan jeton, defterden toplanır (sütun yok) | `profile-rules.mjs` `WEALTH_XP` (Lv.0–50) | `data/wealth.ts` |
 | Yankı | Karşı taraftan gelen elmas, defterden toplanır | `profile-rules.mjs` `CHARM_XP` (Lv.0–50) | `data/charm.ts` |

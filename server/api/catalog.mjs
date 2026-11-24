@@ -265,10 +265,11 @@ export const WITHDRAW = { minDiamonds: 10_000, maxDiamonds: 1_000_000, weeklyDia
 export const diamondValueUsd = (diamonds, perUsd = EXCHANGE.diamondsPerUsd) => Math.floor((diamonds / perUsd) * 100) / 100;
 
 /**
- * SVIP level n needs SVIP_XP[n - 1] points (1 purchased coin = 1 point): the compiled values, as the app has them. The
- * server decides with Seviye ayarları (levels.mjs svipLevel), which start from these.
+ * SVIP level n needs SVIP_XP[n - 1] points (1 loaded coin = 1 point: a store purchase, a Jeton Noktası sale, a
+ * management load; owners, 24 Nov 2026): the compiled values, as the app has them. The server decides with Seviye
+ * ayarları (levels.mjs svipLevel), which start from these (migration 123 moved a saved table to them too).
  */
-export const SVIP_XP = [500_000, 1_250_000, 2_500_000, 4_000_000, 7_500_000, 15_000_000, 40_000_000, 100_000_000, 210_000_000, 400_000_000];
+export const SVIP_XP = [25_000, 62_500, 125_000, 200_000, 375_000, 750_000, 2_000_000, 5_000_000, 10_500_000, 20_000_000];
 export const svipLevel = (xp) => SVIP_XP.filter((t) => xp >= t).length;
 
 // --- Mağaza (economy.mjs): what the shop sells, in step with the app (app/src/data/catalog.ts COSMETICS and

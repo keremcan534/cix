@@ -211,7 +211,7 @@ export function VipPointsInfo({ decay, width, level = 0 }: { decay: string | nul
           <View style={{ flex: 1, gap: 6 }}>
             {/* Grown past 1.1 the rule's last line is left with one word. */}
             <Text style={text} textBreakStrategy="balanced" maxFontSizeMultiplier={1.1}>
-              {'Yüklediğin her jeton 1 VIP puanı kazandırır.\nBonus jetonlar ve hediye gelen jetonlar sayılmaz; iade edilen yüklemenin puanı geri alınır.'}
+              {'Yüklediğin her jeton 1 VIP puanı kazandırır: mağazadan, Jeton Noktası’ndan ya da yönetimin yüklediği.\nBonus jetonlar ve hediye gelen jetonlar sayılmaz; iade edilen ya da geri alınan yüklemenin puanı geri alınır.'}
             </Text>
             {decay && (
               <Text style={[text, { color: '#cdb9c9' }]} textBreakStrategy="balanced" maxFontSizeMultiplier={1.1}>

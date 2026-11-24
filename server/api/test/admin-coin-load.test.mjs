@@ -87,6 +87,24 @@ describe('Yönetim jeton yüklemesi', () => {
     }
   });
 
+  test('VIP puanı: yönetim yüklemesi ve Jeton Noktası satışı jeton kadar puan verir; geri alınan yükleme puanını götürür; toptan vermez', async () => {
+    const { admin, bank } = await setup();
+    const svip = async (u) => Number((await q('SELECT svip_xp FROM users WHERE id = $1', [u.user.id])).rows[0].svip_xp);
+    await ok(call('POST', '/api/admin/jeton/wholesale', { bank: bank.user.id, coins: 100_000, paymentRef: 'URETIM-V', ref: rnd(6) }, admin.session), 'üretim');
+    assert.equal(await svip(bank), 0, 'toptan stok puan vermez');
+    const loaded = await signUp('Yüklenen');
+    const load = (await ok(call('POST', '/api/admin/jeton/load', { bank: bank.user.id, to: loaded.user.id, coins: 30_000, valueTl: 6600, ref: rnd(8) }, admin.session), 'yükleme')).transfer;
+    assert.equal(await svip(loaded), 30_000, '30.000 puan: VIP 1 (25.000)');
+    const [, meJ] = await call('GET', '/api/me', null, loaded.session);
+    assert.equal(meJ.user.svipXp, 30_000);
+    await ok(call('POST', '/api/admin/jeton/reverse', { transfer: load.id, reason: 'Yanlış kişi' }, admin.session), 'geri al');
+    assert.equal(await svip(loaded), 0, 'yanlış yüklemenin puanı gider');
+    const bought = await signUp('Bayiden Alan');
+    await ok(call('POST', '/api/jeton/transfer', { to: bought.user.id, coins: 62_500, ref: rnd(8) }, bank.session), 'bayi satışı');
+    assert.equal(await svip(bought), 62_500, 'Jeton Noktası satışı: VIP 2 (62.500)');
+    assert.equal(await svip(bank), 0, 'satan bayi puan almaz');
+  });
+
   test('yalnız yönetici; geçersiz tutar, stoğu yetmeyen banka ve banka olmayan hesap reddedilir', async () => {
     const { admin, bank } = await setup();
     const user = await signUp('Sıradan');

@@ -3,6 +3,7 @@
 // server's checks follow them for every app. Nothing changes until the panel saves; a save someone would drop by
 // asks for a confirm first; a Rütbe tier's price and days follow the shown-price rule; the drop takes only the
 // inactive, once in its interval. Days run as seconds here (LEVEL_DAY_SECONDS=1) and the drop runs every 300 ms.
+import { readFileSync } from 'node:fs';
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -166,11 +167,11 @@ describe('Seviye ayarları: sunucunun denetimleri ayara uyar', () => {
   test('eşik yükselip biri düşecekse önce onay ister; düşen kişi VIP hakkını kaybeder', async () => {
     await freshAdmin();
     const p = await signUp('VIP Bir');
-    await setSvip(p, 600_000);
+    await setSvip(p, 30_000);
     assert.equal((await call('PATCH', '/api/me/extras', { hideWealth: true }, p.session))[0], 200, 'VIP 1 seviyesini gizler');
     const v = await view('vip');
     const doc = structuredClone(v.doc);
-    doc.levels[0].points = 700_000;
+    doc.levels[0].points = 35_000;
     const pre = await ok(call('POST', '/api/admin/levels/preview', { system: 'vip', doc }, admin.session), 'önizleme');
     assert.ok(pre.impact.down >= 1 && pre.impact.people >= 1, JSON.stringify(pre.impact));
     const [st, j] = await save('vip', doc, v.rev);
@@ -189,11 +190,11 @@ describe('Seviye ayarları: sunucunun denetimleri ayara uyar', () => {
     await freshAdmin();
     const room = (u) => call('POST', '/api/rooms', { title: `Seviye ${rnd(3)}`, password: '1234' }, u.session);
     const first = await signUp('Oda Bir');
-    await setSvip(first, 600_000);
+    await setSvip(first, 30_000);
     assert.equal((await room(first))[0], 200, 'VIP 1 şifreli oda açar');
     const owner = await signUp('Profil Sahibi');
     const loud = await signUp('Görünen');
-    await setSvip(loud, 600_000);
+    await setSvip(loud, 30_000);
     await ok(call('GET', `/api/user?id=${owner.user.id}&visit=1`, null, loud.session), 'ziyaret');
     assert.equal((await ok(call('GET', '/api/me/visitors', null, owner.session), 'ziyaretçiler')).count, 1);
 
@@ -204,16 +205,16 @@ describe('Seviye ayarları: sunucunun denetimleri ayara uyar', () => {
       d.perks.push({ key: 'visitors', from: 1, on: true });
     });
     const second = await signUp('Oda İki');
-    await setSvip(second, 600_000);
+    await setSvip(second, 30_000);
     const [st, j] = await room(second);
     assert.equal(st, 403, 'oda şifresi artık VIP 3');
     assert.match(j.error, /Oda kilidi/);
     const quiet = await signUp('Sessiz');
-    await setSvip(quiet, 600_000);
+    await setSvip(quiet, 30_000);
     await ok(call('GET', `/api/user?id=${owner.user.id}&visit=1`, null, quiet.session), 'sessiz ziyaret');
     let seen = await ok(call('GET', '/api/me/visitors', null, owner.session), 'ziyaretçiler');
     assert.deepEqual([seen.count, seen.visitors], [1, null], 'VIP 1 artık iz bırakmaz; sahibin aboneliği yok, kim olduğunu görmez');
-    await setSvip(owner, 600_000);
+    await setSvip(owner, 30_000);
     seen = await ok(call('GET', '/api/me/visitors', null, owner.session), 'ziyaretçiler');
     assert.deepEqual(seen.visitors.map((x) => x.id), [loud.user.id], 'VIP 1 artık ziyaretçilerini görür');
     assert.equal((await call('PATCH', '/api/me/extras', { hideCharm: true }, owner.session))[0], 403, "VIP'te seviye gizleme kapalı");
@@ -332,11 +333,11 @@ describe('Seviye düşmesi', () => {
   test('VIP: jeton yüklemeyen düşer, yükleyen düşmez; önce onay, bir kez, kayıt ve listeler', async () => {
     await freshAdmin();
     const idle = await signUp('Yüklemeyen');
-    await setSvip(idle, 600_000);
+    await setSvip(idle, 30_000);
     await h.sql.query("UPDATE users SET created_at = now() - interval '10 days' WHERE id = $1", [idle.user.id]);
     const active = await signUp('Yükleyen');
     await ok(call('POST', '/api/wallet/purchase', { platform: 'test', productId: 'coins_1000', transactionId: `txn_${rnd(6)}` }, active.session), 'yükleme');
-    await setSvip(active, 600_000);
+    await setSvip(active, 30_000);
 
     const v = await view('vip');
     const doc = { ...structuredClone(v.doc), decay: { on: true, idleDays: 300, drop: 1, everyDays: 365, floor: 0 } };
@@ -349,15 +350,15 @@ describe('Seviye düşmesi', () => {
 
     assert.deepEqual((await dropsOf(idle)).map((d) => [d.system, d.from, d.to]), [['vip', 1, 0]]);
     assert.equal((await me(idle)).svipXp, 0);
-    assert.equal((await me(active)).svipXp, 600_000, 'yükleyen düşmez');
+    assert.equal((await me(active)).svipXp, 30_000, 'yükleyen düşmez');
     assert.deepEqual(await dropsOf(active, 1, 0), []);
     const [, cat] = await call('GET', '/api/catalog?levels=1');
     assert.deepEqual(cat.levels.vip.decay, { idleDays: 300, drop: 1, everyDays: 365, floor: 0 }, 'telefonlar kuralı yazar');
     const list = await ok(call('GET', '/api/admin/levels/drops?system=vip', null, admin.session), 'düşüşler');
-    assert.ok(list.drops.some((d) => d.userId === idle.user.id && d.name === 'Yüklemeyen' && d.pointsBefore === 600_000 && d.pointsAfter === 0 && d.idleDays >= 300));
+    assert.ok(list.drops.some((d) => d.userId === idle.user.id && d.name === 'Yüklemeyen' && d.pointsBefore === 30_000 && d.pointsAfter === 0 && d.idleDays >= 300));
 
     // Back at VIP 1 and still not topping up: not again within everyDays.
-    await setSvip(idle, 600_000);
+    await setSvip(idle, 30_000);
     await sleep(1000);
     assert.equal((await dropsOf(idle, 2, 0)).length, 1, 'aralık dolmadan tekrar düşmez');
     await off('vip');
@@ -402,5 +403,23 @@ describe('Seviye düşmesi', () => {
     assert.deepEqual((await dropsOf(star)).map((d) => [d.system, d.from, d.to]), [['charm', from, from - 1]], 'taban');
     await off('charm');
     assert.equal((await me(star)).charmXp, CHARM_XP[from - 1]);
+  });
+});
+
+// Last: it writes the settings table under the server (its view of it is stale afterwards).
+describe('VIP puanları (24 Kasım 2026, migration 123)', () => {
+  test('panelin kaydettiği eski VIP tablosu yeni puanlara geçer; adları, hakları ve sürümü korunur/ilerler', async () => {
+    await freshAdmin();
+    const old = [500_000, 1_250_000, 2_500_000, 4_000_000, 7_500_000, 15_000_000, 40_000_000, 100_000_000, 210_000_000, 400_000_000];
+    const doc = { ...structuredClone((await view('vip')).doc), levels: old.map((points, i) => ({ level: i + 1, points, name: `Seviye ${i + 1}` })) };
+    await h.sql.query("INSERT INTO level_settings (system, doc) VALUES ('vip', $1) ON CONFLICT (system) DO UPDATE SET doc = $1", [doc]);
+    const before = (await h.sql.query("SELECT rev FROM level_settings WHERE system = 'vip'")).rows[0].rev;
+    await h.sql.query(readFileSync(new URL('../migrations/123_vip_points.sql', import.meta.url), 'utf8'));
+    const after = (await h.sql.query("SELECT doc, rev FROM level_settings WHERE system = 'vip'")).rows[0];
+    assert.deepEqual(after.doc.levels.map((l) => l.points), SVIP_XP);
+    assert.deepEqual(SVIP_XP, [25_000, 62_500, 125_000, 200_000, 375_000, 750_000, 2_000_000, 5_000_000, 10_500_000, 20_000_000]);
+    assert.deepEqual(after.doc.levels.map((l) => l.name), old.map((_, i) => `Seviye ${i + 1}`), 'adlar kalır');
+    assert.deepEqual(after.doc.perks, doc.perks, 'haklar kalır');
+    assert.ok(Number(after.rev) > Number(before), 'telefonlar yeniden okur');
   });
 });

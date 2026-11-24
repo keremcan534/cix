@@ -277,6 +277,8 @@ export const jetonRoutes = {
       // Each portion keeps the longer lock of where the bank got it (a store purchase stays 7 days).
       const portions = parts.map((p) => ({ channel: 'jeton_noktasi', amount: p.amount, lockHours: p.lockHours, transferId: transfer, sourceLot: p.lot, sourceUser: u.id }));
       await creditCoins(c, to, portions, 'Jeton Noktası yüklemesi', `${b.ref}-in`, u.id, { actor: u.id, detail });
+      // VIP points (owners, 24 Nov 2026): coins bought at a Jeton Noktası count as a store purchase does.
+      await c.query('UPDATE users SET svip_xp = svip_xp + $2 WHERE id = $1', [to, coins]);
     });
     return { ...out, transfer: await findTransfer(u.id, b.ref) };
   },
@@ -435,6 +437,8 @@ export const jetonRoutes = {
       const parts = await spendCoins(c, bank, coins, 'Yönetim jeton yüklemesi', b.ref, to, { actor: a.id, detail, capped: false });
       const portions = parts.map((p) => ({ channel: 'jeton_noktasi', amount: p.amount, lockHours: p.lockHours, transferId: transfer, sourceLot: p.lot, sourceUser: bank }));
       await creditCoins(c, to, portions, 'Jeton yüklemesi (yönetim)', `${b.ref}-in`, bank, { actor: a.id, detail });
+      // VIP points (owners, 24 Nov 2026): a management load counts too; taking it back takes them back (reverse).
+      await c.query('UPDATE users SET svip_xp = svip_xp + $2 WHERE id = $1', [to, coins]);
       await audit(c, a.id, 'jeton.admin_load', to, { transfer, bank, coins, valueTl, paymentRef }, ip);
     });
     const t = await db.query(`${LOADS_SELECT} AND t.from_user = $1 AND t.ref = $2`, [bank, b.ref]);
@@ -479,6 +483,8 @@ export const jetonRoutes = {
       // Server refs (':'): no phone can take them first.
       await move(c, load.to_user, 'coin', -coins, 'Yanlış jeton yüklemesi geri alındı', `jeton-geri:${id}`, load.from_user, { channel: 'jeton_noktasi', actor: a.id, detail: { ...detail, lots: taken } });
       await creditCoins(c, load.from_user, [{ channel: 'toptan', amount: coins, transferId: back }], 'Geri alınan yönetim yüklemesi', `jeton-geri:${id}-in`, load.to_user, { actor: a.id, detail });
+      // A wrong load gives no VIP points: all of it comes off, spent coins too (never below 0).
+      await c.query('UPDATE users SET svip_xp = greatest(0, svip_xp - $2) WHERE id = $1', [load.to_user, Number(load.coins)]);
       await audit(c, a.id, 'jeton.admin_reverse', load.to_user, { load: id, transfer: back, coins, spent: Number(load.coins) - coins, reason }, ip);
       return { coins, spent: Number(load.coins) - coins, transfer: Number(back) };
     });

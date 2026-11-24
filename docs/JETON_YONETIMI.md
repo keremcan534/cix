@@ -45,6 +45,10 @@
 >   1.500.000 elmas); seviye 1 ve üstü için 20 aktif yayıncı (haftada 10 USD); yeni ajans ilk 4 hafta %50; üst ajans
 >   fark almaz. Aday ajans kuralı ve aylık ceza kalktı. Pasif yayıncı 60 günde düşer, dönünce 3 günü var. Ayrıntı:
 >   `AJANS_HIYERARSI.md`, `AJANS_STATUSU.md`.
+> - **VIP puanları (24 Kasım 2026):** VIP1 25.000 · VIP2 62.500 · VIP3 125.000 · VIP4 200.000 · VIP5 375.000 · VIP6
+>   750.000 · VIP7 2.000.000 · VIP8 5.000.000 · VIP9 10.500.000 · VIP10 20.000.000 puan; 1 yüklenen jeton = 1 puan
+>   (mağaza, Jeton Noktası, yönetim yüklemesi; toptan stok sayılmaz; geri alınan yükleme puanını götürür). VIP10 ≈
+>   4.400.000 TL yükleme. Eski APK'lar kendi VIP'ini eski eşiklerle gösterir; sunucunun denetimleri yeni eşiklerle.
 > - **Sonraki adımlar (sahiplerle):** jetonla fiyatlanan her şey (hediyeler, VIP eşikleri, Rütbe, mağaza, oyunlar) ayrı
 >   ayrı konuşulacak; şimdilik jeton sayıları aynı.
 
