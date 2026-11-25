@@ -17,6 +17,7 @@ import { Avatar, Button } from '@/components/ui';
 import { assistantExample, shareIn } from '@/lib/agency-assistant';
 import { agencyNet, errorText, fmtD, fmtDate, fmtDateTime, runAction, useNet, type Assistant, type AssistantCandidate, type AssistantList, type MyAssistant } from '@/lib/agency-net';
 import { showAlert } from '@/lib/alert';
+import { AssistantRemovalCard, NoteSheet, removalStateText } from '@/components/assistant-removal';
 import { SCRIM, colors, edge, fonts, radius, semantic, space } from '@/theme';
 
 /** Shown without a server connection (labelled as example data; actions are disabled there). */
@@ -57,11 +58,13 @@ export function AssistantsTab({ agencyId, rate, demo, name }: { agencyId: string
   const q = useNet(name, () => agencyNet.assistants(agencyId), demoAssistants, [agencyId]);
   const [sheet, setSheet] = useState<{ kind: 'add' } | { kind: 'share'; a: Assistant } | { kind: 'rules' } | null>(null);
   const isDemo = demo || q.demo;
+  // Removing takes the assistant's consent (owners, 25 Nov 2026): a request goes to them.
   const remove = (a: Assistant) =>
-    showAlert('Asistanlıktan çıkar', `${a.user.name} artık asistan olmayacak. Bundan sonraki kazançlardan pay yazılmaz; getirdiği yayıncılar ajansında kalır. Aynı hafta yeniden ekleyemezsin.`, [
+    showAlert('Asistanlıktan çıkar', `${a.user.name} kişisine çıkarma isteği gider. Onaylarsa asistanlığı biter (bundan sonraki kazançlardan pay yazılmaz, getirdiği yayıncılar ajansında kalır). Reddederse sürer; o zaman yönetime itiraz edebilirsin.`, [
       { text: 'Vazgeç', style: 'cancel' },
-      { text: 'Çıkar', style: 'destructive', onPress: () => void runAction(isDemo, () => agencyNet.removeAssistant(agencyId, a.id), 'Asistanlık sona erdi.', q.reload) },
+      { text: 'İstek gönder', style: 'destructive', onPress: () => void runAction(isDemo, () => agencyNet.removeAssistant(agencyId, a.id), `İstek ${a.user.name} kişisine gönderildi.`, q.reload) },
     ]);
+  const [dispute, setDispute] = useState<Assistant | null>(null);
   return (
     <NetState q={q}>
       {(d) => (
@@ -85,20 +88,29 @@ export function AssistantsTab({ agencyId, rate, demo, name }: { agencyId: string
                 {d.canAdd && <Button title="Asistan ekle" icon="person-add-outline" onPress={() => setSheet({ kind: 'add' })} />}
               </Panel>
             ) : (
-              d.assistants.map((a) => <AssistantCard key={a.id} a={a} onShare={() => setSheet({ kind: 'share', a })} onRemove={() => remove(a)} />)
+              d.assistants.map((a) => <AssistantCard key={a.id} a={a} onShare={() => setSheet({ kind: 'share', a })} onRemove={() => remove(a)} onDispute={() => setDispute(a)} />)
             )}
             <Text style={st.foot}>Pay her takvim haftasında bir kez değişir; yeni pay sonraki pazartesi 00:00’da (Türkiye saati) başlar. Geçmiş kazançlar değişmez.</Text>
           </Section>
           {sheet?.kind === 'add' && <AddSheet agencyId={agencyId} rate={rate} demo={isDemo} onClose={() => setSheet(null)} onDone={q.reload} />}
           {sheet?.kind === 'share' && <ShareSheet agencyId={agencyId} rate={rate} a={sheet.a} demo={isDemo} onClose={() => setSheet(null)} onDone={q.reload} />}
           {sheet?.kind === 'rules' && <RulesSheet max={d.max} rate={rate} onClose={() => setSheet(null)} />}
+          {dispute?.removal && (
+            <NoteSheet
+              title="Yönetime itiraz et"
+              text={`${dispute.user.name} çıkarma isteğini reddetti. Neden çıkarmak istediğini kısaca yaz; yönetim iki tarafla iletişime geçip karar verir.`}
+              onClose={() => setDispute(null)}
+              onSend={(t) => runAction(isDemo, () => agencyNet.disputeRemoval(dispute.removal!.id, t), 'İtirazın yönetime iletildi.', () => (setDispute(null), q.reload()))}
+            />
+          )}
         </View>
       )}
     </NetState>
   );
 }
 
-function AssistantCard({ a, onShare, onRemove }: { a: Assistant; onShare: () => void; onRemove: () => void }) {
+function AssistantCard({ a, onShare, onRemove, onDispute }: { a: Assistant; onShare: () => void; onRemove: () => void; onDispute: () => void }) {
+  const removal = a.removal ? removalStateText(a.removal) : null;
   return (
     <Panel>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
@@ -122,8 +134,13 @@ function AssistantCard({ a, onShare, onRemove }: { a: Assistant; onShare: () => 
       </View>
       {!a.member && <Text style={st.warn}>Ajanstan ayrıldığı için pay almıyor. Çıkarıp yerine başka birini ekleyebilirsin.</Text>}
       {!a.canChange && <Text style={st.foot}>Bu hafta pay değiştirildi. Sonraki değişikliği {fmtDate(a.nextChangeFrom)} pazartesiden itibaren yapabilirsin.</Text>}
+      {!!removal && <Text style={st.warn}>{removal}</Text>}
       <View style={{ flexDirection: 'row', gap: space.sm }}>
-        <Button title="Asistanlıktan çıkar" variant="ghost" small onPress={onRemove} style={{ flex: 1 }} />
+        {a.removal?.status === 'rejected' ? (
+          <Button title="Yönetime itiraz et" variant="ghost" small icon="flag-outline" onPress={onDispute} style={{ flex: 1 }} />
+        ) : a.removal ? null : (
+          <Button title="Asistanlıktan çıkar" variant="ghost" small onPress={onRemove} style={{ flex: 1 }} />
+        )}
         <Button title="Payı düzenle" variant="tonal" small icon="create-outline" disabled={!a.canChange} onPress={onShare} style={{ flex: 1 }} />
       </View>
     </Panel>
@@ -265,7 +282,8 @@ function RulesSheet({ max, rate, onClose }: { max: number; rate: number; onClose
     'Asistanın getirdiği yayıncılar: asistanın kendi davet koduyla ajansına katılanlar ve asistanın uygulamadan gönderdiği daveti kabul edenler.',
     'Bu yayıncılar kazandıkça, onlardan aldığın ajans komisyonunun belirlediğin yüzdesi asistanın hesabına elmas olarak geçer. Yayıncının kendi kazancından bir şey kesilmez.',
     'Pay %0 ile %100 arasıdır. Her takvim haftasında bir kez değiştirilebilir; yeni pay sonraki pazartesi 00:00’da (Türkiye saati) başlar. Geçmiş kazançlar değişmez.',
-    'Asistanlıktan çıkarırsan ya da asistan ajanstan ayrılırsa o andan sonra pay yazılmaz. Getirdiği yayıncılar ajansında kalır, komisyonun tamamı sana yazılır. Çıkardığın kişiyi aynı hafta yeniden ekleyemezsin.',
+    'Asistanı çıkarmak için ona istek gönderirsin: onaylarsa asistanlığı biter, reddederse sürer. Reddederse ya da itiraz ederse konu yönetime geçer; yönetim iki tarafla iletişime geçip karar verir.',
+    'Asistanlık bittiğinde ya da asistan ajanstan ayrılırsa o andan sonra pay yazılmaz. Getirdiği yayıncılar ajansında kalır, komisyonun tamamı sana yazılır. Çıkan kişiyi aynı hafta yeniden ekleyemezsin.',
     'Bir hediye iade edilirse asistanın o hediyeden aldığı pay da geri alınır.',
     'Küsuratlar birikir, tam elmas olunca asistanın hesabına geçer. Bu elmaslar hediye elmasları gibi bir süre kilitli kalır.',
     'Destekçilerin jeton yüklemelerinden ajansa komisyon yazılmaz; bu yüzden asistan payı yalnız yayıncı kazancından hesaplanır.',
@@ -286,11 +304,12 @@ function RulesSheet({ max, rate, onClose }: { max: number; rate: number; onClose
 }
 
 // --- The assistant's own card (the agency screen) -------------------------------------------------------------
-export function MyAssistantCard({ a }: { a: MyAssistant }) {
+export function MyAssistantCard({ a, onChange }: { a: MyAssistant; onChange?: () => void }) {
   const share = () => Share.share({ message: `${a.agency.name} ajansına katılmak için davet kodum: ${a.code}` }).catch(() => {});
   const live = a.active && a.member;
   return (
     <Section title="Ajans asistanlığım">
+      {a.removal && <AssistantRemovalCard r={a.removal} onDone={() => onChange?.()} />}
       <Panel>
         <View style={ns.rowBetween}>
           <View style={{ flex: 1 }}>

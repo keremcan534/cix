@@ -172,6 +172,8 @@ export const PANEL_ROUTES = new Set([
   'GET /api/admin/families',
   'POST /api/admin/families/create',
   'POST /api/admin/agency/room',
+  'GET /api/admin/agency/assistant-removals',
+  'POST /api/admin/agency/assistant-removals/resolve',
   'GET /api/admin/banners',
   'POST /api/admin/banners',
   'POST /api/admin/banners/toggle',

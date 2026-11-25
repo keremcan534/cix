@@ -123,7 +123,7 @@ function HubBody({ d, demo, reload, askFor }: { d: Me; demo: boolean; reload: ()
       )}
 
       {/* Ajans asistanı: my share, my invite code and what I earned (server/api/agency-assistants.mjs). */}
-      {d.assistant ? <MyAssistantCard a={d.assistant} /> : null}
+      {d.assistant ? <MyAssistantCard a={d.assistant} onChange={reload} /> : null}
 
       {d.membership ? <Membership d={d} demo={demo} reload={reload} askFor={askFor} /> : null}
 
