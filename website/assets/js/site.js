@@ -134,8 +134,8 @@
       const fb = sideways ? -e.gamma * Math.sign(angle) : e.beta; // front / back tilt
       if (base === null) base = fb;
       base += (fb - base) * 0.015; // slowly re-centre on however the phone is being held
-      const nx = Math.round(clamp(lr / 22) * 100) / 100;
-      const ny = Math.round(clamp((fb - base) / 22) * 100) / 100;
+      const nx = Math.round(clamp(lr / 22) * 40) / 40; // coarse steps: sensor noise does not keep the loop busy
+      const ny = Math.round(clamp((fb - base) / 22) * 40) / 40;
       if (nx === tx && ny === ty) return;
       tx = nx; ty = ny;
       kick();
