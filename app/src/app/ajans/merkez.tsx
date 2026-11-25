@@ -9,7 +9,7 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-n
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CenterActions } from '@/components/admin/agency-center-actions';
-import { Empty, Kpi, KpiGrid, Line, NetState, Panel, Pill, ScoreBar, Section, SERIES, Tabs, diamondsKpi, ns, statusTone, useAsk, type Ask } from '@/components/agency-net';
+import { Empty, Kpi, KpiGrid, Line, NetState, Panel, Pill, Section, SERIES, Tabs, diamondsKpi, ns, statusTone, useAsk, type Ask } from '@/components/agency-net';
 import { Backdrop } from '@/components/fx/surface';
 import { SCENES } from '@/components/fx/scenes';
 import { ChoiceChips, ListGroup, ListRow } from '@/components/list';
@@ -17,9 +17,8 @@ import { NoAccess } from '@/components/no-access';
 import { Text, TextInput } from '@/components/text';
 import { liveRules } from '@/lib/live/catalog-live';
 import { Button, Header } from '@/components/ui';
-import { DEMO_TIERS, demoAdminList, demoAdminOverview, demoAdminPayouts, demoAdminPerf, demoAdminSettings, demoAdminTransfers, demoAudit, demoTree } from '@/data/agency-net-demo';
+import { demoAdminList, demoAdminOverview, demoAdminPayouts, demoAdminSettings, demoAdminTransfers, demoAudit, demoTree } from '@/data/agency-net-demo';
 import {
-  CHANGE_TEXT,
   FLAG_TEXT,
   INCOME_TEXT,
   LEVEL_TEXT,
@@ -36,12 +35,10 @@ import {
   fmtScore,
   fmtUsd,
   runAction,
-  unavailable,
   useNet,
   usdOf,
   type AdminAgency,
   type AdminPayout,
-  type AdminScore,
   type Loaded,
   type Tier,
   type Transfer,
@@ -86,14 +83,12 @@ export default function CenterPanel() {
             options={[
               { key: 'genel', label: 'Genel' },
               { key: 'onay', label: 'Onaylar', badge: waiting },
-              { key: 'perf', label: 'Performans' },
               { key: 'kural', label: 'Kurallar' },
               { key: 'denetim', label: 'Denetim' },
             ]}
           />
           {tab === 'genel' && <GeneralTab name={me.name} ov={ov} ask={ask} />}
           {tab === 'onay' && <ApprovalsTab name={me.name} ask={ask} after={ov.reload} />}
-          {tab === 'perf' && <PerformanceTab name={me.name} ask={ask} />}
           {tab === 'kural' && <RulesTab name={me.name} ask={ask} />}
           {tab === 'denetim' && <AuditTab name={me.name} />}
         </>
@@ -591,224 +586,7 @@ function PayoutCard({ p, demo, ask, after }: { p: AdminPayout; demo: boolean; as
   );
 }
 
-// --- Performans: runs, scores, manual tier and rate -------------------------------------------------------------
-function PerformanceTab({ name, ask }: { name: string; ask: AskFn }) {
-  const [runId, setRunId] = useState<number | undefined>(undefined);
-  const q = useNet(
-    name,
-    async () => {
-      const [perf, settings] = await Promise.all([centerNet.performance(runId), centerNet.settings().catch((e) => (unavailable(e) ? Promise.reject(e) : null))]);
-      const tiers = (settings?.values.tiers as Tier[] | undefined) ?? null;
-      return {
-        perf,
-        tiers,
-        poolCap: (settings?.values.pool_cap as number | undefined) ?? null,
-      };
-    },
-    () => ({
-      perf: demoAdminPerf(),
-      tiers: DEMO_TIERS as Tier[] | null,
-      poolCap: 0.4 as number | null,
-    }),
-    [runId],
-  );
-  const run = async (dryRun: boolean) => {
-    if (dryRun) {
-      await runAction(
-        q.demo,
-        () => centerNet.runPerformance(true, 'Deneme değerlendirmesi'),
-        'Deneme tamamlandı. Seviye ve oranlar değişmedi; sonuçlar listede.',
-        () => {
-          setRunId(undefined);
-          q.reload();
-        },
-      );
-      return;
-    }
-    const r = await ask({
-      title: 'Değerlendirme çalıştırılsın mı?',
-      message: 'Tüm ajansların puanı hesaplanır. Hak edilen seviye ve oran değişiklikleri bir sonraki dönemden geçerli olur; mevcut dönem ve geçmiş kazançlar değişmez. Üst ajanslara bildirim gider.',
-      confirm: 'Çalıştır',
-      placeholder: 'ör. Kasım ayı değerlendirmesi',
-    });
-    if (r)
-      await runAction(
-        q.demo,
-        () => centerNet.runPerformance(false, r.reason),
-        'Değerlendirme tamamlandı.',
-        () => {
-          setRunId(undefined);
-          q.reload();
-        },
-      );
-  };
-  return (
-    <Scroll q={q}>
-      <Panel>
-        <Text style={ns.title}>Performans değerlendirmesi</Text>
-        <Text style={ns.dim}>Puan; hacim, aktif yayıncı, büyüme, tutma, yeni yayıncı, operasyon ve güvenilirlik ağırlıklarıyla sunucuda hesaplanır. Deneme hiçbir oranı değiştirmez.</Text>
-        <View style={st.actions}>
-          <Button small variant="tonal" icon="flask-outline" title="Deneme değerlendirmesi" onPress={() => run(true)} style={{ flex: 1 }} />
-          <Button small icon="play" title="Değerlendirmeyi çalıştır" onPress={() => run(false)} style={{ flex: 1 }} />
-        </View>
-      </Panel>
-      <NetState q={q}>
-        {(d) => {
-          const runs = d.perf.runs;
-          const cur = runs.find((r) => r.id === d.perf.runId);
-          const tierLabel = (k: string | null) => (k ? (d.tiers?.find((t) => t.key === k)?.name ?? k) : '—');
-          return (
-            <>
-              <Section title="Değerlendirmeler">
-                {runs.length === 0 ? (
-                  <Empty icon="analytics-outline" text="Henüz değerlendirme çalıştırılmadı." />
-                ) : (
-                  <Panel>
-                    <ChoiceChips<number> value={d.perf.runId ?? 0} onChange={(v) => setRunId(v)} options={runs.slice(0, 8).map((r) => [r.id, `#${r.id}${r.dryRun ? ' · deneme' : ''}`])} />
-                    {cur && (
-                      <View style={{ gap: 2 }}>
-                        <Line label="Tarih" value={fmtDateTime(cur.asOf)} />
-                        <Line label="Ölçüm aralığı" value={`${fmtDate(cur.windowFrom)} – ${fmtDate(cur.asOf)}`} />
-                        <Line label="Yürürlük" value={cur.dryRun ? 'Deneme (uygulanmadı)' : fmtDate(cur.effectiveFrom)} strong />
-                        <Line label="Çalıştıran" value={cur.runBy ?? '—'} />
-                        {!!cur.note && <Line label="Not" value={cur.note} />}
-                      </View>
-                    )}
-                  </Panel>
-                )}
-              </Section>
-              <Section title="Puanlar" right={<Text style={st.dimSmall}>{d.perf.scores.length} ajans</Text>}>
-                {d.perf.scores.length === 0 && runs.length > 0 && <Empty icon="list-outline" text="Bu değerlendirmede puan yok." />}
-                {d.perf.scores.map((s) => (
-                  <ScoreCard key={s.agencyId} s={s} tiers={d.tiers} tierLabel={tierLabel} demo={q.demo} ask={ask} after={q.reload} />
-                ))}
-                <Text style={st.foot}>
-                  Seviye ve oranı yalnızca merkez elle değiştirebilir; üst ajans, alt ajansının puanını, seviyesini veya oranını değiştiremez. Her karar gerekçesiyle kayda geçer ve geçmişe uygulanmaz.
-                </Text>
-              </Section>
-            </>
-          );
-        }}
-      </NetState>
-    </Scroll>
-  );
-}
-
-function ScoreCard({ s, tiers, tierLabel, demo, ask, after }: { s: AdminScore; tiers: Tier[] | null; tierLabel: (k: string | null) => string; demo: boolean; ask: AskFn; after: () => void }) {
-  const [mode, setMode] = useState<'tier' | 'rate' | null>(null);
-  const [tier, setTier] = useState(s.assigned ?? s.current ?? tiers?.[0]?.key ?? '');
-  const [rate, setRate] = useState('');
-  const sub = s.level > 1;
-  const parent = s.parent?.name ?? null;
-  const saveTier = async () => {
-    if (!tier) return;
-    const r = await ask({
-      title: `${s.name}: ${tierLabel(tier)}`,
-      message: 'Seviye ve buna bağlı oran bir sonraki dönemden geçerli olur. Geçmiş kazançlar değişmez.',
-      confirm: 'Seviyeyi ata',
-    });
-    if (r)
-      await runAction(
-        demo,
-        () => centerNet.setTier(s.agencyId, tier, r.reason),
-        'Seviye kararı kaydedildi.',
-        () => {
-          setMode(null);
-          after();
-        },
-      );
-  };
-  const saveRate = async () => {
-    const v = pctIn(rate);
-    if (!(v >= 0) || v > 1) return showAlert('Geçersiz oran', 'Yüzde olarak gir (ör. 32 veya 32,5).');
-    const r = await ask({
-      title: `${s.name}: oran ${fmtPct(v)}`,
-      message: sub
-        ? 'Alt ajans oranı, üst ajansın asgari payını bırakacak şekilde sınırlıdır; sunucu aşan oranı reddeder. Yeni oran geleceğe uygulanır.'
-        : 'Üst ajans oranı havuz sınırını aşamaz. Yeni oran geleceğe uygulanır.',
-      confirm: 'Oranı belirle',
-    });
-    if (r)
-      await runAction(
-        demo,
-        () => centerNet.setRate(s.agencyId, v, r.reason),
-        'Oran kararı kaydedildi.',
-        () => {
-          setMode(null);
-          after();
-        },
-      );
-  };
-  return (
-    <Panel>
-      <View style={ns.rowBetween}>
-        <View style={st.rank}>
-          <Text style={st.rankText}>{s.rank ?? '—'}</Text>
-        </View>
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={st.nodeName} numberOfLines={1}>
-            {s.name}
-          </Text>
-          <Text style={st.dimSmall} numberOfLines={1}>
-            {LEVEL_TEXT(s.level)}
-            {parent ? ` · üst: ${parent}` : ''}
-          </Text>
-        </View>
-        <View style={{ alignItems: 'flex-end' }}>
-          <Text style={st.score}>{fmtScore(s.score)}</Text>
-          <Text style={st.dimSmall}>puan</Text>
-        </View>
-      </View>
-      <ScoreBar score={s.score} parentScore={s.parentScore} />
-      <View style={{ gap: 2 }}>
-        {sub && <Line label="Hak ettiği seviye" value={tierLabel(s.qualified)} />}
-        {sub && <Line label="Atanan seviye" value={s.assignedName ?? tierLabel(s.assigned)} strong />}
-        {sub && s.current !== s.assigned && <Line label="Önceki seviye" value={tierLabel(s.current)} />}
-        <Line label="Art arda dönem" value={fmtD(s.streak)} />
-      </View>
-      <View style={st.pills}>
-        <Pill
-          text={CHANGE_TEXT[s.change] ?? s.change}
-          tone={s.change === 'up' ? 'success' : s.change === 'down' ? 'danger' : s.change === 'waiting' ? 'money' : 'neutral'}
-          icon={s.change === 'up' ? 'arrow-up' : s.change === 'down' ? 'arrow-down' : s.change === 'held' ? 'lock-closed-outline' : 'remove'}
-        />
-        {s.overtakes && <Pill text="Üst ajansı geçti" tone="money" icon="trending-up" />}
-        {s.flags.map((f) => (
-          <Pill key={f} text={FLAG_TEXT[f] ?? f} tone={f === 'review' || f === 'decline' || f === 'spike' ? 'danger' : 'neutral'} icon="flag-outline" />
-        ))}
-      </View>
-      <View style={st.actions}>
-        {sub && tiers && (
-          <Button small variant={mode === 'tier' ? 'hero' : 'tonal'} icon="podium-outline" title="Seviye ata" onPress={() => setMode(mode === 'tier' ? null : 'tier')} style={{ flex: 1 }} />
-        )}
-        <Button small variant={mode === 'rate' ? 'hero' : 'tonal'} icon="options-outline" title="Oran belirle" onPress={() => setMode(mode === 'rate' ? null : 'rate')} style={{ flex: 1 }} />
-      </View>
-      {mode === 'tier' && tiers && (
-        <View style={st.editor}>
-          <ChoiceChips<string> value={tier} onChange={setTier} options={tiers.map((t) => [t.key, `${t.name} · ${fmtPct(t.sub_rate)}`])} />
-          <Button small title="Kaydet" icon="checkmark" onPress={saveTier} />
-        </View>
-      )}
-      {mode === 'rate' && (
-        <View style={st.editor}>
-          <View style={st.inline}>
-            <Text style={st.statLabel}>Yeni oran (%)</Text>
-            <TextInput
-              value={rate}
-              onChangeText={setRate}
-              keyboardType="decimal-pad"
-              placeholder="ör. 32"
-              placeholderTextColor={colors.textDim}
-              style={[ns.input, st.smallInput]}
-              accessibilityLabel="Yeni oran"
-            />
-          </View>
-          <Button small title="Kaydet" icon="checkmark" onPress={saveRate} />
-        </View>
-      )}
-    </Panel>
-  );
-}
+// The old Performans tab (scores, tiers by score) is gone with the weekly levels (owners, 26 Nov 2026).
 
 // --- Kurallar: settings, simulator, history -------------------------------------------------------------------
 type Values = {
