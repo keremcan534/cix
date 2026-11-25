@@ -88,6 +88,8 @@ export type Notice = { id: number; kind: string; title: string; body: string; cr
 
 export type Overview = {
   agency: AgencyCard;
+  /** The agency's BD, by name only (owners, 26 Nov 2026); an older server sends none. */
+  bd?: { name: string } | null;
   /** Aday ajans / aktif ajans with its progress (ended 24 Nov 2026: null); raw, read with lib/agency-activity parseAgencyActivity. */
   activity?: unknown;
   /** Haftalık seviye (server/api/agency-levels.mjs); raw, read with lib/agency-level parseAgencyLevel. An older server sends none. */
