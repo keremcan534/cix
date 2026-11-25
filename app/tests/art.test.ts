@@ -63,7 +63,7 @@ describe('Görsel dosyaları', () => {
     for (const [id, f] of files) shared.set(f, [...(shared.get(f) ?? []), id]);
     assert.deepEqual(
       [...shared.values()].filter((v) => v.length > 1).map((v) => v.sort()).sort((a, b) => a[0].localeCompare(b[0])),
-      [['duygu-opucuk', 'hamle-opucuk-sag', 'hamle-opucuk-sol'], ['hamle-tas', 'hamle-tkm']],
+      [['duygu-dudak', 'hamle-opucuk'], ['duygu-opucuk', 'hamle-opucuk-sag', 'hamle-opucuk-sol'], ['hamle-tas', 'hamle-tkm']],
     );
     const bytes = new Set([...shared.keys()].map((f) => readFileSync(resolve(SRC, 'components', f)).toString('base64')));
     assert.equal(bytes.size, shared.size, 'aynı görsel iki çıkartmada');
@@ -174,13 +174,16 @@ describe('Duygular (Animated Noto Emoji, CC BY 4.0)', () => {
   test('ücretsiz, her birinin animasyonu var, kaynak notu uygulamayla gider', () => {
     const pack = STICKER_PACKS.find((p) => p.id === 'duygu');
     assert.ok(pack && !pack.price && !pack.minVip, 'ücretsiz paket');
-    assert.equal(pack.stickers.length, 32);
+    // 32, then 18 the owners picked from the same set (25 Nov 2026).
+    assert.equal(pack.stickers.length, 50);
+    // One sticker shares the Hamle's file (the same animation): 💋 is the flying kiss.
+    const fileOf = (id: string) => (id === 'duygu-dudak' ? 'hamle-opucuk' : id);
     const art = read('components/ReactionArt.tsx');
     for (const x of pack.stickers) {
       assert.match(x.id, /^duygu-[a-z0-9-]+$/);
       // Read only when drawn: a function per animation, not a require at load.
-      assert.ok(art.includes(`'${x.id}': () => require('../../assets/reactions/duygu/${x.id}.json'),`), x.id);
-      const anim = JSON.parse(readFileSync(resolve(SRC, '../assets/reactions/duygu', `${x.id}.json`), 'utf8'));
+      assert.ok(art.includes(`'${x.id}': () => require('../../assets/reactions/duygu/${fileOf(x.id)}.json'),`), x.id);
+      const anim = JSON.parse(readFileSync(resolve(SRC, '../assets/reactions/duygu', `${fileOf(x.id)}.json`), 'utf8'));
       assert.ok(Array.isArray(anim.layers) && anim.layers.length > 0 && anim.fr > 0 && anim.op > anim.ip, `${x.id}: Lottie`);
     }
     assert.match(readFileSync(resolve(SRC, '../assets/reactions/duygu/LICENSE.txt'), 'utf8'), /Animated Noto Emoji[\s\S]*CC BY 4\.0/);
