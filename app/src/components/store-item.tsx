@@ -46,10 +46,13 @@ export function Shelf({ hue, on, children }: { hue: string; on?: boolean; childr
   );
 }
 
+/** Every preview's height (owners, 25 Nov 2026: compact tiles, 104 before). */
+export const PREVIEW_H = 86;
+
 /** Every preview in one slot of the tallest preview's height, so the names under neighbouring tiles line up. */
 export function ItemPreview(props: { item: Cosmetic; avatar: string; voice: string; still?: boolean }) {
   return (
-    <View style={{ height: 104, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center' }}>
+    <View style={{ height: PREVIEW_H, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center' }}>
       <PreviewBody {...props} />
     </View>
   );
@@ -60,16 +63,16 @@ function PreviewBody({ item, avatar, voice, still }: { item: Cosmetic; avatar: s
   const styles = useItemStyles();
   if (item.kind === 'wave')
     return (
-      <View style={{ height: 104, justifyContent: 'center', alignItems: 'center' }} accessibilityLabel={`${item.name} ses dalgası`}>
+      <View style={{ height: PREVIEW_H, justifyContent: 'center', alignItems: 'center' }} accessibilityLabel={`${item.name} ses dalgası`}>
         <WavePreview wave={item.id} uri={avatar} color={voice} still={still} />
       </View>
     );
   const art = item.kind === 'frame' ? frameArtOf(item.id) : undefined;
   if (art) {
     // Size the avatar so the whole illustrated frame (wings, crown) fits the card.
-    const size = Math.round(100 * 2 * art.hole * 1.04);
+    const size = Math.round(PREVIEW_H * 0.96 * 2 * art.hole * 1.04);
     return (
-      <View style={{ height: 104, justifyContent: 'center', alignItems: 'center' }}>
+      <View style={{ height: PREVIEW_H, justifyContent: 'center', alignItems: 'center' }}>
         <ArtFrame art={art} size={size} still={still} maxScale={3}>
           <Photo uri={avatar} kind="face" style={{ width: '100%', height: '100%' }} />
         </ArtFrame>
@@ -79,8 +82,8 @@ function PreviewBody({ item, avatar, voice, still }: { item: Cosmetic; avatar: s
   if (item.kind === 'frame' && item.fx) {
     const badge = frameBadgeArtOf(item.id);
     return (
-      <View style={{ height: 104, justifyContent: 'center', alignItems: 'center' }}>
-        <AnimatedFrame fx={item.fx as FrameFx} size={64} still={still}>
+      <View style={{ height: PREVIEW_H, justifyContent: 'center', alignItems: 'center' }}>
+        <AnimatedFrame fx={item.fx as FrameFx} size={56} still={still}>
           <Photo uri={avatar} kind="face" style={{ width: '100%', height: '100%' }} />
         </AnimatedFrame>
         {badge && <Image source={badge} style={styles.frameBadge} accessibilityLabel={item.name} />}
@@ -122,7 +125,7 @@ function PreviewBody({ item, avatar, voice, still }: { item: Cosmetic; avatar: s
   if (shopBubble)
     // One the team added: its colours, or its picture stretched round the message as in a room.
     return (
-      <View style={{ height: 104, justifyContent: 'center', alignItems: 'center' }} accessibilityLabel={`${item.name} sohbet balonu`}>
+      <View style={{ height: PREVIEW_H, justifyContent: 'center', alignItems: 'center' }} accessibilityLabel={`${item.name} sohbet balonu`}>
         <ShopBubble look={shopBubble} style={styles.shopBubblePreview}>
           <Text style={{ color: shopBubble.text, fontSize: 13 }}>Merhaba! 👋</Text>
         </ShopBubble>
@@ -160,7 +163,7 @@ const useItemStyles = makeStyles((t) => ({
   artStack: { alignItems: 'center', gap: 4 },
   artIcon: { width: 56, height: 56 },
   rideArt: { width: 72, height: 72 },
-  item: { width: '48.5%', borderRadius: 20, padding: 12, alignItems: 'center', gap: 6, borderWidth: 1.5 },
+  item: { width: '48.5%', borderRadius: 18, padding: 9, alignItems: 'center', gap: 4, borderWidth: 1.5 },
   halo: { position: 'absolute', top: 14, alignSelf: 'center', width: 90, height: 90 },
   onTag: { position: 'absolute', top: 8, right: 8, color: t.semantic.actionInk, backgroundColor: t.semantic.action, fontSize: 10, fontWeight: '800', borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1, overflow: 'hidden', zIndex: 1 },
   framePreview: { width: 64, height: 64, borderRadius: 32, padding: 4 },

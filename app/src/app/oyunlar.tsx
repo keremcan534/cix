@@ -206,20 +206,20 @@ export default function GameCenter() {
                     .map((g, i) => {
                       const ready = g.active && g.playable;
                       return (
-                        <View key={g.id} style={s.half}>
+                        <View key={g.id} style={s.third}>
                           <BreakoutCard
                             icon={{ source: gameArtOf(g.id), emoji: g.emoji }}
                             hue={gameHueOf(g.id)}
-                            iconSize={68}
+                            iconSize={52}
                             dim={!g.active}
                             delay={i * 260}
                             label={ready ? `${g.name} dene` : g.name}
                             onPress={() => ready && setOpen({ kind: 'room', id: g.id })}
                           >
-                            <Text style={s.name} numberOfLines={1}>
+                            <Text style={s.nameSmall} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                               {g.name}
                             </Text>
-                            <Text style={s.dim}>
+                            <Text style={s.dimSmall} numberOfLines={2}>
                               {g.active && !ready ? 'Bu oyun yakında geliyor.' : `${g.minPlayers === g.maxPlayers ? g.minPlayers : `${g.minPlayers}–${g.maxPlayers}`} oyuncu${ready ? (live ? ' · botlarla dene' : '') : ' · pasif'}`}
                             </Text>
                             {ready && <GlossButton label="Dene" tone="action" small />}
@@ -293,6 +293,10 @@ const useStyles = makeStyles((t) => ({
   bannerTitle: { color: t.colors.text, fontFamily: fonts.display, fontSize: 18, lineHeight: 24 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 12 },
   half: { width: '48.5%' },
+  // Three a row (owners, 25 Nov 2026: less empty space).
+  third: { width: '31.8%' },
+  nameSmall: { color: t.colors.text, fontFamily: fonts.display, fontSize: 14, lineHeight: 18 },
+  dimSmall: { color: t.colors.textDim, fontSize: 11, lineHeight: 14 },
   full: { width: '100%' },
   name: { color: t.colors.text, fontFamily: fonts.display, fontSize: 17, lineHeight: 22 },
   // Two cards share a 360 px row: the longest names ("Gece Yarısı Çarkı") need the smaller size to stay whole.
