@@ -37,7 +37,8 @@ export const tayfaAvailable = (live: boolean = !!process.env.EXPO_PUBLIC_API_URL
 
 type Spend = (amount: number, reason?: string) => boolean;
 type Credit = (amount: number, reason?: string) => void;
-export const KABILE_CREATE_COST = 500;
+/** Founding a family (the demo's; a live build shows the server's foundPrice). The owners' price, 25 Nov 2026. */
+export const KABILE_CREATE_COST = 4999;
 
 /** Aile kur: the fee, then my new aile. 'off' in a live build (nothing is charged), 'coins' when the fee is short. */
 export function createKabile(name: string, spend: Spend, live?: boolean): KabileFamily | 'off' | 'coins' {

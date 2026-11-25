@@ -15,14 +15,19 @@ const ok = async (p, what) => {
   assert.equal(st, 200, `${what}: ${j.error}`);
   return j;
 };
-const topUp = (s) => ok(call('POST', '/api/wallet/test-topup', { amount: 1000, ref: rnd(6) }, s), 'yükleme');
-const found = (s, name, ref = rnd(6)) => call('POST', '/api/families', { name, ref }, s);
+const topUp = (s) => ok(call('POST', '/api/wallet/test-topup', { amount: 10000, ref: rnd(6) }, s), 'yükleme');
+/** Founding as a newer app does: with the fee it showed (Canlı ayarlar › Aile kurma ücreti, 4999 by default). */
+const PRICE = 4999;
+const found = (s, name, ref = rnd(6), price = PRICE) => call('POST', '/api/families', { name, ref, ...(price !== null && { price }) }, s);
 
 describe('Aile', () => {
   test('ücret ve seviye tablosu uygulamadakiyle aynı', () => {
     const app = (f) => fs.readFileSync(path.join(import.meta.dirname, '..', '..', '..', 'app', 'src', 'data', f), 'utf8');
     const server = fs.readFileSync(path.join(import.meta.dirname, '..', 'families.mjs'), 'utf8');
-    assert.equal(/KABILE_CREATE_COST = (\d+)/.exec(app('kabile.ts'))[1], /FAMILY_COST = (\d+)/.exec(server)[1]);
+    const registry = fs.readFileSync(path.join(import.meta.dirname, '..', 'live-registry.mjs'), 'utf8');
+    // The demo's fee is the panel's default (older apps show FAMILY_COST, 500).
+    assert.equal(/KABILE_CREATE_COST = (\d+)/.exec(app('kabile.ts'))[1], /family_found_price: \{[^}]*default: (\d+)/.exec(registry)[1]);
+    assert.equal(/FAMILY_COST = (\d+)/.exec(server)[1], '500', 'eski uygulamaların yazdığı ücret');
     const xp = (s) => /FAMILY_XP = \[([^\]]+)\]/.exec(s)[1].replace(/\s/g, '');
     assert.equal(xp(app('rules.ts')), xp(server));
   });
@@ -34,7 +39,7 @@ describe('Aile', () => {
     const ref = rnd(6);
     const both = await Promise.all([1, 2].map(() => found(a.session, 'Kartallar', ref)));
     assert.deepEqual(both.map((x) => x[0]), [200, 200], JSON.stringify(both.map((x) => x[1].error)));
-    assert.equal((await me(a.session)).coins, 500, 'ücret bir kez');
+    assert.equal((await me(a.session)).coins, 10000 - PRICE, 'ücret bir kez');
     const f = both[0][1].family;
     assert.equal(f.name, 'Kartallar');
     assert.equal(f.members, 1);
@@ -46,7 +51,14 @@ describe('Aile', () => {
     await topUp(b.session);
     assert.equal((await found(b.session, 'kartallar'))[0], 409, 'aynı isim');
     assert.notEqual((await found(b.session, 'ara 0532 123 45 67'))[0], 200, 'iletişim bilgisi yok');
-    assert.equal((await me(b.session)).coins, 1000, 'reddedilen kurulum jeton almaz');
+    assert.equal((await me(b.session)).coins, 10000, 'reddedilen kurulum jeton almaz');
+    // The fee as an older app showed it (500, none sent) and a fee that moved: refused, nothing taken.
+    const [old, oj] = await found(b.session, 'Eski Uygulama', rnd(6), null);
+    assert.deepEqual([old, oj.code], [409, 'update_required']);
+    const [moved, mj] = await found(b.session, 'Eski Fiyat', rnd(6), 500);
+    assert.deepEqual([moved, mj.code, mj.price], [409, 'price_changed', PRICE]);
+    assert.equal((await me(b.session)).coins, 10000);
+    assert.equal((await ok(call('GET', '/api/families', null, b.session), 'liste')).foundPrice, PRICE, 'uygulama ücreti sunucudan okur');
   });
 
   test('katılma: onaylı ve açık, roller, çıkarma, devir', async () => {

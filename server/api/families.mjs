@@ -2,7 +2,8 @@
 //
 //   GET  /api/families?q=                     → { families, mine }        (top 50 by this week's power; q filters by name)
 //   GET  /api/family?id=                      → { family, members, myRole, requested, requests, rejoinAt, leaveDays }   (no id: mine, or family null)
-//   POST /api/families      { name, ref }     → { family, user, replay }  (founding fee FAMILY_COST coins)
+//   POST /api/families      { name, ref, price? } → { family, user, replay }  (founding fee: live familyFoundPrice;
+//                                             a newer app sends the price it showed, an older one showed FAMILY_COST)
 //   POST /api/family/join   { id, join? }     → { joined } | { requested } (join: false takes my request back)
 //   POST /api/family/request { userId, accept } → { members }             (the leader or a helper)
 //   POST /api/family/invite { userId }        → { invited }               (the leader or a helper: someone with no family)
@@ -31,7 +32,23 @@ import { live } from './live-settings.mjs';
 import { isStreamer } from './streamer-rule.mjs';
 
 /** The founding fee (app: data/kabile KABILE_CREATE_COST). */
+/** The founding fee older apps show (compiled); the price now is live familyFoundPrice (Canlı ayarlar › Aile). */
 export const FAMILY_COST = 500;
+
+/**
+ * The founding fee now; a newer app sends the price it showed (another one now: 409 price_changed), an older one
+ * sends none and showed FAMILY_COST (another one now: 409 update_required). Nothing moves on either.
+ */
+function foundPrice(shown) {
+  const price = live().familyFoundPrice;
+  const fmt = (n) => n.toLocaleString('tr-TR');
+  if (shown !== undefined && shown !== null) {
+    if (shown !== price) throw Object.assign(new HttpError(409, `Aile kurma ücreti değişti: artık ${fmt(price)} jeton. Yeni ücreti görüp yeniden dene.`), { extra: { code: 'price_changed', price } });
+  } else if (price !== FAMILY_COST) {
+    throw Object.assign(new HttpError(409, 'Aile kurma ücreti değişti. Aile kurmak için uygulamayı güncelle.'), { extra: { code: 'update_required' } });
+  }
+  return price;
+}
 /** Power needed for each level (app: data/rules FAMILY_XP). */
 export const FAMILY_XP = [0, 1_000, 3_000, 6_000, 10_000, 16_000, 24_000, 35_000, 50_000, 70_000, 95_000, 130_000, 175_000, 230_000, 300_000];
 export const familyLevel = (power) => FAMILY_XP.reduce((lvl, t, i) => (power >= t ? i + 1 : lvl), 1);
@@ -241,7 +258,8 @@ export const familyRoutes = {
       .sort((a, b) => b.weekly - a.weekly || b.power - a.power)
       .slice(0, 50);
     const mine = await myMembership(me.id);
-    return { families, mine: mine ? String(mine.family_id) : null };
+    // foundPrice: what founding one costs now (an older app ignores it and shows its own).
+    return { families, mine: mine ? String(mine.family_id) : null, foundPrice: live().familyFoundPrice };
   },
 
   async 'GET /api/family'(req, url) {
@@ -278,7 +296,9 @@ export const familyRoutes = {
       await assertRejoin(c, me.id, null);
       if ((await c.query('SELECT 1 FROM families WHERE lower(name) = lower($1) AND closed_at IS NULL', [name])).rowCount)
         throw new HttpError(409, 'Bu isimde bir aile var');
-      await spendCoins(c, me.id, FAMILY_COST, `Aile kurma: ${name}`, b.ref);
+      // After the ref check above, so a retry of a founding that went through gets its replay.
+      const price = foundPrice(b.price);
+      if (price > 0) await spendCoins(c, me.id, price, `Aile kurma: ${name}`, b.ref);
       const f = await c.query('INSERT INTO families (name, leader) VALUES ($1, $2) RETURNING id', [name, me.id]);
       await addMember(c, Number(f.rows[0].id), me.id, 'owner');
     });

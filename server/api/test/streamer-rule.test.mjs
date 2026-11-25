@@ -28,9 +28,9 @@ async function person(name, gender) {
 const cashOut = (s) => ok(call('GET', '/api/wallet/cash-out', null, s.session));
 /** A family led by `owner` with `members` people, the leader among them. */
 async function familyOf(owner, members) {
-  await h.credit(owner.user.id, 500, { channel: 'google' });
+  await h.credit(owner.user.id, 4999, { channel: 'google' });
   // A visible name: rnd(3) is digits only (harness.mjs); 12 hex characters can spell a handle the contact filter refuses.
-  const f = await ok(call('POST', '/api/families', { name: `Aile ${rnd(3)}`, ref: ref() }, owner.session));
+  const f = await ok(call('POST', '/api/families', { name: `Aile ${rnd(3)}`, ref: ref(), price: 4999 }, owner.session));
   await q("UPDATE families SET join_mode = 'open' WHERE id = $1", [f.family.id]);
   for (let i = 1; i < members; i++) {
     const m = await signUp(`Üye ${rnd(3)}`);
@@ -132,8 +132,8 @@ describe('aileden ayrılan yayıncı 90 gün başka aileye giremez', () => {
     assert.ok(new Date(left.rejoinAt) > new Date(Date.now() + 89 * 86400_000));
     const r = await refused(call('POST', '/api/family/join', { id: f2.id }, s.session), 409, /başka bir aileye katılamazsın/);
     assert.equal(r.code, 'family_rejoin_wait');
-    await h.credit(s.user.id, 500, { channel: 'google' });
-    await refused(call('POST', '/api/families', { name: `Yeni ${rnd(3)}`, ref: ref() }, s.session), 409, /katılamazsın/);
+    await h.credit(s.user.id, 4999, { channel: 'google' });
+    await refused(call('POST', '/api/families', { name: `Yeni ${rnd(3)}`, ref: ref(), price: 4999 }, s.session), 409, /katılamazsın/);
     await refused(call('POST', '/api/family/invite', { userId: s.user.id }, lead2.session), 409, /katılamaz/);
     await ok(call('POST', '/api/family/join', { id: f1.id }, s.session), 'ayrıldığı aile');
     await ok(call('POST', '/api/family/leave', {}, s.session));

@@ -258,7 +258,7 @@ describe('Çevrimiçi, son görülme ve profil', () => {
   test('Aile: çevrimiçi ve bulunduğu oda gizlenebilir', async () => {
     const lead = await signUp('Aile Lideri');
     await ok(call('POST', '/api/wallet/test-topup', { amount: 5000, ref: rnd(6) }, lead.session), 'yükleme');
-    const { family } = await ok(call('POST', '/api/families', { name: `Gizli Aile ${rnd(2)}`, ref: rnd(6) }, lead.session), 'kur');
+    const { family } = await ok(call('POST', '/api/families', { name: `Gizli Aile ${rnd(2)}`, ref: rnd(6), price: 4999 }, lead.session), 'kur');
     await ok(call('POST', '/api/family/settings', { joinMode: 'open' }, lead.session), 'açık');
     const member = await signUp('Aile Üyesi');
     await ok(call('POST', '/api/family/join', { id: family.id }, member.session), 'katıl');

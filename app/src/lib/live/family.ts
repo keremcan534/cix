@@ -36,7 +36,7 @@ function know(p: FamilyPerson) {
 }
 
 export const families = (q = '') =>
-  api.apiRequest<{ families: LiveFamily[]; mine: string | null }>('GET', `/api/families${q.trim() ? `?q=${encodeURIComponent(q.trim())}` : ''}`);
+  api.apiRequest<{ families: LiveFamily[]; mine: string | null; /** What founding one costs now (live familyFoundPrice; older servers: none). */ foundPrice?: number }>('GET', `/api/families${q.trim() ? `?q=${encodeURIComponent(q.trim())}` : ''}`);
 
 /** A family (no id: mine; family null when I have none), its members, and the requests when I lead or help. */
 export async function family(id?: string): Promise<FamilyDetail> {
@@ -47,7 +47,9 @@ export async function family(id?: string): Promise<FamilyDetail> {
 }
 
 /** Founding a family takes the fee once, even when the request is sent again (`ref`). */
-export const create = (name: string, ref: string) => api.apiRequest<{ family: LiveFamily | null; user: api.ServerUser }>('POST', '/api/families', { name, ref });
+/** `price`: the fee the screen showed (the server refuses with price_changed if it moved). */
+export const create = (name: string, ref: string, price?: number) =>
+  api.apiRequest<{ family: LiveFamily | null; user: api.ServerUser }>('POST', '/api/families', { name, ref, ...(price !== undefined && { price }) });
 export const join = (id: string, on = true) => api.apiRequest<{ joined?: boolean; requested?: boolean }>('POST', '/api/family/join', { id, join: on });
 export const answer = (userId: string, accept: boolean) => api.apiRequest<{ members: FamilyMember[] }>('POST', '/api/family/request', { userId, accept });
 export const leave = () => api.apiRequest<{ left: true; rejoinAt?: string | null }>('POST', '/api/family/leave', {});
