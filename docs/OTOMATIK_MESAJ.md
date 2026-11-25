@@ -16,7 +16,7 @@ Uygulama: `app/src/lib/live/auto-chat.ts`, `lib/auto-chat-core.ts`, `lib/msg-rew
 
 ## 5 dakika kuralı (para)
 
-1. Erkek yayıncıya takipleşmeden yazınca mesaj ücreti (Canlı ayarlar › Mesaj ücreti, 240 jeton) **hemen alınır** ve bekletilir. Ücret hangi jeton partisinden geldiyse orada kayıtlı kalır.
+1. Erkek yayıncıya takipleşmeden yazınca mesaj ücreti (Canlı ayarlar › Mesaj ücreti, 12 jeton) **hemen alınır** ve bekletilir. Ücret hangi jeton partisinden geldiyse orada kayıtlı kalır.
 2. Süre, mesaj **sunucuya ulaşınca** başlar ve sunucunun saatiyle sayılır. Telefonun saati bir şey değiştirmez.
 3. Yayıncı süre içinde **geçerli cevap** verirse jeton yayıncının elması olur, bugünkü gibi: kilit süresi, kalp puanı, Gelir, ajans komisyonu.
    - Geçerli cevap: kendi yazdığı en az 2 karakterlik mesaj, fotoğraf ya da hazır cevap.
@@ -113,7 +113,7 @@ Otomatik mesaj karşı tarafta **"Otomatik mesaj"** etiketiyle görünür. Erke�
 | Süre doldu | Ödül süresi doldu. |
 
 - Geri sayım sunucunun saatiyle akar.
-- Erkek kendi mesajının altında yalnız kendi jetonunu görür: "cevap bekleniyor (gelmezse iade edilir)", "ödendi", "Cevap gelmedi · 240 jeton iade edildi". Yayıncının kazancını görmez.
+- Erkek kendi mesajının altında yalnız kendi jetonunu görür: "cevap bekleniyor (gelmezse iade edilir)", "ödendi", "Cevap gelmedi · 12 jeton iade edildi". Yayıncının kazancını görmez.
 
 ## Mesaj Performansım ve ajans paneli
 

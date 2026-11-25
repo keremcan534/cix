@@ -2,10 +2,11 @@
 // written at level 0's rate (agency-lib.mjs calcEvent, level_week). When the week closes (Monday 00:00 Türkiye) each
 // agency's week is settled once: its own streamers' diamonds and active streamers give the level, and the rest of
 // that level's rate goes in as one 'level' ledger row per period, with the assistant's and the BD's part of it. A
-// new agency's incomes already have its fixed level, a late income of a closed week its settled rate.
+// new agency's incomes already have its fixed level, a late income of a closed week its settled rate. A referral
+// agency's week also pays its parent the referral share (payReferral).
 import { addDays, weekBounds, weekStartOf } from './host-bonus-rules.mjs';
 import { HttpError, auth, db, env, readJson, tx } from './core.mjs';
-import { audit, accessOf, diamondsPerUsd, e4, fmt4, needPlatform, notice, settingsAt, settleAssistant, weekNumbers } from './agency-lib.mjs';
+import { audit, accessOf, diamondsPerUsd, e4, fmt4, isClosed, needPlatform, notice, periodOf, settingsAt, settleAssistant, weekNumbers } from './agency-lib.mjs';
 import { isNewAgency, levelFor, nextLevelOf } from './agency-level-rules.mjs';
 import { weekText } from './host-bonus.mjs';
 
@@ -100,6 +101,7 @@ async function settleAgency(c, a, week, s) {
     }
   }
   await c.query('UPDATE agency_level_weeks SET adjustment = $3 WHERE agency_id = $1 AND week_start = $2', [a.id, week, fmt4(total)]);
+  await payReferral(c, a, week, s, total);
   await c.query('UPDATE agencies SET level_key = $2, level_week = $3 WHERE id = $1 AND (level_week IS NULL OR level_week <= $3)', [a.id, level.key, week]);
   const title = level.shown ? `Bu haftanın seviyen: ${level.name} (${pct(level.rate)})` : `Haftanın komisyonu ${pct(level.rate)} ile hesaplandı`;
   const why =
@@ -111,6 +113,47 @@ async function settleAgency(c, a, week, s) {
   await notice(c, a.id, 'tier', title, `${weekText(week)}. ${why}`);
   await audit(c, null, 'agency.week_level', 'agency', a.id, { after: { week, level: level.key, rate: level.rate, base: nums.base, active: nums.active, reason, adjustment: total / 1e4 } });
   return { ...claim.rows[0], adjustment: total / 1e4 };
+}
+
+/**
+ * Referans ajans (owners, 25 Nov 2026; settings referral_policy): when referral agency `a`'s week `week` closes, its
+ * parent then gets `pct` of a's whole commission that week (every income at the rate it ended at, plus the level
+ * row `adjustment`, in 1/10,000 diamond), if the week is one of the `weeks` after the first `free_weeks` counted from
+ * the week a joined that parent (calendar weeks, Monday 00:00 Türkiye; the join week is week 0). On top: nothing is
+ * taken from a. One 'difference' row (the kind a parent's share from its referral agencies has always had, so older
+ * apps count it), once per agency and week (its ref). Nothing for a week without a commission.
+ */
+async function payReferral(c, a, week, s, adjustment) {
+  const p = s.referral_policy;
+  if (!p || !(p.pct > 0) || !(p.weeks > 0)) return;
+  const { from, to } = weekBounds(week);
+  const last = new Date(+to - 1);
+  const link = (
+    await c.query('SELECT parent_id, valid_from FROM agency_parents WHERE agency_id = $1 AND valid_from <= $2 AND (valid_to IS NULL OR valid_to > $2) ORDER BY valid_from DESC, id DESC LIMIT 1', [a.id, last])
+  ).rows[0];
+  if (!link) return;
+  const n = Math.round((Date.parse(`${week}T00:00:00Z`) - Date.parse(`${weekStartOf(link.valid_from)}T00:00:00Z`)) / (7 * 86400e3));
+  if (n < p.free_weeks || n >= p.free_weeks + p.weeks) return;
+  const paid = (
+    await c.query(
+      `SELECT coalesce(sum(k.base_diamonds * round((k.agency_rate + k.transition_rate) * 10000)), 0) AS paid FROM agency_commissions k
+        WHERE k.agency_id = $1 AND (k.level_week = $2 OR (k.level_week IS NULL AND k.occurred_at >= $3 AND k.occurred_at < $4))`,
+      [a.id, week, from, to],
+    )
+  ).rows[0].paid;
+  const commission = Number(paid) + adjustment;
+  const amount = Math.round((commission * e4(p.pct)) / 1e4);
+  if (amount <= 0) return;
+  let period = periodOf(last, s.commission_period);
+  if (await isClosed(c, period)) period = periodOf(new Date(), s.commission_period);
+  const nth = n - p.free_weeks + 1;
+  const row = await c.query(
+    "INSERT INTO agency_ledger (agency_id, kind, amount, rate, period, note, ref) VALUES ($1, 'difference', $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING RETURNING id",
+    [link.parent_id, fmt4(amount), fmt4(e4(p.pct)), period, `Referans ajans: ${a.name} · ${nth}/${p.weeks}. hafta ${pct(p.pct)} · ${weekText(week)}`.slice(0, 200), `referral:${week}:${a.id}`],
+  );
+  if (!row.rowCount) return;
+  await notice(c, link.parent_id, 'ledger', `Referans ajans komisyonu: ${a.name}`, `${weekText(week)}: ${a.name} ajansının haftalık komisyonunun ${pct(p.pct)}'i (${nth}/${p.weeks}. hafta) bakiyene eklendi: ${fmt(amount / 1e4)} elmas.`);
+  await audit(c, null, 'agency.referral', 'agency', link.parent_id, { after: { referral: a.id, week, nth, weeks: p.weeks, pct: p.pct, commission: commission / 1e4, amount: amount / 1e4 } });
 }
 
 let running = null;

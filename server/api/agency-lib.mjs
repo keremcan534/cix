@@ -95,6 +95,10 @@ export const DEFAULTS = {
   // Ajans seviyeleri (owners, 24 Nov 2026; agency-level-rules.mjs, agency-levels.mjs): the commission by the week's
   // level. They replace the pool, the tiers, the performance engine and the parent's difference (calcEvent).
   weekly_levels: WEEKLY_LEVELS_DEFAULT,
+  // Referans ajans (owners, 25 Nov 2026; agency-levels.mjs payReferral): the parent gets nothing for the week the
+  // referral agency joined it (free_weeks), then `pct` of the referral agency's whole commission for each of the next
+  // `weeks` weeks, paid when each week closes and on top: the referral agency keeps all of its own. Nothing after.
+  referral_policy: { pct: 0.05, free_weeks: 1, weeks: 4 },
 };
 
 const bad = (msg) => {
@@ -227,6 +231,10 @@ export function validateSetting(key, value, cur) {
     case 'assistant_policy': {
       const v = { ...cur.assistant_policy, ...obj(value, key) };
       return { max: whole(v.max, 0, 10, 'Ajans asistanı sınırı') };
+    }
+    case 'referral_policy': {
+      const v = { ...cur.referral_policy, ...obj(value, key) };
+      return { pct: rate4(v.pct, 0.5, 'Referans ajans komisyonu'), free_weeks: whole(v.free_weeks, 0, 52, 'Komisyonsuz hafta'), weeks: whole(v.weeks, 0, 104, 'Komisyonlu hafta') };
     }
     default:
       return bad('Bilinmeyen ayar');

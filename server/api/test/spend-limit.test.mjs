@@ -105,6 +105,11 @@ describe('Günlük harcama limiti', () => {
   });
 
   test('ücretli mesaj ve arama dakikası da limitte durur; arama limitle biter', async () => {
+    // The sums below are at these prices (the owners' of 25 Nov 2026 are the defaults: live-registry.test).
+    const admin = await signUp('Yönetici');
+    await q("UPDATE users SET role = 'admin' WHERE id = $1", [admin.user.id]);
+    const view = await ok(call('GET', '/api/admin/live-settings', null, admin.session), 'ayarlar');
+    await ok(call('POST', '/api/admin/live-settings', { changes: { dm_price: 240, call_voice_price: 2000 }, reason: 'Limit testi', baseV: view.v, confirm: true }, admin.session), 'ayar');
     const man = await signUp('Arayan');
     await q("UPDATE users SET gender = 'Erkek' WHERE id = $1", [man.user.id]);
     const star = await signUp('Yayıncı');
@@ -132,8 +137,10 @@ describe('Günlük harcama limiti', () => {
     await q('UPDATE spend_limits SET daily_limit = 2240 WHERE user_id = $1', [man.user.id]);
     const { call: k } = await ok(call('POST', '/api/calls', { to: star.user.id, mode: 'voice', ref: rnd(6) }, man.session), 'ara');
     const ans = await ok(call('POST', '/api/calls/answer', { id: k.id }, star.session), 'aç');
-    assert.equal(ans.call.minutes, 1);
-    await q("UPDATE calls SET started_at = started_at - interval '61 seconds', caller_seen = now(), callee_seen = now() WHERE id = $1", [k.id]);
+    assert.equal(ans.call.minutes, 0, 'ilk dakika 30. saniyede');
+    await q("UPDATE calls SET started_at = started_at - interval '31 seconds', caller_seen = now(), callee_seen = now() WHERE id = $1", [k.id]);
+    assert.equal((await ok(call('POST', '/api/calls/beat', { id: k.id }, man.session), 'beat')).call.minutes, 1);
+    await q("UPDATE calls SET started_at = started_at - interval '30 seconds', caller_seen = now(), callee_seen = now() WHERE id = $1", [k.id]);
     const cut = (await ok(call('POST', '/api/calls/beat', { id: k.id }, man.session), 'beat')).call;
     assert.deepEqual([cut.status, cut.endReason, cut.minutes], ['ended', 'limit', 1]);
     assert.equal(await coins(man.session), 20000 - 240 - 2000, 'ödenemeyen dakika alınmaz');

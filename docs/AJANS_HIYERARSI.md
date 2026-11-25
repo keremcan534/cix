@@ -101,6 +101,14 @@ doğrudan üst ajans  = matrah × oran(üst)           (yayıncı doğrudan üst
 **Örnek** (varsayılanlar): 10.000 elmaslık hediye, alt ajans Başlangıç seviyesinde (%25):
 alt ajans 2.500, üst ajans 1.500 (%40 − %25), toplam 4.000 elmas = 0,80 USD. Yayıncının 10.000 elması aynen kalır.
 
+## Referans ajans komisyonu
+
+Sahiplerin kararı (25 Kasım 2026): bir ajans (A) referansıyla yeni bir ajans (B) getirince, B'nin A'ya bağlandığı takvim haftası (Pazartesi 00:00 – Pazar 23:59:59, Türkiye) A komisyon almaz; sonraki 4 haftanın her birinde B'nin o haftaki toplam komisyonunun %5'i, hafta kapanınca (Pazartesi 00:00, ajans seviyeleriyle aynı anda) A'nın bakiyesine eklenir. B'nin komisyonundan bir şey kesilmez (platform öder). 5. haftadan sonra A, B'den komisyon almaz. Kural herkese bağlandığı tarihe göre uygulanır.
+
+- Ayar: panel › Ajans merkezi › Ağ kuralları › **Referans ajans komisyonu** (`referral_policy`: `pct` 0,05, `free_weeks` 1, `weeks` 4).
+- Kayıt: A'nın defterinde `difference` satırı (eski uygulamalar da referans kazancı olarak sayar), not "Referans ajans: B · n/4. hafta %5", ref `referral:<hafta>:<B>`; her hafta bir kez. A'ya ajans bildirimi gider. Tutar A'ya B'nin haftalık komisyonunu dolaylı gösterir; sahiplerin kuralının doğal sonucu.
+- Kod: `agency-levels.mjs` `payReferral`; test `test/agency-referral.test.mjs`.
+
 ## Ajans asistanı
 
 Ajans sahibi, ajansının yayıncılarından ya da ekibinden birini asistan yapabilir (varsayılan en fazla 1,

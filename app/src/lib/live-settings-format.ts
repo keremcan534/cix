@@ -160,6 +160,12 @@ export const ONE_ON_ONE_KEYS: { key: OneOnOneKey; unit: string }[] = [
   { key: 'dm_price', unit: ' jeton' },
   { key: 'call_voice_price', unit: ' jeton' },
   { key: 'call_video_price', unit: ' jeton' },
+  { key: 'call_charge_after_seconds', unit: ' saniye' },
+  { key: 'call_earn_after_seconds', unit: ' saniye' },
+  { key: 'featured_msg_points', unit: ' puan' },
+  { key: 'featured_voice_points', unit: ' puan' },
+  { key: 'featured_video_points', unit: ' puan' },
+  { key: 'featured_gift_coins', unit: ' jeton' },
   { key: 'heart_voice_level', unit: '' },
   { key: 'heart_video_level', unit: '' },
   { key: 'heart_msg_points', unit: ' puan' },
@@ -256,6 +262,8 @@ export function valueText(key: LiveKey, v: LiveValue, { stored = false, names = 
       return typeof v === 'number' ? (v === 0 ? 'Ücretsiz' : `${fmtNum(v)} jeton`) : String(v);
     case 'call_free_seconds':
     case 'match_free_seconds':
+    case 'call_charge_after_seconds':
+    case 'call_earn_after_seconds':
       return typeof v === 'number' ? `${fmtNum(v)} saniye` : String(v);
     case 'heart_voice_level':
     case 'heart_video_level':

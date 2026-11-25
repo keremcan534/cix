@@ -18,6 +18,7 @@ const ok = async (p, what) => {
 };
 const topUp = (s, amount = 1000) => ok(call('POST', '/api/wallet/test-topup', { amount, ref: rnd(6) }, s), 'yükleme');
 const person = async (name, gender) => {
+  await oldPrices();
   const a = await signUp(name);
   if (gender) await q('UPDATE users SET gender = $2 WHERE id = $1', [a.user.id, gender]);
   return a;
@@ -57,6 +58,14 @@ async function setLive(changes) {
   const view = await ok(call('GET', '/api/admin/live-settings', null, admin.session), 'ayarlar');
   return ok(call('POST', '/api/admin/live-settings', { changes, reason: 'Otomatik mesaj testi', baseV: view.v, confirm: true }, admin.session), 'ayar kaydı');
 }
+
+// The sums below are worked out at these prices (the owners' of 25 Nov 2026 are the defaults: live-registry.test).
+let priced = null;
+function oldPrices() {
+  return (priced ??= setLive({ dm_price: 240, call_voice_price: 2000, call_video_price: 3200 }));
+}
+/** A live call that has lasted `secs` (past 30 s its first minute is paid and earned). */
+const lasted = (id, secs) => q('UPDATE calls SET started_at = started_at - make_interval(secs => $2), caller_seen = now(), callee_seen = now() WHERE id = $1', [id, secs]);
 
 describe('5 dakika kuralı', () => {
   test('ücretli mesajın jetonu cevabı bekler; zamanında cevap elmas olur, gösterge yalnız yayıncıya', async () => {
@@ -389,6 +398,7 @@ describe('SimilarClub Sistem: arama bildirimleri', () => {
     await topUp(man.session, 10_000);
     const ring = await ok(call('POST', '/api/calls', { to: star.user.id, mode: 'voice', ref: rnd(6) }, man.session), 'ara');
     await ok(call('POST', '/api/calls/answer', { id: ring.call.id }, star.session), 'aç');
+    await lasted(ring.call.id, 31);
     await ok(call('POST', '/api/calls/end', { id: ring.call.id }, man.session), 'kapat');
     const notes = await until(async () => {
       const r = (await q('SELECT target, category, title, body, data FROM team_notices WHERE ref LIKE $1 ORDER BY id', [`call:${ring.call.id}:%`])).rows;
@@ -416,6 +426,7 @@ describe('SimilarClub Sistem: arama bildirimleri', () => {
     await setLive({ system_notices_off: ['call_paid'] });
     const ring = await ok(call('POST', '/api/calls', { to: star.user.id, mode: 'video', ref: rnd(6) }, man.session), 'ara');
     await ok(call('POST', '/api/calls/answer', { id: ring.call.id }, star.session), 'aç');
+    await lasted(ring.call.id, 31);
     await ok(call('POST', '/api/calls/end', { id: ring.call.id }, star.session), 'kapat');
     await until(async () => (await q('SELECT notice_at FROM calls WHERE id = $1', [ring.call.id])).rows[0].notice_at);
     const notes = (await q('SELECT target, category FROM team_notices WHERE ref LIKE $1', [`call:${ring.call.id}:%`])).rows;
