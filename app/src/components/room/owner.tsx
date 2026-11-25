@@ -1357,7 +1357,7 @@ const styles = StyleSheet.create({
   topBar: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 16, paddingVertical: 12 },
   topTitle: { color: '#fff', fontWeight: '800', fontSize: 20 },
   section: { color: '#fff', backgroundColor: '#34333B', paddingHorizontal: 16, paddingVertical: 10, fontSize: 14, marginTop: 8 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.08)' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.08)' },
   rowLabel: { color: '#fff', fontSize: 16 },
   rowValue: { color: '#fff', fontSize: 14, textAlign: 'right', flexShrink: 1 },
   hint: { color: '#FACC15', fontSize: 12, lineHeight: 17 },
