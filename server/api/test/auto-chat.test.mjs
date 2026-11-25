@@ -441,3 +441,27 @@ describe('SimilarClub Sistem: arama bildirimleri', () => {
     assert.ok(failures.categories.find((c) => c.category === 'video_call').sent >= 1);
   });
 });
+
+describe('Selam hakkı (kadın, günde greet_daily_women)', () => {
+  test('hak bitince selam gitmez ve kaydedilmez; başka mesaj ve erkeğin selamı sayılmaz; tekrar gönderim hak yemez', async () => {
+    await setLive({ greet_daily_women: 2 });
+    try {
+      const w = await person('Selamcı', 'Kadın');
+      const men = await Promise.all(['Bir', 'İki', 'Üç'].map((n) => person(`Erkek ${n}`, 'Erkek')));
+      const ref = rnd(6);
+      await ok(dm(w.session, men[0].user.id, 'Selam! 👋', ref), '1. selam');
+      assert.equal((await ok(dm(w.session, men[0].user.id, 'Selam! 👋', ref), 'aynı istek')).replay, true, 'tekrar gönderim hak yemez');
+      await ok(dm(w.session, men[0].user.id, 'Nasılsın?'), 'düz mesaj sayılmaz');
+      await ok(dm(w.session, men[1].user.id, 'Selam! 👋'), '2. selam');
+      const [st, j] = await dm(w.session, men[2].user.id, 'Selam! 👋');
+      assert.equal(st, 409);
+      assert.equal(j.code, 'greet_quota');
+      assert.match(j.error, /Bugünlük selam hakkın bitti \(günde 2\)/);
+      assert.equal((await q('SELECT count(*)::int AS n FROM messages WHERE sender = $1 AND recipient = $2', [w.user.id, men[2].user.id])).rows[0].n, 0, 'kaydedilmez');
+      await ok(dm(men[2].session, w.user.id, 'Selam! 👋'), 'erkeğin selamı sınırsız');
+      await ok(dm(men[2].session, men[1].user.id, 'Selam! 👋'), 'erkek sınıra takılmaz');
+    } finally {
+      await setLive({ greet_daily_women: null });
+    }
+  });
+});

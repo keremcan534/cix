@@ -1556,6 +1556,7 @@ export type OneOnOneKey =
   | 'match_video_price'
   | 'call_charge_after_seconds'
   | 'call_earn_after_seconds'
+  | 'greet_daily_women'
   | 'featured_msg_points'
   | 'featured_voice_points'
   | 'featured_video_points'

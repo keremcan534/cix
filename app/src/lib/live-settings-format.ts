@@ -162,6 +162,7 @@ export const ONE_ON_ONE_KEYS: { key: OneOnOneKey; unit: string }[] = [
   { key: 'call_video_price', unit: ' jeton' },
   { key: 'call_charge_after_seconds', unit: ' saniye' },
   { key: 'call_earn_after_seconds', unit: ' saniye' },
+  { key: 'greet_daily_women', unit: ' selam' },
   { key: 'featured_msg_points', unit: ' puan' },
   { key: 'featured_voice_points', unit: ' puan' },
   { key: 'featured_video_points', unit: ' puan' },

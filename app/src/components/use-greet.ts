@@ -31,7 +31,11 @@ export function useGreet() {
     const ref = newRef();
     sendMessage(user.id, GREETING, true, undefined, ref);
     liveDm(user.id, GREETING, ref, (r) => {
-      if (!r.ok) return setMessageFailed(user.id, ref, r.reason, r.retry);
+      if (!r.ok) {
+        // A woman's day of greetings used up (owners: 40 a day): said at once, not only on the bubble.
+        if (r.quota) showAlert('Selam hakkın bitti', r.reason);
+        return setMessageFailed(user.id, ref, r.reason, r.retry);
+      }
       markMessageSent(user.id, ref, r.message);
       bump('greetings');
     });
