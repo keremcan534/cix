@@ -17,7 +17,7 @@ import { liveMode } from '@/lib/live';
 import { useLiveCatalog } from '@/lib/live/catalog-live';
 import { livePacks } from '@/lib/live/emoji-live';
 import { useApp } from '@/store';
-import { ItemPreview, Shelf } from '@/components/store-item';
+import { ItemPreview, PREVIEW_H, Shelf } from '@/components/store-item';
 import { FramePreviewSheet } from '@/components/frame-preview';
 import { fonts, makeStyles, useTheme } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
@@ -243,8 +243,8 @@ export default function StoreScreen() {
 }
 
 const useStyles = makeStyles((t) => ({
-  previewSlot: { height: 104, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center' },
-  previewBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, height: 30, borderRadius: 999, backgroundColor: t.dark ? 'rgba(255,95,162,0.18)' : 'rgba(208,46,120,0.11)' },
+  previewSlot: { height: PREVIEW_H, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center' },
+  previewBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, height: 24, borderRadius: 999, backgroundColor: t.dark ? 'rgba(255,95,162,0.18)' : 'rgba(208,46,120,0.11)' },
   previewText: { color: t.colors.primaryText, fontWeight: '700', fontSize: 12 },
   durations: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 4 },
   duration: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 999, borderWidth: 1, borderColor: t.dark ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.15)' },
@@ -257,11 +257,11 @@ const useStyles = makeStyles((t) => ({
   tabText: { color: t.colors.textDim, fontFamily: fonts.displayBold, fontSize: 13, lineHeight: 18 },
   tabRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   warn: { color: t.colors.gold, fontSize: 12, paddingHorizontal: 16, paddingBottom: 8 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 12, paddingHorizontal: 16, paddingBottom: 30 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 10, paddingHorizontal: 16, paddingBottom: 30 },
   cta: { marginTop: 'auto' },
   packPreview: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, height: 64 },
   freeNote: { width: '100%', color: t.colors.textDim, fontSize: 12, textAlign: 'center' },
-  name: { color: t.colors.text, fontFamily: fonts.display, fontSize: 16, lineHeight: 21, textAlign: 'center' },
+  name: { color: t.colors.text, fontFamily: fonts.display, fontSize: 14.5, lineHeight: 19, textAlign: 'center' },
   meta: { color: t.colors.textDim, fontSize: 12, textAlign: 'center' },
   owned: { color: t.colors.green, fontWeight: '700', paddingVertical: 7 },
   footer: { color: t.colors.textDim, fontSize: 12, textAlign: 'center', paddingBottom: 12 },

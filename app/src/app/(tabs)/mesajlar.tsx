@@ -378,7 +378,7 @@ function HubTile({ title, sub, art, look, badge = 0, onPress }: { title: string;
           <View style={styles.hubSweep} pointerEvents="none" />
           <View style={[styles.hubSweep, styles.hubSweep2]} pointerEvents="none" />
           {/* The picture fills the tile's top, down to its title. */}
-          <Image source={art} style={{ width: 58, height: 58 }} resizeMode="contain" accessibilityIgnoresInvertColors />
+          <Image source={art} style={{ width: 46, height: 46 }} resizeMode="contain" accessibilityIgnoresInvertColors />
           <View style={{ gap: 1 }}>
             <Text style={[styles.hubTitle, narrow && { fontSize: 12, lineHeight: 15 }]} numberOfLines={2}>
               {title}
@@ -591,8 +591,8 @@ const useStyles = makeStyles(({ colors, lift, dark }) => ({
     paddingHorizontal: 4,
   },
   hubs: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 12 },
-  // Tall enough for the 56 px picture over a two-line title and a two-line note, so a third of a narrow phone cuts no word.
-  hub: { height: 156, borderRadius: 18, borderWidth: 2, overflow: 'hidden', paddingHorizontal: 8, paddingVertical: 10, justifyContent: 'space-between' },
+  // Compact (owners, 25 Nov 2026): the 46 px picture over a two-line title and a two-line note, no word cut on a narrow phone.
+  hub: { height: 134, borderRadius: 18, borderWidth: 2, overflow: 'hidden', paddingHorizontal: 8, paddingVertical: 10, justifyContent: 'space-between' },
   hubTitle: { color: '#fff', fontSize: 15, lineHeight: 18, fontWeight: '800', textShadowColor: 'rgba(0,0,0,0.25)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
   hubSub: { color: 'rgba(255,255,255,0.9)', fontSize: 11.5, lineHeight: 14 },
   hubSweep: { position: 'absolute', width: 220, height: 120, borderRadius: 110, borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)', left: -30, bottom: -78, transform: [{ rotate: '-14deg' }] },
@@ -627,12 +627,12 @@ const useStyles = makeStyles(({ colors, lift, dark }) => ({
     alignItems: 'center',
     gap: 12,
     paddingHorizontal: 12,
-    paddingVertical: 12,
+    paddingVertical: 8,
   },
   sysIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },

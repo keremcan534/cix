@@ -347,13 +347,13 @@ function Group({ items }: { items: Item[] }) {
   const { colors } = useTheme();
   const styles = useStyles();
   return (
-    <View style={[styles.card, { paddingVertical: 4 }]}>
+    <View style={[styles.card, { paddingVertical: 2, gap: 0 }]}>
       {items.map((m, i) => (
         <Pressable key={m.label} style={[styles.menuRow, i > 0 && styles.sep]} onPress={m.onPress} accessibilityLabel={m.label}>
-          {m.art ? <Art name={m.art} size={30} /> : m.img ? <Icon3D name={m.img} size={28} /> : <GlyphIcon name={m.icon} size={24} color={colors.text} scale={1.17} />}
+          {m.art ? <Art name={m.art} size={26} /> : m.img ? <Icon3D name={m.img} size={24} /> : <GlyphIcon name={m.icon} size={21} color={colors.text} scale={1.17} />}
           <Text style={styles.menuLabel}>{m.label}</Text>
           {m.dot && <View style={styles.redDot} />}
-          <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
+          <Ionicons name="chevron-forward" size={16} color={colors.textDim} />
         </Pressable>
       ))}
     </View>
@@ -481,8 +481,9 @@ const useStyles = makeStyles(({ colors, semantic, lift, dark }) => ({
   gameRow: { flexDirection: 'row', gap: 8 },
   gameTile: { flex: 1, alignItems: 'center', gap: 2, backgroundColor: colors.cardAlt, borderRadius: 12, paddingVertical: 8, paddingHorizontal: 2 },
   roomCta: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, backgroundColor: colors.card, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: 'rgba(56,189,248,0.4)', ...(dark ? {} : { boxShadow: lift.boxShadow }) },
-  menuRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 15 },
+  // Compact rows (owners, 25 Nov 2026: "daha derli toplu olsun"): about 46 high.
+  menuRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
   sep: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
-  menuLabel: { flex: 1, color: colors.text, fontSize: 16 },
+  menuLabel: { flex: 1, color: colors.text, fontSize: 15 },
   logout: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, padding: 14 },
 }));

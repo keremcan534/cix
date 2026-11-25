@@ -234,7 +234,7 @@ export default function TaskCenter() {
 }
 
 const useStyles = makeStyles(({ colors, semantic, lift, dark }) => ({
-  card: { backgroundColor: colors.card, borderRadius: 20, padding: 16, gap: 14, ...lift },
+  card: { backgroundColor: colors.card, borderRadius: 20, padding: 14, gap: 10, ...lift },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   checkTitle: { color: colors.text, fontSize: 20, fontFamily: fonts.display, letterSpacing: -0.3 },
   checkBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9 },
@@ -255,11 +255,12 @@ const useStyles = makeStyles(({ colors, semantic, lift, dark }) => ({
   taskReward: { color: colors.gold, fontWeight: '700', fontSize: 14 },
   track: { height: 4, borderRadius: 2, backgroundColor: colors.cardAlt, overflow: 'hidden' },
   fill: { height: 4, borderRadius: 2, backgroundColor: semantic.action },
-  task: { gap: 6, paddingVertical: 14 },
+  // Compact (owners, 25 Nov 2026).
+  task: { gap: 4, paddingVertical: 9 },
   sep: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
-  taskTitle: { color: colors.text, fontWeight: '700', fontSize: 16 },
+  taskTitle: { color: colors.text, fontWeight: '700', fontSize: 15 },
   dim: { color: colors.textDim, fontSize: 13, lineHeight: 18 },
-  goBtn: { backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 22, paddingVertical: 8, minWidth: 76, alignItems: 'center' },
+  goBtn: { backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 18, paddingVertical: 6, minWidth: 68, alignItems: 'center' },
   goText: { color: '#fff', fontWeight: '700', fontSize: 14 },
   invite: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 18, padding: 16 },
 }));

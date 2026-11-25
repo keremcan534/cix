@@ -184,7 +184,7 @@ const useStyles = makeStyles(({ colors, surface, dark }) => ({
   group: { backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: surface.rim, overflow: 'hidden' },
   separator: { height: StyleSheet.hairlineWidth, backgroundColor: surface.hairline, marginLeft: 58 },
   footer: { color: colors.textDim, fontSize: 12, lineHeight: 17, paddingHorizontal: space.xs, opacity: 0.85 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 54, paddingHorizontal: 14, paddingVertical: 10 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 46, paddingHorizontal: 14, paddingVertical: 8 },
   pressed: { backgroundColor: surface.pressed },
   disabled: { opacity: 0.45 },
   tile: { width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },

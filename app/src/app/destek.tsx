@@ -350,7 +350,7 @@ const useStyles = makeStyles(({ colors, lift }) => ({
   topic: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.card, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 11, ...lift },
   topicText: { color: colors.text, fontSize: 14, fontWeight: '600' },
   cardTitle: { color: colors.text, fontWeight: '800', fontSize: 17 },
-  faqRow: { paddingVertical: 14, gap: 6 },
+  faqRow: { paddingVertical: 10, gap: 6 },
   faqQ: { color: colors.text, fontSize: 15, flex: 1 },
   divider: { borderBottomWidth: 1, borderBottomColor: colors.border },
   service: { flexDirection: 'row', alignItems: 'center', gap: 14 },

@@ -296,7 +296,7 @@ const useStyles = makeStyles(({ colors, dark }) => ({
   flourish: { width: 36, height: 2, borderRadius: 1, backgroundColor: '#F7A8CF' },
   sheetTitle: { color: '#F0468E', fontSize: 18, fontWeight: '900' },
   note: { color: colors.textDim, fontSize: 14, lineHeight: 20, textAlign: 'center', marginTop: 18, paddingHorizontal: 12 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, minHeight: 64 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, minHeight: 54 },
   rank: { width: 22, textAlign: 'center', color: colors.textDim, fontSize: 15, fontWeight: '700' },
   name: { color: colors.text, fontSize: 16, fontWeight: '700', flexShrink: 1 },
   tag: { color: '#E0307E', backgroundColor: dark ? 'rgba(240,70,142,0.18)' : '#FDE2EF', fontSize: 11, fontWeight: '800', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, overflow: 'hidden' },
