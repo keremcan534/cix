@@ -516,6 +516,8 @@ describe('Askı, personel, BD, ödemeler, raporlar', () => {
 
     ok(await admin.post('/api/admin/agency/staff/set', { user: bdU.id, roleId: roles['BD yöneticisi'] }));
     ok(await admin.post('/api/admin/agency/bd', { agencyId: T.id, bd: bdU.id }));
+    // The agency sees its BD by name only (owners, 26 Nov 2026).
+    assert.deepEqual(ok(await tOwner.get(`/api/agency/overview?id=${T.id}`)).bd, { name: bdU.name });
     const tree = ok(await bdU.get('/api/admin/agency/tree')).nodes;
     assert.deepEqual(new Set(tree.map((n) => n.id)), new Set([T.id, S.id]));
     refused(await bdU.get('/api/admin/agency/overview'), 403, 'BD merkez özeti');

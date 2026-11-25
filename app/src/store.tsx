@@ -19,7 +19,7 @@ import { charmBonusPct } from '@/data/charm';
 import { showAlert } from '@/lib/alert';
 import { exchangeOwnDiamonds } from '@/lib/coins-bank';
 import { addLock, diamondSplit, fromServerLock, lockMs, lockedReason, locksFor, unlistedLocked, type DiamondLock } from '@/lib/diamond-locks';
-import { clearState, loadState, saveState, today } from '@/lib/persist';
+import { clearState, loadState, saveState, today, trDay } from '@/lib/persist';
 import { validAnyIban } from '@/lib/withdraw-rules';
 import { DEMO_DECOR, DEMO_ROOM_COVER, demoDecorOf, type DemoDecor } from '@/lib/room-decor';
 import { isFiniteNumber, oneOf, withDefaults } from '@/lib/saved-state';
@@ -468,15 +468,34 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>(s.withdrawals ?? []);
 
   // Merged with the defaults: a save from before a counter existed would otherwise make it NaN on the first bump.
-  const [stats, setStats] = useState<Record<TaskKey, number>>(() => withDefaults({ roomMinutes: 0, giftsSent: 0, greetings: 0, moments: 0, calls: 0 }, s.stats));
+  // Görevler are daily (owners, 26 Nov 2026): counters and claims belong to one Türkiye day and start over at 00:00.
+  const NO_STATS: Record<TaskKey, number> = { roomMinutes: 0, giftsSent: 0, greetings: 0, moments: 0, calls: 0 };
+  const [tasksDay, setTasksDay] = useState(() => trDay());
+  const sameDay = s.tasksDay === trDay();
+  const [stats, setStats] = useState<Record<TaskKey, number>>(() => (sameDay ? withDefaults(NO_STATS, s.stats) : NO_STATS));
   const [giftWall, setGiftWall] = useState<Record<string, Record<string, number>>>(s.giftWall ?? {});
   const recordGift = (toId: string, giftId: string, count: number) =>
     setGiftWall((w) => ({ ...w, [toId]: { ...w[toId], [giftId]: (w[toId]?.[giftId] ?? 0) + count } }));
-  const [claimedTasks, setClaimedTasks] = useState<Set<string>>(new Set(s.claimedTasks));
+  const [claimedTasks, setClaimedTasks] = useState<Set<string>>(() => new Set(sameDay ? s.claimedTasks : []));
   // Demo: the user already has a 2-day streak. A live account starts at day 0.
   const [checkInDay, setCheckInDay] = useState(s.checkInDay ?? (liveMode() ? 0 : 2));
   const [checkInDate, setCheckInDate] = useState(s.checkInDate ?? '');
   const [checkedInToday, setCheckedInToday] = useState(() => s.checkInDate === today());
+  // The app left open past midnight: the day's tasks (and the check-in) open again without a restart.
+  useEffect(() => {
+    const tick = () => {
+      const d = trDay();
+      if (d === tasksDay) return;
+      setTasksDay(d);
+      setStats(NO_STATS);
+      setClaimedTasks(new Set());
+      setCheckedInToday((v) => v && checkInDate === today());
+    };
+    tick();
+    const t = setInterval(tick, 30_000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasksDay, checkInDate]);
 
   const [spentTotal, setSpentTotal] = useState(s.spentTotal ?? 0);
   // Older saves have no wealth points yet; start them from total spending.
@@ -704,7 +723,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     loggedIn, me, coins, gameCoins, spentTotal, wealthXp, paidGames, ledger: ledger.slice(0, 100), spentDay: { date: today(), amount: spentToday },
     inventory: [...inventory], equipped, emojiPacks: [...emojiPacks], recentEmojis, settings, notifications: notifications.slice(0, 50),
     myRoom, isHost, diamonds, diamondLocks, totalDiamonds, charmXp, weekly, earnings: earnings.slice(0, 50), withdrawals, stats, giftWall,
-    claimedTasks: [...claimedTasks], checkInDay, checkInDate, svipXp, firstBuys: [...firstBuys], nobleTier, nobleDays, vipDays, vipSubUntil,
+    claimedTasks: [...claimedTasks], tasksDay, checkInDay, checkInDate, svipXp, firstBuys: [...firstBuys], nobleTier, nobleDays, vipDays, vipSubUntil,
     agencyId, agencyRole, ownedAgency, familyRole, familyId, fanClubs, recentRooms,
     serverId, following: [...following], blocked: [...blocked], conversations: conversations.map((c) => (c.messages.length > MAX_SAVED_MESSAGES ? { ...c, messages: c.messages.slice(-MAX_SAVED_MESSAGES) } : c)), followerInvites, starter, safetyLog, ownedAnims: [...ownedAnims], micFx,
     ...(parked && { parked }),

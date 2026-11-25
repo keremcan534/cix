@@ -30,6 +30,9 @@ export async function clearState() {
   } catch {}
 }
 
+/** Türkiye's calendar day (UTC+3 all year), YYYY-MM-DD: Görevler's daily tasks start over at 00:00 Türkiye (owners, 26 Nov 2026). */
+export const trDay = (at = Date.now()) => new Date(at + 3 * 3_600_000).toISOString().slice(0, 10);
+
 /** Local calendar day, used to reset daily counters (check-in, spend limit) after a restart. */
 export const today = () => {
   const d = new Date();

@@ -40,6 +40,8 @@ export type Snapshot = {
   stats: Record<TaskKey, number>;
   giftWall?: Record<string, Record<string, number>>;
   claimedTasks: string[];
+  /** The Türkiye day (lib/persist trDay) the task counters and claims belong to; saves from before it have none. */
+  tasksDay?: string;
   checkInDay: number;
   checkInDate: string;
   svipXp: number;
@@ -81,7 +83,7 @@ const SNAPSHOT_SPEC: Record<keyof Snapshot, Kind> = {
   loggedIn: 'boolean', me: 'object', coins: 'number', gameCoins: 'number', spentTotal: 'number', wealthXp: 'number', paidGames: 'boolean', ledger: 'objects',
   spentDay: 'object', inventory: 'strings', equipped: 'object', emojiPacks: 'strings', recentEmojis: 'strings', settings: 'object',
   notifications: 'objects', myRoom: 'object', isHost: 'boolean', diamonds: 'number', totalDiamonds: 'number', charmXp: 'number',
-  weekly: 'numbers', earnings: 'objects', diamondLocks: 'objects', withdrawals: 'objects', stats: 'object', giftWall: 'object', claimedTasks: 'strings',
+  weekly: 'numbers', earnings: 'objects', diamondLocks: 'objects', withdrawals: 'objects', stats: 'object', giftWall: 'object', claimedTasks: 'strings', tasksDay: 'string?',
   checkInDay: 'number', checkInDate: 'string', svipXp: 'number', firstBuys: 'strings', nobleTier: 'number', nobleDays: 'number',
   vipDays: 'number', vipSubUntil: 'string?', agencyId: 'string?', agencyRole: 'string?', ownedAgency: 'object?', familyRole: 'string?', familyId: 'string?',
   fanClubs: 'object', recentRooms: 'strings', following: 'strings', blocked: 'strings', conversations: 'objects',

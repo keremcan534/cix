@@ -444,6 +444,8 @@ export const agencyRoutes = {
       earnings,
       performance: perf,
       parent,
+      // The agency's BD (owners, 26 Nov 2026): its name only, nothing else of BD (that is management's).
+      bd: (await db.query("SELECT u.name FROM bd_assignments b JOIN users u ON u.id = b.bd_id WHERE b.agency_id = $1 AND b.ended_at IS NULL AND u.deleted_at IS NULL LIMIT 1", [a.id])).rows[0] ?? null,
       request: indep.rowCount ? transferView(indep.rows[0], await namesFor(db, indep.rows)) : null,
       notices: ['owner', 'staff'].includes(viewerOf(x.acc, a)) ? notices.rows.map((r) => ({ id: Number(r.id), kind: r.kind, title: r.title, body: r.body, createdAt: r.created_at })) : [],
       // Older apps draw these (the retired tiers and pool); the weekly levels the app shows are `levels`.

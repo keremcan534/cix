@@ -207,6 +207,8 @@ function Summary({ c }: { c: Ctx }) {
         <View style={st.heroMeta}>
           <Line label="Sahibi" value={o.owner?.name ?? '—'} />
           {o.parent && tree && <Line label="Üst ajans" value={o.parent.name} />}
+          {/* Its BD by name only (owners, 26 Nov 2026); none from an older server. */}
+          {!!o.bd?.name && <Line label="BD" value={o.bd.name} />}
           <Line label="Görünümün" value={VIEWER_TEXT[o.viewer]} />
           <Line label="Ajans kodu" value={a.code} strong />
         </View>

@@ -9,7 +9,7 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-n
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CenterActions } from '@/components/admin/agency-center-actions';
-import { Empty, Kpi, KpiGrid, Line, NetState, Panel, Pill, RateSplit, ScoreBar, Section, SERIES, Tabs, TierLadder, diamondsKpi, ns, statusTone, useAsk, type Ask } from '@/components/agency-net';
+import { Empty, Kpi, KpiGrid, Line, NetState, Panel, Pill, Section, SERIES, Tabs, diamondsKpi, ns, statusTone, useAsk, type Ask } from '@/components/agency-net';
 import { Backdrop } from '@/components/fx/surface';
 import { SCENES } from '@/components/fx/scenes';
 import { ChoiceChips, ListGroup, ListRow } from '@/components/list';
@@ -17,10 +17,8 @@ import { NoAccess } from '@/components/no-access';
 import { Text, TextInput } from '@/components/text';
 import { liveRules } from '@/lib/live/catalog-live';
 import { Button, Header } from '@/components/ui';
-import { DEMO_TIERS, demoAdminList, demoAdminOverview, demoAdminPayouts, demoAdminPerf, demoAdminSettings, demoAdminTransfers, demoAudit, demoTree } from '@/data/agency-net-demo';
+import { demoAdminList, demoAdminOverview, demoAdminPayouts, demoAdminSettings, demoAdminTransfers, demoAudit, demoTree } from '@/data/agency-net-demo';
 import {
-  CHANGE_TEXT,
-  CRITERIA_TEXT,
   FLAG_TEXT,
   INCOME_TEXT,
   LEVEL_TEXT,
@@ -30,7 +28,6 @@ import {
   TRANSFER_STATUS,
   TRANSFER_TEXT,
   centerNet,
-  errorText,
   fmtD,
   fmtDate,
   fmtDateTime,
@@ -38,14 +35,11 @@ import {
   fmtScore,
   fmtUsd,
   runAction,
-  unavailable,
   useNet,
   usdOf,
   type AdminAgency,
   type AdminPayout,
-  type AdminScore,
   type Loaded,
-  type Simulation,
   type Tier,
   type Transfer,
   type TreeNode,
@@ -62,10 +56,6 @@ type AskFn = (a: Ask) => Promise<{ reason: string; field: string } | null>;
 const pctIn = (s: string) => {
   const v = Number(s.replace(',', '.').trim());
   return s.trim() && Number.isFinite(v) ? Math.round(v * 100) / 1e4 : NaN;
-};
-const numIn = (s: string) => {
-  const v = Number(s.replace(',', '.').trim());
-  return s.trim() && Number.isFinite(v) ? v : NaN;
 };
 const openOffice = (id: string) => router.push({ pathname: '/ajans/ofis', params: { id } } as unknown as Href);
 
@@ -93,14 +83,12 @@ export default function CenterPanel() {
             options={[
               { key: 'genel', label: 'Genel' },
               { key: 'onay', label: 'Onaylar', badge: waiting },
-              { key: 'perf', label: 'Performans' },
               { key: 'kural', label: 'Kurallar' },
               { key: 'denetim', label: 'Denetim' },
             ]}
           />
           {tab === 'genel' && <GeneralTab name={me.name} ov={ov} ask={ask} />}
           {tab === 'onay' && <ApprovalsTab name={me.name} ask={ask} after={ov.reload} />}
-          {tab === 'perf' && <PerformanceTab name={me.name} ask={ask} />}
           {tab === 'kural' && <RulesTab name={me.name} ask={ask} />}
           {tab === 'denetim' && <AuditTab name={me.name} />}
         </>
@@ -143,7 +131,6 @@ function GeneralTab({ name, ov, ask }: { name: string; ov: Loaded<ReturnType<typ
               <Kpi icon="people-outline" label="Bağlı yayıncı" value={fmtD(o.streamers)} sub={`${fmtD(o.suspended)} ajans askıda`} />
               <Kpi icon="diamond-outline" tone="money" label="Komisyon matrahı" {...diamondsKpi(o.base30)} />
               <Kpi icon="pie-chart-outline" tone="money" label="Ajans komisyonu" {...diamondsKpi(o.commission30)} />
-              <Kpi icon="briefcase-outline" label="BD komisyonu" {...diamondsKpi(o.bd30)} />
               <Kpi icon="wallet-outline" tone="money" label="Açık ödemeler" value={fmtD(o.payouts_open)} sub={`elmas · ${fmtD(o.payouts_open_count)} talep · ${fmtUsd(usdOf(o.payouts_open))}`} />
               <Kpi icon="hourglass-outline" tone={o.pending ? 'social' : 'action'} label="Onay bekleyen ajans" value={fmtD(o.pending)} />
               <Kpi icon="swap-horizontal-outline" tone={o.transfers_waiting ? 'social' : 'action'} label="Bekleyen transfer" value={fmtD(o.transfers_waiting)} />
@@ -599,224 +586,7 @@ function PayoutCard({ p, demo, ask, after }: { p: AdminPayout; demo: boolean; as
   );
 }
 
-// --- Performans: runs, scores, manual tier and rate -------------------------------------------------------------
-function PerformanceTab({ name, ask }: { name: string; ask: AskFn }) {
-  const [runId, setRunId] = useState<number | undefined>(undefined);
-  const q = useNet(
-    name,
-    async () => {
-      const [perf, settings] = await Promise.all([centerNet.performance(runId), centerNet.settings().catch((e) => (unavailable(e) ? Promise.reject(e) : null))]);
-      const tiers = (settings?.values.tiers as Tier[] | undefined) ?? null;
-      return {
-        perf,
-        tiers,
-        poolCap: (settings?.values.pool_cap as number | undefined) ?? null,
-      };
-    },
-    () => ({
-      perf: demoAdminPerf(),
-      tiers: DEMO_TIERS as Tier[] | null,
-      poolCap: 0.4 as number | null,
-    }),
-    [runId],
-  );
-  const run = async (dryRun: boolean) => {
-    if (dryRun) {
-      await runAction(
-        q.demo,
-        () => centerNet.runPerformance(true, 'Deneme değerlendirmesi'),
-        'Deneme tamamlandı. Seviye ve oranlar değişmedi; sonuçlar listede.',
-        () => {
-          setRunId(undefined);
-          q.reload();
-        },
-      );
-      return;
-    }
-    const r = await ask({
-      title: 'Değerlendirme çalıştırılsın mı?',
-      message: 'Tüm ajansların puanı hesaplanır. Hak edilen seviye ve oran değişiklikleri bir sonraki dönemden geçerli olur; mevcut dönem ve geçmiş kazançlar değişmez. Üst ajanslara bildirim gider.',
-      confirm: 'Çalıştır',
-      placeholder: 'ör. Kasım ayı değerlendirmesi',
-    });
-    if (r)
-      await runAction(
-        q.demo,
-        () => centerNet.runPerformance(false, r.reason),
-        'Değerlendirme tamamlandı.',
-        () => {
-          setRunId(undefined);
-          q.reload();
-        },
-      );
-  };
-  return (
-    <Scroll q={q}>
-      <Panel>
-        <Text style={ns.title}>Performans değerlendirmesi</Text>
-        <Text style={ns.dim}>Puan; hacim, aktif yayıncı, büyüme, tutma, yeni yayıncı, operasyon ve güvenilirlik ağırlıklarıyla sunucuda hesaplanır. Deneme hiçbir oranı değiştirmez.</Text>
-        <View style={st.actions}>
-          <Button small variant="tonal" icon="flask-outline" title="Deneme değerlendirmesi" onPress={() => run(true)} style={{ flex: 1 }} />
-          <Button small icon="play" title="Değerlendirmeyi çalıştır" onPress={() => run(false)} style={{ flex: 1 }} />
-        </View>
-      </Panel>
-      <NetState q={q}>
-        {(d) => {
-          const runs = d.perf.runs;
-          const cur = runs.find((r) => r.id === d.perf.runId);
-          const tierLabel = (k: string | null) => (k ? (d.tiers?.find((t) => t.key === k)?.name ?? k) : '—');
-          return (
-            <>
-              <Section title="Değerlendirmeler">
-                {runs.length === 0 ? (
-                  <Empty icon="analytics-outline" text="Henüz değerlendirme çalıştırılmadı." />
-                ) : (
-                  <Panel>
-                    <ChoiceChips<number> value={d.perf.runId ?? 0} onChange={(v) => setRunId(v)} options={runs.slice(0, 8).map((r) => [r.id, `#${r.id}${r.dryRun ? ' · deneme' : ''}`])} />
-                    {cur && (
-                      <View style={{ gap: 2 }}>
-                        <Line label="Tarih" value={fmtDateTime(cur.asOf)} />
-                        <Line label="Ölçüm aralığı" value={`${fmtDate(cur.windowFrom)} – ${fmtDate(cur.asOf)}`} />
-                        <Line label="Yürürlük" value={cur.dryRun ? 'Deneme (uygulanmadı)' : fmtDate(cur.effectiveFrom)} strong />
-                        <Line label="Çalıştıran" value={cur.runBy ?? '—'} />
-                        {!!cur.note && <Line label="Not" value={cur.note} />}
-                      </View>
-                    )}
-                  </Panel>
-                )}
-              </Section>
-              <Section title="Puanlar" right={<Text style={st.dimSmall}>{d.perf.scores.length} ajans</Text>}>
-                {d.perf.scores.length === 0 && runs.length > 0 && <Empty icon="list-outline" text="Bu değerlendirmede puan yok." />}
-                {d.perf.scores.map((s) => (
-                  <ScoreCard key={s.agencyId} s={s} tiers={d.tiers} tierLabel={tierLabel} demo={q.demo} ask={ask} after={q.reload} />
-                ))}
-                <Text style={st.foot}>
-                  Seviye ve oranı yalnızca merkez elle değiştirebilir; üst ajans, alt ajansının puanını, seviyesini veya oranını değiştiremez. Her karar gerekçesiyle kayda geçer ve geçmişe uygulanmaz.
-                </Text>
-              </Section>
-            </>
-          );
-        }}
-      </NetState>
-    </Scroll>
-  );
-}
-
-function ScoreCard({ s, tiers, tierLabel, demo, ask, after }: { s: AdminScore; tiers: Tier[] | null; tierLabel: (k: string | null) => string; demo: boolean; ask: AskFn; after: () => void }) {
-  const [mode, setMode] = useState<'tier' | 'rate' | null>(null);
-  const [tier, setTier] = useState(s.assigned ?? s.current ?? tiers?.[0]?.key ?? '');
-  const [rate, setRate] = useState('');
-  const sub = s.level > 1;
-  const parent = s.parent?.name ?? null;
-  const saveTier = async () => {
-    if (!tier) return;
-    const r = await ask({
-      title: `${s.name}: ${tierLabel(tier)}`,
-      message: 'Seviye ve buna bağlı oran bir sonraki dönemden geçerli olur. Geçmiş kazançlar değişmez.',
-      confirm: 'Seviyeyi ata',
-    });
-    if (r)
-      await runAction(
-        demo,
-        () => centerNet.setTier(s.agencyId, tier, r.reason),
-        'Seviye kararı kaydedildi.',
-        () => {
-          setMode(null);
-          after();
-        },
-      );
-  };
-  const saveRate = async () => {
-    const v = pctIn(rate);
-    if (!(v >= 0) || v > 1) return showAlert('Geçersiz oran', 'Yüzde olarak gir (ör. 32 veya 32,5).');
-    const r = await ask({
-      title: `${s.name}: oran ${fmtPct(v)}`,
-      message: sub
-        ? 'Alt ajans oranı, üst ajansın asgari payını bırakacak şekilde sınırlıdır; sunucu aşan oranı reddeder. Yeni oran geleceğe uygulanır.'
-        : 'Üst ajans oranı havuz sınırını aşamaz. Yeni oran geleceğe uygulanır.',
-      confirm: 'Oranı belirle',
-    });
-    if (r)
-      await runAction(
-        demo,
-        () => centerNet.setRate(s.agencyId, v, r.reason),
-        'Oran kararı kaydedildi.',
-        () => {
-          setMode(null);
-          after();
-        },
-      );
-  };
-  return (
-    <Panel>
-      <View style={ns.rowBetween}>
-        <View style={st.rank}>
-          <Text style={st.rankText}>{s.rank ?? '—'}</Text>
-        </View>
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={st.nodeName} numberOfLines={1}>
-            {s.name}
-          </Text>
-          <Text style={st.dimSmall} numberOfLines={1}>
-            {LEVEL_TEXT(s.level)}
-            {parent ? ` · üst: ${parent}` : ''}
-          </Text>
-        </View>
-        <View style={{ alignItems: 'flex-end' }}>
-          <Text style={st.score}>{fmtScore(s.score)}</Text>
-          <Text style={st.dimSmall}>puan</Text>
-        </View>
-      </View>
-      <ScoreBar score={s.score} parentScore={s.parentScore} />
-      <View style={{ gap: 2 }}>
-        {sub && <Line label="Hak ettiği seviye" value={tierLabel(s.qualified)} />}
-        {sub && <Line label="Atanan seviye" value={s.assignedName ?? tierLabel(s.assigned)} strong />}
-        {sub && s.current !== s.assigned && <Line label="Önceki seviye" value={tierLabel(s.current)} />}
-        <Line label="Art arda dönem" value={fmtD(s.streak)} />
-      </View>
-      <View style={st.pills}>
-        <Pill
-          text={CHANGE_TEXT[s.change] ?? s.change}
-          tone={s.change === 'up' ? 'success' : s.change === 'down' ? 'danger' : s.change === 'waiting' ? 'money' : 'neutral'}
-          icon={s.change === 'up' ? 'arrow-up' : s.change === 'down' ? 'arrow-down' : s.change === 'held' ? 'lock-closed-outline' : 'remove'}
-        />
-        {s.overtakes && <Pill text="Üst ajansı geçti" tone="money" icon="trending-up" />}
-        {s.flags.map((f) => (
-          <Pill key={f} text={FLAG_TEXT[f] ?? f} tone={f === 'review' || f === 'decline' || f === 'spike' ? 'danger' : 'neutral'} icon="flag-outline" />
-        ))}
-      </View>
-      <View style={st.actions}>
-        {sub && tiers && (
-          <Button small variant={mode === 'tier' ? 'hero' : 'tonal'} icon="podium-outline" title="Seviye ata" onPress={() => setMode(mode === 'tier' ? null : 'tier')} style={{ flex: 1 }} />
-        )}
-        <Button small variant={mode === 'rate' ? 'hero' : 'tonal'} icon="options-outline" title="Oran belirle" onPress={() => setMode(mode === 'rate' ? null : 'rate')} style={{ flex: 1 }} />
-      </View>
-      {mode === 'tier' && tiers && (
-        <View style={st.editor}>
-          <ChoiceChips<string> value={tier} onChange={setTier} options={tiers.map((t) => [t.key, `${t.name} · ${fmtPct(t.sub_rate)}`])} />
-          <Button small title="Kaydet" icon="checkmark" onPress={saveTier} />
-        </View>
-      )}
-      {mode === 'rate' && (
-        <View style={st.editor}>
-          <View style={st.inline}>
-            <Text style={st.statLabel}>Yeni oran (%)</Text>
-            <TextInput
-              value={rate}
-              onChangeText={setRate}
-              keyboardType="decimal-pad"
-              placeholder="ör. 32"
-              placeholderTextColor={colors.textDim}
-              style={[ns.input, st.smallInput]}
-              accessibilityLabel="Yeni oran"
-            />
-          </View>
-          <Button small title="Kaydet" icon="checkmark" onPress={saveRate} />
-        </View>
-      )}
-    </Panel>
-  );
-}
+// The old Performans tab (scores, tiers by score) is gone with the weekly levels (owners, 26 Nov 2026).
 
 // --- Kurallar: settings, simulator, history -------------------------------------------------------------------
 type Values = {
@@ -860,6 +630,8 @@ type Values = {
   income_types: Record<string, boolean>;
   parent_zero?: { enabled: boolean; tier: string };
   bd_policy?: { rate: number; basis: string };
+  weekly_levels?: { min_active: number; active_usd: number; new_weeks: number; levels: { key: string; name: string; rate: number; from: number; shown: boolean }[] };
+  referral_policy?: { pct: number; free_weeks: number; weeks: number };
   /** Ajans asistanı: how many assistants an agency may have at once (server/api/agency-assistants.mjs). */
   assistant_policy?: { max: number };
 };
@@ -913,22 +685,6 @@ function RulesTab({ name, ask }: { name: string; ask: AskFn }) {
       <NetState q={q}>
         {(d) => {
           const v = d.values as unknown as Values;
-          const editPct = async (key: 'pool_cap' | 'top_rate' | 'parent_min_rate', title: string, hint: string) => {
-            const r = await ask({
-              title,
-              message: `${hint} Şu an ${fmtPct(v[key])}. Geçmiş komisyonlar değişmez.`,
-              confirm: 'Kaydet',
-              field: {
-                label: 'Yeni değer (%)',
-                placeholder: String((v[key] ?? 0) * 100).replace('.', ','),
-                keyboard: 'decimal-pad',
-              },
-            });
-            if (!r) return;
-            const val = pctIn(r.field);
-            if (!(val >= 0) || val > 1) return showAlert('Geçersiz değer', 'Yüzde olarak gir (ör. 40).');
-            await runAction(q.demo, () => centerNet.saveSetting(key, val, r.reason), 'Kural kaydedildi.', q.reload);
-          };
           const editAssistants = async () => {
             const r = await ask({
               title: 'Ajans başına asistan',
@@ -943,65 +699,36 @@ function RulesTab({ name, ask }: { name: string; ask: AskFn }) {
           };
           return (
             <>
-              <Section title="Komisyon havuzu">
+              {/* Today's rules (owners, Nov 2026): weekly levels, referral agencies, assistants (BD is management's own business, owners 26 Nov 2026: not shown in the app). The retired pool,
+                  tiers and score weights are no longer shown. Levels are edited in the panel (Ajans seviyeleri). */}
+              {v.weekly_levels && (
+                <Section title="Haftalık seviyeler">
+                  <Panel>
+                    {v.weekly_levels.levels.map((l) => (
+                      <Line key={l.key} label={`${l.name}${l.from > 0 ? ` · ${fmtD(l.from)} elmas` : ''}${l.shown ? '' : ' (uygulamada görünmez)'}`} value={fmtPct(l.rate)} strong={l.shown} />
+                    ))}
+                    <Text style={st.foot}>
+                      Haftalık elmas eşiğine ve aktif yayıncıya göre (Başlangıç ve üstü için o hafta en az {fmtUsd(v.weekly_levels.active_usd)} kazanan {fmtD(v.weekly_levels.min_active)} yayıncı). Yeni ajans ilk {fmtD(v.weekly_levels.new_weeks)} hafta Başlangıç oranını alır. Hafta içinde en alt oran yazılır, Pazartesi 00:00’da fark eklenir. Yayıncının elması azalmaz. Düzenleme: panel › Ajans seviyeleri.
+                    </Text>
+                  </Panel>
+                </Section>
+              )}
+
+              <Section title="Ağ kuralları">
                 <Panel>
-                  <RateSplit
-                    rate={v.tiers?.[0]?.sub_rate ?? 0}
-                    parentShare={Math.max(0, (v.top_rate ?? 0) - (v.tiers?.[0]?.sub_rate ?? 0))}
-                    poolCap={v.pool_cap}
-                    ownLabel={`Alt ajans (${v.tiers?.[0]?.name ?? 'ilk seviye'})`}
-                    parentLabel="Üst ajans farkı"
-                  />
                   <View style={{ gap: 2 }}>
-                    <EditLine
-                      label="Toplam havuz sınırı"
-                      value={fmtPct(v.pool_cap)}
-                      onEdit={() => editPct('pool_cap', 'Toplam havuz sınırı', 'Bir hediyeden tüm ajanslara yazılabilecek en yüksek komisyon.')}
-                    />
-                    <EditLine label="Üst ajans oranı" value={fmtPct(v.top_rate)} onEdit={() => editPct('top_rate', 'Üst ajans oranı', 'Üst ajansın zincirdeki toplam oranı; havuz sınırını aşamaz.')} />
-                    <EditLine
-                      label="Üst ajans asgari payı"
-                      value={fmtPct(v.parent_min_rate)}
-                      onEdit={() => editPct('parent_min_rate', 'Üst ajans asgari payı', 'Alt ajans en yüksek seviyede olsa da üst ajansa kalan pay.')}
-                    />
-                    <Line label="Katman sayısı" value={fmtD(v.max_levels)} />
+                    {v.referral_policy && (
+                      <Line
+                        label="Referans ajans komisyonu"
+                        value={v.referral_policy.pct > 0 ? `${fmtPct(v.referral_policy.pct)} · ${fmtD(v.referral_policy.weeks)} hafta` : 'Kapalı'}
+                      />
+                    )}
+                    {v.referral_policy && v.referral_policy.pct > 0 && <Line label="Komisyonsuz ilk hafta" value={`${fmtD(v.referral_policy.free_weeks)} hafta`} />}
+                    {v.assistant_policy && <EditLine label="Ajans başına asistan" value={fmtD(v.assistant_policy.max)} onEdit={editAssistants} />}
                     <Line label="Komisyon dönemi" value={PERIOD_TEXT[v.commission_period] ?? v.commission_period} />
                     <Line label="Dönem kapanışı" value={`${fmtD(v.period_close_days)} gün sonra`} />
-                    {v.parent_zero && (
-                      <Line label="Üst ajans payını sıfırlama" value={v.parent_zero.enabled ? `Açık (${v.tiers.find((t) => t.key === v.parent_zero?.tier)?.name ?? v.parent_zero.tier})` : 'Kapalı'} />
-                    )}
-                    {v.bd_policy && <Line label="BD komisyonu" value={`${fmtPct(v.bd_policy.rate)} · ayrı ödenir`} />}
-                    {v.assistant_policy && <EditLine label="Ajans başına asistan" value={fmtD(v.assistant_policy.max)} onEdit={editAssistants} />}
                   </View>
-                </Panel>
-              </Section>
-
-              <Section title="Seviyeler ve oranlar">
-                <Panel>
-                  <TierLadder tiers={v.tiers} current={null} score={null} poolCap={v.pool_cap} floor={v.parent_min_rate} />
-                  <TiersEditor
-                    key={JSON.stringify(v.tiers)}
-                    tiers={v.tiers}
-                    onSave={(tiers) =>
-                      save(
-                        'tiers',
-                        tiers,
-                        'Seviye tablosu kaydedilsin mi?',
-                        'Yeni eşik ve oranlar bir sonraki değerlendirmeden geçerli olur. Üst seviyenin oranı alttakinden düşük olamaz; sunucu kontrol eder.',
-                      )
-                    }
-                  />
-                </Panel>
-              </Section>
-
-              <Section title="Puan ağırlıkları">
-                <Panel>
-                  <WeightsEditor
-                    key={JSON.stringify(v.weights)}
-                    weights={v.weights}
-                    criteria={d.criteria}
-                    onSave={(w) => save('weights', w, 'Ağırlıklar kaydedilsin mi?', 'Puanlar bir sonraki değerlendirmede yeni ağırlıklarla hesaplanır.')}
-                  />
+                  <Text style={st.foot}>Referans ajans komisyonunu platform öder; ajansların komisyonundan kesilmez. Oranlar panelden değişir.</Text>
                 </Panel>
               </Section>
 
@@ -1026,18 +753,6 @@ function RulesTab({ name, ask }: { name: string; ask: AskFn }) {
 
               <Section title="Politikalar">
                 <Panel>
-                  {v.performance && (
-                    <View style={{ gap: 2 }}>
-                      <Text style={st.groupTitle}>Performans</Text>
-                      <Line label="Ölçüm penceresi" value={`${fmtD(v.performance.window_months)} ay`} />
-                      <Line label="Değerlendirme sıklığı" value={PERIOD_TEXT[v.performance.cadence] ?? v.performance.cadence} />
-                      <Line label="Yükselme için art arda dönem" value={fmtD(v.performance.promotion_min_periods)} />
-                      <Line label="Düşüş için art arda dönem" value={fmtD(v.performance.demotion_min_periods)} />
-                      <Line label="Bir seferde en fazla" value={`${fmtD(v.performance.max_step)} seviye`} />
-                      <Line label="Asgari aktif yayıncı" value={fmtD(v.performance.min_active_streamers)} />
-                      <Line label="Yürürlük" value={v.performance.effective === 'immediate' ? 'Hemen' : 'Bir sonraki dönem'} />
-                    </View>
-                  )}
                   {v.payout_policy && (
                     <View style={{ gap: 2 }}>
                       <Text style={st.groupTitle}>Ödeme</Text>
@@ -1056,18 +771,8 @@ function RulesTab({ name, ask }: { name: string; ask: AskFn }) {
                       <Line label="Ajans ücretsiz bırakabilir" value={yesNo(v.transfer_policy.owner_choice)} />
                     </View>
                   )}
-                  {v.subagency_policy && (
-                    <View style={{ gap: 2 }}>
-                      <Text style={st.groupTitle}>Alt ajans</Text>
-                      <Line label="Alt ajans kurulabilir" value={yesNo(v.subagency_policy.enabled)} />
-                      <Line label="Onay" value={v.subagency_policy.approval === 'auto' ? 'Otomatik' : 'Merkez onayı'} />
-                      {v.join_policy && <Line label="Yayıncı katılımı onaylı" value={yesNo(v.join_policy.requires_approval)} />}
-                    </View>
-                  )}
                 </Panel>
               </Section>
-
-              <Simulator demo={q.demo} />
 
               <Section title="Kural geçmişi">
                 {d.history.length === 0 ? (
@@ -1103,165 +808,6 @@ function EditLine({ label, value, onEdit }: { label: string; value: string; onEd
         <Ionicons name="create-outline" size={15} color={semantic.action} />
       </View>
     </Pressable>
-  );
-}
-
-function TiersEditor({ tiers, onSave }: { tiers: Tier[]; onSave: (t: Tier[]) => void }) {
-  const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState(() =>
-    tiers.map((t) => ({
-      min: String(t.min_score),
-      rate: String(Math.round(t.sub_rate * 1e4) / 100).replace('.', ','),
-    })),
-  );
-  const submit = () => {
-    const out = tiers.map((t, i) => ({
-      ...t,
-      min_score: i === 0 ? 0 : numIn(draft[i].min),
-      sub_rate: pctIn(draft[i].rate),
-    }));
-    if (out.some((t) => !Number.isFinite(t.min_score) || !Number.isFinite(t.sub_rate) || t.min_score < 0 || t.min_score > 100 || t.sub_rate < 0))
-      return showAlert('Geçersiz değer', 'Puan 0–100, oran yüzde olarak girilmeli.');
-    onSave(out);
-  };
-  if (!open) return <Button small variant="tonal" icon="create-outline" title="Eşik ve oranları düzenle" onPress={() => setOpen(true)} />;
-  return (
-    <View style={st.editor}>
-      <View style={st.tableHead}>
-        <Text style={[st.statLabel, { flex: 1 }]}>Seviye</Text>
-        <Text style={[st.statLabel, st.cell]}>Asgari puan</Text>
-        <Text style={[st.statLabel, st.cell]}>Alt ajans %</Text>
-      </View>
-      {tiers.map((t, i) => (
-        <View key={t.key} style={st.tableRow}>
-          <Text style={[st.lineValue, { flex: 1, textAlign: 'left' }]} numberOfLines={3}>
-            {t.name}
-          </Text>
-          <TextInput
-            value={draft[i].min}
-            editable={i > 0}
-            onChangeText={(x) => setDraft((d) => d.map((r, j) => (j === i ? { ...r, min: x } : r)))}
-            keyboardType="decimal-pad"
-            style={[ns.input, st.cell, st.cellInput, i === 0 && { opacity: 0.5 }]}
-            accessibilityLabel={`${t.name} asgari puan`}
-          />
-          <TextInput
-            value={draft[i].rate}
-            onChangeText={(x) => setDraft((d) => d.map((r, j) => (j === i ? { ...r, rate: x } : r)))}
-            keyboardType="decimal-pad"
-            style={[ns.input, st.cell, st.cellInput]}
-            accessibilityLabel={`${t.name} alt ajans oranı`}
-          />
-        </View>
-      ))}
-      <View style={st.actions}>
-        <Button small variant="ghost" title="Vazgeç" onPress={() => setOpen(false)} style={{ flex: 1 }} />
-        <Button small icon="checkmark" title="Kaydet" onPress={submit} style={{ flex: 1 }} />
-      </View>
-    </View>
-  );
-}
-
-function WeightsEditor({ weights, criteria, onSave }: { weights: Record<string, number>; criteria: string[]; onSave: (w: Record<string, number>) => void }) {
-  const [draft, setDraft] = useState<Record<string, string>>(() => Object.fromEntries(criteria.map((k) => [k, String(weights[k] ?? 0)])));
-  const vals = Object.fromEntries(criteria.map((k) => [k, numIn(draft[k] ?? '')]));
-  const total = criteria.reduce((x, k) => x + (Number.isFinite(vals[k]) ? vals[k] : 0), 0);
-  const dirty = criteria.some((k) => vals[k] !== (weights[k] ?? 0));
-  const submit = () => {
-    if (criteria.some((k) => !Number.isFinite(vals[k]) || vals[k] < 0 || vals[k] > 100)) return showAlert('Geçersiz ağırlık', 'Her ağırlık 0 ile 100 arasında olmalı.');
-    onSave(vals);
-  };
-  return (
-    <View style={{ gap: 10 }}>
-      {criteria.map((k) => {
-        const v = Number.isFinite(vals[k]) ? vals[k] : 0;
-        return (
-          <View key={k} style={st.weightRow}>
-            <View style={{ flex: 1, gap: 4 }}>
-              <View style={ns.rowBetween}>
-                <Text style={st.lineValue}>{CRITERIA_TEXT[k] ?? k}</Text>
-                <Text style={st.dimSmall}>{total > 0 ? fmtPct(v / total) : '—'}</Text>
-              </View>
-              <View style={st.weightTrack}>
-                <View style={[st.weightFill, { width: `${total > 0 ? (v / total) * 100 : 0}%` }]} />
-              </View>
-            </View>
-            <TextInput
-              value={draft[k]}
-              onChangeText={(x) => setDraft((d) => ({ ...d, [k]: x }))}
-              keyboardType="decimal-pad"
-              style={[ns.input, st.smallInput]}
-              accessibilityLabel={`${CRITERIA_TEXT[k] ?? k} ağırlığı`}
-            />
-          </View>
-        );
-      })}
-      <Text style={st.foot}>Toplam {fmtD(total)}. Ağırlıklar oransaldır; her kriterin puana katkısı ağırlığının toplama oranıdır.</Text>
-      {dirty && <Button small icon="checkmark" title="Ağırlıkları kaydet" onPress={submit} />}
-    </View>
-  );
-}
-
-function Simulator({ demo }: { demo: boolean }) {
-  const [base, setBase] = useState('10000');
-  const [subRate, setSubRate] = useState('');
-  const [res, setRes] = useState<Simulation | null>(null);
-  const [busy, setBusy] = useState(false);
-  const go = async () => {
-    const b = Math.round(numIn(base));
-    if (!(b > 0)) return showAlert('Geçersiz matrah', 'Pozitif bir elmas miktarı gir.');
-    const sr = subRate.trim() ? pctIn(subRate) : undefined;
-    if (sr !== undefined && !(sr >= 0)) return showAlert('Geçersiz oran', 'Alt ajans oranını yüzde olarak gir veya boş bırak.');
-    if (demo) return runAction(true, async () => {});
-    setBusy(true);
-    try {
-      setRes(
-        await centerNet.simulate({
-          base: b,
-          ...(sr !== undefined ? { subRate: sr } : {}),
-        }),
-      );
-    } catch (e) {
-      showAlert('Hesaplanamadı', errorText(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <Section title="Komisyon simülatörü">
-      <Panel>
-        <Text style={ns.dim}>Sunucunun kurallarıyla tek bir hediyenin dağılımını gösterir; kayıt oluşturmaz.</Text>
-        <View style={st.simInputs}>
-          <View style={{ flex: 1, gap: 6 }}>
-            <Text style={st.statLabel}>Hediye elması (matrah)</Text>
-            <TextInput value={base} onChangeText={setBase} keyboardType="number-pad" style={ns.input} accessibilityLabel="Matrah" />
-          </View>
-          <View style={{ flex: 1, gap: 6 }}>
-            <Text style={st.statLabel}>Alt ajans oranı (%)</Text>
-            <TextInput
-              value={subRate}
-              onChangeText={setSubRate}
-              keyboardType="decimal-pad"
-              placeholder="Boş: yalnız üst ajans"
-              placeholderTextColor={colors.textDim}
-              style={ns.input}
-              accessibilityLabel="Alt ajans oranı"
-            />
-          </View>
-        </View>
-        <Button small icon="calculator-outline" title={busy ? 'Hesaplanıyor' : 'Hesapla'} disabled={busy} onPress={go} />
-        {res && (
-          <View style={{ gap: 2 }}>
-            {res.shares.map((x, i) => (
-              <Line key={i} label={`${x.agency} · ${x.kind === 'direct' ? 'doğrudan' : 'fark'} ${fmtPct(x.rate)}`} value={`${fmtD(x.amount)} elmas`} />
-            ))}
-            <Line label={`Toplam ajans komisyonu · ${fmtPct(res.totalRate)}`} value={`${fmtD(res.pool)} elmas · ${fmtUsd(res.usd.pool)}`} strong />
-            <Line label="Platformda kalan" value={`${fmtD(res.platformKeeps)} elmas`} />
-            <Text style={st.foot}>Yayıncı hediye elmasının tamamını alır; komisyon platformun payından ödenir. Havuz sınırı {fmtPct(res.poolCap)}.</Text>
-          </View>
-        )}
-      </Panel>
-    </Section>
   );
 }
 
