@@ -136,7 +136,6 @@ function GeneralTab({ name, ov, ask }: { name: string; ov: Loaded<ReturnType<typ
               <Kpi icon="people-outline" label="Bağlı yayıncı" value={fmtD(o.streamers)} sub={`${fmtD(o.suspended)} ajans askıda`} />
               <Kpi icon="diamond-outline" tone="money" label="Komisyon matrahı" {...diamondsKpi(o.base30)} />
               <Kpi icon="pie-chart-outline" tone="money" label="Ajans komisyonu" {...diamondsKpi(o.commission30)} />
-              <Kpi icon="briefcase-outline" label="BD komisyonu" {...diamondsKpi(o.bd30)} />
               <Kpi icon="wallet-outline" tone="money" label="Açık ödemeler" value={fmtD(o.payouts_open)} sub={`elmas · ${fmtD(o.payouts_open_count)} talep · ${fmtUsd(usdOf(o.payouts_open))}`} />
               <Kpi icon="hourglass-outline" tone={o.pending ? 'social' : 'action'} label="Onay bekleyen ajans" value={fmtD(o.pending)} />
               <Kpi icon="swap-horizontal-outline" tone={o.transfers_waiting ? 'social' : 'action'} label="Bekleyen transfer" value={fmtD(o.transfers_waiting)} />
@@ -922,7 +921,7 @@ function RulesTab({ name, ask }: { name: string; ask: AskFn }) {
           };
           return (
             <>
-              {/* Today's rules (owners, Nov 2026): weekly levels, referral agencies, BD, assistants. The retired pool,
+              {/* Today's rules (owners, Nov 2026): weekly levels, referral agencies, assistants (BD is management's own business, owners 26 Nov 2026: not shown in the app). The retired pool,
                   tiers and score weights are no longer shown. Levels are edited in the panel (Ajans seviyeleri). */}
               {v.weekly_levels && (
                 <Section title="Haftalık seviyeler">
@@ -947,12 +946,11 @@ function RulesTab({ name, ask }: { name: string; ask: AskFn }) {
                       />
                     )}
                     {v.referral_policy && v.referral_policy.pct > 0 && <Line label="Komisyonsuz ilk hafta" value={`${fmtD(v.referral_policy.free_weeks)} hafta`} />}
-                    {v.bd_policy && <Line label="BD komisyonu" value={v.bd_policy.rate > 0 ? `${fmtPct(v.bd_policy.rate)} · ${v.bd_policy.basis === 'pool' ? 'ajans komisyonundan' : 'yayıncı elması dahil'}` : 'Kapalı'} />}
                     {v.assistant_policy && <EditLine label="Ajans başına asistan" value={fmtD(v.assistant_policy.max)} onEdit={editAssistants} />}
                     <Line label="Komisyon dönemi" value={PERIOD_TEXT[v.commission_period] ?? v.commission_period} />
                     <Line label="Dönem kapanışı" value={`${fmtD(v.period_close_days)} gün sonra`} />
                   </View>
-                  <Text style={st.foot}>Referans ajans ve BD komisyonunu platform öder; ajansların komisyonundan kesilmez. Oranlar panelden değişir.</Text>
+                  <Text style={st.foot}>Referans ajans komisyonunu platform öder; ajansların komisyonundan kesilmez. Oranlar panelden değişir.</Text>
                 </Panel>
               </Section>
 
