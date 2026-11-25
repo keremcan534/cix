@@ -214,7 +214,7 @@ describe('Keşfet', () => {
     assert.equal((await call('GET', '/api/discover'))[0], 401);
   });
 
-  test('karşı cinsiyet; yeni üyeler; öne çıkanlar: erkeğe 1v1 kazanan yayıncılar, yayıncıya 1v1 harcayanlar', async () => {
+  test('karşı cinsiyet; yeni üyeler; öne çıkanlar: bu haftanın birebir puanı, erkeğe yayıncılar, kadına erkekler', async () => {
     const q = (s, p) => h.sql.query(s, p);
     const [man, rich, newbie, star, quiet, woman] = await Promise.all(['Levent', 'Mert', 'Nuri', 'Oya', 'Pelin', 'Rana'].map((n) => signUp(n)));
     await q("UPDATE users SET gender = 'Erkek' WHERE id = ANY($1::uuid[])", [[man, rich, newbie].map((x) => x.user.id)]);
@@ -229,10 +229,21 @@ describe('Keşfet', () => {
     const [ag] = (await q("INSERT INTO agencies (code, name, level, status) VALUES ($1, 'Kıyı', 1, 'approved') RETURNING id", [`K${rnd(3).toUpperCase()}`])).rows;
     await q("INSERT INTO agency_streamers (streamer_id, agency_id, method) VALUES ($1, $3, 'admin'), ($2, $3, 'admin')", [star.user.id, quiet.user.id, ag.id]);
     await q("INSERT INTO gift_events (sender, recipient, gift_id, count, unit_price, total, place, ref) VALUES ($1, $2, 'gul', 1, 500, 500, 'chat', $3)", [rich.user.id, star.user.id, rnd(6)]);
-    const featured = await ids(man.session, 'featured');
-    assert.deepEqual(featured.slice(0, 2), [star.user.id, quiet.user.id], 'kazanan yayıncı önce, sonra öteki yayıncı');
+    // Score (featured_* defaults): Mert–Oya gift 500 → 5 each. Nuri–Pelin: 3 messages (3) and a 1-minute video call
+    // (10) → 13 each. An automatic message and last week's call don't count.
+    let featured = await ids(man.session, 'featured');
+    assert.deepEqual(featured.slice(0, 2), [star.user.id, quiet.user.id], 'puanı olan yayıncı önce, sonra öteki yayıncı');
+    for (let i = 0; i < 3; i++) await q("INSERT INTO messages (sender, recipient, body, ref) VALUES ($1, $2, 'Merhaba', $3)", [newbie.user.id, quiet.user.id, rnd(6)]);
+    await q("INSERT INTO messages (sender, recipient, body, ref, source) VALUES ($1, $2, 'Selam', $3, 'auto_opener')", [quiet.user.id, rich.user.id, rnd(6)]);
+    const talk = (a, b, ago) =>
+      q("INSERT INTO calls (kind, mode, caller, callee, status, started_at, ended_at, ref) VALUES ('call', 'video', $1, $2, 'ended', now() - make_interval(days => $3, secs => 60), now() - make_interval(days => $3), $4)", [a, b, ago, rnd(6)]);
+    await talk(newbie.user.id, quiet.user.id, 0);
+    await talk(rich.user.id, star.user.id, 8);
+    featured = await ids(man.session, 'featured');
+    assert.deepEqual(featured.slice(0, 2), [quiet.user.id, star.user.id], 'mesaj ve görüşme dakikası puanı yükseltir');
     assert.ok(!featured.includes(woman.user.id), 'yayıncı olmayan öne çıkmaz');
-    assert.deepEqual(await ids(star.session, 'featured'), [rich.user.id], 'yayıncıya 1v1 harcayan');
+    assert.deepEqual(await ids(star.session, 'featured'), [newbie.user.id, rich.user.id], 'kadın birebiri en çok kullanan erkekleri görür');
+    assert.deepEqual(await ids(woman.session, 'featured'), [newbie.user.id, rich.user.id], 'yayıncı olmayan kadın da');
     assert.equal((await call('GET', '/api/discover?list=hepsi', null, man.session))[0], 400);
   });
 });

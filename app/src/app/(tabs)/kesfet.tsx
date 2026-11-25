@@ -113,18 +113,21 @@ export default function DiscoverScreen() {
         contentContainerStyle={{ paddingBottom: 16 }}
         ListHeaderComponent={
           <View>
-            {/* A word for the person, by the time of day ("İyi günler, Ayşe"), on a pink glass bar with a waving hand. */}
-            <LinearGradient colors={['#FFF6FA', '#FCE3EF', '#F8CFE4']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.greetBar}>
+            {/* A word for the person, by the time of day ("İyi günler, Ayşe"), on a pink glass bar with a waving hand (the
+                owners' design, 25 Nov 2026): a pale pill with a white rim, a light sweep on its right and a soft pink
+                shadow under it; the hand in its own pink circle, the name in deep plum, two glossy hearts. */}
+            <LinearGradient colors={['#FDF1F6', '#FBE4EE', '#F7D3E3']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.greetBar}>
+              <View style={styles.greetSweep} pointerEvents="none" />
               <View style={styles.greetHand}>
-                <EmojiIcon emoji="👋" size={20} />
+                <EmojiIcon emoji="👋" size={22} />
               </View>
               <Text style={styles.greet} accessibilityRole="header" numberOfLines={1}>
                 {greetingFor(hour)}
                 {firstName(me.name) ? `, ${firstName(me.name)}` : ''}
               </Text>
               <View style={styles.greetHearts} pointerEvents="none">
-                <Icon3D name="heart" size={22} />
-                <Icon3D name="heart" size={13} style={styles.greetHeartSmall} />
+                <Icon3D name="heart" size={24} style={styles.greetHeartBig} />
+                <Icon3D name="heart" size={15} style={styles.greetHeartSmall} />
               </View>
             </LinearGradient>
             {/* Four glossy tiles in one row: Hemen Tanış, Canlı Odalar, Aile, Jeton Kazan. */}
@@ -393,7 +396,8 @@ function UserRow({
             user.verified && <VerifiedBadge size={16} />
           )}
           {user.vip && <VipBadge />}
-          {typeof levels?.charm === 'number' && <CharmBadge level={levels.charm} />}
+          {/* Small, beside the name (the owners, 25 Nov 2026); level 0 has nothing to show. */}
+          {typeof levels?.charm === 'number' && levels.charm > 0 && <CharmBadge level={levels.charm} size="xs" />}
         </View>
         <View style={styles.chips}>
           {!!distance && (
@@ -516,18 +520,22 @@ const useStyles = makeStyles(({ colors, lift, dark, edge }) => ({
     gap: 10,
     marginHorizontal: 16,
     marginTop: 8,
-    height: 50,
-    borderRadius: 25,
-    paddingLeft: 6,
-    paddingRight: 12,
+    height: 52,
+    borderRadius: 26,
+    paddingLeft: 7,
+    paddingRight: 14,
     borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.9)',
-    boxShadow: '0 0 18px rgba(255,120,190,0.35)',
+    borderColor: 'rgba(255,255,255,0.95)',
+    overflow: 'hidden',
+    boxShadow: '0 6px 16px rgba(226,120,170,0.28)',
   },
-  greetHand: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#FBD3E5', alignItems: 'center', justifyContent: 'center' },
-  greet: { flex: 1, color: HOME.deep, fontSize: 17, fontFamily: fonts.display, letterSpacing: -0.2 },
-  greetHearts: { flexDirection: 'row', alignItems: 'flex-start' },
-  greetHeartSmall: { marginLeft: -4, marginTop: -8 },
+  // The glass's light: a wide pale sweep over the bar's right half.
+  greetSweep: { position: 'absolute', right: -40, top: -70, width: 260, height: 120, borderRadius: 130, backgroundColor: 'rgba(255,255,255,0.38)' },
+  greetHand: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#F9D1E2', alignItems: 'center', justifyContent: 'center' },
+  greet: { flex: 1, color: '#8C1D57', fontSize: 18, fontFamily: fonts.displayBold, letterSpacing: -0.3 },
+  greetHearts: { flexDirection: 'row', alignItems: 'flex-start', width: 38, height: 34 },
+  greetHeartBig: { position: 'absolute', left: 0, bottom: 0 },
+  greetHeartSmall: { position: 'absolute', right: 0, top: 0 },
   tiles: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 6 },
   tile: { borderRadius: 20, paddingHorizontal: 3, paddingVertical: 8, overflow: 'hidden', alignItems: 'center', justifyContent: 'flex-end', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.55)' },
   tileGloss: { position: 'absolute', left: 0, right: 0, top: 0, height: '48%' },

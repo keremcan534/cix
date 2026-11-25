@@ -120,6 +120,9 @@ async function assertNoSplitNumber(me, to, body, ref) {
   throw contactError(verdict.category, 'text', await countRefusal(me.id, verdict.category, 'dm.sequence'));
 }
 
+/** The Selam button's message (app components/use-greet.ts GREETING). */
+const GREETING = 'Selam! 👋';
+
 export const messageRoutes = {
   async 'POST /api/messages'(req) {
     const me = await auth(req);
@@ -206,9 +209,19 @@ export const messageRoutes = {
         throw e;
       });
     } else {
+      // Selam (owners, 25 Nov 2026): a woman's greeting ("Selam! 👋", the Selam button's message, older apps' too)
+      // takes one of the day's greet_daily_women rights with the message; past them nothing is stored.
+      const greetMax = me.gender === 'Kadın' && body === GREETING ? live().greetDaily : 0;
       row = await tx(async (c) => {
         await keyLock(c, me.id, to);
-        return (await insert(c)).rows[0];
+        const r = await insert(c);
+        if (!r.rowCount) return null;
+        if (greetMax > 0 && (await takeQuota(c, me.id, 'greet', greetMax)) === null)
+          throw Object.assign(new HttpError(409, `Bugünlük selam hakkın bitti (günde ${greetMax}). Yarın yeniden selam verebilirsin.`), { extra: { code: 'greet_quota' } });
+        return r.rows[0];
+      }).catch((e) => {
+        if (e.code === '23505') return null;
+        throw e;
       });
     }
     if (!row) return replay();

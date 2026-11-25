@@ -34,6 +34,7 @@ import { eraseDecor } from './room-decor.mjs';
 import { shownRoomOf } from './presence-room.mjs';
 import { clearMarks, eraseMarks, profileMarksOf } from './profile-marks.mjs';
 import { endBondOnBlock } from './bonds.mjs';
+import { live } from './live-settings.mjs';
 
 /** The interests the app offers (app/src/data/mock.ts INTERESTS). */
 export const INTERESTS = ['🎤 Karaoke', '🎮 Oyun', '💬 Sohbet', '⚽ Spor', '✈️ Seyahat', '🎬 Film', '💃 Dans', '📚 Kitap', '🎧 Müzik', '☕ Kahve'];
@@ -246,6 +247,33 @@ export const FOLLOW_LINE = 'Seni takip etti';
 /** A follow line's ref: one a day (Turkey's calendar) from one follower to one person. */
 const followRef = (to) => `follow:${to}:${new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Istanbul' })}`;
 
+/** The week's start, Monday 00:00 Türkiye. */
+const TR_WEEK = "(date_trunc('week', now() AT TIME ZONE 'Europe/Istanbul') AT TIME ZONE 'Europe/Istanbul')";
+/**
+ * Öne çıkanlar (owners, 25 Nov 2026): each person's 1v1 score this week (from Monday 00:00, Turkish time), as rows
+ * (uid, score): every message they wrote or got (people's own: manual and quick replies; no automatic message or
+ * follow line) times $3, every minute of a voice call or match they made or took (free or paid; to its end, or now
+ * while it lasts) times $4, of a video one times $5, and the coins of every chat gift (in a call too) they sent or got
+ * divided by $6. The weights are live settings (Birebir ve eşleşme, featured_*).
+ */
+const FEATURED_SCORES = `
+  SELECT uid, sum(pts) AS score FROM (
+    SELECT x AS uid, count(*) * $3::numeric AS pts
+      FROM messages m CROSS JOIN LATERAL (VALUES (m.sender), (m.recipient)) v(x)
+     WHERE m.created_at >= ${TR_WEEK} AND m.source IN ('manual', 'quick_reply')
+     GROUP BY x
+    UNION ALL
+    SELECT x, sum(extract(epoch FROM coalesce(k.ended_at, now()) - k.started_at) / 60 * (CASE k.mode WHEN 'video' THEN $5::numeric ELSE $4::numeric END))
+      FROM calls k CROSS JOIN LATERAL (VALUES (k.caller), (k.callee)) v(x)
+     WHERE k.started_at >= ${TR_WEEK} AND k.status IN ('live', 'ended')
+     GROUP BY x
+    UNION ALL
+    SELECT x, sum(g.total) / $6::numeric
+      FROM gift_events g CROSS JOIN LATERAL (VALUES (g.sender), (g.recipient)) v(x)
+     WHERE g.place = 'chat' AND g.created_at >= ${TR_WEEK}
+     GROUP BY x
+  ) t GROUP BY uid`;
+
 export const socialRoutes = {
   async 'PATCH /api/me'(req) {
     const u = await auth(req);
@@ -447,37 +475,32 @@ export const socialRoutes = {
   /**
    * Keşfet: real people. Men see women and women see men (anyone, while either of the two hasn't given a gender);
    * blocks either way and deleted accounts are left out. `list`: 'home' (most recently active first), 'new' (newest
-   * accounts first) or 'featured', who 1v1 lifts in the last 30 days: for a streamer, the people who spent most on
-   * them in private (chat gifts, paid messages, paid call and match minutes: paid_events); for anyone else, the agency
-   * streamers who earned most there (all streamers, the earners first).
+   * accounts first) or 'featured' (owners, 25 Nov 2026): this week's 1v1 score, highest first (featuredScores). A woman
+   * sees the men who use 1v1 most (only those with a score); anyone else the agency streamers (all of them, the
+   * highest first).
    */
   async 'GET /api/discover'(req, url) {
     const me = await auth(req);
     const list = url.searchParams.get('list') ?? 'home';
     if (!['home', 'new', 'featured'].includes(list)) throw new HttpError(400, 'Geçersiz liste');
-    const live = `EXISTS (SELECT 1 FROM agency_streamers s WHERE s.streamer_id = $X AND s.ended_at IS NULL AND s.contract = 'approved')`;
-    const streamer = list === 'featured' && (await db.query(`SELECT ${live.replace('$X', '$1')} AS yes`, [me.id])).rows[0].yes;
-    // 1v1 coins in the window: given by them (to me, a streamer) or received by them (anyone else).
-    const score = list !== 'featured' ? '0' : streamer
-      ? `((SELECT coalesce(sum(g.total), 0) FROM gift_events g WHERE g.sender = u.id AND g.place = 'chat' AND g.created_at > now() - interval '30 days')
-          + (SELECT coalesce(sum(p.coins), 0) FROM paid_events p WHERE p.payer = u.id AND p.earner = $1 AND p.created_at > now() - interval '30 days'))`
-      : `((SELECT coalesce(sum(g.total), 0) FROM gift_events g WHERE g.recipient = u.id AND g.place = 'chat' AND g.created_at > now() - interval '30 days')
-          + (SELECT coalesce(sum(p.coins), 0) FROM paid_events p WHERE p.earner = u.id AND p.created_at > now() - interval '30 days'))`;
-    const only = list !== 'featured' ? '' : streamer
-      ? `AND ${score} > 0`
-      : `AND ${live.replace('$X', 'u.id')}`;
-    const order = list === 'new' ? 'u.created_at DESC' : list === 'featured' ? 'score DESC, a.seen DESC NULLS LAST' : 'a.seen DESC NULLS LAST, u.created_at DESC';
+    const featured = list === 'featured';
+    const streamerOnly = `EXISTS (SELECT 1 FROM agency_streamers s WHERE s.streamer_id = u.id AND s.ended_at IS NULL AND s.contract = 'approved')`;
+    // A woman sees the men with a score; anyone else the agency streamers.
+    const only = !featured ? '' : me.gender === 'Kadın' ? "AND u.gender = 'Erkek' AND coalesce(f.score, 0) > 0" : `AND ${streamerOnly}`;
+    const order = list === 'new' ? 'u.created_at DESC' : featured ? 'score DESC, a.seen DESC NULLS LAST' : 'a.seen DESC NULLS LAST, u.created_at DESC';
+    const s = live();
     const r = await db.query(
-      `SELECT u.*, a.seen, ${score} AS score
+      `${featured ? `WITH f AS (${FEATURED_SCORES}) ` : ''}SELECT u.*, a.seen, ${featured ? 'coalesce(f.score, 0)' : '0'} AS score
          FROM users u
          JOIN LATERAL (SELECT max(s.last_seen_at) AS seen FROM sessions s WHERE s.user_id = u.id) a ON true
+         ${featured ? 'LEFT JOIN f ON f.uid = u.id' : ''}
         WHERE u.id <> $1 AND u.deleted_at IS NULL
           AND ($2::text IS NULL OR u.gender IS NULL OR u.gender <> $2)
           AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker = $1 AND b.blocked = u.id) OR (b.blocker = u.id AND b.blocked = $1))
           ${only}
         ORDER BY ${order}
         LIMIT 60`,
-      [me.id, me.gender ?? null],
+      featured ? [me.id, me.gender ?? null, s.featuredMsg, s.featuredVoice, s.featuredVideo, s.featuredGiftCoins] : [me.id, me.gender ?? null],
     );
     const fresh = Date.now() - 5 * 60_000;
     // Each card's levels and country, for the whole list in a few queries (profiles.mjs); then what each one shows me:

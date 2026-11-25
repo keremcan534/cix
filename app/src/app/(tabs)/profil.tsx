@@ -22,7 +22,7 @@ import { confirmLogout, showAlert } from '@/lib/alert';
 import { copyText } from '@/lib/clipboard';
 import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
-import { EmojiIcon, Icon3D, type Icon3DName } from '@/components/Icon3D';
+import { Icon3D, type Icon3DName } from '@/components/Icon3D';
 import { openEvents } from '@/components/events/open';
 import { GameIcon } from '@/components/GameArt';
 import { IS_DEMO } from '@/lib/build';
@@ -232,11 +232,25 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        <View style={[styles.card, { flexDirection: 'row' }]}>
-          <Shortcut emoji="🎁" label="Jeton Kazan" onPress={() => router.push('/gorevler')} />
-          <Shortcut emoji="⛺" label="Ailem" onPress={() => router.push('/aile')} />
-          {/* Invite rewards: the demo's, or the server's in a live build (server/api/referrals.mjs). */}
-          <Shortcut emoji="✉️" label="Arkadaşını Getir" onPress={() => router.push('/davet')} />
+        {/* The owners' design (25 Nov 2026): a pale pink glass card with a rose rim, three picture tiles split by fine
+            lines, a short bar under each label, soft waves along the bottom and a heart in the middle. */}
+        <View style={styles.benCard}>
+          <LinearGradient colors={['#FFF7FA', '#FDEEF4', '#FBE6EF']} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={StyleSheet.absoluteFill} />
+          <View style={[styles.benWave, { left: -70, bottom: -62 }]} pointerEvents="none" />
+          <View style={[styles.benWave, { right: -70, bottom: -66, opacity: 0.8 }]} pointerEvents="none" />
+          <View style={{ flexDirection: 'row', alignItems: 'stretch' }}>
+            <Shortcut art={BEN_ART.jeton} label="Jeton Kazan" onPress={() => router.push('/gorevler')} />
+            <View style={styles.benSep} />
+            <Shortcut art={BEN_ART.aile} label="Ailem" onPress={() => router.push('/aile')} />
+            <View style={styles.benSep} />
+            {/* Invite rewards: the demo's, or the server's in a live build (server/api/referrals.mjs). */}
+            <Shortcut art={BEN_ART.davet} label="Arkadaşını Getir" onPress={() => router.push('/davet')} />
+          </View>
+          <View style={styles.benHeartRow} pointerEvents="none">
+            <View style={styles.benHeartLine} />
+            <Ionicons name="heart-outline" size={14} color="#B5497A" />
+            <View style={styles.benHeartLine} />
+          </View>
         </View>
 
         {myRoom.profileVisible && live && (
@@ -370,17 +384,23 @@ function StatusCard({ title, sub, colors: c, dot, icon, bg, onPress }: { title: 
   );
 }
 
-function Shortcut({ emoji, label, onPress }: { emoji: string; label: string; onPress: () => void }) {
-  const { colors } = useTheme();
+/** Ben's three shortcuts' pictures (the owners' design, 25 Nov 2026). */
+const BEN_ART = {
+  jeton: require('../../../assets/home/kisayol/ben-jeton.webp'),
+  aile: require('../../../assets/home/kisayol/ben-aile.webp'),
+  davet: require('../../../assets/home/kisayol/ben-davet.webp'),
+};
+function Shortcut({ art, label, onPress }: { art: ImageSourcePropType; label: string; onPress: () => void }) {
   const styles = useStyles();
   return (
-    <Pressable style={{ flex: 1, alignItems: 'center', gap: 6 }} onPress={onPress} accessibilityLabel={label}>
+    <Pressable style={({ pressed }) => [{ flex: 1, alignItems: 'center', gap: 7, paddingTop: 4 }, pressed && { opacity: 0.85 }]} onPress={onPress} accessibilityRole="button" accessibilityLabel={label}>
       <View style={styles.shortIcon}>
-        <EmojiIcon emoji={emoji} size={30} />
+        <Image source={art} style={{ width: 44, height: 44 }} resizeMode="contain" />
       </View>
-      <Text style={{ color: colors.text, fontSize: 14, textAlign: 'center' }} numberOfLines={2}>
+      <Text style={styles.benLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
         {label}
       </Text>
+      <View style={styles.benBar} />
     </Pressable>
   );
 }
@@ -427,7 +447,35 @@ const useStyles = makeStyles(({ colors, semantic, lift, dark }) => ({
   statusTitle: { color: '#fff', fontSize: 18, fontWeight: '900' },
   // The corner picture sits below this line, so "Henüz yok" has the tile's whole width.
   statusSub: { color: 'rgba(255,255,255,0.85)', fontSize: 12 },
-  shortIcon: { width: 60, height: 60, borderRadius: 18, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center' },
+  shortIcon: {
+    width: 62,
+    height: 62,
+    borderRadius: 18,
+    backgroundColor: '#FBE9F0',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.9)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: '0 3px 8px rgba(214,128,166,0.22)',
+  },
+  benCard: {
+    marginHorizontal: 16,
+    borderRadius: 22,
+    borderWidth: 1.5,
+    borderColor: '#EDB3CB',
+    paddingTop: 14,
+    paddingBottom: 8,
+    paddingHorizontal: 6,
+    overflow: 'hidden',
+    boxShadow: '0 6px 16px rgba(214,128,166,0.22)',
+  },
+  // Soft pink waves along the card's bottom (two wide ellipses under its edge).
+  benWave: { position: 'absolute', width: 280, height: 90, borderRadius: 140, backgroundColor: 'rgba(244,176,204,0.26)' },
+  benSep: { width: 1, marginVertical: 18, backgroundColor: 'rgba(181,73,122,0.22)' },
+  benLabel: { color: '#4A1F35', fontSize: 14, fontWeight: '700', textAlign: 'center', paddingHorizontal: 2 },
+  benBar: { width: 22, height: 3, borderRadius: 2, backgroundColor: '#DB7AA5' },
+  benHeartRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 6 },
+  benHeartLine: { width: 34, height: 1, backgroundColor: 'rgba(181,73,122,0.35)' },
   gameCard: { marginHorizontal: 16, backgroundColor: colors.card, borderRadius: 16, padding: 12, gap: 10, borderWidth: 1, borderColor: 'rgba(246,189,96,0.35)', ...(dark ? {} : { boxShadow: lift.boxShadow }) },
   gameHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   gameRow: { flexDirection: 'row', gap: 8 },
