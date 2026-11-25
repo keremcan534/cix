@@ -223,7 +223,7 @@ export const VIP_SUBS = [
 export const VIP_SUB_BY_PRODUCT = new Map(VIP_SUBS.map((p) => [p.productId, p]));
 
 /**
- * Diamonds → coins (Gelir > Çevir): a diamond's official value (5.000 💎 = 1 USD, at USD_TRY) priced at the coin value
+ * Diamonds → coins (Gelir > Çevir): a diamond's official value (1.000 💎 = 1 USD, at USD_TRY) priced at the coin value
  * (1.000 coins = `coinValueTl` TL), no fee, coins rounded down. The same sum as app/src/lib/coins-bank.ts
  * exchangeOwnDiamonds with the rules in app/src/data/rules.ts; tests/server-catalog.test.ts fails when they drift.
  * `usdTry` and `coinValueTl` are the values in effect: Çevir passes the live ones (live-settings.mjs, Canlı ayarlar);
@@ -243,7 +243,7 @@ export const exchangeCoins = (diamonds, usdTry = EXCHANGE.usdTry, coinValueTl = 
 export const PAYOUT_USD_TRY = 49;
 /** TL for `usd` at the payout rate, to the kuruş. */
 export const payoutTl = (usd, rate = PAYOUT_USD_TRY) => Math.round(usd * rate * 100) / 100;
-/** What diamonds are paid in TL (5.000 💎 = 1 USD at the payout rate): what a Jeton Noktası pays a host for them. */
+/** What diamonds are paid in TL (1.000 💎 = 1 USD at the payout rate): what a Jeton Noktası pays a host for them. */
 export const diamondValueTl = (diamonds, rate = PAYOUT_USD_TRY, perUsd = EXCHANGE.diamondsPerUsd) => Math.round((diamonds / perUsd) * rate * 100) / 100;
 /**
  * A host sells diamonds to a Jeton Noktası: the bank pays their value at the payout rate and gets coins worth that plus

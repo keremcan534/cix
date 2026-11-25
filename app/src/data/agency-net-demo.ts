@@ -329,7 +329,7 @@ export const demoPayouts = (id: string): Payouts => {
   const b = demoOverview(id).earnings!.balances;
   return {
     balances: b,
-    policy: { min_diamonds: 50000, currencies: ['USD', 'TRY'], two_person: true },
+    policy: { min_diamonds: 10000, currencies: ['USD', 'TRY'], two_person: true },
     payouts: [
       { id: 31, amount: 412_000, usd: 82.4, currency: 'USD', status: 'paid', statusLabel: 'Ödendi', requestedAt: ago(34), approvedAt: ago(33), paidAt: ago(32), paymentRef: 'TRX-82140', note: null },
       { id: 27, amount: 365_500, usd: 73.1, currency: 'USD', status: 'paid', statusLabel: 'Ödendi', requestedAt: ago(64), approvedAt: ago(63), paidAt: ago(62), paymentRef: 'TRX-79021', note: null },
