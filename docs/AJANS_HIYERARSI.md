@@ -96,7 +96,10 @@ doğrudan üst ajans  = matrah × oran(üst)           (yayıncı doğrudan üst
 - Her komisyon kaydı hangi ayar ve oran sürümleriyle hesaplandığını `rule_version` alanında saklar.
 
 **BD komisyonu** ayrı defterdedir (`bd_ledger`) ve ajans havuzundan düşmez: `bd_policy.rate × matrah`
-(`basis`: `base`, `pool` veya `base_plus_pool`; varsayılan %5, `base_plus_pool`).
+(`basis`: `base`, `pool` veya `base_plus_pool`; varsayılan %5, `pool`). Sahiplerin kararı (25 Kasım 2026): BD'nin işi
+uygulamaya ajans getirmek ve bu ajanslara destek olmak; komisyonunu yalnız sorumlu olduğu ajansların toplam ajans
+komisyonundan alır, yayıncıların elmasından almaz. Platform öder, ajansın payı azalmaz. Oran panelde: Ajans merkezi ›
+Ağ kuralları › **BD komisyonu**. Panelde daha önce kaydedilmiş bir `bd_policy` varsa o geçerlidir.
 
 **Örnek** (varsayılanlar): 10.000 elmaslık hediye, alt ajans Başlangıç seviyesinde (%25):
 alt ajans 2.500, üst ajans 1.500 (%40 − %25), toplam 4.000 elmas = 0,80 USD. Yayıncının 10.000 elması aynen kalır.

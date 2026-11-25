@@ -324,7 +324,16 @@ describe('Ajans asistanı', () => {
     assert.equal(await shareOf(gone.id), undefined, 'ajanstan ayrılan asistan');
     assert.equal(ok(await owner2.get(`/api/agency/assistants?id=${T2.id}`)).assistants[0].member, false);
 
-    ok(await owner.post('/api/agency/assistants/remove', { id: T.id, assistantId: H.id }));
+    // The owner asks; it ends only when the assistant accepts (owners, 25 Nov 2026).
+    const asked = ok(await owner.post('/api/agency/assistants/remove', { id: T.id, assistantId: H.id, ask: true }));
+    assert.deepEqual([asked.removed, asked.request.status], [false, 'pending']);
+    assert.equal(ok(await owner.post('/api/agency/assistants/remove', { id: T.id, assistantId: H.id, ask: true })).request.id, asked.request.id, 'ikinci dokunuş aynı istek');
+    const pending = ok(await helper.get('/api/agency/me')).assistant.removal;
+    assert.deepEqual([pending.id, pending.status, pending.owner.name], [asked.request.id, 'pending', owner.name]);
+    assert.equal(ok(await owner.get(`/api/agency/assistants?id=${T.id}`)).assistants.find((x) => x.id === H.id).removal.status, 'pending');
+    refused(await outsider.post('/api/agency/assistants/removal/answer', { requestId: pending.id, answer: 'accept' }), 404, 'başkası cevaplayamaz');
+    ok(await helper.post('/api/agency/assistants/removal/answer', { requestId: pending.id, answer: 'accept' }));
+    ok(await helper.post('/api/agency/assistants/removal/answer', { requestId: pending.id, answer: 'accept' }), 'çift dokunuş');
     const after = (await income(a1, 100)).commission;
     assert.deepEqual((await ledgerOf(after.id)).map((x) => [x.kind, num(x.amount)]), [['direct', 20]], 'komisyonun tamamı sahibin');
     assert.equal((await q('SELECT agency_id FROM agency_streamers WHERE streamer_id = $1 AND ended_at IS NULL', [a1.id]))[0].agency_id, T.id, 'yayıncı ajansta kalır');
@@ -338,5 +347,39 @@ describe('Ajans asistanı', () => {
     const me = ok(await helper.get('/api/agency/me')).assistant;
     assert.equal(me.active, false);
     assert.ok(me.total.wallet > 0);
+  });
+
+  test('asistanlıktan çıkarma: ret, iki taraf da itiraz eder, yönetim karar verir; eski uygulama durumu öğrenir', async () => {
+    const A = ok(await owner.get(`/api/agency/assistants?id=${T.id}`)).assistants.find((x) => x.user.id === a2.id);
+    // An older app (no `ask`): told the request went to the assistant, nothing ended.
+    const [st, j] = await owner.post('/api/agency/assistants/remove', { id: T.id, assistantId: A.id });
+    assert.equal(st, 409);
+    assert.match(j.error, /onaylarsa asistanlıktan çıkar/);
+    const r1 = ok(await a2.get('/api/agency/me')).assistant.removal;
+    refused(await owner.post('/api/agency/assistants/removal/dispute', { requestId: r1.id, note: 'Anlaşamadık' }), 409, 'cevap gelmeden itiraz yok');
+    ok(await a2.post('/api/agency/assistants/removal/answer', { requestId: r1.id, answer: 'reject' }));
+    assert.equal(ok(await a2.get('/api/agency/me')).assistant.active, true, 'ret: asistanlık sürer');
+    refused(await owner.post('/api/agency/assistants/remove', { id: T.id, assistantId: A.id, ask: true }), 409, 'retten sonra yeni istek değil itiraz');
+    refused(await a2.post('/api/agency/assistants/removal/dispute', { requestId: r1.id, note: 'Ben de' }), 404, 'retten sonra itiraz sahibin');
+    ok(await owner.post('/api/agency/assistants/removal/dispute', { requestId: r1.id, note: 'Asistan ajansla çalışmıyor' }));
+    // Management: the open disputes, with names and 12-digit IDs; a non-admin can't see or decide.
+    refused(await owner.get('/api/admin/agency/assistant-removals'), 403);
+    const list = ok(await admin.get('/api/admin/agency/assistant-removals')).requests;
+    const d = list.find((x) => x.id === r1.id);
+    assert.deepEqual([d.status, d.disputedBy, d.disputeNote], ['disputed', 'owner', 'Asistan ajansla çalışmıyor']);
+    assert.match(d.assistant.no, /^\d{12}$/);
+    refused(await owner.post('/api/admin/agency/assistant-removals/resolve', { requestId: r1.id, outcome: 'remove', note: 'Görüşüldü' }), 403);
+    ok(await admin.post('/api/admin/agency/assistant-removals/resolve', { requestId: r1.id, outcome: 'keep', note: 'İki tarafla görüşüldü, kalıyor' }));
+    assert.equal(ok(await a2.get('/api/agency/me')).assistant.active, true, 'yönetim: kalır');
+    // Asked again; this time the assistant disputes at once, and management removes.
+    const r2 = ok(await owner.post('/api/agency/assistants/remove', { id: T.id, assistantId: A.id, ask: true })).request;
+    refused(await a2.post('/api/agency/assistants/removal/answer', { requestId: r2.id, answer: 'dispute' }), 400, 'itiraz açıklamasız olmaz');
+    ok(await a2.post('/api/agency/assistants/removal/answer', { requestId: r2.id, answer: 'dispute', note: 'Haksız buluyorum' }));
+    refused(await a2.post('/api/agency/assistants/removal/answer', { requestId: r2.id, answer: 'accept' }), 409, 'yönetimdeyken cevap değişmez');
+    const done = ok(await admin.post('/api/admin/agency/assistant-removals/resolve', { requestId: r2.id, outcome: 'remove', note: 'Sahip haklı' })).request;
+    assert.equal(done.status, 'removed');
+    assert.notEqual(ok(await a2.get('/api/agency/me')).assistant?.active, true, 'yönetim: çıkarıldı (pay almadıysa kartı da yok)');
+    assert.equal(ok(await admin.get('/api/admin/agency/assistant-removals')).requests.some((x) => x.id === r2.id), false, 'karara bağlanan listeden düşer');
+    assert.equal((await q("SELECT count(*)::int AS n FROM agency_audit WHERE action LIKE 'assistant.remove_%'"))[0].n >= 8, true, 'her adım denetime yazılır');
   });
 });

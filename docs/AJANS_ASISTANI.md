@@ -47,7 +47,8 @@ yetmezse alınabildiği kadar alınır; kalan borç olarak kalır ve sonraki pay
 
 ## Kurallar
 
-- **Kim atar:** yalnız ajans sahibi atar, payı değiştirir, çıkarır (merkez `agencies.manage` ile çıkarabilir).
+- **Kim atar:** yalnız ajans sahibi atar ve payı değiştirir. Çıkarmak asistanın onayıyla olur (merkez `agencies.manage` ile anında çıkarabilir).
+- **Çıkarma onayı (sahiplerin kararı, 25 Kasım 2026):** sahip “Asistanlıktan çıkar” deyince asistana istek gider (bildirim; Ben sekmesinde ve ajans ekranında kart). Asistan **Onayla** derse asistanlık biter, **Reddet** derse sürer, **İtiraz et** derse konu yönetime geçer. Asistan reddederse sahip yönetime itiraz edebilir. Yönetim iki tarafla iletişime geçip panelde “kalsın” ya da “çıkarılsın” der; iki tarafa bildirim gider. Bir asistan için aynı anda tek açık istek olur; retten sonra yeni istek değil itiraz açılır. Her adım `agency_audit`e yazılır (`assistant.remove_*`).
 - **Kim asistan olur:** ajansın şu anki yayıncılarından ya da ekibinden biri; sahibin kendisi olamaz; kişi aynı anda
   tek ajansta asistan olabilir.
 - **Sınır:** aynı anda en fazla `assistant_policy.max` asistan (varsayılan 1, en çok 10). Merkez, finans panelinde
@@ -79,7 +80,10 @@ edilmedi; destekçi payı yalnız kurallar sayfasında açıklandı.
 | `GET /api/agency/assistants/candidates?id=&q=` | Asistan yapılabilecek kişiler (ajansın yayıncıları ve ekibi) |
 | `POST /api/agency/assistants/add` `{ id, user, pct }` | Asistan ata; ilk pay hemen başlar |
 | `POST /api/agency/assistants/share` `{ id, assistantId, pct }` | Payı değiştir (haftada bir, pazartesiden geçerli) |
-| `POST /api/agency/assistants/remove` `{ id, assistantId }` | Asistanlığı bitir |
+| `POST /api/agency/assistants/remove` `{ id, assistantId, ask }` | Sahip: asistana çıkarma isteği gönderir (`{ removed: false, request }`). Merkez: anında bitirir. `ask` göndermeyen eski uygulamaya 409 “İsteğin gönderildi… güncelle” döner, istek yine açılır |
+| `POST /api/agency/assistants/removal/answer` `{ requestId, answer: accept|reject|dispute, note? }` | Asistan: onayla (biter), reddet (sürer), itiraz et (açıklama 3–500; yönetime geçer) |
+| `POST /api/agency/assistants/removal/dispute` `{ requestId, note }` | Sahip: reddedilen isteğe itiraz (yönetime geçer) |
+| `GET /api/admin/agency/assistant-removals[?status=all]`, `POST /api/admin/agency/assistant-removals/resolve` `{ requestId, outcome: remove|keep, note }` | Yönetim (panel › Ajanslar › Asistan itirazları): itirazları görür, iki tarafla görüşüp karar verir |
 | `GET /api/agency/me` → `assistant` | Asistanın kendi kartı: pay, kod, getirdikleri, kazancı, son paylar |
 | `GET /api/agency/lookup?code=` | Asistan kodunda `assistant.name` döner |
 | `GET /api/wallet/income` | Asistan olan ya da olmuş kişide "Ajans asistanı payı" satırı |

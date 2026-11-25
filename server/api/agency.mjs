@@ -255,7 +255,8 @@ export const agencyRoutes = {
       // The streamer rules as they apply to me, so the app shows what is possible (the server checks again).
       streamer: { eligible: st.eligible, gender: st.gender, held: st.held, pickUntil: st.pickUntil, pickDays: p.pick_days, canLeave: p.can_leave, womenOnly: p.women_only },
       membership: m.rowCount
-        ? { agency: { id: m.rows[0].agency_id, name: m.rows[0].name, code: m.rows[0].code, level: m.rows[0].level, parentName: m.rows[0].parent_name }, joinedAt: m.rows[0].joined_at, method: m.rows[0].method }
+        ? // parentName: never (owners, 25 Nov 2026: a referral agency shows no parent); kept null for older apps.
+          { agency: { id: m.rows[0].agency_id, name: m.rows[0].name, code: m.rows[0].code, level: m.rows[0].level, parentName: null }, joinedAt: m.rows[0].joined_at, method: m.rows[0].method }
         : null,
       requests: reqs.rows.map((r) => ({ id: Number(r.id), kind: r.kind, method: r.method, agency: { id: r.agency_id, name: r.agency_name, code: r.code }, note: r.note, createdAt: r.created_at })),
       transfer: tr.rowCount ? transferView(tr.rows[0], names) : null,
@@ -271,8 +272,8 @@ export const agencyRoutes = {
     await auth(req);
     const { agency: a, assistant } = await resolveJoinCode(db, url.searchParams.get('code'));
     if (a.status !== 'approved') throw new HttpError(404, 'Bu kodla aktif bir ajans yok');
-    const p = a.parent_id ? await db.query('SELECT name FROM agencies WHERE id = $1', [a.parent_id]) : null;
-    return { agency: { id: a.id, name: a.name, code: a.code, level: a.level, parentName: p?.rows[0]?.name ?? null }, assistant: assistant ? { name: assistant.name } : null };
+    // parentName: never shown (owners, 25 Nov 2026: a referral agency shows no parent); null for older apps.
+    return { agency: { id: a.id, name: a.name, code: a.code, level: a.level, parentName: null }, assistant: assistant ? { name: assistant.name } : null };
   },
 
   async 'POST /api/agency/join'(req) {
@@ -422,7 +423,9 @@ export const agencyRoutes = {
     }
     const perf = perms.has('reports.performance') ? await perfOf(db, a, x.s) : null;
     let parent = null;
-    if (a.parent_id) {
+    // A referral agency's own owner and team never see that it hangs under another agency (owners, 25 Nov 2026):
+    // only the parent sees it (Referans ajanslar); the centre and its BD still do. Older apps drew this as "Üst ajans".
+    if (a.parent_id && !['owner', 'staff'].includes(viewerOf(x.acc, a))) {
       const p = await agencyRow(db, a.parent_id);
       parent = { id: p.id, name: p.name, score: perf?.parentScore ?? null };
     }

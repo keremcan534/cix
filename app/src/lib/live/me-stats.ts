@@ -7,7 +7,7 @@ import { useIsFocused } from 'expo-router';
 import { useEffect, useSyncExternalStore } from 'react';
 
 import * as api from '@/lib/api';
-import { agencyNet } from '@/lib/agency-net';
+import { agencyNet, type AssistantRemoval } from '@/lib/agency-net';
 import { tieCounts } from '@/lib/follow-ties';
 import { liveMode, myServerId } from '@/lib/live';
 import { putTies } from '@/lib/live/profile';
@@ -16,7 +16,8 @@ import { agencyLinkOf, type AgencyLink } from '@/lib/me-view';
 /** `friends` null: an older server that doesn't count them. */
 export type MeStats = { serverId: string; followers: number; following: number; friends: number | null };
 /** `agency` undefined: not read yet (or the read failed); null: I have no agency. `owner`: whose numbers these are. */
-type Snap = { owner: string | null; stats: MeStats | null; agency: AgencyLink | null | undefined };
+/** `removal`: a request to end my assistant role that waits for me or sits with management (owners, 25 Nov 2026). */
+type Snap = { owner: string | null; stats: MeStats | null; agency: AgencyLink | null | undefined; removal?: AssistantRemoval | null };
 
 const EMPTY: Snap = { owner: null, stats: null, agency: undefined };
 let snap: Snap = EMPTY;
@@ -43,11 +44,14 @@ export function refreshMeStats(): Promise<void> {
     if (profile.status === 'fulfilled') putTies(id, profile.value);
     put({
       ...(profile.status === 'fulfilled' && { stats: { serverId: id, ...tieCounts(profile.value) } }),
-      ...(agency.status === 'fulfilled' && { agency: agencyLinkOf(agency.value) }),
+      ...(agency.status === 'fulfilled' && { agency: agencyLinkOf(agency.value), removal: openRemoval(agency.value.assistant?.removal) }),
     });
   })().finally(() => (reading = null));
   return reading;
 }
+
+/** Only a request I can act on or that is with management; anything malformed is none. */
+const openRemoval = (r: AssistantRemoval | null | undefined) => (r && typeof r.id === 'number' && (r.status === 'pending' || r.status === 'disputed') ? r : null);
 
 const useSnap = () => {
   const s = useSyncExternalStore(subscribe, () => snap, () => snap);
@@ -62,7 +66,7 @@ export function useMeStats() {
   useEffect(() => {
     if (liveMode() && focused) void refreshMeStats().catch(() => {});
   }, [focused]);
-  return { stats: s.stats, agency: s.agency };
+  return { stats: s.stats, agency: s.agency, removal: s.removal ?? null };
 }
 
 /** My agency on the server for the profile pill: undefined until known. `read`: start a read if there is none yet. */

@@ -2,7 +2,8 @@
 //
 //   GET  /api/families?q=                     → { families, mine }        (top 50 by this week's power; q filters by name)
 //   GET  /api/family?id=                      → { family, members, myRole, requested, requests, rejoinAt, leaveDays }   (no id: mine, or family null)
-//   POST /api/families      { name, ref }     → { family, user, replay }  (founding fee FAMILY_COST coins)
+//   POST /api/families      { name, ref, price? } → { family, user, replay }  (founding fee: live familyFoundPrice;
+//                                             a newer app sends the price it showed, an older one showed FAMILY_COST)
 //   POST /api/family/join   { id, join? }     → { joined } | { requested } (join: false takes my request back)
 //   POST /api/family/request { userId, accept } → { members }             (the leader or a helper)
 //   POST /api/family/invite { userId }        → { invited }               (the leader or a helper: someone with no family)
@@ -22,7 +23,7 @@
 // filter, and a mute on public text (sanctions 'post') stops chatting. A streamer (streamer-rule.mjs) who leaves of
 // their own accord can't join or found another family for family_rejoin_days (Canlı ayarlar, 90 to begin with); going
 // back to the family they left is allowed, and someone the family put out doesn't wait.
-import { HttpError, auth, blockedBetween, db, int, limit, once, publicText, readJson, tx, userId } from './core.mjs';
+import { HttpError, auth, blockedBetween, db, int, limit, once, publicNoOf, publicText, readJson, text, tx, userId } from './core.mjs';
 import { notify } from './push.mjs';
 import { assertMay } from './sanctions.mjs';
 import { spendCoins } from './wallet.mjs';
@@ -31,7 +32,23 @@ import { live } from './live-settings.mjs';
 import { isStreamer } from './streamer-rule.mjs';
 
 /** The founding fee (app: data/kabile KABILE_CREATE_COST). */
+/** The founding fee older apps show (compiled); the price now is live familyFoundPrice (Canlı ayarlar › Aile). */
 export const FAMILY_COST = 500;
+
+/**
+ * The founding fee now; a newer app sends the price it showed (another one now: 409 price_changed), an older one
+ * sends none and showed FAMILY_COST (another one now: 409 update_required). Nothing moves on either.
+ */
+function foundPrice(shown) {
+  const price = live().familyFoundPrice;
+  const fmt = (n) => n.toLocaleString('tr-TR');
+  if (shown !== undefined && shown !== null) {
+    if (shown !== price) throw Object.assign(new HttpError(409, `Aile kurma ücreti değişti: artık ${fmt(price)} jeton. Yeni ücreti görüp yeniden dene.`), { extra: { code: 'price_changed', price } });
+  } else if (price !== FAMILY_COST) {
+    throw Object.assign(new HttpError(409, 'Aile kurma ücreti değişti. Aile kurmak için uygulamayı güncelle.'), { extra: { code: 'update_required' } });
+  }
+  return price;
+}
 /** Power needed for each level (app: data/rules FAMILY_XP). */
 export const FAMILY_XP = [0, 1_000, 3_000, 6_000, 10_000, 16_000, 24_000, 35_000, 50_000, 70_000, 95_000, 130_000, 175_000, 230_000, 300_000];
 export const familyLevel = (power) => FAMILY_XP.reduce((lvl, t, i) => (power >= t ? i + 1 : lvl), 1);
@@ -193,6 +210,41 @@ const managers = async (id) =>
   (await db.query("SELECT user_id FROM family_members WHERE family_id = $1 AND role IN ('owner', 'helper')", [id])).rows.map((x) => x.user_id);
 
 export const familyRoutes = {
+  /** (admin) The open families, newest first: name, leader (name and ID), members. */
+  async 'GET /api/admin/families'(req) {
+    const me = await auth(req);
+    if (me.role !== 'admin') throw new HttpError(403, 'Yönetici hesabı gerekli');
+    const r = await db.query(
+      `SELECT f.id, f.name, f.created_at, u.name AS leader_name, u.public_no AS leader_no, (SELECT count(*)::int FROM family_members m WHERE m.family_id = f.id) AS members
+         FROM families f JOIN users u ON u.id = f.leader WHERE f.closed_at IS NULL ORDER BY f.created_at DESC LIMIT 300`,
+    );
+    return { families: r.rows.map((x) => ({ id: String(x.id), name: x.name, createdAt: x.created_at.toISOString(), leader: { name: x.leader_name, no: x.leader_no === null ? null : String(x.leader_no) }, members: x.members })) };
+  },
+
+  /**
+   * (admin) A family founded by staff (owners, 25 Nov 2026): { name, founder } — free (no founding fee); the founder
+   * leads it. Refused if the founder is already in a family or the name is taken; told to the founder.
+   */
+  async 'POST /api/admin/families/create'(req) {
+    const me = await auth(req);
+    if (me.role !== 'admin') throw new HttpError(403, 'Yönetici hesabı gerekli');
+    const b = await readJson(req);
+    const name = text(b.name, 2, 24, 'Aile adı');
+    const founder = userId(b.founder, 'kurucu');
+    const f = await tx(async (c) => {
+      const u = (await c.query('SELECT id, name, public_no FROM users WHERE id = $1 AND deleted_at IS NULL FOR UPDATE', [founder])).rows[0];
+      if (!u) throw new HttpError(404, 'Kullanıcı bulunamadı');
+      if (await myMembership(founder, c)) throw new HttpError(409, `${u.name} zaten bir ailede`);
+      if ((await c.query('SELECT 1 FROM families WHERE lower(name) = lower($1) AND closed_at IS NULL', [name])).rowCount) throw new HttpError(409, 'Bu isimde bir aile var');
+      const row = (await c.query('INSERT INTO families (name, leader) VALUES ($1, $2) RETURNING id', [name, founder])).rows[0];
+      await addMember(c, Number(row.id), founder, 'owner');
+      await c.query("INSERT INTO audit_events (actor, action, target, detail) VALUES ($1, 'family.create', $2, $3)", [me.id, founder, JSON.stringify({ family: String(row.id), name, free: true })]);
+      return { id: String(row.id), name, leader: { name: u.name, no: publicNoOf(u) } };
+    });
+    notify([founder], { title: f.name, body: 'Yönetim senin için bu aileyi kurdu; ailenin lideri sensin', data: { type: 'family_joined', family: f.id } });
+    return { family: f };
+  },
+
   async 'GET /api/families'(req, url) {
     const me = await auth(req);
     const q = (url.searchParams.get('q') ?? '').trim().slice(0, 24);
@@ -206,7 +258,8 @@ export const familyRoutes = {
       .sort((a, b) => b.weekly - a.weekly || b.power - a.power)
       .slice(0, 50);
     const mine = await myMembership(me.id);
-    return { families, mine: mine ? String(mine.family_id) : null };
+    // foundPrice: what founding one costs now (an older app ignores it and shows its own).
+    return { families, mine: mine ? String(mine.family_id) : null, foundPrice: live().familyFoundPrice };
   },
 
   async 'GET /api/family'(req, url) {
@@ -243,7 +296,9 @@ export const familyRoutes = {
       await assertRejoin(c, me.id, null);
       if ((await c.query('SELECT 1 FROM families WHERE lower(name) = lower($1) AND closed_at IS NULL', [name])).rowCount)
         throw new HttpError(409, 'Bu isimde bir aile var');
-      await spendCoins(c, me.id, FAMILY_COST, `Aile kurma: ${name}`, b.ref);
+      // After the ref check above, so a retry of a founding that went through gets its replay.
+      const price = foundPrice(b.price);
+      if (price > 0) await spendCoins(c, me.id, price, `Aile kurma: ${name}`, b.ref);
       const f = await c.query('INSERT INTO families (name, leader) VALUES ($1, $2) RETURNING id', [name, me.id]);
       await addMember(c, Number(f.rows[0].id), me.id, 'owner');
     });

@@ -524,11 +524,11 @@ describe('Askı, personel, BD, ödemeler, raporlar', () => {
     const k = (await commissionsOf(tA)).at(-1);
     const bd = await q('SELECT * FROM bd_ledger WHERE commission_id = $1', [k.id]);
     assert.equal(bd.length, 1);
-    assert.equal(num(bd[0].amount), (10000 + 3500) * 0.05, 'BD: (matrah + ajans payı) × %5');
+    assert.equal(num(bd[0].amount), 3500 * 0.05, 'BD: yalnız ajans komisyonunun %5’i (yayıncının elmasından değil)');
     assert.equal(num(k.agency_amount), 3500, 'ajans payı BD yüzünden azalmaz');
     const rep = ok(await bdU.get('/api/admin/agency/bd-report'));
     assert.deepEqual(rep.agencies.map((a) => a.id), [T.id]);
-    assert.equal(rep.ledger[0].amount, 675);
+    assert.equal(rep.ledger[0].amount, 175);
   });
 
   test('[Ş1-16] ödeme: kapanan dönem, tek açık talep, aynı istek tekrarı, iki kişili onay, benzersiz ödeme referansı', async () => {

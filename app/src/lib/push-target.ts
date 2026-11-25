@@ -40,6 +40,9 @@ export function pushTarget(data: Record<string, unknown> | undefined): Href | nu
     // Named, changed or ended as an agency assistant (server/api/agency-assistants.mjs): the agency screen, my card there.
     case 'agency_assistant':
       return '/ajans';
+    // A request to end my assistant role, or the owner's dispute (owners, 25 Nov 2026): Ben, where I answer it.
+    case 'assistant_removal':
+      return '/(tabs)/profil';
     // A bond's request, accept, refusal or end (server/api/bonds.mjs): my own Bağlar tab, where requests are answered.
     // It opened the notifications before, which never list it (Güncelleme 7, madde 3a).
     case 'bond':

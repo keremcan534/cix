@@ -116,13 +116,19 @@ function FamilyList({
   };
   const [q, setQ] = useState('');
   const [list, setList] = useState<fam.LiveFamily[] | null>(null);
+  // What founding a family costs now (the server's; the compiled one until it answers or on an older server).
+  const [price, setPrice] = useState(KABILE_CREATE_COST);
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     let on = true;
-    const t = setTimeout(() => fam.families(q).then((r) => on && setList(r.families), () => on && setList([])), q ? 350 : 0);
+    const t = setTimeout(() => fam.families(q).then((r) => {
+          if (!on) return;
+          setList(r.families);
+          if (typeof r.foundPrice === 'number' && Number.isSafeInteger(r.foundPrice) && r.foundPrice >= 0) setPrice(r.foundPrice);
+        }, () => on && setList([])), q ? 350 : 0);
     return () => {
       on = false;
       clearTimeout(t);
@@ -134,10 +140,13 @@ function FamilyList({
     if (n.length < 2) return showAlert('Aile adı en az 2 karakter olmalı');
     setBusy(true);
     try {
-      const r = await once(`family:create:${n}`, (ref) => fam.create(n, ref));
+      const r = await once(`family:create:${n}`, (ref) => fam.create(n, ref, price));
       applyServerUser(r, `Aile kurma: ${n}`);
       onCreated();
     } catch (e) {
+      // The fee moved since the screen read it: show the new one (the message says it).
+      const now = (e as { data?: { code?: string; price?: unknown } })?.data;
+      if (now?.code === 'price_changed' && typeof now.price === 'number') setPrice(now.price);
       showAlert('Aile kurulamadı', message(e));
     } finally {
       setBusy(false);
@@ -178,9 +187,9 @@ function FamilyList({
               ))}
             </Card>
           )}
-          {mine ? null : creating ? (
+          {mine || loading || failed ? null : creating ? (
             <Card style={{ gap: 10 }}>
-              <Text style={styles.title}>Aile kur · {fmt(KABILE_CREATE_COST)} jeton</Text>
+              <Text style={styles.title}>Aile kur · {price > 0 ? `${fmt(price)} jeton` : 'ücretsiz'}</Text>
               <TextInput value={name} onChangeText={setName} placeholder="Aile adı" placeholderTextColor={colors.textDim} style={styles.input} maxLength={24} />
               <Text style={styles.dim}>Kuran kişi aile lideri olur: yardımcı atar, istekleri onaylar ve duyuruyu yazar.</Text>
               <GradientButton title={busy ? 'Kuruluyor…' : 'Kur'} onPress={busy ? undefined : found} />

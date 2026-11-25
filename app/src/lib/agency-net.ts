@@ -269,6 +269,20 @@ export type Assistant = {
   week: { streamerIncome: number; share: number };
   month: { share: number };
   total: { share: number; wallet: number };
+  /** An open request to end it (owners, 25 Nov 2026); none from an older server. */
+  removal?: AssistantRemoval | null;
+};
+/** Asistanlıktan çıkarma isteği: the owner asks, the assistant answers, a dispute goes to management. */
+export type AssistantRemoval = {
+  id: number;
+  assistantId: number;
+  agency: Named;
+  assistant: { name: string; no: string | null };
+  owner: { name: string; no: string | null };
+  status: 'pending' | 'accepted' | 'rejected' | 'disputed' | 'removed' | 'kept' | 'closed';
+  disputedBy: 'owner' | 'assistant' | null;
+  disputeNote: string | null;
+  askedAt: string;
 };
 export type AssistantList = { max: number; open: number; canAdd: boolean; weekStart: string; nextWeek: string; assistants: Assistant[] };
 export type AssistantCandidate = { id: string; name: string; avatarUrl: string | null; role: 'streamer' | 'staff' };
@@ -419,7 +433,10 @@ export const agencyNet = {
   assistantCandidates: (id: string, q = '') => get<{ users: AssistantCandidate[] }>('/api/agency/assistants/candidates', { id, q }).then((r) => r.users),
   addAssistant: (id: string, user: string, pct: number) => post<{ assistant: Assistant }>('/api/agency/assistants/add', { id, user, pct }),
   setAssistantShare: (id: string, assistantId: number, pct: number) => post<{ assistant: Assistant; replay: boolean }>('/api/agency/assistants/share', { id, assistantId, pct }),
-  removeAssistant: (id: string, assistantId: number) => post('/api/agency/assistants/remove', { id, assistantId }),
+  /** The owner asks the assistant (`ask`: this app shows the request; an older one is told by a 409). */
+  removeAssistant: (id: string, assistantId: number) => post<{ removed: boolean; request: AssistantRemoval | null }>('/api/agency/assistants/remove', { id, assistantId, ask: true }),
+  answerRemoval: (requestId: number, answer: 'accept' | 'reject' | 'dispute', note?: string) => post<{ request: AssistantRemoval }>('/api/agency/assistants/removal/answer', { requestId, answer, ...(note && { note }) }),
+  disputeRemoval: (requestId: number, note: string) => post<{ request: AssistantRemoval }>('/api/agency/assistants/removal/dispute', { requestId, note }),
 };
 
 export const centerNet = {

@@ -15,7 +15,7 @@ export const EXPORTED = [
   'room_poll_votes', 'room_follower_invites', 'room_follows', 'room_open_notices',
   'backpack_items', 'backpack_moves', 'referral_codes', 'referrals', 'casino_rounds', 'room_decor',
   'events', 'event_reservations', 'event_participants', 'event_reminders_sent', 'event_reminder_optout',
-  'agency_assistants', 'agency_assistant_ledger', 'level_drops', 'level_offsets', 'guards', 'guard_settings',
+  'agency_assistants', 'agency_assistant_ledger', 'agency_assistant_removals', 'level_drops', 'level_offsets', 'guards', 'guard_settings',
   'message_holds', 'auto_templates', 'auto_quota', 'auto_sends', 'profile_marks', 'private_album_photos', 'private_album_unlocks',
   'host_bonuses', 'vip_points', 'vip_evaluations', 'vip_extensions',
 ];

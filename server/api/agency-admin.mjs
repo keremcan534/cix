@@ -63,6 +63,7 @@ import {
 } from './agency-ops.mjs';
 import { applyTier, calcPending, runPerformance } from './agency-perf.mjs';
 import { PLAY_PAYOUT, insertAgency, playMoneyOn } from './agency.mjs';
+import { openRoomOf, whoIs } from './public-no.mjs';
 
 const TEST = env.ALLOW_TEST_TOPUP === '1';
 const bad = (m) => {
@@ -201,6 +202,17 @@ if (env.AGENCY_JOBS !== '0') {
 }
 
 // --- Routes ------------------------------------------------------------------------------------------------
+/** Links the open room `no` names (the room's ID, its owner's) to agency `agencyId`; a 404 or 409 that says why. */
+async function linkRoom(c, agencyId, no) {
+  const owner = await whoIs(String(no ?? ''), c);
+  const room = owner ? await openRoomOf(owner.id, c) : null;
+  if (!room) throw new HttpError(404, 'Bu ID’de açık bir oda yok: odanın ID’sini (oda sahibinin ID’si) yazın');
+  const taken = await c.query('SELECT name FROM agencies WHERE room_id = $1 AND id <> $2', [room.id, agencyId]);
+  if (taken.rowCount) throw new HttpError(409, `Bu oda zaten ${taken.rows[0].name} ajansına bağlı`);
+  await c.query('UPDATE agencies SET room_id = $2 WHERE id = $1', [agencyId, room.id]);
+  return { id: room.id, title: room.title, no: owner.public_no === null || owner.public_no === undefined ? null : String(owner.public_no) };
+}
+
 export const agencyAdminRoutes = {
   async 'GET /api/admin/agency/tree'(req) {
     const x = await center(db, req);
@@ -216,7 +228,8 @@ export const agencyAdminRoutes = {
              WHERE sc.agency_id = a.id AND pr.dry_run = false ORDER BY sc.run_id DESC LIMIT 1) z) AS perf,
          (SELECT b.bd_id FROM bd_assignments b WHERE b.agency_id = a.id AND b.ended_at IS NULL) AS bd_id,
          (SELECT row_to_json(z) FROM (SELECT bu.name, bu.public_no::text AS no FROM bd_assignments b JOIN users bu ON bu.id = b.bd_id WHERE b.agency_id = a.id AND b.ended_at IS NULL LIMIT 1) z) AS bd_user,
-         u.public_no AS owner_no
+         u.public_no AS owner_no,
+         (SELECT row_to_json(z) FROM (SELECT ro.id, ro.title, ru.public_no::text AS no FROM rooms ro JOIN users ru ON ru.id = ro.owner WHERE ro.id = a.room_id AND ro.closed_at IS NULL) z) AS room
        FROM agencies a LEFT JOIN users u ON u.id = a.owner_id
       WHERE a.status IN ('approved', 'suspended', 'pending', 'draft') ORDER BY a.level, a.name LIMIT 5000`,
     );
@@ -254,6 +267,8 @@ export const agencyAdminRoutes = {
         bdName: a.bd_user?.name ?? null,
         bdNo: a.bd_user?.no ?? null,
         ownerNo: a.owner_no === null || a.owner_no === undefined ? null : String(a.owner_no),
+        // Its own room (owners, 25 Nov 2026), while open: { id, title, no }.
+        room: a.room ?? null,
       });
     }
     return { nodes, poolCap: x.s.pool_cap, topRate: x.s.top_rate };
@@ -352,6 +367,22 @@ export const agencyAdminRoutes = {
     };
   },
 
+  /**
+   * An agency's own room (owners, 25 Nov 2026): { agencyId, roomNo } links the open room that ID names (the room's ID
+   * is its owner's); roomNo null takes the link off. Odalar shows the room under the agency's name.
+   */
+  async 'POST /api/admin/agency/room'(req) {
+    const b = await readJson(req);
+    return tx(async (c) => {
+      const x = await center(c, req, 'agencies.manage');
+      const a = await agencyRow(c, uuid(b.agencyId, 'ajans'), true);
+      const room = b.roomNo === null || b.roomNo === '' ? null : await linkRoom(c, a.id, b.roomNo);
+      if (!room) await c.query('UPDATE agencies SET room_id = NULL WHERE id = $1', [a.id]);
+      await audit(c, x.u.id, 'agency.room', 'agency', a.id, { before: { room: a.room_id ?? null }, after: { room: room?.id ?? null } });
+      return { room };
+    });
+  },
+
   async 'POST /api/admin/agency/create'(req) {
     const b = await readJson(req);
     return tx(async (c) => {
@@ -363,7 +394,10 @@ export const agencyAdminRoutes = {
       }
       const a = await insertAgency(c, b, { parent, owner: b.owner ? uuid(b.owner, 'yönetici') : null, actor: x.u.id, status: 'pending', pendingWith: 'center' });
       await approveAgency(c, a, x.u.id, 'Merkez oluşturdu');
-      return { agency: { id: a.id, code: a.code, name: a.name, level: a.level, status: 'approved' } };
+      // Its own room, by the room's ID (owners, 25 Nov 2026): a wrong ID stops the founding, nothing is kept.
+      const room = b.roomNo ? await linkRoom(c, a.id, b.roomNo) : null;
+      if (room) await audit(c, x.u.id, 'agency.room', 'agency', a.id, { before: { room: null }, after: { room: room.id } });
+      return { agency: { id: a.id, code: a.code, name: a.name, level: a.level, status: 'approved', room } };
     });
   },
 

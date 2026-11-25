@@ -550,6 +550,11 @@ export async function exportOf(c, uid) {
       'SELECT a.name, x.code, x.assigned_at, x.ended_at, x.end_reason FROM agency_assistants x JOIN agencies a ON a.id = x.agency_id WHERE x.user_id = $1 ORDER BY x.id',
       (x) => ({ agency: x.name, code: x.code, assignedAt: x.assigned_at, endedAt: x.ended_at, endReason: x.end_reason ?? null }),
     ),
+    // Requests to end my assistant role, made to me or by me as an owner (owners, 25 Nov 2026).
+    assistantRemovals: await all(
+      'SELECT g.name, r.status, r.disputed_by, r.dispute_note, r.created_at, r.answered_at, r.resolved_at, r.user_id = $1 AS mine FROM agency_assistant_removals r JOIN agencies g ON g.id = r.agency_id WHERE r.user_id = $1 OR r.asked_by = $1 ORDER BY r.id',
+      (x) => ({ agency: x.name, role: x.mine ? 'assistant' : 'owner', status: x.status, disputedBy: x.disputed_by ?? null, disputeNote: x.dispute_note ?? null, askedAt: x.created_at, answeredAt: x.answered_at ?? null, resolvedAt: x.resolved_at ?? null }),
+    ),
     assistantShares: await all('SELECT l.amount, l.wallet, l.pct, l.period, l.created_at FROM agency_assistant_ledger l WHERE l.user_id = $1 ORDER BY l.id', (x) => ({
       diamonds: Number(x.amount),
       toWallet: Number(x.wallet),

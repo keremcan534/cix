@@ -99,7 +99,8 @@ function HubBody({ d, demo, reload, askFor }: { d: Me; demo: boolean; reload: ()
                     {a.name}
                   </Text>
                   <View style={st.pills}>
-                    <Pill text={LEVEL_TEXT(a.level)} tone="action" />
+                    {/* A referral agency's own people never read "alt ajans" (owners, 25 Nov 2026). */}
+                    {a.level <= 1 && <Pill text={LEVEL_TEXT(a.level)} tone="action" />}
                     <Pill text={STATUS_TEXT[a.status]} tone={statusTone(a.status)} />
                     {!!a.tierName && a.level > 1 && <Pill text={a.tierName} tone="money" />}
                   </View>
@@ -122,7 +123,7 @@ function HubBody({ d, demo, reload, askFor }: { d: Me; demo: boolean; reload: ()
       )}
 
       {/* Ajans asistanı: my share, my invite code and what I earned (server/api/agency-assistants.mjs). */}
-      {d.assistant ? <MyAssistantCard a={d.assistant} /> : null}
+      {d.assistant ? <MyAssistantCard a={d.assistant} onChange={reload} /> : null}
 
       {d.membership ? <Membership d={d} demo={demo} reload={reload} askFor={askFor} /> : null}
 
@@ -179,10 +180,8 @@ function Membership({ d, demo, reload, askFor }: { d: Me; demo: boolean; reload:
         <View style={ns.rowBetween}>
           <View style={{ flex: 1 }}>
             <Text style={ns.title}>{m.agency.name}</Text>
-            <Text style={ns.dim}>
-              {LEVEL_TEXT(m.agency.level)}
-              {m.agency.parentName ? ` · Üst ajans: ${m.agency.parentName}` : ''}
-            </Text>
+            {/* A referral agency shows as an agency of its own: no "alt ajans", no parent (owners, 25 Nov 2026). */}
+            <Text style={ns.dim}>Ajans · kod {m.agency.code}</Text>
           </View>
           <Pill text="Üye" tone="success" icon="checkmark-circle" />
         </View>
@@ -346,10 +345,7 @@ function Join({ demo, reload, pickUntil }: { demo: boolean; reload: () => void; 
           <Ionicons name="business-outline" size={20} color={semantic.action} />
           <View style={{ flex: 1 }}>
             <Text style={[ns.title, { fontSize: 15 }]}>{found.name}</Text>
-            <Text style={ns.dim}>
-              {LEVEL_TEXT(found.level)}
-              {found.parentName ? ` · ${found.parentName}` : ''}
-            </Text>
+            <Text style={ns.dim}>Ajans · kod {found.code}</Text>
             {!!found.via && <Text style={ns.dim}>Davet eden: {found.via} (ajans asistanı)</Text>}
           </View>
         </View>

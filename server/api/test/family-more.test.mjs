@@ -20,8 +20,8 @@ const task = (o, id) => o.tasks.find((t) => t.id === id);
 /** A family with its leader and one member (open join). */
 async function familyOf(name) {
   const lead = await signUp(`${name} Lider`);
-  await topUp(lead.session);
-  const { family } = await ok(call('POST', '/api/families', { name: `${name} ${rnd(2)}`, ref: rnd(6) }, lead.session), 'kur');
+  await topUp(lead.session, 5000);
+  const { family } = await ok(call('POST', '/api/families', { name: `${name} ${rnd(2)}`, ref: rnd(6), price: 4999 }, lead.session), 'kur');
   await ok(call('POST', '/api/family/settings', { joinMode: 'open' }, lead.session), 'açık');
   const member = await signUp(`${name} Üye`);
   assert.deepEqual(await ok(call('POST', '/api/family/join', { id: family.id }, member.session), 'katıl'), { joined: true });
