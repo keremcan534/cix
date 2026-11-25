@@ -6,7 +6,9 @@
 //   GET  /api/team?before=                → { notices, unread }   everyone's and mine, newest first, 30 a page
 //   GET  /api/team/unread                 → { unread }            new since I last opened it (30 days at most)
 //   POST /api/team/seen { upTo }          → { unread }
-//   GET  /api/room-banners                → { events, boards }    boards: { agency|charm|wealth: { day|week|month: rows } }
+//   GET  /api/room-banners?banners=1      → { events, boards, banners? }   boards: { agency|charm|wealth: { day|week|month: rows } };
+//                                           banners (Banner Yönetimi, banners.mjs) for an app that asks; an older app gets
+//                                           them in events, as notice slides
 //   GET  /api/admin/team                  → { notices }           (admin) the latest 100, with whom each was for
 //   POST /api/admin/team { kind, title, body?, imageUrl?, link?, target?, bannerDays? } → { notice }   (admin)
 //   POST /api/admin/team/remove { id }    → { removed }           (admin)
@@ -18,6 +20,7 @@ import { HttpError, auth, db, env, int, limit, readJson, text, userId } from './
 import { PERIODS, topBoard } from './gifts.mjs';
 import { notify } from './push.mjs';
 import { removeFiles, verifyUpload } from './media.mjs';
+import { liveBanners, phoneView } from './banners.mjs';
 
 export const KINDS = ['event', 'update', 'reward', 'rule', 'notice'];
 const PAGE = 30;
@@ -60,7 +63,7 @@ async function unread(me) {
   return r.rows[0].n;
 }
 
-function photoOf(v) {
+export function photoOf(v) {
   if (v === undefined || v === null || v === '') return null;
   const base = (env.S3_PUBLIC_URL ?? '').replace(/\/$/, '');
   const dir = `${base}/notice/`;
@@ -108,10 +111,16 @@ export const teamRoutes = {
     return { unread: await unread(me) };
   },
 
-  async 'GET /api/room-banners'(req) {
+  async 'GET /api/room-banners'(req, url) {
     await auth(req);
     const ev = await db.query("SELECT n.* FROM team_notices n WHERE n.banner AND n.target IS NULL AND n.removed_at IS NULL AND n.ends_at > now() ORDER BY n.id DESC LIMIT 5");
-    return { events: ev.rows.map((x) => ({ ...view(x), endsAt: x.ends_at.toISOString() })), boards: await bannerBoards() };
+    const events = ev.rows.map((x) => ({ ...view(x), endsAt: x.ends_at.toISOString() }));
+    const live = await liveBanners();
+    // A newer app asks for the banners apart; an older one shows them as notice slides (an uploaded picture only: it
+    // doesn't have the app's own example pictures, so those fall back to its slide without one).
+    if (url?.searchParams.get('banners') === '1') return { events, boards: await bannerBoards(), banners: live.map(phoneView) };
+    const old = live.map((b) => ({ id: `b${b.id}`, kind: 'event', title: b.title, body: b.subtitle, imageUrl: b.image_url ?? null, link: b.link ?? null, personal: false, createdAt: b.created_at.toISOString(), endsAt: (b.ends_at ?? new Date(Date.now() + 86_400_000)).toISOString() }));
+    return { events: [...old, ...events], boards: await bannerBoards() };
   },
 
   async 'GET /api/admin/team'(req) {

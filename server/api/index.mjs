@@ -103,6 +103,7 @@ import { supportRoutes } from './support.mjs';
 import { myDataRoutes } from './my-data.mjs';
 import { spendLimitRoutes } from './spend-limit.mjs';
 import { teamRoutes } from './team.mjs';
+import { bannerRoutes } from './banners.mjs';
 import { TEST_ADMIN } from './test-admin.mjs';
 import { djLiveRoutes } from './dj-live.mjs';
 import { musicRoutes } from './music.mjs';
@@ -389,6 +390,7 @@ const routes = {
   ...eventRoutes,
   ...momentRoutes,
   ...teamRoutes,
+  ...bannerRoutes,
   ...musicRoutes,
   ...djLiveRoutes,
   ...roomVideoRoutes,
