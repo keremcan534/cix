@@ -10,11 +10,14 @@ AddType image/webp .webp
 <IfModule mod_rewrite.c>
   RewriteEngine On
 
-  # HTTPS'e zorlama. SSL sertifikası etkinleştikten SONRA aşağıdaki üç satırın başındaki # işaretini kaldırın.
-  # (Sertifika yokken açılırsa site açılmaz.)
-  # RewriteCond %{HTTPS} off
-  # RewriteCond %{HTTP:X-Forwarded-Proto} !https
-  # RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+  # HTTPS'e zorlama (similarclub.online'da SSL açık). Sertifika bir gün düşerse bu üç satırın başına # koyun.
+  RewriteCond %{HTTPS} off
+  RewriteCond %{HTTP:X-Forwarded-Proto} !https
+  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+  # www.similarclub.online -> similarclub.online
+  RewriteCond %{HTTP_HOST} ^www\.(.+)$ [NC]
+  RewriteRule ^ https://%1%{REQUEST_URI} [L,R=301]
 
   # Uzantısız adresler: /gizlilik -> gizlilik.html, /hesap-silme -> hesap-silme.html
   RewriteCond %{REQUEST_FILENAME} !-f

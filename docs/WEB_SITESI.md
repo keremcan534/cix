@@ -1,7 +1,7 @@
 # Web sitesi
 
 Similar Club'ın tanıtım sitesi. Klasör: `website/`. Çerçeve yok, derleme yok: düz HTML, bir CSS, bir JS. Dosyalar
-olduğu gibi GoDaddy'ye yüklenir. Hazır paket: depo kökündeki `similar-club-web-sitesi.zip` (git'e girmez, her
+olduğu gibi GoDaddy'ye yüklenir. Yayında: **https://similarclub.online** (GoDaddy Web Hosting Deluxe, cPanel). Hazır paket: depo kökündeki `similar-club-web-sitesi.zip` (git'e girmez, her
 değişiklikten sonra yeniden üretilir).
 
 Tasarım BlackBlue sitesinin dilinden geliyor (siyah zemin, bulanık hareketli arka plan, ince çerçeveli kartlar, mono
@@ -61,12 +61,11 @@ Güncelleme: değişen dosyayı aynı yere yeniden yükleyin. CSS ya da JS deği
 
 | Ne | Nerede | Not |
 | --- | --- | --- |
-| **Destek e-postası gerçekten çalışmalı** | Her sayfada `destek@similarclub.app` | Uygulamadaki adresle aynı (`app/src/lib/support-mail.ts`). Alınan alan adı farklıysa iki yerde birden değişmeli ve bu adrese gelen postayı biri okumalı. |
+| **Uygulamadaki destek adresi** | `app/src/lib/support-mail.ts` | Site `info@similarclub.online` kullanıyor (GoDaddy'de açık). Uygulama hâlâ `destek@similarclub.app` diyor; `similarclub.app` bizim değil, oraya giden posta kaybolur. Yeni APK ile değişmeli. Bu adrese gelen postayı biri okumalı. |
 | **Avukat metinleri** | `gizlilik.html`, `kosullar.html`, `topluluk-kurallari.html` | Google Play ve App Store gizlilik politikası adresi ister; boş kalıpla inceleme geçmez. Metin sıfırdan yazılmalı (`YAYIN_HAZIRLIGI.md` 7 ve 11). Gizlilik metni sitedeki Google yazı tiplerini de anmalı (aşağıda). |
 | **Hesap silme sözleri** | `hesap-silme.html` | Sayfa "e-postayla gelen talebi en geç 30 gün içinde sileriz" diyor ve neyin silinip neyin saklandığını sunucunun yaptığına göre anlatıyor (`SUNUCU.md` › `DELETE /api/me`). 30 gün sözünü tutacak biri olmalı; avukat süreyi değiştirirse sayfa da değişmeli. |
 | **18+ sözü** | Ana sayfa › Güven | "18 yaşından küçük olduğu anlaşılan hesaplar kapatılır" diyor; şikâyet gelince bunu yapacak biri olmalı. |
 | **Mağaza düğmeleri** | `assets/js/site.js` en üstte `STORE_LINKS` | Uygulama yayınlanınca `play: 'https://play.google.com/store/apps/details?id=com.similarclub.app'` ve App Store adresi yazılır; "Çok yakında" düğmeleri kendiliğinden gerçek bağlantıya döner. O zaman Google ve Apple'ın resmî rozetlerine geçmek gerekebilir (ikisinin de marka kuralları var). |
-| **Paylaşım görseli** | `index.html` › `og:image` | WhatsApp ve sosyal medya önizlemesi tam adres ister: alan adı belli olunca `https://<alan adı>/assets/img/paylasim.jpg` yapılmalı. |
 | **Şirket bilgisi** | Alt bilgi | Şirket unvanı ve adresi yok. Avukat isterse (ör. UK şirketi bilgisi) alt bilgiye eklenir. |
 
 ## Bilerek yazılmayanlar
