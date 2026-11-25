@@ -345,9 +345,11 @@ function FramedAvatarBase({ uri, size = 44, vipLevel = 0, frameId, online, artSc
 }
 
 /** A level chip's size: 'sm' in lists and chats, 'md' under the Profil tab's big name, 'lg' on its own. */
-export type ChipSize = 'sm' | 'md' | 'lg';
+/** xs: a list card's row beside the name (the owners, 25 Nov 2026: small, not over the design). */
+export type ChipSize = 'xs' | 'sm' | 'md' | 'lg';
 /** Per size: the chip's height and side padding, the picture's dot and the number's size. */
 const CHIP: Record<ChipSize, { height: number; left: number; right: number; dot: number; glyph: number; text: number }> = {
+  xs: { height: 15, left: 2, right: 6, dot: 11, glyph: 8, text: 10 },
   sm: { height: 20, left: 2, right: 8, dot: 15, glyph: 10, text: 12 },
   md: { height: 25, left: 2, right: 9, dot: 19, glyph: 12, text: 14 },
   lg: { height: 30, left: 4, right: 12, dot: 22, glyph: 13, text: 15 },
