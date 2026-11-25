@@ -24,8 +24,10 @@
 // Whoever is called decides who may call them (Ayarlar › "Beni kimler arayabilir?", privacy.mjs callRefusals);
 // Eşleşme isn't a call to anyone, so it doesn't ask.
 //
-// A minute is paid when it starts: the first when the call goes live, the next at 60 s, and so on. A payer who
-// can't pay the next minute is cut off. Both phones say they are still there (beat); a call nobody hears from in
+// A minute is paid when it starts, the next at 60 s, and so on; the first (owners, 25 Nov 2026) only once the call
+// passes call_earn_after_seconds (30), when the earner gets it. A call that ends after call_charge_after_seconds (10)
+// but before that costs its payer the whole first minute and earns nobody anything (the coins stay with the system,
+// no agency commission); one that ends sooner costs nothing. A payer who can't pay the next minute is cut off. Both phones say they are still there (beat); a call nobody hears from in
 // 30 s ends, and so does a free match at its time. A call's voice and video go through LiveKit room call-<id>,
 // which is deleted when the call ends, so nobody stays in it unpaid.
 import crypto from 'node:crypto';
@@ -271,11 +273,37 @@ async function chargeMinute(c, k, n) {
  */
 const cutBy = (e) => (e.extra?.code === 'insufficient' || e.extra?.code === 'reward_coins_only' ? 'coins' : e.extra?.code === 'daily_limit' ? 'limit' : null);
 
-/** Ends a call (lock held). A ringing call is declined (by the callee), cancelled (by the caller) or missed. */
+/**
+ * Ends a call (call lock held; both accounts too when it was live). A ringing call is declined (by the callee),
+ * cancelled (by the caller) or missed. A paid live call whose first minute isn't paid yet pays it now when it lasted
+ * long enough (firstMinute): with the earner's diamonds from the earning second, else to nobody. The time it lasted
+ * is to the end, or for phones gone quiet to the first of them to go quiet. A payer who can't pay it any more pays
+ * nothing (the call was let ring only with the first minute in hand).
+ */
 async function endCall(c, k, reason, by = null) {
+  if (k.status === 'live' && k.payer && k.price > 0 && Number(k.minutes) === 0 && k.started_at) {
+    const quiet = Math.min(Date.parse(k.caller_seen), Date.parse(k.callee_seen));
+    const lasted = reason === 'lost' ? Math.max(0, (quiet - Date.parse(k.started_at)) / 1000) : Number(k.elapsed);
+    const { chargeAfter, earnAfter } = firstMinute();
+    if (lasted > chargeAfter) {
+      try {
+        await chargeMinute(c, lasted >= earnAfter ? k : { ...k, earner: null }, 1);
+      } catch (e) {
+        if (!cutBy(e)) throw e;
+      }
+    }
+  }
   const status = k.status !== 'ringing' ? 'ended' : by === k.callee ? 'declined' : by === k.caller ? 'cancelled' : 'missed';
   await c.query('UPDATE calls SET status = $2, end_reason = $3, ended_by = $4, ended_at = now() WHERE id = $1', [k.id, status, reason, by]);
 }
+
+/** The first minute's two seconds (live settings); earning never starts before the charge does. */
+const firstMinute = () => {
+  const s = live();
+  return { chargeAfter: s.callChargeAfter, earnAfter: Math.max(s.callChargeAfter, s.callEarnAfter) };
+};
+/** How many minutes a live call has owed after `elapsed` seconds: none before the earning second, then one a minute. */
+export const minutesDue = (elapsed, earnAfter) => (elapsed < earnAfter ? 0 : Math.floor(elapsed / 60) + 1);
 
 /** What a live call owes or whether it is over now: minutes due, a free match's end, phones gone quiet. */
 const dueOf = (k) => {
@@ -284,7 +312,7 @@ const dueOf = (k) => {
   const quiet = (Date.parse(k.now) - Math.min(Date.parse(k.caller_seen), Date.parse(k.callee_seen))) / 1000;
   if (k.free && k.max_seconds && elapsed >= k.max_seconds) return 'time';
   if (quiet > LOST_S) return 'lost';
-  if (k.payer && k.price > 0 && k.minutes < Math.floor(elapsed / 60) + 1) return 'minute';
+  if (k.payer && k.price > 0 && k.minutes < minutesDue(elapsed, firstMinute().earnAfter)) return 'minute';
   return null;
 };
 
@@ -301,7 +329,7 @@ async function settle(id) {
       await endCall(c, k, due);
       ended = true;
     } else if (due === 'minute') {
-      const upTo = Math.floor(Number(k.elapsed) / 60) + 1;
+      const upTo = minutesDue(Number(k.elapsed), firstMinute().earnAfter);
       for (let n = k.minutes + 1; n <= upTo; n++) {
         try {
           await chargeMinute(c, k, n);
@@ -408,7 +436,7 @@ async function pairUp(me, mode) {
         [mode, other.id, me.id, payer, earner, price, free, free ? s.matchSeconds : null, `match-${crypto.randomBytes(8).toString('hex')}`],
       );
       const call = await callById(c, k.rows[0].id, true);
-      if (price > 0) await chargeMinute(c, call, 1);
+      // Its first minute is paid later (firstMinute); `short` above made sure the payer has it.
       await c.query('DELETE FROM match_queue WHERE user_id = ANY($1::uuid[])', [[me.id, other.id]]);
       return { state: 'matched', call: view(await callById(c, call.id), me.id) };
     }
@@ -550,12 +578,10 @@ export const oneOnOneRoutes = {
       if (k.status !== 'ringing') throw new HttpError(409, 'Arama sona erdi');
       await c.query("UPDATE calls SET status = 'live', started_at = now(), caller_seen = now(), callee_seen = now() WHERE id = $1", [id]);
       if (!k.payer || k.price <= 0) return;
-      try {
-        await chargeMinute(c, k, 1);
-      } catch (e) {
-        const why = cutBy(e);
-        if (!why) throw e;
-        await endCall(c, { ...k, status: 'live' }, why);
+      // The first minute is paid later (firstMinute); the payer must still have it now.
+      const why = (await paidCoins(c, k.payer)) < k.price ? 'coins' : (await limitRefusal(c, k.payer, k.price)) ? 'limit' : null;
+      if (why) {
+        await endCall(c, { ...k, status: 'live', started_at: null }, why);
         cut = true;
       }
     });
@@ -579,6 +605,7 @@ export const oneOnOneRoutes = {
     let ended = false;
     if (peek.status === 'ringing' || peek.status === 'live') {
       await tx(async (c) => {
+        await lockUsers(c, [peek.caller, peek.callee]);
         const k = await callById(c, id, true);
         if (k.status !== 'ringing' && k.status !== 'live') return;
         await endCall(c, k, 'hangup', me.id);

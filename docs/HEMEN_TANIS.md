@@ -19,7 +19,7 @@ Kaynak: *Similarclup – Hemen Tanış Özellik Gereksinimleri*. Uygulama şu an
 - **Ücret:**
   - Sesli 20 jeton/dk, görüntülü 40 jeton/dk (`MATCH_PRICE`).
   - Arama ve kabul bekleme ücretsiz. Ücret bağlantı kurulduğu an başlar.
-  - İlk dakika bağlantıda alınır. Görüşme 10 saniye dolmadan biterse ilk dakika iade edilir.
+  - İlk dakika (sahiplerin kuralı, 25 Kasım 2026; Canlı ayarlar › Birebir ve eşleşme): görüşme 10 saniyeyi geçerse tam 1 dakika alınır, daha kısası ücretsizdir. Yayıncı ilk dakikanın elmasını görüşme 30 saniyeyi geçerse kazanır; 10–30 saniye arası biten görüşmenin dakikası kimseye elmas olmaz, sistemde kalır.
   - Sonraki her dakika başında ücret alınır. Bakiye bir sonraki dakikaya yetmeyecekse uyarı çıkar; dakika dolunca görüşme güvenli şekilde sonlanır.
   - Bakiye yetersizse görüşme hiç başlatılmaz.
 - **Reddetme, iptal, bağlantı hatası:** Ücret alınmaz.

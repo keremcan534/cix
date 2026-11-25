@@ -17,6 +17,7 @@ const ok = async (p, what) => {
 };
 const topUp = (s, amount = 1000) => ok(call('POST', '/api/wallet/test-topup', { amount, ref: rnd(6) }, s), 'yükleme');
 const person = async (name, gender) => {
+  await oldPrices();
   const a = await signUp(name);
   if (gender) await q('UPDATE users SET gender = $2 WHERE id = $1', [a.user.id, gender]);
   return a;
@@ -34,6 +35,22 @@ const follow = (s, to) => ok(call('POST', '/api/follow', { to }, s), 'takip');
 /** Heart points as if `from` had sent `to` a chat gift. */
 const giftPoints = (from, to, total) =>
   q("INSERT INTO gift_events (sender, recipient, gift_id, count, unit_price, total, place, ref) VALUES ($1, $2, 'gul', 1, $3, $3, 'chat', $4)", [from, to, total, rnd(6)]);
+let admin = null;
+/** Live settings, as the panel saves them. */
+async function setLive(changes) {
+  if (!admin) {
+    admin = await signUp('Yönetici');
+    await q("UPDATE users SET role = 'admin' WHERE id = $1", [admin.user.id]);
+  }
+  const view = await ok(call('GET', '/api/admin/live-settings', null, admin.session), 'ayarlar');
+  return ok(call('POST', '/api/admin/live-settings', { changes, reason: 'Birebir testi', baseV: view.v, confirm: true }, admin.session), 'ayar kaydı');
+}
+// The sums below are worked out at these prices (the owners' of 25 Nov 2026 are the defaults: live-registry.test).
+let priced = null;
+function oldPrices() {
+  return (priced ??= setLive({ dm_price: 240, call_voice_price: 2000, call_video_price: 3200, match_voice_price: 600, match_video_price: 750 }));
+}
+
 const ring = (s, to, mode = 'voice', ref = rnd(6)) => call('POST', '/api/calls', { to, mode, ref }, s);
 const beat = (s, id) => ok(call('POST', '/api/calls/beat', { id }, s), 'beat');
 const backdate = (id, secs) => q("UPDATE calls SET started_at = started_at - make_interval(secs => $2), caller_seen = now(), callee_seen = now() WHERE id = $1", [id, secs]);
@@ -226,17 +243,23 @@ describe('Birebir arama', () => {
 
     const ans = await ok(call('POST', '/api/calls/answer', { id: k.id }, star.session), 'aç');
     assert.equal(ans.call.status, 'live');
-    assert.equal(ans.call.minutes, 1);
+    assert.equal(ans.call.minutes, 0, 'ilk dakika açılınca değil');
     const grant = tokenOf(ans.token);
     assert.equal(grant.sub, star.user.id);
     assert.equal(grant.video.room, `call-${k.id}`);
     assert.deepEqual(grant.video.canPublishSources, ['microphone'], 'sesli aramada kamera yok');
-    assert.equal((await me(man.session)).coins, 3000, 'ilk dakika açılınca');
+    assert.equal((await me(man.session)).coins, 5000, 'açılınca henüz ödenmez');
     assert.equal((await call('GET', `/token?room=call-${k.id}`, null, outsider.session))[0], 404, 'arama odasına oda jetonuyla girilmez');
     assert.ok((await ok(call('POST', '/api/calls/join', { id: k.id }, man.session), 'yeniden bağlan')).token);
     assert.equal((await call('POST', '/api/calls/join', { id: k.id }, outsider.session))[0], 404);
 
-    await backdate(k.id, 61);
+    await backdate(k.id, 29);
+    assert.equal((await beat(man.session, k.id)).call.minutes, 0, '30 saniyeden önce ödenmez');
+    await backdate(k.id, 2);
+    assert.equal((await beat(man.session, k.id)).call.minutes, 1);
+    assert.equal((await me(man.session)).coins, 3000, 'ilk dakika 30. saniyede');
+    assert.equal((await me(star.session)).diamonds, 2000);
+    await backdate(k.id, 30);
     const two = (await beat(man.session, k.id)).call;
     assert.equal(two.minutes, 2);
     assert.equal(two.coins, 4000);
@@ -355,10 +378,12 @@ describe('Birebir arama', () => {
     assert.equal(paid.maxSeconds, null);
     assert.equal(paid.iPay, true);
     await ok(call('POST', '/api/calls/answer', { id: paid.id }, b.session), 'aç');
-    assert.equal((await me(a.session)).coins, 4400, 'ilk dakika açılınca');
+    await backdate(paid.id, 31);
+    await beat(a.session, paid.id);
+    assert.equal((await me(a.session)).coins, 4400, 'ilk dakika 30. saniyede');
     assert.equal((await me(b.session)).diamonds, 0, 'kimse kazanmaz');
     assert.deepEqual((await q('SELECT kind, coins, earner FROM paid_events WHERE call_id = $1', [paid.id])).rows, [{ kind: 'voice_call', coins: 600, earner: null }]);
-    await backdate(paid.id, 100);
+    await backdate(paid.id, 69);
     const on = (await beat(a.session, paid.id)).call;
     assert.equal(on.status, 'live', 'ücretli arama 58 saniyede kesilmez');
     assert.equal(on.minutes, 2);
@@ -399,6 +424,74 @@ describe('Birebir arama', () => {
     assert.equal(three.coins, 6000);
     assert.equal((await me(man.session)).coins, 10000 - 2 - 6000);
     assert.equal((await me(star.session)).diamonds, 6000);
+  });
+});
+
+describe('İlk dakika: 10 saniyede kesilir, 30 saniyede kazanılır', () => {
+  /** A live paid voice call between a man and a streamer, answered; the man has 10.000 coins. */
+  async function liveCall(n) {
+    const man = await person(`Arayan${n}`, 'Erkek');
+    const star = await streamer(`Yayıncı${n}`);
+    await giftPoints(man.user.id, star.user.id, 1500);
+    await topUp(man.session, 10_000);
+    const { call: k } = await ok(ring(man.session, star.user.id), 'ara');
+    await ok(call('POST', '/api/calls/answer', { id: k.id }, star.session), 'aç');
+    return { man, star, k };
+  }
+  const events = (id) => q('SELECT kind, coins, earner FROM paid_events WHERE call_id = $1 ORDER BY id', [id]).then((r) => r.rows);
+  const income = (star) => q('SELECT count(*)::int AS n FROM income_events WHERE streamer_id = $1', [star]).then((r) => r.rows[0].n);
+
+  test('10 saniyeden kısa görüşme ücretsiz', async () => {
+    const { man, star, k } = await liveCall(1);
+    await backdate(k.id, 9);
+    const end = (await ok(call('POST', '/api/calls/end', { id: k.id }, man.session), 'kapat')).call;
+    assert.equal(end.minutes, 0);
+    assert.equal((await me(man.session)).coins, 10_000);
+    assert.equal((await me(star.session)).diamonds, 0);
+    assert.deepEqual(await events(k.id), []);
+  });
+
+  test('10–30 saniye: arayan tam 1 dakika öder, kadın kazanmaz, ajansa komisyon yok', async () => {
+    const { man, star, k } = await liveCall(2);
+    await backdate(k.id, 15);
+    assert.equal((await beat(man.session, k.id)).call.minutes, 0, 'görüşürken henüz kesilmez');
+    const end = (await ok(call('POST', '/api/calls/end', { id: k.id }, star.session), 'kapat')).call;
+    assert.equal(end.minutes, 1);
+    assert.equal((await me(man.session)).coins, 8000);
+    assert.equal((await me(star.session)).diamonds, 0, '30 saniyeden kısa görüşmede kazanç yok');
+    assert.deepEqual(await events(k.id), [{ kind: 'voice_call', coins: 2000, earner: null }]);
+    assert.equal(await income(star.user.id), 0);
+  });
+
+  test('30 saniyeyi geçen görüşme bitince ilk dakika ödenir ve kazanılır (arada sorulmasa da)', async () => {
+    const { man, star, k } = await liveCall(3);
+    await backdate(k.id, 35);
+    await ok(call('POST', '/api/calls/end', { id: k.id }, man.session), 'kapat');
+    assert.equal((await me(man.session)).coins, 8000);
+    assert.equal((await me(star.session)).diamonds, 2000);
+    assert.deepEqual(await events(k.id), [{ kind: 'voice_call', coins: 2000, earner: star.user.id }]);
+    assert.equal(await income(star.user.id), 1);
+  });
+
+  test('sessiz kalan aramada süre son duyulan ana kadar sayılır', async () => {
+    const { man, star, k } = await liveCall(4);
+    // Talked 20 s, then the man's phone went quiet for over 30 s: 20 s, not 51.
+    await q("UPDATE calls SET started_at = now() - interval '51 seconds', caller_seen = now() - interval '31 seconds', callee_seen = now() WHERE id = $1", [k.id]);
+    await until(async () => (await q('SELECT end_reason FROM calls WHERE id = $1', [k.id])).rows[0].end_reason === 'lost');
+    assert.equal((await me(man.session)).coins, 8000);
+    assert.equal((await me(star.session)).diamonds, 0);
+  });
+
+  test('saniyeler panelden değişir', async () => {
+    await setLive({ call_charge_after_seconds: 5, call_earn_after_seconds: 20 });
+    try {
+      const { man, star, k } = await liveCall(5);
+      await backdate(k.id, 21);
+      assert.equal((await beat(man.session, k.id)).call.minutes, 1);
+      assert.equal((await me(star.session)).diamonds, 2000);
+    } finally {
+      await setLive({ call_charge_after_seconds: null, call_earn_after_seconds: null });
+    }
   });
 });
 
@@ -465,6 +558,9 @@ describe('Eşleşme', () => {
     assert.equal(paid.call.maxSeconds, null);
     assert.equal(paid.rights.freeLeft, 0);
     assert.ok(paid.rights.nextFreeAt);
+    assert.equal((await me(m.session)).coins, 1000, 'eşleşince henüz ödenmez');
+    await backdate(paid.call.id, 31);
+    await beat(m.session, paid.call.id);
     assert.equal((await me(m.session)).coins, 400);
     assert.equal((await me(w2.session)).diamonds, 0, 'yayıncı olmayan kazanmaz');
     const ev = await q('SELECT kind, coins, earner FROM paid_events WHERE call_id = $1', [paid.call.id]);
@@ -511,6 +607,8 @@ describe('Eşleşme', () => {
     const got = await ok(join(m.session, 'video'), 'eşleş');
     assert.equal(got.state, 'matched');
     assert.equal(got.call.price, 750);
+    await backdate(got.call.id, 31);
+    await beat(m.session, got.call.id);
     assert.equal((await me(m.session)).coins, 250);
     assert.equal((await me(star.session)).diamonds, 750);
     assert.equal((await state(star.session)).call.iEarn, true);

@@ -884,6 +884,7 @@ const SETTING_TEXT: Record<string, string> = {
   bd_policy: 'BD politikası',
   suspension_policy: 'Askıya alma politikası',
   assistant_policy: 'Ajans asistanı sınırı',
+  referral_policy: 'Referans ajans komisyonu',
 };
 const PERIOD_TEXT: Record<string, string> = {
   month: 'Aylık',

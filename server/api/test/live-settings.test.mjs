@@ -103,7 +103,7 @@ describe('nothing saved', () => {
       j.settings.map((x) => x.key),
       [
         ...['features_off', 'notice', 'campaign', 'gifts_hidden', 'shop_hidden', 'packs_hidden', 'pack_setup', 'exchange_usd_try', 'coin_value_tl', 'jeton_wholesale_tl', 'host_weekly_bonus', 'diamonds_per_usd', 'payout_usd_try', 'withdraw_max_diamonds', 'withdraw_weekly_diamonds', 'otp_global_per_hour', 'min_version'],
-        ...['dm_price', 'call_voice_price', 'call_video_price', 'call_free', 'call_free_seconds', 'call_plain_voice_price', 'call_plain_video_price', 'match_voice_price', 'match_video_price', 'match_free', 'match_free_seconds', 'heart_voice_level', 'heart_video_level'],
+        ...['dm_price', 'call_voice_price', 'call_video_price', 'call_free', 'call_free_seconds', 'call_plain_voice_price', 'call_plain_video_price', 'match_voice_price', 'match_video_price', 'call_charge_after_seconds', 'call_earn_after_seconds', 'match_free', 'match_free_seconds', 'greet_daily_women', 'featured_msg_points', 'featured_voice_points', 'featured_video_points', 'featured_gift_coins', 'heart_voice_level', 'heart_video_level'],
         ...['heart_msg_points', 'heart_msg_daily', 'heart_grace_days', 'heart_half_days'],
         'backpack_call_task',
         ...['rewards_off', 'welcome_coins', 'invite_coins', 'invite_daily_cap'],
