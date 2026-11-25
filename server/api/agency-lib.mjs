@@ -3,7 +3,7 @@
 // rate, settings at a moment), the commission calculation and commission periods. docs/AJANS_HIYERARSI.md.
 //
 // Money: commissions are in diamonds with 4 decimals (numeric(20,4)), computed with integers in units of
-// 1/10,000 diamond so a split never loses or invents a fraction. Rates are numeric(6,4). 5,000 diamonds = 1 USD.
+// 1/10,000 diamond so a split never loses or invents a fraction. Rates are numeric(6,4). 1,000 diamonds = 1 USD (owners, 24 Nov 2026; fixed).
 import crypto from 'node:crypto';
 
 import { HttpError, db, move } from './core.mjs';
@@ -71,7 +71,8 @@ export const DEFAULTS = {
   income_types: { gift: true, lucky_gift: true, campaign: false, bonus: false, task_reward: false, refund: true, other: false, message: true, call: true },
   commission_period: 'month',
   period_close_days: 7,
-  payout_policy: { min_diamonds: 50000, currencies: ['USD', 'TRY'], two_person: true },
+  // Owners, 25 Nov 2026: an agency is paid from 10 USD (10.000 💎 at 1.000 💎 = 1 USD), as a streamer is.
+  payout_policy: { min_diamonds: 10000, currencies: ['USD', 'TRY'], two_person: true },
   transfer_policy: { decision_days: 7, require_center: false, free_below_diamonds: 50000, fee_rate: 0.1, fee_payer: 'to_agency', fee_account: 'platform', agency_fee_rate: 0.1, owner_choice: true },
   performance: { window_months: 3, cadence: 'month', promotion_min_periods: 2, demotion_min_periods: 2, max_step: 1, min_active_streamers: 3, active_days: 30, require_verified: false, decline_drop: 15, effective: 'next_period' },
   weights: { volume: 20, active: 15, average: 10, growth: 15, retention: 15, acquisition: 10, operations: 5, reliability: 10 },

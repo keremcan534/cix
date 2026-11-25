@@ -93,7 +93,7 @@ edilmedi; destekçi payı yalnız kurallar sayfasında açıklandı.
 - Asistan elması, hediyenin jetonu nereden gelirse gelsin mağaza jetonu kilidi kadar kilitlenir.
 - İade asistanın elmasını geri alırken kilit satırlarına dokunmaz; kalan kilit en çok kilit süresi boyunca başka
   elmasları da kilitli gösterebilir (para çıkmaz, yalnız erken çıkamaz).
-- Ajans hesabındaki elmas (5.000 elmas = 1 USD, ajans ödemesiyle) ile cüzdan elması aynı sayıyla taşınır; cüzdan
+- Ajans hesabındaki elmas (1.000 elmas = 1 USD, ajans ödemesiyle) ile cüzdan elması aynı sayıyla taşınır; cüzdan
   elmasının çekim değeri cüzdan kurallarındadır.
 - Ajanstan ayrılan asistanın kaydı, sahip yeni asistan ekleyene ya da çıkarana kadar "Ajanstan ayrıldı" olarak görünür;
   pay ayrıldığı andan itibaren zaten yazılmaz.

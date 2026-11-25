@@ -52,7 +52,7 @@ kesilmez, platform tarafından ayrıca ödenir. Mevcut %40 kuralı bu matrah üz
 Hangi gelir türlerinin matraha girdiği merkezin `income_types` ayarıdır (varsayılan: hediye, şans hediyesi ve iade
 dahil; kampanya, bonus, görev ödülü, diğer hariç). İade negatif matrahtır ve komisyonu aynı oranlarla geri alır.
 
-**Kur:** 5000 elmas = 1 USD (`DIAMONDS_PER_USD`). Tutarlar sunucuda tam sayı olarak 1/10.000 elmas biriminde
+**Kur:** 1.000 elmas = 1 USD (sahiplerin kararı, sabit) (`DIAMONDS_PER_USD`). Tutarlar sunucuda tam sayı olarak 1/10.000 elmas biriminde
 hesaplanır, veritabanında `numeric(20,4)` elmas olarak tutulur.
 
 ## Hiyerarşi
