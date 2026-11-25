@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, TextInput } from '@/components/text';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { ActionSheet } from '@/components/ActionSheet';
-import { Art, artSource, type ArtName } from '@/components/Art';
+import { Art, type ArtName } from '@/components/Art';
 import { FloatIcon } from '@/components/fx/float';
 import { SCENES } from '@/components/fx/scenes';
 import { Backdrop, DepthCard, EdgeLight, Glass, Gloss, PressableScale, Shine, glow } from '@/components/fx/surface';
@@ -344,32 +344,50 @@ function ClosestRoomCard({ match }: { match: RoomMatch }) {
   );
 }
 
-// Shortcuts as lit tiles that fill the row edge to edge, so no screen width leaves wide gaps between them. Four, not five:
-// the game hub already lists every game, so the shelf doesn't feature one.
+// Shortcuts as pastel tiles that fill the row edge to edge (the owners' design, 25 Nov 2026): each its own soft colour,
+// the picture, the label and a short bar of the tile's colour under it. Four, not five: the game hub already lists
+// every game, so the shelf doesn't feature one.
+const SHELF_ART = {
+  coins: require('../../../assets/home/kisayol/odalar-jeton.webp'),
+  match: require('../../../assets/home/kisayol/odalar-tanis.webp'),
+  games: require('../../../assets/home/kisayol/odalar-oyun.webp'),
+  tasks: require('../../../assets/home/kisayol/odalar-gorev.webp'),
+};
+/** Each tile's two background tones, edge and bar (the design's cream, pink, coral and lilac). */
+const SHELF_TONE: Record<keyof typeof SHELF_ART, { bg: [string, string]; edge: string; bar: string; ink: string }> = {
+  coins: { bg: ['#FBF2E3', '#F4DDC2'], edge: '#EED3AC', bar: '#DDB57F', ink: '#4A2F10' },
+  match: { bg: ['#FBD9E6', '#F3B6CE'], edge: '#EFB0C8', bar: '#E5517E', ink: '#33182A' },
+  games: { bg: ['#FCE0DE', '#F6C3C2'], edge: '#F1BDBB', bar: '#EE6A6A', ink: '#33182A' },
+  tasks: { bg: ['#ECE6F9', '#DACFF3'], edge: '#CDBFEF', bar: '#9A7BDD', ink: '#1F2340' },
+};
 function QuickStrip({ coins, checkedInToday }: { coins: number; checkedInToday: boolean }) {
-  const { colors } = useTheme();
   const styles = useStyles();
-  const items: { key: string; source: number | undefined; hue: string; label: string; a11y?: string; onPress: () => void; dot?: boolean }[] = [
-    { key: 'coins', source: icon3dSource('coin'), hue: '#F6BD60', label: coins.toLocaleString('tr-TR'), a11y: 'Cüzdan', onPress: () => router.push('/cuzdan') },
-    ...(oneOnOneOpen() ? [{ key: 'match', source: icon3dSource('bolt'), hue: '#FF5FA2', label: 'Hemen Tanış', onPress: () => router.push('/eslesme') }] : []),
-    { key: 'games', source: artSource('ana-oyun-merkezi'), hue: '#FF6576', label: 'Oyun merkezi', onPress: () => router.push('/oyunlar') },
-    { key: 'tasks', source: artSource('ana-gorevler'), hue: '#A78BFA', label: 'Görevler', onPress: () => router.push('/gorevler'), dot: !checkedInToday },
+  const items: { key: keyof typeof SHELF_ART; label: string; a11y?: string; onPress: () => void; dot?: boolean }[] = [
+    { key: 'coins', label: coins.toLocaleString('tr-TR'), a11y: 'Cüzdan', onPress: () => router.push('/cuzdan') },
+    ...(oneOnOneOpen() ? [{ key: 'match' as const, label: 'Hemen Tanış', onPress: () => router.push('/eslesme') }] : []),
+    { key: 'games', label: 'Oyun merkezi', onPress: () => router.push('/oyunlar') },
+    { key: 'tasks', label: 'Görevler', onPress: () => router.push('/gorevler'), dot: !checkedInToday },
   ];
   return (
     <View style={styles.shelf}>
-      {items.map((it, i) => (
-        <View key={it.key} style={{ flex: 1 }}>
-          <PressableScale style={[styles.shelfItem, { backgroundColor: `${it.hue}1F`, borderColor: `${it.hue}47` }]} onPress={it.onPress} accessibilityLabel={it.a11y ?? it.label}>
-            <View>
-              <FloatIcon source={it.source} size={46} hue={it.hue} bob delay={i * 280} />
-              {it.dot && <View style={[styles.dot, { top: 0, right: 0 }]} />}
-            </View>
-            <Text style={[styles.shelfText, it.key === 'coins' && { color: colors.gold }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.72}>
-              {it.label}
-            </Text>
-          </PressableScale>
-        </View>
-      ))}
+      {items.map((it, i) => {
+        const t = SHELF_TONE[it.key];
+        return (
+          <View key={it.key} style={{ flex: 1 }}>
+            <PressableScale style={[styles.shelfItem, { borderColor: t.edge }]} onPress={it.onPress} accessibilityLabel={it.a11y ?? it.label}>
+              <LinearGradient colors={t.bg} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+              <View>
+                <FloatIcon source={SHELF_ART[it.key]} size={46} hue={t.bar} bob delay={i * 280} />
+                {it.dot && <View style={[styles.dot, { top: 0, right: 0 }]} />}
+              </View>
+              <Text style={[styles.shelfText, { color: t.ink }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.72}>
+                {it.label}
+              </Text>
+              <View style={[styles.shelfBar, { backgroundColor: t.bar }]} />
+            </PressableScale>
+          </View>
+        );
+      })}
     </View>
   );
 }
@@ -805,8 +823,9 @@ const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark, edge
   personPct: { color: colors.textDim, fontSize: 11, fontWeight: '800' },
   // quick strip
   shelf: { flexDirection: 'row', gap: 6, paddingHorizontal: 16 },
-  shelfItem: { alignItems: 'center', gap: 5, paddingTop: 9, paddingBottom: 8, borderRadius: 16, borderWidth: 1, overflow: 'hidden' },
-  shelfText: { color: colors.text, fontSize: 11, fontWeight: '700', paddingHorizontal: 2 },
+  shelfItem: { alignItems: 'center', gap: 4, paddingTop: 9, paddingBottom: 8, borderRadius: 18, borderWidth: 1, overflow: 'hidden', ...glow('#C9879F3D', 8, 3) },
+  shelfText: { color: colors.text, fontSize: 11, fontWeight: '800', paddingHorizontal: 2 },
+  shelfBar: { width: 18, height: 3, borderRadius: 2, opacity: 0.85 },
   // category bar
   catBar: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   catText: { color: colors.textDim, fontSize: 17, lineHeight: 24, fontFamily: fonts.displayBold },
