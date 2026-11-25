@@ -29,6 +29,8 @@ import { messagePreview } from '@/components/ReactionArt';
 import { liveMode, message, oneOnOneOpen, toLocal, toServer, useServerRoomList } from '@/lib/live';
 import { clearLiveCalls, moreLiveCalls, useLiveCallLog, useLiveHearts } from '@/lib/live/call-log';
 import { useLiveFollowers } from '@/lib/live/friends';
+import { useMyServerAgency } from '@/lib/live/me-stats';
+import { agencyScreensHidden } from '@/lib/me-view';
 import { loadPair } from '@/lib/live/one-on-one';
 import { Photo } from '@/components/photo';
 import { VisitorsSheet, useProfileVisitors } from '@/components/visitors-sheet';
@@ -60,7 +62,10 @@ const NOBODY: ReadonlySet<string> = new Set();
 const POPULAR_ROOM = [...ROOMS].sort((a, b) => b.listeners - a.listeners)[0];
 
 export default function MessagesScreen() {
-  const { conversations, blocked, following, recentRooms, markRead, myRoom } = useApp();
+  const { conversations, blocked, following, recentRooms, markRead, myRoom, me, agencyId, agencyRole } = useApp();
+  // A woman who streams for an agency sees none of its screens (owners, 25 Nov 2026).
+  const myAgency = useMyServerAgency(liveMode());
+  const agencyHidden = agencyScreensHidden(me.gender, liveMode() ? myAgency?.role : agencyId && agencyRole !== 'owner' && agencyRole !== 'assistant' ? 'member' : null);
   // Profil › Arkadaşlar opens this tab on Arkadaşlarım (the tab stays mounted, so follow later visits too).
   const params = useLocalSearchParams<{ tab?: string }>();
   const asked = params.tab === 'friends' || (params.tab === 'calls' && oneOnOneOpen()) ? params.tab : null;
@@ -182,7 +187,7 @@ export default function MessagesScreen() {
         {/* SimilarClub Sistem (server/api/system-notices.mjs): Similar Ekibi's announcements and my account's notices. */}
         <HubTile title="SimilarClub Sistem" sub="Kazanç, ödül, duyuru" art={HUB_ART.team} look={HUB_LOOK.team} badge={teamNew} onPress={() => setTeamOpen(true)} />
         <HubTile title="Çevrim içi hizmet" sub="Destek ekibine yaz" art={HUB_ART.support} look={HUB_LOOK.support} onPress={() => router.push('/destek')} />
-        <HubTile title="Ajansım" sub="Ajans ve kazanç" art={HUB_ART.agency} look={HUB_LOOK.agency} onPress={() => router.push('/ajans')} />
+        {!agencyHidden && <HubTile title="Ajansım" sub="Ajans ve kazanç" art={HUB_ART.agency} look={HUB_LOOK.agency} onPress={() => router.push('/ajans')} />}
       </View>
       {live && <OpenerNotice />}
       <View style={styles.chipRow}>

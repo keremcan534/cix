@@ -14,7 +14,7 @@ import { useStaffRole } from '@/lib/live/admin';
 import { ROLE_NAME } from '@/lib/live/family';
 import { useMyServerAgency } from '@/lib/live/me-stats';
 import { useTies } from '@/lib/live/profile';
-import { AGENCY_ROLE_TEXT } from '@/lib/me-view';
+import { AGENCY_ROLE_TEXT, agencyScreensHidden } from '@/lib/me-view';
 import { useApp } from '@/store';
 import { glass, makeStyles, themes, useTheme } from '@/theme';
 
@@ -65,7 +65,7 @@ export type Affiliation = { emoji?: string; name: string; sub: string; href?: Hr
  * anyone's Aile the server's answer for their profile (lib/live/profile useTies); `known` false until they are in.
  */
 export function useAffiliations(user: User): { agency: Affiliation | null; kabile: Affiliation | null; known: boolean } {
-  const { agencyId, agencyRole, ownedAgency, familyId } = useApp();
+  const { agencyId, agencyRole, ownedAgency, familyId, me } = useApp();
   const isMe = user.id === 'me';
   const live = liveMode();
   const server = useMyServerAgency(isMe && live);
@@ -76,7 +76,7 @@ export function useAffiliations(user: User): { agency: Affiliation | null; kabil
     const a = ties?.agency;
     const agency: Affiliation | null = isMe
       ? server
-        ? { emoji: '🏢', name: server.name, sub: AGENCY_ROLE_TEXT[server.role], href: '/ajans' }
+        ? { emoji: '🏢', name: server.name, sub: AGENCY_ROLE_TEXT[server.role], ...(!agencyScreensHidden(me.gender, server.role) && { href: '/ajans' as const }) }
         : null
       : a
         ? { emoji: '🏢', name: a.name, sub: 'Yayıncı' }
@@ -92,7 +92,7 @@ export function useAffiliations(user: User): { agency: Affiliation | null; kabil
     if (agencyId === 'own' && ownedAgency) agency = { emoji: '🏢', name: ownedAgency.name, sub: ROLE_LABEL.owner, href: '/ajans' };
     else {
       const a = AGENCIES.find((x) => x.id === agencyId);
-      if (a) agency = { emoji: a.logo, name: a.name, sub: ROLE_LABEL[agencyRole ?? 'member'], href: '/ajans' };
+      if (a) agency = { emoji: a.logo, name: a.name, sub: ROLE_LABEL[agencyRole ?? 'member'], ...(!agencyScreensHidden(me.gender, agencyRole === 'assistant' ? 'staff' : (agencyRole ?? 'member')) && { href: '/ajans' as const }) };
     }
   } else {
     const m = agencyOf(user.id);

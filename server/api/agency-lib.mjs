@@ -88,7 +88,9 @@ export const DEFAULTS = {
   // Referans ajans gizliliği (owners, 22 Nov 2026): off, an agency's own people see only their sub-agencies' names,
   // never their streamers, counts, earnings or scores (subsHidden); the centre and its BD always see them.
   parent_sees_subs: false,
-  bd_policy: { rate: 0.05, basis: 'base_plus_pool' },
+  // BD komisyonu (owners, 25 Nov 2026): a BD brings agencies in and supports them, and gets 5% of those agencies' total
+  // commission only ('pool'), never of their streamers' diamonds; the platform pays it (the agencies keep theirs).
+  bd_policy: { rate: 0.05, basis: 'pool' },
   suspension_policy: { reliability_below: 40, inactive_days: 90 },
   // Ajans asistanı (docs/AJANS_ASISTANI.md): how many assistants an agency may have at once.
   assistant_policy: { max: 1 },

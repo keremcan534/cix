@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { AGENCIES, agencyOf } from '@/data/agency';
 import { ME, USERS } from '@/data/mock';
 import { INITIAL_RBAC, initialUserRoles, shownStaffBadge } from '@/data/rbac';
-import { agencyLinkOf, myCompletion, profileFromServer, rowVisible, type ServerMeView } from '@/lib/me-view';
+import { agencyLinkOf, agencyScreensHidden, myCompletion, profileFromServer, rowVisible, streamerCenterVisible, type ServerMeView } from '@/lib/me-view';
 import type { Me, MyAgency } from '@/lib/agency-net';
 
 describe('Profil: ajans ve cinsiyet', () => {
@@ -80,6 +80,27 @@ describe('Ben menüsü: hangi satır görünür', () => {
   test('sunucuda karşılığı olmayan satırlar canlıda gizli, demoda görünür', () => {
     assert.equal(rowVisible({ localOnly: true, agencyOnly: true }, { ...live, hasAgency: true }), false);
     assert.equal(rowVisible({ localOnly: true, agencyOnly: true }, { demo: true, live: false, hasAgency: true }), true);
+  });
+
+  test('Yayıncı Merkezi yalnız yayıncı kadında; erkekte ve yayıncı olmayan kadında hiç (sahipler, 25 Kasım 2026)', () => {
+    assert.equal(streamerCenterVisible('Kadın', true), true);
+    assert.equal(streamerCenterVisible('Kadın', false), false);
+    assert.equal(streamerCenterVisible('Kadın', null), false, 'sunucunun cevabı gelmeden görünmez');
+    assert.equal(streamerCenterVisible('Erkek', true), false);
+    assert.equal(streamerCenterVisible(undefined, true), false);
+    assert.equal(rowVisible({ streamerOnly: true }, { ...live, hasAgency: false, streamerCenter: true }), true);
+    assert.equal(rowVisible({ streamerOnly: true }, { ...live, hasAgency: false, streamerCenter: false }), false);
+    assert.equal(rowVisible({ streamerOnly: true }, { ...live, hasAgency: false }), false);
+  });
+
+  test('ajansa katılan kadın ajans ekranlarını hiç görmez; sahibi ve ekibi görür', () => {
+    assert.equal(agencyScreensHidden('Kadın', 'member'), true);
+    assert.equal(agencyScreensHidden('Kadın', 'owner'), false);
+    assert.equal(agencyScreensHidden('Kadın', 'staff'), false);
+    assert.equal(agencyScreensHidden('Erkek', 'member'), false);
+    assert.equal(agencyScreensHidden('Kadın', null), false);
+    assert.equal(rowVisible({ agencyOnly: true }, { ...live, hasAgency: true, agencyHidden: true }), false);
+    assert.equal(rowVisible({ noAgencyOnly: true }, { ...live, hasAgency: true, agencyHidden: true }), false, 'katıl satırı da yok');
   });
 
   test('yönetim ekranları yalnızca demo derlemesinde', () => {

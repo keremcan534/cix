@@ -187,7 +187,7 @@ function FamilyList({
               ))}
             </Card>
           )}
-          {mine ? null : creating ? (
+          {mine || loading || failed ? null : creating ? (
             <Card style={{ gap: 10 }}>
               <Text style={styles.title}>Aile kur · {price > 0 ? `${fmt(price)} jeton` : 'ücretsiz'}</Text>
               <TextInput value={name} onChangeText={setName} placeholder="Aile adı" placeholderTextColor={colors.textDim} style={styles.input} maxLength={24} />

@@ -434,6 +434,8 @@ export default function SettingsScreen() {
         </ListGroup>
 
         <ListGroup label="Bildirimler" footer="Güvenlik ve ödeme bildirimleri kapatılamaz ve ertelenmez.">
+          {/* The notices themselves: moved here from Ben (owners, 25 Nov 2026). */}
+          <ListRow icon="notifications-outline" title="Bildirimlerim" subtitle="Gelen tüm bildirimler" onPress={() => router.push('/bildirimler')} />
           <Toggle k="notifySocial" icon="chatbubbles-outline" title="Sosyal" subtitle="Mesajlar ve yeni takipçiler" />
           {NOTIFY_ROWS.map(([k, title, icon]) => (
             <ListSwitch
@@ -472,7 +474,6 @@ export default function SettingsScreen() {
           />
           <ListRow icon="document-text-outline" title="Kullanım Koşulları" onPress={() => openLegal('terms')} />
           <ListRow icon="shield-checkmark-outline" title="Gizlilik Politikası" onPress={() => openLegal('privacy')} />
-          <ListRow icon="code-slash-outline" tone="neutral" title="Açık kaynak lisansları" subtitle="Uygulamada kullanılan kütüphaneler ve yazı tipi" onPress={() => setLicenses(true)} />
           {/* The version, and a newer build when one is out (lib/app-update): a tap downloads and installs it in the app. */}
           {update ? (
             <ListRow
@@ -489,9 +490,10 @@ export default function SettingsScreen() {
               onPress={install.phase === 'downloading' || install.phase === 'installing' ? undefined : () => void installUpdate(update)}
             />
           ) : (
-            <ListRow icon="information-circle-outline" tone="neutral" title="Uygulama sürümü" value={versionLabel(APP_VERSION)} />
+            // A tap shows the open-source notices (the libraries' and the font's licences ask for them to ship with the app).
+            <ListRow icon="information-circle-outline" tone="neutral" title="Uygulama sürümü" value={versionLabel(APP_VERSION)} onPress={() => setLicenses(true)} chevron={false} />
           )}
-          {liveMode() && <LineTestRow />}
+          {IS_DEMO && liveMode() && <LineTestRow />}
         </ListGroup>
 
         <ListGroup
@@ -503,7 +505,8 @@ export default function SettingsScreen() {
             ) : undefined
           }
         >
-          {live ? (
+          {/* Verilerimin kopyası: not on the menu (owners, 25 Nov 2026); asked for through Destek (KVKK), staff send it. */}
+          {!IS_DEMO ? null : live ? (
             // The server puts the copy together at once (lib/live/my-data); the share sheet saves or sends the file.
             <ListRow
               icon="download-outline"

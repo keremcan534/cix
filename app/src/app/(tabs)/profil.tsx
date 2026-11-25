@@ -27,12 +27,13 @@ import { openEvents } from '@/components/events/open';
 import { GameIcon } from '@/components/GameArt';
 import { IS_DEMO } from '@/lib/build';
 import { casinoVisible, useGames } from '@/lib/games';
-import { liveMode, myServerId, oneOnOneOpen, useServerRooms } from '@/lib/live';
+import { liveMode, myServerId, useServerRooms } from '@/lib/live';
+import { useAutoMe } from '@/lib/live/auto-chat';
 import { liveSignOut } from '@/lib/live/account';
 import { loadMyList } from '@/lib/live/follows';
 import { useMeStats } from '@/lib/live/me-stats';
 import { splitTies, tiesOf, type TieSide } from '@/lib/follow-ties';
-import { myCompletion, rowVisible, type MenuFlags } from '@/lib/me-view';
+import { agencyScreensHidden, myCompletion, rowVisible, streamerCenterVisible, type MenuFlags } from '@/lib/me-view';
 import { OwnMarkNote } from '@/components/profile-mark';
 import { useMyMarks } from '@/lib/live/marks-live';
 import { useVisitorsUnseen } from '@/lib/visitors-seen';
@@ -45,15 +46,13 @@ type OneWay = Exclude<TieSide, 'friends'>;
 type Item = MenuFlags & { icon: IconName; img?: Icon3DName; art?: ArtName; label: string; onPress: () => void; dot?: boolean };
 
 const GROWTH: Item[] = [
-  { icon: 'mic-outline', img: 'mic', label: 'Yayıncı Merkezi', onPress: () => router.push('/yayinci') },
+  { icon: 'mic-outline', img: 'mic', label: 'Yayıncı Merkezi', onPress: () => router.push('/yayinci'), streamerOnly: true },
   { icon: 'business-outline', img: 'briefcase', label: 'Ajans', onPress: () => router.push('/ajans'), agencyOnly: true },
   // The agency chat group and the member network are demo screens; with a server, /ajans holds the real ones.
   { icon: 'chatbubbles-outline', img: 'chat', label: 'Ajans sohbet grubu', onPress: () => router.push('/ajans/sohbet'), agencyOnly: true },
   { icon: 'git-network-outline', label: 'Üye ağım ve komisyonlar', onPress: () => router.push('/ajans/ag'), agencyOnly: true, localOnly: true },
   { icon: 'add-circle-outline', img: 'briefcase', label: 'Ajansa katıl / ajans başvurusu', onPress: () => router.push('/ajans'), noAgencyOnly: true },
-  { icon: 'trophy-outline', img: 'trophy', label: 'Sıralama', onPress: () => router.push('/siralama') },
-  ...(oneOnOneOpen() ? [{ icon: 'flash-outline', img: 'bolt', label: 'Hemen Tanış', onPress: () => router.push('/eslesme') } satisfies Item] : []),
-  { icon: 'notifications-outline', label: 'Bildirimler', onPress: () => router.push('/bildirimler') },
+  // Sıralama and Hemen Tanış are not in Ben (owners, 25 Nov 2026): Sıralama is on Odalar and Keşfet.
   { icon: 'game-controller-outline', label: 'Oyun kataloğu yönetimi (demo)', onPress: () => router.push('/oyun-yonetimi'), demoOnly: true, localOnly: true },
   { icon: 'sparkles-outline', label: 'Animasyon kataloğu yönetimi (demo)', onPress: () => router.push('/animasyon-yonetimi'), demoOnly: true, localOnly: true },
   { icon: 'flash-outline', label: 'PK yönetimi (demo)', onPress: () => router.push('/pk-yonetimi'), demoOnly: true, localOnly: true },
@@ -63,12 +62,11 @@ const GROWTH: Item[] = [
 ];
 const SUPPORT: Item[] = [
   { icon: 'headset-outline', label: 'Müşteri hizmetleri', onPress: () => router.push('/destek') },
-  { icon: 'shield-checkmark-outline', label: 'Güvenlik Merkezi', onPress: () => router.push('/ayarlar') },
   { icon: 'settings-outline', label: 'Ayarlar', onPress: () => router.push('/ayarlar') },
 ];
 
 export default function ProfileScreen() {
-  const { coins, isHost, following, blocked, me, logout, vipLevel, equipped, wealthLevel, paidGames, charmLevel, agencyId, myRoom, svipLevel, nobleTier, inventory, vipDays } = useApp();
+  const { coins, isHost, following, blocked, me, logout, vipLevel, equipped, wealthLevel, paidGames, charmLevel, agencyId, agencyRole, myRoom, svipLevel, nobleTier, inventory, vipDays } = useApp();
   const { colors, semantic, dark } = useTheme();
   const styles = useStyles();
   const { casino } = useGames();
@@ -132,7 +130,12 @@ export default function ProfileScreen() {
   ];
   // Live: agency rows follow my membership on the server (none shows until it is read).
   const hasAgency = live ? (server.agency === undefined ? null : !!server.agency) : !!agencyId;
-  const visible = (m: Item) => rowVisible(m, { demo: IS_DEMO, live, hasAgency });
+  // Yayıncı Merkezi: a woman streamer only (live: the server's answer, lib/live/auto-chat; demo: my own switch).
+  const auto = useAutoMe();
+  const streamerCenter = streamerCenterVisible(me.gender, live ? (auto ? auto.tools === true : null) : isHost);
+  // A woman who streams for an agency sees none of its screens.
+  const agencyHidden = agencyScreensHidden(me.gender, live ? server.agency?.role : agencyId ? (agencyRole === 'owner' ? 'owner' : agencyRole === 'assistant' ? 'staff' : 'member') : null);
+  const visible = (m: Item) => rowVisible(m, { demo: IS_DEMO, live, hasAgency, streamerCenter, agencyHidden });
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -277,13 +280,6 @@ export default function ProfileScreen() {
                 Odam · Lv.{roomLevel(myRoom.xp)} · ID {roomCode('yeni')} · {myRoom.memberIds.length + 1} üye
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
-          </Pressable>
-        )}
-        {!isHost && (
-          <Pressable onPress={() => router.push('/yayinci')} style={styles.roomCta}>
-            <Icon3D name="diamond" size={28} />
-            <Text style={{ color: colors.text, flex: 1, fontWeight: '600' }}>Yayıncı ol, hediyelerden para kazan</Text>
             <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
           </Pressable>
         )}

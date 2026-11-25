@@ -175,6 +175,9 @@ function Summary({ c }: { c: Ctx }) {
   const { o } = c;
   const a = o.agency;
   const sub = a.level > 1;
+  // A referral agency's own owner and team never see that it hangs under another agency, nor "alt ajans" (owners,
+  // 25 Nov 2026); only the parent sees it, under Referans ajanslar. The centre and its BD still see the tree.
+  const tree = !sub || !c.acting;
   const p = o.performance;
   const e = o.earnings;
   // Aday ajans / aktif ajans (server/api/agency-activity.mjs); none from an older server.
@@ -194,7 +197,7 @@ function Summary({ c }: { c: Ctx }) {
               {a.name}
             </Text>
             <View style={st.pills}>
-              <Pill text={LEVEL_TEXT(a.level)} tone="action" />
+              {tree && <Pill text={LEVEL_TEXT(a.level)} tone="action" />}
               <Pill text={STATUS_TEXT[a.status]} tone={statusTone(a.status)} />
               {(sub || !!level) && !!a.tierName && <Pill text={a.tierName} tone="money" icon="trending-up" />}
               {activity && !activity.off && <Pill text={activity.status === 'active' ? 'Aktif ajans' : 'Aday ajans'} tone={activity.status === 'active' ? 'success' : 'money'} icon={activity.status === 'active' ? 'checkmark-circle-outline' : 'hourglass-outline'} />}
@@ -203,7 +206,7 @@ function Summary({ c }: { c: Ctx }) {
         </View>
         <View style={st.heroMeta}>
           <Line label="Sahibi" value={o.owner?.name ?? '—'} />
-          {o.parent && <Line label="Üst ajans" value={o.parent.name} />}
+          {o.parent && tree && <Line label="Üst ajans" value={o.parent.name} />}
           <Line label="Görünümün" value={VIEWER_TEXT[o.viewer]} />
           <Line label="Ajans kodu" value={a.code} strong />
         </View>
@@ -243,9 +246,9 @@ function Summary({ c }: { c: Ctx }) {
         <Panel>
           <View style={ns.rowBetween}>
             <Text style={ns.title}>{fmtPct(o.rate.rate)}</Text>
-            {sub && o.rate.parentShare > 0 && <Text style={ns.dim}>Üst ajans farkı {fmtPct(o.rate.parentShare)}</Text>}
+            {sub && tree && o.rate.parentShare > 0 && <Text style={ns.dim}>Üst ajans farkı {fmtPct(o.rate.parentShare)}</Text>}
           </View>
-          <RateSplit rate={o.rate.rate} parentShare={o.rate.parentShare} poolCap={o.rate.poolCap} ownLabel={sub ? 'Bu alt ajans' : 'Bu ajans (doğrudan)'} />
+          <RateSplit rate={o.rate.rate} parentShare={tree ? o.rate.parentShare : 0} poolCap={o.rate.poolCap} ownLabel={!tree ? 'Bu ajans' : sub ? 'Bu alt ajans' : 'Bu ajans (doğrudan)'} />
           {o.rate.upcoming && (
             <View style={st.upcoming}>
               <Ionicons name="calendar-outline" size={16} color={semantic.action} />
@@ -256,9 +259,9 @@ function Summary({ c }: { c: Ctx }) {
             </View>
           )}
           {level ? (
-            <Text style={st.foot}>Oran haftalık seviyenden gelir; her ajans yalnız kendi yayıncılarıyla değerlendirilir, üst ajans alt ajanstan pay almaz.</Text>
+            <Text style={st.foot}>Oran haftalık seviyenden gelir; her ajans yalnız kendi yayıncılarıyla değerlendirilir{tree ? ', üst ajans alt ajanstan pay almaz' : ''}.</Text>
           ) : (
-            sub && <Text style={st.foot}>Alt ajans oranını yalnızca performans motoru veya merkez belirler; üst ajans puanı, seviyeyi veya oranı değiştiremez. Değişiklikler gelecek dönemden geçerlidir.</Text>
+            sub && <Text style={st.foot}>{tree ? 'Alt ajans oranını yalnızca performans motoru veya merkez belirler; üst ajans puanı, seviyeyi veya oranı değiştiremez.' : 'Oranını yalnızca performans motoru veya merkez belirler.'} Değişiklikler gelecek dönemden geçerlidir.</Text>
           )}
         </Panel>
       </Section>
@@ -276,10 +279,10 @@ function Summary({ c }: { c: Ctx }) {
               </View>
               <View style={{ alignItems: 'flex-end', gap: 6 }}>
                 <Pill text={CHANGE_TEXT[p.change]} tone={p.change === 'up' ? 'success' : p.change === 'down' ? 'danger' : 'neutral'} />
-                {sub && p.overtakes && <Pill text="Üst ajansı geçti" tone="money" icon="flash-outline" />}
+                {sub && tree && p.overtakes && <Pill text="Üst ajansı geçti" tone="money" icon="flash-outline" />}
               </View>
             </View>
-            <ScoreBar score={p.score} parentScore={sub ? p.parentScore : null} />
+            <ScoreBar score={p.score} parentScore={sub && tree ? p.parentScore : null} />
             {p.next && (
               <View style={st.next}>
                 <Text style={[ns.title, { fontSize: 15 }]}>
@@ -287,7 +290,7 @@ function Summary({ c }: { c: Ctx }) {
                 </Text>
                 {p.next.needScore > 0 && <Need text={`${fmtScore(p.next.needScore)} puan daha`} />}
                 {p.next.needActive > 0 && <Need text={`${p.next.needActive} aktif yayıncı daha`} />}
-                {p.next.needOvertake && <Need text="Üst ajansın puanını geçmek" />}
+                {p.next.needOvertake && tree && <Need text="Üst ajansın puanını geçmek" />}
                 <Need text={`${p.next.periodsInRow} dönem üst üste şartları sağlamak`} />
               </View>
             )}
@@ -341,22 +344,8 @@ function Banner({ icon, tone, text }: { icon: keyof typeof Ionicons.glyphMap; to
 }
 
 function Actions({ c }: { c: Ctx }) {
-  const { o, demo, reload, ask, id } = c;
-  const a = o.agency;
-  const sub = a.level > 1;
+  const { demo, reload, ask, id } = c;
   const [subject, setSubject] = useState<'tier' | 'commission' | 'transfer' | 'other'>('tier');
-  const independence = async () => {
-    const r = await ask({ title: 'Bağımsızlık talebi', message: 'Kararı yalnızca merkez verir. Onaylanırsa üst ajans bundan sonraki gelirinizden pay almaz; merkez sınırlı süreli bir geçiş komisyonu tanımlayabilir. Geçmiş kazançlar değişmez.', confirm: 'Merkeze gönder', place: 'agency.independence' });
-    if (r) await runAction(demo, () => agencyNet.independence(id, r.reason), 'Talebin merkeze iletildi.', reload);
-  };
-  const changeParent = async () => {
-    const r = await ask({ title: 'Üst ajans değiştir', message: 'Yeni üst ajansın kodunu yaz. Mevcut üst ajans, yeni üst ajans ve merkez kurallarına göre onaylanır.', field: { label: 'Yeni üst ajans kodu', placeholder: 'Örn. ALK5R3' }, confirm: 'Talep gönder', place: 'agency.change_parent' });
-    if (r) await runAction(demo, () => agencyNet.changeParent(id, r.field.toUpperCase(), r.reason), 'Talebin iletildi.', reload);
-  };
-  const close = async () => {
-    const r = await ask({ title: 'Alt ajansı kapat', message: 'Yayıncılar üst ajansa geçer veya ayrılır (merkez kurallarına göre). Geçmiş komisyon kayıtları silinmez.', confirm: 'Kapatma talebi', danger: true, place: 'agency.sub_close' });
-    if (r) await runAction(demo, () => agencyNet.closeSub(id, r.reason), 'Kapatma talebi alındı.', reload);
-  };
   const appeal = async () => {
     const r = await ask({ title: 'İtiraz', message: 'İtirazın merkeze iletilir ve sonuç bildirim olarak gelir.', reasonLabel: 'Açıklama', min: 10, confirm: 'İtirazı gönder' });
     if (r) await runAction(demo, () => agencyNet.appeal(id, subject, r.reason), 'İtirazın merkeze iletildi.', reload);
@@ -366,13 +355,8 @@ function Actions({ c }: { c: Ctx }) {
   return (
     <Section title="İşlemler">
       <Panel>
-        {sub && c.can('transfers.manage') && !o.request && a.status === 'approved' && (
-          <>
-            <Button title="Bağımsızlık talebi" variant="tonal" icon="flag-outline" onPress={independence} />
-            <Button title="Üst ajans değiştir" variant="tonal" icon="swap-horizontal" onPress={changeParent} />
-          </>
-        )}
-        {sub && c.can('transfers.manage') && ['approved', 'suspended'].includes(a.status) && <Button title="Alt ajansı kapat" variant="danger" icon="close-circle-outline" onPress={close} />}
+        {/* A referral agency's own people don't see its parent (owners, 25 Nov 2026): no independence, parent change or
+            closing as a sub from here; the centre does those. */}
         {c.acting && (
           <View style={{ gap: space.sm }}>
             <Text style={st.label}>İtiraz konusu</Text>
@@ -647,7 +631,7 @@ function PerformanceTab({ c }: { c: Ctx }) {
             </Section>
           )}
           {d.subagencies.length > 0 && (
-            <ListGroup label="Alt ajans sıralaması">
+            <ListGroup label="Referans ajans sıralaması">
               {d.subagencies.map((s) => (
                 <ListRow key={s.id} leading={<Text style={st.rank}>{s.rank}</Text>} title={s.name} subtitle={`${s.tierName ?? '—'} · ${CHANGE_TEXT[s.change]} · ${s.active} aktif yayıncı`} value={fmtScore(s.score)} onPress={() => openOffice(s.id)} />
               ))}
@@ -656,7 +640,7 @@ function PerformanceTab({ c }: { c: Ctx }) {
           {d.history.length > 0 && (
             <ListGroup label="Geçmiş değerlendirmeler">
               {[...d.history].reverse().map((h) => (
-                <ListRow key={h.runId} icon="time-outline" tone="neutral" title={`${fmtDate(h.asOf)} · puan ${fmtScore(h.score)}`} subtitle={`${h.tierName ?? (sub ? '—' : 'Üst ajans')} · ${CHANGE_TEXT[h.change]}${h.rank ? ` · sıra ${h.rank}` : ''} · hacim ${fmtD(h.volume)}`} />
+                <ListRow key={h.runId} icon="time-outline" tone="neutral" title={`${fmtDate(h.asOf)} · puan ${fmtScore(h.score)}`} subtitle={`${h.tierName ?? '—'} · ${CHANGE_TEXT[h.change]}${h.rank ? ` · sıra ${h.rank}` : ''} · hacim ${fmtD(h.volume)}`} />
               ))}
             </ListGroup>
           )}
@@ -760,7 +744,7 @@ function Earnings({ c }: { c: Ctx }) {
                           <Text style={st.small}>{fmtUsd(usdOf(r.amount))}</Text>
                         </View>
                       }
-                      onPress={() => ledgerDetail(r)}
+                      onPress={() => ledgerDetail(r, c.o.agency.level <= 1 || !c.acting)}
                     />
                   ))}
                 </ListGroup>
@@ -775,14 +759,15 @@ function Earnings({ c }: { c: Ctx }) {
 }
 const PAGE = 20;
 
-function ledgerDetail(r: LedgerRow) {
+/** `tree`: false for a referral agency's own people, who see no parent (owners, 25 Nov 2026). */
+function ledgerDetail(r: LedgerRow, tree: boolean) {
   const lines = [
     `İşlem: ${r.txn ?? '—'}`,
     r.incomeType ? `Gelir türü: ${INCOME_TEXT[r.incomeType] ?? r.incomeType}` : null,
     r.base !== null ? `Matrah: ${fmtD(r.base)} elmas` : null,
     r.totalRate !== null ? `Toplam ajans oranı: ${fmtPct(r.totalRate)} (sınır ${fmtPct(r.poolCap)})` : null,
-    r.subAmount !== null ? `Alt ajans: ${fmtPct(r.subRate)} → ${fmtD(r.subAmount)} elmas` : null,
-    r.parentAmount !== null ? `Üst ajans farkı: ${fmtD(r.parentAmount)} elmas` : null,
+    r.subAmount !== null ? `${tree ? 'Alt ajans' : 'Ajans'}: ${fmtPct(r.subRate)} → ${fmtD(r.subAmount)} elmas` : null,
+    r.parentAmount !== null && tree ? `Üst ajans farkı: ${fmtD(r.parentAmount)} elmas` : null,
     r.transitionAmount ? `Geçiş komisyonu: ${fmtD(r.transitionAmount)} elmas` : null,
     `Bu kayıt: ${fmtD(r.amount)} elmas (${fmtUsd(usdOf(r.amount))})`,
     `Dönem: ${r.period} · ${r.statusLabel}`,

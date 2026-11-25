@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { router } from 'expo-router';
+import { Redirect, router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,6 +13,8 @@ import { CONTACT_TITLE, contactRefusal } from '@/lib/contact-filter';
 import { RULES, pct, usd } from '@/data/rules';
 import { NetworkHub } from '@/components/agency-net-hub';
 import { apiEnabled } from '@/lib/api';
+import { useMyServerAgency } from '@/lib/live/me-stats';
+import { agencyScreensHidden } from '@/lib/me-view';
 import { useApp } from '@/store';
 import { colors } from '@/theme';
 import { BrandLoader } from '@/components/fx/brand-loader';
@@ -20,12 +22,21 @@ import { BrandLoader } from '@/components/fx/brand-loader';
 export default function AgencyHub() {
   // With our server the agency network is the server's (hierarchy, commission, approvals); the local prototype
   // below stays for builds without a server address.
-  return apiEnabled() ? <NetworkHub /> : <LocalAgencyHub />;
+  return apiEnabled() ? <LiveAgencyHub /> : <LocalAgencyHub />;
+}
+
+/** A woman who streams for an agency sees none of its screens (owners, 25 Nov 2026): a link here takes her home. */
+function LiveAgencyHub() {
+  const { me } = useApp();
+  const mine = useMyServerAgency(true);
+  if (agencyScreensHidden(me.gender, mine?.role)) return <Redirect href="/" />;
+  return <NetworkHub />;
 }
 
 function LocalAgencyHub() {
-  const { agencyId, agencyRole, ownedAgency, pendingAgency } = useApp();
+  const { agencyId, agencyRole, ownedAgency, pendingAgency, me } = useApp();
   if (agencyRole === 'owner' || agencyRole === 'assistant') return <OwnerEntry />;
+  if (agencyId && agencyScreensHidden(me.gender, 'member')) return <Redirect href="/" />;
   // An agency id the app doesn't know (an old save) shows the join screen instead of an empty member view.
   if (agencyId && AGENCIES.some((x) => x.id === agencyId)) return <MemberView />;
   if (pendingAgency || ownedAgency?.status === 'İnceleniyor') return <Pending />;
