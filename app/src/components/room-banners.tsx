@@ -5,7 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect, type Href } from 'expo-router';
 import { useCallback, useEffect, useRef, useState, type ComponentRef } from 'react';
-import { Image, Pressable, ScrollView, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 
 import { Text } from '@/components/text';
 import { FloatIcon } from '@/components/fx/float';
@@ -16,7 +16,7 @@ import { AGENCIES } from '@/data/agency';
 import { LEADERBOARDS } from '@/data/economy';
 import { ROOM_EVENTS } from '@/data/rooms-ui';
 import { liveMode } from '@/lib/live';
-import { TEAM_KIND_LABEL, roomBanners, type BoardKey, type BoardPeriod, type RoomBanners as Banners, type TeamKind } from '@/lib/live/team';
+import { TEAM_KIND_LABEL, bannerClick, bannerSeen, roomBanners, type AdminBanner, type BannerAccent, type BoardKey, type BoardPeriod, type RoomBanners as Banners, type TeamKind } from '@/lib/live/team';
 import { noticeHref } from '@/lib/notice-links';
 import { compact } from '@/lib/compact';
 import { useApp } from '@/store';
@@ -25,7 +25,8 @@ import { ThemeScope, fonts, makeStyles } from '@/theme';
 type Row = { id: string; name: string; avatar: string; score: number };
 type EventSlide = { kind: 'event'; id: string; tag: TeamKind; title: string; body: string; image: string | null; link: string | undefined };
 type BoardSlide = { kind: 'board'; id: BoardKey; rows: Record<BoardPeriod, Row[]> };
-type Slide = EventSlide | BoardSlide;
+type BannerSlide = { kind: 'banner'; id: string; b: AdminBanner };
+type Slide = EventSlide | BoardSlide | BannerSlide;
 
 const PERIODS: { key: BoardPeriod; label: string; screen: string }[] = [
   { key: 'day', label: 'Gün', screen: 'daily' },
@@ -33,10 +34,11 @@ const PERIODS: { key: BoardPeriod; label: string; screen: string }[] = [
   { key: 'month', label: 'Ay', screen: 'monthly' },
 ];
 // Each board's sign (docs/GORSEL_URETIM_LISTESI.md § 13, app/assets/banners, 192 px).
+// The headers' pictures: the owners' neon podium design (25 Nov 2026, assets/banners/podyum/baslik-*).
 const BOARD: Record<BoardKey, { title: string; sub: string; art: number; unit: Icon3DName; tint: readonly [string, string]; screen: string }> = {
-  agency: { title: 'Zirvedeki ajanslar', sub: 'Yayıncılarının kazandığı elmas', art: require('../../assets/banners/banner-zirvedeki-ajanslar.png'), unit: 'diamond', tint: ['#123A52', '#1D1846'], screen: 'ajans' },
-  charm: { title: 'En çok hediye alanlar', sub: 'Gelen hediyelerin elması', art: require('../../assets/banners/banner-en-cok-hediye-alan.png'), unit: 'diamond', tint: ['#4A1838', '#24163F'], screen: 'yayinci' },
-  wealth: { title: 'En çok hediye gönderenler', sub: 'Gönderilen hediyelerin jetonu', art: require('../../assets/banners/banner-en-cok-hediye-gonderen.png'), unit: 'coin', tint: ['#4A3510', '#241A3D'], screen: 'zengin' },
+  agency: { title: 'Zirvedeki ajanslar', sub: 'Yayıncılarının kazandığı elmas', art: require('../../assets/banners/podyum/baslik-ajans.webp'), unit: 'diamond', tint: ['#123A52', '#1D1846'], screen: 'ajans' },
+  charm: { title: 'En çok hediye alanlar', sub: 'Gelen hediyelerin elması', art: require('../../assets/banners/podyum/baslik-alan.webp'), unit: 'diamond', tint: ['#4A1838', '#24163F'], screen: 'yayinci' },
+  wealth: { title: 'En çok hediye gönderenler', sub: 'Gönderilen hediyelerin jetonu', art: require('../../assets/banners/podyum/baslik-gonderen.webp'), unit: 'coin', tint: ['#4A3510', '#241A3D'], screen: 'zengin' },
 };
 /** A management event without its own picture: a cup and a calendar leaf in the corner. */
 const EVENT_ART: number = require('../../assets/banners/banner-etkinlik-varsayilan.png');
@@ -53,11 +55,25 @@ const KIND_LOOK: Record<TeamKind, { tint: readonly [string, string]; art: number
   rule: { tint: ['#0F766E', '#1E40AF'], art: icon3dSource('tasks'), hue: '#99F6E4' },
 };
 const EVERY_MS = 5500;
-/** Every slide's height: the podium card's crowns, laurels and stage need the room. */
-const CARD_H = 204;
+/** Every slide's height: the podium card's crowns, laurels and pedestals need the room. */
+const CARD_H = 212;
+/** The app's own banner pictures (Banner Yönetimi `art`): the owners' examples. */
+const BANNER_ART: Record<string, number> = {
+  'ornek-hediye-alanlar': require('../../assets/banners/ornek-hediye-alanlar.webp'),
+  'ornek-hediye-gonderenler': require('../../assets/banners/ornek-hediye-gonderenler.webp'),
+  'ornek-zirvedeki-ajanslar': require('../../assets/banners/ornek-zirvedeki-ajanslar.webp'),
+};
+/** A banner's button and rim colours (Banner Yönetimi `accent`). */
+const ACCENT: Record<BannerAccent, { button: readonly [string, string]; rim: string; ink: string }> = {
+  mor: { button: ['#C14DFF', '#7B2FF7'], rim: '#B66BFF', ink: '#fff' },
+  pembe: { button: ['#FF5FA8', '#D61F78'], rim: '#FF7BC0', ink: '#fff' },
+  altin: { button: ['#FFE08A', '#F2B635'], rim: '#FFC94D', ink: '#3A2400' },
+  turkuaz: { button: ['#6FF3FF', '#22B8D6'], rim: '#4FE3F5', ink: '#06303A' },
+};
 
 
 function liveSlides(d: Banners): Slide[] {
+  const banners: Slide[] = (d.banners ?? []).filter((b) => b.imageUrl || (b.art && BANNER_ART[b.art])).map((b) => ({ kind: 'banner', id: `b${b.id}`, b }));
   const events: Slide[] = d.events.map((e) => ({ kind: 'event', id: `e${e.id}`, tag: e.kind, title: e.title, body: e.body, image: e.imageUrl, link: e.link ?? undefined }));
   const boards = (['agency', 'charm', 'wealth'] as const).map((id): BoardSlide => {
     const rows = {} as Record<BoardPeriod, Row[]>;
@@ -69,7 +85,7 @@ function liveSlides(d: Banners): Slide[] {
     }
     return { kind: 'board', id, rows };
   });
-  return [...events, ...boards];
+  return [...banners, ...events, ...boards];
 }
 
 function demoSlides(): Slide[] {
@@ -79,7 +95,14 @@ function demoSlides(): Slide[] {
     AGENCIES.filter((a) => a.status === 'active')
       .map((a) => ({ id: a.id, name: a.name, avatar: '', score: a.hosts * 4_150 * times }))
       .sort((a, b) => b.score - a.score);
+  const example = (id: string, title: string, art: string, accent: BannerAccent, link: string): Slide => ({
+    kind: 'banner',
+    id,
+    b: { id, title, subtitle: '', cta: 'Sıralamayı Gör', link, imageUrl: null, art, showText: false, accent },
+  });
   return [
+    example('demo-alan', 'En Çok Hediye Alanlar', 'ornek-hediye-alanlar', 'turkuaz', '/siralama?board=yayinci&period=weekly'),
+    example('demo-gonderen', 'En Çok Hediye Gönderenler', 'ornek-hediye-gonderenler', 'altin', '/siralama?board=zengin&period=weekly'),
     ...ROOM_EVENTS.slice(0, 1).map((e): Slide => ({ kind: 'event', id: e.id, tag: 'event', title: e.title, body: e.when, image: null, link: `/oda/${e.roomId}` })),
     { kind: 'board', id: 'agency', rows: { day: agencies(1), week: agencies(6), month: agencies(24) } },
     { kind: 'board', id: 'charm', rows: { day: people(LEADERBOARDS.yayinci.daily), week: people(LEADERBOARDS.yayinci.weekly), month: people(LEADERBOARDS.yayinci.weekly, 4) } },
@@ -88,7 +111,7 @@ function demoSlides(): Slide[] {
 }
 
 /** A board with nobody on it in any period (a new server) is left out rather than shown empty. */
-const worthShowing = (s: Slide) => s.kind === 'event' || PERIODS.some((p) => s.rows[p.key].length > 0);
+const worthShowing = (s: Slide) => s.kind !== 'board' || PERIODS.some((p) => s.rows[p.key].length > 0);
 
 export function RoomBanners() {
   const styles = useStyles();
@@ -123,6 +146,12 @@ export function RoomBanners() {
     const t = setTimeout(() => scroller.current?.scrollTo({ x: ((index + 1) % count) * step, animated: true }), EVERY_MS);
     return () => clearTimeout(t);
   }, [count, held, index, settings.reduceMotion, step]);
+  // The banner in view counts as seen (once a run; the server counts each person once a day).
+  const shown = slides[index];
+  const shownBanner = live && shown?.kind === 'banner' ? shown.b.id : null;
+  useEffect(() => {
+    if (shownBanner) bannerSeen(shownBanner);
+  }, [shownBanner]);
   const settle = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     setIndex(Math.max(0, Math.min(count - 1, Math.round(e.nativeEvent.contentOffset.x / step))));
     setHeld(false);
@@ -144,7 +173,7 @@ export function RoomBanners() {
       >
         {slides.map((s) => (
           <View key={s.id} style={[styles.card, { width: cardW }]}>
-            <ThemeScope scheme="dark">{s.kind === 'event' ? <EventCard s={s} live={live} /> : <BoardCard s={s} />}</ThemeScope>
+            <ThemeScope scheme="dark">{s.kind === 'banner' ? <BannerCard s={s} live={live} /> : s.kind === 'event' ? <EventCard s={s} live={live} /> : <BoardCard s={s} />}</ThemeScope>
           </View>
         ))}
       </ScrollView>
@@ -156,6 +185,55 @@ export function RoomBanners() {
         </View>
       )}
     </View>
+  );
+}
+
+/**
+ * A Banner Yönetimi banner (the owners' design, 25 Nov 2026): its picture fills the card under a thin rim of its
+ * colour; with "Yazıları göster" its title, line and button sit on a dark sweep on the left (a picture with its own
+ * words shows only the button, if it has one). A tap opens its link and counts once a day.
+ */
+function BannerCard({ s, live }: { s: BannerSlide; live: boolean }) {
+  const styles = useStyles();
+  const { b } = s;
+  const href = noticeHref(b.link ?? undefined, live);
+  const a = ACCENT[b.accent];
+  const source = b.imageUrl ? { uri: b.imageUrl } : BANNER_ART[b.art ?? ''];
+  const open = () => {
+    if (!href) return;
+    if (live) bannerClick(b.id);
+    router.push(href as Href);
+  };
+  return (
+    <PressableScale to={0.98} disabled={!href} onPress={open} accessibilityRole={href ? 'button' : 'image'} accessibilityLabel={[b.title, b.subtitle, b.cta].filter(Boolean).join(', ')}>
+      <View style={[styles.bannerCard, { borderColor: a.rim, boxShadow: `0 0 12px ${a.rim}66` }]}>
+        <Image source={source} style={styles.cover} resizeMode="cover" accessibilityIgnoresInvertColors />
+        {b.showText && <LinearGradient colors={['rgba(14,6,34,0.86)', 'rgba(14,6,34,0.55)', 'rgba(14,6,34,0)']} start={{ x: 0, y: 0 }} end={{ x: 0.75, y: 0 }} style={StyleSheet.absoluteFill} />}
+        <Gloss radius={18} strength={0.12} />
+        <View style={styles.bannerBody}>
+          {b.showText && (
+            <View style={{ maxWidth: '62%', gap: 4 }}>
+              <Text style={styles.bannerTitle} numberOfLines={2}>
+                {b.title}
+              </Text>
+              {!!b.subtitle && (
+                <Text style={styles.bannerSub} numberOfLines={2}>
+                  {b.subtitle}
+                </Text>
+              )}
+            </View>
+          )}
+          {!!b.cta && !!href && (
+            <LinearGradient colors={a.button} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.bannerCta, !b.showText && styles.bannerCtaAlone]}>
+              <Text style={[styles.bannerCtaText, { color: a.ink }]} numberOfLines={1}>
+                {b.cta}
+              </Text>
+              <Ionicons name="chevron-forward" size={14} color={a.ink} />
+            </LinearGradient>
+          )}
+        </View>
+      </View>
+    </PressableScale>
   );
 }
 
@@ -220,6 +298,13 @@ const PODIUM = {
 /** The card's neon rim (pink, violet, blue) and its navy glass. */
 const NEON = { rim: ['#FF4FD8', '#B44CFF', '#5B6CFF', '#22D3FF'], fill: ['#1E0F48', '#130A33', '#1A0B3A'] } as const;
 
+/** Each place's colours: ring, rank badge and pedestal (silver-violet, gold, rose), as the owners' design has them. */
+const PLACE = {
+  1: { ring: '#FFC24A', glow: 'rgba(255,190,60,0.85)', badge: ['#FFE58A', '#F2A81D'] as const, badgeInk: '#3A2400', ped: ['#F7C548', '#B9750C', '#5E3A05'] as const, pedRim: '#FFE08A' },
+  2: { ring: '#B8A8FF', glow: 'rgba(160,140,255,0.7)', badge: ['#FFFFFF', '#C9CCE0'] as const, badgeInk: '#1E2A5A', ped: ['#6A48E8', '#3A1E9C', '#1E0F5C'] as const, pedRim: '#9F8BFF' },
+  3: { ring: '#FF9EB6', glow: 'rgba(255,120,170,0.7)', badge: ['#FFE2CF', '#E9A27A'] as const, badgeInk: '#4A1A08', ped: ['#E04BB4', '#8E1C78', '#4A0C44'] as const, pedRim: '#FF8BD8' },
+} as const;
+
 function BoardCard({ s }: { s: BoardSlide }) {
   const styles = useStyles();
   const b = BOARD[s.id];
@@ -228,95 +313,84 @@ function BoardCard({ s }: { s: BoardSlide }) {
   const period = picked ?? PERIODS.find((p) => s.rows[p.key].length > 0)?.key ?? 'day';
   const rows = s.rows[period];
   const screen = PERIODS.find((p) => p.key === period)!.screen;
-  // Podium order: second, first, third.
+  // Podium order: second, first, third. A place nobody holds yet still shows ("Sıra boş").
   const podium = [rows[1], rows[0], rows[2]];
   return (
     <PressableScale to={0.98} onPress={() => router.push(`/siralama?board=${b.screen}&period=${screen}` as Href)} accessibilityRole="button" accessibilityLabel={`${b.title}, tam sıralama`}>
       <LinearGradient colors={NEON.rim} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.rim}>
         <LinearGradient colors={NEON.fill} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.boardFill}>
-          {/* The first place's stage: two glowing rings under the middle of the podium. */}
-          <View style={styles.stage} pointerEvents="none">
-            <View style={styles.stageOuter} />
-            <View style={styles.stageInner} />
-          </View>
-          {/* The title has the whole line; what it counts shares the next one with the period switch, on two lines if it must. */}
+          {/* The owners' design (25 Nov 2026): the board's picture, its name and what it counts, the period switch on
+              the right; a fine line; then the three on their glowing pedestals. */}
           <View style={styles.boardHead}>
-            <Image source={b.art} style={{ width: 28, height: 28 }} resizeMode="contain" accessibilityIgnoresInvertColors />
-            <Text style={styles.boardTitle} numberOfLines={1}>
-              {b.title}
-            </Text>
-          </View>
-          <View style={styles.boardLine}>
-            <Text style={styles.boardSub} numberOfLines={2}>
-              {b.sub}
-            </Text>
-            <View style={styles.periods} accessibilityRole="tablist">
-              {PERIODS.map((p) => (
-                <Pressable key={p.key} onPress={() => setPicked(p.key)} hitSlop={6} accessibilityRole="tab" accessibilityState={{ selected: p.key === period }} style={[styles.period, p.key === period && styles.periodOn]}>
-                  <Text style={[styles.periodText, p.key === period && styles.periodTextOn]}>{p.label}</Text>
-                </Pressable>
-              ))}
+            <Image source={b.art} style={styles.boardArt} resizeMode="contain" accessibilityIgnoresInvertColors />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.boardTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                {b.title}
+              </Text>
+              <Text style={styles.boardSub} numberOfLines={2}>
+                {b.sub}
+              </Text>
             </View>
           </View>
-          {rows.length ? (
-            <View style={styles.podium}>
-              {podium.map((r, i) => {
-                const rank = i === 1 ? 1 : i === 0 ? 2 : 3;
-                const first = rank === 1;
-                const face = first ? 54 : 44;
-                const crownW = first ? 44 : 30;
-                const crown = <Image source={PODIUM.crown[rank - 1]} style={{ width: crownW, height: crownW / PODIUM.crownRatio[rank - 1], marginBottom: -3 }} resizeMode="contain" />;
-                const badge = (
-                  <View style={[styles.rank, first && styles.rankFirst]}>
-                    <Text style={[styles.rankText, first && styles.rankTextFirst]}>{rank}</Text>
-                  </View>
-                );
-                // A place nobody holds yet still shows as a place, so one name never floats alone in an empty row.
-                if (!r)
-                  return (
-                    <View key={`empty${rank}`} style={styles.place} accessible accessibilityLabel={`${rank}. sıra boş`}>
-                      {crown}
-                      <View>
-                        <View style={[styles.emptyFace, { width: face, height: face, borderRadius: face / 2 }]}>
-                          <Ionicons name="person" size={face * 0.45} color="rgba(255,255,255,0.45)" />
-                        </View>
-                        {badge}
-                      </View>
-                      <Text style={[styles.name, styles.emptyText]} numberOfLines={1}>
-                        Sıra boş
-                      </Text>
-                      <Text style={[styles.scoreText, styles.emptyText]}>—</Text>
-                    </View>
-                  );
-                return (
-                  <View key={r.id} style={styles.place} accessible accessibilityLabel={`${rank}. ${r.name}, ${compact(r.score)}`}>
-                    {crown}
-                    <View>
-                      {first && (
-                        <>
-                          <Image source={PODIUM.laurel} style={[styles.laurel, { left: -26 }]} resizeMode="contain" />
-                          <Image source={PODIUM.laurel} style={[styles.laurel, { right: -26, transform: [{ scaleX: -1 }] }]} resizeMode="contain" />
-                        </>
-                      )}
-                      <View style={[styles.faceRing, first ? styles.faceRingFirst : styles.faceRingOther, { borderRadius: face / 2 + 3 }]}>
+          <View style={styles.periods} accessibilityRole="tablist">
+            {PERIODS.map((p) => (
+              <Pressable key={p.key} onPress={() => setPicked(p.key)} hitSlop={6} accessibilityRole="tab" accessibilityState={{ selected: p.key === period }} style={[styles.period, p.key === period && styles.periodOn]}>
+                <Text style={[styles.periodText, p.key === period && styles.periodTextOn]}>{p.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+          <View style={styles.boardRule} />
+          <View style={styles.podium}>
+            {podium.map((r, i) => {
+              const rank = (i === 1 ? 1 : i === 0 ? 2 : 3) as 1 | 2 | 3;
+              const first = rank === 1;
+              const p = PLACE[rank];
+              const face = first ? 58 : 48;
+              const crownW = first ? 50 : 36;
+              return (
+                <View key={r?.id ?? `empty${rank}`} style={[styles.place, first && styles.placeFirst]} accessible accessibilityLabel={r ? `${rank}. ${r.name}, ${compact(r.score)}` : `${rank}. sıra boş`}>
+                  <Image source={PODIUM.crown[rank - 1]} style={{ width: crownW, height: crownW / PODIUM.crownRatio[rank - 1], marginBottom: -4, zIndex: 2 }} resizeMode="contain" />
+                  <View style={{ zIndex: 2 }}>
+                    {first && (
+                      <>
+                        <Image source={PODIUM.laurel} style={[styles.laurel, { left: -27 }]} resizeMode="contain" />
+                        <Image source={PODIUM.laurel} style={[styles.laurel, { right: -27, transform: [{ scaleX: -1 }] }]} resizeMode="contain" />
+                      </>
+                    )}
+                    <View style={[styles.faceRing, { borderColor: p.ring, boxShadow: `0 0 10px ${p.glow}`, borderRadius: face / 2 + 4 }]}>
+                      {r ? (
                         <Avatar uri={r.avatar || undefined} name={r.name} size={face} />
-                      </View>
-                      {badge}
+                      ) : (
+                        <View style={[styles.emptyFace, { width: face, height: face, borderRadius: face / 2 }]}>
+                          <Ionicons name="person" size={face * 0.5} color="rgba(255,255,255,0.45)" />
+                        </View>
+                      )}
                     </View>
-                    <Text style={[styles.name, first && styles.nameFirst]} numberOfLines={1}>
-                      {r.name}
-                    </Text>
-                    <View style={styles.score}>
-                      <Icon3D name={b.unit} size={15} />
-                      <Text style={styles.scoreText}>{compact(r.score)}</Text>
-                    </View>
+                    <LinearGradient colors={p.badge} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={[styles.rank, first && styles.rankFirst]}>
+                      <Text style={[styles.rankText, { color: p.badgeInk }]}>{rank}</Text>
+                    </LinearGradient>
                   </View>
-                );
-              })}
-            </View>
-          ) : (
-            <Text style={styles.none}>Bu dönemde henüz kimse yok.</Text>
-          )}
+                  {/* The pedestal: a tilted glowing block behind the name and the score. */}
+                  <View style={[styles.pedestal, first && styles.pedestalFirst]}>
+                    <View style={[styles.pedShape, { boxShadow: `0 0 14px ${p.glow}` }]} pointerEvents="none">
+                      <LinearGradient colors={p.ped} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={[StyleSheet.absoluteFill, { borderRadius: 10, borderTopWidth: 2, borderColor: p.pedRim }]} />
+                    </View>
+                    <Text style={[styles.name, first && styles.nameFirst, !r && styles.emptyText]} numberOfLines={1}>
+                      {r ? r.name : 'Sıra boş'}
+                    </Text>
+                    {r ? (
+                      <View style={styles.score}>
+                        <Icon3D name={b.unit} size={14} />
+                        <Text style={styles.scoreText}>{compact(r.score)}</Text>
+                      </View>
+                    ) : (
+                      <Text style={[styles.scoreText, styles.emptyText]}>—</Text>
+                    )}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
         </LinearGradient>
       </LinearGradient>
     </PressableScale>
@@ -340,56 +414,45 @@ const useStyles = makeStyles(({ colors }) => ({
   eventTitlePlain: { fontSize: 22, lineHeight: 27 },
   eventSub: { color: 'rgba(255,255,255,0.86)', fontSize: 13, lineHeight: 18 },
 
-  rim: { height: CARD_H, borderRadius: 20, padding: 1.5 },
-  boardFill: { flex: 1, borderRadius: 18.5, overflow: 'hidden', paddingHorizontal: 14, paddingTop: 10, paddingBottom: 18 },
-  boardHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  boardTitle: { flex: 1, minWidth: 0, color: '#fff', fontSize: 17, fontFamily: fonts.display },
-  boardLine: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
-  boardSub: { flex: 1, minWidth: 0, color: 'rgba(255,255,255,0.78)', fontSize: 12.5, lineHeight: 16 },
-  periods: { flexDirection: 'row', padding: 2, borderRadius: 999, borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)', backgroundColor: 'rgba(255,255,255,0.06)' },
-  period: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, borderWidth: 1.5, borderColor: 'transparent' },
-  periodOn: { borderColor: '#FF4FD8', backgroundColor: 'rgba(255,60,200,0.14)', boxShadow: '0 0 8px rgba(255,60,210,0.7)' },
-  periodText: { color: 'rgba(255,255,255,0.82)', fontSize: 13, fontWeight: '700' },
-  periodTextOn: { color: '#fff' },
+  bannerCard: { height: CARD_H, borderRadius: 20, overflow: 'hidden', borderWidth: 1.5, backgroundColor: '#140A30' },
+  bannerBody: { flex: 1, justifyContent: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 10 },
+  bannerTitle: { color: '#fff', fontSize: 23, lineHeight: 27, fontFamily: fonts.display, textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 6 },
+  bannerSub: { color: 'rgba(255,255,255,0.9)', fontSize: 13, lineHeight: 17 },
+  bannerCta: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, boxShadow: '0 4px 12px rgba(0,0,0,0.35)' },
+  bannerCtaAlone: { position: 'absolute', left: 16, bottom: 14 },
+  bannerCtaText: { fontSize: 13, fontWeight: '800' },
 
-  podium: { flex: 1, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-around' },
-  place: { flex: 1, alignItems: 'center', gap: 1 },
-  faceRing: { padding: 2, borderWidth: 2 },
-  faceRingFirst: { borderColor: '#FFC24A', boxShadow: '0 0 12px rgba(255,190,60,0.85)' },
-  faceRingOther: { borderColor: '#E58CFF', boxShadow: '0 0 8px rgba(229,140,255,0.6)' },
-  laurel: { position: 'absolute', top: 2, width: 23, height: 23 / (50 / 138) },
-  rank: {
-    position: 'absolute',
-    right: -4,
-    bottom: -2,
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
-    paddingHorizontal: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F2F0FA',
-  },
-  rankFirst: { backgroundColor: '#FFC83D', boxShadow: '0 0 6px rgba(255,200,60,0.8)' },
-  rankText: { color: '#1E2A5A', fontSize: 12, fontWeight: '900' },
-  rankTextFirst: { color: '#3A2400' },
-  name: { color: '#fff', fontSize: 14, fontWeight: '800', maxWidth: '94%', marginTop: 3 },
-  nameFirst: { fontSize: 15 },
-  score: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  scoreText: { color: 'rgba(255,255,255,0.9)', fontSize: 13, fontWeight: '800', fontVariant: ['tabular-nums'] },
-  // An empty place: a dashed dim ring, dim words.
-  emptyFace: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderColor: 'rgba(255,255,255,0.5)',
-    backgroundColor: 'rgba(255,255,255,0.06)',
-  },
-  emptyText: { color: 'rgba(255,255,255,0.6)' },
-  // The first place's stage: a wide violet ring and a pink one inside it, glowing.
-  stage: { position: 'absolute', left: 0, right: 0, bottom: -24, height: 40, alignItems: 'center', justifyContent: 'center' },
-  stageOuter: { position: 'absolute', width: '62%', height: 30, borderRadius: 999, borderWidth: 2, borderColor: 'rgba(120,110,255,0.85)', boxShadow: '0 0 12px rgba(90,120,255,0.7)' },
-  stageInner: { position: 'absolute', width: '42%', height: 18, top: 6, borderRadius: 999, borderWidth: 2, borderColor: 'rgba(255,80,216,0.95)', boxShadow: '0 0 12px rgba(255,60,210,0.8)' },
+  rim: { height: CARD_H, borderRadius: 20, padding: 1.5 },
+  boardFill: { flex: 1, borderRadius: 18.5, overflow: 'hidden', paddingHorizontal: 12, paddingTop: 8, paddingBottom: 8 },
+  boardHead: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingRight: 4 },
+  boardArt: { width: 40, height: 40 },
+  boardTitle: { color: '#fff', fontSize: 17, fontFamily: fonts.display },
+  // Room on its right for the period switch below the title.
+  boardSub: { color: 'rgba(255,255,255,0.72)', fontSize: 11.5, lineHeight: 14, marginTop: 1, marginRight: 112 },
+  periods: { position: 'absolute', right: 10, top: 32, flexDirection: 'row', padding: 2, borderRadius: 999, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)', backgroundColor: 'rgba(255,255,255,0.06)' },
+  period: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999, borderWidth: 1.5, borderColor: 'transparent' },
+  periodOn: { borderColor: '#FF4FD8', backgroundColor: 'rgba(255,60,200,0.16)', boxShadow: '0 0 8px rgba(255,60,210,0.7)' },
+  periodText: { color: 'rgba(255,255,255,0.82)', fontSize: 11.5, fontWeight: '700' },
+  periodTextOn: { color: '#fff' },
+  boardRule: { height: 1, backgroundColor: 'rgba(255,255,255,0.12)', marginTop: 8, marginBottom: 2 },
+
+  podium: { flex: 1, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 6 },
+  place: { flex: 1, alignItems: 'center' },
+  placeFirst: { flex: 1.15 },
+  faceRing: { padding: 2, borderWidth: 2.5, backgroundColor: 'rgba(20,10,48,0.9)' },
+  laurel: { position: 'absolute', top: -2, width: 25, height: 25 / (50 / 138) },
+  rank: { position: 'absolute', right: -5, bottom: -3, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.7)' },
+  rankFirst: { width: 22, height: 22, borderRadius: 11, boxShadow: '0 0 6px rgba(255,200,60,0.9)' },
+  rankText: { fontSize: 12, fontWeight: '900' },
+  pedestal: { alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center', marginTop: -6, paddingTop: 9, paddingBottom: 5, minHeight: 44 },
+  pedestalFirst: { minHeight: 50 },
+  // A block narrower at the top, as if seen from above (the design's stage).
+  pedShape: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, borderRadius: 10, transform: [{ perspective: 220 }, { rotateX: '24deg' }] },
+  name: { color: '#fff', fontSize: 13.5, fontWeight: '800', maxWidth: '92%' },
+  nameFirst: { fontSize: 14.5 },
+  score: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  scoreText: { color: '#fff', fontSize: 13, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  emptyFace: { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.08)' },
+  emptyText: { color: 'rgba(255,255,255,0.72)' },
   none: { flex: 1, color: 'rgba(255,255,255,0.75)', fontSize: 13, textAlign: 'center', textAlignVertical: 'center', paddingTop: 30 },
 }));

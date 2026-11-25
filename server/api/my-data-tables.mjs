@@ -23,6 +23,7 @@ export const EXPORTED = [
 /** Tables that point at an account but are not that person's to receive, with the reason. */
 export const NOT_EXPORTED = {
   admin_permissions: 'staff access settings',
+  banners: 'the management’s banners; only which staff member made, changed or removed one',
   // No foreign key (so the test doesn't ask), listed all the same: it names an owner.
   room_xp_pending: 'room XP of a gift on its way to the owner (milliseconds; room-xp-add.mjs): the total is users.room_xp, in the copy',
   family_cooldowns: 'the date a rule lets someone join another family again; the families they were in are in family_members',

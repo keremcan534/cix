@@ -168,6 +168,12 @@ export const PANEL_ROUTES = new Set([
   'GET /api/admin/team',
   'POST /api/admin/team',
   'POST /api/admin/team/remove',
+  'GET /api/admin/banners',
+  'POST /api/admin/banners',
+  'POST /api/admin/banners/toggle',
+  'POST /api/admin/banners/order',
+  'POST /api/admin/banners/remove',
+  'GET /api/admin/banners/stats',
   // Etkinlikler (events.mjs).
   'GET /api/admin/events',
   'POST /api/admin/events/review',

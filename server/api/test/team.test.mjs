@@ -52,14 +52,14 @@ describe('Similar Ekibi', () => {
     assert.deepEqual(older.notices.map((n) => n.id), [ev.id]);
 
     // The banner runs in Odalar; a removed notice is gone everywhere.
-    const banners = await ok(call('GET', '/api/room-banners', null, b.session), 'banner');
+    const banners = await ok(call('GET', '/api/room-banners?banners=1', null, b.session), 'banner');
     assert.deepEqual(banners.events.map((e) => e.title), ['Hafta sonu PK turnuvası']);
     assert.ok(Date.parse(banners.events[0].endsAt) > Date.now() + 2 * 86_400_000);
     const list = await ok(call('GET', '/api/admin/team', null, boss.session), 'liste');
     assert.equal(list.notices.find((n) => n.id === mine.id).target.name, 'Ayşe');
     await ok(call('POST', '/api/admin/team/remove', { id: ev.id }, boss.session), 'kaldır');
     assert.equal(await status(call('POST', '/api/admin/team/remove', { id: ev.id }, boss.session)), 404);
-    assert.deepEqual((await ok(call('GET', '/api/room-banners', null, b.session), 'banner')).events, []);
+    assert.deepEqual((await ok(call('GET', '/api/room-banners?banners=1', null, b.session), 'banner')).events, []);
     assert.ok(!(await ok(call('GET', '/api/team', null, b.session), 'akış')).notices.some((n) => n.id === ev.id));
   });
 
