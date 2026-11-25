@@ -17,8 +17,7 @@ import { useApp, type NotifyType, type Settings } from '@/store';
 import { makeStyles, useTheme, type Appearance } from '@/theme';
 import { IS_DEMO } from '@/lib/build';
 import { openLegal } from '@/lib/legal';
-import { liveMode, message, myServerId } from '@/lib/live';
-import { testLine, useLineState } from '@/lib/live/live-line';
+import { liveMode, message } from '@/lib/live';
 import { confirmDeleteLiveAccount, liveSignOut } from '@/lib/live/account';
 import { useLivePrivacy, usePrivacySetter, type PrivacyKey } from '@/lib/live/privacy';
 import { useEventReminderSetting } from '@/lib/live/event-reminders';
@@ -30,10 +29,6 @@ import { APP_VERSION } from '@/lib/reporting';
 import { formatPhone } from '@/lib/verify-code';
 import { VerifiedPill, VerifySheet } from '@/components/verify-sheet';
 import { useLiveSessions } from '@/lib/live/sessions';
-import { openSupportMail } from '@/lib/open-mail';
-import { dataRequestMail } from '@/lib/support-mail';
-import { ApiError } from '@/lib/api';
-import { exportMyData } from '@/lib/live/my-data';
 import { LiveSpendLimit } from '@/components/spend-limit-live';
 
 type BoolKey = { [K in keyof Settings]: Settings[K] extends boolean ? K : never }[keyof Settings];
@@ -141,27 +136,8 @@ function LiveSessions() {
 }
 
 export default function SettingsScreen() {
-  const { nobleTier, me, phone, deletionRequested, requestDeletion, logout, resetAll, blocked, toggleBlock, safetyLog, requestDataExport, settings, setSetting, sessions, endSession, notify } = useApp();
+  const { nobleTier, me, phone, deletionRequested, requestDeletion, logout, resetAll, blocked, toggleBlock, safetyLog, settings, setSetting, sessions, endSession, notify } = useApp();
   const [licenses, setLicenses] = useState(false);
-  // Live mode: Verilerimin kopyası (lib/live/my-data). A server without the route yet takes the request by e-mail.
-  const [exporting, setExporting] = useState(false);
-  const askExport = () =>
-    showAlert(
-      'Verilerimin kopyası',
-      'Kişisel verilerin JSON dosyası olarak hazırlanır. Yalnız güvendiğin yere kaydet. 24 saatte bir alınabilir.',
-      [
-        { text: 'Vazgeç', style: 'cancel' },
-        {
-          text: 'Hazırla',
-          onPress: () => {
-            setExporting(true);
-            exportMyData()
-              .catch((e: unknown) => (e instanceof ApiError && e.status === 404 ? openSupportMail(dataRequestMail(myServerId(), me.name)) : showAlert('Kopya hazırlanamadı', message(e))))
-              .finally(() => setExporting(false));
-          },
-        },
-      ],
-    );
   // Live mode: the account's e-mail and checked number (the ways the server has on, lib/remote-config).
   const { email, phoneVerified } = useApp();
   const { signIn, verify } = useRemoteConfig();
@@ -493,7 +469,6 @@ export default function SettingsScreen() {
             // A tap shows the open-source notices (the libraries' and the font's licences ask for them to ship with the app).
             <ListRow icon="information-circle-outline" tone="neutral" title="Uygulama sürümü" value={versionLabel(APP_VERSION)} onPress={() => setLicenses(true)} chevron={false} />
           )}
-          {IS_DEMO && liveMode() && <LineTestRow />}
         </ListGroup>
 
         <ListGroup
@@ -505,20 +480,7 @@ export default function SettingsScreen() {
             ) : undefined
           }
         >
-          {/* Verilerimin kopyası: not on the menu (owners, 25 Nov 2026); asked for through Destek (KVKK), staff send it. */}
-          {!IS_DEMO ? null : live ? (
-            // The server puts the copy together at once (lib/live/my-data); the share sheet saves or sends the file.
-            <ListRow
-              icon="download-outline"
-              tone="neutral"
-              title={exporting ? 'Verilerin hazırlanıyor…' : 'Verilerimin kopyasını iste'}
-              subtitle="JSON dosyası · 24 saatte bir"
-              onPress={exporting ? undefined : askExport}
-              chevron={false}
-            />
-          ) : (
-            <ListRow icon="download-outline" tone="neutral" title="Verilerimin kopyasını iste" subtitle="UK GDPR kapsamında e-postana gönderilir" onPress={requestDataExport} chevron={false} />
-          )}
+          {/* No system rows here (owners, 25 Nov 2026): no connection test, no data copy (asked through Destek, KVKK). */}
           <ListRow
             icon="log-out-outline"
             tone="neutral"
@@ -532,7 +494,7 @@ export default function SettingsScreen() {
               })
             }
           />
-          {IS_DEMO && (
+          {IS_DEMO && !live && (
             <ListRow
               icon="refresh-outline"
               tone="neutral"
@@ -594,32 +556,3 @@ const useStyles = makeStyles(({ colors, semantic, dark }) => ({
   chipTextOn: { color: '#fff' },
 }));
 
-/**
- * Bağlantı testi: whether the live line (lib/live/live-line) is open on this phone and how fast a ping comes back
- * on it, so a slow "someone wrote / called / followed" can be told apart from a phone that never gets the line.
- */
-function LineTestRow() {
-  const line = useLineState();
-  const [busy, setBusy] = useState(false);
-  const state =
-    line.status === 'open' ? 'Anlık bağlantı açık' : line.status === 'connecting' ? 'Bağlanıyor…' : 'Anlık bağlantı kapalı · yedek yoklama 3 sn';
-  const run = async () => {
-    if (busy) return;
-    setBusy(true);
-    try {
-      const r = await testLine();
-      const how = r.state.way === 'xhr' ? 'yol 2' : 'yol 1';
-      showAlert(
-        'Bağlantı testi',
-        r.ms !== null
-          ? `Anlık bağlantı çalışıyor: ${(r.ms / 1000).toLocaleString('tr-TR', { maximumFractionDigits: 1 })} sn (${how}).`
-          : `Anlık bağlantı cevap vermedi (${how}, sunucuda açık hat: ${r.serverLines}${r.state.error ? `, ${r.state.error}` : ''}). Güncellemeler 3 sn'de bir yoklanıyor.`,
-      );
-    } catch (e) {
-      showAlert('Bağlantı testi', message(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-  return <ListRow icon="pulse-outline" tone="neutral" title="Bağlantı testi" subtitle={busy ? 'Ölçülüyor…' : state} onPress={() => void run()} />;
-}
