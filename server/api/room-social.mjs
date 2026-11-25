@@ -207,6 +207,9 @@ export async function withRoomBadges(list) {
     const ids = list.map((r) => r.id);
     const owners = [...new Set(list.map((r) => r.owner.id))];
     const fam = await db.query('SELECT fm.user_id, f.id, f.name FROM family_members fm JOIN families f ON f.id = fm.family_id WHERE fm.user_id = ANY($1::uuid[]) AND f.closed_at IS NULL', [owners]);
+    // A room linked to an agency (agencies.room_id, owners 25 Nov 2026) shows that agency whoever owns it.
+    const linked = await db.query("SELECT room_id, id, name FROM agencies WHERE room_id = ANY($1::uuid[]) AND status = 'approved'", [ids]);
+    const byRoom = new Map(linked.rows.map((x) => [x.room_id, { id: String(x.id), name: x.name }]));
     const ag = await db.query(
       `SELECT DISTINCT ON (x.uid) x.uid, a.id, a.name FROM (
          SELECT s.streamer_id AS uid, s.agency_id AS aid, 1 AS pref FROM agency_streamers s WHERE s.streamer_id = ANY($1::uuid[]) AND s.ended_at IS NULL AND s.contract = 'approved'
@@ -224,7 +227,7 @@ export async function withRoomBadges(list) {
     const families = new Map(fam.rows.map((x) => [x.user_id, { id: String(x.id), name: x.name }]));
     const agencies = new Map(ag.rows.map((x) => [x.uid, { id: String(x.id), name: x.name }]));
     const pks = new Set(pk.rows.map((x) => x.room_id));
-    return list.map((r) => ({ ...r, agency: agencies.get(r.owner.id) ?? null, family: families.get(r.owner.id) ?? null, pk: pks.has(r.id), weekRank: week.get(r.id) ?? null }));
+    return list.map((r) => ({ ...r, agency: byRoom.get(r.id) ?? agencies.get(r.owner.id) ?? null, family: families.get(r.owner.id) ?? null, pk: pks.has(r.id), weekRank: week.get(r.id) ?? null }));
   } catch (e) {
     console.error('room badges', String(e).slice(0, 200));
     return list;

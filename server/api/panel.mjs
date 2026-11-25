@@ -168,6 +168,10 @@ export const PANEL_ROUTES = new Set([
   'GET /api/admin/team',
   'POST /api/admin/team',
   'POST /api/admin/team/remove',
+  // Aileler (families.mjs) and an agency's own room (agency-admin.mjs).
+  'GET /api/admin/families',
+  'POST /api/admin/families/create',
+  'POST /api/admin/agency/room',
   'GET /api/admin/banners',
   'POST /api/admin/banners',
   'POST /api/admin/banners/toggle',

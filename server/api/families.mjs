@@ -22,7 +22,7 @@
 // filter, and a mute on public text (sanctions 'post') stops chatting. A streamer (streamer-rule.mjs) who leaves of
 // their own accord can't join or found another family for family_rejoin_days (Canlı ayarlar, 90 to begin with); going
 // back to the family they left is allowed, and someone the family put out doesn't wait.
-import { HttpError, auth, blockedBetween, db, int, limit, once, publicText, readJson, tx, userId } from './core.mjs';
+import { HttpError, auth, blockedBetween, db, int, limit, once, publicNoOf, publicText, readJson, text, tx, userId } from './core.mjs';
 import { notify } from './push.mjs';
 import { assertMay } from './sanctions.mjs';
 import { spendCoins } from './wallet.mjs';
@@ -193,6 +193,41 @@ const managers = async (id) =>
   (await db.query("SELECT user_id FROM family_members WHERE family_id = $1 AND role IN ('owner', 'helper')", [id])).rows.map((x) => x.user_id);
 
 export const familyRoutes = {
+  /** (admin) The open families, newest first: name, leader (name and ID), members. */
+  async 'GET /api/admin/families'(req) {
+    const me = await auth(req);
+    if (me.role !== 'admin') throw new HttpError(403, 'Yönetici hesabı gerekli');
+    const r = await db.query(
+      `SELECT f.id, f.name, f.created_at, u.name AS leader_name, u.public_no AS leader_no, (SELECT count(*)::int FROM family_members m WHERE m.family_id = f.id) AS members
+         FROM families f JOIN users u ON u.id = f.leader WHERE f.closed_at IS NULL ORDER BY f.created_at DESC LIMIT 300`,
+    );
+    return { families: r.rows.map((x) => ({ id: String(x.id), name: x.name, createdAt: x.created_at.toISOString(), leader: { name: x.leader_name, no: x.leader_no === null ? null : String(x.leader_no) }, members: x.members })) };
+  },
+
+  /**
+   * (admin) A family founded by staff (owners, 25 Nov 2026): { name, founder } — free (no founding fee); the founder
+   * leads it. Refused if the founder is already in a family or the name is taken; told to the founder.
+   */
+  async 'POST /api/admin/families/create'(req) {
+    const me = await auth(req);
+    if (me.role !== 'admin') throw new HttpError(403, 'Yönetici hesabı gerekli');
+    const b = await readJson(req);
+    const name = text(b.name, 2, 24, 'Aile adı');
+    const founder = userId(b.founder, 'kurucu');
+    const f = await tx(async (c) => {
+      const u = (await c.query('SELECT id, name, public_no FROM users WHERE id = $1 AND deleted_at IS NULL FOR UPDATE', [founder])).rows[0];
+      if (!u) throw new HttpError(404, 'Kullanıcı bulunamadı');
+      if (await myMembership(founder, c)) throw new HttpError(409, `${u.name} zaten bir ailede`);
+      if ((await c.query('SELECT 1 FROM families WHERE lower(name) = lower($1) AND closed_at IS NULL', [name])).rowCount) throw new HttpError(409, 'Bu isimde bir aile var');
+      const row = (await c.query('INSERT INTO families (name, leader) VALUES ($1, $2) RETURNING id', [name, founder])).rows[0];
+      await addMember(c, Number(row.id), founder, 'owner');
+      await c.query("INSERT INTO audit_events (actor, action, target, detail) VALUES ($1, 'family.create', $2, $3)", [me.id, founder, JSON.stringify({ family: String(row.id), name, free: true })]);
+      return { id: String(row.id), name, leader: { name: u.name, no: publicNoOf(u) } };
+    });
+    notify([founder], { title: f.name, body: 'Yönetim senin için bu aileyi kurdu; ailenin lideri sensin', data: { type: 'family_joined', family: f.id } });
+    return { family: f };
+  },
+
   async 'GET /api/families'(req, url) {
     const me = await auth(req);
     const q = (url.searchParams.get('q') ?? '').trim().slice(0, 24);
