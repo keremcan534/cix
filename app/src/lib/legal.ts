@@ -1,26 +1,29 @@
-// Legal documents linked from the sign-in, wallet, VIP and settings screens.
-// The owner publishes each document on the web and sets its address at build time (EXPO_PUBLIC_*_URL,
-// e.g. in eas.json or app/.env.local). Expo inlines these only when read as literal process.env.X, so each
-// one is spelled out below. Until an address is set, a tap explains where the text will live instead of
-// opening a dead page. Store review needs real links, so this is on the launch checklist.
+// Legal documents linked from the sign-in, wallet, VIP and settings screens. They live on the website's legal
+// pages (docs/yasal, generated into website/tr/*.html; `center` is the list of all of them). A build can point one
+// elsewhere with EXPO_PUBLIC_*_URL (eas.json or app/.env.local); Expo inlines these only when read as literal
+// process.env.X, so each one is spelled out below. If a page can't be opened, a tap explains where to ask instead.
 import { Linking } from 'react-native';
 
 import { showAlert } from '@/lib/alert';
 
-export type LegalDoc = 'terms' | 'privacy' | 'payment' | 'subscription';
+export type LegalDoc = 'terms' | 'privacy' | 'payment' | 'subscription' | 'center';
 
 export const LEGAL_TITLE: Record<LegalDoc, string> = {
   terms: 'Kullanım Koşulları',
   privacy: 'Gizlilik Politikası',
   payment: 'Ödeme Sözleşmesi',
   subscription: 'Abonelik Koşulları',
+  center: 'Yasal metinler',
 };
 
+const SITE = 'https://similarclub.online';
+
 const URLS: Record<LegalDoc, string | undefined> = {
-  terms: process.env.EXPO_PUBLIC_TERMS_URL,
-  privacy: process.env.EXPO_PUBLIC_PRIVACY_URL,
-  payment: process.env.EXPO_PUBLIC_PAYMENT_TERMS_URL,
-  subscription: process.env.EXPO_PUBLIC_SUBSCRIPTION_TERMS_URL,
+  terms: process.env.EXPO_PUBLIC_TERMS_URL || `${SITE}/tr/terms`,
+  privacy: process.env.EXPO_PUBLIC_PRIVACY_URL || `${SITE}/tr/privacy`,
+  payment: process.env.EXPO_PUBLIC_PAYMENT_TERMS_URL || `${SITE}/tr/refund-policy`,
+  subscription: process.env.EXPO_PUBLIC_SUBSCRIPTION_TERMS_URL || `${SITE}/tr/vip-terms`,
+  center: `${SITE}/yasal`,
 };
 
 export const legalUrl = (doc: LegalDoc) => URLS[doc] || undefined;
