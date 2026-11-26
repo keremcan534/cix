@@ -687,7 +687,21 @@ export type RoomMember = UserCard & { since: string | null };
 export type RoomMembers = { members: RoomMember[]; total: number; joined?: number; cap: number; mine: 'owner' | 'admin' | 'member' | 'pending' | null; joinMode: RoomRules['joinMode']; canManage: boolean; pending: RoomMember[] };
 /** `image`: a photo in the chat (its storage address), null for text only. */
 /** `gift`: the line a gift sent from a chat writes (newer servers; lib/dm-gift-fx parses it). */
-export type DirectMessage = { id: number; from: string; to: string; text: string; image?: string | null; event?: SharedEvent; gift?: unknown; createdAt: string; readAt: string | null };
+export type DirectMessage = {
+  id: number;
+  from: string;
+  to: string;
+  text: string;
+  image?: string | null;
+  event?: SharedEvent;
+  gift?: unknown;
+  createdAt: string;
+  readAt: string | null;
+  /** Newer servers (27 Nov 2026): the message it answers, a take-back, a paid photo (lib/dm-thread reads them). */
+  replyTo?: unknown;
+  retracted?: unknown;
+  paidPhoto?: unknown;
+};
 /** An event sent in a message (Etkinlik Merkezi "Arkadaşına gönder"); older servers never send it. */
 export type SharedEvent = { id: number; title: string | null; startsAt: string | null };
 export type ServerConversation = { user: UserCard; last: DirectMessage; unread: number };
@@ -1075,8 +1089,12 @@ export const casinoReport = () => call<CasinoReport>('GET', '/api/admin/casino/r
 export const saveLuckyConfig = (config: ServerLuckyConfig, version: number) =>
   call<{ config: ServerLuckyConfig; version: number; updatedAt: string }>('POST', '/api/admin/lucky/config', { config, version });
 
-export const sendDm = (to: string, text: string, ref = newRef(), image?: string, event?: number) =>
-  call<{ message: DirectMessage; replay: boolean }>('POST', '/api/messages', { to, text, ref, ...(image && { image }), ...(event && { event }) }).then((r) => r.message);
+export const sendDm = (to: string, text: string, ref = newRef(), image?: string, event?: number, opts: { replyTo?: number; paid?: boolean } = {}) =>
+  call<{ message: DirectMessage; replay: boolean }>('POST', '/api/messages', { to, text, ref, ...(image && { image }), ...(event && { event }), ...(opts.replyTo && { replyTo: opts.replyTo }), ...(opts.paid && { paid: true }) }).then((r) => r.message);
+/** Takes my message back (within 2 minutes; never one that carried money): POST /api/messages/unsend. */
+export const unsendDm = (id: number) => call<{ message: DirectMessage }>('POST', '/api/messages/unsend', { id }).then((r) => r.message);
+/** Opens a paid photo at the price its card showed: POST /api/messages/open (the coins become her diamonds). */
+export const openPaidPhoto = (id: number, price: number) => call<{ message: DirectMessage; coins: number }>('POST', '/api/messages/open', { id, price });
 export const dmThread = (peer: string) => call<{ messages: DirectMessage[] }>('GET', `/api/messages?with=${encodeURIComponent(peer)}`).then((r) => r.messages);
 export const conversations = () => call<{ conversations: ServerConversation[] }>('GET', '/api/conversations').then((r) => r.conversations);
 export const markDmRead = (peer: string) => call<{ read: number }>('POST', '/api/messages/read', { with: peer });
@@ -1557,6 +1575,7 @@ export type CasinoKey = 'casino_off' | 'casino_open' | 'games_staff' | 'casino_m
 /** 1v1 and Eşleşme (server/api/live-registry.mjs, "Birebir ve eşleşme"): whole numbers. */
 export type OneOnOneKey =
   | 'dm_price'
+  | 'dm_photo_price'
   | 'call_voice_price'
   | 'call_video_price'
   | 'call_free'

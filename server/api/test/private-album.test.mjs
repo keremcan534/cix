@@ -96,6 +96,14 @@ async function setPrice(price) {
 }
 
 describe('Özel albüm', () => {
+  // The owners' price (27 Nov 2026) is 1,000 coins; the tests below run at 500, as the panel would set it.
+  test('varsayılan fiyat 1.000 jeton; panelden değişir', async () => {
+    const s = await streamer('Fiyat Yıldız');
+    const v = await signUp('Fiyat Bakan');
+    assert.equal((await ok(call('GET', `/api/user/private-album?id=${s.user.id}`, null, v.session), 'albüm')).price, 1000);
+    await setPrice(500);
+  });
+
   test('dosya kontrolü: JPEG, PNG, WebP, HEIC; başkası değil', () => {
     assert.equal(photoKind(JPEG), 'jpeg');
     assert.equal(photoKind(Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(20)])), 'png');

@@ -14,7 +14,7 @@ Sahiplerin kararıyla 24 Kasım 2026'da yapıldı: "Yayıncılar için özel alb
 
 | Konu | Karar |
 | --- | --- |
-| Fiyat | Herkese tek fiyat, panelde **Canlı ayarlar › Özel albüm** (başta 500 jeton). 0: kapalı. |
+| Fiyat | Herkese tek fiyat, panelde **Canlı ayarlar › Özel albüm** (başta 1.000 jeton, sahiplerin 27 Kasım 2026 kararı; panelde daha önce kaydedilmiş bir fiyat varsa o geçerli kalır). 0: kapalı. |
 | Gelir | Hediye gibi yayıncıya: jeton elmasa döner (her parça jetonun kilidiyle: mağaza jetonu 7 gün, Jeton Noktası 1 gün), ajans komisyonu hediye gibi. |
 | Onay | Yok: fotoğraf hemen görünür. Sorunlu olan şikâyetle kaldırılır. |
 | Kimler | Yalnız ajanstaki onaylı yayıncılar. |

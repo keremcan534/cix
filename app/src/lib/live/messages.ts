@@ -85,11 +85,11 @@ const retryable = (e: unknown) => !(e instanceof api.ApiError) || e.status === 0
  * contact details (lib/contact-filter): sending it again would fail the same way. `event`: an Etkinlik Merkezi event
  * the message carries (the other side's app draws its card).
  */
-export function liveDm(to: string, text: string, ref: string, done: (r: SendResult) => void, event?: number) {
+export function liveDm(to: string, text: string, ref: string, done: (r: SendResult) => void, event?: number, replyTo?: number) {
   const id = toServer(to);
   if (!id) return done({ ok: false, reason: 'Kullanıcı bulunamadı', retry: false });
   api
-    .sendDm(id, text, ref, undefined, event)
+    .sendDm(id, text, ref, undefined, event, { replyTo })
     // "Seen" stays where the sync left it: moving it up to my message would skip a reply with a lower id that is
     // already on the server. The next sync finds my message by its id.
     .then((m) => done({ ok: true, message: m }))
@@ -182,7 +182,7 @@ export function useLiveThread(userId: string, app: Inbox) {
     // read by them, shows at once.
     const peer = toServer(userId);
     const off = onLine((e) => {
-      if ((e.type === 'message' || e.type === 'message_read' || e.type === 'gift') && e.from === peer) tick();
+      if (['message', 'message_read', 'gift', 'message_unsent', 'message_opened'].includes(e.type) && e.from === peer) tick();
     });
     const closed = peer ? markChatOpen(peer) : undefined;
     return () => {

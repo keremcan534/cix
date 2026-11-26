@@ -11,7 +11,7 @@ import { rnd, startApi } from './harness.mjs';
 
 // Locks of 0 days: gifted diamonds can leave at once, so Çevir and diamond sales run on them too.
 // Canlı Yörünge's rounds run fast: a 0,4 s window and a climb of e^(3t).
-const h = startApi({ BOND_SWEEP_MS: '200', BAG_SWEEP_MS: '200', ROOM_XP_SWEEP_MS: '200', HOLD_SWEEP_MS: '200', AUTO_CHAT_SWEEP_MS: '0', LOCK_DAYS_STORE: '0', LOCK_DAYS_JETON: '0', TEST_TOPUP_DAILY: '100000000', AGENCY_JOBS: '0', ROCKET_BET_MS: '400', ROCKET_IGNITE_MS: '0', ROCKET_PAUSE_MS: '100', ROCKET_RATE: '3' });
+const h = startApi({ BOND_SWEEP_MS: '200', BAG_SWEEP_MS: '200', ROOM_XP_SWEEP_MS: '200', HOLD_SWEEP_MS: '200', AUTO_CHAT_SWEEP_MS: '0', LOCK_DAYS_STORE: '0', LOCK_DAYS_JETON: '0', TEST_TOPUP_DAILY: '100000000', AGENCY_JOBS: '0', ROCKET_BET_MS: '400', ROCKET_IGNITE_MS: '0', ROCKET_PAUSE_MS: '100', ROCKET_RATE: '3', S3_ENDPOINT: 'https://acc.r2.cloudflarestorage.com', S3_BUCKET: 'media', S3_KEY: 'testkey', S3_SECRET: 'testsecret', S3_PUBLIC_URL: 'https://cdn.example.com' });
 const { call, signUp } = h;
 const q = async (sql, args) => (await h.sql.query(sql, args)).rows;
 const ok = async (p, what) => {
@@ -101,7 +101,7 @@ describe('Para: aynı anda rastgele işlemler', () => {
       // decide it, racing the marks.
       [2, async (u) => ['iz tercihi', 'PATCH', '/api/me/privacy', random() < 0.3 ? { profileMarks: random() < 0.5 } : { marksFrom: pick(['everyone', 'following', 'nobody']) }, u.session]],
       [2, async (u) => ['takip', 'POST', '/api/follow', { to: other(u).user.id, follow: random() < 0.7 }, u.session]],
-      [4, async (u) => ['özel albüm', 'POST', '/api/user/private-album/unlock', { user: pick(albumOwners).user.id, price: random() < 0.15 ? 450 : 500, ref: rnd(6) }, u.session]],
+      [4, async (u) => ['özel albüm', 'POST', '/api/user/private-album/unlock', { user: pick(albumOwners).user.id, price: random() < 0.15 ? 450 : 1000, ref: rnd(6) }, u.session]],
       [6, async (u) => ['test hediyesi', 'POST', '/api/wallet/gift', { to: other(u).user.id, amount: 1 + Math.floor(random() * 500), ref: rnd(6) }, u.session]],
       [8, async (u) => ['çevir', 'POST', '/api/wallet/exchange', { usdTry: 50.62, coinValueTl: 220, diamonds: pick([100, 500, 1000]), ref: rnd(6) }, u.session]],
       [5, async (u) => ['bağ isteği', 'POST', '/api/bonds/request', { to: other(u).user.id, kind: pick(['kardes', 'kanka']), ref: rnd(6) }, u.session]],
@@ -152,6 +152,21 @@ describe('Para: aynı anda rastgele işlemler', () => {
       // settles what waits for her. A quick reply (only a streamer's, only to someone who wrote: else refused).
       [8, async (u) => ['mesaj', 'POST', '/api/messages', { to: other(u).user.id, text: pick(['Selam', 'Merhaba, nasılsın?', '.']), ref: rnd(6) }, u.session]],
       [2, async (u) => ['hazır cevap', 'POST', '/api/messages', { to: other(u).user.id, quick: 1, ref: rnd(6) }, u.session]],
+      // Ücretli fotoğraf (messages.mjs): an album owner (an approved streamer) sends one to anyone (to a non-payer: refused);
+      // the recipient opens a locked one at its price (the mix often sends the same one twice at once); a message taken back (one that
+      // carries money: refused) beside the answers that settle holds.
+      [3, async () => {
+        const o = pick(albumOwners);
+        return ['ücretli fotoğraf', 'POST', '/api/messages', { to: other(o).user.id, image: `https://cdn.example.com/dm/${o.user.id}/${rnd(6)}.jpg`, paid: true, ref: rnd(6) }, o.session];
+      }],
+      [4, async () => {
+        const [m] = await q('SELECT id, recipient, paid_price FROM messages WHERE paid_price IS NOT NULL AND paid_opened_at IS NULL AND paid_until > now() ORDER BY random() LIMIT 1');
+        return m ? ['fotoğraf açma', 'POST', '/api/messages/open', { id: Number(m.id), price: Number(m.paid_price) }, personOf(m.recipient).session] : null;
+      }],
+      [3, async () => {
+        const [m] = await q("SELECT id, sender FROM messages WHERE created_at > now() - interval '2 minutes' AND retracted_at IS NULL ORDER BY random() LIMIT 1");
+        return m && personOf(m.sender) ? ['geri alma', 'POST', '/api/messages/unsend', { id: Number(m.id) }, personOf(m.sender).session] : null;
+      }],
       // A held message's time runs out now: the sweep gives its coins back, or pays an answer that came in time.
       [2, async () => {
         await q("UPDATE message_holds SET deadline_at = now() - interval '1 minute' WHERE message_id = (SELECT message_id FROM message_holds WHERE status = 'pending' ORDER BY random() LIMIT 1)");

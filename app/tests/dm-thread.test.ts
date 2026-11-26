@@ -254,3 +254,40 @@ describe('Takip satırı', () => {
     assert.match(src, /\{user\.name\} seni takip etti · \{messageTime\(item\)\}/);
   });
 });
+
+describe('Yanıtla, geri al, ücretli fotoğraf (27 Kasım 2026)', () => {
+  const sync = { peer: PEER, after: 0 };
+  test('yanıt alıntısıyla gelir; bozuk alıntı yok sayılır', () => {
+    const r = mergeThread([], [dm(5, PEER, 'Evet geliyorum', { replyTo: { id: 4, from: ME, text: 'Odada mısın?', photo: false } }), dm(6, PEER, 'Selam', { replyTo: { id: 'x' } })], sync);
+    assert.deepEqual(r.messages[0].replyTo, { sid: 4, fromMe: true, text: 'Odada mısın?', photo: false });
+    assert.equal(r.messages[1].replyTo, undefined);
+  });
+  test('geri alınan mesaj zaten telefondaysa da güncellenir, fotoğrafı gider', () => {
+    const first = mergeThread([], [dm(7, PEER, 'Fotoğraf', { image: 'https://cdn/x.jpg' })], sync).messages;
+    const r = mergeThread(first, [dm(7, PEER, 'Bu mesaj geri alındı', { retracted: 'unsent', image: null })], sync);
+    assert.equal(r.changed, true);
+    assert.deepEqual([r.messages[0].text, r.messages[0].image, r.messages[0].retracted], ['Bu mesaj geri alındı', undefined, 'unsent']);
+  });
+  test('kilitli ücretli fotoğraf bu uygulamanın sözüyle görünür, açılınca fotoğraf gelir, süresi dolan alıcıda silinir', () => {
+    const until = '2026-11-27T10:02:00.000Z';
+    const locked = mergeThread([], [dm(8, PEER, '🔒 Ücretli fotoğraf (120 jeton). Açmak için uygulamayı güncelle.', { image: null, paidPhoto: { price: 120, state: 'locked', until } })], sync).messages;
+    assert.deepEqual([locked[0].text, locked[0].image, locked[0].paidPhoto?.state], ['🔒 Ücretli fotoğraf · 120 jeton', undefined, 'locked']);
+    const open = mergeThread(locked, [dm(8, PEER, 'Fotoğraf', { image: 'https://cdn/p.jpg', paidPhoto: { price: 120, state: 'open', until } })], sync).messages;
+    assert.deepEqual([open[0].image, open[0].paidPhoto?.state], ['https://cdn/p.jpg', 'open']);
+    const gone = mergeThread(locked, [dm(8, PEER, 'Ücretli fotoğraf açılmadı, süresi doldu', { image: null, retracted: 'expired', paidPhoto: { price: 120, state: 'expired', until } })], sync);
+    assert.equal(gone.messages.length, 0, 'alıcıda silinir');
+    assert.equal(mergeThread([], [dm(9, PEER, 'x', { retracted: 'expired', paidPhoto: { price: 120, state: 'expired', until } })], sync).messages.length, 0, 'yeni gelen de eklenmez');
+    // The sender keeps hers, marked.
+    const mine = mergeThread([], [dm(10, ME, 'Fotoğraf', { image: 'https://cdn/m.jpg', retracted: 'expired', paidPhoto: { price: 120, state: 'expired', until } })], sync).messages;
+    assert.equal(mine[0].paidPhoto?.state, 'expired');
+  });
+});
+
+describe('Alıntılanan mesaj geri alınınca', () => {
+  test('yanıttaki alıntı da "geri alındı" olur', () => {
+    const sync = { peer: PEER, after: 0 };
+    const first = mergeThread([], [dm(12, PEER, 'Tamam', { replyTo: { id: 11, from: ME, text: 'Akşam oradayım', photo: false } })], sync).messages;
+    const r = mergeThread(first, [dm(12, PEER, 'Tamam', { replyTo: { id: 11, from: ME, text: 'Bu mesaj geri alındı', photo: false } })], sync);
+    assert.equal(r.messages[0].replyTo?.text, 'Bu mesaj geri alındı');
+  });
+});

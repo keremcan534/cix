@@ -45,7 +45,7 @@ import { checkInteraction } from '@/lib/interaction';
 import { incomingWarning, scanMessage } from '@/lib/safety';
 import { messageRefusal, noteSent } from '@/lib/contact-filter';
 import { ContactNote } from '@/components/contact-note';
-import { newRef, sendDm } from '@/lib/api';
+import { newRef, openPaidPhoto, sendDm, unsendDm } from '@/lib/api';
 import { HeartBar, heartOf, paidPair, useChatGift, usePair } from '@/components/one-on-one-bar';
 import { liveMode, message as errorText, refreshWallet, serverRoomByCode, toServer, useServerRoomList } from '@/lib/live';
 import { sharedRoomInvite } from '@/lib/room-social';
@@ -64,6 +64,8 @@ type ChatMessage = Conversation['messages'][number];
 /** The server's limit for one message (server/api/messages.mjs). */
 const MAX_LENGTH = 1000;
 /** 44 dp tall, and apart from each other across the composer's 10 dp gaps. */
+/** A message is taken back within this (the server's UNSEND_SECONDS). */
+const UNSEND_MS = 120_000;
 const COMPOSER_ICON_SLOP = { top: 10, bottom: 10, left: 5, right: 5 };
 
 export function ChatThread({
@@ -100,6 +102,8 @@ export function ChatThread({
   // An open chat with a real person reads its thread every few seconds (both sides, the server's times).
   useLiveThread(user.id, { importDms });
   const [picked, setPicked] = useState<ChatMessage | null>(null);
+  // Yanıtla (owners, 27 Nov 2026): the message my next one answers, quoted over the composer.
+  const [replying, setReplying] = useState<ChatMessage | null>(null);
   // A photo message opened over the whole screen (tap it; a long press still opens the message's options).
   const [viewing, setViewing] = useState<string | null>(null);
   const [reporting, setReporting] = useState<ChatMessage | null>(null);
@@ -202,7 +206,7 @@ export function ChatThread({
     setRefused(null);
   };
   const thread = `dm:${user.id}`;
-  const deliver = (text: string, ref: string, event?: number) =>
+  const deliver = (text: string, ref: string, event?: number, replyTo?: number) =>
     liveDm(
       user.id,
       text,
@@ -226,6 +230,7 @@ export function ChatThread({
         setDraft((d) => d || text);
       },
       event,
+      replyTo,
     );
   const retry = (m: ChatMessage) => {
     if (!m.ref || m.noRetry) return;
@@ -271,9 +276,26 @@ export function ChatThread({
           ],
     );
   };
+  // Geri al (owners, 27 Nov 2026): my message within 2 minutes of the server's time, never one that carried money (the
+  // server checks; a paid message's fee says so here).
+  const canUnsend = (m: ChatMessage) =>
+    real && m.fromMe && m.sid !== undefined && !m.retracted && !m.gift && !extras(m.sid)?.fee && m.paidPhoto?.state !== 'open' && !!m.at && serverNowMs() - Date.parse(m.at) < UNSEND_MS;
+  const canReply = (m: ChatMessage) => real && m.sid !== undefined && !m.retracted && !m.follow && !(m.paidPhoto && m.paidPhoto.state !== 'open' && !m.fromMe);
+  const unsend = async (m: ChatMessage) => {
+    if (m.sid === undefined) return;
+    try {
+      await unsendDm(m.sid);
+      if (replying?.sid === m.sid) setReplying(null);
+      await syncThread(user.id, { importDms });
+    } catch (e) {
+      showAlert('Geri alınamadı', errorText(e));
+    }
+  };
   const messageOptions: SheetOption[] = picked
     ? [
-        { label: 'Kopyala', icon: 'copy-outline', onPress: () => void copyText(picked.text, 'Mesaj') },
+        ...(canReply(picked) ? [{ label: 'Yanıtla', icon: 'arrow-undo-outline' as const, onPress: () => setReplying(picked) }] : []),
+        ...(canUnsend(picked) ? [{ label: 'Geri al', icon: 'refresh-outline' as const, onPress: () => void unsend(picked) }] : []),
+        ...(picked.retracted ? [] : [{ label: 'Kopyala', icon: 'copy-outline' as const, onPress: () => void copyText(picked.text, 'Mesaj') }]),
         ...(picked.fromMe ? [] : [{ label: 'Şikâyet et', icon: 'flag-outline' as const, onPress: () => reportMessage(picked) }]),
         {
           label: 'Sil',
@@ -291,12 +313,20 @@ export function ChatThread({
   // A photo (live, a real person): opens with the heart level or a mutual follow (the server's pair.photo). It
   // goes to the storage, then as a message; the thread then reads it back from the server (no bubble ahead of it).
   const [sendingPhoto, setSendingPhoto] = useState(false);
-  const photoOpen = !!pair?.photo?.open;
-  const sendPhoto = async () => {
+  // Ücretli fotoğraf (owners, 27 Nov 2026): an approved streamer to someone who pays her (the server's pair.paidPhoto).
+  const paidPrice = pair?.paidPhoto ?? 0;
+  const freeOpen = !!pair?.photo?.open;
+  const photoOpen = freeOpen || paidPrice > 0;
+  const [photoChoice, setPhotoChoice] = useState(false);
+  const photoTap = () => {
+    if (paidPrice > 0 && !sendingPhoto && !isBlocked && !missing) return setPhotoChoice(true);
+    void sendPhoto(false);
+  };
+  const sendPhoto = async (paid: boolean) => {
     if (sendingPhoto || isBlocked || missing) return;
     if (dmMuted) return showSanction(dmMuted);
     if (!allowed.ok) return showAlert('Mesaj gönderilemiyor', allowed.reason);
-    if (!photoOpen) return showAlert('Fotoğraf kilitli', pair?.photo?.why ?? 'Bu sohbette fotoğraf henüz açık değil.');
+    if (!paid && !freeOpen) return showAlert('Fotoğraf kilitli', pair?.photo?.why ?? 'Bu sohbette fotoğraf henüz açık değil.');
     if (!mutual && coins < price) {
       return showAlert('Yetersiz jeton', `Karşılıklı takip olmadan mesaj başı ${price} jeton.`, [
         { text: 'Vazgeç', style: 'cancel' },
@@ -310,7 +340,8 @@ export function ChatThread({
     setSendingPhoto(true);
     try {
       const url = await uploadPhoto('dm', picked.assets[0]);
-      await sendDm(to, '', newRef(), url);
+      await sendDm(to, '', newRef(), url, undefined, { paid, replyTo: real ? replying?.sid : undefined });
+      setReplying(null);
       await syncThread(user.id, { importDms });
       reload();
       void refreshWallet().catch(() => {});
@@ -319,6 +350,39 @@ export function ChatThread({
     } finally {
       setSendingPhoto(false);
     }
+  };
+
+  // A locked paid photo: its price asked once, then the server takes the coins and shows it.
+  const [opening, setOpening] = useState<number | null>(null);
+  const openPaid = (m: ChatMessage) => {
+    const p = m.paidPhoto;
+    if (m.sid === undefined || !p || p.state !== 'locked' || opening) return;
+    if (coins < p.price) {
+      return showAlert('Yetersiz jeton', `Bu fotoğrafı açmak ${p.price} jeton.`, [
+        { text: 'Vazgeç', style: 'cancel' },
+        { text: 'Jeton yükle', onPress: () => router.push('/cuzdan') },
+      ]);
+    }
+    showAlert('Ücretli fotoğraf', `${user.name} sana ücretli bir fotoğraf gönderdi. Açmak ${p.price} jeton.`, [
+      { text: 'Vazgeç', style: 'cancel' },
+      {
+        text: `Aç · ${p.price} jeton`,
+        onPress: () => {
+          const sid = m.sid!;
+          setOpening(sid);
+          openPaidPhoto(sid, p.price)
+            .then(() => {
+              void refreshWallet().catch(() => {});
+              return syncThread(user.id, { importDms });
+            })
+            .catch((e) => {
+              showAlert('Fotoğraf açılamadı', errorText(e));
+              void syncThread(user.id, { importDms }).catch(() => {});
+            })
+            .finally(() => setOpening(null));
+        },
+      },
+    ]);
   };
 
   // `sticker` (a sticker token) goes out on its own and leaves the typed draft alone.
@@ -345,11 +409,13 @@ export function ChatThread({
       return;
     }
     const ref = real ? newRef() : undefined;
+    const replyTo = real ? replying?.sid : undefined;
     sendMessage(user.id, text, true, undefined, ref);
     noteSent(thread, text);
     setEmojiOpen(false);
+    setReplying(null);
     if (!sticker) setDraft('');
-    if (ref) return deliver(text, ref);
+    if (ref) return deliver(text, ref, undefined, replyTo);
     // Fake reply so the prototype feels real.
     setTyping(true);
     replyTimer.current = setTimeout(() => {
@@ -396,7 +462,8 @@ export function ChatThread({
             ) : item.fromMe ? (
               <Pressable onLongPress={() => setPicked(item)} delayLongPress={350} style={styles.mine} accessibilityHint="Seçenekler için basılı tut">
                 {!!sourceLabel(item.source ?? extras(item.sid)?.source, true) && <Text style={[styles.autoLabel, { alignSelf: 'flex-end' }]}>{sourceLabel(item.source ?? extras(item.sid)?.source, true)}</Text>}
-                <LinearGradient colors={gradientDeep} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.bubble, styles.mineBubble]}>
+                <LinearGradient colors={gradientDeep} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.bubble, styles.mineBubble, item.retracted && styles.retractedBubble]}>
+                  {item.replyTo && <Quote q={item.replyTo} who={item.replyTo.fromMe ? 'Sen' : user.name} />}
                   {!!item.image && (
                     <Pressable onPress={() => setViewing(item.image!)} onLongPress={() => setPicked(item)} delayLongPress={350} accessibilityRole="imagebutton" accessibilityLabel="Fotoğraf. Büyütmek için dokun">
                       <Image source={{ uri: item.image }} style={styles.photo} resizeMode="cover" />
@@ -405,8 +472,9 @@ export function ChatThread({
                   {item.gift ? (
                     <GiftLine gift={item.gift} text={item.text} onPlay={() => replayGift(item, item.gift!)} onLongPress={() => setPicked(item)} />
                   ) : (
-                    !(item.image && item.text === 'Fotoğraf') && <MessageText text={inviteOf(item)?.line ?? item.text} style={styles.bubbleText} />
+                    !(item.image && item.text === 'Fotoğraf') && <MessageText text={inviteOf(item)?.line ?? item.text} style={[styles.bubbleText, item.retracted && styles.retractedText]} />
                   )}
+                  {item.paidPhoto && <PaidMark p={item.paidPhoto} />}
                   {item.room ? <RoomCard room={item.room} /> : inviteOf(item) && <SharedRoomCard invite={inviteOf(item)!} />}
                   {item.event && <EventCard event={item.event} />}
                   <Text style={styles.time}>
@@ -435,7 +503,9 @@ export function ChatThread({
             ) : (
               <View style={{ gap: 6 }}>
                 {!!sourceLabel(item.source ?? extras(item.sid)?.source, false) && <Text style={styles.autoLabel}>{sourceLabel(item.source ?? extras(item.sid)?.source, false)}</Text>}
-                <Pressable onLongPress={() => setPicked(item)} delayLongPress={350} style={[styles.bubble, styles.theirs]} accessibilityHint="Seçenekler için basılı tut">
+                <Pressable onLongPress={() => setPicked(item)} delayLongPress={350} style={[styles.bubble, styles.theirs, item.retracted && styles.retractedBubble]} accessibilityHint="Seçenekler için basılı tut">
+                  {item.replyTo && <Quote q={item.replyTo} who={item.replyTo.fromMe ? 'Sen' : user.name} theirs />}
+                  {item.paidPhoto?.state === 'locked' && <LockedPhoto p={item.paidPhoto} busy={opening === item.sid} onOpen={() => openPaid(item)} />}
                   {!!item.image && (
                     <Pressable onPress={() => setViewing(item.image!)} onLongPress={() => setPicked(item)} delayLongPress={350} accessibilityRole="imagebutton" accessibilityLabel="Fotoğraf. Büyütmek için dokun">
                       <Image source={{ uri: item.image }} style={styles.photo} resizeMode="cover" />
@@ -444,7 +514,7 @@ export function ChatThread({
                   {item.gift ? (
                     <GiftLine gift={item.gift} text={item.text} theirs onPlay={() => replayGift(item, item.gift!)} onLongPress={() => setPicked(item)} />
                   ) : (
-                    !(item.image && item.text === 'Fotoğraf') && <MessageText text={inviteOf(item)?.line ?? item.text} style={[styles.bubbleText, styles.theirsText]} />
+                    !(item.image && item.text === 'Fotoğraf') && item.paidPhoto?.state !== 'locked' && <MessageText text={inviteOf(item)?.line ?? item.text} style={[styles.bubbleText, styles.theirsText, item.retracted && styles.retractedText]} />
                   )}
                   {item.room ? <RoomCard room={item.room} theirs /> : inviteOf(item) && <SharedRoomCard invite={inviteOf(item)!} theirs />}
                   {item.event && <EventCard event={item.event} theirs />}
@@ -503,6 +573,20 @@ export function ChatThread({
         )}
         <ContactNote text={refused} />
         {emojiOpen && <EmojiPanel onPick={(e) => (stickerIdOf(e) ? send(e) : edit((d) => d + e))} onClose={() => setEmojiOpen(false)} />}
+        {replying && (
+          <View style={styles.replyBar}>
+            <View style={styles.replyAccent} />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.replyWho}>{replying.fromMe ? 'Kendi mesajını yanıtlıyorsun' : `${user.name} kişisine yanıt`}</Text>
+              <Text style={styles.replyText} numberOfLines={1}>
+                {replying.image && replying.text === 'Fotoğraf' ? '📷 Fotoğraf' : replying.text}
+              </Text>
+            </View>
+            <Pressable onPress={() => setReplying(null)} hitSlop={10} accessibilityLabel="Yanıtı iptal et">
+              <Ionicons name="close" size={20} color={colors.textDim} />
+            </Pressable>
+          </View>
+        )}
         <View style={styles.inputRow}>
           {/* The panel and the keyboard take turns: together they leave no room for the messages on a small phone. */}
           <Pressable
@@ -522,7 +606,7 @@ export function ChatThread({
           )}
           {real && !isBlocked && (
             <Pressable
-              onPress={() => void sendPhoto()}
+              onPress={photoTap}
               disabled={sendingPhoto}
               style={[styles.composerIcon, { opacity: photoOpen && !sendingPhoto ? 1 : 0.45 }]}
               accessibilityLabel={photoOpen ? 'Fotoğraf gönder' : 'Fotoğraf (kilitli)'}
@@ -569,6 +653,15 @@ export function ChatThread({
       {gift.sheet}
       <PhotoViewer uri={viewing} onClose={() => setViewing(null)} />
       <ActionSheet visible={!!picked} options={messageOptions} onClose={() => setPicked(null)} />
+      <ActionSheet
+        visible={photoChoice}
+        title="Fotoğraf gönder"
+        options={[
+          ...(freeOpen ? [{ label: 'Ücretsiz gönder', icon: 'image-outline' as const, onPress: () => void sendPhoto(false) }] : []),
+          { label: `Ücretli gönder · ${paidPrice} jeton`, icon: 'lock-closed-outline' as const, onPress: () => void sendPhoto(true) },
+        ]}
+        onClose={() => setPhotoChoice(false)}
+      />
       {quick && (
         <ActionSheet
           visible={quickOpen}
@@ -645,6 +738,66 @@ function InviteCard({ title, cover, seed, state, onJoin, theirs }: { title: stri
       </View>
     </Pressable>
   );
+}
+
+/** The message an answer quotes (Yanıtla): who wrote it and its first line. */
+function Quote({ q, who, theirs }: { q: NonNullable<ChatMessage['replyTo']>; who: string; theirs?: boolean }) {
+  const styles = useStyles();
+  return (
+    <View style={[styles.quote, theirs && styles.quoteTheirs]}>
+      <Text style={[styles.quoteWho, theirs && styles.quoteWhoTheirs]} numberOfLines={1}>
+        {who}
+      </Text>
+      <Text style={[styles.quoteText, theirs && styles.quoteTextTheirs]} numberOfLines={2}>
+        {q.photo && q.text === 'Fotoğraf' ? '📷 Fotoğraf' : q.text}
+      </Text>
+    </View>
+  );
+}
+
+/** Seconds left until `until` on the server's clock, ticking every second (0 when past). */
+function useSecondsLeft(until: string) {
+  const end = Date.parse(until);
+  const left = () => (Number.isNaN(end) ? 0 : Math.max(0, Math.ceil((end - serverNowMs()) / 1000)));
+  const [s, setS] = useState(left);
+  useEffect(() => {
+    const t = setInterval(() => setS(left()), 1000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [until]);
+  return s;
+}
+
+/** A paid photo not opened yet: its price, the time left, and "Aç". Gone when the time runs out (the next sync drops it). */
+function LockedPhoto({ p, busy, onOpen }: { p: NonNullable<ChatMessage['paidPhoto']>; busy: boolean; onOpen: () => void }) {
+  const styles = useStyles();
+  const left = useSecondsLeft(p.until);
+  const over = left <= 0;
+  return (
+    <Pressable onPress={onOpen} disabled={busy || over} style={styles.locked} accessibilityRole="button" accessibilityLabel={over ? 'Ücretli fotoğrafın süresi doldu' : `Ücretli fotoğraf, ${p.price} jeton, açmak için dokun`}>
+      <Ionicons name="lock-closed" size={30} color="#fff" />
+      <Text style={styles.lockedTitle}>Ücretli fotoğraf</Text>
+      {over ? (
+        <Text style={styles.lockedNote}>Süresi doldu</Text>
+      ) : (
+        <>
+          <LinearGradient colors={['#FF5FA2', '#C2306E']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.lockedBtn}>
+            {busy ? <ActivityIndicator size="small" color="#fff" /> : <Icon3D name="coin" size={14} />}
+            <Text style={styles.lockedBtnText}>Aç · {p.price} jeton</Text>
+          </LinearGradient>
+          <Text style={styles.lockedNote}>{`${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')} içinde açılmazsa silinir`}</Text>
+        </>
+      )}
+    </Pressable>
+  );
+}
+
+/** My paid photo: its price and what happened to it. */
+function PaidMark({ p }: { p: NonNullable<ChatMessage['paidPhoto']> }) {
+  const styles = useStyles();
+  const left = useSecondsLeft(p.until);
+  const text = p.state === 'open' ? `🔓 Açıldı · ${p.price} jeton` : p.state === 'expired' || left <= 0 ? '⌛ Açılmadı, silindi' : `🔒 ${p.price} jeton · açılmayı bekliyor`;
+  return <Text style={styles.paidMark}>{text}</Text>;
 }
 
 /** Room invite sent from a room's "Paylaş" (my own copy carries the room). */
@@ -767,6 +920,24 @@ const useStyles = makeStyles(({ colors, lift, ink, dark }) => ({
   giftLineKindTheirs: { color: ink(0.7) },
   giftLineName: { color: '#fff', fontSize: 15, fontWeight: '800' },
   roomCardTheirs: { backgroundColor: dark ? 'rgba(0,0,0,0.25)' : colors.cardAlt },
+  retractedBubble: { opacity: 0.7 },
+  retractedText: { fontStyle: 'italic' },
+  quote: { borderLeftWidth: 3, borderLeftColor: 'rgba(255,255,255,0.8)', backgroundColor: 'rgba(0,0,0,0.18)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, marginBottom: 4 },
+  quoteTheirs: { borderLeftColor: colors.pink, backgroundColor: dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' },
+  quoteWho: { color: '#fff', fontWeight: '800', fontSize: 12 },
+  quoteWhoTheirs: { color: colors.pink },
+  quoteText: { color: 'rgba(255,255,255,0.85)', fontSize: 13 },
+  quoteTextTheirs: { color: colors.textDim },
+  replyBar: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 12, marginBottom: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12, backgroundColor: colors.cardAlt },
+  replyAccent: { width: 3, alignSelf: 'stretch', borderRadius: 2, backgroundColor: colors.pink },
+  replyWho: { color: colors.pink, fontWeight: '800', fontSize: 12 },
+  replyText: { color: colors.textDim, fontSize: 13 },
+  locked: { width: 220, height: 170, borderRadius: 14, alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#2A1530', marginBottom: 4 },
+  lockedTitle: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  lockedBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7 },
+  lockedBtnText: { color: '#fff', fontWeight: '800', fontSize: 14 },
+  lockedNote: { color: 'rgba(255,255,255,0.75)', fontSize: 11 },
+  paidMark: { color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: '700', marginTop: 2 },
   inviteCard: { marginTop: 6, borderRadius: 14, overflow: 'hidden', backgroundColor: 'rgba(0,0,0,0.25)', width: 230 },
   inviteCover: { width: 230, height: 120 },
   inviteFoot: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 8 },

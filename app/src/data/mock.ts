@@ -165,6 +165,12 @@ export type Conversation = {
     gift?: { id: string; count: number };
     /** Live mode: they followed me (the server's line, lib/dm-thread): drawn as a note in the middle, not a bubble. */
     follow?: true;
+    /** Live mode: the message it answers (Yanıtla), quoted over it. */
+    replyTo?: { sid: number; fromMe: boolean; text: string; photo: boolean };
+    /** Live mode: taken back by its writer, or a paid photo not opened in time. */
+    retracted?: 'unsent' | 'expired';
+    /** Live mode: an approved streamer's paid photo: locked for the recipient until paid. */
+    paidPhoto?: { price: number; state: 'locked' | 'open' | 'expired'; until: string };
   }[];
   unread: number;
 };

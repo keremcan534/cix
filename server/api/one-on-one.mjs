@@ -165,6 +165,8 @@ export async function pairOf(c, me, other) {
     dmPrice: payer === me && !mutual ? s.dmPrice : 0,
     heart: { points, level, next: HEART_LEVELS[level + 1] ?? null, floor: HEART_LEVELS[level], voiceAt: s.heartVoice, videoAt: s.heartVideo, photoAt: PHOTO_HEART_LEVEL },
     calls: { voice: closed('voice', call('voice')), video: closed('video', call('video')) },
+    // Ücretli fotoğraf (messages.mjs): its price when I, a streamer, may send one to this person (they pay me); else 0.
+    paidPhoto: paid && x.me_s ? s.dmPhotoPrice : 0,
     // A photo in the chat: with a streamer from the heart level, otherwise between people who follow each other.
     photo: paid
       ? { open: level >= PHOTO_HEART_LEVEL, why: level >= PHOTO_HEART_LEVEL ? null : `Mesajda fotoğraf kalp seviyesi ${PHOTO_HEART_LEVEL} olunca açılır` }

@@ -73,12 +73,12 @@ async function giveBack(c, h, status, reason, lots = lotsOf(h)) {
 
 /** SQL: whether message `m` (a row alias) is a valid answer of hold `h`'s streamer. $1: reply_min_chars. */
 const VALID = (m, h) =>
-  `${m}.sender = ${h}.earner AND ${m}.recipient = ${h}.payer AND ${m}.id > ${h}.message_id AND ${m}.source IN ('manual', 'quick_reply')
+  `${m}.sender = ${h}.earner AND ${m}.recipient = ${h}.payer AND ${m}.id > ${h}.message_id AND ${m}.source IN ('manual', 'quick_reply') AND ${m}.retracted_at IS NULL
    AND (${m}.image_url IS NOT NULL OR ${m}.source = 'quick_reply' OR char_length(btrim(${m}.body)) >= $1)`;
 
 /** Whether `reply` (a stored message row) is a valid answer: what VALID says in SQL. */
 const validReply = (reply) =>
-  (reply.source === 'manual' || reply.source === 'quick_reply') && (reply.image_url || reply.source === 'quick_reply' || String(reply.body ?? '').trim().length >= live().replyMinChars);
+  !reply.retracted_at && (reply.source === 'manual' || reply.source === 'quick_reply') && (reply.image_url || reply.source === 'quick_reply' || String(reply.body ?? '').trim().length >= live().replyMinChars);
 
 /**
  * The streamer `reply.sender` just answered `reply.recipient`: every hold of theirs still unanswered gets this
