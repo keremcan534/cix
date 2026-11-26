@@ -7,7 +7,7 @@
 // light, the idle breathing and the win shine.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { memo, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, memo, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Animated, Easing, Image, Pressable, StyleSheet, View, type LayoutChangeEvent, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 
 import { GoldText } from '@/components/games/fx/gold-text';
@@ -51,10 +51,17 @@ export const SALON = {
 /** The gold of the stage's bezel: light at the top, deep at the sides, a bright line at the bottom. */
 const BEZEL: Colors = ['#FFE7B0', '#C9963F', '#5A3B10', '#B7832E', '#FFD98A'];
 
+/**
+ * False while the game is minimised in a room (game-panel): it keeps playing, but nobody sees it, so nothing on it
+ * moves (its loops, flickers and counters would otherwise keep the phone busy under the room).
+ */
+export const GameShown = createContext(true);
+
 /** `still`: no motion at all. `quiet`: no decoration either (ambient light, idle breathing, win shine). */
 export function useSalonFx() {
   const { reduceMotion, effectsOff } = useSettings();
-  return { still: reduceMotion, quiet: reduceMotion || effectsOff };
+  const shown = useContext(GameShown);
+  return { still: reduceMotion || !shown, quiet: reduceMotion || effectsOff || !shown };
 }
 
 /** The game's root: stage on top taking the free height, controls under it. */

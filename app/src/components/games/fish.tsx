@@ -5,7 +5,7 @@
 // neither changes the odds (lib/fish-hunt). What the stage is made of is in fish-stage, where a balloon is at any
 // moment in fish-swim. (The code still calls a balloon a fish: the game's ids are its first, fish-shaped ones.)
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, View, type GestureResponderEvent } from 'react-native';
 
 import { Text } from '@/components/text';
@@ -67,8 +67,6 @@ export function FishPlayer({ entry }: { entry: Entry }) {
   const [bursts, setBursts] = useState<Burst[]>([]);
   const [frozenUntil, setFrozenUntil] = useState(0);
   const [freezeReady, setFreezeReady] = useState(0);
-  /** Wall clock of the last look at the freeze timers, read in render instead of Date.now(). */
-  const [wall, setWall] = useState(0);
   const [lockOn, setLockOn] = useState(false);
   const [lockKey, setLockKey] = useState<number | null>(null);
   const [auto, setAuto] = useState(false);
@@ -240,15 +238,10 @@ export function FishPlayer({ entry }: { entry: Entry }) {
     // halt and go only read refs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [frozenUntil, frost]);
-  // The freeze card counts down while the ice holds and while the card rests.
-  useEffect(() => {
-    if (!freezeReady) return;
-    const id = setInterval(() => {
-      setWall(Date.now());
-      if (Date.now() >= freezeReady) clearInterval(id);
-    }, 400);
-    return () => clearInterval(id);
-  }, [freezeReady]);
+  const startFreeze = useCallback((now: number) => {
+    setFrozenUntil(now + FREEZE_MS);
+    setFreezeReady(now + FREEZE_COOLDOWN);
+  }, []);
 
   /** The cannon turns toward a point. */
   const point = (x: number, y: number) => {
@@ -407,17 +400,6 @@ export function FishPlayer({ entry }: { entry: Entry }) {
   const access = casinoAccess(game, entry, wealthLevel);
   if (!access.ok) return <CasinoLock reason={access.reason} needWealth={access.needWealth} />;
 
-  const frozen = wall < frozenUntil;
-  const freezeWait = Math.max(0, Math.ceil((freezeReady - wall) / 1000));
-  const freezeLeft = Math.max(0, Math.ceil((frozenUntil - wall) / 1000));
-  const freeze = () => {
-    if (freezeWait > 0 || frozen) return;
-    tapHaptic();
-    playSfx('spin', 0.6);
-    setWall(Date.now());
-    setFrozenUntil(Date.now() + FREEZE_MS);
-    setFreezeReady(Date.now() + FREEZE_COOLDOWN);
-  };
   // The big balloons float behind the small ones, so a small one is never hidden.
   const school = [...fish].sort((a, b) => b.size - a.size);
 
@@ -482,10 +464,7 @@ export function FishPlayer({ entry }: { entry: Entry }) {
             <Ionicons name="locate" size={21} color={lockOn ? '#fff' : '#FDA4AF'} />
             <Text style={f.cardText}>{lockOn ? (lockKey === null ? 'Seç' : 'Kilitli') : 'Kilit'}</Text>
           </Pressable>
-          <Pressable onPress={freeze} style={[f.card, frozen && { backgroundColor: '#0369A1', borderColor: '#E0F2FE' }, !frozen && freezeWait > 0 && { opacity: 0.55 }]} accessibilityRole="button" accessibilityState={{ disabled: frozen || freezeWait > 0 }} accessibilityLabel="Balonları dondur">
-            <Ionicons name="snow" size={21} color={frozen ? '#fff' : ICE} />
-            <Text style={f.cardText}>{frozen ? `${freezeLeft} sn` : freezeWait > 0 ? `${freezeWait} sn` : 'Dondur'}</Text>
-          </Pressable>
+          <FreezeCard frozenUntil={frozenUntil} freezeReady={freezeReady} onFreeze={startFreeze} />
         </View>
         <Pressable
           onPress={() => {
@@ -537,6 +516,40 @@ export function FishPlayer({ entry }: { entry: Entry }) {
     </View>
   );
 }
+
+/**
+ * The freeze card: it counts down while the ice holds and while the card rests (30 s). The clock it reads lives here,
+ * so that countdown redraws this card, not the whole sky with its balloons and the cannon every 400 ms.
+ */
+const FreezeCard = memo(function FreezeCard({ frozenUntil, freezeReady, onFreeze }: { frozenUntil: number; freezeReady: number; onFreeze: (now: number) => void }) {
+  /** Wall clock of the last look at the freeze timers, read in render instead of Date.now(). */
+  const [wall, setWall] = useState(0);
+  useEffect(() => {
+    if (!freezeReady) return;
+    const id = setInterval(() => {
+      setWall(Date.now());
+      if (Date.now() >= freezeReady) clearInterval(id);
+    }, 400);
+    return () => clearInterval(id);
+  }, [freezeReady]);
+  const frozen = wall < frozenUntil;
+  const freezeWait = Math.max(0, Math.ceil((freezeReady - wall) / 1000));
+  const freezeLeft = Math.max(0, Math.ceil((frozenUntil - wall) / 1000));
+  const freeze = () => {
+    if (freezeWait > 0 || frozen) return;
+    tapHaptic();
+    playSfx('spin', 0.6);
+    const now = Date.now();
+    setWall(now);
+    onFreeze(now);
+  };
+  return (
+    <Pressable onPress={freeze} style={[f.card, frozen && { backgroundColor: '#0369A1', borderColor: '#E0F2FE' }, !frozen && freezeWait > 0 && { opacity: 0.55 }]} accessibilityRole="button" accessibilityState={{ disabled: frozen || freezeWait > 0 }} accessibilityLabel="Balonları dondur">
+      <Ionicons name="snow" size={21} color={frozen ? '#fff' : ICE} />
+      <Text style={f.cardText}>{frozen ? `${freezeLeft} sn` : freezeWait > 0 ? `${freezeWait} sn` : 'Dondur'}</Text>
+    </Pressable>
+  );
+});
 
 const f = StyleSheet.create({
   // The sky is drawn edge to edge inside the shell's frame.
