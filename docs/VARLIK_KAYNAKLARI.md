@@ -9,7 +9,7 @@ Uygulamada kullanılan görsellerin, seslerin, yazı tipinin ve kütüphanelerin
 | Dosya | Kaynak | Fotoğrafçı | Durum |
 | --- | --- | --- | --- |
 | `sahne-aile.jpg` | Unsplash (bağlantı yok) | bilinmiyor | kaynak doğrulanmalı |
-| `sahne-ana-sayfa.jpg` | Unsplash (bağlantı yok) | bilinmiyor | kaynak doğrulanmalı |
+| `sahne-ana-sayfa.jpg` | Unsplash, [Milky way and mountains reflected in a serene lake](https://unsplash.com/photos/milky-way-and-mountains-reflected-in-a-serene-lake-HUYPJupBvwE) (26 Kasım 2026'da indirildi, 2400×1600'ün ortasından 900×1600 kesildi; Unsplash Lisansı: ticari kullanım serbest, kaynak gösterme zorunlu değil) | Pascal Debrunner | doğrulandı |
 | `sahne-cuzdan.jpg` | Unsplash (bağlantı yok) | bilinmiyor | kaynak doğrulanmalı |
 | `sahne-giris.jpg` | Unsplash (bağlantı yok) | bilinmiyor | kaynak doğrulanmalı |
 | `sahne-kesfet.jpg` | Unsplash (bağlantı yok) | bilinmiyor | kaynak doğrulanmalı |
@@ -52,6 +52,7 @@ Plus Jakarta Sans, `@expo-google-fonts/plus-jakarta-sans` paketiyle gelir. Lisan
 ## 4b. Oyun Salonu yazı tipi ve 3D jeton
 
 - **Cinzel ve Cinzel Decorative** (telif: The Cinzel Project Authors; Decorative: Natanael Gama, ayrılmış ad "Cinzel"; yazı tiplerini değiştirmiyoruz), `@expo-google-fonts/cinzel` ve `@expo-google-fonts/cinzel-decorative` paketleriyle gelir. Lisans SIL Open Font License 1.1 (Plus Jakarta Sans ile aynı lisans): uygulamaya gömülerek ticari kullanılabilir, yazı tipi tek başına satılamaz. Oyun Salonu'nun kazanç yazıları ve düğme etiketleri. Durum: doğrulandı (paketlerin `LICENSE_FONT` dosyası OFL 1.1, 2026-11-24).
+- **Ana sayfa gökyüzünün parıltısı** (`app/assets/fx/yildiz-parilti.png`, 26 Kasım 2026): dört kollu küçük yıldız, Python ile kodla çizildi. Dış kaynak yok. Durum: doğrulandı.
 - **3D altın jeton ve yıldız parıltısı** (`app/assets/fx/coin-spin.png`, `sparkle-burst.png`): bizim çizimimiz. Jeton Blender'da modellenip çizildi (taç ve elmas bizim işaretimiz, kimsenin logosu değil); parıltı kodla üretildi. Dış kaynak yok. Durum: doğrulandı.
 
 ## 4c. Yörünge görselleri (`app/assets/games/yorunge/`)
