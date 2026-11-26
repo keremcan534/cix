@@ -43,8 +43,18 @@ modunda olması, hata takibi olmaması ve kırık kodun birleşmeden önce yakal
   katkı verenler arasında şansla dağılır. Jeton ödülü sahibin kararıyla **normal jeton** (Şanslı hediye kazancıyla aynı): hediyeyle
   elmasa, elmas da nakde dönebilir. Yani Şanslı hediye ile aynı risk. **Kapalı gelir**, panelden açılır; açmadan önce aynı avukat
   görüşüne katın. Riski azaltmak için ödül yalnız süreli mağaza eşyası yapılabilir.
+- **Oyun anahtarları (26 Kasım 2026, sahiplerin isteği):** sunucunun oynattığı her oyun (Oyun Salonu, Yörünge, Rüzgâr
+  Gülü, Şanslı hediyeler, oda masaları) Canlı ayarlar › Oyun Salonu'ndan herkese kapatılır ya da yalnız yöneticilere
+  açılır; sunucu eski APK'larda da reddeder ([`OYUN_MERKEZI.md`](OYUN_MERKEZI.md) › Oyun anahtarları). Önceden Şanslı
+  hediye acil durum düğmesiyle durmuyordu, yalnız paket paket kapanıyordu; artık Acil durum › Hediye ve Oyunlar da durdurur.
+  **Mağaza riski:** sahipler "ayrı mağaza sürümü" yerine tek uygulama ve sunucu düğmesini seçti, yani şans oyunlarının kodu
+  mağaza sürümünün içinde. İncelemede bütün oyunlar beyan edilmeli; inceleme sırasında kapatıp sonradan açmak Apple'da
+  "gizli özellik" (2.3.1), Google Play'de aldatıcı davranış sayılır ve geliştirici hesabını kapattırabilir. Düğme, onaysız
+  akışı kapalı tutmak için kullanılır, incelemeden saklamak için değil. Oyunu sunucudan indirilen kodla (WebView/HTML5)
+  getirmek de bunu değiştirmez.
 - **Öneri:** İlk sürümde Şanslı hediye kapalı olsun, ya da kazancı nakde dönmeyen ayrı bir bakiyeye gitsin (Oyun
-  Salonu gibi). Kararı bir avukat görüşüyle siz verin; kapatma ya da ayrı bakiye işini Claude yapar.
+  Salonu gibi). Kararı bir avukat görüşüyle siz verin; kapatma artık panelden tek tık (Kapalı oyunlar › Şanslı
+  hediyeler), ayrı bakiye işini Claude yapar.
 
 ### 2. Sunucu kapasitesi (siz: bir tık ve bir karar · Claude: yük testi yapıldı)
 - Canlı sunucu **1 çekirdek / 6 GB**. Ses odaları (LiveKit), veritabanı, API ve panel aynı makinede.

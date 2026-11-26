@@ -68,7 +68,7 @@ describe('nothing saved', () => {
   test('/api/config is the .env config plus v: 0; the catalog is whole', async () => {
     A = await h.account('Ayşe Yönetici', 'admin');
     B = await h.account('Bora Yönetici', 'admin');
-    assert.deepEqual(await config(), { minVersion: null, updateUrl: null, notice: null, adminSite: null, featuresOff: ['dm'], v: 0, ...SIGN_IN });
+    assert.deepEqual(await config(), { minVersion: null, updateUrl: null, notice: null, adminSite: null, featuresOff: ['dm'], gamesOff: [], gamesStaff: [], v: 0, ...SIGN_IN });
     const [st, cat] = await call('GET', '/api/catalog');
     assert.equal(st, 200);
     // 73 gifts: 41 off the shelf for now (catalog.mjs GIFTS_PAUSED), 7 bond gifts only for an app with their shelf.
@@ -107,7 +107,7 @@ describe('nothing saved', () => {
         ...['heart_msg_points', 'heart_msg_daily', 'heart_grace_days', 'heart_half_days'],
         'backpack_call_task',
         ...['rewards_off', 'welcome_coins', 'invite_coins', 'invite_daily_cap'],
-        ...['casino_off', 'casino_open', 'casino_max_bet', 'casino_daily_rounds', 'rocket_house_pct'],
+        ...['casino_off', 'casino_open', 'games_staff', 'casino_max_bet', 'casino_daily_rounds', 'rocket_house_pct'],
         ...['room_decor_off', 'room_bg_custom_price', 'room_bg_custom_days'],
         ...['room_staff_away_minutes', 'boss_seat_coins', 'room_owner_bonus_pct', 'boss_seat_minutes', 'dj_live_kbps', 'dj_live_per_room', 'family_found_price', 'family_cashout_members', 'family_rejoin_days', 'private_album_price', 'vip_extend_price', 'vip_extend_days', 'vip_extend_offer_days'],
         ...['bond_max_cift', 'bond_max_kin', 'bond_max_kanka', 'bond_pending_max', 'bond_answer_days', 'bond_cooldown_days', 'bond_talk_daily', 'bond_drop_pct', 'bond_drop_flat', 'bond_idle_end_days', 'bond_idle_warn_days'],
@@ -233,7 +233,7 @@ describe('saving', () => {
     const j = ok(await save(B.session, { features_off: ['gifts'] }));
     assert.deepEqual(j.preview[0].before, ['dm']);
     assert.deepEqual(j.preview[0].after, ['dm', 'gifts']);
-    assert.match(j.preview[0].impact, /Yeni hediye gönderimi durur\. Eski uygulamalar "Bu özellik geçici olarak kapalı" mesajı görür\. Sunucu ayarında kapalı kalır: Mesajlar\./);
+    assert.match(j.preview[0].impact, /Yeni hediye gönderimi \(Şanslı hediyeler dahil\) durur\. Eski uygulamalar "Bu özellik geçici olarak kapalı" mesajı görür\. Sunucu ayarında kapalı kalır: Mesajlar\./);
     const [st, e] = await send();
     assert.equal(st, 503);
     assert.equal(e.error, OFF);
@@ -449,7 +449,7 @@ describe('LIVE_SAFE_MODE', () => {
       return [r.status, await r.json()];
     };
     try {
-      assert.deepEqual(await (await fetch(`${base}/api/config`)).json(), { minVersion: null, updateUrl: null, notice: null, adminSite: null, featuresOff: ['dm'], v: 0, ...SIGN_IN });
+      assert.deepEqual(await (await fetch(`${base}/api/config`)).json(), { minVersion: null, updateUrl: null, notice: null, adminSite: null, featuresOff: ['dm'], gamesOff: [], gamesStaff: [], v: 0, ...SIGN_IN });
       const [st, p] = await sc('GET', SETTINGS, null, G.session);
       assert.equal(st, 200);
       assert.equal(p.safeMode, true);

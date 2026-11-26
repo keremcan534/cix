@@ -79,7 +79,7 @@ Eski uygulama sürümleri yeni masaları çizemez: oda oyunlarında sunucu ve uy
 - **Sonuç sunucuda:** tur, diğer oyunlar gibi `POST /api/casino/play` ile oynanır (`game: 'bilye'`, `pick`: atış gücü). Sunucu bilyenin düşeceği hedefi çeker; ekran o hedefe giden, simülasyonda gerçekten oraya düşmüş bir uçuşu oynatır. Telefon sonucu belirlemez.
 - **Olasılık:** her atış gücü için 400.000 atış simüle edildi ve bilyenin gerçekten nereye düştüğü sayıldı. Ödeyen hedeflerin payları, beklenen geri ödeme %40'ı geçmeyecek biçimde ölçeklendi (Hafif %39,98, Orta %39,99, Güçlü %40,00); kalan pay ödemesiz ceplere gider. Altın kupa her atış gücünde %1'in altındadır. Tahta ya da fizik değişirse `node --experimental-strip-types --no-warnings --import ./tests/register.mjs scripts/bilye-table.ts` yeniden çalıştırılır; testler eski tablo kalırsa kırılır.
 - **Ekonomi:** ayrı bir sistem kurulmadı. Bahis önce oyun bakiyesinden düşer; kazanç oyun bakiyesine yazılır (hediye edilemez, paraya çevrilemez). Bahsin %60'ı kasaya, %40'ı ödül havuzuna; kazanç yalnızca havuzdan ödenir, havuz en yüksek ödülü karşılayamıyorsa tur reddedilir. **Günlük sınır yok** (sahipler kaldırdı, Kasım 2026): Canlı ayarlar › Oyun Salonu › Günlük sınır varsayılanı 0 = sınırsız; bir sayı yazılırsa kişi başı her oyunda günde en yüksek bahisle o kadar tur oynanır. En yüksek bahis ve oyunu kapatma da oradan. Kişinin kendi koyduğu harcama limiti oyunlarda da geçerli.
-- **Rapor:** Yönetim › Oyun Salonu (yalnız yönetici). Turlar 180 gün saklanır; kasa defteri başlangıçtan bu yanadır.
+- **Rapor:** Yönetim › Oyun Salonu (yalnız yönetici). Turlar 180 gün saklanır; kasa defteri başlangıçtan bu yanadır. Açıp kapatma: "Oyun anahtarları" bölümü.
 - **Henüz yok (sonraki aşamalar, karar gerektirir):** oyuncu oranının panelden değiştirilmesi (60/40 kuralını değiştirir), Pachinko'ya özel Jackpot ve Fever modu, ikinci tahta, oda içi skor tablosu, düello ve turnuvalar.
 
 ## Canlı Yörünge (herkes aynı roket)
@@ -155,6 +155,36 @@ Bütün jetonlu oyunlarda (Şans Çarkı, Zar, Gece Yarısı Çarkı, Ejder ile 
 **Altın Kasa:** 5 makara × 3 sıra, 30 duraklı sabit makara şeritleri, 10 sabit çizgi (bahis çizgilere eşit bölünür). 💰 Servet (Wild) yalnızca 2.–4. makarada çıkar ve Kasa dışında her sembolün yerine geçer. 🏦 Kasa (Scatter) ekranın herhangi bir yerinde 3+ gelirse 8 bedava dönüş verir; bedava dönüşlerde kazançlar 2 katıdır ve yeniden tetiklenmez. Bütün tur (bedava dönüşler dahil) tek istekte sunucuda çözülür, tek bahis ve tek ödeme yazılır; ekran sadece sonucu oynatır. Beklenen geri ödeme %39,97'dir (makara sayıları tam %40'a bölünmüyor; kasa lehine). Kombinasyon sayısı (30⁵) tek tek saymaya çok büyük olduğu için oran şerit sayılarından tam olarak hesaplanır ve 200.000 turluk simülasyonla doğrulanır (`tests/fortune-slot.test.ts`). Havuz kontrolü için en yüksek çarpan 850x alınır (her çizgi en yüksek ödemede, ana dönüş + 8 bedava dönüş ×2). Otomatik çevirme 10/25/50 tur; bedava dönüşte, 10x+ kazançta, seçilen kayıp limitinde ve reddedilen turda kendiliğinden durur.
 
 Uğurlu hediye bu kurala dahil değildir; ayrı bir modüldür (`lib/lucky.ts`, beklenen geri ödeme %65).
+
+## Oyun anahtarları: her oyun sunucudan açılır ve kapanır
+
+Sahiplerin isteği (26 Kasım 2026): oyunlar sunucudan açılıp kapatılabilsin. Yeni sürüm gerekmez; finans paneli › Canlı
+ayarlar › Oyun ve şanslı hediyeler (ya da uygulamada Yönetim › Canlı ayarlar › Oyun Salonu ve oyunlar):
+
+| Ayar | Ne yapar |
+|---|---|
+| **Kapalı oyunlar** | Seçilen oyun herkese kapanır, yöneticiler dahil. |
+| **Yalnız yöneticilere açık oyunlar** | Seçilen oyunu yalnız yönetici hesapları görür ve oynar; diğer herkese kapalı görünür. Yeni bir oyunu herkese açmadan önce denemek için. Bir şans oyununu bu listeden çıkarmak (herkese açmak) iki kez onay ister. |
+| **Jetonlu oyunlar herkese açık** | Oyun Salonu ve Rüzgâr Gülü'nün hepsi için; kapalıyken zaten yalnız yöneticilere açık (aşağıda). |
+| Acil durum › **Oyunlar** | Hepsini birden durdurur. |
+
+Listedeki oyunlar: Oyun Salonu'nun bütün oyunları (Yörünge ve Pachinko dahil), Rüzgâr Gülü, Şanslı hediyeler, ücretsiz oda
+oyunları (Ludo, Renk Kartları, XOX, Dört Taş). Oda roketinin düğmesi kendi sayfasında (`docs/ODA_ROKETI.md`).
+
+- **Kapalı oyun hiçbir yerde görünmez:** oda menüsü, oyun panelinin "başka oyuna geç" listesi, odadaki çark kısayolu,
+  hediye panelinin Şanslı rafı, Oyun Merkezi. Uygulama listeyi `GET /api/config`'ten okur, en geç yarım dakikada öğrenir.
+- **Sunucu da reddeder,** eski APK'larda da: yeni tur, Şanslı gönderim, yeni masa, masaya oturma ve yeni el olmaz, jeton
+  düşmez. Oyun bakiyesi ve geçmiş kalır. Başlamış bir oda eli bitirilebilir; Yörünge'de havadaki yakıtla kaçış açık kalır.
+- **Eski APK'lar** Oyun Salonu ve Yörünge'de kapalı oyunu gizler (listeyi sunucudan okur). Rüzgâr Gülü'nü ve oda oyunlarını
+  gösterir, dokununca "Rüzgâr Gülü şu an kapalı" gibi bir cümle görür; Şanslı rafı boş kalır. Oyun Salonu'nun bütün oyunları
+  ve Rüzgâr Gülü kapalıysa eski APK'larda da Oyun Salonu ve çark hiç görünmez.
+- **Yönetim › Oyun kataloğu** ekranındaki ayarlar yalnız o telefonda denemedir; canlı sürümde "Aktif" yerine oyunun
+  sunucudaki durumu yazar.
+- **Mağaza:** bu düğmeler oyunları uygulamadan çıkarmaz, oyunlar mağaza sürümünün içindedir. Google Play ve App Store
+  incelemesinde bütün oyunlar açıkça beyan edilir; inceleme sırasında kapatıp sonra açmak "gizli özellik" sayılır ve hesap
+  kapatmaya kadar gider (`docs/YAYIN_HAZIRLIGI.md` §3).
+- Kod: `server/api/game-switch.mjs`, `app/src/lib/game-switch.ts`. Testler: `server/api/test/game-switch.test.mjs`,
+  `app/tests/game-switch.test.ts`.
 
 ## Erişim kuralı: şimdilik yalnız yöneticiler
 

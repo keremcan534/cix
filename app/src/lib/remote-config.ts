@@ -19,6 +19,10 @@ export type RemoteConfig = {
    *  screen; null keeps the screen (an older server sends none). */
   adminSite: string | null;
   featuresOff: Feature[];
+  /** Canlı ayarlar › Oyun Salonu › Kapalı oyunlar and Yalnız yöneticilere açık oyunlar (server/api/game-switch.mjs):
+   *  game ids (Oyun Salonu's, 'wheel', 'lucky', the room tables'). Empty from an older server. */
+  gamesOff: string[];
+  gamesStaff: string[];
   /** The server's live settings version (Canlı ayarlar); 0 from an older server. When it changes, the live
    *  catalog is read again (lib/remote-control, lib/live/catalog-live). */
   v: number;
@@ -29,8 +33,11 @@ export type RemoteConfig = {
 
 const VERIFY_OFF: VerifyFlags = { sms: false, whatsapp: false };
 /** Nothing set: what the app uses before the first answer, and without a server. */
-export const EMPTY_CONFIG: RemoteConfig = { minVersion: null, updateUrl: null, notice: null, adminSite: null, featuresOff: [], v: 0, signIn: null, verify: VERIFY_OFF };
+export const EMPTY_CONFIG: RemoteConfig = { minVersion: null, updateUrl: null, notice: null, adminSite: null, featuresOff: [], gamesOff: [], gamesStaff: [], v: 0, signIn: null, verify: VERIFY_OFF };
 
+const GAME_ID = /^[a-z0-9_]{1,30}$/;
+/** A list of game ids as the server sends it; anything else is left out. */
+const gameIdsOf = (v: unknown) => (Array.isArray(v) ? [...new Set(v.filter((x): x is string => typeof x === 'string' && GAME_ID.test(x)))].slice(0, 100) : []);
 const isFeature = (v: unknown): v is Feature => typeof v === 'string' && (FEATURES as readonly string[]).includes(v);
 const record = (v: unknown) => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null);
 
@@ -59,6 +66,8 @@ export function parseConfig(raw: unknown): RemoteConfig {
     notice: str(r.notice, 300),
     adminSite: site && /^https:\/\/[^\s/]+\.\S{2,}$/.test(site) ? site : null,
     featuresOff: Array.isArray(r.featuresOff) ? [...new Set(r.featuresOff.filter(isFeature))] : [],
+    gamesOff: gameIdsOf(r.gamesOff),
+    gamesStaff: gameIdsOf(r.gamesStaff),
     v: typeof r.v === 'number' && Number.isSafeInteger(r.v) && r.v >= 0 ? r.v : 0,
     signIn: parseSignIn(r.signIn),
     verify: parseVerify(r.verify),
@@ -83,6 +92,14 @@ export function compareVersions(a: string, b: string): number {
 export const needsUpdate = (current: string, config: RemoteConfig) => !!config.minVersion && !!parseVersion(current) && compareVersions(current, config.minVersion) < 0;
 
 export const isOff = (config: RemoteConfig, f: Feature) => config.featuresOff.includes(f);
+
+/**
+ * A game this account can't play now, as the server decides it (server/api/game-switch.mjs gameShut): Acil durum ›
+ * Oyunlar shuts every one, Kapalı oyunlar shuts it for everyone, Yalnız yöneticilere açık oyunlar for all but admins.
+ * Ids are the server's: Oyun Salonu's games ('rocket' is Yörünge), 'wheel' (Rüzgâr Gülü), 'lucky' (Şanslı
+ * hediyeler), the room tables ('ludo', 'cards', 'xox', 'four'). The screens hide a shut game; the server refuses it.
+ */
+export const gameShut = (config: RemoteConfig, id: string, admin: boolean) => isOff(config, 'games') || config.gamesOff.includes(id) || (!admin && config.gamesStaff.includes(id));
 
 /** The site's address as Ayarlar › Yönetim shows it: its host ("panel.ornek.com"). */
 export const siteHost = (url: string) => url.replace(/^https:\/\//, '').split(/[/?#]/)[0];

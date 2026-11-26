@@ -43,6 +43,7 @@ Kullanıcı Uğurlu kategorisinden bir hediye gönderir. Sunucu yayımlanmış o
      - Aynı gönderimin tekrarı (cevap kaybolduysa) bu kontrolden önce ilk sonucunu alır.
      - Eski APK bu iki alanı göndermez; eskisi gibi sunucunun o anki fiyatı ve olasılıklarıyla oynar. Bu açık eski APK'larda kalır; Canlı ayarlar › Zorunlu sürüm yükseltilince kapanır.
      - Paket kaldırıldı ya da kapatıldıysa açık sayfadan gönderim "Bu Şanslı hediye şu an kapalı" ile reddedilir, hiçbir şey kımıldamaz.
+     - **Hepsini birden kapatmak (26 Kasım 2026):** Canlı ayarlar › Oyun Salonu › Kapalı oyunlar › Şanslı hediyeler (herkese) ya da Yalnız yöneticilere açık oyunlar (yönetici dışındakilere). Raf yeni uygulamada kalkar, eski uygulamada boş kalır; gönderim "Şanslı hediyeler şu an kapalı" ile reddedilir. Acil durum › Hediye ya da Oyunlar da Şanslı gönderimi durdurur (eskiden durdurmuyordu). Aynı gönderimin tekrarı yine ilk sonucunu alır. Ayrıntı: [`OYUN_MERKEZI.md`](OYUN_MERKEZI.md) › Oyun anahtarları.
 - **Alıcılar:** Tek kişiye, seçilen kişilere veya "Tümü" ile mikrofondaki herkese gönderilebilir. Adet seçilebilir (×1, ×10, ×66 …); her hediye için ayrı çekiliş yapılır (ayrı işlem kimliği). Bakiye bir yerde biterse kalan hediyeler gönderilmez ve sohbette yazılır.
 - **Tekrar eden istek:** Aynı işlem kimliği gelirse ilk sonuç döner. İkinci kez jeton düşülmez, ödül verilmez.
 - **Bütçe:**

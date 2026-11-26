@@ -34,6 +34,7 @@ import { lineRocket } from './live-line.mjs';
 import { live } from './live-settings.mjs';
 import { LIVE_DRAW, RATE, autoOf, crashOf, houseOf, maskName, msTo, multAt, payoutOf, poolCap } from './rocket-live-rules.mjs';
 import { spendCoins } from './wallet.mjs';
+import { assertGameOpen, gameShut } from './game-switch.mjs';
 import { casinoNeed, needPaidGames, paidGamesOpen, wealthPoints } from './wheel.mjs';
 
 const msOf = (v, d, min = 50) => (Number(v) >= min ? Math.round(Number(v)) : d);
@@ -471,7 +472,7 @@ export const rocketRoutes = {
     limit(`rocket-view:${me.id}`, RATE_LIMIT, 'Çok sık yeniliyorsun, biraz bekle');
     const s = live();
     const open = paidGamesOpen(me, s);
-    const on = open && isOn(GAME, s);
+    const on = open && !gameShut(GAME.id, me, s);
     if (on) {
       watchers.set(String(me.id), Date.now() + WATCH_MS);
       wake();
@@ -513,7 +514,7 @@ export const rocketRoutes = {
     const before = await seen();
     if (before) return answer(before, true);
     const s = live();
-    if (!isOn(GAME, s)) throw new HttpError(409, `${GAME.name} şu an kapalı`);
+    assertGameOpen(GAME.id, me, s, GAME.name);
     needPaidGames(me, s);
     const r0 = round;
     if (!r0 || r0.id !== b.round) throw new HttpError(409, 'Bu tur kapandı, sıradaki turu bekle');

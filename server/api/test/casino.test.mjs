@@ -99,7 +99,9 @@ describe('Oyun Salonu canlı ayarları', () => {
     assert.deepEqual([DEFAULTS.casino_off, DEFAULTS.casino_max_bet, DEFAULTS.casino_daily_rounds], [[], 25_000, 0]);
     assert.deepEqual(validate('casino_off', ['neon', 'slot']), ['slot', 'neon']);
     assert.equal(validate('casino_off', []), null);
-    refused(() => validate('casino_off', ['wheel']));
+    // Kapalı oyunlar reaches every game the server plays (game-switch.mjs), Rüzgâr Gülü too; an unknown one is refused.
+    assert.deepEqual(validate('casino_off', ['wheel', 'neon']), ['neon', 'wheel']);
+    refused(() => validate('casino_off', ['okey']));
     assert.equal(validate('casino_max_bet', 1000), 1000);
     for (const v of [0, 249, 300, 25_250, '1000']) refused(() => validate('casino_max_bet', v));
     for (const v of [-1, 201, 1.5]) refused(() => validate('casino_daily_rounds', v));

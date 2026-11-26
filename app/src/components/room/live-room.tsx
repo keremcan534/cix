@@ -182,6 +182,7 @@ import {
   type Result,
 } from '@/lib/room-presence';
 import { kindOf, mergeFeed, type FeedMsg } from '@/lib/chat-feed';
+import { useGameShut } from '@/lib/game-switch';
 import { blockedFeature } from '@/lib/remote-control';
 import { ALL_FEATURES, applyServerStage, applyServerVideo, changeLayout, layoutById, modeById, seedStage, setClassicCapacity, setStageInfo, slotStates, stagePermission, useStages, type PlaybackState, type StageInfo } from '@/lib/room-modes';
 import { shareVideo, videoPlayback } from '@/lib/live/room-video';
@@ -344,6 +345,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const roomMeta = useLivePeers(id);
   const liveState = roomMeta.state;
   const app = useApp();
+  // Games the server switched off or keeps for admins (lib/game-switch): no tile, no shortcut.
+  const shut = useGameShut();
   // Live mode: reporting a real room or person goes to the moderators (components/report-sheet).
   const reporting = useReport();
   const { coins, spendCoins, spendBlock, addCoins, receiveDiamonds, bump, vipLevel, svipLevel, nobleTier, blocked, settings, setSetting, equipped, myRoom, updateMyRoom, addRoomXp, agencyId, createTicket, visitRoom, addFanPoints, following, notify, familyId, ownedAgency, conversations, sendMessage, followerInvites, markFollowerInvite } = app;
@@ -742,7 +745,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   }, [setPerson]);
   const [moving, setMoving] = useState<string | null>(null);
   // The Rüzgâr Gülü shortcut floats over the chat's right side; while it shows, the chat keeps that side free.
-  const wheelShown = full && !game && !combo && !moving && !emojiOpen && !typing && !chatRefused && casinoVisible(app.wealthLevel, app.paidGames);
+  const wheelShown = full && !game && !combo && !moving && !emojiOpen && !typing && !chatRefused && casinoVisible(app.wealthLevel, app.paidGames) && !shut('wheel');
   // The Oda roketi shortcut (owners, 25 Nov 2026): on the same right side, just above the Rüzgâr Gülü (or where it would
   // be), while the room's rocket is on; it steps aside as the wheel does.
   const [inviteSeat, setInviteSeat] = useState<number | null>(null);
@@ -3368,22 +3371,22 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     },
     // The free room games are opened by the room's staff (owner and admins); everyone else joins the table they open.
     // A server room plays them at the server's table (Ludo, Renk Kartları, XOX), so there everyone sees the section to
-    // sit at an open table; Okey (bots on this phone) stays in the demo.
-    ...(canManage || real
+    // sit at an open table; Okey (bots on this phone) stays in the demo. A game the server shut isn't listed.
+    ...((canManage || real) && gameCatalog.roomGames.some((g) => g.active && !shut(g.id) && (!real || !g.playable || isTableGame(g.id)))
       ? [
           {
             title: 'Oda Oyunları · ücretsiz',
             variant: 'tile',
             note: canManage ? 'Masayı aç, herkes katılsın' : 'Açık masaya otur',
             items: gameCatalog.roomGames
-              .filter((g) => g.active && (!real || !g.playable || isTableGame(g.id)))
+              .filter((g) => g.active && !shut(g.id) && (!real || !g.playable || isTableGame(g.id)))
               .map((g) => ({ key: `rg-${g.id}`, label: g.name, emoji: g.emoji, art: gameArtOf(g.id), hue: gameHueOf(g.id), badge: g.playable ? undefined : ('SOON' as const), onPress: () => openRoomGame(g.id) })),
           } satisfies MenuSection,
         ]
       : []),
     // Oyun Salonu only exists for Cömertlik Lv.2 and up; below that the room menu has no trace of it. A live build
     // plays every one of its games on the server (lib/live/casino); a game the server switched off isn't listed.
-    ...(casinoVisible(app.wealthLevel, app.paidGames)
+    ...(casinoVisible(app.wealthLevel, app.paidGames) && (!shut('wheel') || gameCatalog.casino.some((g) => g.active && !shut(g.id) && g.fromRoom))
       ? [
           {
             title: 'Oyun Salonu',
@@ -3391,9 +3394,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             note: 'Sonuçlar sunucuda doğrulanır · jeton harcaması günlük limite dahildir',
             items: [
               // Rüzgâr Gülü: the server plays it (components/games/wheel); Oyun Salonu is only shown from Lv.2.
-              { key: 'cg-ruzgar', label: 'Rüzgâr Gülü', icon: 'compass' as const, art: salonArt('oyun-ruzgar-gulu'), hue: '#F6BD60', badge: 'NEW' as const, onPress: () => (setPanel(null), setGame({ kind: 'wheel' }), setGameMin(false)) },
+              ...(shut('wheel') ? [] : [{ key: 'cg-ruzgar', label: 'Rüzgâr Gülü', icon: 'compass' as const, art: salonArt('oyun-ruzgar-gulu'), hue: '#F6BD60', badge: 'NEW' as const, onPress: () => (setPanel(null), setGame({ kind: 'wheel' }), setGameMin(false)) }]),
               ...gameCatalog.casino
-                .filter((g) => g.active && g.fromRoom)
+                .filter((g) => g.active && !shut(g.id) && g.fromRoom)
                 .map((g) => ({ key: `cg-${g.id}`, label: g.name, emoji: g.emoji, art: gameArtOf(g.id), hue: gameHueOf(g.id), onPress: () => openCasino(g.id) })),
             ],
           } satisfies MenuSection,

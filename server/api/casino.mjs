@@ -28,6 +28,7 @@ import crypto from 'node:crypto';
 import { HttpError, REF, auth, db, limit, move, readJson, selfUser, tx } from './core.mjs';
 import { live } from './live-settings.mjs';
 import { spendCoins } from './wallet.mjs';
+import { assertGameOpen, gameShut } from './game-switch.mjs';
 import { casinoNeed, needPaidGames, paidGamesOpen, wealthPoints } from './wheel.mjs';
 import {
   BOARDS,
@@ -184,7 +185,8 @@ export const casinoRoutes = {
       games: GAMES.map((g) => ({
         id: g.id,
         name: g.name,
-        active: open && isOn(g, s),
+        // Switched off, or kept for admins (game-switch.mjs): off, so an installed app hides it.
+        active: open && !gameShut(g.id, me, s),
         bets: betsUpTo(g, s.casinoMaxBet),
         dailyLimit: dailyOf(g, s),
         playedToday: played.get(g.id) ?? 0,
@@ -223,7 +225,7 @@ export const casinoRoutes = {
     const before = await seen();
     if (before) return answer(before, true);
     const s = live();
-    if (!isOn(g, s)) throw new HttpError(409, `${g.name} şu an kapalı`);
+    assertGameOpen(g.id, me, s, g.name);
     needPaidGames(me, s);
     const place = b.place === 'room' ? 'room' : 'profile';
     const board = isBoard(g.id) ? BOARDS[g.id] : null;

@@ -309,6 +309,6 @@ describe('values as the admin reads them', () => {
     assert.ok(sentence.startsWith('10.000 elmas = 2.263 → '), sentence);
     assert.ok(sentence.includes('uygulamayı güncelle'), sentence);
     const off = registry.impactOf('features_off', [], ['gifts'], { env: { featuresOff: [] }, raw: ['gifts'] }) as string;
-    assert.equal(off, 'Yeni hediye gönderimi durur. Eski uygulamalar "Bu özellik geçici olarak kapalı" mesajı görür.');
+    assert.equal(off, 'Yeni hediye gönderimi (Şanslı hediyeler dahil) durur. Eski uygulamalar "Bu özellik geçici olarak kapalı" mesajı görür.');
   });
 });

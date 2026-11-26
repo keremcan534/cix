@@ -4,7 +4,7 @@
 // (live-settings.mjs): a feature is off when either switches it off, and the live notice and minimum version
 // replace .env's.
 //
-//   GET /api/config (public, cacheable 30 s) → { minVersion, updateUrl, notice, featuresOff, v, signIn, verify }
+//   GET /api/config (public, cacheable 30 s) → { minVersion, updateUrl, notice, featuresOff, gamesOff, gamesStaff, v, signIn, verify }
 //     v: the live settings' version plus the admins' gifts' (custom-gifts.mjs); the app reloads the catalog when it changes.
 //
 //   APP_MIN_VERSION  e.g. 1.0.3: older apps show a blocking "Güncelleme gerekli" screen
@@ -48,6 +48,9 @@ export const ROUTES = {
   'POST /api/wallet/withdraw': ['withdraw'],
   'POST /api/wheel/spin': ['games'],
   'POST /api/casino/play': ['games'],
+  // Şanslı hediyeler (POST /api/lucky/send) and Canlı Yörünge's fuel check Hediye / Oyunlar in the handler, after the
+  // replay (game-switch.mjs): a send that went through keeps its answer. Yörünge's escape stays open, so a fuel on board
+  // can still be cashed.
   'POST /api/rooms/table': ['games'],
   'POST /api/shop/buy': ['shop'],
   'POST /api/wallet/spend': ['shop'],
@@ -122,6 +125,8 @@ export const configRoutes = {
     const s = live();
     // .env's switched-off features first, in .env's order, then the live ones.
     // adminSite: the staff's Yönetim is on the web (Canlı ayarlar › Yönetim sitesi); null keeps it in the app.
-    return { minVersion: s.minVersion, updateUrl: CONFIG.updateUrl, notice: s.notice, adminSite: s.adminSite, featuresOff: [...new Set([...CONFIG.featuresOff, ...s.featuresOff])], v: s.v + customGiftsRev() + emojiRev() + levelsRev() + shopItemsRev() + luckyArtRev() + markKindsRev() + bondLooksRev(), ...signInOf(env, s.otpPerHour) };
+    // gamesOff / gamesStaff: Canlı ayarlar › Kapalı oyunlar and Yalnız yöneticilere açık oyunlar (game-switch.mjs), so a
+    // newer app hides a shut game everywhere; the server refuses it either way.
+    return { minVersion: s.minVersion, updateUrl: CONFIG.updateUrl, notice: s.notice, adminSite: s.adminSite, featuresOff: [...new Set([...CONFIG.featuresOff, ...s.featuresOff])], gamesOff: [...s.casinoOff], gamesStaff: [...s.gamesStaff], v: s.v + customGiftsRev() + emojiRev() + levelsRev() + shopItemsRev() + luckyArtRev() + markKindsRev() + bondLooksRev(), ...signInOf(env, s.otpPerHour) };
   },
 };

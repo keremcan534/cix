@@ -17,10 +17,12 @@
 // whose time ran out loses. This is applied whenever someone reads or acts on the table, so no clock runs here.
 // People who block each other (either way) don't sit at one table. Someone banned from the room can't play in it.
 // Kept: the table while it is played; one nobody touched for a day goes when a new table opens, and a deleted
-// account's tables go with it (social.mjs eraseAccount). Nothing here is money.
+// account's tables go with it (social.mjs eraseAccount). Nothing here is money. A game switched off in Canlı ayarlar ›
+// Kapalı oyunlar, or kept for admins, opens no table and deals no new hand (game-switch.mjs); a hand already dealt ends.
 import crypto from 'node:crypto';
 
 import { HttpError, auth, db, limit, readJson, tx } from './core.mjs';
+import { assertGameOpen } from './game-switch.mjs';
 import { liveKitName, rankOf, roomRow } from './rooms.mjs';
 import { roomService } from './live.mjs';
 import { TABLE_GAMES, TURN_MS, leaveTable, moveTable, openTable, staleTable, startTable, tableOptions, timeoutTable, viewOf } from './room-games-rules.mjs';
@@ -133,6 +135,7 @@ export const roomGameRoutes = {
       if (typeof b.game !== 'string' || !Object.hasOwn(TABLE_GAMES, b.game)) throw new HttpError(400, 'Geçersiz oyun');
       if (!staff) throw new HttpError(403, 'Masayı oda sahibi veya yöneticiler açar');
       if (!tableOptions(b.game, b.options)) throw new HttpError(400, 'Geçersiz oyun ayarı');
+      assertGameOpen(b.game, me);
     }
     const out = await tx(async (c) => {
       let row = await tableRow(c, room.id, 'FOR UPDATE');
@@ -161,6 +164,11 @@ export const roomGameRoutes = {
         if (!opener) throw new HttpError(403, 'Masayı açan veya oda yönetimi kapatır');
         await c.query('DELETE FROM room_tables WHERE room_id = $1', [room.id]);
         return null;
+      }
+      // A game switched off or kept for admins (game-switch.mjs) takes no new player and no new hand; a hand already
+      // dealt can be played out, left or closed.
+      if (action === 'join' || action === 'start' || action === 'again') {
+        if (!(action === 'join' && seat >= 0)) assertGameOpen(row.game, me);
       }
       if (action === 'join') {
         if (seat >= 0) return row;
