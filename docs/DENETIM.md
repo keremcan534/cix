@@ -386,7 +386,8 @@ Para çekenlere kimlik + canlı selfie, herkese isteğe bağlı mavi rozet; sağ
   karşılaştırılır, sonuç finans personeline gösterilir; reddetmez.
 - **Maliyet:** liste fiyatı kimlik 0,33 USD, rozet 0,15 USD. Aylık bütçe Canlı ayarlardan (varsayılan 100 USD); dolunca o
   ay yeni doğrulama açılmaz. Kişi başına günde tür başına 3 deneme.
-- **Panel (Claude, sonra):** inceleme sırası, karar ve elle doğrulama uçları `PANEL_ROUTES`'ta hazır; panel deposunda
-  sayfa ve `APP_ROUTES` izni yapılmadı. O zamana kadar görüntülere Didit Business Console'dan bakılır.
+- **Panel sayfası yok (sizin kararınız):** görüntülere Didit Business Console'dan bakılır. Bizim kurallarımızın
+  incelemeye düşürdüğü kayıtlar (18 yaş altı, cinsiyet uyuşmazlığı, aynı kimlik) ve yüz taramasız elle doğrulama
+  arayüzsüz kalır; istenince Claude yönetim uçlarıyla kapatır. Bekleyen 18 yaş altı kaydı alarm verir.
 - **Telefonda denenmeli:** Didit sayfasının Android tarayıcıda kamerayı açması ve `similarclub://kimlik-dogrulama` ile
   uygulamaya dönüş.
