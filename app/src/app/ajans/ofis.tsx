@@ -102,7 +102,9 @@ export default function AgencyOffice() {
     { key: 'performance', label: 'Performans', perm: 'reports.performance', hidden: !!o && !!parseAgencyLevel(o.level) },
     // Otomatik mesaj: how the agency's streamers answer paid messages (figures only, server/api/auto-chat.mjs).
     { key: 'messages', label: 'Mesaj performansı', perm: 'streamers.view', hidden: !live },
-    { key: 'earnings', label: 'Kazanç', perm: 'reports.commission' },
+    // Kazanç is gone (owners, 26 Nov 2026): the payout is asked for on Gelir, each record is in the streamer's own
+    // record (Yayıncılar), the week's figures on Özet. The centre still sees it in its own view.
+    { key: 'earnings', label: 'Kazanç', perm: 'reports.commission', hidden: !!o && (o.viewer === 'owner' || o.viewer === 'staff') },
     { key: 'requests', label: 'Talepler', perm: 'streamers.view', badge: o ? o.counts.pending_requests + o.counts.pending_transfers : 0 },
     { key: 'team', label: 'Ekip', perm: 'staff.manage', hidden: !!o && !['owner', 'staff'].includes(o.viewer) },
     // Ajans asistanı: only the owner names assistants and sets their share (server/api/agency-assistants.mjs).

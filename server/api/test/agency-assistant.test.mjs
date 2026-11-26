@@ -324,6 +324,12 @@ describe('Ajans asistanı', () => {
     assert.equal(await shareOf(gone.id), undefined, 'ajanstan ayrılan asistan');
     assert.equal(ok(await owner2.get(`/api/agency/assistants?id=${T2.id}`)).assistants[0].member, false);
 
+    // Asistan merkezi: the streamers she brought, by their 12-digit ID, with when they joined and what they earned.
+    const brought = ok(await helper.get('/api/agency/me')).assistant.streamers;
+    const mine = brought.find((x) => x.name === a1.name);
+    assert.ok(mine, 'getirdiği yayıncı listede');
+    assert.match(mine.no, /^\d{12}$/);
+    assert.ok(mine.total > 0 && mine.joinedAt);
     // The owner asks; it ends only when the assistant accepts (owners, 25 Nov 2026).
     const asked = ok(await owner.post('/api/agency/assistants/remove', { id: T.id, assistantId: H.id, ask: true }));
     assert.deepEqual([asked.removed, asked.request.status], [false, 'pending']);

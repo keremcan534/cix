@@ -185,8 +185,19 @@ export async function myAssistant(q, userId) {
        FROM agency_assistant_ledger l LEFT JOIN users s ON s.id = l.streamer_id WHERE l.user_id = $1 ORDER BY l.id DESC LIMIT 20`,
     [userId],
   );
+  // Asistan merkezi (owners, 26 Nov 2026): the streamers I brought to this agency, by their 12-digit ID, with when they
+  // joined (and left) and what they earned this week and since joining. Never anyone else's.
+  const brought = await q.query(
+    `SELECT u.name, u.public_no::text AS no, m.joined_at, m.ended_at,
+            (SELECT coalesce(sum(e.diamonds), 0) FROM income_events e WHERE e.streamer_id = m.streamer_id AND e.occurred_at >= greatest(m.joined_at, $3) AND (m.ended_at IS NULL OR e.occurred_at < m.ended_at)) AS week,
+            (SELECT coalesce(sum(e.diamonds), 0) FROM income_events e WHERE e.streamer_id = m.streamer_id AND e.occurred_at >= m.joined_at AND (m.ended_at IS NULL OR e.occurred_at < m.ended_at)) AS total
+       FROM agency_streamers m JOIN users u ON u.id = m.streamer_id
+      WHERE m.invited_by = $1 AND m.agency_id = $2 AND u.deleted_at IS NULL ORDER BY m.ended_at IS NULL DESC, m.joined_at DESC LIMIT 200`,
+    [userId, v.agency.id, weekStart(new Date())],
+  );
   return {
     ...v,
+    streamers: brought.rows.map((x) => ({ name: x.name, no: x.no ?? null, joinedAt: x.joined_at, endedAt: x.ended_at ?? null, week: n(x.week), total: n(x.total) })),
     rows: rows.rows.map((x) => ({
       id: Number(x.id),
       amount: d4(x.amount),

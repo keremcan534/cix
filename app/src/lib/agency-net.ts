@@ -291,7 +291,9 @@ export type AssistantRemoval = {
 export type AssistantList = { max: number; open: number; canAdd: boolean; weekStart: string; nextWeek: string; assistants: Assistant[] };
 export type AssistantCandidate = { id: string; name: string; avatarUrl: string | null; role: 'streamer' | 'staff' };
 export type AssistantRow = { id: number; amount: number; wallet: number; pct: number; basis: number; reversal: boolean; streamer: string | null; at: string };
-export type MyAssistant = Assistant & { rows: AssistantRow[] };
+/** Asistan merkezi's list (owners, 26 Nov 2026): the streamers I brought; none from an older server. */
+export type BroughtStreamer = { name: string; no: string | null; joinedAt: string; endedAt: string | null; week: number; total: number };
+export type MyAssistant = Assistant & { rows: AssistantRow[]; streamers?: BroughtStreamer[] };
 
 // --- Centre (platform) types ----------------------------------------------------------------------------------
 export type TreeNode = {

@@ -9,6 +9,7 @@ import { Text } from '@/components/text';
 import { Art } from '@/components/Art';
 import { ExchangeSheet } from '@/components/exchange-sheet';
 import { IncomeSources } from '@/components/income-sources';
+import { AgencyPayoutCard } from '@/components/agency-payout-card';
 import { LoadError } from '@/components/load-error';
 import { Card, Header } from '@/components/ui';
 import { userById } from '@/data/mock';
@@ -195,6 +196,8 @@ export default function IncomeScreen() {
         </LinearGradient>
 
         {live && <IncomeSources />}
+        {/* An agency owner's withdrawable commission and payout request (owners, 26 Nov 2026; was the office's Kazanç). */}
+        {live && <AgencyPayoutCard />}
 
         {/* Live: the server's Jeton Noktası (the banks, Anında bozdur, transfers); the demo's sample books otherwise. */}
         <Pressable style={styles.bankLink} onPress={() => router.push('/coins-bank')} accessibilityLabel="Jeton Noktası">

@@ -668,6 +668,36 @@ export const autoChatRoutes = {
 };
 
 /** For the agency's report (agency.mjs): the figures of the agency's own streamers in the period. */
+/**
+ * How often each streamer answers (owners, 26 Nov 2026): paid messages answered, and calls / matches that went live,
+ * voice and video apart. A call counts when it rang her (cancelled by the caller before she could answer: left out);
+ * a match counts whichever side she was on. pct: whole percent, null when there was none.
+ */
+const pctOf = (yes, n) => (n ? Math.round((yes / n) * 100) : null);
+async function answerRates(q, ids, p) {
+  const r = await q.query(
+    `SELECT u AS id, c.kind, c.mode, count(*) FILTER (WHERE c.started_at IS NOT NULL)::int AS yes, count(*)::int AS n
+       FROM calls c CROSS JOIN LATERAL (VALUES (c.callee), (CASE WHEN c.kind = 'match' THEN c.caller END)) v(u)
+      WHERE v.u = ANY($1::uuid[]) AND c.created_at >= ${p.from} AND c.created_at < ${p.to} AND c.status <> 'ringing'
+        AND (c.status <> 'cancelled' OR c.started_at IS NOT NULL)
+      GROUP BY 1, 2, 3`,
+    [ids],
+  );
+  const out = new Map();
+  for (const x of r.rows) {
+    const key = `${x.mode}${x.kind === 'call' ? 'Call' : 'Match'}`;
+    const m = out.get(x.id) ?? {};
+    m[key] = { yes: (m[key]?.yes ?? 0) + x.yes, n: (m[key]?.n ?? 0) + x.n };
+    out.set(x.id, m);
+  }
+  return out;
+}
+const RATE_KEYS = ['videoCall', 'voiceCall', 'videoMatch', 'voiceMatch'];
+const ratesOf = (figs, calls) => ({
+  message: { pct: pctOf(figs.answered, figs.total), n: figs.total },
+  ...Object.fromEntries(RATE_KEYS.map((k) => [k, { pct: pctOf(calls?.[k]?.yes ?? 0, calls?.[k]?.n ?? 0), n: calls?.[k]?.n ?? 0 }])),
+});
+
 export async function agencyMessagePerformance(q, agencyId, p) {
   const r = await q.query(
     `SELECT u.id, u.name, u.public_no, u.avatar_url, ${onlineSql('u.id', '15')} AS online
@@ -681,6 +711,7 @@ export async function agencyMessagePerformance(q, agencyId, p) {
   const quota = new Map();
   for (const x of used.rows) quota.set(x.user_id, { ...(quota.get(x.user_id) ?? {}), [x.kind]: x.used });
   const s = live();
+  const calls = await answerRates(q, ids, p);
   const streamers = r.rows.map((x) => ({
     id: x.id,
     name: x.name,
@@ -690,7 +721,11 @@ export async function agencyMessagePerformance(q, agencyId, p) {
     ...(figs.get(x.id) ?? figuresOf(null)),
     quickToday: { used: quota.get(x.id)?.quick ?? 0, total: s.quickDaily },
     autoToday: { used: quota.get(x.id)?.auto ?? 0, total: s.autoDaily },
+    rates: ratesOf(figs.get(x.id) ?? figuresOf(null), calls.get(x.id)),
   }));
+  // The agency's together: every streamer's counts added.
+  const sum = {};
+  for (const m of calls.values()) for (const k of RATE_KEYS) if (m[k]) sum[k] = { yes: (sum[k]?.yes ?? 0) + m[k].yes, n: (sum[k]?.n ?? 0) + m[k].n };
   const all = await q.query(`SELECT ${FIGURES} FROM message_holds h WHERE h.earner = ANY($1::uuid[]) AND h.delivered_at >= ${p.from} AND h.delivered_at < ${p.to}`, [ids]);
   // The previous period of the same length, for the change.
   const prev = await q.query(
@@ -701,6 +736,7 @@ export async function agencyMessagePerformance(q, agencyId, p) {
   return {
     streamers,
     totals: figuresOf(all.rows[0]),
+    rates: ratesOf(figuresOf(all.rows[0]), sum),
     previous: figuresOf(prev.rows[0]),
     fastest: [...ranked].filter((x) => x.avgSeconds !== null).sort((a, b) => a.avgSeconds - b.avgSeconds).slice(0, 5).map((x) => ({ id: x.id, name: x.name, avgSeconds: x.avgSeconds, inTimeRate: x.inTimeRate })),
     lowest: [...ranked].sort((a, b) => (a.inTimeRate ?? 0) - (b.inTimeRate ?? 0)).slice(0, 5).map((x) => ({ id: x.id, name: x.name, inTimeRate: x.inTimeRate, total: x.total })),

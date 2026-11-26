@@ -48,6 +48,8 @@ type Item = MenuFlags & { icon: IconName; img?: Icon3DName; art?: ArtName; label
 
 const GROWTH: Item[] = [
   { icon: 'mic-outline', img: 'mic', label: 'Yayıncı Merkezi', onPress: () => router.push('/yayinci'), streamerOnly: true },
+  // Asistan merkezi (owners, 26 Nov 2026): an agency assistant's streamers and share, under Yayıncı Merkezi.
+  { icon: 'ribbon-outline', label: 'Asistan merkezi', onPress: () => router.push('/asistan'), assistantOnly: true },
   // "Ajans merkezi" (owners, 26 Nov 2026): the agency's own place (its owner and team; a woman streaming for one sees none).
   { icon: 'business-outline', img: 'briefcase', label: 'Ajans merkezi', onPress: () => router.push('/ajans'), agencyOnly: true },
   // The agency chat group and the member network are demo screens; with a server, /ajans holds the real ones.
@@ -139,7 +141,7 @@ export default function ProfileScreen() {
   const streamerCenter = streamerCenterVisible(me.gender, live ? (auto ? auto.tools === true : null) : isHost);
   // A woman who streams for an agency sees none of its screens.
   const agencyHidden = agencyScreensHidden(me.gender, live ? server.agency?.role : agencyId ? (agencyRole === 'owner' ? 'owner' : agencyRole === 'assistant' ? 'staff' : 'member') : null);
-  const visible = (m: Item) => rowVisible(m, { demo: IS_DEMO, live, hasAgency, streamerCenter, agencyHidden });
+  const visible = (m: Item) => rowVisible(m, { demo: IS_DEMO, live, hasAgency, streamerCenter, agencyHidden, assistant: live && server.assistant });
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
