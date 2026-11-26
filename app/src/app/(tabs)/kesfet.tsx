@@ -28,10 +28,7 @@ import { levelsOf } from '@/lib/live/levels';
 import { cityDistanceText, distanceOf } from '@/lib/live/distances';
 import type { DiscoverList } from '@/lib/api';
 import { MessagePrefsButton } from '@/components/message-prefs';
-import { useMyServerAgency } from '@/lib/live/me-stats';
 
-/** The owners' agency application banner (gorseller/banner, 1717×916). */
-const AGENCY_APPLY = require('../../../assets/banners/ajans-basvurusu.webp');
 
 const TABS = ['Ana Sayfa', 'Yakındakiler', 'Öne çıkanlar', 'Çevrim içi', 'Yeni kullanıcılar'] as const;
 type Tab = (typeof TABS)[number];
@@ -71,12 +68,6 @@ export default function DiscoverScreen() {
   const [hour] = useState(() => new Date().getHours());
   // A live build lists real people from the server (no sample profiles; distances by city: lib/live/distances).
   const live = liveMode();
-  // The agency application banner: only for someone in no agency (live: the server's answer; none shows before it).
-  const myAgency = useMyServerAgency(live);
-  const { agencyId } = useApp();
-  const noAgency = live ? myAgency === null : !agencyId;
-  // Its size from the screen (an image given only a ratio takes its own size on the web).
-  const applyW = useWindowDimensions().width - 32;
   const list = LIST_OF[tab];
   const serverPeople = useDiscoverPeople(list);
   const peopleState = useDiscoverState(list);
@@ -199,13 +190,6 @@ export default function DiscoverScreen() {
                   <Text style={{ color: colors.primaryText, fontWeight: '700', fontSize: 12 }}>Temizle</Text>
                 </Pressable>
               </View>
-            )}
-
-            {/* Ajans başvurusu (owners, 26 Nov 2026): pinned at the top of Öne çıkanlar for anyone with no agency yet. */}
-            {tab === 'Öne çıkanlar' && noAgency && (
-              <Pressable onPress={() => router.push('/ajans')} accessibilityRole="button" accessibilityLabel="Ajans başvurusu: hemen başvur" style={styles.applyBanner}>
-                <Image source={AGENCY_APPLY} style={{ width: applyW, height: Math.round((applyW * 916) / 1717) }} resizeMode="cover" />
-              </Pressable>
             )}
 
             {tab === 'Yakındakiler' && settings.cityDiscovery && (
@@ -587,7 +571,6 @@ const useStyles = makeStyles(({ colors, lift, dark, edge }) => ({
   tabFade: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 22 },
   tabSep: { width: 1, height: 22, backgroundColor: HOME.line, marginHorizontal: 2 },
   iconBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
-  applyBanner: { marginHorizontal: 16, marginTop: 10, marginBottom: 4, borderRadius: 18, overflow: 'hidden', boxShadow: '0 4px 14px rgba(91,33,182,0.28)' },
   filterDot: { position: 'absolute', top: 2, right: 0, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary },
   activeFilters: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, marginTop: 4, backgroundColor: colors.card, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, ...lift },
   activeText: { flex: 1, color: colors.text, fontSize: 12 },
