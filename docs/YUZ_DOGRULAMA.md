@@ -84,8 +84,11 @@ Yönetim uçları (finans panelinden çağrılabilir, `PANEL_ROUTES`):
 Her işlem `audit_events`'e önce/sonra haliyle yazılır. Yönetimin kararını Didit'ten sonra gelen bir güncelleme
 değiştirmez.
 
-**Panel sayfası yok (sonraki iş):** uçlar hazır, finans paneli deposunda sayfa, `APP_ROUTES` ve izin yapılmadı. O
-zamana kadar inceleme Didit Business Console'dan yapılır; karar API ile ya da panel sayfası gelince oradan verilir.
+**Panel sayfası yok (sahiplerin kararı, 26 Kasım 2026: "finans paneline gerek yok"):** görüntülere ve Didit'in kendi
+incelemesine Didit Business Console'dan bakılır; orada verilen karar webhook'la buraya gelir. Bizim kurallarımızın
+incelemeye düşürdüğü kayıtları (18 yaş altı, cinsiyet uyuşmazlığı, aynı kimlik, aynı yüz) Didit'ten karara bağlamak
+mümkün değil: bunlar yönetim uçlarıyla kapanır. Elle doğrulama da öyle. Arayüz olmadığı için bu işleri istenince Claude
+uçları çağırarak yapar. Çekim talebindeki ad uyuşması (`holderMatchesId`, `idName`) da panelde görünmez.
 
 ## Para çekme şartı
 
@@ -156,7 +159,6 @@ zamana kadar inceleme Didit Business Console'dan yapılır; karar API ile ya da 
 
 ## Kalanlar
 
-- Finans paneli sayfası: inceleme sırası, karar, elle doğrulama, çekim talebinde ad uyuşması.
 - e-Devlet yaş belirteci: kılavuz çıkınca.
 - Hemen Tanış (yabancıyla görüntülü) için rozet şartı ya da öne çıkarma: sahiplerin kararı.
 - Telefonda denenmeli: Didit sayfasının Android tarayıcıda kamerayı açması ve uygulamaya dönüş.
