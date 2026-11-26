@@ -3,7 +3,7 @@
 // server has no ticket or data-copy route yet (server/api/support.mjs, my-data.mjs). Pure, so the node tests load
 // it; lib/open-mail opens the mail app.
 
-export const SUPPORT_EMAIL = 'destek@similarclub.app';
+export const SUPPORT_EMAIL = 'support@similarclub.online';
 
 export type Mail = { subject: string; body?: string };
 

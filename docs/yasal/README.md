@@ -5,10 +5,11 @@ içerik birebir aynı). 14 belge, Türkçe ve İngilizce. **Paketin kendi notu: 
 YAYIMLAMAYIN".** Her belgenin başında "Taslak, yayımlamayın" yazıyor ve doldurulmamış alanlar var (`[ONAY TARİHİ]`,
 `[TEKNİK ENVANTER]`, `[SAĞLAYICI/ALICI LİSTESİ…]`, `[SAKLAMA SÜRELERİ…]`, `[EK A]`, `[EK B]` …).
 
-**26 Kasım 2026, sahiplerin kararı: taslak haliyle yayınlanıyor.** Sayfalarda belgenin durumu "Sürüm 1.0 • Taslak •
-Yürürlük: onay bekliyor" olarak görünür (paketin ekibe yazdığı "yayımlamayın" notu okuyucuya gösterilmez); metindeki
-boş alanlar olduğu gibi durur. Avukat onaylayıp alanları doldurunca `.md` dosyaları güncellenir, sayfalar yeniden
-üretilir ve durum satırı belgeden gelir.
+**Sahiplerin kararı:** 26 Kasım 2026'da taslak haliyle yayınlandı; 27 Kasım 2026'da taslak notu da kaldırıldı.
+Sayfalarda durum satırı yalnız "Sürüm 1.0" (İngilizcesi "Version 1.0"): "Taslak, yayımlamayın" ve boş yürürlük tarihi
+(`[ONAY TARİHİ]`) okuyucuya gösterilmez (`siteye-aktar.py`, `HIDDEN_STATUS`). Metnin içindeki boş alanlar olduğu gibi
+durur. Avukat onaylayıp alanları ve yürürlük tarihini doldurunca `.md` dosyaları güncellenir, sayfalar yeniden üretilir
+ve "Yürürlük" kendiliğinden yeniden görünür.
 
 | Dosya | Nerede görünür |
 | --- | --- |
@@ -28,8 +29,9 @@ sayfanın alt bilgisindeki "Yasal" sütununu bu sayfalara bağlar. Sonra site pa
 
 ## Metinlerle uygulama arasında açık kalanlar
 
-- **Destek adresi:** metinler `support@similarclub.online` diyor; site `info@similarclub.online`, uygulama hâlâ
-  `destek@similarclub.app` (bizim olmayan bir alan adı). Tek bir adres seçilmeli ve o posta kutusu açılmalı.
+- **Destek adresi (27 Kasım 2026, kapandı):** sahipler `support@similarclub.online`'ı seçti; metinler, site ve
+  uygulama (`app/src/lib/support-mail.ts`) bunu kullanıyor, posta kutusu GoDaddy'de açık. Eski APK'lar hâlâ
+  `destek@similarclub.app` gösterir; o alan adı bizim değil, oraya giden posta kaybolur. Bu adresi biri okumalı.
 - **Hesap silme yolu:** metin "Ayarlar > Hesap > Hesabımı Sil" ve `https://similarclub.online/delete-account` diyor.
   Sitede `/delete-account` artık `/hesap-silme` sayfasına gidiyor; uygulamadaki gerçek yol avukata bildirilmeli.
 - **Oyunlar ve jeton:** Jeton ve Oyun metinleri "onaylanmamış şans mekanizması etkinleştirilmez" diyor; uygulamada
