@@ -23,6 +23,8 @@ import { verifyUpload } from './media.mjs';
 const LINK = /^\/(?!\/)[A-Za-z0-9/_?=&.%-]{0,119}$/;
 const ART = /^[a-z0-9-]{1,40}$/;
 export const ACCENTS = ['mor', 'pembe', 'altin', 'turkuaz'];
+/** Who sees a banner (owners, 26 Nov 2026): everyone, or someone in no agency (the agency application banner). */
+export const AUDIENCES = ['all', 'no_agency'];
 const MAX_LIVE = 10;
 
 async function admin(req) {
@@ -62,6 +64,7 @@ const view = (b, now) => ({
   startsAt: b.starts_at?.toISOString() ?? null,
   endsAt: b.ends_at?.toISOString() ?? null,
   enabled: b.enabled,
+  audience: b.audience ?? 'all',
   sort: b.sort,
   state: stateOf(b, now),
   updatedAt: b.updated_at.toISOString(),
@@ -81,10 +84,17 @@ export const phoneView = (b) => ({
 });
 
 /** The banners the phones show now, in order (at most MAX_LIVE). */
-export async function liveBanners(q = db) {
+export async function liveBanners(q = db, viewer = null) {
+  // A banner for someone in no agency (audience no_agency) is left out for one who streams for one, owns one or is on
+  // one's team. Without a viewer (an admin's preview) every live one comes.
   const r = await q.query(
     `SELECT * FROM banners WHERE removed_at IS NULL AND enabled AND (starts_at IS NULL OR starts_at <= now()) AND (ends_at IS NULL OR ends_at > now())
+        AND ($1::uuid IS NULL OR audience = 'all' OR NOT (
+              EXISTS (SELECT 1 FROM agency_streamers m WHERE m.streamer_id = $1 AND m.ended_at IS NULL)
+              OR EXISTS (SELECT 1 FROM agencies a WHERE a.owner_id = $1 AND a.status IN ('draft', 'pending', 'approved', 'suspended'))
+              OR EXISTS (SELECT 1 FROM staff_assignments s WHERE s.user_id = $1 AND s.revoked_at IS NULL)))
       ORDER BY sort, id LIMIT ${MAX_LIVE}`,
+    [viewer],
   );
   return r.rows;
 }
@@ -124,7 +134,9 @@ async function fieldsOf(b, prev) {
   if (startsAt && endsAt && endsAt <= startsAt) throw new HttpError(400, 'Bitiş başlangıçtan sonra olmalı');
   if (has('endsAt') && endsAt && endsAt <= new Date() && (!prev || +endsAt !== +(prev.ends_at ?? 0))) throw new HttpError(400, 'Bitiş geçmişte olamaz');
   const enabled = has('enabled') ? b.enabled === true : (prev?.enabled ?? false);
-  return { title, subtitle, cta, link, imageUrl, art, showText, accent, startsAt, endsAt, enabled };
+  const audience = has('audience') ? (AUDIENCES.includes(b.audience) ? b.audience : null) : (prev?.audience ?? 'all');
+  if (!audience) throw new HttpError(400, 'Kimlere: all ya da no_agency');
+  return { title, subtitle, cta, link, imageUrl, art, showText, accent, startsAt, endsAt, enabled, audience };
 }
 
 /** One person's view or click of a banner counts once a day (in memory: a restart may count one twice). */
@@ -172,17 +184,17 @@ export const bannerRoutes = {
     const prev = id ? (await db.query('SELECT * FROM banners WHERE id = $1 AND removed_at IS NULL', [id])).rows[0] : null;
     if (id && !prev) throw new HttpError(404, 'Banner bulunamadı');
     const f = await fieldsOf(b, prev);
-    const vals = [f.title, f.subtitle, f.cta, f.link, f.imageUrl, f.art, f.showText, f.accent, f.startsAt, f.endsAt, f.enabled, me.id];
+    const vals = [f.title, f.subtitle, f.cta, f.link, f.imageUrl, f.art, f.showText, f.accent, f.startsAt, f.endsAt, f.enabled, me.id, f.audience];
     const row = (
       prev
         ? await db.query(
             `UPDATE banners SET title = $1, subtitle = $2, cta = $3, link = $4, image_url = $5, art = $6, show_text = $7, accent = $8, starts_at = $9, ends_at = $10,
-               enabled = $11, first_on_at = coalesce(first_on_at, CASE WHEN $11 THEN now() END), updated_by = $12, updated_at = now() WHERE id = $13 RETURNING *`,
+               enabled = $11, first_on_at = coalesce(first_on_at, CASE WHEN $11 THEN now() END), updated_by = $12, audience = $13, updated_at = now() WHERE id = $14 RETURNING *`,
             [...vals, id],
           )
         : await db.query(
-            `INSERT INTO banners (title, subtitle, cta, link, image_url, art, show_text, accent, starts_at, ends_at, enabled, first_on_at, created_by, updated_by, sort)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, CASE WHEN $11 THEN now() END, $12, $12, (SELECT coalesce(max(sort), 0) + 1 FROM banners WHERE removed_at IS NULL)) RETURNING *`,
+            `INSERT INTO banners (title, subtitle, cta, link, image_url, art, show_text, accent, starts_at, ends_at, enabled, first_on_at, created_by, updated_by, audience, sort)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, CASE WHEN $11 THEN now() END, $12, $12, $13, (SELECT coalesce(max(sort), 0) + 1 FROM banners WHERE removed_at IS NULL)) RETURNING *`,
             vals,
           )
     ).rows[0];

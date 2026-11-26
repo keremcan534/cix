@@ -84,3 +84,7 @@ Sahiplerin neon tasarımı (25 Kasım 2026):
   - Sunucu: `server/api/test/banners.test.mjs`.
   - Uygulama: `app/tests/banners-parse.test.ts`.
   - Panel: rota listesi testi.
+
+## Kimlere ve Ajans Başvurusu bannerı (26 Kasım 2026)
+
+Her bannerın bir **Kimlere** seçeneği var: **Herkes** ya da **Ajansı olmayanlar** (`audience`: `all` | `no_agency`). Ajansı olmayanlar seçilen banner, bir ajansta yayıncı olan, ajans sahibi olan ya da ajans ekibinde olan kişiye gönderilmez (`GET /api/room-banners`). **Ajans Başvurusu** bannerı (görseli uygulamada: `ajans-basvurusu`) artık burada yönetilen bir bannerdır: sıranın başında, Ajansı olmayanlar için, `/ajans`’a gider (136). Panelden kapatılır, sıralanır, tarih verilir. Görsel, kayan alanın her telefon genişliğinde yazısı ve düğmesi kesilmeyecek şekilde hazırlandı.
