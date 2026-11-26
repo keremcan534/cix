@@ -208,6 +208,12 @@ const LOOK: Record<string, Look> = {
   silent_visit: { name: 'Sessiz ziyaret', emoji: '🥷', art: 'ayricalik-gizli-ziyaret' },
   entry_greeting: { name: 'Giriş karşılaması', emoji: '🌟', art: 'ayricalik-giris-ekrani' },
   visitors: { name: 'Profiline bakanları gör', emoji: '👀' },
+  // Gizlilik (owners, 26 Nov 2026; lib/privacy-perks).
+  privacy_room: { name: 'Bulunduğum odayı gizle', emoji: '🚪', art: 'ayricalik-gizli-oda-girisi' },
+  privacy_global: { name: 'Duyurularda adımı gizle', emoji: '📢', art: 'ayricalik-platform-duyurusu' },
+  privacy_online: { name: 'Çevrimiçi gizlilik', emoji: '🫥' },
+  privacy_marks: { name: 'Profilime iz bırakılmasın', emoji: '🛡️' },
+  privacy_profile: { name: 'Profilimi gizle', emoji: '🎭', art: 'ayricalik-klan-gizliligi' },
 };
 const shown = (perks: PerkAt[], looks: Record<string, Look>): ShownRight[] =>
   perks

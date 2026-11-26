@@ -44,6 +44,13 @@ export const PERKS = Object.freeze(
     { key: 'vip_gifts', name: 'Üyelere özel hediyeler', systems: ['vip'], ready: true, gate: true },
     { key: 'silent_visit', name: 'Sessiz ziyaret', systems: ['vip', 'noble'], ready: true },
     { key: 'entry_greeting', name: 'Giriş karşılaması', systems: ['noble'], ready: true },
+    // Gizlilik (owners, 26 Nov 2026): Ayarlar › Gizlilik is no longer for everyone; each choice is a VIP / Rütbe right
+    // (privacy.mjs PRIVACY_PERKS: which setting each opens).
+    { key: 'privacy_room', name: 'Bulunduğum odayı gizle', systems: ['vip', 'noble'], ready: true },
+    { key: 'privacy_global', name: 'Genel duyurularda adımı gizle', systems: ['vip', 'noble'], ready: true },
+    { key: 'privacy_online', name: 'Çevrimiçi ve son görülme gizliliği', systems: ['vip', 'noble'], ready: true },
+    { key: 'privacy_marks', name: 'Profilime iz bırakılmasın', systems: ['vip', 'noble'], ready: true },
+    { key: 'privacy_profile', name: 'Profilimi gizle', systems: ['vip', 'noble'], ready: true },
     { key: 'visitors', name: 'Profiline bakanları gör', systems: ['vip', 'sub'], ready: true },
     { key: 'discover_boost', name: "Ana Sayfa'da öne çıkma", systems: ['charm'], ready: true },
     { key: 'moments_post', name: "Anlar'da paylaşım", systems: ['charm'], ready: true, gate: true },
@@ -67,7 +74,7 @@ export const PERKS = Object.freeze(
     { key: 'free_match', name: 'Günlük ücretsiz eşleşme', systems: ['sub'], ready: false },
     { key: 'gold_name', name: 'Altın isim', systems: ['sub', 'vip'], ready: false },
     { key: 'welcome_box', name: 'Hoş Geldin Kutusu', systems: ['sub'], ready: false },
-  ].map((p) => Object.freeze({ gate: false, ...p, systems: Object.freeze(p.systems) })),
+  ].map((p) => Object.freeze({ gate: false, added: p.key.startsWith('privacy_'), ...p, systems: Object.freeze(p.systems) })),
 );
 export const PERK = new Map(PERKS.map((p) => [p.key, p]));
 
@@ -102,13 +109,15 @@ export const DEFAULTS = Object.freeze({
   vip: {
     levels: SVIP_XP.map((points, i) => ({ level: i + 1, points, name: `VIP ${i + 1}` })),
     // vip_gifts 1: a gift made in Yönetim › Hediyeler may open at VIP 1 (the app's own start at VIP 2).
-    perks: [perk('badge'), perk('frame'), perk('hide_levels'), perk('room_password'), perk('vip_store'), perk('vip_gifts'), perk('silent_visit', 7)],
+    perks: [perk('badge'), perk('frame'), perk('hide_levels'), perk('room_password'), perk('vip_store'), perk('vip_gifts'), perk('silent_visit', 7),
+      perk('privacy_room', 2), perk('privacy_global', 3), perk('privacy_online', 4), perk('privacy_marks', 5), perk('privacy_profile', 6)],
     decay: OFF,
   },
   noble: {
     levels: NOBLE.map((x) => ({ level: x.tier, name: x.name, price: x.price, days: x.days, plans: nobleDefaultPlans(x.price, x.days) })),
     // Any Rütbe tier hides levels and sets a room password; Sessiz ziyaret from Kont (the third tier).
-    perks: [perk('badge'), perk('room_password'), perk('hide_levels'), perk('entry_greeting'), perk('frame'), perk('silent_visit', 3)],
+    perks: [perk('badge'), perk('room_password'), perk('hide_levels'), perk('entry_greeting'), perk('frame'), perk('silent_visit', 3),
+      perk('privacy_room', 1), perk('privacy_global', 2), perk('privacy_online', 3), perk('privacy_marks', 3), perk('privacy_profile', 4)],
   },
   wealth: {
     levels: WEALTH_XP.map((points, level) => ({ level, points })),
@@ -307,6 +316,8 @@ export async function refreshLevels(q = db) {
     try {
       // Checked again: a stored document a later version can't read keeps today's values instead of failing.
       docs[row.system] = validate(row.system, row.doc);
+      const have = new Set(docs[row.system].perks?.map((p) => p.key) ?? []);
+      for (const p of DEFAULTS[row.system].perks ?? []) if (!have.has(p.key) && PERK.get(p.key)?.added) docs[row.system].perks.push({ ...p });
       meta[row.system] = { rev: Number(row.rev), updatedAt: row.updated_at, updatedBy: row.updated_by };
     } catch (e) {
       console.error('level settings unreadable', row.system, String(e?.message ?? e).slice(0, 200));

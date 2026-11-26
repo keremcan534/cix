@@ -84,6 +84,65 @@ const COLUMN = {
   marksFrom: 'marks_from',
   globalHideName: 'global_hide_name',
 };
+/**
+ * Gizlilik is a VIP / Rütbe right (owners, 26 Nov 2026): each setting below may move off its default only with its
+ * perk (levels.mjs; Seviye ayarları set the level). Without it the setting is the default whatever was saved: on
+ * the way in (PATCH refuses) and when the perk is gone (VIP dropped, Rütbe ended: the next read puts it back).
+ * "Kimler ulaşabilir" (dmFrom, callsFrom, invitesFrom) stays for everyone; marksFrom only its "Kimse".
+ */
+export const PRIVACY_PERKS = Object.freeze({
+  showCurrentRoom: 'privacy_room',
+  globalHideName: 'privacy_global',
+  showOnline: 'privacy_online',
+  showLastSeen: 'privacy_online',
+  profileMarks: 'privacy_marks',
+  profilePublic: 'privacy_profile',
+});
+const offDefault = (k, v) => (k === 'marksFrom' ? v === 'nobody' : v !== PRIVACY_DEFAULTS[k]);
+const perkOf = (k) => (k === 'marksFrom' ? 'privacy_marks' : PRIVACY_PERKS[k]);
+/** The privacy perks `uid` has now (a Set of keys). */
+async function privacyPerksOf(q, uid) {
+  // PRIVACY_PERKS=0 (the tests): every choice open, as before the rights.
+  if (process.env.PRIVACY_PERKS === '0') return new Set(Object.values(PRIVACY_PERKS));
+  // Imported here: tests and modules read this one's rules without the server's (economy and levels reach live.mjs).
+  const [{ statusOf }, { hasPerk }] = await Promise.all([import('./economy.mjs'), import('./levels.mjs')]);
+  const u = (await q.query('SELECT svip_xp FROM users WHERE id = $1', [uid])).rows[0];
+  const noble = (await statusOf(q, uid)).noble?.tier ?? 0;
+  return new Set([...new Set(Object.values(PRIVACY_PERKS))].filter((p) => hasPerk(p, { svipXp: u?.svip_xp ?? 0, nobleTier: noble })));
+}
+/** Where each privacy perk opens (VIP level, Rütbe tier; null where it isn't given), for the app's lock lines. */
+const perkLevels = async () => {
+  const { perkFrom } = await import('./levels.mjs');
+  return Object.fromEntries([...new Set(Object.values(PRIVACY_PERKS))].map((p) => [p, { vip: perkFrom('vip', p), noble: perkFrom('noble', p) }]));
+};
+/** Puts back every setting `uid` no longer has the right to (once; the stored row then agrees everywhere). */
+async function enforcePerks(q, uid, have) {
+  const p = await privacyOf(q, uid);
+  const back = {};
+  for (const k of [...Object.keys(PRIVACY_PERKS), 'marksFrom']) if (offDefault(k, p[k]) && !have.has(perkOf(k))) back[k] = k === 'marksFrom' ? MARKS_FROM_DEFAULT : PRIVACY_DEFAULTS[k];
+  if (!Object.keys(back).length) return p;
+  if ('marksFrom' in back || 'profileMarks' in back) Object.assign(back, { marksFrom: MARKS_FROM_DEFAULT, profileMarks: true });
+  const cols = Object.keys(back).map((k) => COLUMN[k]);
+  await q.query(`UPDATE privacy_settings SET ${cols.map((c, i) => `${c} = $${i + 2}`).join(', ')}, updated_at = now() WHERE user_id = $1`, [uid, ...Object.values(back)]);
+  return privacyOf(q, uid);
+}
+/** Every user with a setting past a right: put back (the job; a lapsed VIP or Rütbe loses its privacy). */
+export async function enforcePrivacyPerks(q = db) {
+  const r = await q.query(`SELECT user_id FROM privacy_settings WHERE NOT profile_public OR NOT show_online OR NOT show_last_seen OR NOT show_current_room
+                             OR global_hide_name OR NOT profile_marks OR marks_from = 'nobody' LIMIT 5000`);
+  for (const { user_id: uid } of r.rows) await enforcePerks(q, uid, await privacyPerksOf(q, uid)).catch(() => {});
+}
+let perkTimer = null;
+export function startPrivacyPerks() {
+  if (perkTimer) return;
+  perkTimer = setInterval(() => void enforcePrivacyPerks().catch((e) => console.error('privacy perks', String(e?.message ?? e).slice(0, 200))), 10 * 60_000);
+  perkTimer.unref();
+}
+export function stopPrivacyPerks() {
+  clearInterval(perkTimer);
+  perkTimer = null;
+}
+
 const CHOICES = { dmFrom: ['everyone', 'following', 'mutual'], callsFrom: ['everyone', 'following', 'nobody'], invitesFrom: ['everyone', 'following', 'nobody'], marksFrom: MARKS_FROM };
 /** A session seen this recently is online (as Keşfet has always counted it). */
 export const ONLINE_MS = 5 * 60_000;
@@ -262,14 +321,25 @@ const ALL_DEFAULT = Object.entries(COLUMN)
 export const privacyRoutes = {
   async 'GET /api/me/privacy'(req) {
     const me = await auth(req);
-    return { privacy: await privacyOf(db, me.id) };
+    const have = await privacyPerksOf(db, me.id);
+    // perks: the privacy rights I have; perkLevels: where each opens (a newer app shows only what I have).
+    return { privacy: await enforcePerks(db, me.id, have), perks: [...have], perkLevels: await perkLevels() };
   },
 
   /** Changes some of my settings; the answer is all of them as they are now. */
   async 'PATCH /api/me/privacy'(req) {
     const me = await auth(req);
     limit(`privacy:${me.id}`, 30, 'Çok sık değiştiriyorsun, biraz bekle');
-    const set = patchOf(await readJson(req));
+    const body = await readJson(req);
+    const set = patchOf(body);
+    // A setting past my rights is refused (an older app still shows every switch).
+    const have = await privacyPerksOf(db, me.id);
+    for (const k of [...Object.keys(PRIVACY_PERKS), 'marksFrom']) {
+      if (!(k in (body ?? {})) || !offDefault(k, body[k]) || have.has(perkOf(k))) continue;
+      const at = (await perkLevels())[perkOf(k)];
+      const where = [at.vip !== null && `VIP ${at.vip}`, at.noble !== null && 'Rütbe'].filter(Boolean).join(' ya da ');
+      throw Object.assign(new HttpError(403, `Bu gizlilik ayarı ${where || 'VIP'} ayrıcalığıdır.`), { extra: { code: 'privacy_perk', perk: perkOf(k) } });
+    }
     const cols = Object.keys(set);
     // Profil izleri: who may mark me is in my look (marksFrom, noMarks), which the rooms I'm in hear when it changes.
     const marksWere = 'profile_marks' in set ? (await privacyOf(db, me.id)).marksFrom : null;
@@ -287,7 +357,7 @@ export const privacyRoutes = {
     // Back to every default: nothing to keep.
     await db.query(`DELETE FROM privacy_settings WHERE user_id = $1 AND ${ALL_DEFAULT}`, [me.id]);
     // Profil izleri: the choice blocks new marks only; the ones I have stay (the owners' decision, 20 Nov 2026).
-    const privacy = await privacyOf(db, me.id);
+    const privacy = await enforcePerks(db, me.id, have);
     // Imported when needed (profile-marks.mjs reaches this module through its own imports).
     if (marksWere !== null && privacy.marksFrom !== marksWere) void import('./profile-marks.mjs').then((m) => m.announceMarks(me.id)).catch(() => {});
     return { privacy };

@@ -27,6 +27,8 @@ import { liveMode, oneOnOneOpen, reloadDiscoverPeople, useDiscoverPeople, useDis
 import { levelsOf } from '@/lib/live/levels';
 import { cityDistanceText, distanceOf } from '@/lib/live/distances';
 import type { DiscoverList } from '@/lib/api';
+import { MessagePrefsButton } from '@/components/message-prefs';
+
 
 const TABS = ['Ana Sayfa', 'Yakındakiler', 'Öne çıkanlar', 'Çevrim içi', 'Yeni kullanıcılar'] as const;
 type Tab = (typeof TABS)[number];
@@ -168,9 +170,9 @@ export default function DiscoverScreen() {
                 {moreRight && <LinearGradient colors={['rgba(255,240,247,0)', HOME.glass]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.tabFade} pointerEvents="none" />}
               </View>
               <View style={styles.tabSep} />
-              <Pressable style={styles.iconBtn} onPress={() => router.push('/siralama')} hitSlop={6} accessibilityLabel="Sıralama">
-                <Ionicons name="trophy-outline" size={20} color={HOME.plum} />
-              </Pressable>
+              {/* Arama tercihleri (moved from Mesajlar, owners 26 Nov 2026), drawn as the bar's own line icon. Sıralama has
+                  its own ways in on Ana Sayfa. */}
+              <MessagePrefsButton icon={<View style={styles.iconBtn}><Ionicons name="happy-outline" size={21} color={HOME.plum} /></View>} />
               <View style={styles.tabSep} />
               <Pressable style={styles.iconBtn} onPress={() => setFilterOpen(true)} hitSlop={6} accessibilityLabel="Ülke seç">
                 <Ionicons name="globe-outline" size={20} color={HOME.plum} />

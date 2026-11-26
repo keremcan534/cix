@@ -10,7 +10,6 @@ import { SCENES } from '@/components/fx/scenes';
 import { ActionSheet, type SheetOption } from '@/components/ActionSheet';
 import { Avatar, VerifiedBadge, VipBadge } from '@/components/ui';
 import { HeartBadge } from '@/components/heart-level';
-import { MessagePrefsButton } from '@/components/message-prefs';
 import { CALL_HISTORY, formatDuration, formatIntimacy, intimacyOf, isTodayTime, messageTime } from '@/data/messages-ui';
 import { FOLLOWS_ME, ROOMS, userById, type Conversation, type User } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
@@ -196,7 +195,6 @@ export default function MessagesScreen() {
             <Chip key={f.key} label={f.label} active={filter === f.key} onPress={() => setFilter(f.key)} />
           ))}
         </ScrollView>
-        <MessagePrefsButton />
       </View>
       {filter === 'all' && (
         <View style={styles.systemCard}>

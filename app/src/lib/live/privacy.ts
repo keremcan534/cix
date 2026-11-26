@@ -2,24 +2,45 @@
 // (server/api/privacy.mjs). They are read after signing in (LiveSync) and when Ayarlar opens, and saved as soon as
 // one changes: the choice moves at once and goes back, with a note, if the server refuses (lib/privacy-sync). The
 // demo keeps them in the store only. Without a server address nothing here runs.
-import { useEffect } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 
 import * as api from '@/lib/api';
 import { showAlert } from '@/lib/alert';
 import { liveMode, message, onAccountChange } from '@/lib/live';
 import { PRIVACY_KEYS, marksShown, privacyBody, privacySync, type PrivacyKey } from '@/lib/privacy-sync';
+import { demoPrivacyPerks, perksFromServer } from '@/lib/privacy-perks';
 import { useApp, type Settings } from '@/store';
 
 export { PRIVACY_KEYS, type PrivacyKey };
 type Put = <K extends keyof Settings>(k: K, v: Settings[K]) => void;
 
 const sync = privacySync();
-onAccountChange(() => sync.reset());
+// The Gizlilik rights I have (lib/privacy-perks): null until read; undefined from an older server (all shown).
+let perks: Set<string> | null | undefined = null;
+const perkListeners = new Set<() => void>();
+const putPerks = (p: Set<string> | null | undefined) => {
+  perks = p;
+  perkListeners.forEach((l) => l());
+};
+onAccountChange(() => (sync.reset(), putPerks(null)));
+
+/** My Gizlilik rights: live, the server's; the demo, from my VIP level and Rütbe tier. */
+export function usePrivacyPerks(): Set<string> | null | undefined {
+  const { svipLevel, nobleTier } = useApp();
+  const live = useSyncExternalStore(
+    (l) => (perkListeners.add(l), () => void perkListeners.delete(l)),
+    () => perks,
+    () => perks,
+  );
+  return liveMode() ? live : demoPrivacyPerks(svipLevel, nobleTier);
+}
 
 /** Reads my choices from the server into the store (`put`: the store's setSetting). */
 export async function loadPrivacy(put: Put) {
   if (!liveMode()) return;
-  const p = await api.myPrivacy();
+  const all = await api.myPrivacyAll();
+  const p = all.privacy;
+  putPerks(perksFromServer(all.perks));
   const shown = sync.loaded(p);
   for (const k of PRIVACY_KEYS) if (shown[k] !== undefined) put(k, shown[k] as Settings[typeof k]);
   // A server before "Kimler profilime iz bırakabilir": its switch alone (on: everyone could).

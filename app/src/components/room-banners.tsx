@@ -19,6 +19,7 @@ import { liveMode } from '@/lib/live';
 import { TEAM_KIND_LABEL, bannerClick, bannerSeen, roomBanners, type AdminBanner, type BannerAccent, type BoardKey, type BoardPeriod, type RoomBanners as Banners, type TeamKind } from '@/lib/live/team';
 import { noticeHref } from '@/lib/notice-links';
 import { compact } from '@/lib/compact';
+import { useMyServerAgency } from '@/lib/live/me-stats';
 import { useApp } from '@/store';
 import { ThemeScope, fonts, makeStyles } from '@/theme';
 
@@ -62,7 +63,18 @@ const BANNER_ART: Record<string, number> = {
   'ornek-hediye-alanlar': require('../../assets/banners/ornek-hediye-alanlar.webp'),
   'ornek-hediye-gonderenler': require('../../assets/banners/ornek-hediye-gonderenler.webp'),
   'ornek-zirvedeki-ajanslar': require('../../assets/banners/ornek-zirvedeki-ajanslar.webp'),
+  'ajans-basvurusu': require('../../assets/banners/ajans-basvurusu.webp'),
 };
+/**
+ * Ajans başvurusu (owners, 26 Nov 2026): the app's own slide, always first, for anyone in no agency; the picture carries
+ * its own button. Not a Banner Yönetimi banner (no seen / click counts).
+ */
+const AGENCY_APPLY: Slide = {
+  kind: 'banner',
+  id: 'app-agency-apply',
+  b: { id: 'app-agency-apply', title: 'Ajans Başvurusu', subtitle: 'Kendi ajansını kur veya güçlü bir ekibe katıl', cta: '', link: '/ajans', imageUrl: null, art: 'ajans-basvurusu', showText: false, accent: 'mor' },
+};
+const ownSlide = (id: string) => id.startsWith('app-');
 /** A banner's button and rim colours (Banner Yönetimi `accent`). */
 const ACCENT: Record<BannerAccent, { button: readonly [string, string]; rim: string; ink: string }> = {
   mor: { button: ['#C14DFF', '#7B2FF7'], rim: '#B66BFF', ink: '#fff' },
@@ -134,7 +146,11 @@ export function RoomBanners() {
       };
     }, [live]),
   );
-  const slides = (live ? (server ? liveSlides(server) : []) : demoSlides()).filter(worthShowing);
+  // The application slide: only for someone in no agency (live: the server's answer; none before it).
+  const myAgency = useMyServerAgency(live);
+  const { agencyId } = useApp();
+  const noAgency = live ? myAgency === null : !agencyId;
+  const slides = [...(noAgency ? [AGENCY_APPLY] : []), ...(live ? (server ? liveSlides(server) : []) : demoSlides()).filter(worthShowing)];
 
   const scroller = useRef<ComponentRef<typeof ScrollView>>(null);
   const [index, setIndex] = useState(0);
@@ -146,9 +162,18 @@ export function RoomBanners() {
     const t = setTimeout(() => scroller.current?.scrollTo({ x: ((index + 1) % count) * step, animated: true }), EVERY_MS);
     return () => clearTimeout(t);
   }, [count, held, index, settings.reduceMotion, step]);
+  // Slides came or went (the server's answer, the application slide): back to the first, so the dots and the card agree.
+  const [slidesWere, setSlidesWere] = useState(count);
+  if (slidesWere !== count) {
+    setSlidesWere(count);
+    setIndex(0);
+  }
+  useEffect(() => {
+    scroller.current?.scrollTo({ x: 0, animated: false });
+  }, [count]);
   // The banner in view counts as seen (once a run; the server counts each person once a day).
   const shown = slides[index];
-  const shownBanner = live && shown?.kind === 'banner' ? shown.b.id : null;
+  const shownBanner = live && shown?.kind === 'banner' && !ownSlide(shown.b.id) ? shown.b.id : null;
   useEffect(() => {
     if (shownBanner) bannerSeen(shownBanner);
   }, [shownBanner]);
@@ -201,7 +226,7 @@ function BannerCard({ s, live }: { s: BannerSlide; live: boolean }) {
   const source = b.imageUrl ? { uri: b.imageUrl } : BANNER_ART[b.art ?? ''];
   const open = () => {
     if (!href) return;
-    if (live) bannerClick(b.id);
+    if (live && !ownSlide(b.id)) bannerClick(b.id);
     router.push(href as Href);
   };
   return (

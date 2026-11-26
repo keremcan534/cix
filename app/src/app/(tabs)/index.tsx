@@ -36,7 +36,6 @@ import {
   type CountryId,
   type RoomTab,
 } from '@/data/rooms-ui';
-import { StarterPath } from '@/components/starter';
 import { RoomBanners } from '@/components/room-banners';
 import { showAlert } from '@/lib/alert';
 import { closestRooms, type RoomMatch } from '@/lib/closest';
@@ -91,9 +90,8 @@ export default function RoomsScreen() {
   // The home screen leads with the open room whose host has the most in common with you (lib/closest); a
   // password room is never offered there.
   const closest = closestRooms(me, visible.filter((r) => !isLockedRoom(r.id)), userById, { following, recent: recentRooms, blocked })[0];
-  // Live: my own open room on the server ("Odam"), and where the starter's "join a room" step leads.
+  // Live: my own open room on the server ("Odam").
   const myLive = live ? serverRooms.find((r) => r.hostId === 'me') : undefined;
-  const starterRoom = live && closest ? (`/oda/${closest.room.id}` as const) : undefined;
 
   // Personalized suggestions with an explanation; blocked hosts and private rooms are excluded.
   const suggestions: Suggestion[] = visible
@@ -204,7 +202,6 @@ export default function RoomsScreen() {
         ListHeaderComponent={
           main === 'rec' ? (
             <View style={{ gap: 14, paddingBottom: 4 }}>
-              <StarterPath roomHref={starterRoom} />
               <RoomBanners />
               {closest && <ClosestRoomCard match={closest} />}
               <QuickStrip coins={coins} checkedInToday={checkedInToday} />

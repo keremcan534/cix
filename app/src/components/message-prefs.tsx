@@ -1,7 +1,6 @@
 // The smiley beside Mesajlar's filters: which calls I take and which messages show a notification on my phone. The
 // server keeps and enforces the choices (server/api/privacy.mjs); each is saved as soon as it moves (lib/live/privacy).
-// Below them, live only, Otomatik mesaj's choices (lib/live/auto-chat): automatic conversation starts reach me, the
-// system may start conversations in my name (a man), my automatic messages go out (a woman streamer).
+// Message notifications and Otomatik mesaj's choices are no longer offered here (owners, 26 Nov 2026).
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
@@ -10,9 +9,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Switch } from '@/components/luxe-switch';
 import { Text } from '@/components/text';
-import { showAlert } from '@/lib/alert';
-import { message } from '@/lib/live';
-import { setAutoChoice, useAutoMe, type AutoMe } from '@/lib/live/auto-chat';
 import { useLivePrivacy, usePrivacySetter } from '@/lib/live/privacy';
 import { useApp } from '@/store';
 import { makeStyles, SCRIM, useTheme } from '@/theme';
@@ -23,8 +19,7 @@ type PrefKey = 'voiceCalls' | 'videoCalls' | 'messagePush' | 'pushCloseOnly';
 const ROWS: { key: PrefKey; icon: IconName; title: string; sub: string }[] = [
   { key: 'voiceCalls', icon: 'call', title: 'Sesli arama kabul et', sub: 'Kapalıyken kimse seni sesli arayamaz.' },
   { key: 'videoCalls', icon: 'videocam', title: 'Görüntülü arama kabul et', sub: 'Kapalıyken kimse seni görüntülü arayamaz.' },
-  { key: 'messagePush', icon: 'notifications', title: 'Mesaj bildirimleri al', sub: 'Kapalıyken mesajlar yine gelir, telefonuna bildirim düşmez.' },
-  { key: 'pushCloseOnly', icon: 'heart', title: 'Yalnızca samimi kişilerden bildirim al', sub: 'Karşılıklı takipleştiğin ya da aranızda kalp seviyesi olan kişiler.' },
+  // Turning message notifications or automatic messages off is no longer offered here (owners, 26 Nov 2026).
 ];
 
 function PrefsSheet({ onClose }: { onClose: () => void }) {
@@ -41,7 +36,7 @@ function PrefsSheet({ onClose }: { onClose: () => void }) {
       <View style={[s.sheet, { paddingBottom: Math.max(bottom, 12) + 8 }]}>
         <View style={s.grip} />
         <Text style={s.title} accessibilityRole="header">
-          Arama ve bildirim tercihleri
+          Arama tercihleri
         </Text>
         {ROWS.map((r) => {
           // Only close people's notifications: there is nothing to narrow while message notifications are off.
@@ -59,58 +54,26 @@ function PrefsSheet({ onClose }: { onClose: () => void }) {
             </View>
           );
         })}
-        <AutoRows />
       </View>
     </Modal>
   );
 }
 
-type AutoKey = 'autoReceive' | 'autoOpener' | 'autoSend';
-const AUTO_ROWS: { key: AutoKey; icon: IconName; title: string; sub: string; shown: (a: AutoMe) => boolean; value: (a: AutoMe) => boolean }[] = [
-  { key: 'autoReceive', icon: 'chatbubbles', title: 'Otomatik sohbet başlangıçlarını al', sub: 'Yayıncıların otomatik mesajları ve sistemin başlattığı sohbetler sana gelir; “Otomatik” diye işaretlidir.', shown: () => true, value: (a) => a.receive },
-  {
-    key: 'autoOpener',
-    icon: 'sparkles',
-    title: 'Benim adıma ücretsiz sohbet başlat',
-    sub: 'Sistem senin adına günde birkaç ücretsiz “Merhaba” mesajı gönderir; karşı tarafta otomatik olarak görünür. Senden jeton düşmez.',
-    shown: (a) => !!a.opener,
-    value: (a) => !!a.opener?.sending,
-  },
-  { key: 'autoSend', icon: 'paper-plane', title: 'Otomatik mesajlarım gönderilsin', sub: 'Çevrimiçiyken şablonlarından biri yeni kullanıcılara gider (günde en çok 10).', shown: (a) => a.tools, value: (a) => !!a.auto?.sending },
-];
-
-/** Otomatik mesaj's choices (a live build only; each row only where it applies to me). */
-function AutoRows() {
-  const a = useAutoMe();
-  const { colors } = useTheme();
-  const s = useStyles();
-  if (!a) return null;
-  const save = (k: AutoKey, v: boolean) =>
-    void (k === 'autoOpener' ? setAutoChoice('autoOpenerSeen', true).then(() => setAutoChoice(k, v)) : setAutoChoice(k, v)).catch((e) => showAlert('Ayar kaydedilemedi', message(e)));
-  return (
-    <>
-      {AUTO_ROWS.filter((r) => r.shown(a)).map((r) => (
-        <View key={r.key} style={s.row}>
-          <View style={s.icon}>
-            <Ionicons name={r.icon} size={19} color={colors.primaryText} />
-          </View>
-          <View style={{ flex: 1, gap: 2 }}>
-            <Text style={s.rowTitle}>{r.title}</Text>
-            <Text style={s.rowSub}>{r.sub}</Text>
-          </View>
-          <Switch value={r.value(a)} accessibilityLabel={r.title} onValueChange={(v) => save(r.key, v)} />
-        </View>
-      ))}
-    </>
-  );
-}
-
 /** The smiley that opens the preferences. */
-export function MessagePrefsButton() {
+export function MessagePrefsButton({ icon }: { /** Drawn instead of the glossy face (Ana Sayfa's bar: its plum line icons). */ icon?: React.ReactNode } = {}) {
   const [open, setOpen] = useState(false);
+  if (icon)
+    return (
+      <>
+        <Pressable onPress={() => setOpen(true)} hitSlop={6} accessibilityRole="button" accessibilityLabel="Arama tercihleri">
+          {icon}
+        </Pressable>
+        {open && <PrefsSheet onClose={() => setOpen(false)} />}
+      </>
+    );
   return (
     <>
-      <Pressable onPress={() => setOpen(true)} hitSlop={6} accessibilityRole="button" accessibilityLabel="Arama ve bildirim tercihleri">
+      <Pressable onPress={() => setOpen(true)} hitSlop={6} accessibilityRole="button" accessibilityLabel="Arama tercihleri">
         <LinearGradient colors={['#FFE27A', '#FFC531', '#F2A10F']} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={smile.face}>
           <View style={[smile.eye, { left: 10 }]} />
           <View style={[smile.eye, { right: 10 }]} />
