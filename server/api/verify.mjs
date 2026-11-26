@@ -129,7 +129,8 @@ const checkView = (r) =>
 
 /** The latest check of each kind for `uid`. */
 async function latest(uid, q = db) {
-  const r = await q.query('SELECT DISTINCT ON (kind) * FROM identity_checks WHERE user_id = $1 ORDER BY kind, id DESC', [uid]);
+  // A withdrawn check waiting for the provider's copy to go (the sweep) is no longer the person's.
+  const r = await q.query("SELECT DISTINCT ON (kind) * FROM identity_checks WHERE user_id = $1 AND NOT 'withdrawn' = ANY(reasons) ORDER BY kind, id DESC", [uid]);
   return Object.fromEntries(KINDS.map((k) => [k, r.rows.find((x) => x.kind === k) ?? null]));
 }
 
@@ -262,10 +263,11 @@ export async function sweepChecks() {
         deleted++;
       }
     }
-    // A deleted account's rows go once the provider holds nothing more (or there never was a provider session).
+    // A deleted account's rows, and a withdrawn consent's leftovers, go once the provider holds nothing more (or there
+    // never was a provider session).
     await db.query(
       `DELETE FROM identity_checks i USING users u
-        WHERE u.id = i.user_id AND u.deleted_at IS NOT NULL AND (i.session_id IS NULL OR i.provider_deleted_at IS NOT NULL)`,
+        WHERE u.id = i.user_id AND (u.deleted_at IS NOT NULL OR 'withdrawn' = ANY(i.reasons)) AND (i.session_id IS NULL OR i.provider_deleted_at IS NOT NULL)`,
     );
     return { closed: closed.rowCount, deleted };
   } finally {
@@ -459,22 +461,42 @@ export const verifyRoutes = {
     const b = await readJson(req, 1024);
     const kind = kindOf(b.kind);
     limit(`verify-withdraw:${u.id}`, 10);
-    const sessions = await tx(async (c) => {
+    // The provider's copy first, outside any lock; a session it couldn't delete is retried by the sweep.
+    const open = (await db.query('SELECT id, session_id FROM identity_checks WHERE user_id = $1 AND kind = $2 AND session_id IS NOT NULL AND provider_deleted_at IS NULL', [u.id, kind])).rows;
+    const left = [];
+    for (const x of open) {
+      if (!env.DIDIT_API_KEY || !(await deleteAtProvider(x.session_id))) left.push(x.id);
+    }
+    await tx(async (c) => {
       await c.query('SELECT 1 FROM users WHERE id = $1 FOR NO KEY UPDATE', [u.id]);
-      const r = await c.query('DELETE FROM identity_checks WHERE user_id = $1 AND kind = $2 RETURNING session_id, provider_deleted_at', [u.id, kind]);
+      // What the provider still holds keeps a row with nothing of the person's in it, for the sweep to finish.
+      if (left.length) {
+        await c.query(
+          `UPDATE identity_checks SET status = 'expired', reasons = '{withdrawn}', doc_name = NULL, doc_sex = NULL, doc_adult = NULL, doc_country = NULL,
+             doc_hash = NULL, avatar_url = NULL, session_url = NULL, consent_ip = NULL, decided_at = now() - make_interval(days => $2 + 1)
+            WHERE id = ANY($1::bigint[])`,
+          [left, KEEP_DAYS],
+        );
+        console.error('verify withdraw: provider copy not deleted yet, the sweep retries');
+      }
+      const r = await c.query('DELETE FROM identity_checks WHERE user_id = $1 AND kind = $2 AND NOT (id = ANY($3::bigint[])) RETURNING id', [u.id, kind, left]);
       if (kind === 'face') await c.query('UPDATE users SET verified_avatar = NULL WHERE id = $1', [u.id]);
-      await c.query('INSERT INTO audit_events (actor, action, target, detail, ip) VALUES ($1, $2, $3, $4, $5)', [u.id, 'verify.withdraw', u.id, JSON.stringify({ kind, checks: r.rowCount }), clientIp(req)]);
-      return r.rows.filter((x) => x.session_id && !x.provider_deleted_at).map((x) => x.session_id);
+      await c.query('INSERT INTO audit_events (actor, action, target, detail, ip) VALUES ($1, $2, $3, $4, $5)', [
+        u.id,
+        'verify.withdraw',
+        u.id,
+        JSON.stringify({ kind, checks: r.rowCount + left.length, providerPending: left.length }),
+        clientIp(req),
+      ]);
     });
-    // After the commit, outside the lock: the provider's copy. One that fails is logged; the person's records are gone.
-    if (env.DIDIT_API_KEY) for (const sid of sessions) if (!(await deleteAtProvider(sid))) console.error('verify withdraw: provider copy not deleted');
+    if (left.length) sweepSoon();
     const s = await state(u);
     return { verified: s.verified, idVerified: s.idVerified };
   },
 
   /** Didit → us when a session changes. Only a signed call is read; the decision itself is fetched from Didit. */
   async 'POST /api/verify/webhook'(req) {
-    const raw = await readRaw(req, 256_000);
+    const raw = await readRaw(req, 1_000_000);
     if (!signatureOk(raw, req.headers, env.DIDIT_WEBHOOK_SECRET)) throw new HttpError(401, 'İmza geçersiz');
     let e;
     try {

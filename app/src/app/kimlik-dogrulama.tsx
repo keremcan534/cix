@@ -73,8 +73,9 @@ export default function VerifyScreen() {
         if (!alive) return;
         show(s);
         setError(null);
-        // Back through the provider's link (?verificationSessionId=…&status=…): ask about whatever was open.
-        if (params.status) for (const k of VERIFY_KINDS) back(k);
+        // Back through the provider's link (?verificationSessionId=…&status=…), or a check left open (the webhook may
+        // be late): ask the provider now.
+        for (const k of VERIFY_KINDS) if (params.status || s?.[k]?.status === 'pending') back(k);
       })
       .catch((e) => alive && setError(message(e)))
       .finally(() => alive && setLoaded(true));

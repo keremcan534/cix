@@ -417,6 +417,23 @@ describe('Yüz doğrulaması ve mavi rozet', () => {
     assert.ok((await q("SELECT 1 FROM audit_events WHERE action = 'verify.withdraw' AND actor = $1", [s.user.id])).rowCount);
   });
 
+  test('rıza geri alınırken sağlayıcıya ulaşılamazsa: kişinin hiçbir bilgisi kalmaz, silme sonra tekrar denenir', async () => {
+    const { s, sid } = await verifiedWoman('Geri Alan Kadın', { name: 'DERYA AK' });
+    didit.down = true;
+    try {
+      const r = await ok(call('POST', '/api/verify/withdraw', { kind: 'id' }, s.session), 'geri al');
+      assert.equal(r.idVerified, false);
+      const left = (await q('SELECT status, reasons, doc_name, doc_hash, doc_sex, provider_deleted_at FROM identity_checks WHERE session_id = $1', [sid])).rows[0];
+      assert.deepEqual([left.status, left.reasons, left.doc_name, left.doc_hash, left.doc_sex, left.provider_deleted_at], ['expired', ['withdrawn'], null, null, null, null]);
+      const view = await ok(call('GET', '/api/verify', null, s.session), 'durum');
+      assert.deepEqual([view.id, view.idVerified], [null, false]);
+    } finally {
+      didit.down = false;
+    }
+    await wait(async () => (await q('SELECT count(*)::int AS n FROM identity_checks WHERE session_id = $1', [sid])).rows[0].n === 0, 'sonradan silinir');
+    assert.ok(didit.deleted.includes(sid));
+  });
+
   test('yönetim rozeti sıfırlar', async () => {
     const s = await person('Sıfırlanan Rozet', 'Erkek');
     await withPhoto(s);

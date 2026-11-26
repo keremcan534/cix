@@ -50,7 +50,8 @@ görür; yeni uygulamada cümle doğrulama ekranını açar.
   - **Fotoğraf, selfie, yüz şablonu ya da doğum tarihi tutulmaz.**
 - **Didit'te:** görüntüler ve kimlik bilgisi. Karardan **30 gün sonra** sunucu Didit'teki kopyayı siler (itiraz için
   süre). Yarım kalan oturum 48 saatte kapanır; yerine yenisi açılınca eskisi hemen silinir.
-- **Rıza geri alınınca:** kayıtlar hemen, Didit'teki kopya hemen.
+- **Rıza geri alınınca:** kayıtlar hemen, Didit'teki kopya hemen. Didit'e o an ulaşılamazsa kişinin bilgileri yine
+  hemen silinir; geriye yalnız Didit oturum numarası kalır, kopyanın silinmesi otomatik olarak tekrar denenir.
 - **Hesap silinince:** kimlik bilgileri aynı anda boşaltılır; Didit'teki kopya ve satırlar birkaç saniye içinde
   silinir.
 - **Veri kopyası (Verilerimi indir):** kişinin kendi kayıtları, kimlikte okunan bilgilerle birlikte (`identityChecks`).
