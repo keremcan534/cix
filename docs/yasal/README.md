@@ -12,7 +12,7 @@ boş alanlar olduğu gibi durur. Avukat onaylayıp alanları doldurunca `.md` do
 
 | Dosya | Nerede görünür |
 | --- | --- |
-| `tr/`, `en/` 01–08, 11–14 | Sitede `/tr/<ad>` ve `/en/<ad>` (ör. `/tr/privacy`); hepsinin listesi `/yasal` (İngilizcesi `/en/legal`). Uygulamada Ayarlar › Destek › Kullanım Koşulları, Gizlilik Politikası ve altında "Diğer yasal metinler" (`app/src/lib/legal.ts`). |
+| `tr/`, `en/` 01–08, 11–14 | Sitede `/tr/<ad>` ve `/en/<ad>` (ör. `/tr/privacy`); hepsinin listesi `/yasal` (İngilizcesi `/en/legal`). Uygulamada Ayarlar › Yasal bilgiler: Kullanım Koşulları, Gizlilik Politikası ve altında "Diğer yasal metinler" (`app/src/lib/legal.ts`). |
 | `tr/`, `en/` 09 Yayıncı Sözleşmesi, 10 Ajans İş Birliği Sözleşmesi | **Sitede yok:** taraflara ayrıca imzalatılacak sözleşmeler (Ek A ve Ek B'deki kazanç ve komisyon oranları kesinleşmeden). |
 | `00-README-kontrol-listesi.md` | **Ekip içi:** yayın öncesi kontrol listesi, Ek A/B (planlanan oranlar), resmî kaynaklar. Hiçbir yerde yayınlanmaz. |
 
