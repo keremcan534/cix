@@ -106,3 +106,11 @@ export function sharedRoomCode(text: string): string | null {
   const m = /Oda ID: (\d{12})(?!\d)/.exec(text);
   return m ? m[1] : null;
 }
+/** A shared room's message as the chat shows it over its card: the invite line without the number, and the room's name. */
+export function sharedRoomInvite(text: string): { code: string; line: string; title: string } | null {
+  const code = sharedRoomCode(text);
+  if (!code) return null;
+  const line = text.replace(/\s*Oda ID: \d{12}(?!\d)/, '').trim();
+  const title = /"(.+)" odasına/.exec(line)?.[1] ?? 'Oda';
+  return { code, line, title };
+}

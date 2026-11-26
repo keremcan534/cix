@@ -16,7 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import * as ImagePicker from 'expo-image-picker';
-import { FlatList, Image, Keyboard, Platform, Pressable, View } from 'react-native';
+import { ActivityIndicator, FlatList, Image, Keyboard, Platform, Pressable, View } from 'react-native';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { onWebEnter } from '@/lib/enter-sends';
 
@@ -47,7 +47,8 @@ import { messageRefusal, noteSent } from '@/lib/contact-filter';
 import { ContactNote } from '@/components/contact-note';
 import { newRef, sendDm } from '@/lib/api';
 import { HeartBar, heartOf, paidPair, useChatGift, usePair } from '@/components/one-on-one-bar';
-import { liveMode, message as errorText, refreshWallet, toServer } from '@/lib/live';
+import { liveMode, message as errorText, refreshWallet, serverRoomByCode, toServer, useServerRoomList } from '@/lib/live';
+import { sharedRoomInvite } from '@/lib/room-social';
 import type { Pair } from '@/lib/live/one-on-one';
 import { MESSAGE_REPORT_REASONS, isLiveUser, liveDm, reportDm, syncThread, useLiveThread, type SendResult } from '@/lib/live/messages';
 import { sendQuick, serverNowMs, useAutoMe, useThreadExtras } from '@/lib/live/auto-chat';
@@ -404,9 +405,9 @@ export function ChatThread({
                   {item.gift ? (
                     <GiftLine gift={item.gift} text={item.text} onPlay={() => replayGift(item, item.gift!)} onLongPress={() => setPicked(item)} />
                   ) : (
-                    !(item.image && item.text === 'Fotoğraf') && <MessageText text={item.text} style={styles.bubbleText} />
+                    !(item.image && item.text === 'Fotoğraf') && <MessageText text={inviteOf(item)?.line ?? item.text} style={styles.bubbleText} />
                   )}
-                  {item.room && <RoomCard room={item.room} />}
+                  {item.room ? <RoomCard room={item.room} /> : inviteOf(item) && <SharedRoomCard invite={inviteOf(item)!} />}
                   {item.event && <EventCard event={item.event} />}
                   <Text style={styles.time}>
                     {messageTime(item)}{' '}
@@ -443,9 +444,9 @@ export function ChatThread({
                   {item.gift ? (
                     <GiftLine gift={item.gift} text={item.text} theirs onPlay={() => replayGift(item, item.gift!)} onLongPress={() => setPicked(item)} />
                   ) : (
-                    !(item.image && item.text === 'Fotoğraf') && <MessageText text={item.text} style={[styles.bubbleText, styles.theirsText]} />
+                    !(item.image && item.text === 'Fotoğraf') && <MessageText text={inviteOf(item)?.line ?? item.text} style={[styles.bubbleText, styles.theirsText]} />
                   )}
-                  {item.room && <RoomCard room={item.room} theirs />}
+                  {item.room ? <RoomCard room={item.room} theirs /> : inviteOf(item) && <SharedRoomCard invite={inviteOf(item)!} theirs />}
                   {item.event && <EventCard event={item.event} theirs />}
                   <Text style={[styles.time, styles.theirsTime]}>{messageTime(item)}</Text>
                 </Pressable>
@@ -614,22 +615,68 @@ function GiftLine({ gift, text, theirs, onPlay, onLongPress }: { gift: DmGift; t
   );
 }
 
-/** Room invite sent from a room's "Paylaş": opens the room. `theirs` sits on the other side's themed bubble. */
-function RoomCard({ room, theirs }: { room: RoomInviteCard; theirs?: boolean }) {
-  const { colors } = useTheme();
+/** A message that is a room's invite line with its number (lib/room-social): the other side's copy has no card of its own. */
+const inviteOf = (m: { text: string; gift?: unknown; image?: string }) => (m.gift || m.image ? null : sharedRoomInvite(m.text));
+
+/**
+ * A room invite (owners, 26 Nov 2026): the room's cover, its name and "Katıl". Opening it goes through /oda/<id>,
+ * which asks first when another room is open ("Başka bir odaya geçilsin mi?", components/room/session-ui).
+ */
+function InviteCard({ title, cover, seed, state, onJoin, theirs }: { title: string; cover: string; seed: string; state: 'open' | 'looking' | 'closed'; onJoin: () => void; theirs?: boolean }) {
   const styles = useStyles();
+  const closed = state === 'closed';
   return (
-    <Pressable onPress={() => router.push(`/oda/${room.roomId}`)} style={[styles.roomCard, theirs && styles.roomCardTheirs]} accessibilityRole="button" accessibilityLabel={`${room.title} odasına katıl`}>
-      <Photo uri={room.cover} kind="cover" seed={room.roomId} style={styles.roomCover} />
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={[styles.roomTitle, theirs && styles.theirsText]} numberOfLines={1}>
-          {room.title}
+    <Pressable onPress={onJoin} disabled={state !== 'open'} style={[styles.inviteCard, theirs && styles.roomCardTheirs]} accessibilityRole="button" accessibilityLabel={closed ? `${title} odası şu an kapalı` : `${title} odasına katıl`}>
+      <Photo uri={cover} kind="cover" seed={seed} style={[styles.inviteCover, closed && { opacity: 0.45 }]} />
+      <View style={styles.inviteFoot}>
+        <Text style={[styles.roomTitle, theirs && styles.theirsText, { flex: 1 }]} numberOfLines={1}>
+          {title}
         </Text>
-        <Text style={[styles.roomJoin, theirs && styles.roomJoinTheirs]}>🎙️ Odaya katıl</Text>
+        {state === 'looking' ? (
+          <ActivityIndicator size="small" color={theirs ? undefined : '#fff'} />
+        ) : closed ? (
+          <Text style={[styles.roomJoin, theirs && styles.roomJoinTheirs]}>Oda kapalı</Text>
+        ) : (
+          <LinearGradient colors={['#FF5FA2', '#C2306E']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.joinBtn}>
+            <Ionicons name="mic" size={13} color="#fff" />
+            <Text style={styles.joinText}>Katıl</Text>
+          </LinearGradient>
+        )}
       </View>
-      <Ionicons name="chevron-forward" size={18} color={theirs ? colors.text : '#fff'} />
     </Pressable>
   );
+}
+
+/** Room invite sent from a room's "Paylaş" (my own copy carries the room). */
+function RoomCard({ room, theirs }: { room: RoomInviteCard; theirs?: boolean }) {
+  return <InviteCard title={room.title} cover={room.cover} seed={room.roomId} state="open" onJoin={() => router.push(`/oda/${room.roomId}`)} theirs={theirs} />;
+}
+
+/** An invite that came as its text (the server keeps only that): the room is found by its number among the open ones. */
+function SharedRoomCard({ invite, theirs }: { invite: { code: string; title: string }; theirs?: boolean }) {
+  const list = useServerRoomList();
+  const listed = list.find((r) => r.code === invite.code) ?? null;
+  const [looked, setLooked] = useState<'looking' | 'done'>(listed ? 'done' : 'looking');
+  useEffect(() => {
+    if (listed) return;
+    let alive = true;
+    serverRoomByCode(invite.code)
+      .catch(() => null)
+      .finally(() => alive && setLooked('done'));
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [invite.code]);
+  const room = listed;
+  const state = room ? 'open' : looked === 'looking' ? 'looking' : 'closed';
+  const join = async () => {
+    // Read again on the tap: the room may have closed since the card was drawn.
+    const now = await serverRoomByCode(invite.code).catch(() => null);
+    if (now) router.push(`/oda/${now.id}`);
+    else showAlert('Oda şu an açık değil', 'Bu oda kapanmış ya da içinde kimse yok. Biraz sonra tekrar dene.');
+  };
+  return <InviteCard title={room?.title ?? invite.title} cover={room?.cover ?? ''} seed={invite.code} state={state} onJoin={() => void join()} theirs={theirs} />;
 }
 
 /** An event sent from its detail's "Arkadaşına gönder": opens it in Etkinlik Merkezi (which shows its state now). */
@@ -720,7 +767,11 @@ const useStyles = makeStyles(({ colors, lift, ink, dark }) => ({
   giftLineKindTheirs: { color: ink(0.7) },
   giftLineName: { color: '#fff', fontSize: 15, fontWeight: '800' },
   roomCardTheirs: { backgroundColor: dark ? 'rgba(0,0,0,0.25)' : colors.cardAlt },
-  roomCover: { width: 44, height: 44, borderRadius: 10 },
+  inviteCard: { marginTop: 6, borderRadius: 14, overflow: 'hidden', backgroundColor: 'rgba(0,0,0,0.25)', width: 230 },
+  inviteCover: { width: 230, height: 120 },
+  inviteFoot: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 8 },
+  joinBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
+  joinText: { color: '#fff', fontWeight: '800', fontSize: 13 },
   eventIcon: { width: 44, height: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#7C3AED' },
   roomTitle: { color: '#fff', fontWeight: '700', fontSize: 14 },
   roomJoin: { color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 },
