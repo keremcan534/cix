@@ -54,6 +54,8 @@ görür; yeni uygulamada cümle doğrulama ekranını açar.
   hemen silinir; geriye yalnız Didit oturum numarası kalır, kopyanın silinmesi otomatik olarak tekrar denenir.
 - **Hesap silinince:** kimlik bilgileri aynı anda boşaltılır; Didit'teki kopya ve satırlar birkaç saniye içinde
   silinir.
+- **Yedekler:** gecelik veritabanı yedeğinde yalnız sonuç satırları var (görüntü yok). Silinen bir kayıt eski yedeklerde
+  yedeklerin kendi saklama süresi boyunca kalır; bu gizlilik politikasında yazmalı.
 - **Veri kopyası (Verilerimi indir):** kişinin kendi kayıtları, kimlikte okunan bilgilerle birlikte (`identityChecks`).
 - Didit'e bizim kişi numaramız gitmez; hesaptan üretilen sabit bir işaret gider (`u-…`).
 
