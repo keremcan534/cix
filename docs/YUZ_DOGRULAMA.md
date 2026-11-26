@@ -159,6 +159,14 @@ uçları çağırarak yapar. Çekim talebindeki ad uyuşması (`holderMatchesId`
 
 ## Kalanlar
 
+- **Sahiplerin kararı bekleniyor (27 Kasım 2026, "bu pahalı, ücretsiz lazım"):**
+  - **1. yol (öneri):** Didit yalnız aylık ücretsiz krediyle (10 USD, iş e-postasıyla açılan hesapta). Ayda yaklaşık 30
+    kimlik ya da 65 rozet eder. Canlı ayarlar › Kimlik doğrulama › Aylık bütçe 10 yapılır; kredi bitince o ay yeni
+    doğrulama açılmaz.
+  - **2. yol:** tamamen ücretsiz, ekibin baktığı doğrulama. Kişi kimlik fotoğrafı ve kimlikle selfie (rozet için pozlu
+    selfie) yükler, yönetici bakar. Uygulamada yöneticilere bir inceleme ekranı gerekir. Kimlik fotoğraflarını biz
+    saklarız (30 gün).
+  - Didit anahtarları GitHub'a henüz girilmedi; doğrulama kapalı.
 - e-Devlet yaş belirteci: kılavuz çıkınca.
 - Hemen Tanış (yabancıyla görüntülü) için rozet şartı ya da öne çıkarma: sahiplerin kararı.
 - Telefonda denenmeli: Didit sayfasının Android tarayıcıda kamerayı açması ve uygulamaya dönüş.
