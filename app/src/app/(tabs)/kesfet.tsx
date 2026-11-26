@@ -75,6 +75,8 @@ export default function DiscoverScreen() {
   const myAgency = useMyServerAgency(live);
   const { agencyId } = useApp();
   const noAgency = live ? myAgency === null : !agencyId;
+  // Its size from the screen (an image given only a ratio takes its own size on the web).
+  const applyW = useWindowDimensions().width - 32;
   const list = LIST_OF[tab];
   const serverPeople = useDiscoverPeople(list);
   const peopleState = useDiscoverState(list);
@@ -202,7 +204,7 @@ export default function DiscoverScreen() {
             {/* Ajans başvurusu (owners, 26 Nov 2026): pinned at the top of Öne çıkanlar for anyone with no agency yet. */}
             {tab === 'Öne çıkanlar' && noAgency && (
               <Pressable onPress={() => router.push('/ajans')} accessibilityRole="button" accessibilityLabel="Ajans başvurusu: hemen başvur" style={styles.applyBanner}>
-                <Image source={AGENCY_APPLY} style={styles.applyArt} resizeMode="cover" />
+                <Image source={AGENCY_APPLY} style={{ width: applyW, height: Math.round((applyW * 916) / 1717) }} resizeMode="cover" />
               </Pressable>
             )}
 
@@ -586,7 +588,6 @@ const useStyles = makeStyles(({ colors, lift, dark, edge }) => ({
   tabSep: { width: 1, height: 22, backgroundColor: HOME.line, marginHorizontal: 2 },
   iconBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   applyBanner: { marginHorizontal: 16, marginTop: 10, marginBottom: 4, borderRadius: 18, overflow: 'hidden', boxShadow: '0 4px 14px rgba(91,33,182,0.28)' },
-  applyArt: { width: '100%', aspectRatio: 1717 / 916 },
   filterDot: { position: 'absolute', top: 2, right: 0, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary },
   activeFilters: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, marginTop: 4, backgroundColor: colors.card, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, ...lift },
   activeText: { flex: 1, color: colors.text, fontSize: 12 },
