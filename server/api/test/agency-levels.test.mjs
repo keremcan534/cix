@@ -44,6 +44,7 @@ describe('Haftalık seviye farkı: asistan, BD, iade', () => {
     const code = (await q('SELECT code FROM agencies WHERE id = $1', [A.id]))[0].code;
     ok(await helper.post('/api/agency/join', { code, method: 'code' }));
     const H = ok(await owner.post('/api/agency/assistants/add', { id: A.id, user: helper.id, pct: 50 })).assistant;
+    ok(await helper.post('/api/agency/assistants/offer/answer', { assistantId: H.id, answer: 'accept' }));
     ok(await s1.post('/api/agency/join', { code: H.code, method: 'code' }), 'asistanın koduyla');
     ok(await s2.post('/api/agency/join', { code, method: 'code' }));
     const roles = Object.fromEntries(ok(await admin.get('/api/agency/roles')).roles.map((r) => [r.name, r.id]));

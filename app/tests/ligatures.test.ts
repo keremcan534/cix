@@ -39,9 +39,9 @@ describe('fi bağlacı (Profil, Profıl değil)', () => {
     assert.match(src, /import \{[^}]*breakFi[^}]*fontVariantOf[^}]*\} from '@\/lib\/ligatures'/);
     // The outermost text gets the default; a nested one inherits it unless its own style sets a fontVariant.
     assert.match(text, /flat\?\.fontVariant !== undefined \? variantOf\(flat\.fontVariant\) : parent \? null : NO_LIGATURES/);
-    assert.match(text, /style=\{\[NO_PAD, style, own, variant\]\}/, 'Text: varsayılan stilin ardından');
+    assert.match(text, /style=\{\[NO_PAD, style, own, variant, scaledOf\(flat, !parent\)\]\}/, 'Text: varsayılan stilin ardından');
     assert.match(input, /flat\?\.fontVariant !== undefined \? variantOf\(flat\.fontVariant\) : NO_LIGATURES/);
-    assert.match(input, /style=\{\[top, style, own, variant\]\}/, 'TextInput: varsayılan stilin ardından');
+    assert.match(input, /style=\{\[top, style, own, variant, scaledOf\(flat, true\)\]\}/, 'TextInput: varsayılan stilin ardından');
     assert.match(src, /const SPLIT_FI = Platform\.OS !== 'web';/, 'web fontVariant\'ı uygular; ayırıcı yalnız telefonda');
     assert.match(text, /SPLIT_FI && !rest\.selectable \? unjoinFi\(children\) : children/);
   });

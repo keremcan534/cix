@@ -105,14 +105,24 @@ describe('Yayıncı kuralları', () => {
     assert.equal(ok(await fresh.get('/api/agency/me')).streamer.held, true);
   });
 
-  test('aynı cihazdaki ikinci hesap ilk hesabın ajansına bağlanır; işlem önceki çift kaydı da taşır', async () => {
-    const [first, second, third] = await Promise.all([account('İlk Hesap'), account('İkinci Hesap'), account('Üçüncü Hesap')]);
+  test('bir telefonda tek yayıncı: aynı telefondaki diğer hesap yayıncı olamaz; eski çift kayıt yine taşınır', async () => {
+    // One after another: the first account opened on the phone holds its streamer place.
+    const first = await account('İlk Hesap');
+    const second = await account('İkinci Hesap');
+    const third = await account('Üçüncü Hesap');
     await sameDevice(first, second, third);
     ok(await first.post('/api/agency/join', { code: await codeOf(X) }));
-    const j = ok(await second.post('/api/agency/join', { code: await codeOf(Y) }));
-    assert.equal(j.membership.agency.id, X.id);
-    assert.equal(j.sameDevice, true);
-    assert.equal((await q("SELECT count(*)::int AS n FROM agency_audit WHERE action = 'streamer.multi_account' AND target_id = $1", [second.id]))[0].n, 1);
+    // Owners, 26 Nov 2026: the phone's other accounts can't stream at all (no "Yayıncı ol", the server refuses).
+    const [st, j] = await second.post('/api/agency/join', { code: await codeOf(Y) });
+    assert.equal(st, 403);
+    assert.match(j.error, /Bu telefonda zaten bir yayıncı hesabı var/);
+    const me2 = ok(await second.get('/api/agency/me')).streamer;
+    assert.deepEqual([me2.deviceTaken, me2.eligible, me2.held], [true, false, false]);
+    assert.equal(ok(await first.get('/api/agency/me')).streamer.deviceTaken, false, 'ilk hesap yayıncı kalır');
+    // Never held by the centre either, even past the days to pick an agency.
+    await q("UPDATE users SET created_at = now() - interval '30 days' + (CASE WHEN id = $1 THEN interval '1 minute' ELSE interval '0' END) WHERE id = ANY($2::uuid[])", [second.id, [first.id, second.id]]);
+    const kind = ok(await admin.get(`/api/admin/users?q=${encodeURIComponent('İkinci Hesap')}`)).users.find((u) => u.id === second.id)?.streamer;
+    assert.equal(kind ?? null, null, 'ikinci hesap yönetim yayıncısı da olmaz');
     // A link from before the rule (or around it): the job moves it to the first agency.
     await q("INSERT INTO agency_streamers (streamer_id, agency_id, method) VALUES ($1, $2, 'code')", [third.id, Y.id]);
     const r = ok(await admin.post('/api/admin/agency/jobs/run', {}));
@@ -120,10 +130,7 @@ describe('Yayıncı kuralları', () => {
     const links = await q('SELECT agency_id, end_reason, method FROM agency_streamers WHERE streamer_id = $1 ORDER BY joined_at, id', [third.id]);
     assert.deepEqual(
       links.map((l) => [l.agency_id, l.end_reason, l.method]),
-      [
-        [Y.id, 'multi_account', 'code'],
-        [X.id, null, 'transfer'],
-      ],
+      [[Y.id, 'multi_account', 'code']],
     );
   });
 

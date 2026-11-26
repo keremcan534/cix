@@ -120,7 +120,7 @@ export const diamondsKpi = (v: number | null | undefined) => ({ value: fmtD(v), 
  * How one gift's commission splits: this agency's rate, the parent's difference share and what the platform keeps,
  * on one bar of 100% of the streamer's gift diamonds (the streamer's own diamonds are not reduced).
  */
-export function RateSplit({ rate, parentShare, poolCap, ownLabel = 'Bu ajans', parentLabel = 'Üst ajans farkı', note = true }: { rate: number; parentShare: number; poolCap: number; ownLabel?: string; parentLabel?: string; note?: boolean }) {
+export function RateSplit({ rate, parentShare, poolCap, ownLabel = 'Bu ajans', parentLabel = 'Referans farkı', note = true }: { rate: number; parentShare: number; poolCap: number; ownLabel?: string; parentLabel?: string; note?: boolean }) {
   // Rates are 4-decimal fractions; round so 0.40 − 0.25 − 0.15 doesn't leave a float crumb as a "%0" segment.
   const rest = Math.max(0, Math.round((poolCap - rate - parentShare) * 1e4) / 1e4);
   const segs = [
@@ -168,7 +168,7 @@ export function TierLadder({ tiers, current, score, poolCap, floor = 0.01 }: { t
               <Text style={[s.tierName, on && { color: '#fff' }]}>{t.name}</Text>
               <Text style={s.tierNeed}>
                 Puan {t.min_score}+{t.min_active ? ` · ${t.min_active} aktif yayıncı` : ''}
-                {t.overtake ? ' · üst ajans puanını geçmek' : ''}
+                {t.overtake ? ' · referans veren ajansın puanını geçmek' : ''}
               </Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
@@ -261,7 +261,7 @@ export function ScoreBar({ score, parentScore }: { score: number; parentScore?: 
           <View style={s.legendItem}>
             <View style={[s.swatch, { backgroundColor: '#fff', width: 3 }]} />
             <Text style={s.legendText}>
-              Üst ajans <Text style={s.legendValue}>{fmtScore(parentScore)}</Text>
+              Referans veren ajans <Text style={s.legendValue}>{fmtScore(parentScore)}</Text>
             </Text>
           </View>
         </View>
@@ -305,7 +305,7 @@ export function StackedColumns({ rows }: { rows: { label: string; a: number; b: 
         </View>
         <View style={s.legendItem}>
           <View style={[s.swatch, { backgroundColor: SERIES.parent }]} />
-          <Text style={s.legendText}>Alt ajans farkı</Text>
+          <Text style={s.legendText}>Referans farkı</Text>
         </View>
       </View>
     </View>

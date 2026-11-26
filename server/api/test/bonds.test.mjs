@@ -136,7 +136,8 @@ describe('Bağlar', () => {
     const [, r] = await ask(a.session, b.user.id, 'kanka');
     await call('POST', '/api/bonds/respond', { id: r.bond.id, accept: true }, b.session);
     await call('POST', '/api/gifts/send', { to: b.user.id, giftId: 'g4', count: 1, ref: rnd(6) }, a.session);
-    const send = (s, to) => call('POST', '/api/messages', { to, text: 'selam', ref: rnd(6) }, s);
+    // Different words each time: the same message a third time in a row is refused (message-quality.mjs).
+    const send = (s, to) => call('POST', '/api/messages', { to, text: `selam ${rnd(4)}`, ref: rnd(6) }, s);
     await send(a.session, b.user.id);
     await send(a.session, b.user.id);
     for (let i = 0; i < 12; i++) {

@@ -44,7 +44,7 @@ export const DEMO_TIERS: Tier[] = [
   { key: 'start', name: 'Başlangıç', min_score: 0, sub_rate: 0.25, min_active: 0, overtake: false },
   { key: 'growing', name: 'Gelişen', min_score: 40, sub_rate: 0.3, min_active: 3, overtake: false },
   { key: 'successful', name: 'Başarılı', min_score: 60, sub_rate: 0.35, min_active: 5, overtake: false },
-  { key: 'overtook', name: 'Üst ajansı geçmiş', min_score: 60, sub_rate: 0.38, min_active: 5, overtake: true },
+  { key: 'overtook', name: 'Referans veren ajans geçmiş', min_score: 60, sub_rate: 0.38, min_active: 5, overtake: true },
   { key: 'elite', name: 'Çok yüksek performans', min_score: 80, sub_rate: 0.39, min_active: 10, overtake: true },
 ];
 const tierName = (k: string | null) => DEMO_TIERS.find((t) => t.key === k)?.name ?? null;
@@ -137,7 +137,7 @@ export function demoOverview(id: string): Overview {
     notices:
       a.id === 'demo-top'
         ? [
-            { id: 3, kind: 'overtake', title: 'Gece Işığı bu dönem puanınızı geçti', body: 'Alt ajansınızın puanı 71,8; sizin puanınız 66,4. Kalıcı olursa alt ajans oranı gelecek dönem %38 olur, fark komisyonunuz %2 kalır. Mevcut ve geçmiş kazançlarınız değişmez.', createdAt: ago(1) },
+            { id: 3, kind: 'overtake', title: 'Gece Işığı bu dönem puanınızı geçti', body: 'Referans ajansınızın puanı 71,8; sizin puanınız 66,4. Kalıcı olursa referans ajans oranı gelecek dönem %38 olur, fark komisyonunuz %2 kalır. Mevcut ve geçmiş kazançlarınız değişmez.', createdAt: ago(1) },
             { id: 2, kind: 'tier', title: 'Kuzey Yıldızı yükselmeye yakın', body: 'Bir dönem daha 60 puanın üzerinde kalırsa gelecek dönem Başarılı seviyesine geçer.', createdAt: ago(2) },
           ]
         : [],
@@ -284,7 +284,7 @@ export function demoPerformance(id: string): Performance {
     tierHistory: a.parentId
       ? [{ from: 'start', fromName: 'Başlangıç', to: a.tier ?? 'start', toName: tierName(a.tier), fromRate: 0.25, toRate: rateOf(a), effectiveFrom: ago(60), source: 'engine', reason: 'Performans değerlendirmesi #9', at: ago(62) }]
       : [],
-    rateHistory: [{ rate: rateOf(a), parentFloor: a.parentId ? 0.01 : null, tier: a.tier, source: a.parentId ? 'engine' : 'default', effectiveFrom: ago(60), reason: a.parentId ? 'Performans değerlendirmesi #9' : 'Üst ajans standart oranı' }],
+    rateHistory: [{ rate: rateOf(a), parentFloor: a.parentId ? 0.01 : null, tier: a.tier, source: a.parentId ? 'engine' : 'default', effectiveFrom: ago(60), reason: a.parentId ? 'Performans değerlendirmesi #9' : 'Referans veren ajans standart oranı' }],
     subagencies: subs.map((s) => ({ id: s.id, name: s.name, score: s.score ?? 0, overallRank: s.overallRank, rank: s.rank ?? 0, overtakes: s.overtakes, tier: s.tier, tierName: s.tierName, change: s.id === 'demo-s1' ? 'waiting' : 'same', active: s.active, volume: s.volume30 })),
     weights: { volume: 20, active: 15, average: 10, growth: 15, retention: 15, acquisition: 10, operations: 5, reliability: 10 },
     tiers: DEMO_TIERS,
@@ -480,7 +480,7 @@ export const demoAdminTransfers = (): Transfer[] => [
     fee: 0,
     feeRule: null,
     transition: null,
-    reason: 'Üç dönemdir üst ajans puanının üzerindeyiz; bağımsız ilerlemek istiyoruz.',
+    reason: 'Üç dönemdir referans veren ajansın puanının üzerindeyiz; bağımsız ilerlemek istiyoruz.',
     createdAt: ago(1),
     decidedAt: null,
     decisionNote: null,
@@ -491,5 +491,5 @@ export const demoAdminTransfers = (): Transfer[] => [
 export const demoAudit = (): AuditRow[] => [
   { id: 991, actor: { id: 'u-admin', name: 'Merkez' }, action: 'performance.run', targetType: 'run', targetId: '12', before: null, after: { agencies: 7, changes: 0 }, result: 'ok', reason: 'Aylık değerlendirme', at: ago(1) },
   { id: 990, actor: { id: 'u-admin', name: 'Merkez' }, action: 'agency.status', targetType: 'agency', targetId: 'demo-t3', before: { status: 'approved' }, after: { status: 'suspended' }, result: 'ok', reason: '90 gündür aktif yayıncı yok', at: ago(6) },
-  { id: 989, actor: { id: 'u-demo-top', name: 'Mavi Işık Ajans' }, action: 'agency.rate', targetType: 'agency', targetId: 'demo-s1', before: null, after: null, result: 'denied', reason: 'Üst ajans alt ajans oranını değiştiremez', at: ago(8) },
+  { id: 989, actor: { id: 'u-demo-top', name: 'Mavi Işık Ajans' }, action: 'agency.rate', targetType: 'agency', targetId: 'demo-s1', before: null, after: null, result: 'denied', reason: 'Referans veren ajans referans ajans oranını değiştiremez', at: ago(8) },
 ];

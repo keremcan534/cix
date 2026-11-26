@@ -17,7 +17,7 @@ import { Avatar, Button } from '@/components/ui';
 import { assistantExample, shareIn } from '@/lib/agency-assistant';
 import { agencyNet, errorText, fmtD, fmtDate, fmtDateTime, runAction, useNet, type Assistant, type AssistantCandidate, type AssistantList, type MyAssistant } from '@/lib/agency-net';
 import { showAlert } from '@/lib/alert';
-import { AssistantRemovalCard, NoteSheet, removalStateText } from '@/components/assistant-removal';
+import { AssistantOfferCard, AssistantRemovalCard, NoteSheet, removalStateText } from '@/components/assistant-removal';
 import { SCRIM, colors, edge, fonts, radius, semantic, space } from '@/theme';
 
 /** Shown without a server connection (labelled as example data; actions are disabled there). */
@@ -60,7 +60,9 @@ export function AssistantsTab({ agencyId, rate, demo, name }: { agencyId: string
   const isDemo = demo || q.demo;
   // Removing takes the assistant's consent (owners, 25 Nov 2026): a request goes to them.
   const remove = (a: Assistant) =>
-    showAlert('Asistanlıktan çıkar', `${a.user.name} kişisine çıkarma isteği gider. Onaylarsa asistanlığı biter (bundan sonraki kazançlardan pay yazılmaz, getirdiği yayıncılar ajansında kalır). Reddederse sürer; o zaman yönetime itiraz edebilirsin.`, [
+    a.pending
+      ? runAction(isDemo, () => agencyNet.removeAssistant(agencyId, a.id), `${a.user.name} için teklif geri alındı.`, q.reload)
+      : showAlert('Asistanlıktan çıkar', `${a.user.name} kişisine çıkarma isteği gider. Onaylarsa asistanlığı biter (bundan sonraki kazançlardan pay yazılmaz, getirdiği yayıncılar ajansında kalır). Reddederse sürer; o zaman yönetime itiraz edebilirsin.`, [
       { text: 'Vazgeç', style: 'cancel' },
       { text: 'İstek gönder', style: 'destructive', onPress: () => void runAction(isDemo, () => agencyNet.removeAssistant(agencyId, a.id), `İstek ${a.user.name} kişisine gönderildi.`, q.reload) },
     ]);
@@ -90,7 +92,6 @@ export function AssistantsTab({ agencyId, rate, demo, name }: { agencyId: string
             ) : (
               d.assistants.map((a) => <AssistantCard key={a.id} a={a} onShare={() => setSheet({ kind: 'share', a })} onRemove={() => remove(a)} onDispute={() => setDispute(a)} />)
             )}
-            <Text style={st.foot}>Pay her takvim haftasında bir kez değişir; yeni pay sonraki pazartesi 00:00’da (Türkiye saati) başlar. Geçmiş kazançlar değişmez.</Text>
           </Section>
           {sheet?.kind === 'add' && <AddSheet agencyId={agencyId} rate={rate} demo={isDemo} onClose={() => setSheet(null)} onDone={q.reload} />}
           {sheet?.kind === 'share' && <ShareSheet agencyId={agencyId} rate={rate} a={sheet.a} demo={isDemo} onClose={() => setSheet(null)} onDone={q.reload} />}
@@ -109,41 +110,55 @@ export function AssistantsTab({ agencyId, rate, demo, name }: { agencyId: string
   );
 }
 
-function AssistantCard({ a, onShare, onRemove, onDispute }: { a: Assistant; onShare: () => void; onRemove: () => void; onDispute: () => void }) {
+/**
+ * One assistant, compact (owners, 26 Nov 2026: three must fit without scrolling): photo, name and state on one line,
+ * the details in two short lines. The share is fixed once agreed (no "Payı düzenle").
+ */
+function AssistantCard({ a, onShare: _onShare, onRemove, onDispute }: { a: Assistant; onShare: () => void; onRemove: () => void; onDispute: () => void }) {
   const removal = a.removal ? removalStateText(a.removal) : null;
   return (
-    <Panel>
+    <Panel style={{ gap: space.sm, paddingVertical: space.md }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
-        <Avatar uri={a.user.avatarUrl ?? undefined} name={a.user.name} size={48} />
-        <View style={{ flex: 1, gap: 4 }}>
+        <Avatar uri={a.user.avatarUrl ?? undefined} name={a.user.name} size={38} />
+        <View style={{ flex: 1, gap: 2 }}>
           <Text style={ns.title} numberOfLines={1}>
             {a.user.name}
           </Text>
-          <Pill text={a.member ? 'Asistan' : 'Ajanstan ayrıldı'} tone={a.member ? 'success' : 'danger'} icon={a.member ? 'ribbon-outline' : 'alert-circle-outline'} />
+          <Text style={st.foot} numberOfLines={1}>
+            {fmtDate(a.assignedAt)} · Kod {a.code} · Pay %{a.share.pct}
+          </Text>
         </View>
+        <Pill text={a.pending ? 'Onay bekliyor' : a.member ? 'Asistan' : 'Ayrıldı'} tone={a.pending ? 'money' : a.member ? 'success' : 'danger'} />
       </View>
-      <View style={{ gap: 2 }}>
-        <Line label="Asistan oldu" value={fmtDateTime(a.assignedAt)} />
-        <Line label="Davet kodu" value={a.code} />
-        <Line label="Getirdiği yayıncı" value={a.invited.now === a.invited.total ? `${a.invited.total}` : `${a.invited.total} (ajansta ${a.invited.now})`} />
-        <Line label="Yayıncı payı" value={`%${a.share.pct}`} strong />
-        {a.upcoming && <Line label={`${fmtDate(a.upcoming.from)} itibarıyla`} value={`%${a.upcoming.pct}`} />}
-        <Line label="Bu hafta getirdiklerinin kazancı" value={`${fmtD(a.week.streamerIncome)} elmas`} />
-        <Line label="Bu hafta asistana geçen" value={`${fmtD(a.week.share)} elmas`} />
-        <Line label="Toplam asistana geçen" value={`${fmtD(a.total.share)} elmas`} />
+      <View style={st.facts}>
+        <Fact label="Getirdiği" value={a.invited.now === a.invited.total ? `${a.invited.total}` : `${a.invited.total} (${a.invited.now})`} />
+        <Fact label="Bu hafta kazanç" value={fmtD(a.week.streamerIncome)} />
+        <Fact label="Bu hafta pay" value={fmtD(a.week.share)} />
+        <Fact label="Toplam pay" value={fmtD(a.total.share)} />
       </View>
-      {!a.member && <Text style={st.warn}>Ajanstan ayrıldığı için pay almıyor. Çıkarıp yerine başka birini ekleyebilirsin.</Text>}
-      {!a.canChange && <Text style={st.foot}>Bu hafta pay değiştirildi. Sonraki değişikliği {fmtDate(a.nextChangeFrom)} pazartesiden itibaren yapabilirsin.</Text>}
+      {!a.member && <Text style={st.warn}>Ajanstan ayrıldığı için pay almıyor.</Text>}
       {!!removal && <Text style={st.warn}>{removal}</Text>}
-      <View style={{ flexDirection: 'row', gap: space.sm }}>
-        {a.removal?.status === 'rejected' ? (
-          <Button title="Yönetime itiraz et" variant="ghost" small icon="flag-outline" onPress={onDispute} style={{ flex: 1 }} />
-        ) : a.removal ? null : (
-          <Button title="Asistanlıktan çıkar" variant="ghost" small onPress={onRemove} style={{ flex: 1 }} />
-        )}
-        <Button title="Payı düzenle" variant="tonal" small icon="create-outline" disabled={!a.canChange} onPress={onShare} style={{ flex: 1 }} />
-      </View>
+      {a.pending ? (
+        <Button title="Teklifi geri al" variant="ghost" small onPress={onRemove} />
+      ) : a.removal?.status === 'rejected' ? (
+        <Button title="Yönetime itiraz et" variant="ghost" small icon="flag-outline" onPress={onDispute} />
+      ) : a.removal ? null : (
+        <Button title="Asistanlıktan çıkar" variant="ghost" small onPress={onRemove} />
+      )}
     </Panel>
+  );
+}
+
+function Fact({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={st.fact}>
+      <Text style={st.factValue} numberOfLines={1}>
+        {value}
+      </Text>
+      <Text style={st.factLabel} numberOfLines={1}>
+        {label}
+      </Text>
+    </View>
   );
 }
 
@@ -206,7 +221,7 @@ function AddSheet({ agencyId, rate, demo, onClose, onDone }: { agencyId: string;
   const save = async () => {
     if (!pick || value === null || busy) return;
     setBusy(true);
-    const done = await runAction(demo, () => agencyNet.addAssistant(agencyId, pick.id, value), `${pick.name} artık asistanın.`, onDone);
+    const done = await runAction(demo, () => agencyNet.addAssistant(agencyId, pick.id, value), `Teklif ${pick.name} kişisine gönderildi. Onaylayınca asistanlık %${value} payla başlar.`, onDone);
     setBusy(false);
     if (done) onClose();
   };
@@ -309,6 +324,7 @@ export function MyAssistantCard({ a, onChange }: { a: MyAssistant; onChange?: ()
   const live = a.active && a.member;
   return (
     <Section title="Ajans asistanlığım">
+      {a.pending && <AssistantOfferCard a={a} onDone={() => onChange?.()} />}
       {a.removal && <AssistantRemovalCard r={a.removal} onDone={() => onChange?.()} />}
       <Panel>
         <View style={ns.rowBetween}>
@@ -357,6 +373,10 @@ const st = StyleSheet.create({
   notice: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 9, borderRadius: radius.pill, backgroundColor: 'rgba(246,189,96,0.10)', borderWidth: 1, borderColor: 'rgba(246,189,96,0.28)' },
   noticeText: { color: colors.text, fontSize: 13, flex: 1 },
   foot: { color: colors.textDim, fontSize: 12, lineHeight: 17 },
+  facts: { flexDirection: 'row', gap: 6 },
+  fact: { flex: 1, paddingVertical: 6, borderRadius: radius.md, backgroundColor: 'rgba(255,255,255,0.05)', alignItems: 'center', gap: 1 },
+  factValue: { color: '#fff', fontSize: 14, fontFamily: fonts.displayBold, fontVariant: ['tabular-nums'] },
+  factLabel: { color: colors.textDim, fontSize: 10.5 },
   warn: { color: semantic.danger, fontSize: 12.5, lineHeight: 18 },
   rule: { color: semantic.actionText, fontSize: 12.5, lineHeight: 18 },
   ruleNo: { color: colors.textDim, fontSize: 14, lineHeight: 20, fontWeight: '700', minWidth: 18 },

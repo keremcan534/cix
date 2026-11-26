@@ -106,8 +106,8 @@ export function VipBadge() {
 
 export type ButtonVariant = 'hero' | 'money' | 'tonal' | 'ghost' | 'danger';
 
-const BUTTON_HEIGHT = 48;
-const BUTTON_SMALL = 34;
+const BUTTON_HEIGHT = 44;
+const BUTTON_SMALL = 31;
 
 /**
  * One button, five jobs, each on its gold-rimmed face (components/luxe-face). `ghost` is words alone, and a button
@@ -200,7 +200,7 @@ const useStyles = makeStyles(({ colors }) => ({
     gap: 6,
     minHeight: BUTTON_HEIGHT,
     paddingVertical: 10,
-    paddingHorizontal: 22,
+    paddingHorizontal: 20,
   },
   btnSmall: { minHeight: BUTTON_SMALL, paddingVertical: 5, paddingHorizontal: 14 },
   btnText: { color: '#fff', fontWeight: '700', fontSize: 15, letterSpacing: 0.1, flexShrink: 1, textAlign: 'center' },

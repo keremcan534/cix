@@ -54,6 +54,21 @@ function payoutDetails(method, details) {
   return { method, holder, account };
 }
 
+/**
+ * One IBAN, one account (owners, 26 Nov 2026): an IBAN another account has asked a payout to (any request but one
+ * staff rejected) is refused, compared without spaces and case. "other" details are not compared (free text).
+ */
+const IBAN_KEY = "upper(regexp_replace(account, '\\s', '', 'g'))";
+export const ibanKey = (v) => String(v ?? '').replace(/\s+/g, '').toUpperCase();
+async function ibanOwner(c, userId, account) {
+  const r = await c.query(
+    `SELECT u.public_no::text AS no FROM withdrawals w JOIN users u ON u.id = w.user_id
+      WHERE w.method = 'iban' AND ${IBAN_KEY} = $2 AND w.user_id <> $1 AND w.status <> 'rejected' LIMIT 1`,
+    [userId, ibanKey(account)],
+  );
+  return r.rows[0] ?? null;
+}
+
 const view = (w) => ({
   id: Number(w.id),
   diamonds: Number(w.diamonds),
@@ -125,6 +140,8 @@ export const withdrawRoutes = {
       if ((await c.query("SELECT 1 FROM withdrawals WHERE user_id = $1 AND status = 'pending'", [u.id])).rowCount) {
         throw new HttpError(409, 'Bekleyen bir çekim talebin var; sonuçlanınca yenisini açabilirsin');
       }
+      if (method === 'iban' && (await ibanOwner(c, u.id, account)))
+        throw Object.assign(new HttpError(409, 'Bu IBAN başka bir hesapta kullanılmış. Her IBAN yalnız bir hesaba bağlanabilir; kendi adına olan başka bir hesap kullan ya da destekle görüş.'), { extra: { code: 'iban_taken' } });
       const used = await weekUsed(c, u.id);
       if (used + n > rules.weeklyDiamonds)
         throw new HttpError(409, `Bu hafta en çok ${fmt(rules.weeklyDiamonds)} elmas çekilebilir; kalan ${fmt(Math.max(0, rules.weeklyDiamonds - used))} elmas. Sınır Pazartesi 00:00'da yenilenir`);
@@ -181,6 +198,23 @@ export const withdrawRoutes = {
       [status],
     );
     const playMoney = PLAY_MONEY || (await everHadPlayMoney(db));
+    // Warnings for staff (owners, 26 Nov 2026): other accounts with this IBAN, and other accounts whose payout requests
+    // or sign-ins came from the same internet address (a home Wi-Fi; mobile lines share addresses, so only a hint).
+    const ids = r.rows.map((w) => Number(w.id));
+    const same = ids.length
+      ? (
+          await db.query(
+            `SELECT w.id,
+                    (SELECT coalesce(json_agg(DISTINCT u2.public_no::text), '[]') FROM withdrawals o JOIN users u2 ON u2.id = o.user_id
+                      WHERE o.method = 'iban' AND w.method = 'iban' AND upper(regexp_replace(o.account, '\\s', '', 'g')) = upper(regexp_replace(w.account, '\\s', '', 'g')) AND o.user_id <> w.user_id) AS iban,
+                    (SELECT coalesce(json_agg(DISTINCT u3.public_no::text), '[]') FROM withdrawals o JOIN users u3 ON u3.id = o.user_id
+                      WHERE w.ip <> '' AND o.ip = w.ip AND o.user_id <> w.user_id) AS ip
+               FROM withdrawals w WHERE w.id = ANY($1::bigint[])`,
+            [ids],
+          )
+        ).rows
+      : [];
+    const flags = new Map(same.map((x) => [Number(x.id), { sameIban: x.iban.filter(Boolean), sameNetwork: x.ip.filter(Boolean) }]));
     // The TL to send now, at the payout rate in effect (Canlı ayarlar › payout_usd_try); the decision sends it back.
     const rate = live().payoutUsdTry;
     return {
@@ -194,6 +228,9 @@ export const withdrawRoutes = {
         play: w.play,
         payable: w.status === 'pending' && !w.play && !playMoney,
         decidedBy: w.decided_by,
+        // Other accounts (12-digit IDs) with this IBAN, and from the same internet address.
+        sameIban: flags.get(Number(w.id))?.sameIban ?? [],
+        sameNetwork: flags.get(Number(w.id))?.sameNetwork ?? [],
       })),
     };
   },

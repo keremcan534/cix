@@ -197,8 +197,8 @@ export async function runPerformance(c, { asOf = new Date(), effectiveFrom = nul
 
     if (dryRun) continue;
     if (x.overtakes && !(pv && pv.overtakes)) {
-      await notice(c, a.id, 'overtake', 'Performansta üst ajansını geçtin', `Puanın ${x.score}, üst ajansının ${x.parentScore}. Kademen bir sonraki değerlendirmelerde yükselebilir.`);
-      await notice(c, a.parent_id, 'overtake', `${a.name} performansta seni geçti`, 'Bu alt ajansın komisyon payı artabilir; senin bu alt ajanstan aldığın fark payı azalır. Kendi yayıncılarından aldığın komisyon değişmez.');
+      await notice(c, a.id, 'overtake', 'Performansta referans veren ajansı geçtin', `Puanın ${x.score}, referans veren ajansın ${x.parentScore}. Kademen bir sonraki değerlendirmelerde yükselebilir.`);
+      await notice(c, a.parent_id, 'overtake', `${a.name} performansta seni geçti`, 'Bu referans ajansın komisyon payı artabilir; senin ondan aldığın fark payı azalır. Kendi yayıncılarından aldığın komisyon değişmez.');
     }
     if (change === 'up' || change === 'down') await applyTier(c, a, assigned, eff, { source: 'engine', runId, actor, reason: `Performans değerlendirmesi #${runId}: puan ${x.score}, sıra ${x.rank}` });
   }
@@ -231,7 +231,7 @@ export async function applyTier(c, a, tierKey, eff, { source, runId = null, acto
   const parentPct = a.parent_id ? Math.max(0, topRate(await rateAt(c, a.parent_id, new Date(eff)), s) - e4(newRate)) / 1e4 : 0;
   if (source !== 'approval') {
     await notice(c, a.id, 'tier', `Komisyon kademen: ${tierName(s, tierKey)}`, `Yeni payın ${pct(newRate)}; ${when} tarihinden itibaren kazanılan gelire uygulanır. Önceki kazançların değişmez.`);
-    if (a.parent_id) await notice(c, a.parent_id, 'tier', `${a.name}: ${tierName(s, tierKey)} kademesi`, `Bu alt ajansın yayıncılarından fark payın ${when} tarihinden itibaren ${pct(parentPct)}. Kendi yayıncılarının komisyonu değişmez.`);
+    if (a.parent_id) await notice(c, a.parent_id, 'tier', `${a.name}: ${tierName(s, tierKey)} kademesi`, `Bu referans ajansın yayıncılarından fark payın ${when} tarihinden itibaren ${pct(parentPct)}. Kendi yayıncılarının komisyonu değişmez.`);
   }
   return { rateId: Number(r.rows[0].id), rate: Number(newRate), effectiveFrom: eff };
 }

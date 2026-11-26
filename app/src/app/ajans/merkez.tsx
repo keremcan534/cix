@@ -127,7 +127,7 @@ function GeneralTab({ name, ov, ask }: { name: string; ov: Loaded<ReturnType<typ
         {(o) => (
           <Section title="Son 30 gün">
             <KpiGrid>
-              <Kpi icon="business-outline" label="Üst ajans" value={fmtD(o.tops)} sub={`${fmtD(o.subs)} alt ajans`} />
+              <Kpi icon="business-outline" label="Ana ajans" value={fmtD(o.tops)} sub={`${fmtD(o.subs)} referans ajans`} />
               <Kpi icon="people-outline" label="Bağlı yayıncı" value={fmtD(o.streamers)} sub={`${fmtD(o.suspended)} ajans askıda`} />
               <Kpi icon="diamond-outline" tone="money" label="Komisyon matrahı" {...diamondsKpi(o.base30)} />
               <Kpi icon="pie-chart-outline" tone="money" label="Ajans komisyonu" {...diamondsKpi(o.commission30)} />
@@ -169,7 +169,7 @@ function GeneralTab({ name, ov, ask }: { name: string; ov: Loaded<ReturnType<typ
                   ))}
                 </View>
               ))}
-              <Text style={st.foot}>Bir ajansa dokununca panelini merkez görünümünde açarsın. Üst ajans oranı en fazla {fmtPct(t.topRate)}.</Text>
+              <Text style={st.foot}>Bir ajansa dokununca panelini merkez görünümünde açarsın. Ana ajans oranı en fazla {fmtPct(t.topRate)}.</Text>
             </Section>
           );
         }}
@@ -187,7 +187,7 @@ function NodeCard({ n, sub, demo, ask, after }: { n: TreeNode; sub?: boolean; de
       closed: `${n.name} kapatılsın mı?`,
     }[status];
     const message = {
-      suspended: 'Askıdaki ajans yeni yayıncı ve alt ajans alamaz. Geçmiş kayıtları ve kazançları korunur.',
+      suspended: 'Askıdaki ajans yeni yayıncı ve referans ajans alamaz. Geçmiş kayıtları ve kazançları korunur.',
       approved: 'Ajans yeniden aktif olur.',
       closed: 'Kapatma kalıcıdır. Geçmiş kayıtlar silinmez; bağlı yayıncılar için transfer gerekir.',
     }[status];
@@ -243,7 +243,7 @@ function NodeCard({ n, sub, demo, ask, after }: { n: TreeNode; sub?: boolean; de
           <View style={st.pills}>
             {n.status === 'approved' && !!n.activity && <Pill text={n.activity === 'active' ? 'Aktif ajans' : 'Aday ajans'} tone={n.activity === 'active' ? 'success' : 'money'} icon={n.activity === 'active' ? 'checkmark-circle-outline' : 'hourglass-outline'} />}
             {!!n.tierName && <Pill text={n.tierName} tone="action" icon="podium-outline" />}
-            {n.overtakes && <Pill text="Üst ajansı geçti" tone="money" icon="trending-up" />}
+            {n.overtakes && <Pill text="Referans veren ajansı geçti" tone="money" icon="trending-up" />}
             {n.flags.map((f) => (
               <Pill key={f} text={FLAG_TEXT[f] ?? f} tone={f === 'review' || f === 'decline' ? 'danger' : 'neutral'} icon="flag-outline" />
             ))}
@@ -355,7 +355,7 @@ function AppCard({ a, demo, ask, after }: { a: AdminAgency; demo: boolean; ask: 
       approve
         ? {
             title: `${a.name} onaylansın mı?`,
-            message: 'Ajans aktif olur, kodu yayıncı ve alt ajans kabul etmeye başlar.',
+            message: 'Ajans aktif olur, kodu yayıncı ve referans ajans kabul etmeye başlar.',
             confirm: 'Onayla',
             min: 0,
             placeholder: 'İsteğe bağlı not',
@@ -424,7 +424,7 @@ function TransferCard({ t, demo, ask, after }: { t: Transfer; demo: boolean; ask
     const r = await ask({
       title: independence ? 'Bağımsızlık onaylansın mı?' : 'Transfer onaylansın mı?',
       message: independence
-        ? `${t.agency?.name ?? 'Alt ajans'} üst ajans olur; oranı bir sonraki dönemden geçerli değişir.${transition ? ` Eski üst ajansa 180 gün boyunca mevcut yayıncılardan ${fmtPct(transition.rate)} geçiş komisyonu yazılır (bağımsız ajansın payından; toplam havuz aşılmaz).` : ' Geçiş komisyonu yok.'} Geçmiş kazançlar değişmez.`
+        ? `${t.agency?.name ?? 'Referans ajans'} bağımsız ajans olur; oranı bir sonraki dönemden geçerli değişir.${transition ? ` Eski referans veren ajansa 180 gün boyunca mevcut yayıncılardan ${fmtPct(transition.rate)} geçiş komisyonu yazılır (bağımsız ajansın payından; toplam havuz aşılmaz).` : ' Geçiş komisyonu yok.'} Geçmiş kazançlar değişmez.`
         : 'Diğer tarafların onayları tamamsa transfer hemen yürürlüğe girer. Geçmiş kazançlar değişmez.',
       confirm: 'Onayla',
       min: 0,
@@ -462,7 +462,7 @@ function TransferCard({ t, demo, ask, after }: { t: Transfer; demo: boolean; ask
         <View style={[st.routeEnd, { alignItems: 'flex-end' }]}>
           <Text style={st.statLabel}>Yeni</Text>
           <Text style={st.routeName} numberOfLines={1}>
-            {t.to?.name ?? (independence ? 'Bağımsız üst ajans' : t.kind === 'streamer_leave' ? 'Ajanssız' : '—')}
+            {t.to?.name ?? (independence ? 'Bağımsız ajans' : t.kind === 'streamer_leave' ? 'Ajanssız' : '—')}
           </Text>
         </View>
       </View>
@@ -485,7 +485,7 @@ function TransferCard({ t, demo, ask, after }: { t: Transfer; demo: boolean; ask
         <View style={st.transition}>
           <Pressable onPress={() => setWithTransition((v) => !v)} style={st.check} accessibilityRole="checkbox" accessibilityState={{ checked: withTransition }}>
             <Ionicons name={withTransition ? 'checkbox' : 'square-outline'} size={20} color={withTransition ? semantic.action : colors.textDim} />
-            <Text style={{ color: '#fff', flex: 1, fontWeight: '600' }}>Eski üst ajansa geçiş komisyonu tanımla</Text>
+            <Text style={{ color: '#fff', flex: 1, fontWeight: '600' }}>Eski referans veren ajansa geçiş komisyonu tanımla</Text>
           </Pressable>
           {withTransition && (
             <View style={{ gap: 6 }}>
@@ -637,9 +637,9 @@ type Values = {
 };
 const SETTING_TEXT: Record<string, string> = {
   pool_cap: 'Toplam havuz sınırı',
-  top_rate: 'Üst ajans oranı',
+  top_rate: 'Ana ajans oranı',
   max_levels: 'Katman sayısı',
-  subagency_policy: 'Alt ajans politikası',
+  subagency_policy: 'Referans ajans politikası',
   join_policy: 'Katılım politikası',
   income_types: 'Komisyona dahil gelirler',
   commission_period: 'Komisyon dönemi',
@@ -649,10 +649,10 @@ const SETTING_TEXT: Record<string, string> = {
   performance: 'Performans politikası',
   weights: 'Puan ağırlıkları',
   tiers: 'Seviye tablosu',
-  parent_min_rate: 'Üst ajans asgari payı',
-  parent_zero: 'Üst ajans payını sıfırlama',
-  parent_sees_sub_earnings: 'Alt ajans kazancı görünürlüğü',
-  parent_sees_subs: 'Üst ajans referans ajanslarının yayıncılarını ve rakamlarını görür',
+  parent_min_rate: 'Referans veren ajansın asgari payı',
+  parent_zero: 'Referans payını sıfırlama',
+  parent_sees_sub_earnings: 'Referans ajans kazancı görünürlüğü',
+  parent_sees_subs: 'Referans veren ajans referans ajanslarının yayıncılarını ve rakamlarını görür',
   bd_policy: 'BD politikası',
   suspension_policy: 'Askıya alma politikası',
   assistant_policy: 'Ajans asistanı sınırı',
@@ -816,7 +816,7 @@ const ACTION_TEXT: Record<string, string> = {
   'agency.approve': 'Ajans onayı',
   'agency.create': 'Ajans oluşturma',
   'agency.ops_score': 'Operasyon puanı',
-  'agency.parent': 'Üst ajans değişikliği',
+  'agency.parent': 'Referans ajans değişikliği',
   'agency.rate': 'Oran kararı',
   'agency.reject': 'Ajans reddi',
   'agency.status': 'Durum değişikliği',
@@ -845,7 +845,7 @@ const ACTION_TEXT: Record<string, string> = {
   'streamer.assign': 'Yayıncı ataması',
   'streamer.invite': 'Yayıncı daveti',
   'streamer.link': 'Yayıncı bağlantısı',
-  'sub.close': 'Alt ajans kapatma',
+  'sub.close': 'Referans ajansı kapatma',
   'transfer.approve': 'Transfer onayı',
   'transfer.center': 'Merkez transfer kararı',
   'transfer.complete': 'Transfer tamamlandı',

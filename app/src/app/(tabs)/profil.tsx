@@ -32,7 +32,7 @@ import { useAutoMe } from '@/lib/live/auto-chat';
 import { liveSignOut } from '@/lib/live/account';
 import { loadMyList } from '@/lib/live/follows';
 import { refreshMeStats, useMeStats } from '@/lib/live/me-stats';
-import { AssistantRemovalCard } from '@/components/assistant-removal';
+import { AssistantOfferCard, AssistantRemovalCard } from '@/components/assistant-removal';
 import { splitTies, tiesOf, type TieSide } from '@/lib/follow-ties';
 import { agencyScreensHidden, myCompletion, rowVisible, streamerCenterVisible, type MenuFlags } from '@/lib/me-view';
 import { OwnMarkNote } from '@/components/profile-mark';
@@ -48,6 +48,8 @@ type Item = MenuFlags & { icon: IconName; img?: Icon3DName; art?: ArtName; label
 
 const GROWTH: Item[] = [
   { icon: 'mic-outline', img: 'mic', label: 'Yayıncı Merkezi', onPress: () => router.push('/yayinci'), streamerOnly: true },
+  // Asistan merkezi (owners, 26 Nov 2026): an agency assistant's streamers and share, under Yayıncı Merkezi.
+  { icon: 'ribbon-outline', label: 'Asistan merkezi', onPress: () => router.push('/asistan'), assistantOnly: true },
   // "Ajans merkezi" (owners, 26 Nov 2026): the agency's own place (its owner and team; a woman streaming for one sees none).
   { icon: 'business-outline', img: 'briefcase', label: 'Ajans merkezi', onPress: () => router.push('/ajans'), agencyOnly: true },
   // The agency chat group and the member network are demo screens; with a server, /ajans holds the real ones.
@@ -115,7 +117,8 @@ export default function ProfileScreen() {
   const main: Item[] = [
     // "Yayıncı ol" (owners, 26 Nov 2026): only a woman with no agency yet, here rather than among the agency rows; a man
     // can't stream (the agency application is on Ana Sayfa's banner).
-    ...(me.gender === 'Kadın' ? [{ icon: 'mic-outline', img: 'mic', label: 'Yayıncı ol', onPress: () => router.push('/ajans'), noAgencyOnly: true } satisfies Item] : []),
+    // Not on a phone whose streamer is another account (one streamer per phone, owners 26 Nov 2026).
+    ...(me.gender === 'Kadın' && !server.deviceTaken ? [{ icon: 'mic-outline', img: 'mic', label: 'Yayıncı ol', onPress: () => router.push('/ajans'), noAgencyOnly: true } satisfies Item] : []),
     { icon: 'diamond-outline', img: 'diamond', label: 'Gelir', onPress: () => router.push('/gelir') },
     { icon: 'business-outline', img: 'coin', label: 'Jeton Noktası', onPress: () => router.push('/coins-bank') },
     { icon: 'storefront-outline', img: 'bag', label: 'Çarşı', onPress: () => router.push('/magaza') },
@@ -139,7 +142,7 @@ export default function ProfileScreen() {
   const streamerCenter = streamerCenterVisible(me.gender, live ? (auto ? auto.tools === true : null) : isHost);
   // A woman who streams for an agency sees none of its screens.
   const agencyHidden = agencyScreensHidden(me.gender, live ? server.agency?.role : agencyId ? (agencyRole === 'owner' ? 'owner' : agencyRole === 'assistant' ? 'staff' : 'member') : null);
-  const visible = (m: Item) => rowVisible(m, { demo: IS_DEMO, live, hasAgency, streamerCenter, agencyHidden });
+  const visible = (m: Item) => rowVisible(m, { demo: IS_DEMO, live, hasAgency, streamerCenter, agencyHidden, assistant: live && server.assistant });
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -322,6 +325,7 @@ export default function ProfileScreen() {
         )}
 
         {/* A request to end my assistant role: answered here (she may not see the agency screen). */}
+        {server.offer && <AssistantOfferCard a={server.offer} light onDone={() => void refreshMeStats().catch(() => {})} />}
         {server.removal && <AssistantRemovalCard r={server.removal} light onDone={() => void refreshMeStats().catch(() => {})} />}
         <Group items={main.filter(visible)} />
         <Group items={GROWTH.filter(visible)} />

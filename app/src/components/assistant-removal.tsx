@@ -9,7 +9,7 @@ import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { Text, TextInput } from '@/components/text';
 import { Button } from '@/components/ui';
-import { agencyNet, fmtDateTime, runAction, type AssistantRemoval } from '@/lib/agency-net';
+import { agencyNet, fmtDateTime, runAction, type Assistant, type AssistantRemoval } from '@/lib/agency-net';
 import { showAlert } from '@/lib/alert';
 import { SCRIM, radius, space } from '@/theme';
 
@@ -67,6 +67,35 @@ export function AssistantRemovalCard({ r, light = false, onDone }: { r: Assistan
           onSend={(t) => runAction(false, () => agencyNet.answerRemoval(r.id, 'dispute', t), 'İtirazın yönetime iletildi.', () => (setNote(false), onDone()))}
         />
       )}
+    </View>
+  );
+}
+
+/**
+ * Asistanlık teklifi (owners, 26 Nov 2026): the agency's owner named me with a share; it starts only when I accept.
+ * `light`: on Ben's light paper.
+ */
+export function AssistantOfferCard({ a, light = false, onDone }: { a: Pick<Assistant, 'id' | 'agency' | 'share'>; light?: boolean; onDone: () => void }) {
+  const fg = light ? '#2A1430' : '#fff';
+  const dim = light ? 'rgba(42,20,48,0.68)' : 'rgba(255,255,255,0.68)';
+  const answer = (x: 'accept' | 'reject') =>
+    showAlert(x === 'accept' ? 'Onaylıyor musun?' : 'Reddediyor musun?', x === 'accept' ? `${a.agency.name} ajansının asistanı olursun; getirdiğin yayıncıların kazancından ajans komisyonunun %${a.share.pct}'i sana geçer. Pay sonradan değiştirilmez.` : 'Teklif kapanır.', [
+      { text: 'Vazgeç', style: 'cancel' },
+      { text: x === 'accept' ? 'Onayla' : 'Reddet', onPress: () => void runAction(false, () => agencyNet.answerOffer(a.id, x), x === 'accept' ? 'Artık ajans asistanısın.' : 'Teklifi reddettin.', onDone) },
+    ]);
+  return (
+    <View style={[st.card, light ? st.cardLight : st.cardDark]}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+        <Ionicons name="ribbon-outline" size={22} color="#E0457B" />
+        <Text style={[st.title, { color: fg }]}>Asistanlık teklifi</Text>
+      </View>
+      <Text style={[st.body, { color: dim }]}>
+        {a.agency.name} seni ajans asistanı yapmak istiyor. Pay: getirdiğin yayıncıların kazancından ajans komisyonunun %{a.share.pct}’i. Onaylarsan başlar; pay sonradan değiştirilmez.
+      </Text>
+      <View style={{ flexDirection: 'row', gap: space.sm }}>
+        <Button title="Reddet" variant="ghost" small onPress={() => answer('reject')} style={{ flex: 1 }} />
+        <Button title="Onayla" variant="tonal" small onPress={() => answer('accept')} style={{ flex: 1 }} />
+      </View>
     </View>
   );
 }
