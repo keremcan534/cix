@@ -232,7 +232,9 @@ export const Route = memo(function Route({ geo, target, label, march, still }: {
  * `spin` the flame's licks and, with `roll`, the rocket turning round its long axis (in flight; on the ramp it shows
  * its porthole).
  */
-export function RocketSprite({ power, flick, spin, roll = false }: { power: Animated.AnimatedInterpolation<number> | Animated.Value | number; flick: Animated.Value; spin: Animated.Value; roll?: boolean }) {
+// Memoised: the live stage redraws with each message of the round, and a redraw here would rebuild its native animation
+// nodes (the glow, the flame, the sheets).
+export const RocketSprite = memo(function RocketSprite({ power, flick, spin, roll = false }: { power: Animated.AnimatedInterpolation<number> | Animated.Value | number; flick: Animated.Value; spin: Animated.Value; roll?: boolean }) {
   return (
     <View style={{ width: ROCKET_SIZE, height: ROCKET_SIZE }}>
       <Animated.Image source={GLOW} style={[st.burn, { opacity: power, transform: [{ scale: flick.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1.15] }) }] }]} />
@@ -243,10 +245,25 @@ export function RocketSprite({ power, flick, spin, roll = false }: { power: Anim
       {roll ? <SpriteSheet sheet={ROCKET_SHEET} w={ROCKET_SIZE} h={ROCKET_SIZE} at={spin} /> : <Image source={ROCKET} style={{ width: ROCKET_SIZE, height: ROCKET_SIZE }} fadeDuration={0} accessibilityIgnoresInvertColors />}
     </View>
   );
-}
+});
+
+/**
+ * The sprite sheets, drawn once out of sight when the game opens: a phone decodes a big picture the first time it is
+ * shown, and the roll, the flame and the blast are each first shown at a moment that must not stutter (the launch, the
+ * crash). Kept decoded while the game is open.
+ */
+export const SheetPreload = memo(function SheetPreload() {
+  return (
+    <View style={st.preload} pointerEvents="none">
+      {[ROCKET_SHEET, FLAME_SHEET, BLAST_SHEET].map((sh, i) => (
+        <Image key={i} source={sh.src} style={st.preloadPic} fadeDuration={0} accessibilityIgnoresInvertColors />
+      ))}
+    </View>
+  );
+});
 
 /** The rocket on the ramp before it fires: it slides in when a new one is rolled out and shakes while the engine lights. */
-export function ReadyRocket({ geo, arm, ignite, flick, spin }: { geo: Geo; arm: Animated.Value; ignite: Animated.Value; flick: Animated.Value; spin: Animated.Value }) {
+export const ReadyRocket = memo(function ReadyRocket({ geo, arm, ignite, flick, spin }: { geo: Geo; arm: Animated.Value; ignite: Animated.Value; flick: Animated.Value; spin: Animated.Value }) {
   const a = pathAt(geo, 0);
   const half = ROCKET_SIZE / 2;
   return (
@@ -275,7 +292,7 @@ export function ReadyRocket({ geo, arm, ignite, flick, spin }: { geo: Geo; arm: 
       </Animated.View>
     </View>
   );
-}
+});
 
 // --- A flight -------------------------------------------------------------------------------------------------
 
@@ -431,4 +448,6 @@ const st = StyleSheet.create({
   streak: { position: 'absolute', left: -2.5, bottom: 0, width: 5, height: 190, borderRadius: 3, overflow: 'hidden' },
   endMark: { position: 'absolute', width: 30, height: 30, borderRadius: 15, borderWidth: 2, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(4,5,26,0.6)' },
   endText: { fontSize: 15, fontWeight: '900' },
+  preload: { position: 'absolute', left: 0, top: 0, width: 1, height: 1, opacity: 0, overflow: 'hidden' },
+  preloadPic: { position: 'absolute', width: 1, height: 1 },
 });
