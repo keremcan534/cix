@@ -18,7 +18,10 @@ import { FitBox, GoldText } from '@/components/games/fx/gold-text';
 import { SALON } from '@/components/games/fx/salon';
 import { salonArt } from '@/components/games/fx/salon-art';
 import { SkinOverlay, type SlotSkin } from '@/components/games/fx/slot-skin';
-import { makeTicking, useTicking, type Ticking } from '@/components/games/fx/ticking';
+import { makeTicking, type Ticking } from '@/components/games/fx/ticking';
+import { ClimbLabel } from '@/components/games/fx/climb-label';
+import type { ClimbFormat } from '@/components/games/fx/climb-format';
+import { useSharedValue } from 'react-native-reanimated';
 import { Text } from '@/components/text';
 import { playSfx } from '@/lib/game-sound';
 import { heavyHaptic, rumbleHaptic, successHaptic } from '@/lib/haptics';
@@ -325,9 +328,7 @@ function JackpotShow({ skin, kind, amount, bet, onDone }: { skin: SlotSkin; kind
               <View style={{ width: plateW, height: plateH }}>
                 <Image source={skin.plate.src} style={{ width: plateW, height: plateH }} resizeMode="contain" />
                 <View style={[s.abs, s.center, { left: plateW * 0.15, right: plateW * 0.15, top: plateH * 0.26, bottom: plateH * 0.22 }]}>
-                  <FitBox width={plateW * 0.66}>
-                    <PlateAmount count={count} size={Math.round(plateH * 0.36)} />
-                  </FitBox>
+                  <PlateAmount count={count} size={Math.round(plateH * 0.36)} width={plateW * 0.66} />
                 </View>
               </View>
               <Text style={s.unit}>jeton{x >= 2 ? ` · bahsin ${fmt(x)} katı` : ''}</Text>
@@ -340,9 +341,20 @@ function JackpotShow({ skin, kind, amount, bet, onDone }: { skin: SlotSkin; kind
   );
 }
 
-/** The amount on the win plate as it counts: the one part of the show redrawn with every frame of the count. */
-function PlateAmount({ count, size }: { count: Ticking<number>; size: number }) {
-  return <GoldText size={size}>{`+${fmt(useTicking(count))}`}</GoldText>;
+/** A win plate's words: the amount as it counts. One object, so the label's worklet is not rebuilt on each render. */
+const PLUS: ClimbFormat = { kind: 'plus', prefix: '+' };
+
+/**
+ * The amount on the plate as it counts: the count feeds a shared value and Skia draws it on the UI thread (fx/climb-label),
+ * so a count-up costs no render and no text layout per frame (it used to redraw a 12-layer GoldText sixty times a second).
+ */
+function PlateAmount({ count, size, width }: { count: Ticking<number>; size: number; width: number }) {
+  const sv = useSharedValue(count.get());
+  useEffect(() => {
+    sv.set(count.get());
+    return count.subscribe(() => sv.set(count.get()));
+  }, [count, sv]);
+  return <ClimbLabel climb={sv} format={PLUS} size={size} height={Math.round(size * 1.3)} style={{ width }} fit fallback={<GoldText size={size}>{`+${fmt(count.get())}`}</GoldText>} />;
 }
 
 const s = StyleSheet.create({
