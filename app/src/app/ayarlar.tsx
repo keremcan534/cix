@@ -457,6 +457,10 @@ export default function SettingsScreen() {
             subtitle="Moderasyon, kısıtlama, transfer veya oyun kararı"
             onPress={() => router.push({ pathname: '/destek', params: { kategori: 'Moderasyon kararı' } })}
           />
+        </ListGroup>
+
+        {/* The legal texts on the website (lib/legal, docs/yasal) and the app's version with its open-source notices. */}
+        <ListGroup label="Yasal bilgiler">
           <ListRow icon="document-text-outline" title="Kullanım Koşulları" onPress={() => openLegal('terms')} />
           <ListRow icon="shield-checkmark-outline" title="Gizlilik Politikası" onPress={() => openLegal('privacy')} />
           {/* Every other text (KVKK, deletion, coins and gifts, refunds, games, VIP, copyright, cookies), quietly under the two above. */}
