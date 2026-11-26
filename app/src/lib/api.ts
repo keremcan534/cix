@@ -1144,6 +1144,8 @@ export type ServerPrivacy = {
 export type AutoChoices = { autoReceive?: boolean; autoOpener?: boolean; autoOpenerSeen?: boolean; autoSend?: boolean };
 export const updateAutoChoices = (patch: AutoChoices) => call<{ privacy: ServerPrivacy & AutoChoices }>('PATCH', '/api/me/privacy', patch);
 export const myPrivacy = () => call<{ privacy: ServerPrivacy }>('GET', '/api/me/privacy').then((r) => r.privacy);
+/** With the Gizlilik rights I have (`perks`, 26 Nov 2026; none from an older server). */
+export const myPrivacyAll = () => call<{ privacy: ServerPrivacy; perks?: unknown }>('GET', '/api/me/privacy');
 /** Changes some settings; the answer is all of them as the server has them now. */
 export const updatePrivacy = (patch: Partial<ServerPrivacy>) => call<{ privacy: ServerPrivacy }>('PATCH', '/api/me/privacy', patch).then((r) => r.privacy);
 /** Someone I follow or who follows me; `online` and `lastSeenAt` only as far as they (and I) show them. */

@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
+import { DarkTheme, DefaultTheme, ThemeProvider, router, usePathname } from 'expo-router';
+import { useEffect } from 'react';
 import { Tabs } from 'expo-router/js-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { View, type ColorValue } from 'react-native';
@@ -61,6 +62,14 @@ function TabBarGlass() {
 }
 
 export default function TabLayout() {
+  // The app opens on Ana Sayfa (/kesfet), not Odalar (owners, 26 Nov 2026): "/" stays Odalar's address, so a launch
+  // (or a sign-in) that lands there with no link of its own moves on to Ana Sayfa, once as the tabs mount.
+  const path = usePathname();
+  useEffect(() => {
+    if (path === '/') router.replace('/kesfet');
+    // Once, when the tabs first show.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const { conversations, blocked } = useApp();
   const { colors, scheme } = useTheme();
   // Same chats as the Mesajlar list: a blocked person's unread messages are hidden there, so not counted here.
@@ -74,8 +83,8 @@ export default function TabLayout() {
   return (
     <ThemeProvider value={NAV[scheme]}>
       <Tabs
-        // Back from any tab returns to Odalar (the anchor), not to the first tab in the bar.
-        backBehavior="initialRoute"
+        // Back from any tab returns to Ana Sayfa, the first tab in the bar and where the app opens (owners, 26 Nov 2026).
+        backBehavior="firstRoute"
         screenOptions={{
           headerShown: false,
           tabBarActiveTintColor: NAV_INK.on,

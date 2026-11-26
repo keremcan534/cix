@@ -48,11 +48,11 @@ type Item = MenuFlags & { icon: IconName; img?: Icon3DName; art?: ArtName; label
 
 const GROWTH: Item[] = [
   { icon: 'mic-outline', img: 'mic', label: 'Yayıncı Merkezi', onPress: () => router.push('/yayinci'), streamerOnly: true },
-  { icon: 'business-outline', img: 'briefcase', label: 'Ajans', onPress: () => router.push('/ajans'), agencyOnly: true },
+  // "Ajans merkezi" (owners, 26 Nov 2026): the agency's own place (its owner and team; a woman streaming for one sees none).
+  { icon: 'business-outline', img: 'briefcase', label: 'Ajans merkezi', onPress: () => router.push('/ajans'), agencyOnly: true },
   // The agency chat group and the member network are demo screens; with a server, /ajans holds the real ones.
   { icon: 'chatbubbles-outline', img: 'chat', label: 'Ajans sohbet grubu', onPress: () => router.push('/ajans/sohbet'), agencyOnly: true },
   { icon: 'git-network-outline', label: 'Üye ağım ve komisyonlar', onPress: () => router.push('/ajans/ag'), agencyOnly: true, localOnly: true },
-  { icon: 'add-circle-outline', img: 'briefcase', label: 'Ajansa katıl / ajans başvurusu', onPress: () => router.push('/ajans'), noAgencyOnly: true },
   // Sıralama and Hemen Tanış are not in Ben (owners, 25 Nov 2026): Sıralama is on Odalar and Keşfet.
   { icon: 'game-controller-outline', label: 'Oyun kataloğu yönetimi (demo)', onPress: () => router.push('/oyun-yonetimi'), demoOnly: true, localOnly: true },
   { icon: 'sparkles-outline', label: 'Animasyon kataloğu yönetimi (demo)', onPress: () => router.push('/animasyon-yonetimi'), demoOnly: true, localOnly: true },
@@ -113,6 +113,9 @@ export default function ProfileScreen() {
   const publicId = specialId ? specialId.name.replace('ID ', '') : live ? publicIdOf(me, serverId) : '10284731';
 
   const main: Item[] = [
+    // "Yayıncı ol" (owners, 26 Nov 2026): only a woman with no agency yet, here rather than among the agency rows; a man
+    // can't stream (the agency application is on Ana Sayfa's banner).
+    ...(me.gender === 'Kadın' ? [{ icon: 'mic-outline', img: 'mic', label: 'Yayıncı ol', onPress: () => router.push('/ajans'), noAgencyOnly: true } satisfies Item] : []),
     { icon: 'diamond-outline', img: 'diamond', label: 'Gelir', onPress: () => router.push('/gelir') },
     { icon: 'business-outline', img: 'coin', label: 'Jeton Noktası', onPress: () => router.push('/coins-bank') },
     { icon: 'storefront-outline', img: 'bag', label: 'Çarşı', onPress: () => router.push('/magaza') },

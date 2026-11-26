@@ -57,6 +57,8 @@ export function startApi(extraEnv = {}, { moneyCheck = true } = {}) {
       // The app's sticker packs start "Yakında" (emoji.mjs); the tests buy them, so they are sold here. emoji.test.mjs
       // checks the default.
       PACKS_SOON: '0',
+      // Gizlilik is a VIP / Rütbe right (privacy.mjs); the tests set those choices freely. privacy-perks.test.mjs checks it.
+      PRIVACY_PERKS: '0',
       ALLOW_DEV_AUTH: '1',
       // The storage is a stand-in address in most tests: an uploaded file isn't looked up there (media.mjs).
       UPLOAD_VERIFY: '0',

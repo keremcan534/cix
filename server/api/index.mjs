@@ -88,7 +88,7 @@ import { startCallNoticeSweep, stopCallNoticeSweep, systemNoticeRoutes } from '.
 import { momentRoutes } from './moments.mjs';
 import { oneOnOneRoutes, startCallSweep, stopCallSweep } from './one-on-one.mjs';
 import { callLogRoutes } from './call-log.mjs';
-import { privacyRoutes } from './privacy.mjs';
+import { privacyRoutes, startPrivacyPerks, stopPrivacyPerks } from './privacy.mjs';
 import { purchaseRoutes } from './purchases.mjs';
 import { pkRoutes } from './pk.mjs';
 import { crossPkRoutes } from './pk-cross.mjs';
@@ -571,6 +571,7 @@ function shutdown(signal) {
   stopCustomGifts();
   stopEmoji();
   stopLevels();
+  stopPrivacyPerks();
   stopLevelDecay();
   stopGuardSweep();
   stopServerLoad();
@@ -625,6 +626,8 @@ startStaffSweep();
 startCustomGifts();
 startEmoji();
 startLevels();
+// Gizlilik as a VIP / Rütbe right: a lapsed right puts its setting back (privacy.mjs).
+startPrivacyPerks();
 startLevelDecay();
 // Yayıncı haftalık bonusu: closes the week that ended every Monday 00:00 (host-bonus.mjs).
 startHostBonus();

@@ -43,7 +43,7 @@ export const NOBLE_TIERS = [
   { tier: 2, name: 'Vikont', emoji: '🗡️', art: 'asil-2-vikont' as ArtName, price: 60_000, rights: 16, colors: ['#2DD4BF', '#0F766E'] as [string, string] },
   { tier: 3, name: 'Kont', emoji: '⚔️', art: 'asil-3-kont' as ArtName, price: 150_000, rights: 20, colors: ['#60A5FA', '#1D4ED8'] as [string, string] },
   { tier: 4, name: 'Markiz', emoji: '🏹', art: 'asil-4-markiz' as ArtName, price: 400_000, rights: 25, colors: ['#F472B6', '#BE123C'] as [string, string] },
-  { tier: 5, name: 'Dük', emoji: '🦁', art: 'asil-5-duk' as ArtName, price: 1_000_000, rights: 28, colors: ['#FCD34D', '#B45309'] as [string, string] },
+  { tier: 5, name: 'Dük', emoji: '🦁', art: 'asil-5-duk' as ArtName, price: 1_000_000, rights: 32, colors: ['#FCD34D', '#B45309'] as [string, string] },
 ];
 export const NOBLE_DAYS = 30;
 /** A round price in coins (server/api/levels.mjs roundPrice). */
@@ -89,13 +89,18 @@ export const NOBLE_RIGHTS: { name: string; emoji: string; art?: ArtName; perk?: 
   { name: 'Renkli kullanıcı adı', emoji: '🌈', art: 'ayricalik-diy-unvani', soon: true },
   { name: 'Sessiz ziyaret', emoji: '🥷', art: 'ayricalik-gizli-ziyaret', perk: 'silent_visit' },
   { name: 'Dolu odaya girme', emoji: '🚪', art: 'ayricalik-tam-dolu-odalar', soon: true },
-  { name: 'Çevrimiçi gizlilik', emoji: '🫥', soon: true },
+  // Gizlilik (owners, 26 Nov 2026; lib/privacy-perks): the tier each opens at comes from Seviye ayarları.
+  { name: 'Çevrimiçi gizlilik', emoji: '🫥', perk: 'privacy_online' },
   { name: 'Ülke dolaşımı', emoji: '🌍', art: 'ulke-tum-ulkeler', soon: true },
   { name: 'Sıralamada gizemli kimlik', emoji: '🕵️', art: 'ayricalik-gizemli-kisi-kimligi', soon: true },
   { name: 'Gizli oda girişi', emoji: '👻', art: 'ayricalik-gizli-oda-girisi', soon: true },
   { name: 'Yayın engelleme', emoji: '🔇', soon: true },
   { name: 'Aile gizliliği', emoji: '🎭', art: 'ayricalik-klan-gizliligi', soon: true },
   { name: 'Metin çevirisi', emoji: '🔤', art: 'ayricalik-metin-cevirisi', soon: true },
+  { name: 'Bulunduğum odayı gizle', emoji: '🚪', art: 'ayricalik-gizli-oda-girisi', perk: 'privacy_room' },
+  { name: 'Duyurularda adımı gizle', emoji: '📢', art: 'ayricalik-platform-duyurusu', perk: 'privacy_global' },
+  { name: 'Profilime iz bırakılmasın', emoji: '🛡️', perk: 'privacy_marks' },
+  { name: 'Profilimi gizle', emoji: '🎭', art: 'ayricalik-klan-gizliligi', perk: 'privacy_profile' },
 ];
 export const nobleInfo = (tier: number) => NOBLE_TIERS.find((t) => t.tier === tier);
 

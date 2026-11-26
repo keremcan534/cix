@@ -19,7 +19,8 @@ import { IS_DEMO } from '@/lib/build';
 import { openLegal } from '@/lib/legal';
 import { liveMode, message } from '@/lib/live';
 import { confirmDeleteLiveAccount, liveSignOut } from '@/lib/live/account';
-import { useLivePrivacy, usePrivacySetter, type PrivacyKey } from '@/lib/live/privacy';
+import { useLivePrivacy, usePrivacyPerks, usePrivacySetter, type PrivacyKey } from '@/lib/live/privacy';
+import { privacyShown } from '@/lib/privacy-perks';
 import { useEventReminderSetting } from '@/lib/live/event-reminders';
 import { type CodeKind } from '@/lib/live/account';
 import { useRemoteConfig } from '@/lib/remote-control';
@@ -138,6 +139,10 @@ function LiveSessions() {
 export default function SettingsScreen() {
   const { nobleTier, me, phone, deletionRequested, requestDeletion, logout, resetAll, blocked, toggleBlock, safetyLog, settings, setSetting, sessions, endSession, notify } = useApp();
   const [licenses, setLicenses] = useState(false);
+  // Gizlilik is a VIP / Rütbe right: each choice shows only with its right (lib/privacy-perks).
+  const privacyPerks = usePrivacyPerks();
+  const may = (k: Parameters<typeof privacyShown>[1]) => privacyShown(privacyPerks, k);
+  const anyPrivacy = (['profilePublic', 'showOnline', 'showLastSeen', 'showCurrentRoom', 'profileMarks', 'globalHideName'] as const).some(may);
   // Live mode: the account's e-mail and checked number (the ways the server has on, lib/remote-config).
   const { email, phoneVerified } = useApp();
   const { signIn, verify } = useRemoteConfig();
@@ -267,33 +272,35 @@ export default function SettingsScreen() {
         )}
 
         {/* Live: kept and enforced on the server, so the words say where each one acts there. Invisible entry and
-            the win announcement stay demo only (PRIVACY_DEFAULTS). */}
-        <ListGroup label="Gizlilik" footer={live ? 'Bu ayarlar hesabında saklanır; başka bir telefondan girişte de geçerlidir.' : undefined}>
-          <PrivacyToggle
+            the win announcement stay demo only (PRIVACY_DEFAULTS). Each choice is a VIP / Rütbe right (owners,
+            26 Nov 2026): one without it doesn't show, and with none the section doesn't either. */}
+        {anyPrivacy && (
+        <ListGroup label="Gizlilik" footer={live ? 'Bu ayarlar VIP ve Rütbe ayrıcalığıdır; hesabında saklanır, başka bir telefondan girişte de geçerlidir.' : undefined}>
+          {may('profilePublic') && <PrivacyToggle
             k="profilePublic"
             icon="globe-outline"
             title="Profilim herkese açık"
             subtitle={live ? 'Kapalıyken profil bilgilerini yalnız takip ettiklerin görür.' : undefined}
-          />
-          <PrivacyToggle k="showOnline" icon="radio-button-on-outline" title="Çevrimiçi durumumu göster" subtitle={live ? 'Kapalıyken çevrimiçi ve son görülme bilgin kimseye gösterilmez.' : undefined} />
-          <PrivacyToggle k="showLastSeen" icon="time-outline" title="Son görülme bilgimi göster" subtitle="Kapatırsan başkalarının son görülmesini de göremezsin." />
-          <PrivacyToggle
+          />}
+          {may('showOnline') && <PrivacyToggle k="showOnline" icon="radio-button-on-outline" title="Çevrimiçi durumumu göster" subtitle={live ? 'Kapalıyken çevrimiçi ve son görülme bilgin kimseye gösterilmez.' : undefined} />}
+          {may('showLastSeen') && <PrivacyToggle k="showLastSeen" icon="time-outline" title="Son görülme bilgimi göster" subtitle="Kapatırsan başkalarının son görülmesini de göremezsin." />}
+          {may('showCurrentRoom') && <PrivacyToggle
             k="showCurrentRoom"
             icon="mic-outline"
             title="Bulunduğum odayı profilimde göster"
             subtitle={live ? 'Kapalıyken bulunduğun oda kimseye gösterilmez.' : "Kapalıyken profilinden odana 'Git' ile gelinemez."}
-          />
+          />}
           {/* Profil izleri (server/api/profile-marks.mjs): the same setting as "Kimler profilime iz bırakabilir" below
               (on = Kimse). It blocks new marks only: the owners' decision (20 Nov 2026), the one showing stays. */}
-          <ListSwitch
+          {may('profileMarks') && <ListSwitch
             icon="sparkles-outline"
             title="Profilime iz bırakılmasın"
             subtitle="Açıkken kimse sana 💩 ya da kırık cam gibi iz bırakan hediye gönderemez. Profilindeki iz kalır: süresi dolunca ya da biri temizleyince gider."
             value={settings.marksFrom === 'nobody'}
             onChange={(v) => setPrivacy('marksFrom', v ? 'nobody' : 'following')}
-          />
+          />}
           {/* Global hediye (server/api/global-gifts.mjs): a gift I send or get is announced in every room of the country. */}
-          <PrivacyToggle k="globalHideName" icon="earth-outline" title="Adım genel duyurularda görünmesin" subtitle="Global hediyelerde adın ve fotoğrafın yerine “Bir kullanıcı” yazar, odanın adı da yazmaz." />
+          {may('globalHideName') && <PrivacyToggle k="globalHideName" icon="earth-outline" title="Adım genel duyurularda görünmesin" subtitle="Global hediyelerde adın ve fotoğrafın yerine “Bir kullanıcı” yazar, odanın adı da yazmaz." />}
           {!live && (
             <>
               <Toggle k="luckyAnnounce" icon="megaphone-outline" title="Kazançlarımda adım görünsün" subtitle="Kapalıyken “Bir kullanıcı kazandı” yazar." />
@@ -307,8 +314,6 @@ export default function SettingsScreen() {
               />
             </>
           )}
-          {/* Koruma off and the threshold are kept on the server; they are set on Benim Koruma (app/koruma). */}
-          {live && <ListRow icon="shield-half-outline" title="Koruma" subtitle="Korumayı kapat ya da koruma alanı eşiğini ayarla." onPress={() => router.push({ pathname: '/koruma', params: { ayar: '1' } })} />}
           {stalePrivacy && (
             <ListRow
               icon="refresh-outline"
@@ -320,11 +325,14 @@ export default function SettingsScreen() {
             />
           )}
         </ListGroup>
+        )}
 
         <ListGroup
           label="Kimler ulaşabilir"
           footer={live ? 'Engellediklerin hiç ulaşamaz; yazdığın ya da aradığın kişi sana dönebilir.' : undefined}
         >
+          {/* Koruma off and the threshold are kept on the server; they are set on Benim Koruma (app/koruma). */}
+          {live && <ListRow icon="shield-half-outline" title="Koruma" subtitle="Korumayı kapat ya da koruma alanı eşiğini ayarla." onPress={() => router.push({ pathname: '/koruma', params: { ayar: '1' } })} />}
           <ListBlock title="Bana kimler mesaj gönderebilir?">
             <ChoiceChips value={settings.dmFrom} options={Object.entries(DM_FROM_LABEL) as [DmFrom, string][]} onChange={(v) => setPrivacy('dmFrom', v)} />
           </ListBlock>
@@ -341,7 +349,8 @@ export default function SettingsScreen() {
               options={[
                 ['everyone', 'Herkes'],
                 ['following', 'Yalnız takip ettiklerim'],
-                ['nobody', 'Kimse'],
+                // "Kimse" is the Gizlilik right "Profilime iz bırakılmasın".
+                ...(may('marksFrom') ? [['nobody', 'Kimse'] as ['nobody', string]] : []),
               ]}
               onChange={(v) => setPrivacy('marksFrom', v)}
             />
