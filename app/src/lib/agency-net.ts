@@ -261,6 +261,8 @@ export type Assistant = {
   assignedAt: string;
   endedAt: string | null;
   active: boolean;
+  /** Offered, not yet accepted by the person (owners, 26 Nov 2026); none from an older server. */
+  pending?: boolean;
   /** Still one of the agency's own (a streamer of it or on its team); someone who left gets no share. */
   member: boolean;
   share: { pct: number; since: string };
@@ -441,6 +443,8 @@ export const agencyNet = {
   setAssistantShare: (id: string, assistantId: number, pct: number) => post<{ assistant: Assistant; replay: boolean }>('/api/agency/assistants/share', { id, assistantId, pct }),
   /** The owner asks the assistant (`ask`: this app shows the request; an older one is told by a 409). */
   removeAssistant: (id: string, assistantId: number) => post<{ removed: boolean; request: AssistantRemoval | null }>('/api/agency/assistants/remove', { id, assistantId, ask: true }),
+  /** The person named answers the assistant offer (accept: it starts with the agreed share). */
+  answerOffer: (assistantId: number, answer: 'accept' | 'reject') => post<{ assistant: Assistant }>('/api/agency/assistants/offer/answer', { assistantId, answer }),
   answerRemoval: (requestId: number, answer: 'accept' | 'reject' | 'dispute', note?: string) => post<{ request: AssistantRemoval }>('/api/agency/assistants/removal/answer', { requestId, answer, ...(note && { note }) }),
   disputeRemoval: (requestId: number, note: string) => post<{ request: AssistantRemoval }>('/api/agency/assistants/removal/dispute', { requestId, note }),
 };

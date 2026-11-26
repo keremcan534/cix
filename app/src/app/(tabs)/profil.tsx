@@ -32,7 +32,7 @@ import { useAutoMe } from '@/lib/live/auto-chat';
 import { liveSignOut } from '@/lib/live/account';
 import { loadMyList } from '@/lib/live/follows';
 import { refreshMeStats, useMeStats } from '@/lib/live/me-stats';
-import { AssistantRemovalCard } from '@/components/assistant-removal';
+import { AssistantOfferCard, AssistantRemovalCard } from '@/components/assistant-removal';
 import { splitTies, tiesOf, type TieSide } from '@/lib/follow-ties';
 import { agencyScreensHidden, myCompletion, rowVisible, streamerCenterVisible, type MenuFlags } from '@/lib/me-view';
 import { OwnMarkNote } from '@/components/profile-mark';
@@ -324,6 +324,7 @@ export default function ProfileScreen() {
         )}
 
         {/* A request to end my assistant role: answered here (she may not see the agency screen). */}
+        {server.offer && <AssistantOfferCard a={server.offer} light onDone={() => void refreshMeStats().catch(() => {})} />}
         {server.removal && <AssistantRemovalCard r={server.removal} light onDone={() => void refreshMeStats().catch(() => {})} />}
         <Group items={main.filter(visible)} />
         <Group items={GROWTH.filter(visible)} />

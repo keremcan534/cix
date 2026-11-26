@@ -17,7 +17,7 @@ import { Avatar, Button } from '@/components/ui';
 import { assistantExample, shareIn } from '@/lib/agency-assistant';
 import { agencyNet, errorText, fmtD, fmtDate, fmtDateTime, runAction, useNet, type Assistant, type AssistantCandidate, type AssistantList, type MyAssistant } from '@/lib/agency-net';
 import { showAlert } from '@/lib/alert';
-import { AssistantRemovalCard, NoteSheet, removalStateText } from '@/components/assistant-removal';
+import { AssistantOfferCard, AssistantRemovalCard, NoteSheet, removalStateText } from '@/components/assistant-removal';
 import { SCRIM, colors, edge, fonts, radius, semantic, space } from '@/theme';
 
 /** Shown without a server connection (labelled as example data; actions are disabled there). */
@@ -60,7 +60,9 @@ export function AssistantsTab({ agencyId, rate, demo, name }: { agencyId: string
   const isDemo = demo || q.demo;
   // Removing takes the assistant's consent (owners, 25 Nov 2026): a request goes to them.
   const remove = (a: Assistant) =>
-    showAlert('Asistanlıktan çıkar', `${a.user.name} kişisine çıkarma isteği gider. Onaylarsa asistanlığı biter (bundan sonraki kazançlardan pay yazılmaz, getirdiği yayıncılar ajansında kalır). Reddederse sürer; o zaman yönetime itiraz edebilirsin.`, [
+    a.pending
+      ? runAction(isDemo, () => agencyNet.removeAssistant(agencyId, a.id), `${a.user.name} için teklif geri alındı.`, q.reload)
+      : showAlert('Asistanlıktan çıkar', `${a.user.name} kişisine çıkarma isteği gider. Onaylarsa asistanlığı biter (bundan sonraki kazançlardan pay yazılmaz, getirdiği yayıncılar ajansında kalır). Reddederse sürer; o zaman yönetime itiraz edebilirsin.`, [
       { text: 'Vazgeç', style: 'cancel' },
       { text: 'İstek gönder', style: 'destructive', onPress: () => void runAction(isDemo, () => agencyNet.removeAssistant(agencyId, a.id), `İstek ${a.user.name} kişisine gönderildi.`, q.reload) },
     ]);
@@ -126,7 +128,7 @@ function AssistantCard({ a, onShare: _onShare, onRemove, onDispute }: { a: Assis
             {fmtDate(a.assignedAt)} · Kod {a.code} · Pay %{a.share.pct}
           </Text>
         </View>
-        <Pill text={a.member ? 'Asistan' : 'Ayrıldı'} tone={a.member ? 'success' : 'danger'} />
+        <Pill text={a.pending ? 'Onay bekliyor' : a.member ? 'Asistan' : 'Ayrıldı'} tone={a.pending ? 'money' : a.member ? 'success' : 'danger'} />
       </View>
       <View style={st.facts}>
         <Fact label="Getirdiği" value={a.invited.now === a.invited.total ? `${a.invited.total}` : `${a.invited.total} (${a.invited.now})`} />
@@ -136,7 +138,9 @@ function AssistantCard({ a, onShare: _onShare, onRemove, onDispute }: { a: Assis
       </View>
       {!a.member && <Text style={st.warn}>Ajanstan ayrıldığı için pay almıyor.</Text>}
       {!!removal && <Text style={st.warn}>{removal}</Text>}
-      {a.removal?.status === 'rejected' ? (
+      {a.pending ? (
+        <Button title="Teklifi geri al" variant="ghost" small onPress={onRemove} />
+      ) : a.removal?.status === 'rejected' ? (
         <Button title="Yönetime itiraz et" variant="ghost" small icon="flag-outline" onPress={onDispute} />
       ) : a.removal ? null : (
         <Button title="Asistanlıktan çıkar" variant="ghost" small onPress={onRemove} />
@@ -217,7 +221,7 @@ function AddSheet({ agencyId, rate, demo, onClose, onDone }: { agencyId: string;
   const save = async () => {
     if (!pick || value === null || busy) return;
     setBusy(true);
-    const done = await runAction(demo, () => agencyNet.addAssistant(agencyId, pick.id, value), `${pick.name} artık asistanın.`, onDone);
+    const done = await runAction(demo, () => agencyNet.addAssistant(agencyId, pick.id, value), `Teklif ${pick.name} kişisine gönderildi. Onaylayınca asistanlık %${value} payla başlar.`, onDone);
     setBusy(false);
     if (done) onClose();
   };
@@ -320,6 +324,7 @@ export function MyAssistantCard({ a, onChange }: { a: MyAssistant; onChange?: ()
   const live = a.active && a.member;
   return (
     <Section title="Ajans asistanlığım">
+      {a.pending && <AssistantOfferCard a={a} onDone={() => onChange?.()} />}
       {a.removal && <AssistantRemovalCard r={a.removal} onDone={() => onChange?.()} />}
       <Panel>
         <View style={ns.rowBetween}>

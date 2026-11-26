@@ -72,6 +72,12 @@ describe('Ajans asistanı', () => {
     refused(await owner.post('/api/agency/assistants/add', { id: T.id, user: helper.id, pct: 101 }), 400, 'pay sınırı');
     refused(await owner.post('/api/agency/assistants/add', { id: T.id, user: helper.id, pct: 12.5 }), 400, 'tam sayı');
     H = ok(await owner.post('/api/agency/assistants/add', { id: T.id, user: helper.id, pct: 80 }), 'asistan atanır').assistant;
+    // The person named accepts first (owners, 26 Nov 2026): until then it is an offer, its code doesn't work.
+    assert.deepEqual([H.pending, H.active], [true, false]);
+    refused(await a3.get(`/api/agency/lookup?code=${H.code}`), 404, 'teklifteyken kod çalışmaz');
+    refused(await outsider.post('/api/agency/assistants/offer/answer', { assistantId: H.id, answer: 'accept' }), 404, 'başkası onaylayamaz');
+    H = ok(await helper.post('/api/agency/assistants/offer/answer', { assistantId: H.id, answer: 'accept' }), 'asistan onaylar').assistant;
+    assert.deepEqual([H.pending, H.active], [false, true]);
     assert.equal(H.share.pct, 80);
     assert.equal(H.upcoming, null);
     assert.match(H.code, /^[A-Z0-9]{6,10}$/);
@@ -170,14 +176,16 @@ describe('Ajans asistanı', () => {
 
   test('pay haftada bir değişir ve gelecek pazartesi 00:00’dan (Türkiye) geçerli olur', async () => {
     const now = new Date();
-    const changed = ok(await owner.post('/api/agency/assistants/share', { id: T.id, assistantId: H.id, pct: 50 }), 'değişiklik').assistant;
+    // The share is agreed once (owners, 26 Nov 2026): the owner can't change it; management may.
+    refused(await owner.post('/api/agency/assistants/share', { id: T.id, assistantId: H.id, pct: 50 }), 403, 'sahip payı değiştiremez');
+    const changed = ok(await admin.post('/api/agency/assistants/share', { id: T.id, assistantId: H.id, pct: 50 }), 'değişiklik').assistant;
     assert.equal(changed.share.pct, 80, 'bu hafta eski pay');
     assert.equal(changed.upcoming.pct, 50);
     assert.equal(new Date(changed.upcoming.from).getTime(), nextMonday(now).getTime());
     assert.equal(changed.canChange, false);
     // A double tap is the same change; another change this week is refused.
-    assert.equal(ok(await owner.post('/api/agency/assistants/share', { id: T.id, assistantId: H.id, pct: 50 })).replay, true);
-    refused(await owner.post('/api/agency/assistants/share', { id: T.id, assistantId: H.id, pct: 60 }), 409, 'haftada bir');
+    assert.equal(ok(await admin.post('/api/agency/assistants/share', { id: T.id, assistantId: H.id, pct: 50 })).replay, true);
+    refused(await admin.post('/api/agency/assistants/share', { id: T.id, assistantId: H.id, pct: 60 }), 409, 'haftada bir');
     refused(await helper.post('/api/agency/assistants/share', { id: T.id, assistantId: H.id, pct: 100 }), 403, 'asistan kendi payını değiştiremez');
     // Income now: still 80 %. Income next Monday 01:00: 50 %.
     const nowCom = (await income(a1, 100)).commission;
@@ -192,7 +200,8 @@ describe('Ajans asistanı', () => {
   });
 
   test('%0 ve %100; geçen hafta yapılan değişiklik bu haftayı kilitlemez', async () => {
-    const H2 = ok(await owner2.post('/api/agency/assistants/add', { id: T2.id, user: helper2.id, pct: 0 })).assistant;
+    let H2 = ok(await owner2.post('/api/agency/assistants/add', { id: T2.id, user: helper2.id, pct: 0 })).assistant;
+    H2 = ok(await helper2.post('/api/agency/assistants/offer/answer', { assistantId: H2.id, answer: 'accept' })).assistant;
     ok(await b1.post('/api/agency/join', { code: H2.code, method: 'code' }));
     const zero = (await income(b1, 100)).commission;
     assert.deepEqual((await ledgerOf(zero.id)).map((x) => [x.kind, num(x.amount)]), [['direct', 20]], '%0: bütün komisyon sahibin');
@@ -200,7 +209,7 @@ describe('Ajans asistanı', () => {
     // A change made last week (written straight into the table, as it would have been then) does not count this week.
     const lastWeek = new Date(monday(new Date()).getTime() - 2 * 86400e3);
     await q('INSERT INTO agency_assistant_shares (assistant_id, streamer_pct, effective_from, created_at) VALUES ($1, 0, $2, $3)', [H2.id, monday(new Date()), lastWeek]);
-    const full = ok(await owner2.post('/api/agency/assistants/share', { id: T2.id, assistantId: H2.id, pct: 100 }), 'bu hafta değişebilir').assistant;
+    const full = ok(await admin.post('/api/agency/assistants/share', { id: T2.id, assistantId: H2.id, pct: 100 }), 'bu hafta değişebilir').assistant;
     assert.equal(full.upcoming.pct, 100);
     const before = await diamondsOf(helper2);
     const com = (await income(b1, 100, { occurredAt: new Date(nextMonday(new Date()).getTime() + 60e3).toISOString() })).commission;
@@ -344,10 +353,11 @@ describe('Ajans asistanı', () => {
     assert.deepEqual((await ledgerOf(after.id)).map((x) => [x.kind, num(x.amount)]), [['direct', 20]], 'komisyonun tamamı sahibin');
     assert.equal((await q('SELECT agency_id FROM agency_streamers WHERE streamer_id = $1 AND ended_at IS NULL', [a1.id]))[0].agency_id, T.id, 'yayıncı ajansta kalır');
     refused(await a2.get(`/api/agency/lookup?code=${H.code}`), 404, 'eski kod çalışmaz');
-    refused(await owner.post('/api/agency/assistants/share', { id: T.id, assistantId: H.id, pct: 30 }), 404);
+    refused(await admin.post('/api/agency/assistants/share', { id: T.id, assistantId: H.id, pct: 30 }), 404);
     refused(await owner.post('/api/agency/assistants/add', { id: T.id, user: helper.id, pct: 80 }), 409, 'aynı hafta yeniden');
     // Another member can be named at once; the slot is free.
-    const next = ok(await owner.post('/api/agency/assistants/add', { id: T.id, user: a2.id, pct: 40 })).assistant;
+    let next = ok(await owner.post('/api/agency/assistants/add', { id: T.id, user: a2.id, pct: 40 })).assistant;
+    next = ok(await a2.post('/api/agency/assistants/offer/answer', { assistantId: next.id, answer: 'accept' })).assistant;
     assert.equal(next.share.pct, 40);
     // The former assistant still sees what she earned.
     const me = ok(await helper.get('/api/agency/me')).assistant;
