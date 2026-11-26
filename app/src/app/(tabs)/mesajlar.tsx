@@ -467,7 +467,7 @@ function ConversationRow({ conv, heart }: { conv: Conversation; heart: Heart | n
   const styles = useStyles();
   return (
     <Pressable style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.card }]} onPress={() => router.push(`/sohbet/${u.id}`)}>
-      <AvatarWithBadge user={u} size={52} unread={conv.unread} />
+      <AvatarWithBadge user={u} size={46} unread={conv.unread} />
       <View style={{ flex: 1, gap: 3 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
           <Text style={styles.name} numberOfLines={1}>
@@ -498,7 +498,7 @@ function FriendRow({ friend }: { friend: Friend }) {
   const styles = useStyles();
   return (
     <Pressable style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.card }]} onPress={() => router.push(`/kullanici/${u.id}`)}>
-      <Avatar uri={u.avatar} size={50} online={u.online} />
+      <Avatar uri={u.avatar} size={46} online={u.online} />
       <View style={{ flex: 1, gap: 3 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
           <Text style={styles.name} numberOfLines={1}>
@@ -534,7 +534,7 @@ function CallRow({ call, onCallBack }: { call: CallRowData; onCallBack: () => vo
   const video = call.kind === 'video';
   return (
     <Pressable style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.card }]} onPress={() => router.push(`/kullanici/${u.id}`)}>
-      <Avatar uri={u.avatar} size={50} online={u.online} />
+      <Avatar uri={u.avatar} size={46} online={u.online} />
       <View style={{ flex: 1, gap: 3 }}>
         <Text style={[styles.name, call.direction === 'missed' && { color: colors.red }]} numberOfLines={1}>
           {u.name}
@@ -664,12 +664,13 @@ const useStyles = makeStyles(({ colors, lift, dark }) => ({
     paddingTop: 12,
     paddingBottom: 4,
   },
+  // Ten people on a screen (owners, 26 Nov 2026: 8.5 showed): a 46-point photo and 7.5 above and below.
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 11,
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 7.5,
   },
   name: { color: colors.text, fontWeight: '700', fontSize: 15, flexShrink: 1 },
   last: { color: colors.textDim, fontSize: 13, flexShrink: 1 },
