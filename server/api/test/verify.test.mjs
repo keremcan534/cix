@@ -427,6 +427,11 @@ describe('Yüz doğrulaması ve mavi rozet', () => {
       assert.deepEqual([left.status, left.reasons, left.doc_name, left.doc_hash, left.doc_sex, left.provider_deleted_at], ['expired', ['withdrawn'], null, null, null, null]);
       const view = await ok(call('GET', '/api/verify', null, s.session), 'durum');
       assert.deepEqual([view.id, view.idVerified], [null, false]);
+      // A late webhook for it brings nothing of hers back.
+      didit.down = false;
+      await ok(webhook(sid, 'Approved'), 'geç webhook');
+      const still = (await q('SELECT status, doc_name FROM identity_checks WHERE session_id = $1', [sid])).rows[0];
+      if (still) assert.deepEqual([still.status, still.doc_name], ['expired', null]);
     } finally {
       didit.down = false;
     }
@@ -516,9 +521,19 @@ describe('Veri: kopya, saklama süresi, hesap silme', () => {
 
   test('hesap silinince kimlik bilgisi hemen gider, sağlayıcıdaki kopya ve satırlar ardından', async () => {
     const { s, sid } = await verifiedWoman('Silinen Kadın');
-    await ok(call('DELETE', '/api/me', null, s.session), 'sil');
-    const r = (await q('SELECT doc_name, doc_hash, doc_sex FROM identity_checks WHERE session_id = $1', [sid])).rows[0];
-    if (r) assert.deepEqual([r.doc_name, r.doc_hash, r.doc_sex], [null, null, null]);
+    didit.down = true;
+    try {
+      await ok(call('DELETE', '/api/me', null, s.session), 'sil');
+      const r = (await q('SELECT doc_name, doc_hash, doc_sex FROM identity_checks WHERE session_id = $1', [sid])).rows[0];
+      assert.deepEqual([r.doc_name, r.doc_hash, r.doc_sex], [null, null, null]);
+      // A late webhook for a deleted account writes nothing back.
+      didit.down = false;
+      await ok(webhook(sid, 'Approved'), 'geç webhook');
+      const after = (await q('SELECT doc_name FROM identity_checks WHERE session_id = $1', [sid])).rows[0];
+      if (after) assert.equal(after.doc_name, null);
+    } finally {
+      didit.down = false;
+    }
     await wait(async () => (await q('SELECT count(*)::int AS n FROM identity_checks WHERE user_id = $1', [s.user.id])).rows[0].n === 0, 'satırlar gider');
     assert.ok(didit.deleted.includes(sid));
   });

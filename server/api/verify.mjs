@@ -168,9 +168,11 @@ async function refresh(row) {
   const d = await didit('GET', `/v3/session/${encodeURIComponent(row.session_id)}/decision/`);
   const r = readDecision(d);
   return tx(async (c) => {
-    const u = (await c.query('SELECT id, gender, avatar_url FROM users WHERE id = $1 FOR NO KEY UPDATE', [row.user_id])).rows[0];
+    const u = (await c.query('SELECT id, gender, avatar_url, deleted_at FROM users WHERE id = $1 FOR NO KEY UPDATE', [row.user_id])).rows[0];
     const x = (await c.query('SELECT * FROM identity_checks WHERE id = $1 FOR UPDATE', [row.id])).rows[0];
     if (!u || !x) return x ?? row;
+    // A withdrawn consent, a deleted account or a provider copy already deleted: nothing of the person comes back.
+    if (u.deleted_at || x.provider_deleted_at || (x.reasons ?? []).includes('withdrawn')) return x;
     const provider = r.status ?? x.provider_status;
     if (x.decided_by) {
       await c.query('UPDATE identity_checks SET provider_status = $2 WHERE id = $1', [x.id, provider]);
