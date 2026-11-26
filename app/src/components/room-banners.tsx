@@ -120,8 +120,9 @@ export function RoomBanners() {
   const { settings } = useApp();
   const live = liveMode();
   const { width } = useWindowDimensions();
+  // A slide is a whole page: the card as wide as a room card, nothing of its neighbours at its sides (owners, 26 Nov 2026).
   const cardW = width - 32;
-  const step = cardW + 10;
+  const step = width;
 
   const [server, setServer] = useState<Banners | null>(null);
   useFocusEffect(
@@ -180,13 +181,14 @@ export function RoomBanners() {
         snapToInterval={step}
         decelerationRate="fast"
         disableIntervalMomentum
-        contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}
         onScrollBeginDrag={() => setHeld(true)}
         onMomentumScrollEnd={settle}
       >
         {slides.map((s) => (
-          <View key={s.id} style={[styles.card, { width: cardW }]}>
-            <ThemeScope scheme="dark">{s.kind === 'banner' ? <BannerCard s={s} live={live} /> : s.kind === 'event' ? <EventCard s={s} live={live} /> : <BoardCard s={s} />}</ThemeScope>
+          <View key={s.id} style={{ width, paddingHorizontal: 16 }}>
+            <View style={[styles.card, { width: cardW }]}>
+              <ThemeScope scheme="dark">{s.kind === 'banner' ? <BannerCard s={s} live={live} /> : s.kind === 'event' ? <EventCard s={s} live={live} /> : <BoardCard s={s} />}</ThemeScope>
+            </View>
           </View>
         ))}
       </ScrollView>
