@@ -1,15 +1,24 @@
 // Each screen's backdrop, drawn by <Backdrop scene>: a sea photo of its own (Unsplash, free Unsplash License,
-// cropped to 900x1600) under a navy veil, lit from the top by the screen's accent. Accents follow the color
+// cropped to 900x1600) under a navy veil, lit from the top by the screen's accent. The home screen's is a night sky
+// instead (the Milky Way over an alpine lake, Pascal Debrunner on Unsplash) that lives (`motion: 'sky'`, fx/sky-motion). Accents follow the color
 // meanings in docs/TASARIM_YONU.md: turquoise for live/social spaces, gold for money and status, coral for
 // people. `veil` darkens bright photos more so text on them stays readable.
 import type { ImageSourcePropType } from 'react-native';
 
 import { semantic } from '@/theme';
 
-export type Scene = { photo: ImageSourcePropType; light: string; veil?: number };
+export type Scene = {
+  photo: ImageSourcePropType;
+  light: string;
+  veil?: number;
+  /** How dark the veil is at the very top (behind the header); 0.7 when not given. */
+  veilTop?: number;
+  /** 'sky': the photo drifts slowly, stars twinkle, a shooting star now and then (fx/sky-motion). */
+  motion?: 'sky';
+};
 
 export const SCENES = {
-  home: { photo: require('../../../assets/bg/sahne-ana-sayfa.jpg'), light: semantic.action },
+  home: { photo: require('../../../assets/bg/sahne-ana-sayfa.jpg'), light: semantic.action, veilTop: 0.5, motion: 'sky' },
   games: { photo: require('../../../assets/bg/sahne-oyun-merkezi.jpg'), light: semantic.action },
   store: { photo: require('../../../assets/bg/sahne-magaza.jpg'), light: semantic.money, veil: 0.5 },
   discover: { photo: require('../../../assets/bg/sahne-kesfet.jpg'), light: semantic.social },
