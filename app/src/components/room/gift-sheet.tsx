@@ -834,8 +834,9 @@ function GiftTile({
 }) {
   // At most one corner badge: Global (it says the whole country hears of it), else the effect type unless locked, so
   // the important fact is never crowded out.
-  const badge = global ? 'global' : locked ? null : gift.badge === '3D' || gift.badge === 'music' ? gift.badge : null;
-  const a11y = `${gift.name}, ${stock !== undefined ? `ücretsiz, ${stock} adet` : `${fmt(gift.price)} jeton`}${global ? ', global hediye' : ''}${locked ? `, VIP ${gift.minSvip} gerekli` : ''}${muted ? ', alıcı iz kabul etmiyor' : ''}${favorite ? ', favori' : ''}${soon ? ', yakında' : ''}`;
+  // A bond gift (Bağ hediyesi) carries a chain (owners, 26 Nov 2026), so it reads as one at a glance.
+  const badge = global ? 'global' : locked ? null : isBondGift(gift.id) ? 'bond' : gift.badge === '3D' || gift.badge === 'music' ? gift.badge : null;
+  const a11y = `${gift.name}, ${stock !== undefined ? `ücretsiz, ${stock} adet` : `${fmt(gift.price)} jeton`}${global ? ', global hediye' : ''}${isBondGift(gift.id) ? ', bağ hediyesi' : ''}${locked ? `, VIP ${gift.minSvip} gerekli` : ''}${muted ? ', alıcı iz kabul etmiyor' : ''}${favorite ? ', favori' : ''}${soon ? ', yakında' : ''}`;
   const faded = locked || muted || soon;
   return (
     <Pressable onPress={onPress} onLongPress={onLongPress} delayLongPress={350} style={g.tileWrap} accessibilityRole="button" accessibilityState={{ selected }} accessibilityLabel={a11y} accessibilityHint="Uzun bas: favorilere ekle veya çıkar">
@@ -876,6 +877,10 @@ function GiftTile({
           </View>
         ) : badge === 'music' ? (
           <Image source={MUSIC_BADGE} style={g.musicBadge} accessibilityIgnoresInvertColors />
+        ) : badge === 'bond' ? (
+          <View style={[g.badge, g.bondBadge]} accessibilityLabel="Bağ hediyesi">
+            <Ionicons name="link" size={12} color="#fff" />
+          </View>
         ) : badge ? (
           <View style={g.badge}>
             <Text style={g.badgeText}>{badge}</Text>
@@ -969,6 +974,7 @@ const g = StyleSheet.create({
   badge: { position: 'absolute', top: 2, right: 2, minWidth: 20, height: 16, borderRadius: 5, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
   luckyBadge: { alignSelf: 'center', minWidth: 20, height: 16, borderRadius: 5, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
   badgeText: { color: colors.text, fontSize: 10, fontWeight: '900' },
+  bondBadge: { backgroundColor: '#E0457B' },
   musicBadge: { position: 'absolute', top: 2, right: 2, width: 20, height: 20 },
   soonPill: { alignSelf: 'center', marginTop: 2, paddingHorizontal: 8, paddingVertical: 1, borderRadius: 999, backgroundColor: colors.cardAlt, borderWidth: 1, borderColor: colors.border },
   soonText: { color: colors.textDim, fontSize: 10.5, fontWeight: '800' },

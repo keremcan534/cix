@@ -17,6 +17,12 @@
 // older; the row goes with the account (social.mjs eraseAccount).
 import { HttpError, auth, db, int, readJson, tx } from './core.mjs';
 
+/**
+ * Off (owners, 26 Nov 2026: "günlük harcama limiti olmasın, herkes özgürce harcama yapsın"): no spend is refused and
+ * every phone reads "no limit"; a limit an older app sets is kept but not applied. SPEND_LIMITS=1 turns it back on
+ * (the tests run with it on; spend-limit.test.mjs checks the default).
+ */
+export const SPEND_LIMITS = process.env.SPEND_LIMITS === '1';
 export const RAISE_HOURS = 24;
 /** The smallest and largest daily limit a person may set, in coins. */
 export const LIMIT_MIN = 100;
@@ -50,7 +56,7 @@ async function stateOf(c, uid, lock = false) {
  * what is left. It speaks to the spender: never show it to someone else (a match partner).
  */
 export async function limitRefusal(c, uid, amount) {
-  if (!(amount > 0)) return null;
+  if (!SPEND_LIMITS || !(amount > 0)) return null;
   const s = await stateOf(c, uid, true);
   if (s.limit === null || s.spent + amount <= s.limit) return null;
   const left = Math.max(0, s.limit - s.spent);
@@ -80,7 +86,8 @@ export async function countSpent(c, uid, amount) {
 
 /** What the app shows: the limit now, a waiting change, today's total, what is left and when the day ends. */
 async function view(c, uid) {
-  const s = await stateOf(c, uid);
+  const kept = await stateOf(c, uid);
+  const s = SPEND_LIMITS ? kept : { ...kept, limit: null, next: null };
   const r = await c.query(`SELECT ${TODAY}::text AS day, ((${TODAY} + 1)::timestamp AT TIME ZONE 'Europe/Istanbul') AS resets_at`);
   return {
     limit: s.limit,

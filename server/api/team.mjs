@@ -112,10 +112,10 @@ export const teamRoutes = {
   },
 
   async 'GET /api/room-banners'(req, url) {
-    await auth(req);
+    const me = await auth(req);
     const ev = await db.query("SELECT n.* FROM team_notices n WHERE n.banner AND n.target IS NULL AND n.removed_at IS NULL AND n.ends_at > now() ORDER BY n.id DESC LIMIT 5");
     const events = ev.rows.map((x) => ({ ...view(x), endsAt: x.ends_at.toISOString() }));
-    const live = await liveBanners();
+    const live = await liveBanners(db, me.id);
     // A newer app asks for the banners apart; an older one shows them as notice slides (an uploaded picture only: it
     // doesn't have the app's own example pictures, so those fall back to its slide without one).
     if (url?.searchParams.get('banners') === '1') return { events, boards: await bannerBoards(), banners: live.map(phoneView) };

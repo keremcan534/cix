@@ -31,7 +31,7 @@
 //    to both and settle it in the panel (remove or keep). The centre may still end one at once.
 //  - Supporters' top-ups give an agency no commission (only streamers' income does), so there is no supporter share.
 import { HttpError, UUID, auth, db, readJson, text, tx } from './core.mjs';
-import { accessOf, agencyRow, audit, d4, needPlatform, newCode, nextWeekStart, notice, settingsAt, weekStart } from './agency-lib.mjs';
+import { JOIN_CODE, accessOf, agencyRow, audit, d4, freeJoinCode, needPlatform, nextWeekStart, notice, settingsAt, weekStart } from './agency-lib.mjs';
 import { notify } from './push.mjs';
 
 const bad = (m) => {
@@ -69,7 +69,7 @@ async function ownerOf(c, x, id, { lock = false, centre = null } = {}) {
  */
 export async function resolveJoinCode(c, code) {
   const s = typeof code === 'string' ? code.trim().toUpperCase() : '';
-  if (!/^[A-Z0-9]{6,10}$/.test(s)) throw new HttpError(400, 'Geçersiz ajans kodu');
+  if (!JOIN_CODE.test(s)) throw new HttpError(400, 'Geçersiz ajans kodu');
   const a = await c.query('SELECT * FROM agencies WHERE code = $1', [s]);
   if (a.rowCount) return { agency: a.rows[0], assistant: null };
   const h = await c.query(
@@ -279,8 +279,7 @@ export const agencyAssistantRoutes = {
       if (again.rowCount) throw new HttpError(409, 'Bu hafta asistanlıktan çıkardığın kişiyi gelecek hafta yeniden ekleyebilirsin');
       let row = null;
       for (let i = 0; i < 5 && !row; i++) {
-        const code = newCode();
-        if ((await c.query('SELECT 1 FROM agencies WHERE code = $1', [code])).rowCount) continue;
+        const code = await freeJoinCode(c);
         try {
           await c.query('SAVEPOINT asst');
           row = (await c.query('INSERT INTO agency_assistants (agency_id, user_id, code, assigned_by) VALUES ($1, $2, $3, $4) RETURNING *', [a.id, user, code, x.u.id])).rows[0];

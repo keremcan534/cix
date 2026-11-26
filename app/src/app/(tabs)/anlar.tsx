@@ -43,7 +43,7 @@ import { Photo } from '@/components/photo';
 import { BrandLoader } from '@/components/fx/brand-loader';
 import { PostSkeleton, Skeletons } from '@/components/fx/skeleton';
 
-const TABS = ['Arkadaşlar', 'Önerilen', 'Son'] as const;
+const TABS = ['Önerilen', 'Arkadaşlar', 'Son'] as const;
 type Tab = (typeof TABS)[number];
 /** Width of a post's photo column: the 50 px photo plus room for an illustrated frame round it. */
 const AVATAR_COL = 64;

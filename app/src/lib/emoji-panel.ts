@@ -29,9 +29,16 @@ const inEmojiTab = (id: string) => (EMOJI_TAB_PACKS as readonly string[]).includ
 /** A pack that is bought in the shop or opened by VIP. */
 export const isVipPack = (p: StickerPack) => p.price > 0 || !!p.minVip;
 
+/**
+ * Stickers the Emoji tab leaves out so Müzik fills its rows of five (owners, 26 Nov 2026: "müzik kısmında boşluk var";
+ * 12 left a row of two). They stay in the catalog: one sent by an older app still shows in chats.
+ */
+export const EMOJI_TAB_HIDDEN: ReadonlySet<string> = new Set(['muzik-saksafon', 'muzik-keman']);
 /** The packs of the Emoji tab this panel shows (one taken off, or with no sticker left, isn't). */
 export const emojiTabPacks = (room: boolean, packs: readonly StickerPack[] = STICKER_PACKS) =>
-  EMOJI_TAB_PACKS.map((id) => packs.find((p) => p.id === id)).filter((p): p is StickerPack => !!p && !p.retired && p.stickers.length > 0 && (!p.roomOnly || room));
+  EMOJI_TAB_PACKS.map((id) => packs.find((p) => p.id === id))
+    .filter((p): p is StickerPack => !!p && !p.retired && p.stickers.length > 0 && (!p.roomOnly || room))
+    .map((p) => (p.stickers.some((x) => EMOJI_TAB_HIDDEN.has(x.id)) ? { ...p, stickers: p.stickers.filter((x) => !EMOJI_TAB_HIDDEN.has(x.id)) } : p));
 
 /** VIP's packs are "Yakında" (owners, 25 Nov 2026): shown, not sold or opened; one someone already has stays theirs. */
 export const VIP_SOON = true;
