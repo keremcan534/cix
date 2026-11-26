@@ -5,6 +5,7 @@
 import { HttpError } from './core.mjs';
 import { audit, d4, e4, fmt4, notice, periodOf, rateAt, settingsAt } from './agency-lib.mjs';
 import { applyTier } from './agency-perf.mjs';
+import { deviceTakenSql } from './streamer-rule.mjs';
 import { spendDiamonds } from './wallet.mjs';
 
 export async function setStatus(c, a, to, actor, note = '') {
@@ -75,7 +76,8 @@ export async function streamerState(c, userId, s, at = new Date()) {
         (SELECT agency_id FROM agency_streamers WHERE streamer_id = u.id AND ended_at IS NULL) AS open,
         EXISTS (SELECT 1 FROM agency_streamers WHERE streamer_id = u.id) AS before,
         (SELECT l.end_reason FROM agency_streamers l WHERE l.streamer_id = u.id ORDER BY l.joined_at DESC LIMIT 1) AS last_reason,
-        (SELECT l.returned_at FROM agency_streamers l WHERE l.streamer_id = u.id ORDER BY l.joined_at DESC LIMIT 1) AS returned_at
+        (SELECT l.returned_at FROM agency_streamers l WHERE l.streamer_id = u.id ORDER BY l.joined_at DESC LIMIT 1) AS returned_at,
+        ${deviceTakenSql('u.id')} AS taken
        FROM users u WHERE u.id = $1`,
     [userId],
   );
@@ -86,10 +88,14 @@ export async function streamerState(c, userId, s, at = new Date()) {
   const dropped = !u.open && u.before && u.last_reason === 'inactive';
   const from = dropped ? (u.returned_at ? new Date(u.returned_at) : null) : new Date(u.created_at);
   const pickUntil = p.pick_days > 0 && from ? new Date(from.getTime() + days) : null;
-  const held = u.open ? false : dropped ? !!u.returned_at && new Date(at) >= new Date(new Date(u.returned_at).getTime() + days) : pickUntil !== null && (u.before || new Date(at) >= pickUntil);
+  const held = u.open || u.taken ? false : dropped ? !!u.returned_at && new Date(at) >= new Date(new Date(u.returned_at).getTime() + days) : pickUntil !== null && (u.before || new Date(at) >= pickUntil);
+  // Another account on this phone holds its streamer place (owners, 26 Nov 2026): this one can't stream (one already in
+  // an agency keeps her place; only new links are refused).
+  const taken = !u.open && u.taken;
   return {
     gender: u.gender,
-    eligible: !p.women_only || u.gender === 'Kadın',
+    eligible: (!p.women_only || u.gender === 'Kadın') && !taken,
+    taken,
     open: u.open,
     held,
     pickUntil: dropped && !u.returned_at ? null : pickUntil,
@@ -98,6 +104,7 @@ export async function streamerState(c, userId, s, at = new Date()) {
 
 export function assertEligible(st) {
   if (st.eligible) return;
+  if (st.taken) throw new HttpError(403, 'Bu telefonda zaten bir yayıncı hesabı var; aynı telefondaki başka bir hesap yayıncı olamaz');
   throw new HttpError(403, st.gender ? 'Ajanslarda yalnız kadın hesaplar yayıncı olabilir; erkek hesaplar katkısını Aile üyesi olarak verir' : 'Önce profilinde cinsiyetini seç');
 }
 

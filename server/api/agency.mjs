@@ -255,7 +255,8 @@ export const agencyRoutes = {
     const p = x.s.streamer_policy;
     return {
       // The streamer rules as they apply to me, so the app shows what is possible (the server checks again).
-      streamer: { eligible: st.eligible, gender: st.gender, held: st.held, pickUntil: st.pickUntil, pickDays: p.pick_days, canLeave: p.can_leave, womenOnly: p.women_only },
+      // deviceTaken: another account on this phone is its streamer (owners, 26 Nov 2026): the app shows no "Yayıncı ol".
+      streamer: { eligible: st.eligible, gender: st.gender, held: st.held, pickUntil: st.pickUntil, pickDays: p.pick_days, canLeave: p.can_leave, womenOnly: p.women_only, deviceTaken: !!st.taken },
       membership: m.rowCount
         ? // parentName: never (owners, 25 Nov 2026: a referral agency shows no parent); kept null for older apps.
           { agency: { id: m.rows[0].agency_id, name: m.rows[0].name, code: m.rows[0].code, level: m.rows[0].level, parentName: null }, joinedAt: m.rows[0].joined_at, method: m.rows[0].method }

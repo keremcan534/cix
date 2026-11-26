@@ -245,7 +245,7 @@ export type Me = {
   agencies: MyAgency[];
   platform: string[];
   /** The streamer rules for this account (server agency-ops.mjs streamerState); older servers send none. */
-  streamer?: { eligible: boolean; gender: string | null; held: boolean; pickUntil: string | null; pickDays: number; canLeave: boolean; womenOnly: boolean };
+  streamer?: { eligible: boolean; gender: string | null; held: boolean; pickUntil: string | null; pickDays: number; canLeave: boolean; womenOnly: boolean; /** Another account on this phone is its streamer (owners, 26 Nov 2026). */ deviceTaken?: boolean };
   /** My agency assistant card (server agency-assistants.mjs); null when I never was one, absent on older servers. */
   assistant?: MyAssistant | null;
 };

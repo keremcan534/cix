@@ -17,7 +17,7 @@ import { agencyLinkOf, type AgencyLink } from '@/lib/me-view';
 export type MeStats = { serverId: string; followers: number; following: number; friends: number | null };
 /** `agency` undefined: not read yet (or the read failed); null: I have no agency. `owner`: whose numbers these are. */
 /** `removal`: a request to end my assistant role that waits for me or sits with management (owners, 25 Nov 2026). */
-type Snap = { owner: string | null; stats: MeStats | null; agency: AgencyLink | null | undefined; removal?: AssistantRemoval | null; /** An agency assistant now (Asistan merkezi). */ assistant?: boolean; /** An assistant offer waiting for my answer. */ offer?: { id: number; agency: { id: string; name: string }; share: { pct: number; since: string } } | null };
+type Snap = { owner: string | null; stats: MeStats | null; agency: AgencyLink | null | undefined; removal?: AssistantRemoval | null; /** An agency assistant now (Asistan merkezi). */ assistant?: boolean; /** Another account on this phone is its streamer: no "Yayıncı ol" (owners, 26 Nov 2026). */ deviceTaken?: boolean; /** An assistant offer waiting for my answer. */ offer?: { id: number; agency: { id: string; name: string }; share: { pct: number; since: string } } | null };
 
 const EMPTY: Snap = { owner: null, stats: null, agency: undefined };
 let snap: Snap = EMPTY;
@@ -44,7 +44,7 @@ export function refreshMeStats(): Promise<void> {
     if (profile.status === 'fulfilled') putTies(id, profile.value);
     put({
       ...(profile.status === 'fulfilled' && { stats: { serverId: id, ...tieCounts(profile.value) } }),
-      ...(agency.status === 'fulfilled' && { agency: agencyLinkOf(agency.value), removal: openRemoval(agency.value.assistant?.removal), assistant: agency.value.assistant?.active === true, offer: agency.value.assistant?.pending ? agency.value.assistant : null }),
+      ...(agency.status === 'fulfilled' && { agency: agencyLinkOf(agency.value), removal: openRemoval(agency.value.assistant?.removal), assistant: agency.value.assistant?.active === true, deviceTaken: agency.value.streamer?.deviceTaken === true, offer: agency.value.assistant?.pending ? agency.value.assistant : null }),
     });
   })().finally(() => (reading = null));
   return reading;
@@ -66,7 +66,7 @@ export function useMeStats() {
   useEffect(() => {
     if (liveMode() && focused) void refreshMeStats().catch(() => {});
   }, [focused]);
-  return { stats: s.stats, agency: s.agency, removal: s.removal ?? null, assistant: s.assistant === true, offer: s.offer ?? null };
+  return { stats: s.stats, agency: s.agency, removal: s.removal ?? null, assistant: s.assistant === true, offer: s.offer ?? null, deviceTaken: s.deviceTaken === true };
 }
 
 /** My agency on the server for the profile pill: undefined until known. `read`: start a read if there is none yet. */

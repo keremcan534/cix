@@ -248,6 +248,14 @@ function JoinOrApply({ d, demo, reload, askFor }: { d: Me; demo: boolean; reload
 /** What the join tab offers by the streamer rules: pick a gender, the women-only note, a transfer from the centre, or the code. */
 function StreamerJoin({ d, demo, reload, askFor }: { d: Me; demo: boolean; reload: () => void; askFor: ReturnType<typeof useAsk>[1] }) {
   const s = d.streamer;
+  // One streamer per phone (owners, 26 Nov 2026): this phone's streamer is another account; nothing to join here.
+  if (s?.deviceTaken)
+    return (
+      <Panel>
+        <Text style={ns.title}>Bu telefonda yayıncı hesabı var</Text>
+        <Text style={ns.dim}>Bir telefonda yalnız bir hesap yayıncı olabilir. Bu hesapla uygulamayı normal kullanıcı olarak kullanabilirsin.</Text>
+      </Panel>
+    );
   if (s && !s.eligible && !s.gender) return <PickGender demo={demo} reload={reload} />;
   if (s && !s.eligible)
     return (

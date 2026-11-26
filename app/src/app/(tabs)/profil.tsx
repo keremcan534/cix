@@ -117,7 +117,8 @@ export default function ProfileScreen() {
   const main: Item[] = [
     // "Yayıncı ol" (owners, 26 Nov 2026): only a woman with no agency yet, here rather than among the agency rows; a man
     // can't stream (the agency application is on Ana Sayfa's banner).
-    ...(me.gender === 'Kadın' ? [{ icon: 'mic-outline', img: 'mic', label: 'Yayıncı ol', onPress: () => router.push('/ajans'), noAgencyOnly: true } satisfies Item] : []),
+    // Not on a phone whose streamer is another account (one streamer per phone, owners 26 Nov 2026).
+    ...(me.gender === 'Kadın' && !server.deviceTaken ? [{ icon: 'mic-outline', img: 'mic', label: 'Yayıncı ol', onPress: () => router.push('/ajans'), noAgencyOnly: true } satisfies Item] : []),
     { icon: 'diamond-outline', img: 'diamond', label: 'Gelir', onPress: () => router.push('/gelir') },
     { icon: 'business-outline', img: 'coin', label: 'Jeton Noktası', onPress: () => router.push('/coins-bank') },
     { icon: 'storefront-outline', img: 'bag', label: 'Çarşı', onPress: () => router.push('/magaza') },

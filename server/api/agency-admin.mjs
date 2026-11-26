@@ -181,11 +181,10 @@ export async function streamerPolicyJobs(s) {
         const cur = (await c.query('SELECT agency_id FROM agency_streamers WHERE streamer_id = $1 AND ended_at IS NULL FOR UPDATE', [id])).rows[0];
         const first = await firstAgencyOfPerson(c, id);
         if (!cur || !first || first.id === cur.agency_id) return;
+        // One streamer per phone (owners, 26 Nov 2026): the later account can't stream at all, so it leaves (no move).
         await unlinkStreamer(c, id, 'multi_account');
-        await linkStreamer(c, id, first, 'transfer', null);
-        await audit(c, null, 'streamer.multi_account', 'streamer', id, { before: { agency: cur.agency_id }, after: { agency: first.id } });
-        await notice(c, cur.agency_id, 'transfer', 'Bir yayıncın ilk ajansına taşındı', 'Aynı kişinin bu cihazdaki ilk hesabı başka bir ajansta; ikinci hesap da oraya bağlanır.');
-        await notice(c, first.id, 'transfer', 'Yayıncının ikinci hesabı ajansına bağlandı', '');
+        await audit(c, null, 'streamer.multi_account', 'streamer', id, { before: { agency: cur.agency_id }, after: { agency: null, first: first.id } });
+        await notice(c, cur.agency_id, 'transfer', 'Bir yayıncın ajanstan çıktı', 'Aynı telefonda başka bir yayıncı hesabı var; bir telefonda yalnız bir hesap yayıncı olabilir.');
         out.multiAccount++;
       });
     } catch (e) {
