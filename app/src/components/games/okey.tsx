@@ -64,7 +64,6 @@ export function OkeyTable({ roomId, me, crowd }: { roomId: string; me: Player; c
   const [note, setNote] = useState('');
   const [selected, setSelected] = useState<number | null>(null);
   const [arranged, setArranged] = useState<{ hand: number; slots: (number | null)[] }>({ hand: -1, slots: [] });
-  const [now, setNow] = useState(() => Date.now());
 
   // Opening the game from the room menu opens the room's table (or joins the one already open) as a viewer.
   useEffect(() => {
@@ -79,11 +78,6 @@ export function OkeyTable({ roomId, me, crowd }: { roomId: string; me: Player; c
   }, [roomId, viewer]);
 
   const live = !!table?.game && table.game.phase !== 'over';
-  useEffect(() => {
-    if (!live) return;
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, [live]);
 
   if (!table) return <Text style={s.dim}>Masa hazırlanıyor…</Text>;
   const v = viewFor(table, viewer.id);
@@ -130,7 +124,7 @@ export function OkeyTable({ roomId, me, crowd }: { roomId: string; me: Player; c
   // Seats around the felt, the viewer's at the bottom; turns go to the right (counter-clockwise).
   const at = { bottom: anchor, right: nextSeat(anchor), top: nextSeat(nextSeat(anchor)), left: prevSeat(anchor) };
   const turnHolder = v.turn >= 0 ? v.seats[v.turn].holder : null;
-  const secondsLeft = turnHolder && !turnHolder.bot && live ? Math.min(TURN_MS / 1000, Math.max(0, Math.ceil((table.turnAt + TURN_MS - now) / 1000))) : null;
+  const timed = !!turnHolder && !turnHolder.bot && live;
   const takeTop = seated ? v.seats[prevSeat(v.mySeat)].discardTop : undefined;
 
   const status = (() => {
@@ -210,7 +204,7 @@ export function OkeyTable({ roomId, me, crowd }: { roomId: string; me: Player; c
         <Text style={[s.status, myTurn && { color: semantic.action }]} numberOfLines={2}>
           {status}
         </Text>
-        {secondsLeft !== null && <Text style={[s.timer, secondsLeft <= 10 && { color: colors.pink }]}>{secondsLeft} sn</Text>}
+        {timed && <TurnClock turnAt={table.turnAt} />}
       </View>
       {!!note && <Text style={s.note}>{note}</Text>}
 
@@ -248,6 +242,20 @@ export function OkeyTable({ roomId, me, crowd }: { roomId: string; me: Player; c
       )}
     </View>
   );
+}
+
+/**
+ * The seconds left of a player's turn. It ticks once a second on its own clock, so only this text redraws with it,
+ * not the whole table (seats, discards, the rack with its draggable tiles).
+ */
+function TurnClock({ turnAt }: { turnAt: number }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const secondsLeft = Math.min(TURN_MS / 1000, Math.max(0, Math.ceil((turnAt + TURN_MS - now) / 1000)));
+  return <Text style={[s.timer, secondsLeft <= 10 && { color: colors.pink }]}>{secondsLeft} sn</Text>;
 }
 
 function SeatChip({

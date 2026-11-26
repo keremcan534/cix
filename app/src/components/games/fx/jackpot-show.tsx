@@ -18,6 +18,7 @@ import { FitBox, GoldText } from '@/components/games/fx/gold-text';
 import { SALON } from '@/components/games/fx/salon';
 import { salonArt } from '@/components/games/fx/salon-art';
 import { SkinOverlay, type SlotSkin } from '@/components/games/fx/slot-skin';
+import { makeTicking, useTicking, type Ticking } from '@/components/games/fx/ticking';
 import { Text } from '@/components/text';
 import { playSfx } from '@/lib/game-sound';
 import { heavyHaptic, rumbleHaptic, successHaptic } from '@/lib/haptics';
@@ -119,12 +120,27 @@ function JackpotShow({ skin, kind, amount, bet, onDone }: { skin: SlotSkin; kind
   const [rise] = useState(() => new Animated.Value(calm ? 1 : 0));
   const [twinkle] = useState(() => new Animated.Value(calm ? 0.5 : 0));
   const [out] = useState(() => new Animated.Value(0));
-  const [count, setCount] = useState(calm ? amount : 0);
+  // The amount on show changes every frame while it counts: only the plate's number (PlateAmount) redraws with it.
+  const [count] = useState(() => makeTicking(calm ? amount : 0));
   const [burst, setBurst] = useState(false);
   // A Büyük Kazanç's title climbs with the amount on show (DEV, EFSANE KAZANÇ: lib/win-tier winStageAt); each step
-  // pops the title and sounds a fanfare.
+  // pops the title and sounds a fanfare. Kept as state that changes only at a step, so the show (its rays, sparkles
+  // and coins) redraws a few times instead of every frame.
   const final = winTierOf(amount, bet) ?? 'big';
-  const stage = jackpot ? 'jackpot' : calm ? final : winStageAt(count, bet, final === 'small' ? 'big' : final);
+  const stageAt = useCallback((n: number) => (jackpot ? 'jackpot' : calm ? final : winStageAt(n, bet, final === 'small' ? 'big' : final)), [jackpot, calm, final, bet]);
+  const [stage, setStage] = useState(() => stageAt(count.get()));
+  const titleAt = useRef(stage);
+  /** The amount on show, and the title with it. */
+  const showCount = useCallback(
+    (n: number) => {
+      count.set(n);
+      const next = stageAt(n);
+      if (next === titleAt.current) return;
+      titleAt.current = next;
+      setStage(next);
+    },
+    [count, stageAt],
+  );
   const [step] = useState(() => new Animated.Value(1));
   const shownStage = useRef(stage);
   useEffect(() => {
@@ -145,9 +161,9 @@ function JackpotShow({ skin, kind, amount, bet, onDone }: { skin: SlotSkin; kind
   const close = useCallback(() => {
     if (closing.current) return;
     closing.current = true;
-    setCount(amount);
+    showCount(amount);
     Animated.timing(out, { toValue: 1, duration: 280, useNativeDriver: true }).start(() => done.current());
-  }, [amount, out]);
+  }, [amount, out, showCount]);
 
   useEffect(() => {
     successHaptic();
@@ -195,7 +211,7 @@ function JackpotShow({ skin, kind, amount, bet, onDone }: { skin: SlotSkin; kind
       if (closing.current) return;
       const now = Date.now();
       const t = Math.max(0, Math.min(1, (now - from) / span));
-      setCount(rollAt(0, amount, t));
+      showCount(rollAt(0, amount, t));
       if (t > 0 && t < 1 && now - lastTick > 90) {
         lastTick = now;
         playSfx('tick', 0.35);
@@ -310,7 +326,7 @@ function JackpotShow({ skin, kind, amount, bet, onDone }: { skin: SlotSkin; kind
                 <Image source={skin.plate.src} style={{ width: plateW, height: plateH }} resizeMode="contain" />
                 <View style={[s.abs, s.center, { left: plateW * 0.15, right: plateW * 0.15, top: plateH * 0.26, bottom: plateH * 0.22 }]}>
                   <FitBox width={plateW * 0.66}>
-                    <GoldText size={Math.round(plateH * 0.36)}>{`+${fmt(count)}`}</GoldText>
+                    <PlateAmount count={count} size={Math.round(plateH * 0.36)} />
                   </FitBox>
                 </View>
               </View>
@@ -322,6 +338,11 @@ function JackpotShow({ skin, kind, amount, bet, onDone }: { skin: SlotSkin; kind
       <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityRole="button" accessibilityLabel={`${jackpot ? 'JACKPOT' : WIN_TITLE[final === 'small' ? 'big' : final]}, ${amount} jeton. Kapatmak için dokun`} />
     </Animated.View>
   );
+}
+
+/** The amount on the win plate as it counts: the one part of the show redrawn with every frame of the count. */
+function PlateAmount({ count, size }: { count: Ticking<number>; size: number }) {
+  return <GoldText size={size}>{`+${fmt(useTicking(count))}`}</GoldText>;
 }
 
 const s = StyleSheet.create({

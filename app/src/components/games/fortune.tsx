@@ -3,7 +3,7 @@
 // outcome.fortune. Auto-spin is repeated rounds from this screen; it stops at the bonus, a big win, the loss limit or
 // any refusal (daily limit, balance, pool). It never touches the room or the microphone.
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/text';
@@ -42,7 +42,6 @@ export function FortunePlayer({ entry }: { entry: Entry }) {
   const [bet, setBet] = useState(game.bets[0]);
   const [grid, setGrid] = useState<Sym[][]>(INITIAL);
   const [spinning, setSpinning] = useState<boolean[]>(IDLE);
-  const [tick, setTick] = useState(0);
   const [lit, setLit] = useState<Set<string>>(new Set());
   const [lines, setLines] = useState<string[]>([]);
   const [free, setFree] = useState<{ n: number; won: number } | null>(null);
@@ -60,7 +59,6 @@ export function FortunePlayer({ entry }: { entry: Entry }) {
   const stopAuto = useRef(false);
   const closeBig = useRef<(() => void) | null>(null);
   const [bigScale] = useState(() => new Animated.Value(0));
-  const anySpin = spinning.some(Boolean);
   const lineBet = bet / LINES.length;
 
   useEffect(
@@ -70,11 +68,6 @@ export function FortunePlayer({ entry }: { entry: Entry }) {
     },
     [],
   );
-  useEffect(() => {
-    if (!anySpin) return;
-    const id = setInterval(() => setTick((t) => t + 1), 70);
-    return () => clearInterval(id);
-  }, [anySpin]);
 
   const access = casinoAccess(game, entry, wealthLevel);
   if (!access.ok) return <CasinoLock reason={access.reason} needWealth={access.needWealth} />;
@@ -208,22 +201,7 @@ export function FortunePlayer({ entry }: { entry: Entry }) {
           <Text style={f.title} accessibilityRole="header">
             🏦 ALTIN KASA
           </Text>
-          <View style={f.reels} accessibilityLabel={`Makaralar: ${grid.map((col) => col.map((s) => SYMBOLS[s].name).join(', ')).join(' | ')}`}>
-            {grid.map((col, reel) => (
-              <View key={reel} style={f.reel}>
-                {col.map((sym, row) => {
-                  const shown = spinning[reel] ? blur(reel, row, tick) : sym;
-                  const on = lit.has(`${reel}-${row}`);
-                  return (
-                    <View key={row} style={[f.cell, on && f.cellOn, !spinning[reel] && shown === WILD && f.cellWild]}>
-                      <Text style={[f.sym, spinning[reel] && f.symBlur]}>{SYMBOLS[shown].emoji}</Text>
-                      {!spinning[reel] && (shown === WILD || shown === SCATTER) && <Text style={f.tag}>{shown === WILD ? 'WILD' : 'KASA'}</Text>}
-                    </View>
-                  );
-                })}
-              </View>
-            ))}
-          </View>
+          <FortuneReels grid={grid} spinning={spinning} lit={lit} />
           {free && (
             <Text style={f.free} accessibilityLiveRegion="polite">
               Bedava dönüş {free.n}/{FREE_SPINS} · ×{FREE_MULT} · +{fmt(free.won)}
@@ -335,6 +313,45 @@ export function FortunePlayer({ entry }: { entry: Entry }) {
     </View>
   );
 }
+
+/**
+ * The five reels. A spinning reel shows its strip scrolling, a step every 70 ms: that tick lives here, so only the
+ * reels redraw with it (and of them only the ones still spinning), not the whole screen with its bets, Oto box and
+ * paytable fourteen times a second.
+ */
+const FortuneReels = memo(function FortuneReels({ grid, spinning, lit }: { grid: Sym[][]; spinning: boolean[]; lit: Set<string> }) {
+  const [tick, setTick] = useState(0);
+  const anySpin = spinning.some(Boolean);
+  useEffect(() => {
+    if (!anySpin) return;
+    const id = setInterval(() => setTick((t) => t + 1), 70);
+    return () => clearInterval(id);
+  }, [anySpin]);
+  return (
+    <View style={f.reels} accessibilityLabel={`Makaralar: ${grid.map((col) => col.map((s) => SYMBOLS[s].name).join(', ')).join(' | ')}`}>
+      {grid.map((col, reel) => (
+        <FortuneReel key={reel} reel={reel} col={col} spinning={spinning[reel]} tick={spinning[reel] ? tick : 0} lit={lit} />
+      ))}
+    </View>
+  );
+});
+
+const FortuneReel = memo(function FortuneReel({ reel, col, spinning, tick, lit }: { reel: number; col: Sym[]; spinning: boolean; tick: number; lit: Set<string> }) {
+  return (
+    <View style={f.reel}>
+      {col.map((sym, row) => {
+        const shown = spinning ? blur(reel, row, tick) : sym;
+        const on = lit.has(`${reel}-${row}`);
+        return (
+          <View key={row} style={[f.cell, on && f.cellOn, !spinning && shown === WILD && f.cellWild]}>
+            <Text style={[f.sym, spinning && f.symBlur]}>{SYMBOLS[shown].emoji}</Text>
+            {!spinning && (shown === WILD || shown === SCATTER) && <Text style={f.tag}>{shown === WILD ? 'WILD' : 'KASA'}</Text>}
+          </View>
+        );
+      })}
+    </View>
+  );
+});
 
 function Paytable({ lineBet }: { lineBet: number }) {
   return (
