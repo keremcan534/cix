@@ -86,6 +86,7 @@ describe('defaults are today', () => {
       invite_daily_cap: 10,
       casino_off: [],
       casino_open: [],
+      games_staff: [],
       casino_max_bet: 25_000,
       casino_daily_rounds: 0,
       rocket_house_pct: 60,
@@ -287,6 +288,7 @@ describe('defaults are today', () => {
       'invite_daily_cap',
       'casino_off',
       'casino_open',
+      'games_staff',
       'casino_max_bet',
       'casino_daily_rounds',
       'rocket_house_pct',
@@ -608,7 +610,7 @@ describe('save rules', () => {
     assert.match(t, /\+%10,0/);
     assert.match(impactOf('exchange_usd_try', 49.8, 45), /eski uygulamalar/);
     const off = impactOf('features_off', ['dm'], ['gifts', 'dm'], { env: { featuresOff: ['dm'] }, raw: ['gifts'] });
-    assert.match(off, /Yeni hediye gönderimi durur\. Eski uygulamalar "Bu özellik geçici olarak kapalı" mesajı görür\./);
+    assert.match(off, /Yeni hediye gönderimi \(Şanslı hediyeler dahil\) durur\. Eski uygulamalar "Bu özellik geçici olarak kapalı" mesajı görür\./);
     assert.match(off, /Sunucu ayarında kapalı kalır: Mesajlar/);
     assert.match(impactOf('campaign', null, validate('campaign', camp(), { now: NOW }), { now: NOW }), /^%20 kampanya "Bayram": 50\.000 jetonluk paket alan \+10\.000 kampanya jetonu alır\./);
     assert.match(impactOf('gifts_hidden', [], ['g1']), /Gizlenir: Gül/);

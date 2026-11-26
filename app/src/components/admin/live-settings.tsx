@@ -839,6 +839,13 @@ function RewardsCard({ kit }: { kit: Kit }) {
 }
 
 // --- Oyun Salonu ---------------------------------------------------------------------------------------------
+type GameState = 'on' | 'staff' | 'off';
+const GAME_STATES: [GameState, string][] = [
+  ['on', 'Açık'],
+  ['staff', 'Yalnız yönetici'],
+  ['off', 'Kapalı'],
+];
+const GAME_STATE_LABEL: Record<GameState, string> = { on: 'herkese açılsın', staff: 'yalnız yöneticilere açık olsun', off: 'herkese kapatılsın' };
 /**
  * Oyun Salonu (server/api/casino.mjs): a switch per game, the top stake and the daily limit. The odds are not here:
  * the installed app shows them. Rüzgâr Gülü and every game stop together with Acil durum's Oyunlar.
@@ -848,6 +855,10 @@ function CasinoCard({ kit }: { kit: Kit }) {
   const x = kit.get('casino_off');
   const options = (x.bounds.options as string[] | undefined) ?? [];
   const off = listOf(x.effective);
+  // Yalnız yöneticilere açık oyunlar (an older server has no such key).
+  const staffX = kit.get('games_staff');
+  const staff = staffX ? listOf(staffX.effective) : [];
+  const staffOptions = (staffX?.bounds.options as string[] | undefined) ?? [];
   // Who the coin games are for (an older server has no such key: the row is left out).
   const audience = kit.get('casino_open');
   const everyone = !!audience && listOf(audience.effective).includes('everyone');
@@ -866,7 +877,11 @@ function CasinoCard({ kit }: { kit: Kit }) {
   const reset: LiveChanges = {};
   for (const r of rows) if (r.x.value !== null) reset[r.key] = null;
   return (
-    <Card title="Oyun Salonu" footer={lastChange(x, ...(audience ? [audience] : []), ...rows.map((r) => r.x))} pill={<InvalidPill x={x.invalid ? x : audience?.invalid ? audience : rows.find((r) => r.x.invalid)?.x} />}>
+    <Card
+      title="Oyun Salonu ve oyunlar"
+      footer={lastChange(x, ...(audience ? [audience] : []), ...(staffX ? [staffX] : []), ...rows.map((r) => r.x))}
+      pill={<InvalidPill x={x.invalid ? x : staffX?.invalid ? staffX : audience?.invalid ? audience : rows.find((r) => r.x.invalid)?.x} />}
+    >
       <Text style={s.hint}>Turları sunucu oynar; oranlar uygulamada yazdığı gibidir ve buradan değişmez. Kapatılan oyunun yeni turu reddedilir, oyun bakiyesi kalır.</Text>
       {audience && (
         <ListGroup>
@@ -881,26 +896,32 @@ function CasinoCard({ kit }: { kit: Kit }) {
           />
         </ListGroup>
       )}
-      <ListGroup>
-        {options.map((id) => {
-          const on = !off.includes(id);
-          return (
-            <ListSwitch
-              key={id}
-              icon={on ? 'checkmark-circle-outline' : 'pause-circle-outline'}
-              tone={on ? 'success' : 'danger'}
-              title={kit.names.game?.(id) ?? id}
-              subtitle={on ? 'Açık' : 'Kapalı'}
-              value={on}
-              disabled={kit.locked}
+      {/* Every game the server plays (server/api/game-switch.mjs): open, for admins only, or off for everyone. An older
+          server has no admins-only list: its games are only on or off. */}
+      <Text style={s.hint}>Her oyun açık, yalnız yöneticilere açık ya da herkese kapalı olabilir. Sunucu eski uygulamalarda da uygular. Oda roketinin düğmesi kendi sayfasında.</Text>
+      {options.map((id) => {
+        const name = kit.names.game?.(id) ?? id;
+        const state: GameState = off.includes(id) ? 'off' : staff.includes(id) ? 'staff' : 'on';
+        return (
+          <View key={id} style={{ gap: space.xs }}>
+            <Text style={s.label}>{name}</Text>
+            <ChoiceChips<GameState>
+              value={state}
+              options={GAME_STATES.filter(([v]) => v !== 'staff' || !!staffX)}
               onChange={(v) => {
-                const next = options.filter((g) => (g === id ? !v : off.includes(g)));
-                kit.open(`${kit.names.game?.(id) ?? id} ${v ? 'açılsın' : 'kapatılsın'}`, () => ({ casino_off: next.length ? next : null }), v ? 'Geri dönüş' : 'Acil durum');
+                if (kit.locked || v === state) return;
+                const nextOff = options.filter((g) => (g === id ? v === 'off' : off.includes(g)));
+                const nextStaff = staffOptions.filter((g) => (g === id ? v === 'staff' : staff.includes(g)));
+                kit.open(
+                  `${name}: ${GAME_STATE_LABEL[v]}`,
+                  () => ({ casino_off: nextOff.length ? nextOff : null, ...(staffX ? { games_staff: nextStaff.length ? nextStaff : null } : {}) }),
+                  v === 'on' ? 'Geri dönüş' : 'Acil durum',
+                );
               }}
             />
-          );
-        })}
-      </ListGroup>
+          </View>
+        );
+      })}
       {rows.map((r) => (
         <View key={r.key}>
           <Field

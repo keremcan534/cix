@@ -1553,7 +1553,7 @@ export type DecorKey = 'room_decor_off' | 'room_bg_custom_price' | 'room_bg_cust
 export type RewardKey = 'rewards_off' | 'welcome_coins' | 'invite_coins' | 'invite_daily_cap';
 /** Oyun Salonu (server/api/live-registry.mjs, "Oyun Salonu"): games switched off, who the coin games are open to, the top stake, the daily limit,
  *  Canlı Yörünge's house share. */
-export type CasinoKey = 'casino_off' | 'casino_open' | 'casino_max_bet' | 'casino_daily_rounds' | 'rocket_house_pct';
+export type CasinoKey = 'casino_off' | 'casino_open' | 'games_staff' | 'casino_max_bet' | 'casino_daily_rounds' | 'rocket_house_pct';
 /** 1v1 and Eşleşme (server/api/live-registry.mjs, "Birebir ve eşleşme"): whole numbers. */
 export type OneOnOneKey =
   | 'dm_price'

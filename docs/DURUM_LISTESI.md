@@ -266,7 +266,7 @@ Güncelleme 7'de geldi; 20 Kasım'da "Muzip hediyeler" ile değişti (aşağıda
 | 24 | Mikrofon kuyruğu (el kaldırma) | Çalışıyor | Başta kapalı, Oda ayarlarından açılıyor |
 | 25 | Mikrofon değişikliği herkeste aynı | Telefonda denenmeli | |
 | 26 | Küçük mikrofon, büyüyen sohbet | Çalışıyor | |
-| 27 | Rüzgâr Gülü odada | Seviyeyle açılır | Cömertlik Lv.2'de açılır. Düğmesi örnekteki gibi sağ altta |
+| 27 | Rüzgâr Gülü odada | Seviyeyle açılır | Cömertlik Lv.2'de açılır. Düğmesi örnekteki gibi sağ altta. 26 Kasım: her oyun gibi Canlı ayarlar › Oyun Salonu'ndan kapanır ya da yalnız yöneticilere açılır; yeni APK'da kısayol ve menü kalkar, eski APK'da dokununca "Rüzgâr Gülü şu an kapalı" ([`OYUN_MERKEZI.md`](OYUN_MERKEZI.md) › Oyun anahtarları) |
 | 28 | Uğurlu hediyeler ve yönetimi | Seviyeyle açılır | Cömertlik Lv.2 ve 18 yaş gerekir. Yeni APK'da rafta kazanç tutarı ve kasa ayrıntısı yazmaz, yalnız nasıl oynanır ve olasılık tablosu (Güncelleme 7). Yönetimi: Yönetim sitesinde Uygulama › Şanslı hediye ayarı; yeni APK'da Ayarlar › Yönetim siteyi açar (eski APK'larda Ayarlar › Yönetim › Uğurlu hediyeler, sadece yönetici hesaplar). Güncelleme 7 madde 10 (sahip kararı, hukuk sorusu açık): panelden yeni paket eklenebilir, her pakete ikon ve video verilebilir (sunucu hazır; panel sayfası ayrıca yapılacak). Yeni APK ikonu gösterir, kendi gönderiminde önce videoyu sonra sonucu oynatır, gösterdiği fiyat ya da olasılık değiştiyse gönderim reddedilir ve jeton düşmez; eski APK yeni paketi varsayılan resimle gösterir, videoyu oynatmaz. Videolu Şanslı gönderimi telefonda denenmeli |
 
 ## Belge 2: Güncelleme 2

@@ -13,7 +13,7 @@ Bunlar olmadan ilgili mühendislik işi bitemez. Sıra, yayına etkisine göre.
 
 | # | Ne | Neden gerekli | Durum |
 |---|---|---|---|
-| 1 | **Şans ve para kararları:** Uğurlu hediye, Oyun Salonu oyunları, Jeton Noktası, para çekme ve ajans/davet komisyonları ilk sürümde olacak mı? | Satın alınan jetonla şans çekilişi ve nakde dönen kazanç; mağazalar bunu gerçek paralı kumar sayar, Türkiye'de lisans gerekir. Önerimiz: ilk sürümde kapalı. Hukuk görüşü alınmalı. **19 Kasım 2026, sahip kararı:** hukuk görüşü beklenmeden Şanslı hediye genişletildi (panelden yeni paket, paketlere ikon ve video; [`LUCKY_HEDIYE.md`](LUCKY_HEDIYE.md)). Soru hâlâ açık ve risk büyüdü; yayından önce avukat görüşü şart, gerekirse paketler panelden kapatılır. | ⛔ |
+| 1 | **Şans ve para kararları:** Uğurlu hediye, Oyun Salonu oyunları, Jeton Noktası, para çekme ve ajans/davet komisyonları ilk sürümde olacak mı? | Satın alınan jetonla şans çekilişi ve nakde dönen kazanç; mağazalar bunu gerçek paralı kumar sayar, Türkiye'de lisans gerekir. Önerimiz: ilk sürümde kapalı. Hukuk görüşü alınmalı. **19 Kasım 2026, sahip kararı:** hukuk görüşü beklenmeden Şanslı hediye genişletildi (panelden yeni paket, paketlere ikon ve video; [`LUCKY_HEDIYE.md`](LUCKY_HEDIYE.md)). Soru hâlâ açık ve risk büyüdü; yayından önce avukat görüşü şart, gerekirse paketler panelden kapatılır. **26 Kasım 2026:** her oyun (Oyun Salonu, Yörünge, Rüzgâr Gülü, Şanslı hediyeler, oda oyunları) Canlı ayarlar › Oyun Salonu › Kapalı oyunlar / Yalnız yöneticilere açık oyunlar ile sunucudan kapanır; eski APK'larda da ([`OYUN_MERKEZI.md`](OYUN_MERKEZI.md) › Oyun anahtarları). Oyunların kodu mağaza sürümünde kalır (sahiplerin seçimi): incelemede beyan edilmeli, bkz. §3. | ⛔ |
 | 2 | **Alan adı** | Sunucu adresi, web sürümü, paylaşım bağlantıları, destek e-postası, gizlilik politikası adresi. Şu an geçici `sslip.io` adresi kullanılıyor. | ⛔ |
 | 3 | **Apple Developer** (şirket adına) ve **Google Play Console** (şirket adına) hesapları | Mağazaya yükleme, uygulama içi satın alma, Apple ile giriş. Bireysel Play hesaplarında üretime çıkmadan önce kapalı test şartı olabilir; şirket hesabı önerilir. | ⛔ |
 | 4 | **Expo hesabı** (EAS) | Mağaza derlemesi, gerçek imza, telefonda gerçek ses için development build, push bildirimleri, uzaktan güncelleme. Ücretsiz planla başlanabilir. | ⛔ |
@@ -82,6 +82,7 @@ Bunlar olmadan ilgili mühendislik işi bitemez. Sıra, yayına etkisine göre.
 | Uygulama içi hesap silme | ✅ sunucu · ⏳ uygulama bağlantısı |
 | Web'den hesap silme bağlantısı (Play şartı) | ⏳ alan adıyla |
 | İncelemeci hesabı, inceleme notları, ekran görüntüleri | ⏳ |
+| **Oyunların beyanı:** inceleme notlarında ve yaş anketinde uygulamadaki bütün oyunlar yazılır (Oyun Salonu, Yörünge, Rüzgâr Gülü, Şanslı hediyeler, Oda roketi, oda oyunları), sunucudan kapalı olanlar da. Şans oyunları yalnız onaylı olduğu yer ve hesaplar için açılır; inceleme sırasında kapatıp sonra açmak yasak (Apple 2.3.1 gizli özellik, Google Play aldatıcı davranış), hesap kapatmaya kadar gider. Oyunu sunucudan kod (WebView/HTML5) olarak getirmek de aynı sayılır. | ⏳ |
 | TestFlight ve Play kapalı test | ⏳ |
 
 ### Google Play ile jeton satın alma

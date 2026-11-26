@@ -1,7 +1,7 @@
 // Şanslı hediyeler: gifts with a draw, played on the server (the app shows them: app/src/lib/lucky.ts).
 //
-//   GET  /api/lucky                                          → { version, gifts, announceFrom, share, counts, needLevel,
-//                                                               allowed, minAge, gameCoins, mine }
+//   GET  /api/lucky                                          → { version, active, gifts, announceFrom, share, counts,
+//                                                               needLevel, allowed, minAge, gameCoins, mine }
 //        each gift also { open, since, icon, fx }: since, the version its price and odds are as now from; icon and fx,
 //        its own picture and video from the panel (lucky-art.mjs; null: none)
 //   POST /api/lucky/send { giftId, to: [ids], count, times?, room?, ref, named?, price?, version? } → { send, user, replay }
@@ -25,7 +25,9 @@
 // edit is audited: audit_events 'lucky.config' with the settings before and after and the panel user (and, as before,
 // sanction_audit_logs action lucky_config with a summary). Adding a package (up to 20, Güncelleme 7 madde 10) or taking
 // one out is a save like any other: the version grows, phones read the packages again when the sheet opens, and a
-// send of a package that is gone is refused (400, code lucky_closed) before anything moves.
+// send of a package that is gone is refused (400, code lucky_closed) before anything moves. All of them stop together
+// with Acil durum › Hediye or Oyunlar (503) and with Canlı ayarlar › Kapalı oyunlar / Yalnız yöneticilere açık oyunlar
+// (game-switch.mjs: 409, code lucky_closed; GET answers active: false and no package).
 // A win is announced to everyone with the app open (live-line.mjs lineWin, the banner on top of every room) from the
 // live setting lucky_announce_min_coins up (0: every win); with the sender's name only when the send says `named`.
 import crypto from 'node:crypto';
@@ -36,6 +38,7 @@ import { GIFT_COUNTS } from './catalog.mjs';
 import { HttpError, REF, ageOf, auth, blockedBetween, clientIp, db, filesOut, limit, readJson, selfUser, tx, userId } from './core.mjs';
 import { ROOM, announceGift, liveKitRoom } from './gifts.mjs';
 import { DEFAULT_CONFIG, MIN_AGE, ODDS_TOTAL, SHARE_PCT, checkConfig, checkShownLucky, drawMult, maxMult, shareDiamonds, shareOf, shownOf, sinceOf, withSince } from './lucky-rules.mjs';
+import { assertLiveOn, gameShut } from './game-switch.mjs';
 import { luckyArtAdmin, luckyArtOf, luckyArtRoutes, refreshLuckyArt } from './lucky-art.mjs';
 import { announceRoom } from './live.mjs';
 import { lineWin } from './live-line.mjs';
@@ -139,9 +142,12 @@ export const luckyRoutes = {
       db.query('SELECT * FROM lucky_sends WHERE user_id = $1 ORDER BY id DESC LIMIT 20', [me.id]),
     ]);
     const { config } = cur;
+    // Switched off, or kept for admins (game-switch.mjs): no package to show, an older app's shelf stays empty.
+    const shut = gameShut('lucky', me);
     return {
       version: cur.version,
-      gifts: config.gifts.filter((g) => g.enabled).map((g) => ({ ...g, since: sinceOf(g, cur.version), open: paid + g.price * maxMult(g) <= config.dailyPayoutLimit, ...luckyArtOf(g.id) })),
+      active: !shut,
+      gifts: (shut ? [] : config.gifts).filter((g) => g.enabled).map((g) => ({ ...g, since: sinceOf(g, cur.version), open: paid + g.price * maxMult(g) <= config.dailyPayoutLimit, ...luckyArtOf(g.id) })),
       announceFrom: config.announceFrom,
       share: shareOf(config),
       counts: LUCKY_COUNTS,
@@ -182,6 +188,11 @@ export const luckyRoutes = {
 
     const before = await seen();
     if (before) return answer(before, true);
+    // A Şanslı hediye is a gift and a game: Acil durum's Hediye and Oyunlar both stop it, and so do Kapalı oyunlar
+    // and Yalnız yöneticilere açık oyunlar (game-switch.mjs). After the replay: a send that went through keeps its answer.
+    assertLiveOn('gifts');
+    assertLiveOn('games');
+    if (gameShut('lucky', me)) throw Object.assign(new HttpError(409, 'Şanslı hediyeler şu an kapalı'), { extra: { code: 'lucky_closed' } });
     if (!me.birth_date || ageOf(me.birth_date) < MIN_AGE) throw new HttpError(403, `Şanslı hediyeler ${MIN_AGE} yaş ve üzeri içindir`);
     const need = casinoNeed();
     if ((await wealthPoints(db, me.id)) < need.points) throw new HttpError(403, `Şanslı hediyeler Cömertlik Lv.${need.level} ve üstü için`);

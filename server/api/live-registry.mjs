@@ -15,6 +15,7 @@
 import { COIN_VALUE_TL, EXCHANGE, GIFTS, PACKS, PAYOUT_USD_TRY, SHOP, WHOLESALE_TL, WITHDRAW, exchangeCoins, packsSetUp, payoutTl, tlOfCoins, wholesaleTl } from './catalog.mjs';
 import { DAILY_ROUNDS as CASINO_DAILY_ROUNDS, GAMES as CASINO_GAMES, STAKES as CASINO_STAKES } from './casino-rules.mjs';
 import { REMINDER_KINDS, REMINDER_LABEL } from './event-rules.mjs';
+import { TABLE_GAMES } from './room-games-rules.mjs';
 import { CHEST_MIN_CONTRIBUTION, FAMILY_CHESTS, FAMILY_TASKS, FAMILY_THEMES } from './family-rules.mjs';
 import { MEDAL_RULES, TITLE_RULES } from './profile-rules.mjs';
 import { HOST_BONUS_DEFAULT } from './host-bonus-rules.mjs';
@@ -24,7 +25,7 @@ import { LEVELS as BOND_LEVELS, levelsOf as bondLevelsOf } from './bond-rules.mj
 import { AUTO_CHAT, AUTO_PARTS, AUTO_PART_LABEL, AUTO_PART_OFF, AUTO_TEXTS, NOTICE_CATEGORIES, NOTICE_LABEL, linesOf } from './auto-chat-rules.mjs';
 import { GLOBAL_GIFT_AMOUNTS } from './global-gift-rules.mjs';
 
-/** Every feature that can be switched off (features.mjs ROUTES). `games` is mostly in the app; Rüzgâr Gülü is on the server. */
+/** Every feature that can be switched off (features.mjs ROUTES). `games` stops every game the server plays (game-switch.mjs). */
 export const FEATURES = ['gifts', 'purchases', 'topup', 'exchange', 'jeton', 'games', 'dm', 'rooms', 'withdraw', 'shop'];
 export const FEATURE_LABEL = {
   gifts: 'Hediye',
@@ -45,6 +46,23 @@ export const FEATURE_LABEL = {
 export const MONEY_STOP = ['gifts', 'topup', 'exchange', 'jeton', 'withdraw', 'games'];
 /** What a switched-off feature's calls answer (503), old apps included. */
 export const OFF_MESSAGE = 'Bu özellik geçici olarak kapalı';
+
+/**
+ * Every game a server switch reaches (Canlı ayarlar › Oyun Salonu: Kapalı oyunlar, Yalnız yöneticilere açık oyunlar;
+ * game-switch.mjs): Oyun Salonu's games (Canlı Yörünge is `rocket`), Rüzgâr Gülü, Şanslı hediyeler, then the free room
+ * tables. `chance`: played with coins for a prize drawn by chance. Oda roketi keeps its own switch (room-rocket.mjs).
+ * Ids never change: stored settings and older apps hold them.
+ */
+export const SWITCH_GAMES = Object.freeze([
+  ...CASINO_GAMES.map((g) => ({ id: g.id, name: g.name, label: g.name, chance: true })),
+  { id: 'wheel', name: 'Rüzgâr Gülü', label: 'Rüzgâr Gülü', chance: true },
+  { id: 'lucky', name: 'Şanslı hediyeler', label: 'Şanslı hediyeler', chance: true },
+  ...Object.entries(TABLE_GAMES).map(([id, m]) => ({ id, name: m.name, label: `${m.name} (ücretsiz oda oyunu)`, chance: false })),
+]);
+const GAME_LABELS = Object.fromEntries(SWITCH_GAMES.map((g) => [g.id, g.label]));
+const CHANCE_GAMES = new Set(SWITCH_GAMES.filter((g) => g.chance).map((g) => g.id));
+/** A switchable game's name as messages say it ("Ludo şu an kapalı"); the id when unknown. */
+export const gameName = (id) => SWITCH_GAMES.find((g) => g.id === id)?.name ?? id;
 
 /** A value the registry refuses, with the Turkish reason; live-settings.mjs answers it as a 400. */
 export class LiveError extends Error {}
@@ -122,6 +140,8 @@ export function defaultsOf(e = process.env) {
     // The coin games (Oyun Salonu, Rüzgâr Gülü) are for admin accounts only until they are opened to everyone
     // (the owner's decision). CASINO_OPEN=everyone in .env opens them without a row (the tests' API runs so).
     casino_open: e.CASINO_OPEN === 'everyone' ? ['everyone'] : [],
+    // No game is kept for admin accounts only beyond casino_open (game-switch.mjs).
+    games_staff: [],
     // Canlı Yörünge (rocket-live.mjs) keeps the house rule of every coin game until the owner moves it.
     rocket_house_pct: ROCKET_HOUSE_PCT,
     // Oda süslemesi (room-decor.mjs): both paid parts on, Özel süsleme 5.000 jeton for 30 days.
@@ -694,12 +714,12 @@ const added = (before, after) => after.filter((x) => !before.includes(x));
 
 /** The sentence each newly switched-off feature adds to the preview. */
 const OFF_EFFECT = {
-  gifts: 'Yeni hediye gönderimi durur.',
+  gifts: 'Yeni hediye gönderimi (Şanslı hediyeler dahil) durur.',
   purchases: 'Jeton satın alma durur. Ödemesi alınmış satın almalar açınca tekrar denenir; 3 günden uzun kapalı kalırsa Google parayı iade eder.',
   topup: 'Test jeton yüklemesi durur.',
   exchange: "Elmas çevirme ve Jeton Noktası'na bozdurma durur.",
   jeton: 'Jeton Noktası aktarımları ve toptan satış durur.',
-  games: 'Rüzgâr Gülü ve oyunlar durur.',
+  games: 'Oyun Salonu, Yörünge, Rüzgâr Gülü, Şanslı hediyeler ve oda oyunları durur.',
   dm: 'Yeni özel mesaj gönderilemez.',
   rooms: 'Yeni oda açılamaz, odalara girilemez.',
   withdraw: 'Yeni para çekme talebi alınmaz; bekleyen talepler sürer.',
@@ -1214,22 +1234,22 @@ export const REGISTRY = {
   },
   ...rewardEntries(),
   // Oyun Salonu (casino.mjs). The odds are not here: the installed app shows them (casino-rules.mjs).
+  // Kapalı oyunlar and Yalnız yöneticilere açık oyunlar reach every game the server plays (SWITCH_GAMES, game-switch.mjs).
   casino_off: {
     field: 'casinoOff',
     group: 'Oyun Salonu',
     label: 'Kapalı oyunlar',
-    help: 'Kapatılan oyun Oyun Salonu’ndan çıkar ve sunucu yeni turunu reddeder; oyun bakiyesi ve geçmiş kalır. Rüzgâr Gülü dahil bütün oyunları durdurmak için Acil durum’da Oyunlar’ı kapat.',
+    help: 'Kapatılan oyun herkesten (yöneticiler dahil) gizlenir; sunucu yeni turu, Şanslı hediye gönderimini ve yeni masayı reddeder, eski uygulamalarda da. Oyun bakiyesi ve geçmiş kalır; başlamış bir oda masası elini bitirebilir. Hepsini birden durdurmak için Acil durum’da Oyunlar’ı kapat. Oda roketinin düğmesi kendi sayfasında.',
     type: 'set',
-    bounds: { options: CASINO_GAMES.map((g) => g.id), labels: Object.fromEntries(CASINO_GAMES.map((g) => [g.id, g.name])), max: CASINO_GAMES.length },
+    bounds: { options: SWITCH_GAMES.map((g) => g.id), labels: GAME_LABELS, max: SWITCH_GAMES.length },
     parse: (v) => setOf(v, REGISTRY.casino_off.bounds, 'Kapalı oyunlar'),
     big: () => false,
     impact(before, after) {
-      const name = (id) => CASINO_GAMES.find((g) => g.id === id)?.name ?? id;
       const off = added(before, after);
       const on = added(after, before);
       const out = [];
-      if (off.length) out.push(`Kapanır: ${some(off.map(name))}. Yeni tur oynanamaz; oyun bakiyesi ve geçmiş kalır.`);
-      if (on.length) out.push(`Yeniden açılır: ${some(on.map(name))}.`);
+      if (off.length) out.push(`Kapanır: ${some(off.map(gameName))}. Yeni tur oynanamaz; oyun bakiyesi ve geçmiş kalır.`);
+      if (on.length) out.push(`Yeniden açılır: ${some(on.map(gameName))}.`);
       return out.join(' ') || 'Görünür bir etkisi yok.';
     },
   },
@@ -1249,6 +1269,25 @@ export const REGISTRY = {
         : after.includes('everyone')
           ? 'Oyun Salonu ve Rüzgâr Gülü, Cömertlik Lv.2 ve üstü herkese açılır.'
           : 'Oyun Salonu ve Rüzgâr Gülü yalnızca yönetici hesaplarına görünür; diğer herkeste gizlenir ve yeni tur reddedilir. Oyun bakiyeleri ve geçmiş kalır.',
+  },
+  games_staff: {
+    field: 'gamesStaff',
+    group: 'Oyun Salonu',
+    label: 'Yalnız yöneticilere açık oyunlar',
+    help: 'Seçilen oyunu yalnız yönetici hesapları görür ve oynar; diğer herkese kapalı görünür ve sunucu reddeder. Yeni bir oyunu herkese açmadan önce denemek için. Oyun Salonu ve Rüzgâr Gülü ayrıca “Jetonlu oyunlar herkese açık” kapalıyken zaten yalnız yöneticilere açıktır.',
+    type: 'set',
+    bounds: { options: SWITCH_GAMES.map((g) => g.id), labels: GAME_LABELS, max: SWITCH_GAMES.length },
+    parse: (v) => setOf(v, REGISTRY.games_staff.bounds, 'Yalnız yöneticilere açık oyunlar'),
+    // A game of chance leaving the list opens to every member: confirmed twice, as opening the coin games is.
+    big: (before, after) => before.some((id) => CHANCE_GAMES.has(id) && !(after ?? []).includes(id)),
+    impact(before, after) {
+      const staff = added(before, after);
+      const open = added(after, before);
+      const out = [];
+      if (staff.length) out.push(`Yalnız yöneticilere açık: ${some(staff.map(gameName))}. Diğer herkese kapalı görünür, yeni tur reddedilir.`);
+      if (open.length) out.push(`Herkese açılır (Kapalı oyunlar’da değilse): ${some(open.map(gameName))}.`);
+      return out.join(' ') || 'Görünür bir etkisi yok.';
+    },
   },
   casino_max_bet: {
     field: 'casinoMaxBet',
@@ -1403,7 +1442,7 @@ const readOnlySet = (xs) => {
  *   { v, featuresOff: Set, notice, minVersion, adminSite, giftsHidden: Set, shopHidden: Set, packsHidden: Set, campaign, usdTry, withdrawMax,
  *     withdrawWeekly, otpPerHour, dmPrice, callVoice, callVideo, callFree, callSeconds, callPlainVoice, callPlainVideo,
  *     matchVoice, matchVideo, callChargeAfter, callEarnAfter, matchFree, matchSeconds, greetDaily, featuredMsg, featuredVoice, featuredVideo, featuredGiftCoins, heartVoice,
- *     heartVideo, heartMsg, heartMsgDaily, heartGrace, heartHalf, backpackCallTask, rewardsOff: Set, welcomeCoins, inviteCoins, inviteDailyCap, casinoOff: Set, casinoOpen: Set, casinoMaxBet,
+ *     heartVideo, heartMsg, heartMsgDaily, heartGrace, heartHalf, backpackCallTask, rewardsOff: Set, welcomeCoins, inviteCoins, inviteDailyCap, casinoOff: Set, casinoOpen: Set, gamesStaff: Set, casinoMaxBet,
  *     casinoDailyRounds, rocketHousePct, roomDecorOff: Set, roomBgCustomPrice, roomBgCustomDays, roomStaffAwayMinutes, bossSeatCoins,
  *     bossSeatMinutes, eventMinRoomLevel, eventMinLead, eventMaxMinutes, eventMaxCapacity, eventGrace, eventStrikeLimit,
  *     eventBlockDays, eventRemindersOff: Set, luckyAnnounceMinCoins, globalGiftMinPrice, globalGiftGapSeconds, invalid }
@@ -1452,6 +1491,7 @@ export function snapshotOf(rows = [], e = process.env, { v = 0 } = {}) {
     ...Object.fromEntries(Object.entries(REWARD_AMOUNTS).map(([k, x]) => [x.field, val(k)])),
     casinoOff: readOnlySet(val('casino_off')),
     casinoOpen: readOnlySet(val('casino_open')),
+    gamesStaff: readOnlySet(val('games_staff')),
     casinoMaxBet: val('casino_max_bet'),
     casinoDailyRounds: val('casino_daily_rounds'),
     rocketHousePct: val('rocket_house_pct'),

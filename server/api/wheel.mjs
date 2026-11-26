@@ -14,6 +14,8 @@
 import crypto from 'node:crypto';
 
 import { HttpError, REF, auth, db, env, limit, move, readJson, selfUser, tx } from './core.mjs';
+import { assertGameOpen, gameShut } from './game-switch.mjs';
+import { GAMES as CASINO_GAMES } from './casino-rules.mjs';
 import { live } from './live-settings.mjs';
 import { casinoNeed, topPoints, withOffsets } from './levels.mjs';
 import { TEST_ADMIN, withTopFor } from './test-admin.mjs';
@@ -44,6 +46,14 @@ const STAFF_ONLY = 'Jetonlu oyunlar şu an yalnızca yöneticilere açık';
 export function needPaidGames(user, s = live()) {
   if (!paidGamesOpen(user, s)) throw new HttpError(403, STAFF_ONLY);
 }
+/** Every game behind casino_open: Oyun Salonu's (Canlı Yörünge among them) and this wheel. */
+const PAID_IDS = [...CASINO_GAMES.map((g) => g.id), 'wheel'];
+/**
+ * GET /api/me paidGames: the coin games are open to this account and at least one of them isn't shut
+ * (game-switch.mjs). With every one of them off, an installed app hides Oyun Salonu and Rüzgâr Gülü altogether, the
+ * oldest APKs too (they read only this).
+ */
+export const paidGamesShown = (user, s = live()) => paidGamesOpen(user, s) && PAID_IDS.some((id) => !gameShut(id, user, s));
 /** The coins one person may play a day; 0 (WHEEL_DAILY unset) is no limit. */
 export const DAILY = (() => {
   const n = Number(env.WHEEL_DAILY ?? 0);
@@ -129,6 +139,9 @@ export const wheelRoutes = {
       playedToday: played,
       needLevel: casinoNeed().level,
       allowed: paidGamesOpen(me) && points >= casinoNeed().points,
+      // false: switched off or kept for admins (game-switch.mjs); a spin is refused. An older app shows the wheel and
+      // the refusal's sentence.
+      active: !gameShut('wheel', me),
       gameCoins: Number(me.game_coins),
       winners: winners.rows.map((r) => ({ ...person(r), tier: r.tier, payout: Number(r.payout), jackpot: Number(r.jackpot), best: r.best_milli, at: r.created_at })),
       board: board.rows.map((r) => ({ ...person(r), total: Number(r.total) })),
@@ -154,6 +167,7 @@ export const wheelRoutes = {
 
     const before = await seen();
     if (before) return answer(before, true);
+    assertGameOpen('wheel', me);
     needPaidGames(me);
     const need = casinoNeed();
     if ((await wealthPoints(db, me.id)) < need.points) throw new HttpError(403, `Rüzgâr Gülü Cömertlik Lv.${need.level} ve üstü için`);

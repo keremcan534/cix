@@ -36,6 +36,9 @@ describe('app config', () => {
       // Canlı ayarlar › Yönetim sitesi not saved: the deploy's ADMIN_SITE, so the staff's Yönetim opens the site.
       adminSite: 'https://panel.ornek.com',
       featuresOff: ['gifts', 'topup', 'dm', 'rooms', 'exchange', 'jeton', 'purchases', 'withdraw'],
+      // Canlı ayarlar › Kapalı oyunlar and Yalnız yöneticilere açık oyunlar (game-switch.mjs): none saved.
+      gamesOff: [],
+      gamesStaff: [],
       v: 0,
       // The harness turns on development sign-in only; e-mail, Google, SMS and WhatsApp are unset.
       signIn: { dev: true, google: false, email: false, phone: false },

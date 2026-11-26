@@ -12,6 +12,9 @@ import { Card, Header } from '@/components/ui';
 import type { CasinoGame } from '@/data/games';
 import { resolve } from '@/data/rbac';
 import { updateCasino, updateRoomGame, useGames } from '@/lib/games';
+import { liveMode } from '@/lib/live';
+import { useRemoteConfig } from '@/lib/remote-control';
+import type { RemoteConfig } from '@/lib/remote-config';
 import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 
@@ -57,6 +60,20 @@ function WinPreview() {
   );
 }
 
+/** A game's state on the server (Canlı ayarlar › Oyun Salonu; server/api/game-switch.mjs), as the config says it. */
+const serverState = (config: RemoteConfig, id: string) =>
+  config.featuresOff.includes('games') ? 'Kapalı (Acil durum › Oyunlar)' : config.gamesOff.includes(id) ? 'Kapalı, herkese' : config.gamesStaff.includes(id) ? 'Yalnız yöneticilere açık' : 'Açık';
+
+/**
+ * A live build: the switches here change only this phone's copy (a trial of the screens). Who may play a game is the
+ * server's: its state is shown instead of the Aktif switch, with where to change it.
+ */
+function ServerState({ id }: { id: string }) {
+  const s = useStyles();
+  const config = useRemoteConfig();
+  return <Text style={s.label}>Sunucuda: {serverState(config, id)}</Text>;
+}
+
 function Row({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
   const s = useStyles();
   return (
@@ -87,6 +104,7 @@ export default function GameAdmin() {
   const { roomGames, casino, history, bank } = useGames();
   const [tab, setTab] = useState<'room' | 'casino'>('room');
   const can = resolve(rbac, 'me', 'games.manage', { type: 'platform' });
+  const live = liveMode();
   const { colors } = useTheme();
   const s = useStyles();
 
@@ -112,13 +130,21 @@ export default function GameAdmin() {
         />
       </View>
       <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 40 }}>
+        {live && (
+          <Card style={{ gap: 4 }}>
+            <Text style={s.title}>Oyunu açıp kapatmak</Text>
+            <Text style={s.dim}>
+              Bir oyunu herkes için kapatmak ya da yalnız yöneticilere açmak: Yönetim › Canlı ayarlar › Oyun Salonu (finans panelinde Canlı ayarlar › Oyun ve şanslı hediyeler). Sunucu eski uygulamalarda da uygular. Bu ekrandaki diğer ayarlar yalnız bu telefonda denemedir.
+            </Text>
+          </Card>
+        )}
         {tab === 'room' &&
           roomGames.map((g) => (
             <Card key={g.id} style={{ gap: 8 }}>
               <GameTitle id={g.id} emoji={g.emoji}>
                 {g.name} <Text style={s.dim}>· {g.provider} · v{g.version} · {g.phase}. aşama</Text>
               </GameTitle>
-              <Row label="Aktif" value={g.active} onChange={(v) => updateRoomGame(g.id, { active: v })} />
+              {live ? <ServerState id={g.id} /> : <Row label="Aktif" value={g.active} onChange={(v) => updateRoomGame(g.id, { active: v })} />}
               <Text style={s.label}>Maksimum oyuncu</Text>
               <Chips value={g.maxPlayers} options={[2, 4, 6, 10, 20].filter((n) => n >= g.minPlayers).map((n) => [n, String(n)] as [number, string])} onChange={(v) => updateRoomGame(g.id, { maxPlayers: v })} />
               <Text style={s.label}>Odada kim başlatır?</Text>
@@ -145,7 +171,7 @@ export default function GameAdmin() {
                 <GameTitle id={g.id} emoji={g.emoji}>
                   {g.name} <Text style={s.dim}>· {g.provider}</Text>
                 </GameTitle>
-                <Row label="Aktif" value={g.active} onChange={(v) => updateCasino(g.id, { active: v })} />
+                {live ? <ServerState id={g.id} /> : <Row label="Aktif" value={g.active} onChange={(v) => updateCasino(g.id, { active: v })} />}
                 <Text style={s.label}>Minimum VIP seviyesi</Text>
                 <Chips value={g.minWealth} options={[2, 3, 5, 10].map((n) => [n, `Cömertlik Lv.${n}`] as [number, string])} onChange={(v) => updateCasino(g.id, { minWealth: v })} />
                 <Row label="Profildeki Oyun Salonu'ndan" value={g.fromProfile} onChange={(v) => updateCasino(g.id, { fromProfile: v })} />

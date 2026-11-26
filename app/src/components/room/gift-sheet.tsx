@@ -25,6 +25,7 @@ import { BOND_KINDS, bondGiftMode, bondPointsOf, type RoomBond } from '@/data/bo
 import { GIFTS, isBondGift, userById, type Gift, type GiftCat } from '@/data/mock';
 import { luckyShare, pctOf } from '@/data/rules';
 import { bagCounts, bagLabel, bagNeed as needOf, bagShort as shortOf } from '@/lib/backpack';
+import { useGameShut } from '@/lib/game-switch';
 import { gamblingLevelOk } from '@/lib/games';
 import { pressHaptic, tapHaptic } from '@/lib/haptics';
 import { showAlert } from '@/lib/alert';
@@ -184,8 +185,10 @@ export function GiftSheet({
   // The admins' gifts (Yönetim › Hediyeler) lead their shelves; then the compiled ones the server still lists.
   const shown = roomGiftShelf(catalog);
   const inBag = bagGifts(GIFTS, catalog);
-  // Şanslı is a game of chance: no shelf below the gambling level. Live: the server draws and pays (lib/live/lucky).
-  const luckyShelf = gamblingLevelOk(wealthLevel);
+  // Şanslı is a game of chance: no shelf below the gambling level, nor while the server has it shut (lib/game-switch).
+  // Live: the server draws and pays (lib/live/lucky).
+  const shut = useGameShut();
+  const luckyShelf = gamblingLevelOk(wealthLevel) && !shut('lucky');
   // Live: the packages, odds and today's limit as the server has them, read each time the sheet opens.
   useEffect(() => {
     if (visible && luckyShelf && liveMode()) void refreshLucky().catch(() => {});
