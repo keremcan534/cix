@@ -38,6 +38,7 @@ import { BOT_LINES, DM_PRICE, FOLLOWS_ME, type Conversation, type EventShareCard
 import { openEvents } from '@/components/events/open';
 import { whenText } from '@/lib/events';
 import { messageTime } from '@/data/messages-ui';
+import { QUALITY_MESSAGE, checkQuality } from '@/lib/message-quality';
 import { showAlert } from '@/lib/alert';
 import { copyText } from '@/lib/clipboard';
 import { checkInteraction } from '@/lib/interaction';
@@ -331,6 +332,8 @@ export function ChatThread({
     // coin is spent or a bubble is added, and the text stays in the input. Stickers are catalogue tokens.
     const refusal = sticker ? null : messageRefusal(thread, text, 'dm');
     if (refusal) return setRefused(refusal);
+    // Spam (owners, 26 Nov 2026): one letter or digit, a run of one character (lib/message-quality, the server's rule).
+    if (!sticker && !checkQuality(text).ok) return showAlert('Mesaj gönderilemedi', QUALITY_MESSAGE);
     // Mutual follow chats are free; otherwise each message costs coins (price shown before sending). A real
     // person's message is paid on the server with the message; a balance that clearly can't pay is told here.
     if (!mutual && (real ? coins < price : !spendCoins(DM_PRICE, `Mesaj: ${user.name}`))) {
