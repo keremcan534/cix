@@ -49,7 +49,10 @@ export function RoomMenuSheet({ visible, onClose, sections }: { visible: boolean
               <View style={[styles.grid, s.alignEnd && { justifyContent: 'flex-end' }]}>
                 {s.items.map((it, i) => {
                   const hue = it.hue ?? it.colors?.[0] ?? hueAt(i);
+                  // "Yakında": listed, faded, and a tap does nothing (owners, 26 Nov 2026: Şanslı çanta).
+                  const soon = it.badge === 'SOON';
                   const press = () => {
+                    if (soon) return;
                     onClose();
                     it.onPress();
                   };
@@ -57,8 +60,9 @@ export function RoomMenuSheet({ visible, onClose, sections }: { visible: boolean
                     <Tile key={it.key} item={it} hue={hue} index={i} onPress={press} />
                   ) : (
                     <View key={it.key} style={styles.cellBox}>
-                    <PressableScale style={styles.cell} accessibilityLabel={it.label} onPress={press}>
+                    <PressableScale style={styles.cell} accessibilityLabel={soon ? `${it.label}, yakında` : it.label} accessibilityState={{ disabled: soon }} onPress={press}>
                       <View>
+                        <View style={soon ? { opacity: 0.4 } : undefined}>
                         {s.variant === 'tool' ? (
                           <View style={[styles.tool, { borderColor: `${hue}38` }]}>
                             <LinearGradient colors={[`${hue}2E`, `${hue}08`]} style={StyleSheet.absoluteFill} />
@@ -67,9 +71,10 @@ export function RoomMenuSheet({ visible, onClose, sections }: { visible: boolean
                         ) : (
                           <FloatIcon source={it.art ?? icon3dSourceFor(it.emoji)} emoji={it.emoji} size={46} hue={hue} />
                         )}
+                        </View>
                         <Badge badge={it.badge} />
                       </View>
-                      <Text style={styles.label} numberOfLines={2}>
+                      <Text style={[styles.label, soon && { opacity: 0.5 }]} numberOfLines={2}>
                         {it.label}
                       </Text>
                     </PressableScale>

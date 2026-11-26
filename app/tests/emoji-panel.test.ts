@@ -56,6 +56,8 @@ describe('Emoji paneli: sekmeler', () => {
       for (const gone of ['basic', 'duygu', 'muzik', 'hamle', 'recent']) assert.ok(!ids.includes(gone), `${room ? 'oda' : 'sohbet'}: ${gone}`);
     }
     assert.deepEqual(emojiTabPacks(true).map((p) => p.id), ['duygu', 'muzik', 'hamle']);
+    // Müzik fills two rows of five; no half-empty row.
+    assert.equal(emojiTabPacks(true).find((p) => p.id === 'muzik')!.stickers.length % 5, 0);
     // Hamle acts on the room's mics: a chat's Emoji tab doesn't have it.
     assert.deepEqual(emojiTabPacks(false).map((p) => p.id), ['duygu', 'muzik']);
   });

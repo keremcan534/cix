@@ -258,3 +258,14 @@ Merkez tarafı (`agency-admin.mjs`): `tree`, `overview`, `list`, `create`, `deci
   API ikisini de parametre olarak alıyor.
 - Canlı sunucuya bu uç noktalar `DEPLOY_SSH_KEY` tanımlanıp dağıtım yapılana kadar gitmez.
 - Ajans komisyonu ve nakde çevirme için hukuk görüşü gerekir (`docs/YAYIN_HAZIRLIGI.md` madde 1).
+
+## Ajans kodu 4 hane (27 Kasım 2026)
+
+Sahiplerin isteğiyle yeni açılan her ajansın ve her yeni asistanın kodu **4 haneli** olur (örn. `K7MP`). Kodda harf ve rakam var; 0/O ve 1/I gibi birbirine karışanlar kullanılmaz. Bu kuralla yaklaşık 1 milyon farklı kod üretilebilir. Ajans kodu ile asistan kodu hiçbir zaman aynı olmaz.
+
+- Mevcut ajanslar 8 haneli kodlarını korur; eski kodlar ve paylaşılmış linkler çalışmaya devam eder.
+- Sunucu 4 ile 10 hane arasındaki her kodu arar.
+- Eski APK'lar da 4 haneli kodla arayıp katılabilir, çünkü uygulamanın arama kutusu 4 haneden itibaren arıyor.
+- Kısa kod daha kolay tahmin edilir. Bu yüzden yanlış kod denemesi kişi başı sayılır: bir saatte 10 yanlış koddan sonra (arama ve katılma birlikte) o kişi bir saat kod deneyemez ve "Çok fazla yanlış ajans kodu denedin" uyarısını görür.
+  - Sınır sunucuda `AGENCY_CODE_MISSES` ile değiştirilebilir (`agency-lib.mjs`).
+- Migration: `138_agency_code_4.sql`. Test: `server/api/test/agency-code.test.mjs`.

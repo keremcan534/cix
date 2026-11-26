@@ -357,3 +357,12 @@ Güncelleme 7'de geldi; 20 Kasım'da "Muzip hediyeler" ile değişti (aşağıda
   - 2 dakika içinde açılmazsa alıcıda silinir. Yayıncı kendi tarafında "Açılmadı, silindi" görür.
   - Fiyat Canlı ayarlar › Birebir ve eşleşme › Ücretli fotoğraf'tan değişir; 0 yapılırsa özellik kapanır. Kalp seviyesi şartı yoktur, çünkü açıp açmamak alıcının seçimidir.
   - Eski APK'larda kart yerine "Ücretli fotoğraf (120 jeton). Açmak için uygulamayı güncelle." yazısı görünür; fotoğrafın adresi eski uygulamaya hiç gitmez.
+
+## Ayarlar sadeleştirmesi (27 Kasım 2026)
+
+Sahiplerin isteğiyle Ayarlar'dan şunlar kalktı:
+
+- **Kimler ulaşabilir:** "Bana kimler mesaj gönderebilir?" ve "Beni kimler arayabilir?" seçenekleri kalktı. Artık herkes mesaj atabilir ve arayabilir; engellenen kişiler yine ulaşamaz. Daha önce kısıtlama seçmiş olanların seçimi sunucuda saklı ama uygulanmıyor, eski APK'lar da "Herkes" görüyor. `REACH_CHOICES=1` ile geri açılır (`privacy.mjs`).
+- **Animasyon ve giriş efektlerini kapat:** düğme kalktı; efektler odada Efektler bölümünden kapatılıyor. Bu ayarı daha önce açmış olanlarda yeni sürümle kapalı başlar.
+- **İşlem geçmişi** satırı kalktı. Hareketler cüzdanda duruyor.
+- **Aktif oturumlar** bölümü kalktı. Bu yüzden kullanıcı başka cihazdaki oturumunu uygulamadan kapatamıyor.

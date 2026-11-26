@@ -3359,8 +3359,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       items: [
         // In live mode Oda içi PK runs on the server (lib/live/pk), so only in a server room.
         ...(myRole !== 'member' && !pk && (!liveMode() || real) ? [{ key: 'pk', label: 'PK', emoji: '⚔️', art: artSource('pk-takim-pk'), colors: ['#FF6576', '#B81F66'] as [string, string], onPress: () => (setPanel(null), setPkSetup(true)) }] : []),
-        // Live mode: the server's Şanslı çanta, in a server room only (lib/live/lucky-bags); the demo keeps its envelope.
-        ...(!liveMode() || real ? [{ key: 'env', label: 'Şanslı çanta', emoji: '🧧', art: ROOM_ICON_ART.envelope, colors: ['#B91C1C', '#F59E0B'] as [string, string], onPress: () => setPanel(liveMode() ? 'bag' : 'envelope') }] : []),
+        // Şanslı çanta: listed as "Yakında", faded and closed (owners, 26 Nov 2026). Live mode: the server's (lib/live/lucky-bags).
+        ...(!liveMode() || real ? [{ key: 'env', label: 'Şanslı çanta', emoji: '🧧', art: ROOM_ICON_ART.envelope, colors: ['#B91C1C', '#F59E0B'] as [string, string], badge: 'SOON' as const, onPress: () => setPanel(liveMode() ? 'bag' : 'envelope') }] : []),
         ...(canFunctions ? [{ key: 'poll', label: 'Anket', emoji: '📊', art: ROOM_ICON_ART.poll, colors: ['#0EA5E9', '#2563EB'] as [string, string], onPress: () => setPanel('poll') }] : []),
         ...(roomType === 'qa' ? [{ key: 'qa', label: 'Sorular', emoji: '❓', art: ROOM_ICON_ART.questions, colors: ['#F97316', '#DC2626'] as [string, string], onPress: () => setPanel('qa'), badge: questions.filter((q) => !q.picked).length }] : []),
         // Müzik is the room's staff's and its DJs' (they play it); everyone else just hears it.

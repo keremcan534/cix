@@ -57,7 +57,6 @@ const MINE_TABS: { key: MineTab; label: string }[] = [
   { key: 'joined', label: 'Katıl' },
   { key: 'following', label: 'Takip Et' },
 ];
-type Suggestion = { r: Room; reason: string; why: keyof typeof Ionicons.glyphMap };
 
 export default function RoomsScreen() {
   const { coins, checkedInToday, notifications, following, recentRooms, blocked, me, myRoom, agencyId, familyId } = useApp();
@@ -92,28 +91,6 @@ export default function RoomsScreen() {
   const closest = closestRooms(me, visible.filter((r) => !isLockedRoom(r.id)), userById, { following, recent: recentRooms, blocked })[0];
   // Live: my own open room on the server ("Odam").
   const myLive = live ? serverRooms.find((r) => r.hostId === 'me') : undefined;
-
-  // Personalized suggestions with an explanation; blocked hosts and private rooms are excluded.
-  const suggestions: Suggestion[] = visible
-    .filter((r) => !locked(r) && r.id !== closest?.room.id)
-    .map((r) => {
-      const reason = following.has(r.hostId)
-        ? `Takip ettiğin ${userById(r.hostId).name} burada`
-        : recentRooms.includes(r.id)
-          ? 'Son ziyaret ettiğin oda'
-          : me.interests?.some((i) => i.includes(r.category) || r.tags.some((t) => i.includes(t)))
-            ? `İlgi alanın: ${r.category}`
-            : r.listeners > 300
-              ? 'Şu an çok hareketli'
-              : '';
-      const score = (following.has(r.hostId) ? 3 : 0) + (recentRooms.includes(r.id) ? 2 : 0) + (reason.startsWith('İlgi') ? 1 : 0) + r.listeners / 1000;
-      // The icon says which kind of reason it is, so the line reads at a glance.
-      const why: Suggestion['why'] = following.has(r.hostId) ? 'person' : recentRooms.includes(r.id) ? 'time' : reason.startsWith('İlgi') ? 'sparkles' : 'flame';
-      return { r, reason, why, score };
-    })
-    .filter((x) => x.reason)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 5);
 
   const recRooms = visible
     .filter((r) => matchesTab(r, cat) && (country === 'ALL' || roomCountry(r.id) === country))
@@ -197,7 +174,7 @@ export default function RoomsScreen() {
       <FlatList
         data={main === 'rec' ? recRooms : mineRooms}
         keyExtractor={(r) => r.id}
-        contentContainerStyle={{ gap: 12, paddingTop: headerH + 8, paddingBottom: TAB_BAR_HEIGHT + insets.bottom + 96 }}
+        contentContainerStyle={{ gap: 8, paddingTop: headerH + 8, paddingBottom: TAB_BAR_HEIGHT + insets.bottom + 96 }}
         scrollIndicatorInsets={{ top: headerH }}
         ListHeaderComponent={
           main === 'rec' ? (
@@ -206,7 +183,6 @@ export default function RoomsScreen() {
               {closest && <ClosestRoomCard match={closest} />}
               <QuickStrip coins={coins} checkedInToday={checkedInToday} />
               {similarPeople.length > 0 && <SimilarPeople people={similarPeople} rooms={visible} />}
-              <SuggestionsRow items={suggestions} />
               <CategoryBar cat={cat} onCat={setCat} countryArt={country === 'ALL' ? null : countryArt(country)} onCountry={() => setSheet('country')} />
             </View>
           ) : (
@@ -458,44 +434,6 @@ function SimilarPeople({ people, rooms }: { people: { u: User; score: number }[]
             </PressableScale>
           );
         })}
-      </ScrollView>
-    </View>
-  );
-}
-
-function SuggestionsRow({ items }: { items: Suggestion[] }) {
-  const { colors } = useTheme();
-  const styles = useStyles();
-  if (items.length === 0) return null;
-  return (
-    <View style={{ gap: 10 }}>
-      <View style={styles.sectionRow}>
-        <Art name="ana-senin-icin" size={24} />
-        <Text style={[styles.section, { paddingHorizontal: 0 }]}>Sana göre</Text>
-      </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.glowRoom} contentContainerStyle={[{ gap: 10, paddingHorizontal: 16 }, styles.glowRoomInner]}>
-        {items.map(({ r, reason, why }) => (
-          <PressableScale key={r.id} style={styles.suggest} onPress={() => router.push(`/oda/${r.id}`)}>
-            <View style={styles.suggestFrame}>
-              <Photo uri={r.cover} kind="cover" seed={r.id} style={styles.suggestImg} />
-              <LinearGradient colors={['rgba(22,14,18,0)', 'rgba(22,14,18,0.55)']} style={styles.suggestFade} />
-              <EdgeLight inset={10} strength={0.35} />
-              <View style={styles.liveBadge}>
-                <View style={styles.liveDot} />
-                <Text style={styles.liveText}>{r.listeners}</Text>
-              </View>
-            </View>
-            <Text style={styles.suggestTitle} numberOfLines={1}>
-              {r.title}
-            </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Ionicons name={why} size={12} color={why === 'person' ? colors.pink : why === 'flame' ? colors.gold : colors.primaryText} />
-              <Text style={[styles.suggestWhy, { flexShrink: 1 }]} numberOfLines={1}>
-                {reason}
-              </Text>
-            </View>
-          </PressableScale>
-        ))}
       </ScrollView>
     </View>
   );
@@ -830,11 +768,6 @@ const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark, edge
   catIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   plusBadge: { position: 'absolute', right: -2, bottom: -2, width: 14, height: 14, borderRadius: 7, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   hostName: { color: colors.text, fontSize: 12, marginTop: 4 },
-  // suggestions
-  suggest: { width: 150, gap: 4 },
-  suggestFrame: { width: 150, height: 90, borderRadius: 12, overflow: 'hidden', backgroundColor: colors.card, borderWidth: 1, borderColor: surface.hairline, boxShadow: dark ? '0 6px 16px rgba(0,0,0,0.4)' : SOFT_SHADOW },
-  suggestImg: { width: '100%', height: '100%' },
-  suggestFade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 40 },
   liveBadge: { position: 'absolute', left: 6, bottom: 6, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(22,14,18,0.6)', borderRadius: 999, paddingHorizontal: 6, paddingVertical: 2 },
   liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: semantic.live, boxShadow: '0 0 6px #FF5FA2' },
   liveText: { color: '#fff', fontSize: 11, fontWeight: '800' },
@@ -842,9 +775,9 @@ const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark, edge
   suggestWhy: { color: colors.textDim, fontSize: 12 },
   sectionRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16 },
   // room rows
-  roomCard: { flexDirection: 'row', gap: 12, padding: 10, overflow: 'hidden' },
+  roomCard: { flexDirection: 'row', gap: 12, paddingHorizontal: 10, paddingVertical: 6, overflow: 'hidden' },
   roomCardTop: { borderColor: 'rgba(246,189,96,0.35)' },
-  coverFrame: { width: 84, height: 84, borderRadius: 12, overflow: 'hidden', backgroundColor: colors.cardAlt, boxShadow: dark ? '0 4px 10px rgba(0,0,0,0.35)' : SOFT_SHADOW },
+  coverFrame: { width: 74, height: 74, borderRadius: 12, overflow: 'hidden', backgroundColor: colors.cardAlt, boxShadow: dark ? '0 4px 10px rgba(0,0,0,0.35)' : SOFT_SHADOW },
   cover: { width: '100%', height: '100%' },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   roomTitle: { color: colors.text, fontWeight: '800', fontSize: 15, flexShrink: 1 },

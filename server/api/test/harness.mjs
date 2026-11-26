@@ -59,6 +59,10 @@ export function startApi(extraEnv = {}, { moneyCheck = true } = {}) {
       PACKS_SOON: '0',
       // Gizlilik is a VIP / Rütbe right (privacy.mjs); the tests set those choices freely. privacy-perks.test.mjs checks it.
       PRIVACY_PERKS: '0',
+      // The daily spend limit is off by default (spend-limit.mjs SPEND_LIMITS); the tests check it working. spend-limit.test.mjs checks the default.
+      SPEND_LIMITS: '1',
+      // Kimler ulaşabilir's message and call choices are off by default (privacy.mjs REACH_CHOICES); the tests check them working.
+      REACH_CHOICES: '1',
       ALLOW_DEV_AUTH: '1',
       // The storage is a stand-in address in most tests: an uploaded file isn't looked up there (media.mjs).
       UPLOAD_VERIFY: '0',

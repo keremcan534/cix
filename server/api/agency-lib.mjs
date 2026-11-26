@@ -325,7 +325,41 @@ export async function isClosed(c, period) {
 
 // --- Codes and audit -----------------------------------------------------------------------------------------
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-export const newCode = () => Array.from(crypto.randomBytes(8), (b) => CODE_CHARS[b % CODE_CHARS.length]).join('');
+export const newCode = (len = 8) => Array.from(crypto.randomBytes(len), (b) => CODE_CHARS[b % CODE_CHARS.length]).join('');
+/**
+ * A new agency's and a new assistant's code: 4 characters (owners, 27 Nov 2026; about a million values). Codes given
+ * before keep their 8; a code of 4 to 10 is looked up. Wrong codes are counted per person (codeMiss).
+ */
+export const AGENCY_CODE_LEN = 4;
+export const JOIN_CODE = /^[A-Z0-9]{4,10}$/;
+/** A code that is free for an agency or an assistant: neither holds it (the two never share a value). */
+export async function freeJoinCode(c) {
+  for (let i = 0; i < 20; i++) {
+    const code = newCode(AGENCY_CODE_LEN);
+    const r = await c.query('SELECT 1 FROM agencies WHERE code = $1 UNION ALL SELECT 1 FROM agency_assistants WHERE code = $1', [code]);
+    if (!r.rowCount) return code;
+  }
+  return newCode(8);
+}
+/** Wrong codes a person may try in an hour (lookup and join together) before a 429: a 4-character code isn't guessed. */
+const MISSES = Math.max(1, Number(process.env.AGENCY_CODE_MISSES) || 10);
+const missed = new Map();
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of missed) if (v.until <= now) missed.delete(k);
+}, 600_000).unref();
+/** Before a code lookup: refuses one who has tried too many wrong codes this hour. */
+export function assertCodeTries(uid) {
+  const m = missed.get(uid);
+  if (m && m.until > Date.now() && m.n >= MISSES) throw new HttpError(429, 'Çok fazla yanlış ajans kodu denedin. Bir saat sonra tekrar dene.');
+}
+/** A wrong code (404) counts against the person. */
+export function codeMiss(uid) {
+  const now = Date.now();
+  const m = missed.get(uid);
+  if (!m || m.until <= now) missed.set(uid, { n: 1, until: now + 3600_000 });
+  else m.n += 1;
+}
 
 export async function audit(c, actor, action, targetType, targetId, { before = null, after = null, reason = '', result = 'ok' } = {}) {
   await c.query('INSERT INTO agency_audit (actor_id, action, target_type, target_id, before, after, result, reason) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)', [
@@ -441,7 +475,7 @@ export async function agencyRow(c, id, lock = false) {
 
 export async function agencyByCode(c, code) {
   const s = typeof code === 'string' ? code.trim().toUpperCase() : '';
-  if (!/^[A-Z0-9]{6,10}$/.test(s)) throw new HttpError(400, 'Geçersiz ajans kodu');
+  if (!JOIN_CODE.test(s)) throw new HttpError(400, 'Geçersiz ajans kodu');
   const r = await c.query('SELECT * FROM agencies WHERE code = $1', [s]);
   if (!r.rowCount) throw new HttpError(404, 'Bu kodla bir ajans yok');
   return r.rows[0];

@@ -150,7 +150,7 @@ export default function WalletScreen() {
   // Live mode: today's spending and the limit as the server counts them (server/api/spend-limit.mjs).
   const serverLimit = useServerSpendLimit();
   const spent = live && serverLimit ? serverLimit.spentToday : spentToday;
-  const limitShown = live ? (serverLimit?.limit ?? 0) : settings.dailySpendLimit;
+  const limitShown = live ? (serverLimit?.limit ?? 0) : 0;
   const loadedToday = live ? coinsAddedOn(history.rows) : ledger.filter((r) => r.currency === 'coin' && r.amount > 0 && r.day === day).reduce((x, r) => x + r.amount, 0);
   const serverRows = history.rows.filter((r) => r.currency === filter);
 

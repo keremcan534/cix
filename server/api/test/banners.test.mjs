@@ -26,17 +26,22 @@ describe('Banner Yönetimi', () => {
     await q("UPDATE users SET role = 'admin' WHERE id = $1", [admin.user.id]);
     user = await signUp('Kullanıcı');
     const live = await phone();
-    assert.deepEqual(live.map((b) => b.art), ['ornek-hediye-alanlar', 'ornek-hediye-gonderenler', 'ornek-zirvedeki-ajanslar']);
+    // The agency application banner first (owners, 26 Nov 2026): for someone in no agency.
+    assert.deepEqual(live.map((b) => b.art), ['ajans-basvurusu', 'ornek-hediye-alanlar', 'ornek-hediye-gonderenler', 'ornek-zirvedeki-ajanslar']);
     assert.deepEqual(Object.keys(live[0]).sort(), ['accent', 'art', 'cta', 'endsAt', 'id', 'imageUrl', 'link', 'showText', 'subtitle', 'title']);
     const old = await ok(call('GET', '/api/room-banners', null, user.session), 'eski');
     assert.equal(old.banners, undefined, 'eski uygulamaya yeni alan gitmez');
     const slides = old.events.filter((e) => e.id.startsWith('b'));
-    assert.equal(slides.length, 3);
+    assert.equal(slides.length, 4);
     assert.deepEqual(Object.keys(slides[0]).sort(), ['body', 'createdAt', 'endsAt', 'id', 'imageUrl', 'kind', 'link', 'personal', 'title']);
     assert.equal(slides[0].kind, 'event');
     assert.ok(old.boards.agency, 'sıralamalar yine gelir');
     const all = await list();
-    assert.deepEqual(all.map((b) => b.state), ['live', 'live', 'live']);
+    assert.deepEqual(all.map((b) => [b.state, b.audience]), [['live', 'no_agency'], ['live', 'all'], ['live', 'all'], ['live', 'all']]);
+    // An agency's owner doesn't get it.
+    const boss = await signUp('Ajans Sahibi');
+    await ok(call('POST', '/api/admin/agency/create', { name: `Banner Ajansı ${Date.now() % 100000}`, owner: boss.user.id }, admin.session), 'ajans');
+    assert.equal((await phone(boss.session)).some((b) => b.art === 'ajans-basvurusu'), false, 'ajans sahibine gitmez');
   });
 
   test('yalnız yönetici; eksik ya da yanlış alan reddedilir', async () => {
