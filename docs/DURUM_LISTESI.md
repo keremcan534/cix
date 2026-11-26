@@ -141,8 +141,22 @@ Son güncelleme: preview-96 sonrası (Küçült, çanta yağmuru, @bahset düzel
   - **Panelden bağ işaretleri (yeni APK, 21 Kasım; [`BAGLAR.md`](BAGLAR.md)):** panelde Hediyeler › Bağ işaretleri: her bağ türünün 20 seviyesine durağan resim, hareketli WebP ya da SVGA ve boyut. Yeni APK odada ve profilde tasarımı çizer (tasarım bir üst tasarıma kadar sürer); eski APK kendi işaretini çizer. Telefonda denenmeli: hareketli WebP'nin odada oynaması ve büyük boyutun yüzlere taşması.
   - Telefonda denenmeli: odadaki işaretin büyüklüğü ve "Lv" etiketinin okunması küçük ekranlı telefonlarda.
 - **Maske (görüntülü arama ve eşleşme, kadınlar, Android):** kendi küçük görüntüsünün altındaki **Maske** düğmesi sırayla Kapalı → Göz maskesi → Mozaik yüz → Emoji yüz yapar. Güzellik düğmesi de oraya taşındı. Seçim telefonda kalır, bir sonraki aramada da açık başlar.
-  - Yüzü telefon bulur (saniyede 5 kez). Yüz bulunamazsa (yüz çevrik, karanlık, ekrandan çıkmış) görüntünün tamamı iri karelere bölünür; bir hata olursa siyah gider. Yüz hiçbir zaman maskesiz gitmez.
-  - Durum: Telefonda denenmeli. Kodu bu bilgisayarda derlenemedi; ilk derleme GitHub'daki APK yapımında. Denerken iki telefonla görüntülü ara, karşı telefonda maskenin yüzde durduğuna, kafa hızlı dönünce ve kamera çevrilince yüzün bir an bile görünmediğine bak. Eski Android yüz bulucusu yandan ve uzaktan yüzü zor bulur, o zaman görüntü kareli gider.
+  - **Yenilendi (27 Kasım 2026, sahiplerin şikâyeti: maske yüzü takip etmiyor, kayıyor, çirkin):**
+    - Yüzü artık Google ML Kit buluyor. Modeli APK'nın içinde geldiği için internet gerekmez. Yüzü saniyede 25 kereye kadar arıyor ve göz noktalarını da veriyor.
+    - Maske yüzü takip ediyor: yüz hareket ederken bir sonraki bulmaya kadar hareket yönünde öne taşınıyor, böylece geride kalmıyor. Duran yüzde titremesin diye yumuşatılıyor.
+    - Kafa yana eğilince maske de eğiliyor. Boyutu yüze göre ayarlanıyor; yüz yana dönünce de küçülmüyor.
+    - Maskeler yeniden çizildi:
+      - Göz maskesi: lacivert saten, altın kenar ve süsleme, köşelerde taşlar.
+      - Emoji yüz: her telefonda aynı görünen, çizilmiş gülen yüz.
+      - Mozaik yüz: daha ince kareler.
+    - ML Kit bir telefonda çalışmazsa eski yüz bulucu devreye girer.
+  - Kural aynı: Yüz bulunamazsa (yüz çevrik, karanlık, ekrandan çıkmış) görüntünün tamamı iri karelere bölünür; bir hata olursa siyah gider. Yüz hiçbir zaman maskesiz gitmez.
+  - **Telefonda nasıl denenir:** İki telefonla görüntülü ara. Karşı telefonda şunlara bak:
+    - Maske yüze oturuyor mu?
+    - Kafayı hızlı sağa sola çevirince ve öne arkaya gidince maske yüzün üstünde kalıyor mu?
+    - Kafayı yana eğince maske de eğiliyor mu?
+    - Kamera çevrilince ya da yüz ekrandan çıkınca yüz bir an bile görünüyor mu? (Görünmemeli.)
+  - Kendi maske görselleriniz olursa (saydam PNG) çizilenlerin yerine onlar konabilir.
   - iPhone'da ve eski APK'larda maske düğmesi görünmez.
 
 ## Otomatik mesaj, 5 dakika kuralı ve SimilarClub Sistem (yeni APK)
