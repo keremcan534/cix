@@ -450,6 +450,8 @@ export default function SettingsScreen() {
           />
           <ListRow icon="document-text-outline" title="Kullanım Koşulları" onPress={() => openLegal('terms')} />
           <ListRow icon="shield-checkmark-outline" title="Gizlilik Politikası" onPress={() => openLegal('privacy')} />
+          {/* Every other text (KVKK, deletion, coins and gifts, refunds, games, VIP, copyright, cookies), quietly under the two above. */}
+          <ListRow icon="library-outline" title="Diğer yasal metinler" onPress={() => openLegal('center')} />
           {/* The version, and a newer build when one is out (lib/app-update): a tap downloads and installs it in the app. */}
           {update ? (
             <ListRow
