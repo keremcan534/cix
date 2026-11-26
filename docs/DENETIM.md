@@ -37,8 +37,10 @@ modunda olması, hata takibi olmaması ve kırık kodun birleşmeden önce yakal
   oyunculu oldu (`rocket-live.mjs`, herkes aynı roketi izler): aynı anahtarın arkasında, ama kasa payı canlı ayardan
   düşürülebiliyor (varsayılan %60) ve oyunun çekiciliği arttı; hukuk sorusu onu da kapsar. Oyun başına günlük sınır (Oyun Salonu,
   Rüzgâr Gülü, Zar Düellosu) Kasım 2026'da sahiplerin isteğiyle kaldırıldı: bir kişinin bir günde oynayabileceği
-  jetonun üst sınırı yok; yalnız kişinin kendi koyduğu harcama limiti duruyor. Canlı ayarlar › Oyun Salonu › Günlük
-  sınır (ve `WHEEL_DAILY`) ile yeniden konabilir.
+  jetonun üst sınırı yok. Canlı ayarlar › Oyun Salonu › Günlük sınır (ve `WHEEL_DAILY`) ile yeniden konabilir.
+  **Kişinin kendi koyduğu günlük harcama limiti de 26 Kasım 2026'da sahiplerin isteğiyle kapatıldı** (`spend-limit.mjs`
+  `SPEND_LIMITS`, Ayarlar'daki seçenek kalktı): artık şans oyunlarına ve hediyelere harcanan jetonun hiçbir günlük sınırı yok.
+  Mağazalar ve sorumlu harcama kuralları açısından avukat görüşüne katın; `SPEND_LIMITS=1` ile geri açılır (eski limitler saklı).
 - **Oda roketi** (17 Kasım, `room-rocket.mjs`, [`ODA_ROKETI.md`](ODA_ROKETI.md)): odadaki hediyelerle dolan roketin ödülleri o seviyeye
   katkı verenler arasında şansla dağılır. Jeton ödülü sahibin kararıyla **normal jeton** (Şanslı hediye kazancıyla aynı): hediyeyle
   elmasa, elmas da nakde dönebilir. Yani Şanslı hediye ile aynı risk. **Kapalı gelir**, panelden açılır; açmadan önce aynı avukat

@@ -783,13 +783,9 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     return () => clearTimeout(t);
   }, [diamondLocks]);
 
-  const limitBlock = (n: number) => {
-    // Live mode: the limit is the server's (lib/live/spend-limit); its last known state is checked here too.
-    if (liveMode() && !settingsRef.current.dailySpendLimit) return serverLimitBlock(n);
-    const limit = settingsRef.current.dailySpendLimit;
-    if (!limit || spentTodayRef.current + n <= limit) return null;
-    return `Günlük harcama limitin ${limit.toLocaleString('tr-TR')} jeton (Ayarlar > Harcama kontrolü). Bugün kalan: ${Math.max(0, limit - spentTodayRef.current).toLocaleString('tr-TR')} jeton.`;
-  };
+  // No daily spend limit (owners, 26 Nov 2026): live, the server decides (spend-limit.mjs SPEND_LIMITS, off), and its
+  // last known state is still checked here; the demo has none.
+  const limitBlock = (n: number) => (liveMode() ? serverLimitBlock(n) : null);
   const spendBlock = (n: number) => (coinsRef.current < n ? 'Yetersiz bakiye.' : limitBlock(n));
   /** Takes `n` coins here and mirrors it on the server: api.spend, or `mirror` (a shop buy at the shown price). */
   const spend = (n: number, reason = 'Harcama', mirror?: () => void) => {

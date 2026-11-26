@@ -5,7 +5,6 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
-import { Icon3D } from '@/components/Icon3D';
 import { ChoiceChips, ListBlock, ListGroup, ListRow, ListSwitch } from '@/components/list';
 import { LicensesSheet } from '@/components/licenses-sheet';
 import { Avatar, Header } from '@/components/ui';
@@ -30,7 +29,6 @@ import { APP_VERSION } from '@/lib/reporting';
 import { formatPhone } from '@/lib/verify-code';
 import { VerifiedPill, VerifySheet } from '@/components/verify-sheet';
 import { useLiveSessions } from '@/lib/live/sessions';
-import { LiveSpendLimit } from '@/components/spend-limit-live';
 
 type BoolKey = { [K in keyof Settings]: Settings[K] extends boolean ? K : never }[keyof Settings];
 type IconName = keyof typeof Ionicons.glyphMap;
@@ -72,7 +70,6 @@ const PRIVACY_DEFAULTS: Pick<Settings, 'luckyAnnounce' | 'invisibleEntry'> = {
 const PRIVACY_KEYS = Object.keys(PRIVACY_DEFAULTS) as (keyof typeof PRIVACY_DEFAULTS)[];
 const nowMs = () => Date.now();
 
-const coin = <Icon3D name="coin" size={14} />;
 
 const APPEARANCE: [Appearance, string, IconName][] = [
   ['system', 'Sistem', 'phone-portrait-outline'],
@@ -236,27 +233,6 @@ export default function SettingsScreen() {
                 }
               />
             ))}
-          </ListGroup>
-        )}
-
-        {/* A live build keeps the daily limit on the server, which checks every coin spend against it
-            (components/spend-limit-live). The demo keeps it on this phone. */}
-        {live ? (
-          <LiveSpendLimit />
-        ) : (
-          <ListGroup label="Harcama" footer="Limit dolunca harcamalar gece yarısına kadar durur. Artış 24 saat sonra geçerli olur.">
-            <ListBlock title="Günlük harcama limiti">
-              <ChoiceChips
-                value={settings.dailySpendLimit}
-                options={[
-                  [0, 'Limitsiz'],
-                  [500, '500', coin],
-                  [2000, '2.000', coin],
-                  [10000, '10.000', coin],
-                ]}
-                onChange={(v) => setSetting('dailySpendLimit', v)}
-              />
-            </ListBlock>
           </ListGroup>
         )}
 
