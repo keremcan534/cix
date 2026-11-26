@@ -19,7 +19,10 @@ import { DivineFx } from '@/components/games/fx/divine-fx';
 import { useGameQuake } from '@/components/games/fx/quake';
 import { FitBox, GoldText } from '@/components/games/fx/gold-text';
 import { salonArt } from '@/components/games/fx/salon-art';
-import { makeTicking, useTicking, type Ticking } from '@/components/games/fx/ticking';
+import { makeTicking, type Ticking } from '@/components/games/fx/ticking';
+import { ClimbLabel } from '@/components/games/fx/climb-label';
+import type { ClimbFormat } from '@/components/games/fx/climb-format';
+import { useSharedValue } from 'react-native-reanimated';
 import { Text } from '@/components/text';
 import { playSfx } from '@/lib/game-sound';
 import { heavyHaptic, pressHaptic, rumbleHaptic, successHaptic, tapHaptic } from '@/lib/haptics';
@@ -377,9 +380,7 @@ const WinCelebration = memo(function WinCelebration({ amount, bet, tier, title, 
             </Animated.View>
             {/* The amount on its plate: it shivers while a climbing win counts and lands with a bump. */}
             <Animated.View style={[s.plate, { borderColor: look.ribbon[0], transform: [{ translateX: shiver }, { scale: slam.interpolate({ inputRange: [0, 1], outputRange: [1, 1.22] }) }] }]}>
-              <FitBox width={Math.max(160, box.w * 0.78)}>
-                <PlateAmount count={count} size={52} />
-              </FitBox>
+              <PlateAmount count={count} size={52} width={Math.max(160, box.w * 0.78)} />
             </Animated.View>
             <Text style={s.unit}>jeton{x >= 2 ? ` · bahsin ${fmt(x)} katı` : ''}</Text>
           </Animated.View>
@@ -413,9 +414,20 @@ const WinCelebration = memo(function WinCelebration({ amount, bet, tier, title, 
   );
 });
 
-/** The amount on the plate as it counts: the one part of the show redrawn with every frame of the count. */
-function PlateAmount({ count, size }: { count: Ticking<number>; size: number }) {
-  return <GoldText size={size}>{`+${fmt(useTicking(count))}`}</GoldText>;
+/** A win plate's words: the amount as it counts. One object, so the label's worklet is not rebuilt on each render. */
+const PLUS: ClimbFormat = { kind: 'plus', prefix: '+' };
+
+/**
+ * The amount on the plate as it counts: the count feeds a shared value and Skia draws it on the UI thread (fx/climb-label),
+ * so a count-up costs no render and no text layout per frame (it used to redraw a 12-layer GoldText sixty times a second).
+ */
+function PlateAmount({ count, size, width }: { count: Ticking<number>; size: number; width: number }) {
+  const sv = useSharedValue(count.get());
+  useEffect(() => {
+    sv.set(count.get());
+    return count.subscribe(() => sv.set(count.get()));
+  }, [count, sv]);
+  return <ClimbLabel climb={sv} format={PLUS} size={size} height={Math.round(size * 1.3)} style={{ width }} fit fallback={<GoldText size={size}>{`+${fmt(count.get())}`}</GoldText>} />;
 }
 
 /** A firework over the show: sparks thrown out round a point after `delay` (ms), falling a little as they fade. */

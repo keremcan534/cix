@@ -6,8 +6,9 @@
 // (rocket-stage); the scale on its right grows with the climb, so the rocket keeps rising toward the top. Nothing here
 // decides a round: the server's view leads, and this phone's clock only moves the climb between two of its messages.
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Animated, Easing, Image, Modal, Pressable, ScrollView, StyleSheet, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Animated, Easing, Image, Modal, Pressable, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import Reanimated, { useAnimatedStyle, useFrameCallback, useSharedValue, type SharedValue } from 'react-native-reanimated';
 
 import { Text } from '@/components/text';
@@ -16,10 +17,11 @@ import { GameInfoSheet, InfoButton } from '@/components/games/fx/info-sheet';
 import { GoldText } from '@/components/games/fx/gold-text';
 import { ChoiceChip, SALON, SalonStage, choiceInk, salonScreen, tabular, useBox, useSalonFx } from '@/components/games/fx/salon';
 import { useGameQuake } from '@/components/games/fx/quake';
-import { useWinFx } from '@/components/games/fx/win-fx';
+import { ClimbLabel } from '@/components/games/fx/climb-label';
+import type { ClimbFormat } from '@/components/games/fx/climb-format';
 import { RocketPlayer } from '@/components/games/rocket';
 import { pathAt, pathSamples, stageGeo, type Geo } from '@/components/games/rocket-flight';
-import { BLAST_MS, Explosion, ORBIT, Planet, ROCKET_SIZE, ReadyRocket, RocketSprite, Space, useSpin } from '@/components/games/rocket-stage';
+import { BLAST_MS, Explosion, ORBIT, Planet, ROCKET_SIZE, ReadyRocket, RocketSprite, SheetPreload, Space, useSpin } from '@/components/games/rocket-stage';
 import { BalancePill, fmt, type PillFrame } from '@/components/games/slot-kit';
 import type { RocketMine, RocketSeat, RocketView } from '@/lib/api';
 import { playSfx, warmSfx } from '@/lib/game-sound';
@@ -27,14 +29,15 @@ import { casinoAccess, useGames, type Entry } from '@/lib/games';
 import { errorHaptic, heavyHaptic, pressHaptic, rumbleHaptic, successHaptic, tapHaptic } from '@/lib/haptics';
 import { liveMode } from '@/lib/live';
 import { BANDS, bandCounts, momentOf, type Moment } from '@/lib/live/rocket-live-core';
-import { addFuel, escapeNow, rocketSimOn, setRocketSim, useRocketLive, useRocketState } from '@/lib/live/rocket-live';
+import { addFuel, escapeNow, rocketSimOn, setRocketSim, useRocketLive } from '@/lib/live/rocket-live';
 import { makeRocketSim } from '@/lib/live/rocket-sim';
 import { AUTO_CHOICES, multAt, mulText, payoutOf, reachChance } from '@/lib/rocket-live';
 import { useApp } from '@/store';
 import { SCRIM, fonts } from '@/theme';
 
 const GREEN = '#4ADE80';
-const GLOW = require('../../../assets/fx/glow.png');
+/** The multiplier's words (fx/climb-format): one object, so the Skia label's worklet is not rebuilt on each render. */
+const MULT: ClimbFormat = { kind: 'mult' };
 /** Yörünge's own set (rocket-stage has the rest): the fuel can on its key, the parachute, Kaç's key in three parts. */
 const CAN: number | undefined = require('../../../assets/games/yorunge/bidon.png');
 const CHUTE = require('../../../assets/games/yorunge/parasut.png');
@@ -144,7 +147,6 @@ export function LiveRocketPlayer({ entry }: { entry: Entry }) {
   const [picking, setPicking] = useState(false);
   const [info, setInfo] = useState(false);
   const [history, setHistory] = useState(false);
-  const win = useWinFx();
   const [flick] = useState(() => new Animated.Value(0));
   const [breathe] = useState(() => new Animated.Value(0));
   // While the rocket is in the air the stars stream past (rocket-stage Space `cruise`): one loop every 6 s.
@@ -244,10 +246,10 @@ export function LiveRocketPlayer({ entry }: { entry: Entry }) {
     if (cashed === null || cashed <= 0) return;
     playSfx('cashout');
     successHaptic();
-    void win.celebrate({ amount: paid, bet: fuel });
-    // Once per escape of mine.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Once per escape of mine (the badge on the stage shows it: EscapeBadge).
   }, [cashed, round?.id]);
+  // The climb, worked out every frame on the UI thread: the rocket, its trail, the multiplier and Kaç's payout follow it.
+  const climb = useClimb(st.view, st.offset, still);
 
   const access = casinoAccess(game, entry, wealthLevel);
   if (!access.ok) return <CasinoLock reason={access.reason} needWealth={access.needWealth} />;
@@ -279,7 +281,7 @@ export function LiveRocketPlayer({ entry }: { entry: Entry }) {
           <>
             <Space geo={geo} flight={null} still={still} breathe={breathe} cruise={moment.kind === 'fly' ? cruise : null} />
             <Planet geo={geo} />
-            <Sky geo={geo} view={st.view} offset={st.offset} still={still} flick={flick} spin={spin} flash={flash} />
+            <Sky geo={geo} view={st.view} offset={st.offset} still={still} flick={flick} spin={spin} flash={flash} climb={climb} />
             <Chutes geo={geo} round={round?.id ?? 0} seats={seats} mine={mine} still={still} />
             {moment.kind === 'bet' && <Arrivals geo={geo} round={round?.id ?? 0} seats={seats} mine={mine} still={still} />}
             {moment.kind === 'done' && <Podium seats={seats} mine={mine} />}
@@ -317,9 +319,9 @@ export function LiveRocketPlayer({ entry }: { entry: Entry }) {
             <Text style={s.allText}>Tümü</Text>
           </View>
         </Pressable>
-        <View style={[StyleSheet.absoluteFill, { left: '30%' }]} pointerEvents="box-none">
-          {win.layer}
-        </View>
+        {cashed !== null && cashed > 0 && <EscapeBadge key={round?.id ?? 0} x={cashed} amount={paid} still={still} />}
+        {/* The sprite sheets decoded now, so the launch and the blast don't wait for a big picture to open. */}
+        <SheetPreload />
       </SalonStage>
 
       <View style={{ gap: SALON.row }}>
@@ -369,7 +371,7 @@ export function LiveRocketPlayer({ entry }: { entry: Entry }) {
             ))}
           </View>
         )}
-        <Action moment={moment} mine={mine} bets={st.game?.bets ?? game.bets} maxFuel={st.game?.maxFuel ?? 0} busy={st.busy} offset={st.offset} onFuel={onFuel} onEscape={onEscape} />
+        <Action moment={moment} mine={mine} bets={st.game?.bets ?? game.bets} maxFuel={st.game?.maxFuel ?? 0} busy={st.busy} climb={climb} onFuel={onFuel} onEscape={onEscape} />
         {st.note && (
           <Text style={s.note} accessibilityLiveRegion="polite">
             {st.note}
@@ -453,10 +455,9 @@ function climbU(x: number) {
  * the launch), the big multiplier, and the explosion. The rocket and the trail move on the UI thread (useClimb); the
  * numbers are small parts of their own that count on their own clock, so nothing big is redrawn while it flies.
  */
-const Sky = memo(function Sky({ geo, view, offset, still, flick, spin, flash }: { geo: Geo; view: RocketView | null; offset: number; still: boolean; flick: Animated.Value; spin: Animated.Value; /** The multiplier's flare (a countdown second, a milestone). */ flash: Animated.Value }) {
+const Sky = memo(function Sky({ geo, view, offset, still, flick, spin, flash, climb }: { geo: Geo; view: RocketView | null; offset: number; still: boolean; flick: Animated.Value; spin: Animated.Value; /** The multiplier's flare (a countdown second, a milestone). */ flash: Animated.Value; climb: SharedValue<number> }) {
   // Redrawn only when the moment changes (the countdown's seconds, the ignition); the flight itself doesn't wait for it.
   const m = useMoment(view, offset);
-  const climb = useClimb(view, offset, still);
   const x = xOf(m);
   const p = pathAt(geo, uOf(x));
   const samples = useMemo(() => pathSamples(geo, TRAIL), [geo]);
@@ -507,11 +508,9 @@ const Sky = memo(function Sky({ geo, view, offset, still, flick, spin, flash }: 
       {(!!big || m.kind === 'fly') && (
         <Animated.View style={[s.readout, { transform: [{ scale: flash }] }]} accessibilityLiveRegion="polite">
           {/* The multiplier in metal: gold while it climbs, ruby where it blew up, silver for the countdown. While it
-              climbs only its digits are redrawn, 20 times a second, and its glow is a still light behind it: a blurred
-              copy of text that changes is redrawn with it, which an Android phone feels. */}
-          {m.kind === 'fly' && <Image source={GLOW} style={s.readGlow} accessibilityIgnoresInvertColors />}
+              climbs it is drawn by Skia on the UI thread every frame (fx/climb-label): no render, no text layout. */}
           {m.kind === 'fly' ? (
-            <ClimbText view={view} offset={offset} every={50} format={mulText} render={(x) => <GoldText size={50} lite glow={false}>{x}</GoldText>} />
+            <ClimbLabel climb={climb} format={MULT} size={50} height={66} fallback={<GoldText size={50} lite>1,00×</GoldText>} />
           ) : (
             <GoldText size={50} metal={m.kind === 'done' ? 'ruby' : 'silver'}>
               {big}
@@ -526,25 +525,9 @@ const Sky = memo(function Sky({ geo, view, offset, still, flick, spin, flash }: 
   );
 });
 
-/**
- * A climb's number, counted on its own every `every` ms (only this text is redrawn): the multiplier, or Kaç's payout.
- * Twice a second with motion reduced, or while the game is minimised in a room.
- */
-function ClimbText({ view, offset, every, style, format, render }: { view: RocketView | null; offset: number; every: number; style?: StyleProp<TextStyle>; format: (x: number) => string; /** Draws the text itself (GoldText) instead of a plain Text. */ render?: (text: string) => ReactNode }) {
-  const { still } = useSalonFx();
-  const t = useServerTime(offset, still ? 500 : every);
-  const m = momentOf(view, t || view?.now || 0);
-  if (render) return <>{render(format(xOf(m)))}</>;
-  return (
-    <Text style={style} numberOfLines={1}>
-      {format(xOf(m))}
-    </Text>
-  );
-}
-
-/** The scale's four marks: the top grows with the climb, so their numbers change; read five times a second while it flies. */
+/** The scale's four marks: the top grows with the climb, so their numbers change; read 2,5 times a second while it flies. */
 const Marks = memo(function Marks({ geo, view, offset, fly }: { geo: Geo; view: RocketView | null; offset: number; fly: boolean }) {
-  const t = useServerTime(offset, fly ? 200 : 1000);
+  const t = useServerTime(offset, fly ? 400 : 1000);
   const top = topOf(xOf(momentOf(view, t || view?.now || 0)));
   return (
     <>
@@ -593,6 +576,44 @@ function Blast({ x, y, still }: { x: number; y: number; still: boolean }) {
   }, [fx]);
   return <Explosion x={x} y={y} fx={fx} />;
 }
+
+/**
+ * My escape, said at once and lightly while the rocket flies on for the others: a green and gold plate drops in under
+ * the multiplier with the multiplier I left at and what it paid, then fades. A full win show over a climbing rocket cost
+ * the phone frames at that very moment, and on the stage's right part only it was cut in half.
+ */
+const EscapeBadge = memo(function EscapeBadge({ x, amount, still }: { x: number; amount: number; still: boolean }) {
+  const [t] = useState(() => new Animated.Value(still ? 1 : 0));
+  useEffect(() => {
+    if (still) return;
+    const a = Animated.sequence([
+      Animated.spring(t, { toValue: 1, friction: 6, tension: 120, useNativeDriver: true }),
+      Animated.delay(2000),
+      Animated.timing(t, { toValue: 2, duration: 420, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+    ]);
+    a.start();
+    return () => a.stop();
+  }, [t, still]);
+  return (
+    <Animated.View
+      pointerEvents="none"
+      accessibilityLiveRegion="polite"
+      accessibilityLabel={`Kaçtın, ${mulText(x)}, ${fmt(amount)} jeton`}
+      style={[
+        s.badge,
+        {
+          opacity: t.interpolate({ inputRange: [0, 0.25, 1, 2], outputRange: [0, 1, 1, 0] }),
+          transform: [{ translateY: t.interpolate({ inputRange: [0, 1, 2], outputRange: [-16, 0, -8] }) }, { scale: t.interpolate({ inputRange: [0, 1, 2], outputRange: [0.75, 1, 0.97] }) }],
+        },
+      ]}
+    >
+      <LinearGradient colors={['#1E7A4C', '#0B3D24']} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={s.badgeFace}>
+        <Text style={s.badgeHead}>KAÇTIN · {mulText(x)}</Text>
+        <GoldText size={26} glow={false}>{`+${fmt(amount)}`}</GoldText>
+      </LinearGradient>
+    </Animated.View>
+  );
+});
 
 /** Whoever escaped drifts down under a parachute from where the rocket was, with their multiplier; mine in green. */
 function Chutes({ geo, round, seats, mine, still }: { geo: Geo; round: number; seats: RocketSeat[]; mine: RocketMine | null; still: boolean }) {
@@ -749,7 +770,7 @@ function Action({
   bets,
   maxFuel,
   busy,
-  offset,
+  climb,
   onFuel,
   onEscape,
 }: {
@@ -758,7 +779,7 @@ function Action({
   bets: number[];
   maxFuel: number;
   busy: boolean;
-  offset: number;
+  climb: SharedValue<number>;
   onFuel: (bet: number) => void;
   onEscape: () => void;
 }) {
@@ -774,7 +795,7 @@ function Action({
     );
   }
   const aboard = !!mine && mine.onBoard > 0 && mine.cashed === null;
-  if ((moment.kind === 'fly' || moment.kind === 'ignite') && aboard) return <EscapeButton fuel={mine.onBoard} offset={offset} busy={busy} ready={moment.kind === 'fly'} onPress={onEscape} />;
+  if ((moment.kind === 'fly' || moment.kind === 'ignite') && aboard) return <EscapeButton fuel={mine.onBoard} climb={climb} busy={busy} ready={moment.kind === 'fly'} onPress={onEscape} />;
   const text =
     mine && mine.cashed !== null && mine.cashed > 0
       ? `Kaçtın: ${mulText(mine.cashed)} · +${fmt(mine.payout)} jeton`
@@ -787,7 +808,7 @@ function Action({
           : 'Bu turda yakıtın yok · sıradaki turu bekle';
   const good = !!mine && mine.cashed !== null && mine.cashed > 0;
   return (
-    <KeyPlate on={good} height={56} face={s.wait}>
+    <KeyPlate height={56} face={s.wait}>
       <View style={s.waitRow} accessibilityLiveRegion="polite">
         <Ionicons name={good ? 'checkmark-circle' : moment.kind === 'done' && mine ? 'flame' : 'hourglass-outline'} size={18} color={good ? GREEN : SALON.dim} />
         <Text style={[s.waitText, good && { color: '#BBF7D0' }]} numberOfLines={1}>
@@ -849,12 +870,11 @@ function FuelCan({ bet, off, onPress }: { bet: number; off: boolean; onPress: ()
 }
 
 /**
- * Kaç: what my fuel on board pays now, counted 30 times a second by its text alone (the gold button itself stays
- * still, so its glow and press never stutter); a tap leaves the rocket.
+ * Kaç: what my fuel on board pays now, drawn every frame from the climb by Skia on the UI thread (fx/climb-label; the
+ * button itself never redraws, so its glow and press never stutter); a tap leaves the rocket.
  */
-function EscapeButton({ fuel, offset, busy, ready, onPress }: { fuel: number; offset: number; busy: boolean; ready: boolean; onPress: () => void }) {
-  const { view } = useRocketState();
-  const pays = useCallback((x: number) => `KAÇ · ${fmt(payoutOf(fuel, x))}`, [fuel]);
+function EscapeButton({ fuel, climb, busy, ready, onPress }: { fuel: number; climb: SharedValue<number>; busy: boolean; ready: boolean; onPress: () => void }) {
+  const pays = useMemo<ClimbFormat>(() => ({ kind: 'pay', fuel, prefix: 'KAÇ · ' }), [fuel]);
   const [scale] = useState(() => new Animated.Value(1));
   const spring = (to: number) => Animated.spring(scale, { toValue: to, speed: 40, bounciness: to === 1 ? 10 : 0, useNativeDriver: true }).start();
   const off = busy || !ready;
@@ -878,15 +898,15 @@ function EscapeButton({ fuel, offset, busy, ready, onPress }: { fuel: number; of
         <Image source={KAC.mid} style={{ flex: 1, height: KAC_H }} resizeMode="stretch" accessibilityIgnoresInvertColors />
         <Image source={KAC.right} style={{ width: KAC_H * KAC_CAP, height: KAC_H }} accessibilityIgnoresInvertColors />
         <View style={s.kacLabel} pointerEvents="none">
-          <Ionicons name="rocket" size={20} color="#FFF5C8" />
           {ready ? (
-            <ClimbText view={view} offset={offset} every={80} format={pays} render={(t) => <GoldText size={20} lite glow={false}>{t}</GoldText>} />
+            <ClimbLabel climb={climb} format={pays} size={21} height={KAC_H} metal="emerald" style={s.kacText} fallback={<GoldText size={20} lite>{`KAÇ · ${fmt(payoutOf(fuel, 100))}`}</GoldText>} />
           ) : (
             <GoldText size={18} metal="silver">
               Kalkıyor…
             </GoldText>
           )}
         </View>
+        <Ionicons name="rocket" size={20} color="#FFF5C8" style={s.kacIcon} />
       </Animated.View>
     </Pressable>
   );
@@ -958,7 +978,9 @@ const s = StyleSheet.create({
   trailDot: { position: 'absolute', width: 5, height: 5, borderRadius: 3 },
   rocketBox: { position: 'absolute', left: 0, top: 0, width: ROCKET_SIZE, height: ROCKET_SIZE },
   readout: { position: 'absolute', top: '22%', left: 0, right: 0, alignItems: 'center' },
-  readGlow: { position: 'absolute', top: -34, alignSelf: 'center', width: 240, height: 130, tintColor: '#FFB020', opacity: 0.32 },
+  badge: { position: 'absolute', top: '44%', alignSelf: 'center', borderRadius: 16, padding: 2, backgroundColor: '#E8B53A', boxShadow: '0 6px 18px rgba(0,0,0,0.55)' },
+  badgeFace: { borderRadius: 14, paddingHorizontal: 18, paddingVertical: 6, alignItems: 'center' },
+  badgeHead: { color: '#D1FAE5', fontFamily: fonts.display, fontSize: 12, letterSpacing: 1.2, textShadowColor: 'rgba(3,20,10,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
   // The italic digits lean past their box: room on both sides keeps the last one whole (centred, so even).
   sub: { color: '#E0E7FF', fontWeight: '800', fontSize: 13, textShadowColor: 'rgba(4,5,26,0.9)', textShadowRadius: 6 },
   chute: { position: 'absolute', width: 80, alignItems: 'center' },
@@ -1010,7 +1032,9 @@ const s = StyleSheet.create({
   canPic: { width: 30, height: 30, marginTop: -2 },
   canText: { color: '#FFE7A6', fontFamily: fonts.display, fontSize: 14, lineHeight: 17, ...INK },
   kac: { flexDirection: 'row', alignItems: 'center', height: KAC_H },
-  kacLabel: { ...StyleSheet.absoluteFill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  kacLabel: { ...StyleSheet.absoluteFill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  kacText: { flex: 1, marginHorizontal: 44 },
+  kacIcon: { position: 'absolute', left: 30, top: KAC_H / 2 - 10 },
   wait: { paddingHorizontal: 18 },
   waitRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   waitText: { color: 'rgba(232,238,255,0.88)', fontFamily: fonts.display, fontSize: 14, flexShrink: 1, ...INK },

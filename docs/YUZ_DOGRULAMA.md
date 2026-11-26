@@ -54,6 +54,8 @@ görür; yeni uygulamada cümle doğrulama ekranını açar.
   hemen silinir; geriye yalnız Didit oturum numarası kalır, kopyanın silinmesi otomatik olarak tekrar denenir.
 - **Hesap silinince:** kimlik bilgileri aynı anda boşaltılır; Didit'teki kopya ve satırlar birkaç saniye içinde
   silinir.
+- **Yedekler:** gecelik veritabanı yedeğinde yalnız sonuç satırları var (görüntü yok). Silinen bir kayıt eski yedeklerde
+  yedeklerin kendi saklama süresi boyunca kalır; bu gizlilik politikasında yazmalı.
 - **Veri kopyası (Verilerimi indir):** kişinin kendi kayıtları, kimlikte okunan bilgilerle birlikte (`identityChecks`).
 - Didit'e bizim kişi numaramız gitmez; hesaptan üretilen sabit bir işaret gider (`u-…`).
 
@@ -82,8 +84,11 @@ Yönetim uçları (finans panelinden çağrılabilir, `PANEL_ROUTES`):
 Her işlem `audit_events`'e önce/sonra haliyle yazılır. Yönetimin kararını Didit'ten sonra gelen bir güncelleme
 değiştirmez.
 
-**Panel sayfası yok (sonraki iş):** uçlar hazır, finans paneli deposunda sayfa, `APP_ROUTES` ve izin yapılmadı. O
-zamana kadar inceleme Didit Business Console'dan yapılır; karar API ile ya da panel sayfası gelince oradan verilir.
+**Panel sayfası yok (sahiplerin kararı, 26 Kasım 2026: "finans paneline gerek yok"):** görüntülere ve Didit'in kendi
+incelemesine Didit Business Console'dan bakılır; orada verilen karar webhook'la buraya gelir. Bizim kurallarımızın
+incelemeye düşürdüğü kayıtları (18 yaş altı, cinsiyet uyuşmazlığı, aynı kimlik, aynı yüz) Didit'ten karara bağlamak
+mümkün değil: bunlar yönetim uçlarıyla kapanır. Elle doğrulama da öyle. Arayüz olmadığı için bu işleri istenince Claude
+uçları çağırarak yapar. Çekim talebindeki ad uyuşması (`holderMatchesId`, `idName`) da panelde görünmez.
 
 ## Para çekme şartı
 
@@ -154,7 +159,14 @@ zamana kadar inceleme Didit Business Console'dan yapılır; karar API ile ya da 
 
 ## Kalanlar
 
-- Finans paneli sayfası: inceleme sırası, karar, elle doğrulama, çekim talebinde ad uyuşması.
+- **Sahiplerin kararı bekleniyor (27 Kasım 2026, "bu pahalı, ücretsiz lazım"):**
+  - **1. yol (öneri):** Didit yalnız aylık ücretsiz krediyle (10 USD, iş e-postasıyla açılan hesapta). Ayda yaklaşık 30
+    kimlik ya da 65 rozet eder. Canlı ayarlar › Kimlik doğrulama › Aylık bütçe 10 yapılır; kredi bitince o ay yeni
+    doğrulama açılmaz.
+  - **2. yol:** tamamen ücretsiz, ekibin baktığı doğrulama. Kişi kimlik fotoğrafı ve kimlikle selfie (rozet için pozlu
+    selfie) yükler, yönetici bakar. Uygulamada yöneticilere bir inceleme ekranı gerekir. Kimlik fotoğraflarını biz
+    saklarız (30 gün).
+  - Didit anahtarları GitHub'a henüz girilmedi; doğrulama kapalı.
 - e-Devlet yaş belirteci: kılavuz çıkınca.
 - Hemen Tanış (yabancıyla görüntülü) için rozet şartı ya da öne çıkarma: sahiplerin kararı.
 - Telefonda denenmeli: Didit sayfasının Android tarayıcıda kamerayı açması ve uygulamaya dönüş.
