@@ -573,7 +573,8 @@ export const liveRooms = () => call<{ rooms: { room: string; listeners: number }
 // --- Live mode (lib/live): profile, people, rooms, messages, follows and the Gelir wallet on the server.
 /** `publicNo`: the person's own number (server/api/public-no.mjs), their profile's ID and their room's; an older
  *  server sends none (the app then makes one from the id, data/profile displayId). */
-export type ServerProfile = { username: string | null; gender: 'Kadın' | 'Erkek' | null; age: number | null; city: string | null; bio: string; interests: string[]; avatarUrl: string | null; publicNo?: string | null };
+/** `verified`: the blue badge, their face matched this very photo (server/api/verify.mjs); an older server sends none. */
+export type ServerProfile = { username: string | null; gender: 'Kadın' | 'Erkek' | null; age: number | null; city: string | null; bio: string; interests: string[]; avatarUrl: string | null; publicNo?: string | null; verified?: boolean };
 /** `genderHidden`: I chose "Gizli" (others don't get my gender; I still do). */
 export type ServerMe = ServerUser & ServerProfile & { role?: string; genderHidden?: boolean };
 /** How far someone is from me by our two profile cities (server/api/city-coords.mjs), rounded: never a location.
@@ -1223,6 +1224,14 @@ export type ProfileMore = {
 /** Vitrin: catalog gifts received (by id), the rides and entry effects owned now (shop skus), medals and titles earned. */
 export type Showcase = { gifts: { id: string; count: number }[]; rides: string[]; entries: string[]; medals: string[]; titles: string[] };
 export const showcase = (id: string) => call<Showcase>('GET', `/api/user/showcase?id=${encodeURIComponent(id)}`);
+/** Kimlik ve yüz doğrulaması (server/api/verify.mjs). Unchecked: lib/verify-core parseVerifyState / parseCheck. */
+export const verifyState = () => call<unknown>('GET', '/api/verify');
+/** Opens the provider's page for `kind` under the consent text's version the screen showed (409 consent_changed). */
+export const verifyStart = (kind: 'id' | 'face', consent: string) => call<{ url?: unknown; check?: unknown }>('POST', '/api/verify/start', { kind, consent });
+/** Back from the provider's page: the server asks the provider now. */
+export const verifyRefresh = (kind: 'id' | 'face') => call<{ check?: unknown; verified?: unknown; idVerified?: unknown }>('POST', '/api/verify/refresh', { kind });
+/** Consent withdrawn: my checks of that kind and the provider's copy go. */
+export const verifyWithdraw = (kind: 'id' | 'face') => call<unknown>('POST', '/api/verify/withdraw', { kind });
 /** Özel albüm (server/api/private-album.mjs): someone's album as I may see it. Unchecked: lib/private-album-core parseAlbum. */
 export const privateAlbum = (id: string) => call<unknown>('GET', `/api/user/private-album?id=${encodeURIComponent(id)}`);
 /** Adds a photo already in the storage (kind 'private') to my album; the answer is my album. */

@@ -138,6 +138,12 @@ export const PANEL_ROUTES = new Set([
   // Ses tanıtımı (voice-intro.mjs): a person's profile voice clip, and taking an offensive one off.
   'GET /api/admin/voice',
   'POST /api/admin/voice/clear',
+  // Kimlik ve yüz doğrulaması (verify.mjs): the checks staff decide (review), a reset, and the manual check without a
+  // face scan (the KVKK alternative).
+  'GET /api/admin/verify',
+  'POST /api/admin/verify/decide',
+  'POST /api/admin/verify/reset',
+  'POST /api/admin/verify/manual',
   // Özel albüm (private-album.mjs): a streamer's paid photos, and taking an offensive one down.
   'GET /api/admin/private-album',
   'POST /api/admin/private-album/remove',

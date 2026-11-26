@@ -96,9 +96,9 @@ export default function HostCenter() {
               if (me.verified) return becomeHost();
               // 18+ and real-person checks are a payout requirement, so a store build never skips them.
               if (!IS_DEMO)
-                return showAlert('Doğrulama gerekli', 'Yayıncı olmak ve kazancını çekebilmek için önce 18 yaş ve gerçek kişi doğrulamasını tamamlamalısın. Doğrulama için Destek ekibimize yaz.', [
+                return showAlert('Doğrulama gerekli', 'Yayıncı olmak için önce gerçek kişi doğrulamasını (canlı selfie) tamamlamalısın; kazancını çekmek için ayrıca kimlik doğrulaması istenebilir. İkisi de Ben › Kimlik Doğrulamam’da.', [
                   { text: 'Vazgeç', style: 'cancel' },
-                  { text: 'Doğrulama talebi aç', onPress: () => router.push({ pathname: '/destek', params: { kategori: 'Doğrulama' } }) },
+                  { text: 'Doğrulamaya git', onPress: () => router.push('/kimlik-dogrulama') },
                 ]);
               showAlert('Doğrulama gerekli', 'Yayıncı olmak için önce gerçek kişi doğrulaması yapmalısın. Bu demo sürümünde başvurun yine de onaylandı.');
               becomeHost();

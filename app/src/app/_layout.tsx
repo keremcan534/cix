@@ -136,6 +136,7 @@ function RootStack() {
           <Stack.Screen name="tanis" options={{ animation: 'slide_from_bottom', gestureEnabled: false }} />
           <Stack.Screen name="yayinci/index" />
           <Stack.Screen name="yayinci/cek" />
+          <Stack.Screen name="kimlik-dogrulama" />
           <Stack.Screen name="yayinci/mesajlar" />
           <Stack.Screen name="yayinci/performans" />
           <Stack.Screen name="asistan" />

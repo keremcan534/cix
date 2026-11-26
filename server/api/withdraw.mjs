@@ -16,6 +16,8 @@
 // The diamonds leave the balance when the request is made (one ledger row, ref = the request's ref, so a
 // retry is applied once and they can't be spent twice) and come back on a cancel or a rejection (ref
 // wd:<id>:return, which no client ref can be).
+// The account holder is compared with the name on the person's verified ID document (verify.mjs), when there is
+// one: holder_matches_id (true / false / null), and the document's name, for finance staff before they pay.
 // Payout details stay generic: an IBAN from any country (checked with its mod-97 digits) or another account
 // written out, and the holder's name; they are kept as given.
 //
@@ -27,6 +29,8 @@ import { WITHDRAW, diamondValueUsd, payoutTl } from './catalog.mjs';
 import { live } from './live-settings.mjs';
 import { notify } from './push.mjs';
 import { assertCashOut, cashOutOf } from './streamer-rule.mjs';
+import { idName } from './verify.mjs';
+import { holderMatches } from './verify-rules.mjs';
 import { PLAY_MONEY, diamondState, everHadPlayMoney, spendDiamonds } from './wallet.mjs';
 
 const fmt = (n) => n.toLocaleString('tr-TR');
@@ -79,6 +83,8 @@ const view = (w) => ({
   method: w.method,
   holder: w.holder,
   account: w.account,
+  // The holder against the name on the verified ID document (verify-rules.mjs holderMatches): null without one.
+  holderMatchesId: w.holder_matches_id ?? null,
   status: w.status,
   statusLabel: STATUS_LABEL[w.status],
   note: w.note,
@@ -145,9 +151,10 @@ export const withdrawRoutes = {
       const used = await weekUsed(c, u.id);
       if (used + n > rules.weeklyDiamonds)
         throw new HttpError(409, `Bu hafta en çok ${fmt(rules.weeklyDiamonds)} elmas çekilebilir; kalan ${fmt(Math.max(0, rules.weeklyDiamonds - used))} elmas. Sınır Pazartesi 00:00'da yenilenir`);
+      const match = holderMatches(holder, await idName(u.id, c));
       const w = await c.query(
-        'INSERT INTO withdrawals (user_id, diamonds, usd, method, holder, account, play, ref, ip) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id',
-        [u.id, n, usd, method, holder, account, PLAY_MONEY, b.ref, ip],
+        'INSERT INTO withdrawals (user_id, diamonds, usd, method, holder, account, play, ref, ip, holder_matches_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id',
+        [u.id, n, usd, method, holder, account, PLAY_MONEY, b.ref, ip, match],
       );
       await spendDiamonds(c, u.id, n, 'Para çekme talebi', b.ref, null, { channel: 'cekim', detail: { withdrawal: Number(w.rows[0].id), usd } });
     });
@@ -193,7 +200,9 @@ export const withdrawRoutes = {
     const status = url.searchParams.get('status') || 'pending';
     if (status !== 'all' && !STATUSES.includes(status)) throw new HttpError(400, 'Geçersiz durum');
     const r = await db.query(
-      `SELECT w.*, u.name, u.phone, u.public_no FROM withdrawals w JOIN users u ON u.id = w.user_id
+      `SELECT w.*, u.name, u.phone, u.public_no,
+              (SELECT i.doc_name FROM identity_checks i WHERE i.user_id = w.user_id AND i.kind = 'id' AND i.status = 'approved' ORDER BY i.id DESC LIMIT 1) AS id_name
+         FROM withdrawals w JOIN users u ON u.id = w.user_id
         WHERE ($1 = 'all' OR w.status = $1) ORDER BY w.id ${status === 'pending' ? 'ASC' : 'DESC'} LIMIT 200`,
       [status],
     );
@@ -226,6 +235,8 @@ export const withdrawRoutes = {
         // publicNo: the person's ID in the app (12 digits), what staff read and type; id stays for the calls.
         user: { id: w.user_id, name: w.name, phone: w.phone ?? null, publicNo: w.public_no === null || w.public_no === undefined ? null : String(w.public_no) },
         play: w.play,
+        // The name on the person's verified ID document (verify.mjs), null without one: compare it with the holder.
+        idName: w.id_name ?? null,
         payable: w.status === 'pending' && !w.play && !playMoney,
         decidedBy: w.decided_by,
         // Other accounts (12-digit IDs) with this IBAN, and from the same internet address.

@@ -9,7 +9,7 @@
 //   POST /api/wallet/spend      { amount, reason, ref }       → { user, replay }   (old apps' shop buys: economy.mjs)
 // Coin sources and diamond locks (Gelir: çekilebilir / kilitli): wallet.mjs. Jeton Noktası, refunds and the
 // audit view for disputes: jeton.mjs.
-// Withdrawals (para çekme): withdraw.mjs. Store refunds read from Google Play: refunds.mjs.
+// Withdrawals (para çekme): withdraw.mjs. Kimlik ve yüz doğrulaması (Didit): verify.mjs. Store refunds read from Google Play: refunds.mjs.
 // Sign-in and sessions: auth.mjs (e-mail codes: mail.mjs; WhatsApp phone check: whatsapp.mjs). Push: push.mjs.
 // Gifts, catalog, rankings: gifts.mjs. The admins' own gifts (Yönetim › Hediyeler): custom-gifts.mjs. Store purchases: purchases.mjs; the VIP subscription (Abonelik): vip.mjs. Uploads: media.mjs. Voice token and presence: live.mjs. Profiles, follows, blocks, reports
 // and account deletion: social.mjs (levels, extras, album and Vitrin of a profile: profiles.mjs). Direct messages:
@@ -126,6 +126,7 @@ import { TEST_DAILY, charmPoints, creditCoins, giftCoins, playCoinsToday, spendD
 import { whatsappRoutes } from './whatsapp.mjs';
 import { closeLines, lineRoutes, openLine } from './live-line.mjs';
 import { withdrawRoutes } from './withdraw.mjs';
+import { startVerifySweep, stopVerifySweep, verifyRoutes } from './verify.mjs';
 import { hostBonusRoutes, startHostBonus, stopHostBonus } from './host-bonus.mjs';
 import { startVipMonth, stopVipMonth, vipMonthRoutes } from './vip-month.mjs';
 import { refundSyncRoutes, startRefundSync, stopRefundSync } from './refunds.mjs';
@@ -340,6 +341,7 @@ const routes = {
   ...levelRewardRoutes,
   ...taskRewardRoutes,
   ...withdrawRoutes,
+  ...verifyRoutes,
   ...hostBonusRoutes,
   ...vipMonthRoutes,
   ...jetonRoutes,
@@ -557,6 +559,7 @@ function shutdown(signal) {
   stopSanctionSweep();
   stopLiveSync();
   stopOtpSweep();
+  stopVerifySweep();
   stopCallSweep();
   stopHoldSweep();
   stopAutoChat();
@@ -612,6 +615,7 @@ startBondSweep();
 startSanctionSweep();
 startLiveSync();
 startOtpSweep();
+startVerifySweep();
 startCallSweep();
 startHoldSweep();
 startAutoChat();

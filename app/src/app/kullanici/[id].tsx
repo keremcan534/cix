@@ -873,7 +873,7 @@ export default function UserProfile() {
                 tone="blue"
                 title="Doğrulama"
                 text={user.verified ? 'Gerçek kişi doğrulandı · mavi rozet aktif' : isMe ? 'Selfie ile doğrula, mavi rozet al' : 'Bu kullanıcı henüz doğrulanmadı.'}
-                onPress={isMe && !user.verified ? () => showAlert('Doğrulama gerekli', 'Selfie ile gerçek kişi doğrulaması yap; profilinde mavi rozet görünür.') : undefined}
+                onPress={isMe && !user.verified ? (live ? () => router.push('/kimlik-dogrulama') : () => showAlert('Doğrulama gerekli', 'Selfie ile gerçek kişi doğrulaması yap; profilinde mavi rozet görünür.')) : undefined}
               />
 
               {hasBasics && (

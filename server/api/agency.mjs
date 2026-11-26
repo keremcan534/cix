@@ -72,6 +72,7 @@ import {
 } from './agency-ops.mjs';
 import { PLAY_MONEY, everHadPlayMoney } from './wallet.mjs';
 import { myAssistant, resolveJoinCode } from './agency-assistants.mjs';
+import { assertOwnerId } from './streamer-rule.mjs';
 
 /**
  * Commission is never paid out on a server that holds or held play money (test top-ups, test or sandbox
@@ -961,6 +962,8 @@ export const agencyRoutes = {
       const same = await c.query('SELECT * FROM agency_payouts WHERE agency_id = $1 AND ref = $2', [a.id, r0]);
       if (same.rowCount) return { payout: { id: Number(same.rows[0].id), amount: d4(same.rows[0].amount), status: same.rows[0].status }, replay: true };
       if (a.status !== 'approved') throw new HttpError(403, 'Askıdaki veya kapalı ajans ödeme talep edemez');
+      // Canlı ayarlar › Kimlik doğrulama: the owner's ID check first (streamer-rule.mjs).
+      await assertOwnerId(c, a.owner_id);
       if (!x.s.payout_policy.currencies.includes(b.currency)) bad(`Para birimi: ${x.s.payout_policy.currencies.join(', ')}`);
       if (await playMoneyOn(c)) throw new HttpError(409, PLAY_PAYOUT);
       const open = await c.query("SELECT 1 FROM agency_payouts WHERE agency_id = $1 AND status IN ('pending', 'ready')", [a.id]);

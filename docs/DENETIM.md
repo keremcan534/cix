@@ -105,11 +105,23 @@ modunda olması, hata takibi olmaması ve kırık kodun birleşmeden önce yakal
   gider.
 - Bir kez kontrol edilir, aylık geri yükleme denemesi (`restore.sh --check`) takvime konur.
 
+### 9. Türkiye'de e-Devlet yaş doğrulaması zorunlu (siz + avukat · Claude: kılavuz çıkınca)
+- 7578 sayılı Kanun (5651 ek m.4) ve 10 Ekim 2026 tarihli Yönetmelik (RG 33396), **1 Kasım 2026'dan beri yürürlükte**.
+- Kapsam: Türkiye'den erişilen her sosyal ağ sağlayıcı. Hesap açılışında e-Devlet "yaş doğrulama belirteci" zorunlu,
+  **yetişkinler dahil**. Var olan hesaplar için son gün **31 Mart 2027**. Platforma yalnız 15/18 yaş eşiği bilgisi
+  gelir. Bugün uygulamada yaş, kişinin beyan ettiği doğum tarihi.
+- Yaptırım: önce bildirim ve süre; sonra küresel cironun %3'üne kadar ceza, Türk vergi mükelleflerine reklam yasağı, bant
+  daraltma.
+- Belirtecin teknik kılavuzu (m.12) henüz yayımlanmamış görünüyor. Yüz doğrulaması bunun yerini tutmaz.
+- **Siz:** Similar Club'ın kapsamda olup olmadığını avukata sorun. Kılavuz çıkınca Claude bağlar: kayıtta belirteç ve
+  var olan hesaplar için hatırlatma.
+- Bilgi hukuk bürolarının özetlerinden alındı; Resmî Gazete metni okunmadı ([`YUZ_DOGRULAMA.md`](YUZ_DOGRULAMA.md) › Hukuk).
+
 ---
 
 ## 🟠 Önemli: ilk haftalarda
 
-0. **Para çekme kuralı cinsiyet beyanına dayanıyor (siz: karar):** Erkek hesaplar 18 Kasım'dan beri para çekemiyor ([`YAYINCI_KURALLARI.md`](YAYINCI_KURALLARI.md)). Cinsiyet hesap sahibinin kendi seçimi: kendini kadın seçen erkek hesap kuralı aşar. Ödeme öncesi kimlik kontrolü bu açığı kapatır.
+0. **Para çekme kuralı cinsiyet beyanına dayanıyor (siz: Didit hesabı ve bir ayar):** Erkek hesaplar 18 Kasım'dan beri para çekemiyor ([`YAYINCI_KURALLARI.md`](YAYINCI_KURALLARI.md)). Cinsiyet hesap sahibinin kendi seçimi: kendini kadın seçen erkek hesap kuralı aşar. **26 Kasım 2026:** kimlik doğrulaması yapıldı ([`YUZ_DOGRULAMA.md`](YUZ_DOGRULAMA.md)): kimlikteki cinsiyet hesaptakinden farklıysa para çekme açılmaz, yönetim karar verir. Açık kapanması için Didit hesabı, yeni APK, Zorunlu sürüm ve Canlı ayarlar › Kimlik doğrulama › "Para çekmede kimlik şartı" 1.
 1. **Reklam ölçümü yok (siz + Claude):** Uygulamada analitik ya da yükleme kaynağı ölçümü yok. Reklam ekibi hangi
    reklamın kullanıcı ve ödeme getirdiğini göremez. Firebase Analytics ve Google Ads dönüşümü, ya da AppsFlyer / Adjust
    gibi bir ölçüm hizmeti kurulmalı.
@@ -342,3 +354,29 @@ adlarıyla duyurulur ([`HEDIYE_YONETIMI.md`](HEDIYE_YONETIMI.md) › Global hedi
 - **Eski APK'lar:** duyuruyu görmez; gönderildiği odada normal hediye görür.
 - **Panel (Claude, sonra):** Hediyeler formundaki "Global" kutusu panel deposunda yapılmadı; sunucu ucu hazır
   (`global` alanı, `globalMinPrice`).
+
+## Kimlik ve yüz doğrulaması (26 Kasım 2026, sahiplerin kararı)
+
+Para çekenlere kimlik + canlı selfie, herkese isteğe bağlı mavi rozet; sağlayıcı Didit
+([`YUZ_DOGRULAMA.md`](YUZ_DOGRULAMA.md)).
+
+- **Biyometrik veri (siz + avukat):** yüz eşleştirme KVKK'da özel nitelikli, UK GDPR'da özel kategori veri.
+  - Uygulamada ayrı aydınlatma ve açık rıza ekranı var (metin taslak, avukat onaylamalı).
+  - Rıza vermeyene yüz taramasız yol: yönetimin elle doğrulaması.
+  - Yayından önce: Didit ile DPA, UK için DPIA, KVKK standart sözleşmesi (5 iş günü içinde bildirim), VERBİS ve Türkiye
+    temsilcisi, gizlilik politikasında Didit.
+- **Saklama:** bizde görüntü ve yüz şablonu yok; Didit'teki kopya 30 günde silinir. Rıza geri alınınca ya da hesap
+  silinince hemen silinir. Rıza geri alınınca dolandırıcılığa karşı kimlik izinin tutulup tutulmayacağı avukatın
+  sorusu.
+- **Eski APK'lar:** doğrulama yapamaz. "Para çekmede kimlik şartı" yeni APK dağıtılıp Zorunlu sürüm yükseltilmeden
+  açılırsa eski uygulamadaki yayıncılar para çekemez.
+- **Çocuk güvenliği:** kimliğe göre 18 yaş altı çıkarsa doğrulama incelemeye düşer ve alarm verir (`verify_minor`).
+  Hesap kapatılmalı; otomatik kapatma yok, yönetim karar verir.
+- **Para:** şart üç yerde: Para Çek, Jeton Noktası'na bozdurma, ajans ödemesi. Hesap sahibinin adı kimlikteki adla
+  karşılaştırılır, sonuç finans personeline gösterilir; reddetmez.
+- **Maliyet:** liste fiyatı kimlik 0,33 USD, rozet 0,15 USD. Aylık bütçe Canlı ayarlardan (varsayılan 100 USD); dolunca o
+  ay yeni doğrulama açılmaz. Kişi başına günde tür başına 3 deneme.
+- **Panel (Claude, sonra):** inceleme sırası, karar ve elle doğrulama uçları `PANEL_ROUTES`'ta hazır; panel deposunda
+  sayfa ve `APP_ROUTES` izni yapılmadı. O zamana kadar görüntülere Didit Business Console'dan bakılır.
+- **Telefonda denenmeli:** Didit sayfasının Android tarayıcıda kamerayı açması ve `similarclub://kimlik-dogrulama` ile
+  uygulamaya dönüş.

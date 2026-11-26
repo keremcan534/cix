@@ -186,7 +186,15 @@ export default function IncomeScreen() {
               </Pressable>
             </View>
           ) : (
-            !!withdrawState.cashOut?.why && <Text style={[styles.exchangeSub, { marginTop: 8 }]}>{withdrawState.cashOut.why}</Text>
+            !!withdrawState.cashOut?.why && (
+              // id_required (Canlı ayarlar › Kimlik doğrulama): the sentence opens the verification screen.
+              <Text
+                style={[styles.exchangeSub, { marginTop: 8 }, withdrawState.cashOut.code === 'id_required' && { textDecorationLine: 'underline' }]}
+                onPress={withdrawState.cashOut.code === 'id_required' ? () => router.push('/kimlik-dogrulama') : undefined}
+              >
+                {withdrawState.cashOut.why}
+              </Text>
+            )
           )}
           {pendingWithdraw && (
             <Text style={[styles.exchangeSub, { marginTop: 8 }]} onPress={() => router.push('/yayinci/cek')}>

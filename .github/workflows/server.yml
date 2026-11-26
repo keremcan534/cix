@@ -104,6 +104,14 @@ jobs:
           S3_KEY: ${{ secrets.S3_KEY }}
           S3_SECRET: ${{ secrets.S3_SECRET }}
           S3_PUBLIC_URL: ${{ secrets.S3_PUBLIC_URL }}
+          # Kimlik ve yüz doğrulaması through Didit (server/api/verify.mjs, docs/YUZ_DOGRULAMA.md): the API key, the
+          # webhook's signing secret and the duplicate-document key are secrets; the two workflow ids (Didit Console ›
+          # Workflows) are variables.
+          DIDIT_API_KEY: ${{ secrets.DIDIT_API_KEY }}
+          DIDIT_WEBHOOK_SECRET: ${{ secrets.DIDIT_WEBHOOK_SECRET }}
+          VERIFY_HASH_KEY: ${{ secrets.VERIFY_HASH_KEY }}
+          DIDIT_KYC_WORKFLOW: ${{ vars.DIDIT_KYC_WORKFLOW }}
+          DIDIT_FACE_WORKFLOW: ${{ vars.DIDIT_FACE_WORKFLOW }}
           # Push notifications through Firebase (server/api/push.mjs): the service account key's JSON, a secret. It
           # goes into .env base64-encoded (one line, no quotes) as FCM_SERVICE_ACCOUNT_B64, never printed.
           FCM_SERVICE_ACCOUNT: ${{ secrets.FCM_SERVICE_ACCOUNT }}
@@ -185,7 +193,7 @@ jobs:
               echo "::add-mask::$FCM_SERVICE_ACCOUNT_B64"
             fi
           fi
-          lines=$(for k in MAIL_PROVIDERS MAIL_FROM BREVO_API_KEY RESEND_API_KEY WHATSAPP_NUMBER WHATSAPP_APP_SECRET WHATSAPP_VERIFY_TOKEN OTP_REVIEW_EMAIL OTP_REVIEW_EMAIL_CODE S3_ENDPOINT S3_BUCKET S3_KEY S3_SECRET S3_PUBLIC_URL FCM_SERVICE_ACCOUNT_B64 FC_ADMIN_EMAIL FC_ADMIN_PASSWORD; do
+          lines=$(for k in MAIL_PROVIDERS MAIL_FROM BREVO_API_KEY RESEND_API_KEY WHATSAPP_NUMBER WHATSAPP_APP_SECRET WHATSAPP_VERIFY_TOKEN OTP_REVIEW_EMAIL OTP_REVIEW_EMAIL_CODE S3_ENDPOINT S3_BUCKET S3_KEY S3_SECRET S3_PUBLIC_URL FCM_SERVICE_ACCOUNT_B64 FC_ADMIN_EMAIL FC_ADMIN_PASSWORD DIDIT_API_KEY DIDIT_WEBHOOK_SECRET VERIFY_HASH_KEY DIDIT_KYC_WORKFLOW DIDIT_FACE_WORKFLOW; do
               v=${!k}
               v=${v#"${v%%[![:space:]]*}"}
               v=${v%"${v##*[![:space:]]}"}

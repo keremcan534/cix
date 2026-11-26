@@ -122,6 +122,8 @@ export async function loadPublicProfile(serverId: string, mine = false, visit = 
       ...(p.username && { username: p.username }),
       ...(p.avatarUrl && { avatar: p.avatarUrl }),
       ...(serverNo(p.publicNo) && { publicNo: serverNo(p.publicNo)! }),
+      // The blue badge as the server says it now (verify.mjs): one that dropped (a new photo) goes too.
+      verified: p.verified === true,
     });
   }
   return {

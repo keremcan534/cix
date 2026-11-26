@@ -201,7 +201,13 @@ Odadaki boş ve kilitli mikrofonların rengi; odadaki herkes aynı rengi görür
 | `POST /api/wallet/withdraw` `{diamonds, method, details: {holder, account}, ref}` | Talep: en az 10.000, en çok 1.000.000 elmas (Canlı ayarlar), haftada (Pazartesi–Pazar) en çok 10.000.000; yalnız kilidi açılmış elmas; aynı anda tek bekleyen talep. `method`: `iban` (her ülkenin IBAN'ı, kontrol basamağıyla) veya `other` (serbest hesap bilgisi, 5–120 harf). `holder`: hesap sahibinin adı (3–80). Değer: 1.000 elmas = 1 USD (Canlı ayarlar › Elmas değeri). `FEATURES_OFF=withdraw` yeni talebi kapatır; iptal ve liste açık kalır. |
 | `GET /api/wallet/withdrawals` | Kendi taleplerim (durum: Beklemede / Ödendi / Reddedildi / İptal edildi), çekilebilir elmas ve kurallar. |
 | `POST /api/wallet/withdrawals/cancel` `{id}` | Yalnız beklemedeyken; elmas geri gelir. |
-| `GET /api/wallet/cash-out` | Bu hesap para çekebilir mi: `{allowed, code, why}` ([`YAYINCI_KURALLARI.md`](YAYINCI_KURALLARI.md)). |
+| `GET /api/wallet/cash-out` | Bu hesap para çekebilir mi: `{allowed, code, why}` ([`YAYINCI_KURALLARI.md`](YAYINCI_KURALLARI.md)). Canlı ayarlar › Kimlik doğrulama şartı açıkken (ve Didit anahtarları varken) onaylı kimlik doğrulaması olmayana `code: 'id_required'`; Para Çek, Jeton Noktası'na bozdurma ve ajans ödemesi (sahibinin kimliği) aynı kuralla 403 `id_required` alır. Her çekim talebinde hesap sahibi kimlikteki adla karşılaştırılır: `holderMatchesId` (yöneticide ayrıca `idName`). |
+| `GET /api/verify` → `{on, id, face, verified, idVerified, payoutNeedsId, consent}` | **Kimlik ve yüz doğrulaması** (26 Kasım, `verify.mjs`, migration 136, [`YUZ_DOGRULAMA.md`](YUZ_DOGRULAMA.md)): her türün son kaydı (`pending`, `approved`, `review`, `declined`, `expired`), mavi rozet (`verified`: yüz bu profil fotoğrafıyla eşleşti), onaylı kimlik, şart açık mı, açık rıza metinleri (sürümlü). |
+| `POST /api/verify/start` `{kind: 'id'\|'face', consent}` → `{url, check}` | Didit oturumu açar (ya da açık olanın sayfasını verir); uygulama `url`'i tarayıcıda açar. `consent`: ekranın gösterdiği metnin sürümü; başkasıysa 409 `consent_changed` `{consent}`. Kimlik yalnız para çekebilecek hesaba (yoksa `streamer-rule` cevabı, ör. 403 `men_no_cashout`), zaten onaylıya 409 `already`. Yüz için kendi yüklediği profil fotoğrafı şart (409 `no_photo`, en çok 2 MB `photo_too_big`, JPEG/PNG/WebP `photo_type`); fotoğraf Didit'e `portrait_image` olarak gider. Günde tür başına 3 oturum (429 `tries`); aylık bütçe dolunca 503 `budget`; anahtar yoksa ya da bütçe 0 ise 503 `verify_off`; aynı anda iki dokunuş 409 `opening`. Didit'e bizim kişi numaramız değil, hesaptan üretilen sabit bir işaret (`vendor_data: u-…`) gider. |
+| `POST /api/verify/refresh` `{kind}` → `{check, verified, idVerified}` | Uygulama Didit sayfasından dönünce: sunucu kararı Didit'ten okur. |
+| `POST /api/verify/withdraw` `{kind}` → `{verified, idVerified}` | Rızayı geri alma: o türün bütün kayıtları silinir, rozet kalkar, Didit'teki kopya hemen silinir. `audit_events` `verify.withdraw` (kişisel veri yok). |
+| `POST /api/verify/webhook` | Didit → biz. Yalnız imzalı çağrı (`X-Signature`: ham gövdenin HMAC-SHA256'sı, ya da `X-Signature-V2`: sıralı JSON'un; `X-Timestamp` 5 dakika içinde) okunur; karar sonra Didit'in API'sinden alınır. Didit onaylasa da şunlar incelemeye düşer (`review`): 18 yaş altı (alarm `verify_minor`), kimlikteki cinsiyet hesaptakiyle uyuşmuyor, kimlikte cinsiyet/yaş/ad okunamadı, aynı kimlik başka hesapta (numaranın HMAC'ı), Didit'in aynı yüz uyarısı, Didit'in kendi incelemesi. Yönetimin kararını sağlayıcı değiştirmez. |
+| `GET /api/admin/verify?status=&kind=&user=` · `POST /api/admin/verify/decide` `{id, approve, note?}` · `POST /api/admin/verify/reset` `{user, kind, note?}` · `POST /api/admin/verify/manual` `{user, docName, docSex, adult: true, note}` | Yönetici, panel (`PANEL_ROUTES`; panel sayfası henüz yok): inceleme sırası (kimlikte okunanlar, sebepler, Didit oturum numarası), onay/ret, yeniden doğrulatma (rozet kalkar), **yüz taramasız elle doğrulama** (KVKK'nın istediği alternatif yol; not zorunlu). Hepsi `audit_events` (`verify.decide`, `verify.reset`, `verify.manual`; önce/sonra, panel kullanıcısı). |
 | `POST /api/admin/shop/frame-svga` `{source}` | Yönetici: çerçeve SVGA'sından durağan PNG ve hareketli WebP yapar: `{art, motion, px, bytes}`. |
 | `POST /api/admin/rocket/video` `{level, video}` | Yönetici: oda roketinin 1–5. seviye kalkış videosu; `video: null` kaldırır. |
 | `POST /api/admin/lucky/art` `{id, icon?, video?, iconLink?, videoLink?}` | Yönetici: bir Şanslı paketinin (`lk1`–`lk4` ya da panelin eklediği) ikonu ve videosu (`lucky-art.mjs`). Hediyelerle aynı denetim ve çevirme: ikon saydam PNG/WebP 128–4096 px, video hazır yığılmış MP4 ya da çevrilecek WebM/MOV/SVGA. `null` kaldırır, verilmeyen değişmez; ayarda olmayan paket 404. Cevap `{art}`. `audit_events` `lucky.art` (önce/sonra, panel kullanıcısı). |
@@ -358,6 +364,7 @@ Bakiye yalnızca aynı veritabanı işleminde ledger satırıyla birlikte deği�
 - **098_shop_frame_reach**: `shop_items.art_box_l/_t/_r/_b` (panel çerçevesinin resimde çizili kısmı, hareketli hali dahil) ve `art_box_of` (hangi resimlerden ölçüldü); katalogda `art.reach`. Ayrıntı: [`MAGAZA_YONETIMI.md`](MAGAZA_YONETIMI.md).
 - **099_bond_decay**: `bonds`'a `points_lost` (gecelerin aldığı puan), `gift_day` (iki taraftan son hediyenin Türkiye günü; kurulu bağlarda güncellemenin günü), `decayed_on` (gece düşüşünün son işlendiği gün), `level` / `level_said` / `level_seq` (puanın seviyesi, iki tarafa söylenen seviye, seviye bildirimi sayısı), `idle_warned` (bitiş uyarısının gittiği sessiz dönem), `told_status` (Sistem'e yazılan son durum; eski satırlar işaretli), `end_reason` (`idle`, `gone`, `refund`); gece işi, bildirimler ve odadaki Lv10+ bağlar için kısmi endeksler. Ayrıntı: [`BAGLAR.md`](BAGLAR.md).
 - **084_media_minutes**: `media_minutes` (Türkiye günü ve tür başına saniye: `room` sesli odada geçen süre, `speaker` mikrofon açık, `call_voice` / `call_video` arama; içinde kişi yok, hesap silinince bir şey kalmaz), `voice_tracks` (şu an açık mikrofonlar: kapanınca silinir, süresi `speaker`'a eklenir) ve `finance_sync.usage_day` / `usage_error` (panele gönderilen son dakika günü ve son hata; ilk değeri dün, yani geçmiş günler gönderilmez).
+- **136_identity_checks**: `identity_checks` (kimlik ve yüz doğrulaması: kişi, tür `id`/`face`, durum, Didit oturumu, rıza sürümü/zamanı/IP, incelemeye düşme sebepleri, kimlikte okunan ad, cinsiyet, 18+, ülke ve numaranın HMAC'ı, eşleşen profil fotoğrafı, yönetim kararı, Didit'teki kopyanın silindiği an; görüntü ve yüz şablonu yok); `users.verified_avatar` (rozetin verildiği fotoğraf: fotoğraf değişince rozet düşer); `withdrawals.holder_matches_id`.
 - **090_guards**: `guards` (koruyucu, korunan, puan, başlangıç, son hediye günü, son düşüş günü, bitiş; açık çift başına tek satır) ve `guard_settings` (kapalı mı, eşik, eşiğin son değiştiği an). `gift_events` tetikleyicisi `guard_points` koruyucunun hediyesini puana ekler. Ayrıntı: [`KORUMA.md`](KORUMA.md).
 
 ## Testler ve kurulum
@@ -483,6 +490,7 @@ Herkese açık yanıtta yalnız kod vardır; değer, eşik ve ilgili hesaplar y�
 | `mail_quota_high` | Bugünkü ücretsiz e-posta kotası (bütün sağlayıcılar, UTC günü) dolmak üzere; %100'de e-postayla giriş UTC gece yarısına kadar durur | `ALERT_MAIL_QUOTA_PCT` (%80'den fazla) |
 | `mail_failing` | Son 10 e-posta kodu hiçbir sağlayıcıyla gönderilemedi (anahtar yanlış, hesap durduruldu) | 10 art arda |
 | `money_mismatch` | Para denetimi tutmayan bir bakiye, kayıt, jeton partisi, kilit, hediye ya da ücretli olay buldu ([`PARA_DENETIMI.md`](PARA_DENETIMI.md)); arka planda çalışır, ayrıntı `GET /api/admin/money-check` | `MONEY_CHECK_MIN` (60 dk'da bir; `0` kapalı) |
+| `verify_minor` | Bir kimlik doğrulaması kişinin 18 yaşından küçük olduğunu söylüyor ve yönetim henüz karar vermedi: 18+ uygulamada hesap kapatılmalı ([`YUZ_DOGRULAMA.md`](YUZ_DOGRULAMA.md)) | 1 ve üstü |
 | `alerts_error` | Alarmlar okunamadı (çoğu zaman veritabanı) | — |
 
 Alarm geldiğinde: `GET /api/admin/alerts` ile ayrıntıya bakın; para alarmıysa ilgili özelliği kapatın, hesabı `GET /api/admin/wallet/audit?user=` ile inceleyin.
@@ -591,6 +599,26 @@ Anlar'daki ve profildeki fotoğraflar için. Telefon fotoğrafı doğrudan R2'ye
 **Listelerde fotoğraf (Güncelleme 7, madde 1).** Yalnız ad gönderen listeler artık kişinin fotoğrafını da gönderir (eklenen alan, eski uygulama okumaz): `GET /api/rooms/staff` (`admins[]`, `djs[]`, `bans[]` içinde `avatarUrl`), `GET /api/rooms/mutes` (`userAvatar`), `GET /api/me/room-invites` (`host.avatarUrl`), `GET /api/wallet/earnings` ve `GET /api/wallet/coins` (`from.avatarUrl`), `GET /api/invite` ve `POST /api/invite/redeem` (`mine.by.avatarUrl`), `GET /api/admin/lucky` (`recent[]` ve `winners[]` içinde `sender.avatarUrl`). Uygulama tarafında başarısız bir görünüm okuması (`/api/looks`) 5 ve 15 saniye sonra kendiliğinden tekrarlanır, ekrandaki ama hâlâ okunamamış kişiler 30 saniyede bir yeniden sorulur; açılamayan bir fotoğraf 3 ve 20 saniye sonra yeniden denenir, ancak sonra baş harfe döner.
 
 Kapatmak için GitHub'daki `S3_PUBLIC_URL`'i tek bir `-` yapın. **UK GDPR:** Cloudflare veri işleyen olur; Cloudflare hesabında veri işleme sözleşmesini (DPA) kabul edin, gizlilik politikasına ekleyin.
+
+## Kimlik ve yüz doğrulaması (Didit)
+Para çekenler için kimlik + canlı selfie, herkes için isteğe bağlı mavi rozet (canlı selfie ↔ profil fotoğrafı). Ayrıntı
+ve kurulum: [`YUZ_DOGRULAMA.md`](YUZ_DOGRULAMA.md) › Kurulum. Kısaca:
+
+1. Didit Business hesabı (şirket adına), DPA, işleme bölgesi AB, saklama 1 ay, yüz şablonu saklama kapalı.
+2. İki iş akışı: **KYC** (kimlik + canlılık + yüz eşleşmesi) ve **Biometric Authentication** (canlılık + verilen
+   fotoğrafla eşleşme). Kimlikleri GitHub değişkeni `DIDIT_KYC_WORKFLOW`, `DIDIT_FACE_WORKFLOW`.
+3. Webhook: `https://<alan>/api/verify/webhook`, olay `status.updated`; gizli anahtarı GitHub sırrı
+   `DIDIT_WEBHOOK_SECRET`.
+4. Sırlar: `DIDIT_API_KEY`, `VERIFY_HASH_KEY` (uzun, rastgele, bir kez konur, değiştirilmez: aynı kimliğin iki hesapta
+   kullanılmasını yakalar).
+5. Actions › Server › Run workflow.
+
+`DIDIT_API_KEY` ve `DIDIT_WEBHOOK_SECRET` ile o türün iş akışı yoksa o doğrulama kapalıdır (503) ve para çekmede şart
+uygulanmaz. Didit'teki kopyayı sunucu karardan 30 gün sonra siler (saatlik iş, `VERIFY_SWEEP_MS`); yarım kalan oturum 48
+saatte kapanır. Canlı ayarlar › Kimlik doğrulama: "Para çekmede kimlik şartı" (0/1, varsayılan 0; yeni APK dağıtılıp
+Zorunlu sürüm yükseltilmeden 1 yapmayın) ve "Aylık doğrulama bütçesi" (varsayılan 100 USD, liste fiyatıyla; 0: yeni
+doğrulama yok). **UK GDPR / KVKK:** Didit veri işleyen olur; yüz eşleştirme biyometrik veri: açık rıza ekranı uygulamada,
+DPIA, KVKK standart sözleşmesi ve gizlilik politikası avukatın işi.
 
 ## Sırada
 1. Alan adı (ör. `rtc.<alan>`) → `.env` `DOMAIN`, `Caddyfile`, `livekit.yaml` `turn.domain`, `API_BASE_URL` değişkeni.

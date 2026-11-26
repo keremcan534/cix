@@ -328,6 +328,10 @@ Güncelleme 7'de geldi; 20 Kasım'da "Muzip hediyeler" ile değişti (aşağıda
   - `FCM_SERVICE_ACCOUNT`: Firebase hizmet hesabı anahtarı.
 - **Haftalık aile bonusu:** Şu an sadece tahmin gösteriliyor. Ödenecekse kuralını sen belirle.
 - **Resim denetimi:** Anlar'daki resimleri otomatik denetlemek için bir hizmet seçilmeli.
+- **Kimlik ve yüz doğrulaması (Didit, 26 Kasım 2026):** Kod hazır: Ben › Kimlik Doğrulamam, para çekmede kimlik şartı
+  (Canlı ayarlar, varsayılan kapalı), mavi rozet. Didit hesabı, iki iş akışı, webhook ve GitHub sırları girilince
+  çalışır ([`YUZ_DOGRULAMA.md`](YUZ_DOGRULAMA.md) › Kurulum). Yeni APK gerekir; eski APK'da Kimlik Doğrulamam hâlâ eski
+  uyarıyı gösterir. **Telefonda denenmeli:** Didit sayfasının tarayıcıda kamerayı açması ve uygulamaya dönüş.
 
 **Telefonda denenecekler:** Bu listede "Telefonda denenmeli" yazan maddeler.
 
