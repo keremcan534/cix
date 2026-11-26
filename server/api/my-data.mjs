@@ -85,15 +85,18 @@ export async function exportOf(c, uid) {
   }));
 
   const messages = await all(
-    `SELECT m.id, m.sender, m.recipient, m.body, m.image_url, m.event_id, m.created_at, m.read_at, o.id AS other, o.name AS other_name
+    `SELECT m.id, m.sender, m.recipient, m.body, m.image_url, m.event_id, m.created_at, m.read_at, m.retracted_at, m.paid_price, m.paid_opened_at, o.id AS other, o.name AS other_name
        FROM messages m JOIN users o ON o.id = CASE WHEN m.sender = $1 THEN m.recipient ELSE m.sender END
       WHERE m.sender = $1 OR m.recipient = $1 ORDER BY m.id`,
     (x) => ({
       id: num(x.id),
       direction: x.sender === uid ? 'sent' : 'received',
       with: person(x.other, x.other_name),
-      text: x.body,
-      image: x.image_url ?? null,
+      // A message its writer took back, or a paid photo never paid for, is the writer's: the recipient's copy shows neither.
+      text: x.sender !== uid && x.retracted_at ? 'Bu mesaj geri alındı' : x.sender !== uid && x.paid_price !== null && !x.paid_opened_at ? 'Ücretli fotoğraf (açılmadı)' : x.body,
+      image: x.sender !== uid && (x.retracted_at || (x.paid_price !== null && !x.paid_opened_at)) ? null : (x.image_url ?? null),
+      ...(x.retracted_at ? { takenBack: x.retracted_at } : {}),
+      ...(x.paid_price !== null ? { paidPhoto: { price: Number(x.paid_price), openedAt: x.paid_opened_at } } : {}),
       // An event sent with it (Etkinlik Merkezi "Arkadaşına gönder").
       event: num(x.event_id),
       createdAt: x.created_at,

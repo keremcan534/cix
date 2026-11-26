@@ -345,3 +345,15 @@ Güncelleme 7'de geldi; 20 Kasım'da "Muzip hediyeler" ile değişti (aşağıda
 - Çevrim içi hizmette canlı destek yok, sık sorulanlar ve e-posta var.
 - Odalar bannerları sadece "Sana yakın" sekmesinde.
 - Kulüp (PR #36) senin isteğinle bekletiliyor.
+
+## Mesajlar: yanıtla, geri al, ücretli fotoğraf (27 Kasım 2026)
+
+- **Yanıtla:** Bir mesaja basılı tutup "Yanıtla" denir. Yazma kutusunun üstünde alıntı görünür; gönderilen mesajın üstünde de alıntı durur. Eski APK'lar yalnız yazıyı görür.
+- **Geri al:** Kendi mesajına basılı tutup gönderdikten sonraki 2 dakika içinde "Geri al" denebilir. Bu, yazı ve ücretsiz fotoğraf için geçerli; iki tarafta da "Bu mesaj geri alındı" görünür. Mesaj moderasyon için sunucuda saklanır.
+  - Ücreti ödenmiş mesaj geri alınamaz. Bunlar: erkeğin yayıncıya attığı ücretli mesaj, yayıncının bu mesaja kazanç getiren cevabı ve açılmış ücretli fotoğraf.
+  - Eski APK, mesajı geri alınmadan önce almışsa mesajı görmeye devam eder. Telefona gelen bildirim de geri alınamaz.
+- **Ücretli fotoğraf:** Onaylı yayıncı, kendisine ödeme yapan kişiye fotoğraf butonundan "Ücretli gönder · 120 jeton" ile fotoğraf atar.
+  - Karşı taraf kilitli bir kart görür: fiyat, geri sayım ve "Aç" butonu. Açarsa 120 jeton düşer ve yayıncıya 120 elmas geçer (ücretli mesaj gibi, ajans payı dahil).
+  - 2 dakika içinde açılmazsa alıcıda silinir. Yayıncı kendi tarafında "Açılmadı, silindi" görür.
+  - Fiyat Canlı ayarlar › Birebir ve eşleşme › Ücretli fotoğraf'tan değişir; 0 yapılırsa özellik kapanır. Kalp seviyesi şartı yoktur, çünkü açıp açmamak alıcının seçimidir.
+  - Eski APK'larda kart yerine "Ücretli fotoğraf (120 jeton). Açmak için uygulamayı güncelle." yazısı görünür; fotoğrafın adresi eski uygulamaya hiç gitmez.

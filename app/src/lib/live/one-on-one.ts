@@ -53,6 +53,8 @@ export type Pair = {
   calls: { voice: CallGate; video: CallGate };
   /** A photo in the chat (server one-on-one.mjs): with a streamer from a heart level, else on a mutual follow. Missing from an older server. */
   photo?: { open: boolean; why: string | null };
+  /** Ücretli fotoğraf: its price when I (a streamer) may send one to this person; 0 or missing (an older server): none. */
+  paidPhoto?: number;
 };
 export type MatchRights = { streamer: boolean; free: number; freeLeft: number; nextFreeAt: string | null; seconds: number; price: { voice: number; video: number } };
 export type MatchAnswer = { state: 'idle' | 'waiting' | 'matched'; mode?: CallMode | null; call: CallView | null; rights: MatchRights };

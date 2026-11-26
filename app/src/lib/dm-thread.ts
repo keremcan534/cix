@@ -24,6 +24,10 @@ export type ServerDm = {
   source?: string;
   /** The line of a gift sent from the chat (newer servers): which gift and how many (lib/dm-gift-fx parseDmGift). */
   gift?: unknown;
+  /** Newer servers (27 Nov 2026): the message it answers, a take-back, a paid photo. Read defensively below. */
+  replyTo?: unknown;
+  retracted?: unknown;
+  paidPhoto?: unknown;
 };
 /** The card of a server message's event, or undefined. */
 const eventCard = (d: ServerDm) => (d.event && Number.isSafeInteger(d.event.id) ? { event: { id: d.event.id, title: d.event.title ?? 'Etkinlik', startsAt: d.event.startsAt ?? null } } : null);
@@ -38,6 +42,28 @@ const giftOf = (d: ServerDm) => {
   const gift = parseDmGift(d.gift);
   return gift ? { gift } : null;
 };
+
+/** The message it answers, quoted over it; nothing when missing or malformed. */
+const replyOf = (d: ServerDm, peer: string) => {
+  const q = d.replyTo as { id?: unknown; from?: unknown; text?: unknown; photo?: unknown } | null | undefined;
+  if (!q || typeof q !== 'object' || !Number.isSafeInteger(q.id) || typeof q.text !== 'string') return null;
+  return { replyTo: { sid: q.id as number, fromMe: q.from !== peer, text: q.text, photo: q.photo === true } };
+};
+/** Taken back by its writer, or a paid photo gone unopened. */
+const retractedOf = (d: ServerDm) => (d.retracted === 'unsent' || d.retracted === 'expired' ? { retracted: d.retracted as 'unsent' | 'expired' } : null);
+/** A paid photo's price and state. */
+const paidOf = (d: ServerDm) => {
+  const p = d.paidPhoto as { price?: unknown; state?: unknown; until?: unknown } | null | undefined;
+  if (!p || typeof p !== 'object' || typeof p.price !== 'number' || !(p.price > 0) || !['locked', 'open', 'expired'].includes(p.state as string)) return null;
+  return { paidPhoto: { price: p.price, state: p.state as 'locked' | 'open' | 'expired', until: typeof p.until === 'string' ? p.until : '' } };
+};
+/** What the bubble and the chat list say: a locked paid photo in this app's words (the server's are for older apps). */
+const textOf = (d: ServerDm, mine: boolean) => {
+  const p = paidOf(d)?.paidPhoto;
+  return p && p.state === 'locked' && !mine ? `🔒 Ücretli fotoğraf · ${p.price} jeton` : d.text;
+};
+/** A paid photo that went unopened is gone from the recipient's chat (owners, 27 Nov 2026: "mesaj silinsin"). */
+const goneForMe = (d: ServerDm, mine: boolean) => !mine && d.retracted === 'expired';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 /** 'HH:MM' of an ISO time on this phone's clock, or '' when it can't be read. */
@@ -62,18 +88,35 @@ export function mergeThread(local: readonly ChatMessage[], server: readonly Serv
   out.forEach((m, i) => m.sid !== undefined && known.set(m.sid, i));
   let incoming = 0;
   let changed = false;
+  const drop = new Set<number>();
   for (const d of [...server].sort((a, b) => a.id - b.id)) {
     const at = known.get(d.id);
     if (at !== undefined) {
-      // Already here: only the read receipt can change.
+      // Already here: the read receipt, and what can happen to a message after it arrived (taken back, a paid photo
+      // opened or gone, the quote its answer carries).
       if (isMine(d, sync.peer) && d.readAt && !out[at].read) {
         out[at] = { ...out[at], read: true };
+        changed = true;
+      }
+      const cur = out[at];
+      if (goneForMe(d, isMine(d, sync.peer))) {
+        drop.add(at);
+        changed = true;
+        continue;
+      }
+      const r = retractedOf(d);
+      const p = paidOf(d);
+      const q = replyOf(d, sync.peer);
+      if ((r && cur.retracted !== r.retracted) || (p && cur.paidPhoto?.state !== p.paidPhoto.state) || (q && (!cur.replyTo || cur.replyTo.text !== q.replyTo.text))) {
+        const { image: _image, ...rest } = cur;
+        out[at] = { ...rest, text: textOf(d, isMine(d, sync.peer)), ...(d.image && { image: d.image }), ...r, ...p, ...q };
         changed = true;
       }
       continue;
     }
     if (d.id <= sync.after || hidden.has(d.id)) continue;
     const mine = isMine(d, sync.peer);
+    if (goneForMe(d, mine)) continue;
     const seen = mine && d.readAt ? { read: true } : null;
     // My message still waiting for its answer, else one whose send failed without an answer (the server may have
     // stored it); the oldest first, as the server numbers messages in the order they arrive. A message the server
@@ -90,13 +133,13 @@ export function mergeThread(local: readonly ChatMessage[], server: readonly Serv
       out[pending] = { ...withoutFailure(out[pending]), sid: d.id, at: d.createdAt, ...seen };
       known.set(d.id, pending);
     } else {
-      out.push({ id: `s${d.id}`, fromMe: mine, text: d.text, time: clockOf(d.createdAt), at: d.createdAt, sid: d.id, ...(d.image && { image: d.image }), ...eventCard(d), ...sourceOf(d), ...giftOf(d), ...followOf(d), ...seen });
+      out.push({ id: `s${d.id}`, fromMe: mine, text: textOf(d, mine), time: clockOf(d.createdAt), at: d.createdAt, sid: d.id, ...(d.image && { image: d.image }), ...eventCard(d), ...sourceOf(d), ...giftOf(d), ...followOf(d), ...replyOf(d, sync.peer), ...retractedOf(d), ...paidOf(d), ...seen });
       known.set(d.id, out.length - 1);
       if (!mine) incoming++;
     }
     changed = true;
   }
-  return { messages: out, incoming, changed };
+  return { messages: drop.size ? out.filter((_, i) => !drop.has(i)) : out, incoming, changed };
 }
 
 /** The thread's new `after` once the given server messages are applied, and the deleted ids still worth keeping. */

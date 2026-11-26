@@ -23,6 +23,17 @@
 // { gift: { id, count } } (GIFT_LINE), from which new apps draw the gift's card and play its animation once; older ones
 // show its text. Only the server can write such a line, so a typed "Hediye gönderdi: …" (the look of one, a scam
 // lure) is refused (fakeGiftLine).
+//
+// Owners, 27 Nov 2026 (migration 139):
+//   - Yanıtla: { replyTo: <a message of this chat> } quotes it; every message carries replyTo { id, from, text, photo }
+//     (older apps show the text alone).
+//   POST /api/messages/unsend { id } → { message }   The writer takes a message back within UNSEND_SECONDS (2 min). It
+//     stays stored for moderation and reads "Bu mesaj geri alındı" (retracted: 'unsent', no photo) for everyone. One
+//     that carries money (a paid message, an answer that earned its diamonds, an opened paid photo, a gift) stays.
+//   - Ücretli fotoğraf: { image, paid: true } from an approved streamer to someone who pays her (pairOf earner): the
+//     recipient sees a locked card (paidPhoto { price, state, until }; no photo, older apps a line of text), and
+//   POST /api/messages/open { id, price } → { message, coins }   pays dm_photo_price coins (her diamonds, as a paid
+//     message's) and shows it. Not opened within PAID_PHOTO_SECONDS (2 min) it is gone (retracted: 'expired').
 import { HttpError, REF, auth, blockedBetween, contactError, countRefusal, db, env, int, limit, publicText, readJson, tx, userId } from './core.mjs';
 import { noteAutoReply, quickAfter, quickReplyOf, takeQuota } from './auto-chat.mjs';
 import { live } from './live-settings.mjs';
@@ -45,23 +56,58 @@ const PAGE = 50;
  * a refund that locks both in id order waits the other way round (test/money-fuzz.test.mjs found it).
  */
 export const keyLock = (c, a, b) => c.query('SELECT 1 FROM users WHERE id = ANY($1::uuid[]) ORDER BY id FOR KEY SHARE', [[a, b]]);
-const out = (m, me = null) => ({
+export const UNSEND_SECONDS = 120;
+export const PAID_PHOTO_SECONDS = 120;
+export const UNSENT_TEXT = 'Bu mesaj geri alındı';
+export const EXPIRED_TEXT = 'Ücretli fotoğraf açılmadı, süresi doldu';
+const snippet = (t, n) => {
+  const s = String(t ?? '').replace(/\s+/g, ' ').trim();
+  return s.length > n ? `${s.slice(0, n - 1)}…` : s;
+};
+/** What a message is now: taken back, a paid photo gone unopened, still locked (for `me`, not its writer), or open. */
+function stateOf(m, me) {
+  const paid = m.paid_price !== null && m.paid_price !== undefined;
+  const expired = paid && !m.paid_opened_at && new Date(m.paid_until).getTime() <= Date.now();
+  const gone = m.retracted_at ? 'unsent' : expired ? 'expired' : null;
+  return { paid, gone, locked: paid && !gone && !m.paid_opened_at && me !== m.sender };
+}
+/** The message a reply quotes (columns rp_* of WITH_EVENT), as the bubble shows it over the reply. */
+const replyOf = (m) =>
+  m.reply_to && m.rp_sender
+    ? {
+        replyTo: {
+          id: Number(m.reply_to),
+          from: m.rp_sender,
+          text: m.rp_retracted ? UNSENT_TEXT : m.rp_paid ? 'Ücretli fotoğraf' : snippet(m.rp_body, 120),
+          photo: !!m.rp_image && !m.rp_retracted && !m.rp_paid,
+        },
+      }
+    : {};
+export const out = (m, me = null) => {
+  const { paid, gone, locked } = stateOf(m, me);
+  const price = Number(m.paid_price);
+  return {
   id: Number(m.id),
   from: m.sender,
   to: m.recipient,
-  text: m.body,
-  image: m.image_url ?? null,
+  // Older apps show only this: a taken-back message, a locked or expired paid photo in words.
+  text: gone === 'unsent' ? UNSENT_TEXT : gone === 'expired' ? EXPIRED_TEXT : locked ? `🔒 Ücretli fotoğraf (${price} jeton). Açmak için uygulamayı güncelle.` : m.body,
+  image: gone || locked ? null : (m.image_url ?? null),
   createdAt: m.created_at,
   readAt: m.read_at,
+  ...(gone ? { retracted: gone } : {}),
+  ...(paid ? { paidPhoto: { price, state: gone ? 'expired' : m.paid_opened_at ? 'open' : 'locked', until: new Date(m.paid_until).toISOString() } } : {}),
+  ...(gone ? {} : replyOf(m)),
   // Only on an event's message, so the others read as before.
-  ...(m.event_id ? { event: { id: Number(m.event_id), title: m.event_title ?? null, startsAt: m.event_starts_at ?? null } } : {}),
+  ...(m.event_id && !gone ? { event: { id: Number(m.event_id), title: m.event_title ?? null, startsAt: m.event_starts_at ?? null } } : {}),
   // Only on a gift's line (GIFT_LINE): the gift and how many.
   ...(m.gift_id ? { gift: { id: m.gift_id, count: Number(m.gift_count) } } : {}),
   // Only on an automatic message or a quick reply (auto-chat.mjs): new apps label it, older ones show the text.
   ...(m.source && m.source !== 'manual' ? { source: m.source } : {}),
   // A paid message waiting for its answer (message-holds.mjs): its reward to the streamer, its fee to the payer.
   ...(me ? holdView(m, me) : {}),
-});
+  };
+};
 /**
  * The gift a message is the line of (gifts.mjs writes it in the gift's own transaction, ref `gift:<the gift's ref>`;
  * `gift-` before Nov 2026): the same sender, that ref and the same moment. A phone's ref can't hold ':' (core.mjs REF),
@@ -70,8 +116,9 @@ const out = (m, me = null) => ({
 const GIFT_LINE = (m) =>
   `LEFT JOIN gift_events ge ON ge.sender = ${m}.sender AND left(${m}.ref, 5) IN ('gift:', 'gift-') AND ge.ref = substr(${m}.ref, 6) AND ge.created_at = ${m}.created_at`;
 /** A message row with its event's title and start, its gift (GIFT_LINE), and its hold (out). */
-const WITH_EVENT = `SELECT m.*, e.title AS event_title, e.starts_at AS event_starts_at, ge.gift_id, ge.count AS gift_count, ${HOLD_COLUMNS}
-  FROM messages m LEFT JOIN events e ON e.id = m.event_id ${GIFT_LINE('m')} LEFT JOIN message_holds hd ON hd.message_id = m.id`;
+const REPLY_COLUMNS = 'rp.sender AS rp_sender, rp.body AS rp_body, rp.image_url AS rp_image, rp.retracted_at IS NOT NULL AS rp_retracted, rp.paid_price IS NOT NULL AS rp_paid';
+const WITH_EVENT = `SELECT m.*, e.title AS event_title, e.starts_at AS event_starts_at, ge.gift_id, ge.count AS gift_count, ${HOLD_COLUMNS}, ${REPLY_COLUMNS}
+  FROM messages m LEFT JOIN events e ON e.id = m.event_id ${GIFT_LINE('m')} LEFT JOIN message_holds hd ON hd.message_id = m.id LEFT JOIN messages rp ON rp.id = m.reply_to`;
 /**
  * Text that looks like a gift's line ("Hediye gönderdi: Aslan"): only the server writes those, with the gift. Read
  * past case, spaces, invisible characters and leading symbols, so "🎁 HEDİYE  gönderdi :" is the same.
@@ -139,6 +186,10 @@ export const messageRoutes = {
     if (b.quick !== undefined && b.quick !== null && !quickNo) throw new HttpError(400, 'Geçersiz hazır cevap');
     const image = quickNo ? null : photoOf(b.image, me);
     if (image) await verifyUpload(image, 'dm');
+    const paidPhoto = b.paid === true;
+    if (paidPhoto && !image) throw new HttpError(400, 'Ücretli gönderim yalnız fotoğrafla olur');
+    const replyTo = b.replyTo === undefined || b.replyTo === null ? null : int(b.replyTo, 1, Number.MAX_SAFE_INTEGER);
+    if (b.replyTo !== undefined && b.replyTo !== null && !replyTo) throw new HttpError(400, 'Geçersiz yanıt');
     const ev = image || quickNo ? null : await eventOf(b.event);
     const body = quickNo
       ? await quickReplyOf(me, to, quickNo)
@@ -165,21 +216,32 @@ export const messageRoutes = {
     if (refused && !(await db.query('SELECT 1 FROM messages WHERE sender = $1 AND ref = $2', [me.id, b.ref])).rowCount)
       throw Object.assign(new HttpError(403, refused), { extra: { code: 'privacy' } });
     if (!quickNo && !(image && body === PHOTO_TEXT)) await assertNoSplitNumber(me, to, body, b.ref);
-    if (image) {
+    if (replyTo) {
+      const q = await db.query(
+        `SELECT 1 FROM messages WHERE id = $1 AND retracted_at IS NULL AND source <> 'follow'
+            AND ((sender = $2 AND recipient = $3) OR (sender = $3 AND recipient = $2))`,
+        [replyTo, me.id, to],
+      );
+      if (!q.rowCount) throw new HttpError(400, 'Yanıtladığın mesaj bulunamadı');
+    }
+    let paidPrice = null;
+    if (paidPhoto) {
+      // An approved streamer to someone who pays her (pairOf earner); the recipient chooses to pay, so no heart level.
+      const pair = await pairOf(db, me.id, to);
+      if (pair.earner !== me.id) throw new HttpError(403, 'Ücretli fotoğrafı yalnız onaylı yayıncılar, kendilerine ödeme yapan kişilere gönderebilir');
+      paidPrice = live().dmPhotoPrice;
+      if (!(paidPrice > 0)) throw new HttpError(403, 'Ücretli fotoğraf şu an kapalı');
+    } else if (image) {
       const gate = (await pairOf(db, me.id, to)).photo;
       if (!gate.open) throw new HttpError(403, gate.why);
     }
     const insert = (c) =>
-      c.query('INSERT INTO messages (sender, recipient, body, image_url, ref, event_id, source, template_no) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT (sender, ref) DO NOTHING RETURNING *', [
-        me.id,
-        to,
-        body,
-        image,
-        b.ref,
-        ev?.id ?? null,
-        source,
-        quickNo,
-      ]);
+      c.query(
+        `INSERT INTO messages (sender, recipient, body, image_url, ref, event_id, source, template_no, reply_to, paid_price, paid_until)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, CASE WHEN $10::int IS NULL THEN NULL ELSE now() + make_interval(secs => $11) END)
+         ON CONFLICT (sender, ref) DO NOTHING RETURNING *`,
+        [me.id, to, body, image, b.ref, ev?.id ?? null, source, quickNo, replyTo, paidPrice, PAID_PHOTO_SECONDS],
+      );
     const stored = async (id) => (await db.query(`${WITH_EVENT} WHERE m.id = $1`, [id])).rows[0];
     const replay = async () => ({ message: out((await db.query(`${WITH_EVENT} WHERE m.sender = $1 AND m.ref = $2`, [me.id, b.ref])).rows[0], me.id), replay: true });
     let row;
@@ -237,7 +299,7 @@ export const messageRoutes = {
     if (!row) return replay();
     // Their notification preferences decide; the message itself has arrived either way, and never waits for this.
     wantsMessagePush(db, to, me.id)
-      .then((yes) => yes && notify([to], { title: me.name, body: image ? `${PHOTO_TEXT} gönderdi` : body, data: { type: 'message', from: me.id } }))
+      .then((yes) => yes && notify([to], { title: me.name, body: paidPrice ? `🔒 Ücretli fotoğraf gönderdi (${paidPrice} jeton)` : image ? `${PHOTO_TEXT} gönderdi` : body, data: { type: 'message', from: me.id } }))
       .catch((e) => console.error('message push', e.message));
     // Talking back and forth raises a bond; never fails the message.
     bondTalk(me.id, to, Number(row.id)).catch((e) => console.error('bond talk', e.message));
@@ -298,9 +360,56 @@ export const messageRoutes = {
       [me.id],
     );
     const conversations = r.rows
-      .map((x) => ({ user: { id: x.peer, name: x.peer_name, avatarUrl: x.peer_avatar }, last: out(x), unread: Number(x.unread) }))
+      .map((x) => ({ user: { id: x.peer, name: x.peer_name, avatarUrl: x.peer_avatar }, last: out(x, me.id), unread: Number(x.unread) }))
       .sort((a, b) => b.last.id - a.last.id);
     return { conversations };
+  },
+
+  async 'POST /api/messages/unsend'(req) {
+    const me = await auth(req);
+    limit(`unsend:${me.id}`, 20, 'Çok hızlı geri alıyorsun, biraz bekle');
+    const id = int((await readJson(req)).id, 1, Number.MAX_SAFE_INTEGER);
+    if (!id) throw new HttpError(400, 'Geçersiz mesaj');
+    const peek = (await db.query('SELECT sender, recipient FROM messages WHERE id = $1', [id])).rows[0];
+    if (!peek || peek.sender !== me.id) throw new HttpError(404, 'Mesaj bulunamadı');
+    const row = await tx(async (c) => {
+      // The accounts first, as a hold's answer (message-holds.mjs answerHolds) takes them: an answer can't settle while
+      // it is being taken back.
+      await c.query('SELECT id FROM users WHERE id = ANY($1::uuid[]) ORDER BY id FOR UPDATE', [[peek.sender, peek.recipient]]);
+      const m = (await c.query('SELECT m.*, extract(epoch FROM now() - m.created_at) AS age FROM messages m WHERE m.id = $1 FOR UPDATE', [id])).rows[0];
+      if (m.retracted_at) return m;
+      if (Number(m.age) > UNSEND_SECONDS) throw Object.assign(new HttpError(409, 'Mesaj yalnız gönderdikten sonraki 2 dakika içinde geri alınabilir'), { extra: { code: 'unsend_late' } });
+      const money = await c.query('SELECT 1 FROM message_holds WHERE message_id = $1 OR reply_id = $1 UNION ALL SELECT 1 FROM paid_events WHERE message_id = $1', [id]);
+      if (money.rowCount || m.paid_opened_at || ['gift:', 'gift-'].includes(String(m.ref).slice(0, 5)) || !['manual', 'quick_reply'].includes(m.source))
+        throw Object.assign(new HttpError(409, 'Ücreti ödenmiş ya da ücretli bir mesaja kazanç getirmiş mesaj geri alınamaz'), { extra: { code: 'unsend_paid' } });
+      return (await c.query('UPDATE messages SET retracted_at = now() WHERE id = $1 RETURNING *', [id])).rows[0];
+    });
+    // The other's open chat drops it at once (newer apps; others read it on their next sync).
+    line([peek.recipient], 'message_unsent', { from: me.id, id });
+    return { message: out((await db.query(`${WITH_EVENT} WHERE m.id = $1`, [row.id])).rows[0], me.id) };
+  },
+
+  async 'POST /api/messages/open'(req) {
+    const me = await auth(req);
+    const b = await readJson(req);
+    const id = int(b.id, 1, Number.MAX_SAFE_INTEGER);
+    if (!id) throw new HttpError(400, 'Geçersiz mesaj');
+    const peek = (await db.query('SELECT sender, recipient, paid_price FROM messages WHERE id = $1', [id])).rows[0];
+    if (!peek || peek.recipient !== me.id || peek.paid_price === null) throw new HttpError(404, 'Fotoğraf bulunamadı');
+    // The price the card showed: a message's price never moves, so another one is a stale or broken screen.
+    if (b.price !== Number(peek.paid_price)) throw Object.assign(new HttpError(409, 'Fiyat değişti'), { extra: { code: 'price_changed', price: Number(peek.paid_price) } });
+    if (await blockedBetween(me.id, peek.sender)) throw new HttpError(403, 'Bu fotoğraf açılamaz');
+    await tx(async (c) => {
+      await c.query('SELECT id FROM users WHERE id = ANY($1::uuid[]) ORDER BY id FOR UPDATE', [[me.id, peek.sender]]);
+      const m = (await c.query('SELECT *, paid_until <= now() AS late FROM messages WHERE id = $1 FOR UPDATE', [id])).rows[0];
+      if (m.paid_opened_at) return; // a retry of an open that went through
+      if (m.retracted_at || m.late) throw Object.assign(new HttpError(410, 'Fotoğrafın açılma süresi doldu'), { extra: { code: 'photo_expired' } });
+      await payOneOnOne(c, { kind: 'message', payer: me.id, earner: m.sender, coins: Number(m.paid_price), ref: `photo:${id}`, label: 'Ücretli fotoğraf', income: `photo:${id}`, messageId: id });
+      await c.query('UPDATE messages SET paid_opened_at = now() WHERE id = $1', [id]);
+    });
+    line([peek.sender], 'message_opened', { from: me.id, id });
+    const coins = Number((await db.query('SELECT coins FROM users WHERE id = $1', [me.id])).rows[0].coins);
+    return { message: out((await db.query(`${WITH_EVENT} WHERE m.id = $1`, [id])).rows[0], me.id), coins };
   },
 
   async 'POST /api/messages/read'(req) {

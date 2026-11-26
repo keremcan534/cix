@@ -89,6 +89,7 @@ export function bigChange(key: LiveKey, before: LiveValue, after: LiveValue): bo
     case 'min_version':
       return after !== null;
     case 'dm_price':
+    case 'dm_photo_price':
     case 'call_voice_price':
     case 'call_video_price':
     case 'call_plain_voice_price':
@@ -158,6 +159,7 @@ export const CASINO_NUMBER_KEYS: { key: 'casino_max_bet' | 'casino_daily_rounds'
 /** The 1v1 settings in the order the admin card shows them, with each one's unit. */
 export const ONE_ON_ONE_KEYS: { key: OneOnOneKey; unit: string }[] = [
   { key: 'dm_price', unit: ' jeton' },
+  { key: 'dm_photo_price', unit: ' jeton' },
   { key: 'call_voice_price', unit: ' jeton' },
   { key: 'call_video_price', unit: ' jeton' },
   { key: 'call_charge_after_seconds', unit: ' saniye' },
@@ -253,6 +255,8 @@ export function valueText(key: LiveKey, v: LiveValue, { stored = false, names = 
       return typeof v === 'number' ? (v === 0 ? 'SMS durdu' : `Saatte ${fmtNum(v)}`) : String(v);
     case 'backpack_call_task':
       return typeof v === 'number' ? (v === 0 ? 'Verilmiyor' : `Günde ${v} adet`) : String(v);
+    case 'dm_photo_price':
+      return typeof v === 'number' ? (v === 0 ? 'Kapalı' : `${fmtNum(v)} jeton`) : String(v);
     case 'dm_price':
     case 'call_voice_price':
     case 'call_video_price':
