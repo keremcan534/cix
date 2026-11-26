@@ -152,8 +152,15 @@ export const ONLINE_MS = 5 * 60_000;
  * izleri's two read as the rule that applies (marksRuleOf: profile_marks false is nobody), so a row whose two columns
  * disagree still reads as one setting.
  */
+/**
+ * "Bana kimler mesaj gönderebilir?" and "Beni kimler arayabilir?" are gone (owners, 27 Nov 2026): everyone may write and
+ * call (blocks still hold), and every app reads "Herkes". A choice made before, or sent by an older app, is kept and
+ * applies again with REACH_CHOICES=1 (the tests run with it on; reach-choices-off.test.mjs checks the default).
+ */
+const REACH_CHOICES = process.env.REACH_CHOICES === '1';
 const fromRow = (r) => {
   const out = Object.fromEntries(Object.entries(COLUMN).map(([k, col]) => [k, r?.[col] ?? PRIVACY_DEFAULTS[k]]));
+  if (!REACH_CHOICES) Object.assign(out, { dmFrom: PRIVACY_DEFAULTS.dmFrom, callsFrom: PRIVACY_DEFAULTS.callsFrom });
   out.marksFrom = marksRuleOf(r?.profile_marks ?? true, r?.marks_from);
   out.profileMarks = out.marksFrom !== 'nobody';
   return out;

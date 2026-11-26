@@ -9,14 +9,13 @@ import { ChoiceChips, ListBlock, ListGroup, ListRow, ListSwitch } from '@/compon
 import { LicensesSheet } from '@/components/licenses-sheet';
 import { Avatar, Header } from '@/components/ui';
 import { userById } from '@/data/mock';
-import { CALLS_FROM_LABEL, DM_FROM_LABEL, type CallsFrom, type DmFrom } from '@/data/privacy';
 import { GATES } from '@/data/status';
 import { confirmLogout, showAlert } from '@/lib/alert';
 import { useApp, type NotifyType, type Settings } from '@/store';
 import { makeStyles, useTheme, type Appearance } from '@/theme';
 import { IS_DEMO } from '@/lib/build';
 import { openLegal } from '@/lib/legal';
-import { liveMode, message } from '@/lib/live';
+import { liveMode } from '@/lib/live';
 import { confirmDeleteLiveAccount, liveSignOut } from '@/lib/live/account';
 import { useLivePrivacy, usePrivacyPerks, usePrivacySetter, type PrivacyKey } from '@/lib/live/privacy';
 import { privacyShown } from '@/lib/privacy-perks';
@@ -28,7 +27,6 @@ import { useAppUpdate, versionLabel } from '@/lib/app-update';
 import { APP_VERSION } from '@/lib/reporting';
 import { formatPhone } from '@/lib/verify-code';
 import { VerifiedPill, VerifySheet } from '@/components/verify-sheet';
-import { useLiveSessions } from '@/lib/live/sessions';
 
 type BoolKey = { [K in keyof Settings]: Settings[K] extends boolean ? K : never }[keyof Settings];
 type IconName = keyof typeof Ionicons.glyphMap;
@@ -92,49 +90,8 @@ function AppearancePicker() {
   );
 }
 
-const ONE_ACCOUNT_RULE =
-  'Kişi başına tek hesap: aynı cihaz, telefon ya da IBAN ile açılan hesaplar incelenir; ödemeler bu sürede bekler.';
-// The demo's prototype promises (SMS on a new device, re-verification). The server does neither, so a live build
-// does not say them.
-const DEMO_SESSIONS_FOOTER = `Yeni cihaz veya alışılmadık konumdan girişte bildirim gönderilir ve SMS doğrulaması istenir. Para çekme, IBAN değişikliği ve ajans transferi gibi hassas işlemlerde yeniden doğrulama yapılır. ${ONE_ACCOUNT_RULE}`;
-
-/** Live build: the account's real sessions on the server; Sonlandır ends one there (lib/live/sessions). */
-function LiveSessions() {
-  const styles = useStyles();
-  const { rows, status, busy, reload, revoke } = useLiveSessions(true);
-  const end = (id: string) => void revoke(id).catch((e) => showAlert('Oturum sonlandırılamadı', message(e)));
-  return (
-    <ListGroup label="Aktif oturumlar" footer={`Tanımadığın bir cihaz görürsen oturumunu sonlandır. ${ONE_ACCOUNT_RULE}`}>
-      {status === 'failed' && rows.length === 0 ? (
-        <ListRow icon="cloud-offline-outline" tone="neutral" title="Oturumlar yüklenemedi" subtitle="Dokun, tekrar deneyelim." onPress={() => void reload()} chevron={false} />
-      ) : status === 'loading' ? (
-        <ListRow icon="time-outline" tone="neutral" title="Oturumlar yükleniyor…" />
-      ) : (
-        rows.map((x) => (
-          <ListRow
-            key={x.id}
-            icon={x.web ? 'desktop-outline' : 'phone-portrait-outline'}
-            tone={x.current ? 'success' : 'neutral'}
-            title={x.title}
-            subtitle={x.subtitle}
-            right={
-              x.current ? (
-                <View style={styles.liveDot} accessibilityLabel="Şu an kullandığın cihaz" />
-              ) : (
-                <Pressable style={[styles.endBtn, busy === x.id && { opacity: 0.5 }]} disabled={!!busy} accessibilityLabel={`${x.title} oturumunu sonlandır`} onPress={() => end(x.id)}>
-                  <Text style={styles.endText}>{busy === x.id ? 'Sonlandırılıyor…' : 'Sonlandır'}</Text>
-                </Pressable>
-              )
-            }
-          />
-        ))
-      )}
-    </ListGroup>
-  );
-}
-
 export default function SettingsScreen() {
-  const { nobleTier, me, phone, deletionRequested, requestDeletion, logout, resetAll, blocked, toggleBlock, safetyLog, settings, setSetting, sessions, endSession, notify } = useApp();
+  const { nobleTier, me, phone, deletionRequested, requestDeletion, logout, resetAll, blocked, toggleBlock, safetyLog, settings, setSetting } = useApp();
   const [licenses, setLicenses] = useState(false);
   // Gizlilik is a VIP / Rütbe right: each choice shows only with its right (lib/privacy-perks).
   const privacyPerks = usePrivacyPerks();
@@ -201,40 +158,7 @@ export default function SettingsScreen() {
               onPress={canCheckPhone ? () => setVerifyKind('phone') : undefined}
             />
           )}
-          <ListRow icon="receipt-outline" tone="money" title="İşlem geçmişi" subtitle="Satın almalar ve iadeler" onPress={() => router.push('/cuzdan')} />
         </ListGroup>
-
-        {live ? (
-          <LiveSessions />
-        ) : (
-          <ListGroup label="Aktif oturumlar" footer={DEMO_SESSIONS_FOOTER}>
-            {sessions.map((x) => (
-              <ListRow
-                key={x.id}
-                icon={/Web/.test(x.device) ? 'desktop-outline' : 'phone-portrait-outline'}
-                tone={x.current ? 'success' : 'neutral'}
-                title={x.device}
-                subtitle={`${x.place} · ${x.current ? 'Şu an aktif' : x.last}`}
-                right={
-                  x.current ? (
-                    <View style={styles.liveDot} accessibilityLabel="Şu an kullandığın cihaz" />
-                  ) : (
-                    <Pressable
-                      style={styles.endBtn}
-                      accessibilityLabel={`${x.device} oturumunu sonlandır`}
-                      onPress={() => {
-                        endSession(x.id);
-                        notify({ kind: 'security', icon: 'lock-closed', title: 'Oturum sonlandırıldı', body: `${x.device} · ${x.place} oturumu kapatıldı.` });
-                      }}
-                    >
-                      <Text style={styles.endText}>Sonlandır</Text>
-                    </Pressable>
-                  )
-                }
-              />
-            ))}
-          </ListGroup>
-        )}
 
         {live && (
           <>
@@ -305,17 +229,10 @@ export default function SettingsScreen() {
 
         <ListGroup
           label="Kimler ulaşabilir"
-          footer={live ? 'Engellediklerin hiç ulaşamaz; yazdığın ya da aradığın kişi sana dönebilir.' : undefined}
+          footer={live ? 'Engellediklerin sana hiç ulaşamaz.' : undefined}
         >
           {/* Koruma off and the threshold are kept on the server; they are set on Benim Koruma (app/koruma). */}
           {live && <ListRow icon="shield-half-outline" title="Koruma" subtitle="Korumayı kapat ya da koruma alanı eşiğini ayarla." onPress={() => router.push({ pathname: '/koruma', params: { ayar: '1' } })} />}
-          <ListBlock title="Bana kimler mesaj gönderebilir?">
-            <ChoiceChips value={settings.dmFrom} options={Object.entries(DM_FROM_LABEL) as [DmFrom, string][]} onChange={(v) => setPrivacy('dmFrom', v)} />
-          </ListBlock>
-          <ListBlock title="Beni kimler arayabilir?">
-            <Text style={styles.blockHint}>{live ? 'Sesli ve görüntülü aramalar; Hemen Tanış eşleşmeleri etkilenmez' : 'Ücretli sesli ve görüntülü aramalar'}</Text>
-            <ChoiceChips value={settings.callsFrom} options={Object.entries(CALLS_FROM_LABEL) as [CallsFrom, string][]} onChange={(v) => setPrivacy('callsFrom', v)} />
-          </ListBlock>
           {/* Profil izleri (server/api/privacy.mjs marksFrom): a gift that leaves a mark from anyone else is refused before
               any coin moves. "Yalnız takip ettiklerim" is the default, also for whoever never chose. */}
           <ListBlock title="Kimler profilime iz bırakabilir?">
@@ -387,7 +304,6 @@ export default function SettingsScreen() {
 
         <ListGroup label="Görünüm ve erişilebilirlik" footer="Odalar, oyunlar ve aramalar her temada koyu kalır.">
           <AppearancePicker />
-          <Toggle k="effectsOff" icon="sparkles-outline" title="Animasyon ve giriş efektlerini kapat" />
           <Toggle k="gameFx" icon="flash-outline" title="Oyunlarda güçlü efektler" subtitle="Büyük kazançta ışık, kıvılcım ve şimşek. Eski telefonda oyun takılırsa kapat." />
           <Toggle k="haptics" icon="pulse-outline" title="Dokunuş titreşimi" />
           <Toggle k="reduceMotion" icon="contrast-outline" title="Hareketi azalt" subtitle="Geçişler ve titreşimli efektler sadeleştirilir." />

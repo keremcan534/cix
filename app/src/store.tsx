@@ -587,6 +587,9 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     const saved = withDefaults(defaults, s.settings);
     return {
       ...saved,
+      // "Animasyon ve giriş efektlerini kapat" left Ayarlar (owners, 27 Nov 2026; a room's Efektler turns effects off):
+      // one turned on before would have no switch left, so it starts off.
+      effectsOff: false,
       appearance: oneOf(saved.appearance, APPEARANCES) ?? defaults.appearance,
       notifyTypes: withDefaults(defaults.notifyTypes, saved.notifyTypes),
     };
