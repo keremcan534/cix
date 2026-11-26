@@ -168,4 +168,20 @@ describe('para çekme', () => {
     assert.deepEqual((await ok(call('GET', '/api/wallet/week', null, host.session))).days, [0, 0, 0, 0, 0, 0, 0]);
     assert.equal((await call('GET', '/api/wallet/week', null, null))[0], 401);
   });
+
+  test('bir IBAN tek hesaba bağlanır; yönetim aynı IBAN ve aynı ağdan gelen hesapları görür', async () => {
+    // A second account (diamonds of its own) asks for a payout to the IBAN the first account already used.
+    const second = await signUp('İkinci Hesap');
+    await h.sql.query("UPDATE users SET gender = 'Kadın' WHERE id = $1", [second.user.id]);
+    await h.credit(second.user.id, 20_000, { currency: 'diamond' });
+    const [st, j] = await withdraw({ ...iban(10_000), details: { holder: 'Başka Ad', account: 'gb82west12345698765432' } }, second.session);
+    assert.deepEqual([st, j.code], [409, 'iban_taken'], 'boşluk ve harf büyüklüğü fark etmez');
+    // Another IBAN goes through; the list shows the warnings for staff.
+    await ok(withdraw({ ...iban(10_000), details: { holder: 'Başka Ad', account: 'DE89370400440532013000' } }, second.session));
+    await h.sql.query("UPDATE withdrawals SET ip = '10.0.0.7' WHERE user_id = ANY($1::uuid[])", [[host.user.id, second.user.id]]);
+    const rows = (await ok(call('GET', '/api/admin/withdrawals?status=all', null, admin.session))).rows;
+    const mine = rows.find((w) => w.user.id === second.user.id);
+    assert.deepEqual(mine.sameIban, []);
+    assert.ok(mine.sameNetwork.length >= 1, 'aynı ağdan başka hesap');
+  });
 });
