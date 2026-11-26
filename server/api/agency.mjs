@@ -40,7 +40,9 @@ import {
   balances,
   d4,
   needAgency,
-  newCode,
+  assertCodeTries,
+  codeMiss,
+  freeJoinCode,
   notice,
   permsOn,
   rateView,
@@ -72,6 +74,17 @@ import {
 } from './agency-ops.mjs';
 import { PLAY_MONEY, everHadPlayMoney } from './wallet.mjs';
 import { myAssistant, resolveJoinCode } from './agency-assistants.mjs';
+
+/** A code lookup that counts a wrong code against the person (agency-lib codeMiss), and stops one who tried too many. */
+async function triedCode(uid, find) {
+  assertCodeTries(uid);
+  try {
+    return await find();
+  } catch (e) {
+    if (e instanceof HttpError && e.code === 404) codeMiss(uid);
+    throw e;
+  }
+}
 import { assertOwnerId } from './streamer-rule.mjs';
 
 /**
@@ -273,9 +286,12 @@ export const agencyRoutes = {
 
   /** An agency's code, or an agency assistant's own code (`assistant` names who invites; join with the same code). */
   async 'GET /api/agency/lookup'(req, url) {
-    await auth(req);
-    const { agency: a, assistant } = await resolveJoinCode(db, url.searchParams.get('code'));
-    if (a.status !== 'approved') throw new HttpError(404, 'Bu kodla aktif bir ajans yok');
+    const me = await auth(req);
+    const { agency: a, assistant } = await triedCode(me.id, () => resolveJoinCode(db, url.searchParams.get('code')));
+    if (a.status !== 'approved') {
+      codeMiss(me.id);
+      throw new HttpError(404, 'Bu kodla aktif bir ajans yok');
+    }
     // parentName: never shown (owners, 25 Nov 2026: a referral agency shows no parent); null for older apps.
     return { agency: { id: a.id, name: a.name, code: a.code, level: a.level, parentName: null }, assistant: assistant ? { name: assistant.name } : null };
   },
@@ -285,7 +301,7 @@ export const agencyRoutes = {
     return tx(async (c) => {
       const x = await ctx(c, req);
       // An assistant's code joins their agency and records them as the one who brought this streamer.
-      const { agency: a, assistant } = await resolveJoinCode(c, b.code);
+      const { agency: a, assistant } = await triedCode(x.u.id, () => resolveJoinCode(c, b.code));
       const invitedBy = assistant && assistant.userId !== x.u.id ? assistant.userId : null;
       const method = b.method ?? 'code';
       if (!['code', 'link', 'application'].includes(method)) bad('Geçersiz katılım yolu');
@@ -1118,7 +1134,7 @@ export async function insertAgency(c, b, { parent, owner, actor, status, pending
         `INSERT INTO agencies (code, name, parent_id, level, owner_id, status, pending_with, country, region, contact_name, contact_phone, contact_email, expected_streamers, description, acquired_by_bd, created_by)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
         [
-          newCode(),
+          await freeJoinCode(c),
           name,
           parent?.id ?? null,
           parent ? parent.level + 1 : 1,

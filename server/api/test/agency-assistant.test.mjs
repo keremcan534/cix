@@ -80,7 +80,7 @@ describe('Ajans asistanı', () => {
     assert.deepEqual([H.pending, H.active], [false, true]);
     assert.equal(H.share.pct, 80);
     assert.equal(H.upcoming, null);
-    assert.match(H.code, /^[A-Z0-9]{6,10}$/);
+    assert.match(H.code, /^[A-Z0-9]{4}$/);
     assert.notEqual(H.code, await codeOf(T.id));
     // The limit (assistant_policy.max, 1 by default): a second member can't be named while the first one is there.
     ok(await a2.post('/api/agency/join', { code: await codeOf(T.id), method: 'code' }));

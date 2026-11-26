@@ -89,7 +89,7 @@ function JoinOrCreate() {
             <Card style={{ gap: 10 }}>
               <Text style={styles.title}>Davet koduyla katıl</Text>
               <TextInput value={code} onChangeText={(t) => setCode(t.toUpperCase())} placeholder="Örn. STAR01" placeholderTextColor={colors.textDim} autoCapitalize="characters" style={styles.input} />
-              {code.length >= 6 && !preview && <Text style={{ color: colors.red }}>Bu koda ait ajans yok.</Text>}
+              {code.length >= 4 && !preview && <Text style={{ color: colors.red }}>Bu koda ait ajans yok.</Text>}
               {preview && (
                 <View style={styles.preview}>
                   <Text style={{ fontSize: 30 }}>{preview.logo}</Text>
