@@ -97,10 +97,14 @@ def relocate(chunk, depth):
     return re.sub(r'\b(href|src)="([^"]*)"', fix, chunk)
 
 
-STATUS_FOR_READERS = {
-    "tr": [("Taslak, yayımlamayın", "Taslak"), ("[ONAY TARİHİ]", "onay bekliyor")],
-    "en": [("Draft, do not publish", "Draft"), ("[APPROVAL DATE]", "pending approval")],
-}
+# Parts of a document's status line ("Sürüm 1.0 • Taslak, yayımlamayın • Yürürlük: [ONAY TARİHİ]") that readers don't
+# see: the owners chose to publish the texts without the draft label or the empty effective date (26-27 Nov 2026), so
+# the page shows "Sürüm 1.0". Once the lawyer writes a real date in the .md, the "Yürürlük" part shows again.
+HIDDEN_STATUS = ("Taslak", "Draft", "[ONAY TARİHİ]", "[APPROVAL DATE]")
+
+
+def status_for_readers(status):
+    return " • ".join(p for p in status.split(" • ") if not any(h in p for h in HIDDEN_STATUS))
 
 YASAL_COLUMN = re.compile(r"(<h5>Yasal</h5>\s*<ul>)(.*?)(</ul>)", re.S)
 
@@ -132,10 +136,7 @@ def page(lang, title, description, inner, depth, canonical):
 def doc_page(lang, num, slug, names):
     md = open(os.path.join(HERE, lang, f"{num}-{slug}.md"), encoding="utf-8").read()
     title, status, content = body(md)
-    # The pack's note to the team ("do not publish") is not for readers: the owners chose to publish the drafts
-    # (26 Nov 2026). The page still says it is a draft and that its effective date waits for approval.
-    for a, b in STATUS_FOR_READERS[lang]:
-        status = status.replace(a, b)
+    status = status_for_readers(status)
     ui = UI[lang]
     other = ui["other_lang"]
     words = title.split(" ")
