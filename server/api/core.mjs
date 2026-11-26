@@ -122,6 +122,9 @@ export const profileOf = (u) => ({
   bio: u.bio ?? '',
   interests: u.interests ?? [],
   avatarUrl: u.avatar_url ?? null,
+  // The blue badge: the face was verified against this very profile photo (verify.mjs); it drops when the photo
+  // changes. False for a row read without verified_avatar.
+  verified: !!u.verified_avatar && u.verified_avatar === u.avatar_url,
 });
 export const ageOf = (birth, now = new Date()) => {
   const b = new Date(birth);

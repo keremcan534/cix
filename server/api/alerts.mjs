@@ -16,6 +16,8 @@
 //   money_mismatch      the money checks (money-check.mjs) found balances, ledger rows, coin lots or diamond locks
 //                       that don't add up; they run in the background every MONEY_CHECK_MIN minutes (60; 0 = off)
 //                       on the accounts touched since migration 071, and this uses the last finished run
+//   verify_minor        an ID check (verify.mjs) says the person is under 18 and staff haven't decided it yet: the
+//                       account should be closed (an 18+ app; docs/YUZ_DOGRULAMA.md)
 //   alerts_error        the checks themselves failed (see the API log)
 //
 // The checks read the last hour of the ledger, so the public answer is computed at most once a minute
@@ -155,6 +157,11 @@ export async function checkAll() {
       add('mail_quota_high', `Bugünkü ücretsiz e-posta kotasının %${pct} kullanıldı (${sent}/${cap})`, pct, T.mailQuotaPct, Object.fromEntries(capped.map((p) => [p, { sent: rows.find((r) => r.provider === p)?.sent ?? 0, cap: MAIL_DAILY[p] }])));
   }
   if (mailFailing()) add('mail_failing', 'Son 10 e-posta kodu hiçbir sağlayıcıyla gönderilemedi', 10, 10);
+
+  // Kimlik doğrulaması: a document under 18 waiting for staff (an 18+ app: the account must be closed).
+  const minors = (await db.query("SELECT user_id, created_at FROM identity_checks WHERE status = 'review' AND decided_by IS NULL AND 'under_18' = ANY(reasons) ORDER BY id DESC LIMIT 20")).rows;
+  if (minors.length)
+    add('verify_minor', `Kimliğine göre 18 yaşından küçük ${minors.length} hesap incelemede bekliyor`, minors.length, 0, minors.map((r) => ({ user: r.user_id, at: r.created_at })));
 
   const m = await moneyCheck();
   if (m.problems.length) {

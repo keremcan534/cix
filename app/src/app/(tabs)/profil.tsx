@@ -126,7 +126,10 @@ export default function ProfileScreen() {
       icon: 'checkmark-circle-outline',
       label: 'Kimlik Doğrulamam',
       dot: !me.verified,
-      onPress: () => showAlert(me.verified ? 'Gerçek kişi doğrulandı' : 'Doğrulama gerekli', me.verified ? 'Selfie doğrulaman tamam.' : 'Para çekmek ve davet ödülü için selfie doğrulaması yap.'),
+      // Live: the ID check (money out) and the face check (the badge), server/api/verify.mjs.
+      onPress: live
+        ? () => router.push('/kimlik-dogrulama')
+        : () => showAlert(me.verified ? 'Gerçek kişi doğrulandı' : 'Doğrulama gerekli', me.verified ? 'Selfie doğrulaman tamam.' : 'Para çekmek ve davet ödülü için selfie doğrulaması yap.'),
     },
     { icon: 'bag-handle-outline', img: 'gift', label: 'Çantam', dot: inventory.size > 0, onPress: () => router.push('/canta') },
     // Etkinlik Merkezi on Odamın Etkinlikleri: my places, the ones that passed, my rooms' events.

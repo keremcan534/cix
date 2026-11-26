@@ -35,6 +35,7 @@ import { shownRoomOf } from './presence-room.mjs';
 import { clearMarks, eraseMarks, profileMarksOf } from './profile-marks.mjs';
 import { endBondOnBlock } from './bonds.mjs';
 import { live } from './live-settings.mjs';
+import { eraseChecks, sweepSoon } from './verify.mjs';
 
 /** The interests the app offers (app/src/data/mock.ts INTERESTS). */
 export const INTERESTS = ['🎤 Karaoke', '🎮 Oyun', '💬 Sohbet', '⚽ Spor', '✈️ Seyahat', '🎬 Film', '💃 Dans', '📚 Kitap', '🎧 Müzik', '☕ Kahve'];
@@ -155,6 +156,10 @@ export async function eraseAccount(c, id, phone) {
     // Their level drops and what the drops took off (levels-admin.mjs): no accounting record, nobody else's.
     await c.query('DELETE FROM level_drops WHERE user_id = $1', [id]);
     await c.query('DELETE FROM level_offsets WHERE user_id = $1', [id]);
+    // Kimlik ve yüz doğrulaması (verify.mjs): the document data and the photo's address go now; the provider's copy
+    // and then the rows go with the sweep, started right after.
+    await eraseChecks(c, id);
+    sweepSoon();
     // Gizlilik choices and the "Arama geçmişini temizle" mark (privacy.mjs, call-log.mjs).
     await c.query('DELETE FROM privacy_settings WHERE user_id = $1', [id]);
     await c.query('DELETE FROM call_history_cleared WHERE user_id = $1', [id]);

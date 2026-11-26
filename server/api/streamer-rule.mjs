@@ -7,8 +7,17 @@
 // A man's account can't, and neither can an account that has not said its gender (a man could otherwise just not say).
 // Çevir (diamonds into coins) stays open to everyone: nothing leaves the app. A Jeton Noktası account keeps selling
 // coins: management gave it that role.
-import { HttpError } from './core.mjs';
+// When Canlı ayarlar › Kimlik doğrulama require it (verify_payout_required) and the provider is set up, taking money
+// out also needs an approved ID check (verify.mjs), and so does an agency's payout (its owner's).
+import { HttpError, env } from './core.mjs';
 import { live } from './live-settings.mjs';
+import { providerReady } from './verify-rules.mjs';
+
+/** Whether money out needs an approved ID check now: the switch is on and the provider has its keys. */
+export const idRequired = () => live().verifyPayout === 1 && providerReady(env, 'id');
+/** The sentence an account without the check hears (older apps show it as it is). */
+export const ID_WHY = 'Para çekmek için önce kimliğini doğrula: Ben › Kimlik Doğrulamam. Bu bölümü göremiyorsan uygulamanı güncelle.';
+const ID_OK = "EXISTS (SELECT 1 FROM identity_checks i WHERE i.user_id = u.id AND i.kind = 'id' AND i.status = 'approved')";
 
 /** streamer_policy.pick_days as last saved (agency-lib.mjs DEFAULTS: 3). */
 const PICK_DAYS = `coalesce((SELECT (p.value->>'pick_days')::int FROM agency_settings p WHERE p.key = 'streamer_policy' ORDER BY p.created_at DESC, p.id DESC LIMIT 1), 3)`;
@@ -71,12 +80,18 @@ export const streamerKindSql = (x) =>
 /** Whether `uid` is a streamer now. */
 export const isStreamer = async (q, uid) => (await q.query(`SELECT ${streamerSql('$1::uuid')} AS yes`, [uid])).rows[0].yes;
 
-/** Whether `uid` may take money out: { allowed, code, why } (code and why are null when allowed). */
-export async function cashOutOf(q, uid) {
+/**
+ * Whether `uid` may take money out: { allowed, code, why } (code and why are null when allowed). `id: false` leaves
+ * the ID check out (verify.mjs asks who may open one).
+ */
+export async function cashOutOf(q, uid, { id = true } = {}) {
   const members = live().familyCashoutMembers;
-  const r = (await q.query(`SELECT u.gender, ${agencyOwnerSql('u.id')} AS agency, ${familyOwnerSql('u.id', members)} AS family FROM users u WHERE u.id = $1`, [uid])).rows[0];
+  const r = (await q.query(`SELECT u.gender, ${agencyOwnerSql('u.id')} AS agency, ${familyOwnerSql('u.id', members)} AS family, ${ID_OK} AS id_ok FROM users u WHERE u.id = $1`, [uid])).rows[0];
   if (!r) throw new HttpError(404, 'Kullanıcı bulunamadı');
-  if (r.agency || r.family || r.gender === 'Kadın') return { allowed: true, code: null, why: null };
+  if (r.agency || r.family || r.gender === 'Kadın') {
+    if (id && !r.id_ok && idRequired()) return { allowed: false, code: 'id_required', why: ID_WHY };
+    return { allowed: true, code: null, why: null };
+  }
   if (r.gender === 'Erkek') {
     return {
       allowed: false,
@@ -91,4 +106,11 @@ export async function cashOutOf(q, uid) {
 export async function assertCashOut(q, uid) {
   const s = await cashOutOf(q, uid);
   if (!s.allowed) throw Object.assign(new HttpError(403, s.why), { extra: { code: s.code } });
+}
+
+/** Refuses (403 id_required) an agency's payout while its owner `ownerId` has no approved ID check and one is required. */
+export async function assertOwnerId(q, ownerId) {
+  if (!idRequired()) return;
+  const ok = (await q.query(`SELECT ${ID_OK} AS ok FROM users u WHERE u.id = $1`, [ownerId])).rows[0]?.ok;
+  if (!ok) throw Object.assign(new HttpError(403, 'Ajans ödemesi için önce ajans sahibinin kimliği doğrulanmalı: Ben › Kimlik Doğrulamam. Bu bölümü göremiyorsan uygulamanı güncelle.'), { extra: { code: 'id_required' } });
 }

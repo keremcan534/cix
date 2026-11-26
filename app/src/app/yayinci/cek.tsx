@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ScrollView, View, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -178,6 +178,8 @@ export default function Withdraw() {
           <Card style={{ gap: 6 }}>
             <Ionicons name="lock-closed" size={22} color={colors.textDim} />
             <Text style={styles.dim}>{server.cashOut.why ?? 'Bu hesap para çekemez.'}</Text>
+            {/* Canlı ayarlar require the ID check (server/api/streamer-rule.mjs id_required): it is one tap away. */}
+            {server.cashOut.code === 'id_required' && <Button small title="Kimliğimi doğrula" icon="shield-checkmark" onPress={() => router.push('/kimlik-dogrulama')} style={{ marginTop: 6 }} />}
           </Card>
         </View>
       </SafeAreaView>

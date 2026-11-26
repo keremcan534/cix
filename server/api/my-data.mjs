@@ -699,6 +699,25 @@ export async function exportOf(c, uid) {
     guard,
     // Profil izleri (profile-marks.mjs): the marks left on my photo (who, when, how it came off) and the ones I left.
     profileMarks: await marksDataOf(c, uid),
+    // Kimlik ve yüz doğrulaması (verify.mjs): each check I opened, under which consent, its outcome and what the
+    // document said (name, sex, 18 or over, country). The document's duplicate mark and the provider's session id
+    // are not mine to read: the mark is a one-way code, the session is the provider's copy (deleted on schedule).
+    identityChecks: await all(
+      `SELECT kind, status, provider, consent_version, consent_at, reasons, doc_name, doc_sex, doc_adult, doc_country, avatar_url,
+              created_at, decided_at, provider_deleted_at FROM identity_checks WHERE user_id = $1 ORDER BY id`,
+      (x) => ({
+        kind: x.kind,
+        status: x.status,
+        provider: x.provider,
+        consent: { version: x.consent_version, at: x.consent_at },
+        reasons: x.reasons,
+        document: x.kind === 'id' ? { name: x.doc_name, sex: x.doc_sex, adult: x.doc_adult, country: x.doc_country } : null,
+        photo: x.avatar_url,
+        at: x.created_at,
+        decidedAt: x.decided_at,
+        providerCopyDeletedAt: x.provider_deleted_at,
+      }),
+    ),
     agency,
     visits,
     profileMore,
