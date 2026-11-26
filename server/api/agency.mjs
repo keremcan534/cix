@@ -193,7 +193,7 @@ async function perfOf(c, a, s) {
 
 /** The start of this day, week or month on Turkey's calendar (the periods the panel's totals use). */
 const since = (p) => `date_trunc('${p}', now() AT TIME ZONE 'Europe/Istanbul') AT TIME ZONE 'Europe/Istanbul'`;
-const STREAMER_ROW = `SELECT m.streamer_id, m.agency_id, m.joined_at, m.method, m.contract, u.name, u.username, u.avatar_url, u.phone IS NOT NULL AS verified,
+const STREAMER_ROW = `SELECT m.streamer_id, m.agency_id, m.joined_at, m.method, m.contract, u.name, u.username, u.avatar_url, u.public_no::text AS public_no, u.phone IS NOT NULL AS verified,
     (SELECT coalesce(sum(e.diamonds), 0) FROM income_events e WHERE e.streamer_id = m.streamer_id AND e.occurred_at >= greatest(m.joined_at, now() - interval '30 days')) AS d30,
     (SELECT coalesce(sum(e.diamonds), 0) FROM income_events e WHERE e.streamer_id = m.streamer_id AND e.occurred_at >= greatest(m.joined_at, ${since('week')})) AS d_week,
     (SELECT coalesce(sum(e.diamonds), 0) FROM income_events e WHERE e.streamer_id = m.streamer_id AND e.occurred_at >= greatest(m.joined_at, ${since('month')})) AS d_month,
@@ -205,6 +205,8 @@ const streamerView = (r) => ({
   id: r.streamer_id,
   name: r.name,
   username: r.username,
+  // The 12-digit ID the app shows (Özet's search by ID, owners 26 Nov 2026).
+  no: r.public_no ?? null,
   avatarUrl: r.avatar_url,
   agencyId: r.agency_id,
   joinedAt: r.joined_at,
@@ -828,7 +830,7 @@ export const agencyRoutes = {
       }
       // The centre decides every application, one under a top agency's code too.
       const a = await insertAgency(c, b, { parent, owner, actor: x.u.id, status: 'pending', pendingWith: 'center', bd: bd ? x.u.id : null, screen: bd ? null : x.u });
-      if (parent) await notice(c, parent.id, 'sub', `Yeni alt ajans başvurusu: ${a.name}`, 'Başvuruyu yönetim değerlendirir; onaylanırsa Referans ajanslar bölümünde görünür.');
+      if (parent) await notice(c, parent.id, 'sub', `Yeni referans ajans başvurusu: ${a.name}`, 'Başvuruyu yönetim değerlendirir; onaylanırsa Referans ajanslar bölümünde görünür.');
       return { agency: card(a, x.s), pendingWith: a.pending_with };
     });
   },
@@ -1051,8 +1053,8 @@ export const agencyRoutes = {
       if (to.status !== 'approved' || to.level !== 1 || to.id === a.id || to.id === a.parent_id) throw new HttpError(409, 'Hedef aktif bir üst ajans olmalı');
       const fr = await feeRule(c, 'agency', a.id, x.s);
       const t = await openTransfer(c, { kind: 'change_parent', agencyId: a.id, fromId: a.parent_id, toId: to.id, needs: ['to', 'center'], mode: fr.fee > 0 ? 'paid' : 'free', fee: fr.fee, feeRule: fr, reason: await said(text(b.reason, 3, 500, 'Gerekçe'), x, 'agency.change_parent', 'reason'), ref: ref(b.ref), actor: x.u.id });
-      await notice(c, to.id, 'transfer', `${a.name} alt ajansın olmak istiyor`, '');
-      if (a.parent_id) await notice(c, a.parent_id, 'transfer', `${a.name} üst ajans değişikliği istedi`, 'Kararı hedef ajans ve merkez verir.');
+      await notice(c, to.id, 'transfer', `${a.name} referans ajansın olmak istiyor`, '');
+      if (a.parent_id) await notice(c, a.parent_id, 'transfer', `${a.name} referans ajans değişikliği istedi`, 'Kararı hedef ajans ve merkez verir.');
       return { transfer: transferView(t, await namesFor(c, [t])) };
     });
   },

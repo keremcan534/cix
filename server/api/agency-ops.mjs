@@ -30,7 +30,7 @@ export async function approveAgency(c, a, actor, note = '') {
   if (a.parent_id) await applyTier(c, a, s.tiers[0].key, new Date(), { source: 'approval', actor, reason: 'Alt ajans onayı: başlangıç kademesi' });
   if (a.acquired_by_bd) await c.query('INSERT INTO bd_assignments (bd_id, agency_id, assigned_by) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING', [a.acquired_by_bd, a.id, actor]);
   await notice(c, a.id, 'status', 'Ajansın onaylandı', 'Davet kodunla yayıncı ekleyebilirsin. Komisyon bugünden sonra kazanılan gelire uygulanır.');
-  if (a.parent_id) await notice(c, a.parent_id, 'sub', `${a.name} alt ajansı onaylandı`, '');
+  if (a.parent_id) await notice(c, a.parent_id, 'sub', `${a.name} referans ajansın olarak onaylandı`, '');
   await audit(c, actor, 'agency.approve', 'agency', a.id, { after: { status: 'approved' }, reason: note });
 }
 
@@ -201,9 +201,9 @@ export async function moveParent(c, a, newParentId, actor, reason, transferId = 
     const tier = s.tiers.some((t) => t.key === a.tier) ? a.tier : s.tiers[0].key;
     await applyTier(c, a, tier, now, { source: 'transfer', actor, reason: String(reason).slice(0, 300) });
   }
-  if (oldParent) await notice(c, oldParent, 'sub', `${a.name} artık senin alt ajansın değil`, 'Bu ajansın bundan sonraki gelirinden pay almazsın (merkezin tanımladığı geçiş komisyonu hariç). Geçmiş kazançların değişmez.');
-  if (newParentId) await notice(c, newParentId, 'sub', `${a.name} alt ajansın oldu`, '');
-  await notice(c, a.id, 'parent', newParentId ? 'Üst ajansın değişti' : 'Bağımsız üst ajans oldun', 'Yeni oran bu andan sonra kazanılan gelire uygulanır.');
+  if (oldParent) await notice(c, oldParent, 'sub', `${a.name} artık senin referans ajansın değil`, 'Bu ajansın bundan sonraki gelirinden pay almazsın (merkezin tanımladığı geçiş komisyonu hariç). Geçmiş kazançların değişmez.');
+  if (newParentId) await notice(c, newParentId, 'sub', `${a.name} referans ajansın oldu`, '');
+  await notice(c, a.id, 'parent', newParentId ? 'Referans veren ajansın değişti' : 'Bağımsız ajans oldun', 'Yeni oran bu andan sonra kazanılan gelire uygulanır.');
   await audit(c, actor, 'agency.parent', 'agency', a.id, { before: { parent: oldParent }, after: { parent: newParentId }, reason, transferId });
 }
 

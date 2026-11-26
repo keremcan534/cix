@@ -16,9 +16,10 @@ describe('Ajans ofisi kuralları', () => {
     assert.match(office, /Yayıncılar ajansına kodunla ya da davet bağlantınla katılır\./);
   });
   test('referans ajanslar gizliyken yalnız adlar', () => {
-    assert.match(office, /const subsAllowed = c\.o\.agency\.level === 1 && c\.can\('subagencies\.view'\) && !c\.o\.subsHidden;/);
+    // Yayıncılar lists only the agency's own streamers (owners, 26 Nov 2026).
+    assert.match(office, /const scope = 'direct' as const;/);
     assert.match(office, /if \(\(d as \{ hidden\?: boolean \}\)\.hidden\)/);
-    assert.match(office, /Referans ajansların yayıncıları ve rakamları üst ajansa gösterilmez\./);
+    assert.match(office, /Referans ajansların yayıncıları ve rakamları referans veren ajansa gösterilmez\./);
     assert.match(office, /o\.subsHidden \? undefined : `\$\{o\.counts\.sub_streamers\} yayıncı`/);
   });
 });

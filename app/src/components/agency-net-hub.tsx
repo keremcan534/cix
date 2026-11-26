@@ -99,7 +99,7 @@ function HubBody({ d, demo, reload, askFor }: { d: Me; demo: boolean; reload: ()
                     {a.name}
                   </Text>
                   <View style={st.pills}>
-                    {/* A referral agency's own people never read "alt ajans" (owners, 25 Nov 2026). */}
+                    {/* A referral agency's own people never read "referans ajans" (owners, 25 Nov 2026). */}
                     {a.level <= 1 && <Pill text={LEVEL_TEXT(a.level)} tone="action" />}
                     <Pill text={STATUS_TEXT[a.status]} tone={statusTone(a.status)} />
                     {!!a.tierName && a.level > 1 && <Pill text={a.tierName} tone="money" />}
@@ -180,7 +180,7 @@ function Membership({ d, demo, reload, askFor }: { d: Me; demo: boolean; reload:
         <View style={ns.rowBetween}>
           <View style={{ flex: 1 }}>
             <Text style={ns.title}>{m.agency.name}</Text>
-            {/* A referral agency shows as an agency of its own: no "alt ajans", no parent (owners, 25 Nov 2026). */}
+            {/* A referral agency shows as an agency of its own: no "referans ajans", no parent (owners, 25 Nov 2026). */}
             <Text style={ns.dim}>Ajans · kod {m.agency.code}</Text>
           </View>
           <Pill text="Üye" tone="success" icon="checkmark-circle" />
@@ -214,7 +214,7 @@ export function TransferCard({ t }: { t: Transfer }) {
       {!!(t.streamer?.name ?? t.agency?.name) && <Text style={[ns.title, { fontSize: 14 }]}>{t.streamer?.name ?? t.agency?.name}</Text>}
       <Text style={ns.dim}>
         {t.from?.name ?? (t.kind === 'streamer_move' ? 'Merkez hesabı' : '—')}
-        {t.to ? ` → ${t.to.name ?? '—'}` : t.kind === 'independence' ? ' → bağımsız üst ajans' : t.kind === 'streamer_leave' ? ' → ajanssız' : ''}
+        {t.to ? ` → ${t.to.name ?? '—'}` : t.kind === 'independence' ? ' → bağımsız ajans' : t.kind === 'streamer_leave' ? ' → ajanssız' : ''}
       </Text>
       <View style={st.pills}>
         {t.needs.map((p) => (
@@ -405,16 +405,16 @@ function Apply({ demo, reload }: { demo: boolean; reload: () => void }) {
           expectedStreamers: Number.parseInt(f.expected, 10) || undefined,
           description: f.description.trim() || undefined,
         }),
-      f.parentCode ? 'Alt ajans başvurun üst ajansa ve merkeze iletildi.' : 'Başvurun merkeze iletildi. Sonuç bildirim olarak gelecek.',
+      f.parentCode ? 'Referans ajans başvurun referans veren ajansa ve merkeze iletildi.' : 'Başvurun merkeze iletildi. Sonuç bildirim olarak gelecek.',
       reload,
     );
   };
   return (
     <Panel>
       <Text style={ns.title}>Ajans başvurusu</Text>
-      <Text style={ns.dim}>Bir üst ajansın altında kurmak için onun kodunu yaz; boş bırakırsan doğrudan merkeze bağlı üst ajans başvurusu olur. Onay politikası merkez kurallarındadır.</Text>
+      <Text style={ns.dim}>Bir referans veren ajansın altında kurmak için onun kodunu yaz; boş bırakırsan doğrudan merkeze bağlı ajans başvurusu olur. Onay politikası merkez kurallarındadır.</Text>
       <Field label="Ajans adı" value={f.name} onChange={set('name')} placeholder="En az 2 karakter" />
-      <Field label="Üst ajans kodu (isteğe bağlı)" value={f.parentCode} onChange={(v) => set('parentCode')(v.toUpperCase())} placeholder="Örn. MVD4K2" />
+      <Field label="Referans ajans kodu (isteğe bağlı)" value={f.parentCode} onChange={(v) => set('parentCode')(v.toUpperCase())} placeholder="Örn. MVD4K2" />
       <Field label="Bölge" value={f.region} onChange={set('region')} placeholder="Şehir" />
       <Field label="Yetkili" value={f.contactName} onChange={set('contactName')} placeholder="Ad soyad" />
       <Field label="Telefon" value={f.contactPhone} onChange={set('contactPhone')} placeholder="+90" keyboard="phone-pad" />

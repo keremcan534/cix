@@ -40,7 +40,7 @@ import { AssistantsTab } from '@/components/agency-assistants';
 import { SCENES } from '@/components/fx/scenes';
 import { Backdrop, DepthCard } from '@/components/fx/surface';
 import { ChoiceChips, ListGroup, ListRow } from '@/components/list';
-import { Text } from '@/components/text';
+import { Text, TextInput } from '@/components/text';
 import { Button, Header } from '@/components/ui';
 import { demoCommissions, demoOverview, demoPayouts, demoPerformance, demoReport, demoRequests, demoStaff, demoStreamers, demoSubs, demoTransfers } from '@/data/agency-net-demo';
 import {
@@ -124,7 +124,7 @@ export default function AgencyOffice() {
         {live && !id ? (
           <NoAccess title="Ajans seçilmedi" text="Panelini açmak istediğin ajansı Ajans ekranından seç." />
         ) : q.forbidden ? (
-          <NoAccess text="Bu ajansın paneli yalnız ajans sahibine, ekibine, üst ajansına ve yetkili merkez personeline açık." />
+          <NoAccess text="Bu ajansın paneli yalnız ajans sahibine, ekibine, referans veren ajansına ve yetkili merkez personeline açık." />
         ) : (
           <NetState q={q}>
             {() =>
@@ -160,6 +160,32 @@ export default function AgencyOffice() {
   );
 }
 
+/** The weekly levels' rates as a strip of six colours; the one this agency is at now is lit (owners, 26 Nov 2026). */
+const GAUGE: { rate: number; color: string }[] = [
+  { rate: 0.5, color: '#38BDF8' },
+  { rate: 0.6, color: '#34D399' },
+  { rate: 0.7, color: '#A3E635' },
+  { rate: 0.8, color: '#FACC15' },
+  { rate: 0.9, color: '#FB923C' },
+  { rate: 1, color: '#F43F5E' },
+];
+function RateGauge({ rate }: { rate: number }) {
+  return (
+    <View style={st.gauge} accessibilityLabel={`Komisyon oranı yüzde ${Math.round(rate * 100)}`}>
+      {GAUGE.map((g) => {
+        const on = Math.abs(g.rate - rate) < 0.001;
+        const past = rate > g.rate;
+        return (
+          <View key={g.rate} style={st.gaugeCell}>
+            <View style={[st.gaugeBar, { backgroundColor: g.color, opacity: on ? 1 : past ? 0.55 : 0.18 }, on && st.gaugeOn]} />
+            <Text style={[st.gaugeText, on && { color: '#fff', fontWeight: '800' }]}>%{Math.round(g.rate * 100)}</Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 function Locked({ perm }: { perm: string }) {
   return (
     <Panel style={{ alignItems: 'center', paddingVertical: 36 }}>
@@ -175,7 +201,7 @@ function Summary({ c }: { c: Ctx }) {
   const { o } = c;
   const a = o.agency;
   const sub = a.level > 1;
-  // A referral agency's own owner and team never see that it hangs under another agency, nor "alt ajans" (owners,
+  // A referral agency's own owner and team never see that it hangs under another agency, nor "referans ajans" (owners,
   // 25 Nov 2026); only the parent sees it, under Referans ajanslar. The centre and its BD still see the tree.
   const tree = !sub || !c.acting;
   const p = o.performance;
@@ -185,6 +211,10 @@ function Summary({ c }: { c: Ctx }) {
   // Haftalık seviye (server/api/agency-levels.mjs); none from an older server, which keeps the old screens.
   const level = parseAgencyLevel(o.level);
   const share = () => Share.share({ message: `${a.name} ajansına katılmak için kod: ${a.code}` }).catch(() => {});
+  // The owner's own short summary (owners, 26 Nov 2026): name, code to share, this week's diamonds and the rate now with
+  // its six-colour gauge. The new-agency note goes in the contract, the month's figures to the export, the withdrawable
+  // balance to Gelir, the streamers to their tab. The centre and its BD keep the full view.
+  const compact = c.acting && !!level;
   return (
     <View style={{ gap: space.xl }}>
       <DepthCard style={st.hero} tint={['#123B4A', '#0E2236']}>
@@ -196,28 +226,53 @@ function Summary({ c }: { c: Ctx }) {
             <Text style={st.heroName} numberOfLines={2}>
               {a.name}
             </Text>
+            {compact ? (
+              <View style={st.pills}>
+                <Pill text={STATUS_TEXT[a.status]} tone={statusTone(a.status)} />
+              </View>
+            ) : (
             <View style={st.pills}>
               {tree && <Pill text={LEVEL_TEXT(a.level)} tone="action" />}
               <Pill text={STATUS_TEXT[a.status]} tone={statusTone(a.status)} />
               {(sub || !!level) && !!a.tierName && <Pill text={a.tierName} tone="money" icon="trending-up" />}
               {activity && !activity.off && <Pill text={activity.status === 'active' ? 'Aktif ajans' : 'Aday ajans'} tone={activity.status === 'active' ? 'success' : 'money'} icon={activity.status === 'active' ? 'checkmark-circle-outline' : 'hourglass-outline'} />}
             </View>
+            )}
           </View>
+          {compact && (
+            <Pressable onPress={a.status === 'approved' ? share : undefined} hitSlop={8} style={st.codeBox} accessibilityRole="button" accessibilityLabel={`Ajans kodu ${a.code}, paylaş`}>
+              <Text style={st.codeText}>{a.code}</Text>
+              {a.status === 'approved' && <Ionicons name="share-outline" size={17} color="#fff" />}
+            </Pressable>
+          )}
         </View>
+        {compact && level ? (
+          <View style={st.heroMeta}>
+            <Line label="Bu hafta elmas" value={fmtD(level.base)} strong />
+            <Line label="Komisyon oranı" value={fmtPct(level.level.rate)} strong />
+            <RateGauge rate={level.level.rate} />
+            {!!o.bd?.name && <Line label="BD" value={o.bd.name} />}
+          </View>
+        ) : (
         <View style={st.heroMeta}>
           <Line label="Sahibi" value={o.owner?.name ?? '—'} />
-          {o.parent && tree && <Line label="Üst ajans" value={o.parent.name} />}
+          {o.parent && tree && <Line label="Ana ajans" value={o.parent.name} />}
           {/* Its BD by name only (owners, 26 Nov 2026); none from an older server. */}
           {!!o.bd?.name && <Line label="BD" value={o.bd.name} />}
           <Line label="Görünümün" value={VIEWER_TEXT[o.viewer]} />
           <Line label="Ajans kodu" value={a.code} strong />
         </View>
-        {c.acting && a.status === 'approved' && <Button title="Davet kodunu paylaş" variant="tonal" small icon="share-outline" onPress={share} />}
+        )}
+        {c.acting && !compact && a.status === 'approved' && <Button title="Davet kodunu paylaş" variant="tonal" small icon="share-outline" onPress={share} />}
       </DepthCard>
 
-      {a.status === 'suspended' && <Banner icon="pause-circle-outline" tone="danger" text="Ajans askıda. Yeni üye ve alt ajans alınamaz, ödeme talebi açılamaz; geçmiş kayıtlar ve kazançlar korunur." />}
+      {a.status === 'suspended' && <Banner icon="pause-circle-outline" tone="danger" text="Ajans askıda. Yeni üye ve referans ajans alınamaz, ödeme talebi açılamaz; geçmiş kayıtlar ve kazançlar korunur." />}
       {(a.status === 'pending' || a.status === 'draft') && <Banner icon="hourglass-outline" tone="money" text={a.status === 'draft' ? 'Taslak: onaya gönderilmedi.' : 'Başvuru inceleniyor. Onaylanınca panel açılır.'} />}
 
+      {compact && c.can('streamers.view') && <WeekStreamers c={c} />}
+
+      {!compact && (
+        <>
       {activity && !activity.off && <AgencyStatusCard a={activity} />}
       {level && a.status !== 'pending' && a.status !== 'draft' && <AgencyLevelCard v={level} date={fmtDate} />}
 
@@ -228,14 +283,14 @@ function Summary({ c }: { c: Ctx }) {
           <Kpi label="Aktif yayıncı" icon="mic-outline" value={`${o.counts.active} / ${o.counts.streamers}`} sub="son 30 gün" />
           {level ? (
             <Kpi label="Bu hafta elmas" icon="trending-up-outline" value={fmtD(level.base)} sub={`${level.active} aktif yayıncı`} />
-          ) : sub ? <Kpi label="Performans puanı" icon="speedometer-outline" value={p ? fmtScore(p.score) : '—'} sub={p?.rank ? `Genel sıra ${p.rank}` : 'Henüz değerlendirilmedi'} /> : <Kpi label="Alt ajans" icon="git-branch-outline" value={`${o.counts.active_subs} / ${o.counts.subs}`} sub={o.counts.pending_subs ? `${o.counts.pending_subs} onay bekliyor` : o.subsHidden ? undefined : `${o.counts.sub_streamers} yayıncı`} />}
+          ) : sub ? <Kpi label="Performans puanı" icon="speedometer-outline" value={p ? fmtScore(p.score) : '—'} sub={p?.rank ? `Genel sıra ${p.rank}` : 'Henüz değerlendirilmedi'} /> : <Kpi label="Referans ajans" icon="git-branch-outline" value={`${o.counts.active_subs} / ${o.counts.subs}`} sub={o.counts.pending_subs ? `${o.counts.pending_subs} onay bekliyor` : o.subsHidden ? undefined : `${o.counts.sub_streamers} yayıncı`} />}
         </KpiGrid>
       )}
       {e && (
         <Panel>
           <Text style={ns.title}>Son 30 gün</Text>
           <Line label="Doğrudan komisyon" value={`${fmtD(e.direct30)} elmas`} />
-          {!sub && <Line label="Alt ajans farkı" value={`${fmtD(e.difference30)} elmas`} />}
+          {!sub && <Line label="Referans farkı" value={`${fmtD(e.difference30)} elmas`} />}
           {e.transition30 > 0 && <Line label="Geçiş komisyonu" value={`${fmtD(e.transition30)} elmas`} />}
           {!!e.assistant30 && <Line label="Asistan payı" value={`${fmtD(e.assistant30)} elmas`} />}
           <Line label="Bugün · bu hafta" value={`${fmtD(e.today)} · ${fmtD(e.week)}`} />
@@ -248,9 +303,9 @@ function Summary({ c }: { c: Ctx }) {
         <Panel>
           <View style={ns.rowBetween}>
             <Text style={ns.title}>{fmtPct(o.rate.rate)}</Text>
-            {sub && tree && o.rate.parentShare > 0 && <Text style={ns.dim}>Üst ajans farkı {fmtPct(o.rate.parentShare)}</Text>}
+            {sub && tree && o.rate.parentShare > 0 && <Text style={ns.dim}>Referans farkı {fmtPct(o.rate.parentShare)}</Text>}
           </View>
-          <RateSplit rate={o.rate.rate} parentShare={tree ? o.rate.parentShare : 0} poolCap={o.rate.poolCap} ownLabel={!tree ? 'Bu ajans' : sub ? 'Bu alt ajans' : 'Bu ajans (doğrudan)'} />
+          <RateSplit rate={o.rate.rate} parentShare={tree ? o.rate.parentShare : 0} poolCap={o.rate.poolCap} ownLabel={!tree ? 'Bu ajans' : sub ? 'Bu ajans' : 'Bu ajans (doğrudan)'} />
           {o.rate.upcoming && (
             <View style={st.upcoming}>
               <Ionicons name="calendar-outline" size={16} color={semantic.action} />
@@ -261,9 +316,9 @@ function Summary({ c }: { c: Ctx }) {
             </View>
           )}
           {level ? (
-            <Text style={st.foot}>Oran haftalık seviyenden gelir; her ajans yalnız kendi yayıncılarıyla değerlendirilir{tree ? ', üst ajans alt ajanstan pay almaz' : ''}.</Text>
+            <Text style={st.foot}>Oran haftalık seviyenden gelir; her ajans yalnız kendi yayıncılarıyla değerlendirilir{tree ? ', referans veren ajans referans ajanstan pay almaz' : ''}.</Text>
           ) : (
-            sub && <Text style={st.foot}>{tree ? 'Alt ajans oranını yalnızca performans motoru veya merkez belirler; üst ajans puanı, seviyeyi veya oranı değiştiremez.' : 'Oranını yalnızca performans motoru veya merkez belirler.'} Değişiklikler gelecek dönemden geçerlidir.</Text>
+            sub && <Text style={st.foot}>{tree ? 'Referans ajans oranını yalnızca performans motoru veya merkez belirler; referans veren ajans puanı, seviyeyi veya oranı değiştiremez.' : 'Oranını yalnızca performans motoru veya merkez belirler.'} Değişiklikler gelecek dönemden geçerlidir.</Text>
           )}
         </Panel>
       </Section>
@@ -281,7 +336,7 @@ function Summary({ c }: { c: Ctx }) {
               </View>
               <View style={{ alignItems: 'flex-end', gap: 6 }}>
                 <Pill text={CHANGE_TEXT[p.change]} tone={p.change === 'up' ? 'success' : p.change === 'down' ? 'danger' : 'neutral'} />
-                {sub && tree && p.overtakes && <Pill text="Üst ajansı geçti" tone="money" icon="flash-outline" />}
+                {sub && tree && p.overtakes && <Pill text="Referans veren ajansı geçti" tone="money" icon="flash-outline" />}
               </View>
             </View>
             <ScoreBar score={p.score} parentScore={sub && tree ? p.parentScore : null} />
@@ -292,7 +347,7 @@ function Summary({ c }: { c: Ctx }) {
                 </Text>
                 {p.next.needScore > 0 && <Need text={`${fmtScore(p.next.needScore)} puan daha`} />}
                 {p.next.needActive > 0 && <Need text={`${p.next.needActive} aktif yayıncı daha`} />}
-                {p.next.needOvertake && tree && <Need text="Üst ajansın puanını geçmek" />}
+                {p.next.needOvertake && tree && <Need text="Referans veren ajansın puanını geçmek" />}
                 <Need text={`${p.next.periodsInRow} dönem üst üste şartları sağlamak`} />
               </View>
             )}
@@ -305,6 +360,9 @@ function Summary({ c }: { c: Ctx }) {
             )}
           </Panel>
         </Section>
+      )}
+
+        </>
       )}
 
       {o.notices.length > 0 && (
@@ -382,9 +440,10 @@ function Actions({ c }: { c: Ctx }) {
 
 // --- Streamers ----------------------------------------------------------------------------------------------
 function Streamers({ c }: { c: Ctx }) {
-  // Referans ajans yayıncıları: not while this agency sees its sub-agencies by name only (server subsHidden).
-  const subsAllowed = c.o.agency.level === 1 && c.can('subagencies.view') && !c.o.subsHidden;
-  const [scope, setScope] = useState<'direct' | 'sub'>('direct');
+  // Only the agency's own streamers (owners, 26 Nov 2026: no referral agencies' streamers here).
+  const scope = 'direct' as const;
+  // Her record (kayıt defteri): her commission rows, open under the list.
+  const [open, setOpen] = useState<Streamer | null>(null);
   const [period, setPeriod] = useState<'week' | 'month'>('week');
   const q = useNet(c.name, () => agencyNet.streamers(c.id, scope), () => demoStreamers(c.id, scope), [c.id, scope]);
   // The weekly and monthly earnings as a table: shared as a .csv file (opens in Excel), or its text by mail.
@@ -400,18 +459,8 @@ function Streamers({ c }: { c: Ctx }) {
   };
   return (
     <View style={{ gap: space.lg }}>
-      {subsAllowed && (
-        <ChoiceChips
-          value={scope}
-          onChange={setScope}
-          options={[
-            ['direct', 'Doğrudan yayıncılar'],
-            ['sub', 'Referans ajans yayıncıları'],
-          ]}
-        />
-      )}
       {/* No "Yayıncı davet et" (owners, 22 Nov 2026): a streamer joins with the agency's code or its invite link. */}
-      {c.acting && scope === 'direct' && c.o.agency.status === 'approved' && <Text style={st.foot}>Yayıncılar ajansına kodunla ya da davet bağlantınla katılır.</Text>}
+      {c.acting && c.o.agency.status === 'approved' && <Text style={st.foot}>Yayıncılar ajansına kodunla ya da davet bağlantınla katılır.</Text>}
       <NetState q={q}>
         {(rows) => {
           const total = rows.reduce((x, r) => x + r[period], 0);
@@ -445,7 +494,8 @@ function Streamers({ c }: { c: Ctx }) {
                       key={r.id}
                       leading={<Mono name={r.name} active={r.active} />}
                       title={r.name}
-                      subtitle={[r.username ? `@${r.username}` : null, scope === 'sub' ? r.agencyName : null, `${fmtDate(r.joinedAt)} · ${METHOD_TEXT[r.method] ?? r.method}`, `${Math.round(r.onlineHours30)} saat yayın`].filter(Boolean).join(' · ')}
+                      subtitle={[r.no ? `ID ${r.no}` : null, `${fmtDate(r.joinedAt)} · ${METHOD_TEXT[r.method] ?? r.method}`, `${Math.round(r.onlineHours30)} saat yayın`].filter(Boolean).join(' · ')}
+                      onPress={() => setOpen((o) => (o?.id === r.id ? null : r))}
                       right={
                         <View style={{ alignItems: 'flex-end', gap: 2 }}>
                           <Text style={st.amount}>{fmtD(r[period])}</Text>
@@ -457,11 +507,90 @@ function Streamers({ c }: { c: Ctx }) {
                   ))}
                 </ListGroup>
               )}
+              {open && <StreamerLog c={c} s={open} onClose={() => setOpen(null)} />}
             </View>
           );
         }}
       </NetState>
     </View>
+  );
+}
+
+/** A streamer's record (kayıt defteri): the commission rows her income gave this agency, newest first. */
+function StreamerLog({ c, s, onClose }: { c: Ctx; s: Streamer; onClose: () => void }) {
+  const [limit, setLimit] = useState(PAGE);
+  const led = useNet(c.name, () => agencyNet.commissions(c.id, { streamer: s.id }), () => {
+    const d = demoCommissions(c.id);
+    return { ...d, rows: d.rows.filter((r) => r.streamer?.id === s.id) };
+  }, [c.id, s.id]);
+  return (
+    <Section title={`Kayıt defteri · ${s.name}`} right={<Button title="Kapat" variant="ghost" small icon="close" onPress={onClose} />}>
+      <NetState q={led}>
+        {(d) =>
+          d.rows.length === 0 ? (
+            <Empty icon="receipt-outline" text="Bu yayıncının kaydı yok." />
+          ) : (
+            <View style={{ gap: space.md }}>
+              <ListGroup footer="Kayıtlar değiştirilmez; düzeltme ve iptaller ayrı satır olarak eklenir.">
+                {d.rows.slice(0, limit).map((r) => (
+                  <ListRow
+                    key={r.id}
+                    icon={r.kind === 'assistant' ? 'ribbon-outline' : r.amount < 0 ? 'return-down-back-outline' : 'diamond-outline'}
+                    tone={r.amount < 0 ? 'danger' : 'action'}
+                    title={KIND_TEXT[r.kind] ?? r.kind}
+                    subtitle={`${r.base !== null ? `${fmtD(r.base)} × ${fmtPct(r.rate)}` : fmtPct(r.rate)} · ${r.statusLabel} · ${fmtDateTime(r.occurredAt ?? r.createdAt)}`}
+                    right={
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={[st.amount, r.amount < 0 && { color: semantic.danger }]}>
+                          {r.amount > 0 ? '+' : ''}
+                          {fmtD(r.amount)}
+                        </Text>
+                        <Text style={st.small}>{fmtUsd(usdOf(r.amount))}</Text>
+                      </View>
+                    }
+                    onPress={() => ledgerDetail(r, c.o.agency.level <= 1 || !c.acting)}
+                  />
+                ))}
+              </ListGroup>
+              {d.rows.length > limit && <Button variant="ghost" small icon="chevron-down" title={`Daha fazla göster (${fmtD(d.rows.length - limit)} kayıt daha)`} onPress={() => setLimit((n) => n + PAGE)} />}
+            </View>
+          )
+        }
+      </NetState>
+    </Section>
+  );
+}
+
+/** Özet's list (owners, 26 Nov 2026): each streamer's name and this week's diamonds, found by her 12-digit ID or name. */
+function WeekStreamers({ c }: { c: Ctx }) {
+  const [find, setFind] = useState('');
+  const q = useNet(c.name, () => agencyNet.streamers(c.id, 'direct'), () => demoStreamers(c.id, 'direct'), [c.id]);
+  return (
+    <Section
+      title="Yayıncılar · bu hafta"
+      right={
+        c.can('reports.export') && q.data ? (
+          <Button title="Haftalık Rapor" variant="ghost" small icon="document-text-outline" onPress={() => q.data && (q.data.length ? void shareCsv(`yayinci-kazanclari-${new Date().toISOString().slice(0, 10)}.csv`, `${c.o.agency.name} haftalık rapor`, earningsCsv(q.data)) : showAlert('Gönderilecek kayıt yok', 'Henüz yayıncı yok.'))} />
+        ) : undefined
+      }
+    >
+      <TextInput value={find} onChangeText={setFind} placeholder="ID ya da ad ile ara" placeholderTextColor={colors.textDim} style={st.search} keyboardType="default" autoCorrect={false} />
+      <NetState q={q}>
+        {(rows) => {
+          const t = find.trim().toLocaleLowerCase('tr-TR');
+          const shown = [...rows].filter((r) => !t || (r.no ?? '').includes(t) || r.name.toLocaleLowerCase('tr-TR').includes(t)).sort((x, y) => y.week - x.week);
+          return shown.length === 0 ? (
+            <Empty icon="people-outline" text={t ? 'Bu ID ya da adla yayıncı yok.' : 'Henüz yayıncı yok.'} />
+          ) : (
+            <ListGroup>
+              {shown.slice(0, 50).map((r) => (
+                <ListRow key={r.id} leading={<Mono name={r.name} active={r.active} />} title={r.name} right={<Text style={st.amount}>{fmtD(r.week)}</Text>} />
+              ))}
+            </ListGroup>
+          );
+        }}
+      </NetState>
+    </Section>
   );
 }
 
@@ -501,7 +630,7 @@ function Subs({ c }: { c: Ctx }) {
           // By name only (owners, 22 Nov 2026; server subsHidden): no streamers, numbers or panel to open.
           if ((d as { hidden?: boolean }).hidden)
             return (
-              <ListGroup footer="Referans ajansların yayıncıları ve rakamları üst ajansa gösterilmez.">
+              <ListGroup footer="Referans ajansların yayıncıları ve rakamları referans veren ajansa gösterilmez.">
                 {d.subagencies.map((s) => (
                   <ListRow key={s.id} leading={<Ionicons name="git-branch-outline" size={20} color={colors.textDim} />} title={s.name} right={<Pill text={STATUS_TEXT[s.status]} tone={statusTone(s.status)} />} />
                 ))}
@@ -668,13 +797,7 @@ function PerformanceTab({ c }: { c: Ctx }) {
 
 // --- Earnings -----------------------------------------------------------------------------------------------
 function Earnings({ c }: { c: Ctx }) {
-  const [kind, setKind] = useState<'' | 'direct' | 'difference' | 'transition' | 'assistant'>('');
-  // A busy agency has thousands of rows; show a page at a time (totals above always cover every row).
-  const [limit, setLimit] = useState(PAGE);
-  const led = useNet(c.name, () => agencyNet.commissions(c.id, { kind: kind || undefined }), () => {
-    const d = demoCommissions(c.id);
-    return kind ? { ...d, rows: d.rows.filter((r) => r.kind === kind) } : d;
-  }, [c.id, kind]);
+  const led = useNet(c.name, () => agencyNet.commissions(c.id), () => demoCommissions(c.id), [c.id]);
   const rep = useNet(c.name, () => agencyNet.report(c.id, 'week'), () => demoReport(c.id), [c.id]);
   const e = c.o.earnings;
   const exportCsv = async () => {
@@ -700,58 +823,20 @@ function Earnings({ c }: { c: Ctx }) {
         </Panel>
       </Section>
       {c.can('payouts.request') && c.acting && <PayoutsPanel c={c} />}
-      <Section title="Komisyon kayıtları" right={c.can('reports.export') ? <Button title="CSV" variant="ghost" small icon="download-outline" onPress={exportCsv} /> : undefined}>
-        <ChoiceChips
-          value={kind}
-          onChange={(k) => {
-            setKind(k);
-            setLimit(PAGE);
-          }}
-          options={[
-            ['', 'Tümü'],
-            ['direct', 'Doğrudan'],
-            ['difference', 'Fark'],
-            ['transition', 'Geçiş'],
-            ['assistant', 'Asistan'],
-          ]}
-        />
+      <Section title="Komisyon toplamları" right={c.can('reports.export') ? <Button title="CSV" variant="ghost" small icon="download-outline" onPress={exportCsv} /> : undefined}>
         <NetState q={led}>
           {(d) => (
             <View style={{ gap: space.md }}>
               <Panel>
                 <Line label="Doğrudan" value={`${fmtD(d.totals.direct)} elmas`} />
-                <Line label="Fark" value={`${fmtD(d.totals.difference)} elmas`} />
+                {d.totals.difference !== 0 && <Line label="Referans komisyonu" value={`${fmtD(d.totals.difference)} elmas`} />}
                 {d.totals.transition !== 0 && <Line label="Geçiş" value={`${fmtD(d.totals.transition)} elmas`} />}
                 {!!d.totals.assistant && <Line label="Asistan payı" value={`${fmtD(d.totals.assistant)} elmas`} />}
                 {d.totals.fees !== 0 && <Line label="Transfer ücretleri" value={`${fmtD(d.totals.fees)} elmas`} />}
                 {d.totals.adjustments !== 0 && <Line label="Düzeltmeler" value={`${fmtD(d.totals.adjustments)} elmas`} />}
               </Panel>
-              {d.rows.length === 0 ? (
-                <Empty icon="receipt-outline" text="Kayıt yok." />
-              ) : (
-                <ListGroup footer="Kayıtlar değiştirilmez; düzeltme ve iptaller ayrı satır olarak eklenir.">
-                  {d.rows.slice(0, limit).map((r) => (
-                    <ListRow
-                      key={r.id}
-                      icon={r.kind === 'difference' ? 'git-branch-outline' : r.kind === 'transition' ? 'swap-horizontal' : r.kind === 'assistant' ? 'ribbon-outline' : r.amount < 0 ? 'return-down-back-outline' : 'diamond-outline'}
-                      tone={r.amount < 0 ? 'danger' : r.kind === 'difference' ? 'money' : 'action'}
-                      title={`${KIND_TEXT[r.kind] ?? r.kind}${r.streamer ? ` · ${r.streamer.name}` : ''}`}
-                      subtitle={`${r.base !== null ? `${fmtD(r.base)} × ${fmtPct(r.rate)}` : fmtPct(r.rate)}${r.sourceAgency && r.kind === 'difference' ? ` · ${r.sourceAgency.name}` : ''} · ${r.statusLabel} · ${fmtDateTime(r.occurredAt ?? r.createdAt)}`}
-                      right={
-                        <View style={{ alignItems: 'flex-end' }}>
-                          <Text style={[st.amount, r.amount < 0 && { color: semantic.danger }]}>
-                            {r.amount > 0 ? '+' : ''}
-                            {fmtD(r.amount)}
-                          </Text>
-                          <Text style={st.small}>{fmtUsd(usdOf(r.amount))}</Text>
-                        </View>
-                      }
-                      onPress={() => ledgerDetail(r, c.o.agency.level <= 1 || !c.acting)}
-                    />
-                  ))}
-                </ListGroup>
-              )}
-              {d.rows.length > limit && <Button variant="ghost" small icon="chevron-down" title={`Daha fazla göster (${fmtD(d.rows.length - limit)} kayıt daha)`} onPress={() => setLimit((n) => n + PAGE)} />}
+              {/* Each record belongs to a streamer (owners, 26 Nov 2026): it is in her record on Yayıncılar. */}
+              <Text style={st.foot}>Her yayıncının komisyon kayıtları Yayıncılar sekmesinde, yayıncıya dokununca açılan kayıt defterinde.</Text>
             </View>
           )}
         </NetState>
@@ -768,8 +853,8 @@ function ledgerDetail(r: LedgerRow, tree: boolean) {
     r.incomeType ? `Gelir türü: ${INCOME_TEXT[r.incomeType] ?? r.incomeType}` : null,
     r.base !== null ? `Matrah: ${fmtD(r.base)} elmas` : null,
     r.totalRate !== null ? `Toplam ajans oranı: ${fmtPct(r.totalRate)} (sınır ${fmtPct(r.poolCap)})` : null,
-    r.subAmount !== null ? `${tree ? 'Alt ajans' : 'Ajans'}: ${fmtPct(r.subRate)} → ${fmtD(r.subAmount)} elmas` : null,
-    r.parentAmount !== null && tree ? `Üst ajans farkı: ${fmtD(r.parentAmount)} elmas` : null,
+    r.subAmount !== null ? `${tree ? 'Referans ajans' : 'Ajans'}: ${fmtPct(r.subRate)} → ${fmtD(r.subAmount)} elmas` : null,
+    r.parentAmount !== null && tree ? `Referans farkı: ${fmtD(r.parentAmount)} elmas` : null,
     r.transitionAmount ? `Geçiş komisyonu: ${fmtD(r.transitionAmount)} elmas` : null,
     `Bu kayıt: ${fmtD(r.amount)} elmas (${fmtUsd(usdOf(r.amount))})`,
     `Dönem: ${r.period} · ${r.statusLabel}`,
@@ -1003,6 +1088,14 @@ const st = StyleSheet.create({
   heroMeta: { gap: 6, paddingTop: space.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(255,255,255,0.12)' },
   monogram: { width: 60, height: 60, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,95,162,0.14)', borderWidth: 1, borderColor: 'rgba(255,95,162,0.35)' },
   monoText: { color: semantic.action, fontSize: 26, fontFamily: fonts.display },
+  search: { color: '#fff', fontSize: 15, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)' },
+  codeBox: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingVertical: 4 },
+  codeText: { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 0.6, fontVariant: ['tabular-nums'] },
+  gauge: { flexDirection: 'row', gap: 4, paddingTop: 4 },
+  gaugeCell: { flex: 1, alignItems: 'center', gap: 4 },
+  gaugeBar: { alignSelf: 'stretch', height: 8, borderRadius: 4 },
+  gaugeOn: { height: 10, boxShadow: '0 0 8px rgba(255,255,255,0.45)' },
+  gaugeText: { color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: '600' },
   pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   rowActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 6, paddingHorizontal: 14, paddingBottom: 10 },
   banner: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md, borderRadius: 14, borderWidth: 1 },

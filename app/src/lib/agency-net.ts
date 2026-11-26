@@ -126,6 +126,8 @@ export type Streamer = {
   id: string;
   name: string;
   username: string | null;
+  /** The 12-digit ID (none from an older server). */
+  no?: string | null;
   avatarUrl: string | null;
   agencyId: string;
   joinedAt: string;
@@ -608,15 +610,15 @@ export const fmtDateTime = (iso: string | null | undefined) => (iso && Number.is
 export const fmtScore = (v: number | null | undefined) => (v === null || v === undefined ? '—' : v.toLocaleString('tr-TR', { maximumFractionDigits: 1 }));
 
 export const STATUS_TEXT: Record<AgencyStatus, string> = { draft: 'Taslak', pending: 'Onay bekliyor', approved: 'Aktif', rejected: 'Reddedildi', suspended: 'Askıda', closed: 'Kapatıldı' };
-export const VIEWER_TEXT: Record<Viewer, string> = { owner: 'Sahip', staff: 'Ekip', parent: 'Üst ajans görünümü', center: 'Merkez görünümü', bd: 'BD görünümü' };
-export const LEVEL_TEXT = (level: number) => (level <= 1 ? 'Üst ajans' : 'Alt ajans');
+export const VIEWER_TEXT: Record<Viewer, string> = { owner: 'Sahip', staff: 'Ekip', parent: 'Referans veren ajans görünümü', center: 'Merkez görünümü', bd: 'BD görünümü' };
+export const LEVEL_TEXT = (level: number) => (level <= 1 ? 'Ana ajans' : 'Referans ajans');
 /** Commission ledger kinds as the server writes them (agency_ledger.kind); the words live in lib/admin-format. */
 export const KIND_TEXT: Record<string, string> = AGENCY_LEDGER_LABEL;
-export const TRANSFER_TEXT: Record<TransferKind, string> = { streamer_move: 'Yayıncı transferi', streamer_leave: 'Ajanstan ayrılma', independence: 'Bağımsızlık', change_parent: 'Üst ajans değişikliği', sub_close: 'Alt ajans kapatma' };
+export const TRANSFER_TEXT: Record<TransferKind, string> = { streamer_move: 'Yayıncı transferi', streamer_leave: 'Ajanstan ayrılma', independence: 'Bağımsızlık', change_parent: 'Referans ajans değişikliği', sub_close: 'Referans ajansı kapatma' };
 export const TRANSFER_STATUS: Record<TransferStatus, string> = { pending: 'Onay bekliyor', completed: 'Tamamlandı', rejected: 'Reddedildi', cancelled: 'İptal edildi' };
-export const PARTY_TEXT: Record<string, string> = { from: 'Mevcut ajans', to: 'Yeni ajans', parent: 'Üst ajans', streamer: 'Yayıncı', center: 'Merkez' };
+export const PARTY_TEXT: Record<string, string> = { from: 'Mevcut ajans', to: 'Yeni ajans', parent: 'Ana ajans', streamer: 'Yayıncı', center: 'Merkez' };
 export const CHANGE_TEXT: Record<TierChange, string> = { up: 'Seviye yükseldi', down: 'Seviye düştü', same: 'Seviye korundu', held: 'Merkez sabitledi', waiting: 'Kesinleşmesi bekleniyor' };
-export const FLAG_TEXT: Record<string, string> = { decline: 'Puanı hızlı düştü', low_active: 'Aktif yayıncı az', review: 'İnceleme önerilir', spike: 'Ani hacim artışı (inceleniyor)', overtaken: 'Alt ajansı geçti' };
+export const FLAG_TEXT: Record<string, string> = { decline: 'Puanı hızlı düştü', low_active: 'Aktif yayıncı az', review: 'İnceleme önerilir', spike: 'Ani hacim artışı (inceleniyor)', overtaken: 'Referans ajansı geçti' };
 export const CRITERIA_TEXT: Record<string, string> = {
   volume: 'Hacim',
   active: 'Aktif yayıncı',
@@ -633,9 +635,9 @@ export const PERM_TEXT: Record<string, string> = {
   'streamers.view': 'Yayıncıları görme',
   'streamers.invite': 'Yayıncı davet etme',
   'streamers.approve': 'Katılım onaylama',
-  'subagencies.view': 'Alt ajansları görme',
-  'subagencies.manage': 'Alt ajans yönetimi',
-  'subagencies.earnings': 'Alt ajans kazançları',
+  'subagencies.view': 'Referans ajansları görme',
+  'subagencies.manage': 'Referans ajans yönetimi',
+  'subagencies.earnings': 'Referans ajans kazançları',
   'reports.performance': 'Performans raporları',
   'reports.commission': 'Komisyon raporları',
   'reports.export': 'Rapor dışa aktarma',
