@@ -13,6 +13,7 @@ import { GameInfoSheet } from '@/components/games/fx/info-sheet';
 import { ResultTrail, pushTrail, type TrailItem } from '@/components/games/fx/result-trail';
 import { ChoiceChip, SALON, SalonStage, SideButton, StageHeader, StageStatus, WideAction, choiceInk, salonScreen, salonScreenShort, tabular, useBox, wideInk, type StatusTone } from '@/components/games/fx/salon';
 import { salonArt, type SalonArtName } from '@/components/games/fx/salon-art';
+import { makeTicking, useTicking, type Ticking } from '@/components/games/fx/ticking';
 import { useWinFx } from '@/components/games/fx/win-fx';
 import { WalletRow, fmt, sleep, useShortGame } from '@/components/games/slot-kit';
 import { BALL_R, CUPS, CUP_DEPTH, FIELD, HEIGHT, LANES, LANE_NAME, PEGS, POCKETS, POCKET_W, POCKET_Y, RAIL_Y, TARGETS, WIDTH, type Lane } from '@/lib/bilye/board';
@@ -85,6 +86,23 @@ const BoardArt = memo(function BoardArt({ k }: { k: number }) {
   );
 });
 
+/**
+ * The pegs the ball has just touched, lit. A ball touches a dozen or more in a launch: they are kept outside the
+ * screen's state (fx/ticking), so a touch redraws these few dots, not the whole screen and its controls.
+ */
+function PegSparks({ lit, k }: { lit: Ticking<number[]>; k: number }) {
+  const pegs = useTicking(lit);
+  return (
+    <>
+      {pegs.map((i, n) => {
+        const p = PEGS[i];
+        const r = p.r * 2.4;
+        return <View key={`${i}-${n}`} style={[s.spark, { left: (p.x - r) * k, top: (p.y - r) * k, width: r * 2 * k, height: r * 2 * k, borderRadius: r * k }]} pointerEvents="none" />;
+      })}
+    </>
+  );
+}
+
 export function BilyePlayer({ entry }: { entry: Entry }) {
   const { wealthLevel, coins, gameCoins } = useApp();
   const settings = useSettings();
@@ -99,7 +117,7 @@ export function BilyePlayer({ entry }: { entry: Entry }) {
   const short = useShortGame(entry);
   const [shine, setShine] = useState(0);
   const [path, setPath] = useState<BilyePath | null>(null);
-  const [lit, setLit] = useState<number[]>([]);
+  const [lit] = useState(() => makeTicking<number[]>([]));
   const [landed, setLanded] = useState<number | null>(null);
   const [status, setStatus] = useState<{ text: string; tone?: StatusTone; amount?: number; label?: string }>({ text: 'Atış gücünü seç, bilyeyi fırlat' });
   const [trail, setTrail] = useState<TrailItem[]>([]);
@@ -148,7 +166,7 @@ export function BilyePlayer({ entry }: { entry: Entry }) {
     if (busy.current || !k) return null;
     busy.current = true;
     setLanded(null);
-    setLit([]);
+    lit.set([]);
     setHeld(balance.current - bet);
     setStatus({ text: `${LANE_NAME[lane]} atış…` });
     const r = await playRound('bilye', bet, lane, entry);
@@ -173,7 +191,7 @@ export function BilyePlayer({ entry }: { entry: Entry }) {
         timers.current.push(
           setTimeout(() => {
             if (!alive.current) return;
-            setLit((l) => [...l.slice(-5), h.peg]);
+            lit.set([...lit.get().slice(-5), h.peg]);
             if (!PEGS[h.peg].post) playSfx('tick', 0.22);
           }, h.frame * FRAME_MS),
         );
@@ -182,7 +200,7 @@ export function BilyePlayer({ entry }: { entry: Entry }) {
       if (!alive.current) return null;
     }
     // In the target: it glows, and the round is on screen (the balance may show it).
-    setLit([]);
+    lit.set([]);
     setLanded(round.target);
     glow.setValue(0);
     if (!calm) Animated.sequence([Animated.timing(glow, { toValue: 1, duration: 160, useNativeDriver: true }), Animated.timing(glow, { toValue: 0.55, duration: 420, useNativeDriver: true })]).start();
@@ -250,11 +268,7 @@ export function BilyePlayer({ entry }: { entry: Entry }) {
             <View style={[s.aim, { left: (launchX(lane) - 6) * k, top: (RAIL_Y + BALL_R) * k }]} pointerEvents="none">
               <Ionicons name="caret-down" size={Math.max(10, 12 * k)} color="#FDE68A" />
             </View>
-            {lit.map((i, n) => {
-              const p = PEGS[i];
-              const r = p.r * 2.4;
-              return <View key={`${i}-${n}`} style={[s.spark, { left: (p.x - r) * k, top: (p.y - r) * k, width: r * 2 * k, height: r * 2 * k, borderRadius: r * k }]} pointerEvents="none" />;
-            })}
+            <PegSparks lit={lit} k={k} />
             {target && (
               <Animated.View
                 pointerEvents="none"

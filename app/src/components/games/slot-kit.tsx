@@ -5,7 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, type Href } from 'expo-router';
 import { createContext, useContext, useState, type ReactNode } from 'react';
-import { Image, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Image, Pressable, StyleSheet, View, useWindowDimensions, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Icon3D } from '@/components/Icon3D';
 import { RollingNumber } from '@/components/fx/rolling-number';
@@ -42,7 +42,10 @@ const ROOMY_BARE = 140;
 const NO_AVATAR = 196;
 
 /** Avatar, coins you can play with (wallet + game balance) and a + that opens the wallet. Navy glass, gold digits. */
-export function BalancePill({ shown }: { /** Shown instead of the balance while a round's result is still on its way to the screen (the stake taken, the win not yet seen). */ shown?: number | null }) {
+/** A frame for the balance pill: Salon's gold LuxFrame, or a game's own keys (Yörünge's Blender plates). */
+export type PillFrame = (p: { style?: StyleProp<ViewStyle>; face?: StyleProp<ViewStyle>; children?: ReactNode }) => ReactNode;
+
+export function BalancePill({ shown, Frame = LuxFrame }: { /** Shown instead of the balance while a round's result is still on its way to the screen (the stake taken, the win not yet seen). */ shown?: number | null; Frame?: PillFrame }) {
   const { me, coins, gameCoins } = useApp();
   const go = useGameNav();
   const [pillW, setPillW] = useState(0);
@@ -52,7 +55,7 @@ export function BalancePill({ shown }: { /** Shown instead of the balance while 
   // With room, every digit is shown: at "4,9M" a win of a few hundred would not be seen arriving.
   const format = (n: number) => (roomy && n < 100_000_000 ? fmt(n) : compact(n));
   return (
-    <LuxFrame style={k.pillFrame} face={k.pill}>
+    <Frame style={k.pillFrame} face={k.pill}>
       <View style={k.pillInner} onLayout={(e) => setPillW(e.nativeEvent.layout.width)} accessibilityLabel={`Bakiye ${coins + gameCoins} jeton`}>
       {avatar && <Photo uri={me.avatar} kind="face" style={k.avatar} />}
       <View style={{ flex: 1, minWidth: 0 }}>
@@ -71,7 +74,7 @@ export function BalancePill({ shown }: { /** Shown instead of the balance while 
         </Medal>
       </Pressable>
       </View>
-    </LuxFrame>
+    </Frame>
   );
 }
 

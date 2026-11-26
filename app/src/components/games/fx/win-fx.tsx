@@ -10,7 +10,7 @@
 // but no flash, rings, bursts, sparkles, fireworks or shaking. Decoration only: the round is settled before any of
 // this, and nothing here touches the balance.
 import { LinearGradient } from 'expo-linear-gradient';
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 
 import { Shine } from '@/components/fx/surface';
@@ -19,6 +19,7 @@ import { DivineFx } from '@/components/games/fx/divine-fx';
 import { useGameQuake } from '@/components/games/fx/quake';
 import { FitBox, GoldText } from '@/components/games/fx/gold-text';
 import { salonArt } from '@/components/games/fx/salon-art';
+import { makeTicking, useTicking, type Ticking } from '@/components/games/fx/ticking';
 import { Text } from '@/components/text';
 import { playSfx } from '@/lib/game-sound';
 import { heavyHaptic, pressHaptic, rumbleHaptic, successHaptic, tapHaptic } from '@/lib/haptics';
@@ -112,7 +113,9 @@ export function useWinFx(): { celebrate: Celebrate; layer: ReactNode } {
   return { celebrate, layer: show ? <WinCelebration key={show.id} {...show.win} tier={show.tier} onDone={done} /> : null };
 }
 
-function WinCelebration({ amount, bet, tier, title, onDone }: WinShow & { tier: WinTier; onDone: () => void }) {
+// Memoised: the game screen under it re-renders while it plays (a balloon spawning, Oto's next shot), and each
+// render here rebuilds every ray, streak, sparkle and coin's native animation nodes.
+const WinCelebration = memo(function WinCelebration({ amount, bet, tier, title, onDone }: WinShow & { tier: WinTier; onDone: () => void }) {
   const { reduceMotion, effectsOff, gameFx } = useSettings();
   const small = tier === 'small';
   // The game screen round the show trembles with it (fx/quake).
@@ -140,22 +143,26 @@ function WinCelebration({ amount, bet, tier, title, onDone }: WinShow & { tier: 
   const [twinkle] = useState(() => new Animated.Value(0));
   // Each blow's coin burst (the first comes with the show); a new key throws a new one.
   const [burst, setBurst] = useState(() => (lively ? 1 : 0));
-  const [count, setCount] = useState(small || reduceMotion ? amount : 0);
+  // The amount on show changes every frame while it counts: only its plate (PlateAmount) redraws with it.
+  const [count] = useState(() => makeTicking(small || reduceMotion ? amount : 0));
   const done = useRef(onDone);
   const closing = useRef(false);
   useEffect(() => {
     done.current = onDone;
   });
-  // The title climbs with the amount on show unless the game named it (JACKPOT, GRAND) or it can't count.
-  const stage = !small && !title && !reduceMotion ? winStageAt(count, bet, tier) : tier;
+  // The title climbs with the amount on show unless the game named it (JACKPOT, GRAND) or it can't count; it is
+  // state of its own, set only when it steps up, so the show redraws a few times instead of every frame.
+  const climbing = !small && !title && !reduceMotion;
+  const [stage, setStage] = useState<WinTier>(() => (climbing ? winStageAt(count.get(), bet, tier) : tier));
   const big: BigTier = stage === 'small' ? 'big' : stage;
 
   const close = useCallback(() => {
     if (closing.current) return;
     closing.current = true;
-    setCount(amount);
+    count.set(amount);
+    if (climbing) setStage(winStageAt(amount, bet, tier));
     Animated.timing(out, { toValue: 1, duration: 240, useNativeDriver: true }).start(() => done.current());
-  }, [amount, out]);
+  }, [amount, bet, tier, climbing, count, out]);
 
   /**
    * A blow, `strength` 0…1, as hard as the title `at` is: the title pops, the show punches in and shakes, the stage
@@ -242,10 +249,11 @@ function WinCelebration({ amount, bet, tier, title, onDone }: WinShow & { tier: 
       if (closing.current) return;
       const t = Math.min(1, (Date.now() - start) / span);
       const shown = climbs ? climbAt(amount, t) : rollAt(0, amount, t);
-      setCount(shown);
+      count.set(shown);
       const next = title ? reached : winStageAt(shown, bet, tier);
       if (next !== reached) {
         reached = next;
+        setStage(next);
         const at = next === 'small' ? 'big' : next;
         if (lively) {
           blow(0.85, at);
@@ -370,7 +378,7 @@ function WinCelebration({ amount, bet, tier, title, onDone }: WinShow & { tier: 
             {/* The amount on its plate: it shivers while a climbing win counts and lands with a bump. */}
             <Animated.View style={[s.plate, { borderColor: look.ribbon[0], transform: [{ translateX: shiver }, { scale: slam.interpolate({ inputRange: [0, 1], outputRange: [1, 1.22] }) }] }]}>
               <FitBox width={Math.max(160, box.w * 0.78)}>
-                <GoldText size={52}>{`+${fmt(count)}`}</GoldText>
+                <PlateAmount count={count} size={52} />
               </FitBox>
             </Animated.View>
             <Text style={s.unit}>jeton{x >= 2 ? ` · bahsin ${fmt(x)} katı` : ''}</Text>
@@ -403,10 +411,15 @@ function WinCelebration({ amount, bet, tier, title, onDone }: WinShow & { tier: 
       {lively && <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, s.flash, { opacity: flash }]} />}
     </Animated.View>
   );
+});
+
+/** The amount on the plate as it counts: the one part of the show redrawn with every frame of the count. */
+function PlateAmount({ count, size }: { count: Ticking<number>; size: number }) {
+  return <GoldText size={size}>{`+${fmt(useTicking(count))}`}</GoldText>;
 }
 
 /** A firework over the show: sparks thrown out round a point after `delay` (ms), falling a little as they fade. */
-function Firework({ x, y, color, delay }: { x: number; y: number; color: string; delay: number }) {
+const Firework = memo(function Firework({ x, y, color, delay }: { x: number; y: number; color: string; delay: number }) {
   const [t] = useState(() => new Animated.Value(0));
   useEffect(() => {
     const a = Animated.sequence([Animated.delay(delay), Animated.timing(t, { toValue: 1, duration: 1100, easing: Easing.linear, useNativeDriver: true })]);
@@ -441,7 +454,7 @@ function Firework({ x, y, color, delay }: { x: number; y: number; color: string;
       })}
     </View>
   );
-}
+});
 
 const s = StyleSheet.create({
   layer: { zIndex: 30, elevation: 30, overflow: 'hidden', borderRadius: 22 },

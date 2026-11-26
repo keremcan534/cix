@@ -2,7 +2,7 @@
 // option to the balance. Where they start and land is measured on the screen when they set off, so the layer only
 // needs to fill the view both ends live in (`root`); draw `layer` last in it. One native-driven value per flight,
 // however many coins it carries. Decoration only: a bet counts and a win is paid whether or not anything flew.
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import { memo, useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { Animated, Easing, StyleSheet, View, type HostInstance } from 'react-native';
 
 import { ChipFace, type ChipLook } from '@/components/games/fx/chips';
@@ -101,7 +101,9 @@ export function useFlights(root: RefObject<HostInstance | null>) {
 /** Points of a path for an interpolation: `n` + 1 of them from 0 to 1. */
 const samples = (n: number) => Array.from({ length: n + 1 }, (_, i) => i / n);
 
-function ChipFly({ flight, onDone }: { flight: ChipFlight; onDone: (id: number) => void }) {
+// Memoised (as CoinsFly): every chip placed re-renders the board, and with it each flight still in the air rebuilt
+// its interpolations.
+const ChipFly = memo(function ChipFly({ flight, onDone }: { flight: ChipFlight; onDone: (id: number) => void }) {
   const [t] = useState(() => new Animated.Value(0));
   useEffect(() => {
     const a = Animated.sequence([Animated.delay(flight.delay), Animated.timing(t, { toValue: 1, duration: flight.ms, easing: Easing.out(Easing.quad), useNativeDriver: true })]);
@@ -127,9 +129,9 @@ function ChipFly({ flight, onDone }: { flight: ChipFlight; onDone: (id: number) 
       <ChipFace size={size} look={flight.look} />
     </Animated.View>
   );
-}
+});
 
-function CoinsFly({ flight, onDone }: { flight: CoinFlight; onDone: (id: number) => void }) {
+const CoinsFly = memo(function CoinsFly({ flight, onDone }: { flight: CoinFlight; onDone: (id: number) => void }) {
   const [t] = useState(() => new Animated.Value(0));
   useEffect(() => {
     const a = Animated.timing(t, { toValue: 1, duration: flight.ms, easing: Easing.linear, useNativeDriver: true });
@@ -177,7 +179,7 @@ function CoinsFly({ flight, onDone }: { flight: CoinFlight; onDone: (id: number)
       })}
     </>
   );
-}
+});
 
 const f = StyleSheet.create({
   layer: { zIndex: 40, elevation: 40 },

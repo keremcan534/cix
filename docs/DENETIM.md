@@ -188,6 +188,15 @@ Kod taraması yapıldı (telefonda ölçülmedi). Yapılanlar:
 - Odada müzik çalarken bütün oda her saniye yeniden çiziliyordu; saniyeyi artık yalnız müzik çubuğu sayıyor.
 - Oyunlar: makara, Yörünge ve kontroller ayrı (`docs/OYUN_MERKEZI.md`).
 
+26 Kasım 2026 (sahipler "oyunlar kasıyor" dedi, ikinci tur; yine telefonda ölçülmedi):
+- **Odada oyun:** oda ekranı konuşma ışıkları, sohbet ve saat için saniyede birkaç kez yeniden çiziliyordu ve açık oyunu
+  (Oyun Salonu oyunları, Rüzgâr Gülü) her seferinde baştan çiziyordu. Oyun artık yalnız kendisi ya da açıldığı yer
+  değişince çizilir (`game-panel` `memo`). Küçültülen oyunun döngüleri ve sayaçları durur (`GameShown`).
+- **Kazanç gösterileri:** sayan tutar her karede bütün gösteriyi (ışınlar, jetonlar, havai fişekler) yeniden kuruyordu;
+  artık yalnız tutar yazısı değişir (`fx/ticking`). Altın Kasa makaraları, Bilye'nin çivileri, Balon Avı'nın buz
+  sayacı, Okey'in saati ve uçan çipler de yalnız kendi parçalarını çiziyor.
+- **Yörünge:** ayrıntı `docs/OYUN_MERKEZI.md` (Canlı Yörünge).
+
 Kalanlar (sonraki iş, daha büyük): ortak durumun (`store.tsx`, 144 kullanıcı) parçalara bölünmesi; oda ekranında
 koltukların ve sohbetin yalnız kendi değişikliğinde çizilmesi (4.800 satırlık tek bileşen, konuşma her değiştiğinde
 hepsi çiziliyor); fotoğraflar için `expo-image` ve sunucudan küçük boy; cüzdandaki sürekli çalışan Skia efekti.

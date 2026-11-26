@@ -15,7 +15,7 @@ import { ChoiceChip, SALON, SalonStage, SideButton, WideAction, choiceInk, salon
 import { salonArt } from '@/components/games/fx/salon-art';
 import { useWinFx } from '@/components/games/fx/win-fx';
 import { climbSeconds, driftEnd, flightPlan, milestones, multiplierAt, orbitY, stageGeo, type FlightPlan } from '@/components/games/rocket-flight';
-import { EndMark, FlightLayer, ORBIT, Planet, ReadyRocket, Route, STAR_LAYERS, Space, type Flight } from '@/components/games/rocket-stage';
+import { BLAST_MS, EndMark, FlightLayer, ORBIT, Planet, ReadyRocket, Route, STAR_LAYERS, Space, useSpin, type Flight } from '@/components/games/rocket-stage';
 import { WalletRow, fmt, sleep } from '@/components/games/slot-kit';
 import { ROCKET_TARGETS, rocketReturn } from '@/lib/crash-rocket';
 import { playSfx, warmSfx } from '@/lib/game-sound';
@@ -164,6 +164,8 @@ export function RocketPlayer({ entry }: { entry: Entry }) {
     a.start();
     return () => a.stop();
   }, [burning, calm, flick]);
+  // The flame's licks and, in flight, the rocket's roll.
+  const spin = useSpin(burning && !calm);
 
   const height = box.h;
   const geo = useMemo(() => (width && height ? stageGeo(width, height) : null), [width, height]);
@@ -250,7 +252,7 @@ export function RocketPlayer({ entry }: { entry: Entry }) {
     if (!calm) {
       pop.setValue(0);
       Animated.spring(pop, { toValue: 1, friction: 4, tension: 150, useNativeDriver: true }).start();
-      Animated.timing(f.fx, { toValue: 1, duration: won ? 720 : 880, easing: Easing.linear, useNativeDriver: true }).start();
+      Animated.timing(f.fx, { toValue: 1, duration: won ? 720 : BLAST_MS, easing: Easing.linear, useNativeDriver: true }).start();
       Animated.timing(f.glow, { toValue: 0.45, duration: 900, useNativeDriver: true }).start();
     } else f.glow.setValue(0.6);
     // A new rocket is rolled onto the ramp once this one is gone.
@@ -339,9 +341,9 @@ export function RocketPlayer({ entry }: { entry: Entry }) {
             <Space geo={geo} flight={flight} still={calm} breathe={breathe} />
             <Route geo={geo} target={target} label={short(target)} march={march} still={calm} />
             <Planet geo={geo} />
-            {flight && <FlightLayer key={flight.id} geo={geo} flight={flight} flick={flick} />}
+            {flight && <FlightLayer key={flight.id} geo={geo} flight={flight} flick={flick} spin={spin} />}
             {flight && calm && <EndMark geo={geo} flight={flight} />}
-            {armed && <ReadyRocket geo={geo} arm={arm} ignite={ignite} flick={flick} />}
+            {armed && <ReadyRocket geo={geo} arm={arm} ignite={ignite} flick={flick} spin={spin} />}
             <Readout live={live} value={shown} color={color} sub={sub} pop={pop} top={orbitY(geo, geo.w * 0.3) + 20} />
           </Animated.View>
         )}

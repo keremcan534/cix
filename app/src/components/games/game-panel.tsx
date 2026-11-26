@@ -4,7 +4,7 @@
 // switching, minimising, closing or a provider failure never change seats, mic or room membership.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import { useEffect, useState, type ReactNode } from 'react';
+import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Image, ScrollView, StyleSheet, Pressable, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -18,6 +18,7 @@ import { BoardPlayer } from '@/components/games/board';
 import { LineSlotPlayer } from '@/components/games/line-slot';
 import { SkinBackdrop, SkinOverlay, slotSkinOf } from '@/components/games/fx/slot-skin';
 import { QuakeView } from '@/components/games/fx/quake';
+import { GameShown } from '@/components/games/fx/salon';
 import { salonArt } from '@/components/games/fx/salon-art';
 import { FenerPlayer } from '@/components/games/fener';
 import { YorungePlayer } from '@/components/games/rocket-live';
@@ -59,12 +60,23 @@ const CASINO_SCREENS: Partial<Record<CasinoGame['id'], (p: { entry: Entry }) => 
   goldtree: GoldTreePlayer,
   bilye: BilyePlayer,
 };
-function CasinoScreen({ id, entry }: { id: CasinoGame['id']; entry: Entry }) {
-  if (isLineSlot(id)) return <LineSlotPlayer id={id} entry={entry} />;
-  if (isBoard(id)) return <BoardPlayer id={id} entry={entry} />;
-  const Screen = CASINO_SCREENS[id];
-  return Screen ? <Screen entry={entry} /> : <CasinoPlayer gameId={id} entry={entry} />;
-}
+/** The same place a game was opened from (a room builds a new `entry` object on each of its redraws). */
+const sameEntry = (a: Entry, b: Entry) => a.from === b.from && (a.from !== 'room' || (b.from === 'room' && a.roomId === b.roomId && a.roomTitle === b.roomTitle));
+/**
+ * The game itself, redrawn only when the game or where it was opened from changes. A room redraws its whole screen
+ * many times a second while people talk (the speaking rings, the chat, the room's clock) and this panel with it;
+ * without this every Oyun Salonu game was redrawn with each of those, which is the stutter games had in a room.
+ */
+const CasinoScreen = memo(
+  function CasinoScreen({ id, entry }: { id: CasinoGame['id']; entry: Entry }) {
+    if (isLineSlot(id)) return <LineSlotPlayer id={id} entry={entry} />;
+    if (isBoard(id)) return <BoardPlayer id={id} entry={entry} />;
+    const Screen = CASINO_SCREENS[id];
+    return Screen ? <Screen entry={entry} /> : <CasinoPlayer gameId={id} entry={entry} />;
+  },
+  (a, b) => a.id === b.id && sameEntry(a.entry, b.entry),
+);
+const Wheel = memo(WheelPlayer, (a, b) => sameEntry(a.entry, b.entry));
 /** Games that need most of the screen in a room (Okey, the room games with a table or a board of their own and every casino game with its own screen). Their sheet is tallSheetHeight tall: on a short phone it covers the room's top row of seats while it is open. */
 const isTall = (id: string) => id === 'wheel' || id === 'okey' || id === 'ludo' || id === 'cards' || id === 'xox' || id === 'four' || isLineSlot(id) || isBoard(id) || id in CASINO_SCREENS;
 
@@ -137,130 +149,137 @@ export function GamePanel({
   const titleArt = wheel ? WHEEL_ART : gameArtOf(open.id);
 
   const body = (
-    <View style={[p.panel, inRoom ? p.sheet : p.full, inRoom && { paddingBottom: Math.max(14, insets.bottom + 6) }, inRoom && isTall(openId) && { top: casinoGame || wheel ? insets.top + 6 : height - tallSheetHeight(height) }, skin && p.skinned, hidden && { display: 'none' }]}>
-      {skin && <SkinBackdrop skin={skin} />}
-      <View style={p.head}>
-        {titleArt && <Image source={titleArt} style={{ width: 28, height: 28, marginRight: -6 }} />}
-        {wheel && !titleArt && <Ionicons name="compass" size={24} color={colors.gold} style={{ marginRight: -6 }} />}
-        <Text style={p.title} numberOfLines={1}>
-          {titleArt || wheel ? '' : `${titleEmoji} `}
-          {title}
-        </Text>
-        <Pressable onPress={() => setTools((t) => (t === 'games' ? null : 'games'))} hitSlop={8} accessibilityRole="button" accessibilityLabel="Başka oyuna geç" accessibilityState={{ expanded: tools === 'games' }}>
-          <Ionicons name="grid-outline" size={21} color={tools === 'games' ? semantic.action : colors.textDim} />
-        </Pressable>
-        <Pressable onPress={() => setTools((t) => (t === 'sound' ? null : 'sound'))} hitSlop={8} accessibilityRole="button" accessibilityLabel="Oyun sesi" accessibilityState={{ expanded: tools === 'sound' }}>
-          <Ionicons name={settings.gameVolume === 0 ? 'volume-mute-outline' : 'volume-medium-outline'} size={23} color={tools === 'sound' ? semantic.action : colors.textDim} />
-        </Pressable>
-        {onMinimize && (
-          <Pressable onPress={onMinimize} hitSlop={8} accessibilityLabel="Oyunu küçült">
-            <Ionicons name="chevron-down" size={24} color={colors.textDim} />
-          </Pressable>
-        )}
-        <Pressable onPress={onClose} hitSlop={8} accessibilityLabel="Oyunu kapat">
-          <Ionicons name="close" size={24} color={colors.textDim} />
-        </Pressable>
-      </View>
-
-      {voice && (
-        <View style={p.voice} accessibilityLiveRegion="polite">
-          <Ionicons name="radio" size={14} color={semantic.live} />
-          <Text style={p.voiceText} numberOfLines={1}>
-            {voice.seated ? (voice.micOn ? 'Mikrofonun açık · sesli sohbet sürüyor' : 'Mikrofonun kapalı · koltuktasın') : 'Dinleyicisin · odayı duymaya devam ediyorsun'}
+    <GameShown.Provider value={!hidden}>
+      <View style={[p.panel, inRoom ? p.sheet : p.full, inRoom && { paddingBottom: Math.max(14, insets.bottom + 6) }, inRoom && isTall(openId) && { top: casinoGame || wheel ? insets.top + 6 : height - tallSheetHeight(height) }, skin && p.skinned, hidden && { display: 'none' }]}>
+        {skin && <SkinBackdrop skin={skin} />}
+        <View style={p.head}>
+          {titleArt && <Image source={titleArt} style={{ width: 28, height: 28, marginRight: -6 }} />}
+          {wheel && !titleArt && <Ionicons name="compass" size={24} color={colors.gold} style={{ marginRight: -6 }} />}
+          <Text style={p.title} numberOfLines={1}>
+            {titleArt || wheel ? '' : `${titleEmoji} `}
+            {title}
           </Text>
-          {voice.seated && (
-            <Pressable onPress={voice.onToggleMic} style={[p.mic, !voice.micOn && { backgroundColor: colors.cardAlt }]} accessibilityLabel={voice.micOn ? 'Mikrofonu kapat' : 'Mikrofonu aç'}>
-              <Ionicons name={voice.micOn ? 'mic' : 'mic-off'} size={16} color={voice.micOn ? semantic.liveInk : colors.text} />
+          <Pressable onPress={() => setTools((t) => (t === 'games' ? null : 'games'))} hitSlop={8} accessibilityRole="button" accessibilityLabel="Başka oyuna geç" accessibilityState={{ expanded: tools === 'games' }}>
+            <Ionicons name="grid-outline" size={21} color={tools === 'games' ? semantic.action : colors.textDim} />
+          </Pressable>
+          <Pressable onPress={() => setTools((t) => (t === 'sound' ? null : 'sound'))} hitSlop={8} accessibilityRole="button" accessibilityLabel="Oyun sesi" accessibilityState={{ expanded: tools === 'sound' }}>
+            <Ionicons name={settings.gameVolume === 0 ? 'volume-mute-outline' : 'volume-medium-outline'} size={23} color={tools === 'sound' ? semantic.action : colors.textDim} />
+          </Pressable>
+          {onMinimize && (
+            <Pressable onPress={onMinimize} hitSlop={8} accessibilityLabel="Oyunu küçült">
+              <Ionicons name="chevron-down" size={24} color={colors.textDim} />
             </Pressable>
           )}
+          <Pressable onPress={onClose} hitSlop={8} accessibilityLabel="Oyunu kapat">
+            <Ionicons name="close" size={24} color={colors.textDim} />
+          </Pressable>
         </View>
-      )}
 
-      {tools === 'games' && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 6, paddingVertical: 2 }}>
-          {switchable.map((s) => (
-            <Pressable
-              key={s.key}
-              onPress={() => {
-                setTools(null);
-                onSwitch(s.go);
-              }}
-              style={[p.chip, { flexDirection: 'row', alignItems: 'center', gap: 4 }, s.key === current && p.chipOn]}
-              accessibilityLabel={`${s.name} oyununa geç`}
-            >
-              {s.art && <Image source={s.art} style={{ width: 16, height: 16 }} />}
-              {s.key === 'w' && !s.art && <Ionicons name="compass" size={15} color={colors.gold} />}
-              <Text style={p.chipText}>{s.art || !s.emoji ? s.name : `${s.emoji} ${s.name}`}</Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-      )}
-      {tools === 'sound' && (
-        <View style={p.volume}>
-          <Text style={p.dim}>Oyun sesi</Text>
-          {VOLUMES.map(([v, l]) => (
-            <Pressable
-              key={l}
-              onPress={() => {
-                setSetting('gameVolume', v);
-                // Heard at the level just picked.
-                setGameVolume(v);
-                playSfx('coin');
-              }}
-              style={[p.vol, settings.gameVolume === v && p.chipOn]}
-              accessibilityRole="button"
-              accessibilityState={{ selected: settings.gameVolume === v }}
-            >
-              <Text style={p.volText}>{l}</Text>
-            </Pressable>
-          ))}
-        </View>
-      )}
-
-      {/* At least as tall as the panel: an Oyun Salonu game's stage takes the free height (games/fx/salon), its
-          controls stay at the bottom; a phone too short for it scrolls. */}
-      {/* The game itself trembles with its wins and blows (fx/quake). */}
-      <QuakeView>
-      <ScrollView contentContainerStyle={{ flexGrow: 1, paddingVertical: 8, gap: 10 }} keyboardShouldPersistTaps="handled">
-        {roomGame &&
-          (roomGame.playable ? (
-            <>
-              {tables && entry.from === 'room' && isTableGame(openId) && <LiveTable key={openId} roomId={entry.roomId} game={openId} canOpen={!!canOpenTable} />}
-              {!tables && openId === 'ludo' && <LudoPractice players={players.slice(0, roomGame.maxPlayers)} fit={inRoom} />}
-              {!tables && openId === 'cards' && <CardsPractice players={players.slice(0, roomGame.maxPlayers)} />}
-              {!tables && openId === 'xox' && <XoxPractice players={players.slice(0, 2)} />}
-              {!tables && openId === 'four' && <FourPractice players={players.slice(0, 2)} />}
-              {/* Okey seats its own bots; practice bots (a live Oyun Merkezi) don't come to watch. */}
-              {!tables && openId === 'okey' && <OkeyTable roomId={inRoom ? entry.roomId : 'profil'} me={players[0]} crowd={players.slice(1).filter((x) => !isPracticeBot(x.id))} />}
-              <Text style={p.dim}>
-                {roomGame.minPlayers === roomGame.maxPlayers ? roomGame.minPlayers : `${roomGame.minPlayers}–${roomGame.maxPlayers}`} oyuncu · ücretsiz, VIP gerekmez · oyundan çıkmak seni odadan çıkarmaz
-                {roomGame.note ? ` · ${roomGame.note}` : ''}
-              </Text>
-              {onInvite && !tables && (
-                <Pressable style={p.invite} onPress={() => onInvite(roomGame.name)} accessibilityLabel="Odayı oyuna davet et">
-                  <Ionicons name="megaphone" size={16} color={colors.text} />
-                  <Text style={p.chipText}>Odadakileri masaya davet et</Text>
-                </Pressable>
-              )}
-            </>
-          ) : (
-            <Text style={p.dim}>Bu oyun yakında geliyor.</Text>
-          ))}
-        {casinoGame && casinoVisible(wealthLevel, paidGames) && (
-          <SkinOverlay.Provider value={skin ? setOverlay : null}>
-            <CasinoScreen key={casinoGame.id} id={casinoGame.id} entry={entry} />
-          </SkinOverlay.Provider>
+        {voice && (
+          <View style={p.voice} accessibilityLiveRegion="polite">
+            <Ionicons name="radio" size={14} color={semantic.live} />
+            <Text style={p.voiceText} numberOfLines={1}>
+              {voice.seated ? (voice.micOn ? 'Mikrofonun açık · sesli sohbet sürüyor' : 'Mikrofonun kapalı · koltuktasın') : 'Dinleyicisin · odayı duymaya devam ediyorsun'}
+            </Text>
+            {voice.seated && (
+              <Pressable onPress={voice.onToggleMic} style={[p.mic, !voice.micOn && { backgroundColor: colors.cardAlt }]} accessibilityLabel={voice.micOn ? 'Mikrofonu kapat' : 'Mikrofonu aç'}>
+                <Ionicons name={voice.micOn ? 'mic' : 'mic-off'} size={16} color={voice.micOn ? semantic.liveInk : colors.text} />
+              </Pressable>
+            )}
+          </View>
         )}
-        {wheel && casinoVisible(wealthLevel, paidGames) && <WheelPlayer entry={entry} />}
-      </ScrollView>
-      </QuakeView>
-      {skin && overlay}
-    </View>
+
+        {tools === 'games' && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 6, paddingVertical: 2 }}>
+            {switchable.map((s) => (
+              <Pressable
+                key={s.key}
+                onPress={() => {
+                  setTools(null);
+                  onSwitch(s.go);
+                }}
+                style={[p.chip, { flexDirection: 'row', alignItems: 'center', gap: 4 }, s.key === current && p.chipOn]}
+                accessibilityLabel={`${s.name} oyununa geç`}
+              >
+                {s.art && <Image source={s.art} style={{ width: 16, height: 16 }} />}
+                {s.key === 'w' && !s.art && <Ionicons name="compass" size={15} color={colors.gold} />}
+                <Text style={p.chipText}>{s.art || !s.emoji ? s.name : `${s.emoji} ${s.name}`}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        )}
+        {tools === 'sound' && (
+          <View style={p.volume}>
+            <Text style={p.dim}>Oyun sesi</Text>
+            {VOLUMES.map(([v, l]) => (
+              <Pressable
+                key={l}
+                onPress={() => {
+                  setSetting('gameVolume', v);
+                  // Heard at the level just picked.
+                  setGameVolume(v);
+                  playSfx('coin');
+                }}
+                style={[p.vol, settings.gameVolume === v && p.chipOn]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: settings.gameVolume === v }}
+              >
+                <Text style={p.volText}>{l}</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
+
+        {/* At least as tall as the panel: an Oyun Salonu game's stage takes the free height (games/fx/salon), its
+            controls stay at the bottom; a phone too short for it scrolls. */}
+        {/* The game itself trembles with its wins and blows (fx/quake). */}
+        <QuakeView>
+        <ScrollView contentContainerStyle={{ flexGrow: 1, paddingVertical: 8, gap: 10 }} keyboardShouldPersistTaps="handled">
+          {roomGame &&
+            (roomGame.playable ? (
+              <>
+                {tables && entry.from === 'room' && isTableGame(openId) && <LiveTable key={openId} roomId={entry.roomId} game={openId} canOpen={!!canOpenTable} />}
+                {!tables && openId === 'ludo' && <LudoPractice players={players.slice(0, roomGame.maxPlayers)} fit={inRoom} />}
+                {!tables && openId === 'cards' && <CardsPractice players={players.slice(0, roomGame.maxPlayers)} />}
+                {!tables && openId === 'xox' && <XoxPractice players={players.slice(0, 2)} />}
+                {!tables && openId === 'four' && <FourPractice players={players.slice(0, 2)} />}
+                {/* Okey seats its own bots; practice bots (a live Oyun Merkezi) don't come to watch. */}
+                {!tables && openId === 'okey' && <OkeyTable roomId={inRoom ? entry.roomId : 'profil'} me={players[0]} crowd={players.slice(1).filter((x) => !isPracticeBot(x.id))} />}
+                <Text style={p.dim}>
+                  {roomGame.minPlayers === roomGame.maxPlayers ? roomGame.minPlayers : `${roomGame.minPlayers}–${roomGame.maxPlayers}`} oyuncu · ücretsiz, VIP gerekmez · oyundan çıkmak seni odadan çıkarmaz
+                  {roomGame.note ? ` · ${roomGame.note}` : ''}
+                </Text>
+                {onInvite && !tables && (
+                  <Pressable style={p.invite} onPress={() => onInvite(roomGame.name)} accessibilityLabel="Odayı oyuna davet et">
+                    <Ionicons name="megaphone" size={16} color={colors.text} />
+                    <Text style={p.chipText}>Odadakileri masaya davet et</Text>
+                  </Pressable>
+                )}
+              </>
+            ) : (
+              <Text style={p.dim}>Bu oyun yakında geliyor.</Text>
+            ))}
+          {casinoGame && casinoVisible(wealthLevel, paidGames) && (
+            <SkinOverlay.Provider value={skin ? setOverlay : null}>
+              <CasinoScreen key={casinoGame.id} id={casinoGame.id} entry={entry} />
+            </SkinOverlay.Provider>
+          )}
+          {wheel && casinoVisible(wealthLevel, paidGames) && <Wheel entry={entry} />}
+        </ScrollView>
+        </QuakeView>
+        {skin && overlay}
+      </View>
+    </GameShown.Provider>
   );
-  const go = (href: Parameters<typeof router.push>[0]) => {
-    onLeave?.();
+  // The same function on every redraw: the games read it from context, and a new one would redraw each of them.
+  const leave = useRef(onLeave);
+  useEffect(() => {
+    leave.current = onLeave;
+  });
+  const go = useCallback((href: Parameters<typeof router.push>[0]) => {
+    leave.current?.();
     router.push(href);
-  };
+  }, []);
   return <GameNav.Provider value={go}>{inRoom ? body : <SafeAreaView style={{ flex: 1 }}>{body}</SafeAreaView>}</GameNav.Provider>;
 }
 
