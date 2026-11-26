@@ -48,6 +48,7 @@ yetmezse alınabildiği kadar alınır; kalan borç olarak kalır ve sonraki pay
 ## Kurallar
 
 - **Kim atar:** yalnız ajans sahibi atar ve payı değiştirir. Çıkarmak asistanın onayıyla olur (merkez `agencies.manage` ile anında çıkarabilir).
+- **Asistanlık teklifi (sahiplerin kararı, 26 Kasım 2026):** sahip asistanı payla birlikte ekleyince bu bir tekliftir; asistan Ben'de ya da ajans ekranında **Onayla** derse başlar, **Reddet** derse kapanır. Onaylanana kadar pay yazılmaz, kodu çalışmaz; sahip teklifi geri alabilir. Pay sonradan sahip tarafından değiştirilemez (yalnız yönetim düzeltir, `POST /api/agency/assistants/share`). Uç: `POST /api/agency/assistants/offer/answer` `{ assistantId, answer: accept|reject }`.
 - **Çıkarma onayı (sahiplerin kararı, 25 Kasım 2026):** sahip “Asistanlıktan çıkar” deyince asistana istek gider (bildirim; Ben sekmesinde ve ajans ekranında kart). Asistan **Onayla** derse asistanlık biter, **Reddet** derse sürer, **İtiraz et** derse konu yönetime geçer. Asistan reddederse sahip yönetime itiraz edebilir. Yönetim iki tarafla iletişime geçip panelde “kalsın” ya da “çıkarılsın” der; iki tarafa bildirim gider. Bir asistan için aynı anda tek açık istek olur; retten sonra yeni istek değil itiraz açılır. Her adım `agency_audit`e yazılır (`assistant.remove_*`).
 - **Kim asistan olur:** ajansın şu anki yayıncılarından ya da ekibinden biri; sahibin kendisi olamaz; kişi aynı anda
   tek ajansta asistan olabilir.

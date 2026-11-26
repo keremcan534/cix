@@ -214,7 +214,7 @@ describe('defaults are today', () => {
       reply_minutes: 5,
       reply_grace_seconds: 10,
       message_notice_min: 0,
-      reply_min_chars: 2,
+      reply_min_chars: 4,
       perf_warn_rate: 50,
       perf_warn_min: 10,
       perf_warn_days: 3,

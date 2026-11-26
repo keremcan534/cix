@@ -22,6 +22,21 @@ export const faceFor = (weight?: string | number) => FACE[WEIGHT[String(weight ?
  */
 export const MAX_FONT_SCALE = 1.15;
 
+/**
+ * Every text one step smaller than the sizes the screens name (owners, 26 Nov 2026: "1 tık daha küçük", after
+ * comparing with other apps). One factor here, so every screen keeps its own proportions.
+ */
+export const TEXT_SCALE = 0.92;
+/** RN's size for text that names none. */
+const BASE_SIZE = 14;
+const round1 = (n: number) => Math.round(n * 10) / 10;
+/** A style's size and line height at TEXT_SCALE; an outermost text with no size gets the scaled base size. */
+function scaledOf(flat: TextStyle | null | undefined, outer: boolean): TextStyle | null {
+  const size = flat?.fontSize;
+  if (typeof size !== 'number') return outer ? { fontSize: round1(BASE_SIZE * TEXT_SCALE) } : null;
+  return { fontSize: round1(size * TEXT_SCALE), ...(typeof flat?.lineHeight === 'number' && { lineHeight: round1(flat.lineHeight * TEXT_SCALE) }) };
+}
+
 /** The face of the nearest Text above, so nested text inherits instead of resetting to regular. */
 const ParentFace = createContext<string | null>(null);
 
@@ -59,7 +74,7 @@ export function Text({ style, children, ...rest }: TextProps) {
   // nested text's own fontVariant.
   const variant = flat?.fontVariant !== undefined ? variantOf(flat.fontVariant) : parent ? null : NO_LIGATURES;
   return (
-    <RNText style={[NO_PAD, style, own, variant]} maxFontSizeMultiplier={MAX_FONT_SCALE} {...rest}>
+    <RNText style={[NO_PAD, style, own, variant, scaledOf(flat, !parent)]} maxFontSizeMultiplier={MAX_FONT_SCALE} {...rest}>
       <ParentFace.Provider value={face}>{SPLIT_FI && !rest.selectable ? unjoinFi(children) : children}</ParentFace.Provider>
     </RNText>
   );
@@ -72,5 +87,5 @@ export function TextInput({ style, ref, ...rest }: TextInputProps & { ref?: Ref<
   const top = rest.multiline ? { textAlignVertical: 'top' as const } : null;
   // What is typed can't be changed, so only the web (which honours fontVariant) loses the ligature here.
   const variant = flat?.fontVariant !== undefined ? variantOf(flat.fontVariant) : NO_LIGATURES;
-  return <RNTextInput ref={ref} style={[top, style, own, variant]} maxFontSizeMultiplier={MAX_FONT_SCALE} {...rest} />;
+  return <RNTextInput ref={ref} style={[top, style, own, variant, scaledOf(flat, true)]} maxFontSizeMultiplier={MAX_FONT_SCALE} {...rest} />;
 }

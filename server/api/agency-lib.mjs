@@ -699,7 +699,7 @@ export async function assistantAt(c, agencyId, userId, t) {
             (SELECT s.streamer_pct FROM agency_assistant_shares s WHERE s.assistant_id = a.id AND s.effective_from <= $3
               ORDER BY s.effective_from DESC, s.id DESC LIMIT 1) AS pct
        FROM agency_assistants a JOIN users u ON u.id = a.user_id
-      WHERE a.agency_id = $1 AND a.user_id = $2 AND a.assigned_at <= $3 AND (a.ended_at IS NULL OR a.ended_at > $3)
+      WHERE a.agency_id = $1 AND a.user_id = $2 AND a.accepted_at IS NOT NULL AND a.assigned_at <= $3 AND (a.ended_at IS NULL OR a.ended_at > $3)
         AND (EXISTS (SELECT 1 FROM agency_streamers m WHERE m.streamer_id = a.user_id AND m.agency_id = a.agency_id AND m.joined_at <= $3 AND (m.ended_at IS NULL OR m.ended_at > $3))
           OR EXISTS (SELECT 1 FROM staff_assignments s WHERE s.user_id = a.user_id AND s.agency_id = a.agency_id AND s.granted_at <= $3 AND (s.revoked_at IS NULL OR s.revoked_at > $3)))
       ORDER BY a.assigned_at DESC LIMIT 1`,

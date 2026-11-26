@@ -59,6 +59,8 @@ export type MenuFlags = {
   localOnly?: boolean;
   /** Yayıncı Merkezi: only for a woman who is a streamer (streamerCenterVisible). */
   streamerOnly?: boolean;
+  /** Asistan merkezi: only for an agency assistant now. */
+  assistantOnly?: boolean;
 };
 /** Owners, 25 Nov 2026: a woman who joined an agency (a member, not its owner or staff) never sees the agency's screens. */
 export const agencyScreensHidden = (gender: User['gender'], role: AgencyLink['role'] | null | undefined) => gender === 'Kadın' && role === 'member';
@@ -68,10 +70,11 @@ export const agencyScreensHidden = (gender: User['gender'], role: AgencyLink['ro
  */
 export const streamerCenterVisible = (gender: User['gender'], streamer: boolean | null | undefined) => gender === 'Kadın' && streamer === true;
 /** `hasAgency` null: the server's answer is not in yet, so neither agency row shows (no "join" flash for an owner). */
-export function rowVisible(m: MenuFlags, ctx: { demo: boolean; live: boolean; hasAgency: boolean | null; streamerCenter?: boolean; agencyHidden?: boolean }) {
+export function rowVisible(m: MenuFlags, ctx: { demo: boolean; live: boolean; hasAgency: boolean | null; streamerCenter?: boolean; agencyHidden?: boolean; assistant?: boolean }) {
   if (m.demoOnly && !ctx.demo) return false;
   if (m.localOnly && ctx.live) return false;
   if (m.streamerOnly && ctx.streamerCenter !== true) return false;
+  if (m.assistantOnly && ctx.assistant !== true) return false;
   if (m.agencyOnly) return ctx.hasAgency === true && !ctx.agencyHidden;
   if (m.noAgencyOnly) return ctx.hasAgency === false;
   return true;

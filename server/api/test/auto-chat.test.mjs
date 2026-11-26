@@ -346,6 +346,11 @@ describe('Mesaj performansı', () => {
     assert.deepEqual(rep.streamers.map((x) => x.id), [star.user.id], 'yalnız kendi yayıncısı');
     assert.equal(rep.streamers[0].total, 4);
     assert.equal(rep.totals.inTimeRate, 50);
+    // The five answer rates (owners, 26 Nov 2026): messages answered, calls and matches that went live.
+    assert.deepEqual(rep.streamers[0].rates.message, { pct: 75, n: 4 });
+    await h.sql.query("INSERT INTO calls (kind, mode, caller, callee, status, ref, started_at) VALUES ('call', 'video', $1, $2, 'ended', 'r1', now()), ('call', 'video', $1, $2, 'missed', 'r2', null), ('call', 'voice', $1, $2, 'cancelled', 'r3', null), ('match', 'voice', $2, $1, 'ended', 'r4', now())", [man.user.id, star.user.id]);
+    const rates = (await ok(call('GET', `/api/agency/message-performance?id=${ag.id}&period=7d`, null, owner.session), 'oranlar')).streamers[0].rates;
+    assert.deepEqual([rates.videoCall, rates.voiceCall, rates.voiceMatch, rates.videoMatch], [{ pct: 50, n: 2 }, { pct: null, n: 0 }, { pct: 100, n: 1 }, { pct: null, n: 0 }]);
     assert.equal(JSON.stringify(rep).includes('Mesaj 0'), false, 'mesaj içeriği yok');
     const [stx] = await call('GET', `/api/agency/message-performance?id=${other.agency}&period=7d`, null, owner.session);
     assert.ok(stx === 403 || stx === 404, 'başka ajansın raporu açılmaz');

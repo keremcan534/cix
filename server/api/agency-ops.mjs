@@ -5,6 +5,7 @@
 import { HttpError } from './core.mjs';
 import { audit, d4, e4, fmt4, notice, periodOf, rateAt, settingsAt } from './agency-lib.mjs';
 import { applyTier } from './agency-perf.mjs';
+import { deviceTakenSql } from './streamer-rule.mjs';
 import { spendDiamonds } from './wallet.mjs';
 
 export async function setStatus(c, a, to, actor, note = '') {
@@ -30,7 +31,7 @@ export async function approveAgency(c, a, actor, note = '') {
   if (a.parent_id) await applyTier(c, a, s.tiers[0].key, new Date(), { source: 'approval', actor, reason: 'Alt ajans onayı: başlangıç kademesi' });
   if (a.acquired_by_bd) await c.query('INSERT INTO bd_assignments (bd_id, agency_id, assigned_by) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING', [a.acquired_by_bd, a.id, actor]);
   await notice(c, a.id, 'status', 'Ajansın onaylandı', 'Davet kodunla yayıncı ekleyebilirsin. Komisyon bugünden sonra kazanılan gelire uygulanır.');
-  if (a.parent_id) await notice(c, a.parent_id, 'sub', `${a.name} alt ajansı onaylandı`, '');
+  if (a.parent_id) await notice(c, a.parent_id, 'sub', `${a.name} referans ajansın olarak onaylandı`, '');
   await audit(c, actor, 'agency.approve', 'agency', a.id, { after: { status: 'approved' }, reason: note });
 }
 
@@ -75,7 +76,8 @@ export async function streamerState(c, userId, s, at = new Date()) {
         (SELECT agency_id FROM agency_streamers WHERE streamer_id = u.id AND ended_at IS NULL) AS open,
         EXISTS (SELECT 1 FROM agency_streamers WHERE streamer_id = u.id) AS before,
         (SELECT l.end_reason FROM agency_streamers l WHERE l.streamer_id = u.id ORDER BY l.joined_at DESC LIMIT 1) AS last_reason,
-        (SELECT l.returned_at FROM agency_streamers l WHERE l.streamer_id = u.id ORDER BY l.joined_at DESC LIMIT 1) AS returned_at
+        (SELECT l.returned_at FROM agency_streamers l WHERE l.streamer_id = u.id ORDER BY l.joined_at DESC LIMIT 1) AS returned_at,
+        ${deviceTakenSql('u.id')} AS taken
        FROM users u WHERE u.id = $1`,
     [userId],
   );
@@ -86,10 +88,14 @@ export async function streamerState(c, userId, s, at = new Date()) {
   const dropped = !u.open && u.before && u.last_reason === 'inactive';
   const from = dropped ? (u.returned_at ? new Date(u.returned_at) : null) : new Date(u.created_at);
   const pickUntil = p.pick_days > 0 && from ? new Date(from.getTime() + days) : null;
-  const held = u.open ? false : dropped ? !!u.returned_at && new Date(at) >= new Date(new Date(u.returned_at).getTime() + days) : pickUntil !== null && (u.before || new Date(at) >= pickUntil);
+  const held = u.open || u.taken ? false : dropped ? !!u.returned_at && new Date(at) >= new Date(new Date(u.returned_at).getTime() + days) : pickUntil !== null && (u.before || new Date(at) >= pickUntil);
+  // Another account on this phone holds its streamer place (owners, 26 Nov 2026): this one can't stream (one already in
+  // an agency keeps her place; only new links are refused).
+  const taken = !u.open && u.taken;
   return {
     gender: u.gender,
-    eligible: !p.women_only || u.gender === 'Kadın',
+    eligible: (!p.women_only || u.gender === 'Kadın') && !taken,
+    taken,
     open: u.open,
     held,
     pickUntil: dropped && !u.returned_at ? null : pickUntil,
@@ -98,6 +104,7 @@ export async function streamerState(c, userId, s, at = new Date()) {
 
 export function assertEligible(st) {
   if (st.eligible) return;
+  if (st.taken) throw new HttpError(403, 'Bu telefonda zaten bir yayıncı hesabı var; aynı telefondaki başka bir hesap yayıncı olamaz');
   throw new HttpError(403, st.gender ? 'Ajanslarda yalnız kadın hesaplar yayıncı olabilir; erkek hesaplar katkısını Aile üyesi olarak verir' : 'Önce profilinde cinsiyetini seç');
 }
 
@@ -201,9 +208,9 @@ export async function moveParent(c, a, newParentId, actor, reason, transferId = 
     const tier = s.tiers.some((t) => t.key === a.tier) ? a.tier : s.tiers[0].key;
     await applyTier(c, a, tier, now, { source: 'transfer', actor, reason: String(reason).slice(0, 300) });
   }
-  if (oldParent) await notice(c, oldParent, 'sub', `${a.name} artık senin alt ajansın değil`, 'Bu ajansın bundan sonraki gelirinden pay almazsın (merkezin tanımladığı geçiş komisyonu hariç). Geçmiş kazançların değişmez.');
-  if (newParentId) await notice(c, newParentId, 'sub', `${a.name} alt ajansın oldu`, '');
-  await notice(c, a.id, 'parent', newParentId ? 'Üst ajansın değişti' : 'Bağımsız üst ajans oldun', 'Yeni oran bu andan sonra kazanılan gelire uygulanır.');
+  if (oldParent) await notice(c, oldParent, 'sub', `${a.name} artık senin referans ajansın değil`, 'Bu ajansın bundan sonraki gelirinden pay almazsın (merkezin tanımladığı geçiş komisyonu hariç). Geçmiş kazançların değişmez.');
+  if (newParentId) await notice(c, newParentId, 'sub', `${a.name} referans ajansın oldu`, '');
+  await notice(c, a.id, 'parent', newParentId ? 'Referans veren ajansın değişti' : 'Bağımsız ajans oldun', 'Yeni oran bu andan sonra kazanılan gelire uygulanır.');
   await audit(c, actor, 'agency.parent', 'agency', a.id, { before: { parent: oldParent }, after: { parent: newParentId }, reason, transferId });
 }
 

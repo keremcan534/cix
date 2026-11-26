@@ -126,6 +126,8 @@ export type Streamer = {
   id: string;
   name: string;
   username: string | null;
+  /** The 12-digit ID (none from an older server). */
+  no?: string | null;
   avatarUrl: string | null;
   agencyId: string;
   joinedAt: string;
@@ -243,7 +245,7 @@ export type Me = {
   agencies: MyAgency[];
   platform: string[];
   /** The streamer rules for this account (server agency-ops.mjs streamerState); older servers send none. */
-  streamer?: { eligible: boolean; gender: string | null; held: boolean; pickUntil: string | null; pickDays: number; canLeave: boolean; womenOnly: boolean };
+  streamer?: { eligible: boolean; gender: string | null; held: boolean; pickUntil: string | null; pickDays: number; canLeave: boolean; womenOnly: boolean; /** Another account on this phone is its streamer (owners, 26 Nov 2026). */ deviceTaken?: boolean };
   /** My agency assistant card (server agency-assistants.mjs); null when I never was one, absent on older servers. */
   assistant?: MyAssistant | null;
 };
@@ -259,6 +261,8 @@ export type Assistant = {
   assignedAt: string;
   endedAt: string | null;
   active: boolean;
+  /** Offered, not yet accepted by the person (owners, 26 Nov 2026); none from an older server. */
+  pending?: boolean;
   /** Still one of the agency's own (a streamer of it or on its team); someone who left gets no share. */
   member: boolean;
   share: { pct: number; since: string };
@@ -289,7 +293,9 @@ export type AssistantRemoval = {
 export type AssistantList = { max: number; open: number; canAdd: boolean; weekStart: string; nextWeek: string; assistants: Assistant[] };
 export type AssistantCandidate = { id: string; name: string; avatarUrl: string | null; role: 'streamer' | 'staff' };
 export type AssistantRow = { id: number; amount: number; wallet: number; pct: number; basis: number; reversal: boolean; streamer: string | null; at: string };
-export type MyAssistant = Assistant & { rows: AssistantRow[] };
+/** Asistan merkezi's list (owners, 26 Nov 2026): the streamers I brought; none from an older server. */
+export type BroughtStreamer = { name: string; no: string | null; joinedAt: string; endedAt: string | null; week: number; total: number };
+export type MyAssistant = Assistant & { rows: AssistantRow[]; streamers?: BroughtStreamer[] };
 
 // --- Centre (platform) types ----------------------------------------------------------------------------------
 export type TreeNode = {
@@ -437,6 +443,8 @@ export const agencyNet = {
   setAssistantShare: (id: string, assistantId: number, pct: number) => post<{ assistant: Assistant; replay: boolean }>('/api/agency/assistants/share', { id, assistantId, pct }),
   /** The owner asks the assistant (`ask`: this app shows the request; an older one is told by a 409). */
   removeAssistant: (id: string, assistantId: number) => post<{ removed: boolean; request: AssistantRemoval | null }>('/api/agency/assistants/remove', { id, assistantId, ask: true }),
+  /** The person named answers the assistant offer (accept: it starts with the agreed share). */
+  answerOffer: (assistantId: number, answer: 'accept' | 'reject') => post<{ assistant: Assistant }>('/api/agency/assistants/offer/answer', { assistantId, answer }),
   answerRemoval: (requestId: number, answer: 'accept' | 'reject' | 'dispute', note?: string) => post<{ request: AssistantRemoval }>('/api/agency/assistants/removal/answer', { requestId, answer, ...(note && { note }) }),
   disputeRemoval: (requestId: number, note: string) => post<{ request: AssistantRemoval }>('/api/agency/assistants/removal/dispute', { requestId, note }),
 };
@@ -608,15 +616,15 @@ export const fmtDateTime = (iso: string | null | undefined) => (iso && Number.is
 export const fmtScore = (v: number | null | undefined) => (v === null || v === undefined ? '—' : v.toLocaleString('tr-TR', { maximumFractionDigits: 1 }));
 
 export const STATUS_TEXT: Record<AgencyStatus, string> = { draft: 'Taslak', pending: 'Onay bekliyor', approved: 'Aktif', rejected: 'Reddedildi', suspended: 'Askıda', closed: 'Kapatıldı' };
-export const VIEWER_TEXT: Record<Viewer, string> = { owner: 'Sahip', staff: 'Ekip', parent: 'Üst ajans görünümü', center: 'Merkez görünümü', bd: 'BD görünümü' };
-export const LEVEL_TEXT = (level: number) => (level <= 1 ? 'Üst ajans' : 'Alt ajans');
+export const VIEWER_TEXT: Record<Viewer, string> = { owner: 'Sahip', staff: 'Ekip', parent: 'Referans veren ajans görünümü', center: 'Merkez görünümü', bd: 'BD görünümü' };
+export const LEVEL_TEXT = (level: number) => (level <= 1 ? 'Ana ajans' : 'Referans ajans');
 /** Commission ledger kinds as the server writes them (agency_ledger.kind); the words live in lib/admin-format. */
 export const KIND_TEXT: Record<string, string> = AGENCY_LEDGER_LABEL;
-export const TRANSFER_TEXT: Record<TransferKind, string> = { streamer_move: 'Yayıncı transferi', streamer_leave: 'Ajanstan ayrılma', independence: 'Bağımsızlık', change_parent: 'Üst ajans değişikliği', sub_close: 'Alt ajans kapatma' };
+export const TRANSFER_TEXT: Record<TransferKind, string> = { streamer_move: 'Yayıncı transferi', streamer_leave: 'Ajanstan ayrılma', independence: 'Bağımsızlık', change_parent: 'Referans ajans değişikliği', sub_close: 'Referans ajansı kapatma' };
 export const TRANSFER_STATUS: Record<TransferStatus, string> = { pending: 'Onay bekliyor', completed: 'Tamamlandı', rejected: 'Reddedildi', cancelled: 'İptal edildi' };
-export const PARTY_TEXT: Record<string, string> = { from: 'Mevcut ajans', to: 'Yeni ajans', parent: 'Üst ajans', streamer: 'Yayıncı', center: 'Merkez' };
+export const PARTY_TEXT: Record<string, string> = { from: 'Mevcut ajans', to: 'Yeni ajans', parent: 'Ana ajans', streamer: 'Yayıncı', center: 'Merkez' };
 export const CHANGE_TEXT: Record<TierChange, string> = { up: 'Seviye yükseldi', down: 'Seviye düştü', same: 'Seviye korundu', held: 'Merkez sabitledi', waiting: 'Kesinleşmesi bekleniyor' };
-export const FLAG_TEXT: Record<string, string> = { decline: 'Puanı hızlı düştü', low_active: 'Aktif yayıncı az', review: 'İnceleme önerilir', spike: 'Ani hacim artışı (inceleniyor)', overtaken: 'Alt ajansı geçti' };
+export const FLAG_TEXT: Record<string, string> = { decline: 'Puanı hızlı düştü', low_active: 'Aktif yayıncı az', review: 'İnceleme önerilir', spike: 'Ani hacim artışı (inceleniyor)', overtaken: 'Referans ajansı geçti' };
 export const CRITERIA_TEXT: Record<string, string> = {
   volume: 'Hacim',
   active: 'Aktif yayıncı',
@@ -633,9 +641,9 @@ export const PERM_TEXT: Record<string, string> = {
   'streamers.view': 'Yayıncıları görme',
   'streamers.invite': 'Yayıncı davet etme',
   'streamers.approve': 'Katılım onaylama',
-  'subagencies.view': 'Alt ajansları görme',
-  'subagencies.manage': 'Alt ajans yönetimi',
-  'subagencies.earnings': 'Alt ajans kazançları',
+  'subagencies.view': 'Referans ajansları görme',
+  'subagencies.manage': 'Referans ajans yönetimi',
+  'subagencies.earnings': 'Referans ajans kazançları',
   'reports.performance': 'Performans raporları',
   'reports.commission': 'Komisyon raporları',
   'reports.export': 'Rapor dışa aktarma',

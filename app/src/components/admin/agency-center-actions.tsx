@@ -97,15 +97,15 @@ function CreateSheet({ nodes, close, done }: { nodes: TreeNode[]; close: () => v
                     options={
                       tops.length
                         ? [
-                            ['top', 'Üst ajans'],
-                            ['sub', 'Alt ajans'],
+                            ['top', 'Ana ajans'],
+                            ['sub', 'Referans ajans'],
                           ]
-                        : [['top', 'Üst ajans']]
+                        : [['top', 'Ana ajans']]
                     }
                   />
                 </Field>
                 {!!parentId && (
-                  <Field label="Üst ajansı">
+                  <Field label="Referans veren ajans">
                     <AgencyPick nodes={tops} value={parentId} onChange={setParentId} />
                   </Field>
                 )}

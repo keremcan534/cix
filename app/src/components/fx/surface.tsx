@@ -8,6 +8,7 @@ import { memo, useEffect, useState, type ReactNode } from 'react';
 import { Animated, Easing, Image, Pressable, StyleSheet, View, type GestureResponderEvent, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
 
 import { introScreenDrawn } from '@/components/fx/intro';
+import { SkyMotion } from '@/components/fx/sky-motion';
 import { tapHaptic } from '@/lib/haptics';
 import { useSettings } from '@/store';
 import type { Scene } from '@/components/fx/scenes';
@@ -64,9 +65,15 @@ export function Backdrop({ scene, strength = 0.9 }: { scene: Scene; strength?: n
   return (
     <View style={[StyleSheet.absoluteFill, { pointerEvents: 'none', overflow: 'hidden' }]}>
       {/* Its photo drawn: on the first launch, the opening over the first screen may uncover it now (components/fx/intro). */}
-      <Image source={scene.photo} onLoad={introScreenDrawn} resizeMode="cover" style={[StyleSheet.absoluteFill, { width: '100%', height: '100%', opacity: strength * surface.photo }]} />
+      {scene.motion === 'sky' ? (
+        <SkyMotion>
+          <Image source={scene.photo} onLoad={introScreenDrawn} resizeMode="cover" style={[StyleSheet.absoluteFill, { width: '100%', height: '100%', opacity: strength * surface.photo }]} />
+        </SkyMotion>
+      ) : (
+        <Image source={scene.photo} onLoad={introScreenDrawn} resizeMode="cover" style={[StyleSheet.absoluteFill, { width: '100%', height: '100%', opacity: strength * surface.photo }]} />
+      )}
       <LinearGradient
-        colors={[`rgba(${c},${a(0.7)})`, `rgba(${c},${a(v)})`, `rgba(${c},${a(Math.min(v + 0.12, 0.9))})`, `rgba(${c},${a(0.86)})`]}
+        colors={[`rgba(${c},${a(scene.veilTop ?? 0.7)})`, `rgba(${c},${a(v)})`, `rgba(${c},${a(Math.min(v + 0.12, 0.9))})`, `rgba(${c},${a(0.86)})`]}
         locations={[0, 0.3, 0.66, 1]}
         style={StyleSheet.absoluteFill}
       />

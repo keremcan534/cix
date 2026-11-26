@@ -8,7 +8,8 @@
 //   GET  /api/agency/assistants?id=                        → { max, open, canAdd, weekStart, nextWeek, assistants }
 //   GET  /api/agency/assistants/candidates?id=&q=          → { users }            (the agency's own people)
 //   POST /api/agency/assistants/add    { id, user, pct }   → { assistant }
-//   POST /api/agency/assistants/share  { id, assistantId, pct } → { assistant, replay }
+//   POST /api/agency/assistants/share  { id, assistantId, pct } → { assistant, replay }   (management only, 26 Nov 2026)
+//   POST /api/agency/assistants/offer/answer { assistantId, answer: accept|reject } → { assistant }   (the person named)
 //   POST /api/agency/assistants/remove { id, assistantId, ask? } → { removed, request }  (the owner asks; the centre ends it)
 //   POST /api/agency/assistants/removal/answer  { requestId, answer: accept|reject|dispute, note? } → { request }  (the assistant)
 //   POST /api/agency/assistants/removal/dispute { requestId, note } → { request }   (the owner, after a rejection)
@@ -17,7 +18,9 @@
 //   (the assistant's own view is in GET /api/agency/me, `assistant`; the wallet's Gelir kaynakları lists the share)
 //
 // Rules, all here on the server:
-//  - Only the agency's owner names, changes and removes an assistant (the centre may remove one). The person must be
+//  - Only the agency's owner names an assistant, with the share agreed (the centre may remove one). The person named
+//    accepts or refuses it first (owners, 26 Nov 2026): until then nothing is written and the code doesn't work. The
+//    share is not changed afterwards by the owner; management may correct it. The person must be
 //    one of the agency's own now, not its owner, and not an assistant anywhere else.
 //  - The first share starts with the assignment. A change starts the next Monday 00:00 (Türkiye) and comes at most
 //    once a calendar week. Shares never change backwards.
@@ -71,7 +74,7 @@ export async function resolveJoinCode(c, code) {
   if (a.rowCount) return { agency: a.rows[0], assistant: null };
   const h = await c.query(
     `SELECT g.*, x.user_id AS assistant_user, u.name AS assistant_name FROM agency_assistants x JOIN agencies g ON g.id = x.agency_id JOIN users u ON u.id = x.user_id
-      WHERE x.code = $1 AND x.ended_at IS NULL AND u.deleted_at IS NULL`,
+      WHERE x.code = $1 AND x.ended_at IS NULL AND x.accepted_at IS NOT NULL AND u.deleted_at IS NULL`,
     [s],
   );
   if (!h.rowCount) throw new HttpError(404, 'Bu kodla bir ajans yok');
@@ -115,7 +118,9 @@ async function viewOf(q, row) {
     code: row.code,
     assignedAt: row.assigned_at,
     endedAt: row.ended_at ?? null,
-    active: !row.ended_at,
+    active: !row.ended_at && !!row.accepted_at,
+    // Named, not yet accepted by the person (owners, 26 Nov 2026).
+    pending: !row.ended_at && !row.accepted_at,
     member: r.member,
     share: inForce ? { pct: inForce.streamer_pct, since: inForce.effective_from } : { pct: 0, since: row.assigned_at },
     upcoming: upcoming ? { pct: upcoming.streamer_pct, from: upcoming.effective_from } : null,
@@ -185,8 +190,19 @@ export async function myAssistant(q, userId) {
        FROM agency_assistant_ledger l LEFT JOIN users s ON s.id = l.streamer_id WHERE l.user_id = $1 ORDER BY l.id DESC LIMIT 20`,
     [userId],
   );
+  // Asistan merkezi (owners, 26 Nov 2026): the streamers I brought to this agency, by their 12-digit ID, with when they
+  // joined (and left) and what they earned this week and since joining. Never anyone else's.
+  const brought = await q.query(
+    `SELECT u.name, u.public_no::text AS no, m.joined_at, m.ended_at,
+            (SELECT coalesce(sum(e.diamonds), 0) FROM income_events e WHERE e.streamer_id = m.streamer_id AND e.occurred_at >= greatest(m.joined_at, $3) AND (m.ended_at IS NULL OR e.occurred_at < m.ended_at)) AS week,
+            (SELECT coalesce(sum(e.diamonds), 0) FROM income_events e WHERE e.streamer_id = m.streamer_id AND e.occurred_at >= m.joined_at AND (m.ended_at IS NULL OR e.occurred_at < m.ended_at)) AS total
+       FROM agency_streamers m JOIN users u ON u.id = m.streamer_id
+      WHERE m.invited_by = $1 AND m.agency_id = $2 AND u.deleted_at IS NULL ORDER BY m.ended_at IS NULL DESC, m.joined_at DESC LIMIT 200`,
+    [userId, v.agency.id, weekStart(new Date())],
+  );
   return {
     ...v,
+    streamers: brought.rows.map((x) => ({ name: x.name, no: x.no ?? null, joinedAt: x.joined_at, endedAt: x.ended_at ?? null, week: n(x.week), total: n(x.total) })),
     rows: rows.rows.map((x) => ({
       id: Number(x.id),
       amount: d4(x.amount),
@@ -278,11 +294,11 @@ export const agencyAssistantRoutes = {
       if (!row) throw new HttpError(500, 'Asistan kodu üretilemedi');
       await c.query('INSERT INTO agency_assistant_shares (assistant_id, streamer_pct, effective_from, initial, set_by) VALUES ($1, $2, $3, true, $4)', [row.id, pct, row.assigned_at, x.u.id]);
       await audit(c, x.u.id, 'assistant.add', 'agency', a.id, { after: { assistant: Number(row.id), user, pct } });
-      await notice(c, a.id, 'team', `${p.rows[0].name} ajans asistanı oldu`, `Getirdiği yayıncıların kazancından ajans komisyonunun %${pct}'i asistana geçer.`);
+      await notice(c, a.id, 'team', `${p.rows[0].name} kişisine asistanlık teklifi gitti`, `Pay: getirdiği yayıncıların kazancından ajans komisyonunun %${pct}'i. Onaylayınca başlar.`);
       const v = (await c.query(`${ROW} WHERE x.id = $1`, [row.id])).rows[0];
       return { assistant: await viewOf(c, v), notify: { user, agency: a.name, pct } };
     });
-    notify([out.notify.user], { title: 'Ajans asistanı oldun', body: `${out.notify.agency}: getirdiğin yayıncıların kazancından ajans komisyonunun %${out.notify.pct}'i sana geçer.`, data: { type: 'agency_assistant' } });
+    notify([out.notify.user], { title: 'Asistanlık teklifi', body: `${out.notify.agency} seni asistan yapmak istiyor: getirdiğin yayıncıların kazancından ajans komisyonunun %${out.notify.pct}'i. Onayla ya da reddet.`, data: { type: 'assistant_removal' } });
     return { assistant: out.assistant };
   },
 
@@ -290,7 +306,9 @@ export const agencyAssistantRoutes = {
     const b = await readJson(req);
     const out = await tx(async (c) => {
       const x = await ctx(c, req);
-      const a = await ownerOf(c, x, b.id);
+      const a = await ownerOf(c, x, b.id, { centre: 'agencies.manage' });
+      // The share is agreed once, with the assistant's yes (owners, 26 Nov 2026): the owner can't change it; management may.
+      if (x.acc.owned.has(a.id) && !x.acc.admin) throw new HttpError(403, 'Asistan payı anlaşıldıktan sonra değiştirilemez. Değişiklik için yönetimle görüş.');
       const pct = pctOf(b.pct);
       const r = await c.query(`${ROW} WHERE x.id = $1 AND x.agency_id = $2 AND x.ended_at IS NULL FOR UPDATE OF x`, [idOf(b.assistantId), a.id]);
       if (!r.rowCount) throw new HttpError(404, 'Asistan bulunamadı');
@@ -319,6 +337,12 @@ export const agencyAssistantRoutes = {
       const id = idOf(b.assistantId);
       const own = (await c.query(`${ROW} WHERE x.id = $1 AND x.agency_id = $2 AND x.ended_at IS NULL FOR UPDATE OF x`, [id, a.id])).rows[0];
       if (!own) throw new HttpError(404, 'Asistan bulunamadı');
+      // An offer not yet answered: the owner takes it back at once (nothing had started).
+      if (!own.accepted_at && x.acc.owned.has(a.id)) {
+        await c.query("UPDATE agency_assistants SET ended_at = now(), ended_by = $2, end_reason = 'withdrawn' WHERE id = $1", [id, x.u.id]);
+        await audit(c, x.u.id, 'assistant.offer_withdraw', 'agency', a.id, { after: { assistant: id } });
+        return { removed: true, request: null };
+      }
       // The centre (not the owner): ended at once, as before; any open request is closed.
       if (!x.acc.owned.has(a.id)) {
         await endAssistant(c, id, x.u.id, 'center');
@@ -343,6 +367,34 @@ export const agencyAssistantRoutes = {
     // An older app (no `ask`) said "ended" on any answer: it is told what happens now instead (the request stands).
     if (out.asked && b.ask !== true) throw new HttpError(409, `İsteğin ${out.name} kişisine gönderildi: onaylarsa asistanlıktan çıkar. Durumunu görmek için uygulamayı güncelle.`);
     return { removed: out.removed, request: out.request };
+  },
+
+  /** The person named answers the offer: accept (it starts now, with the share agreed) or reject (nothing starts). */
+  async 'POST /api/agency/assistants/offer/answer'(req) {
+    const b = await readJson(req);
+    const answer = ['accept', 'reject'].includes(b.answer) ? b.answer : bad('Geçersiz cevap');
+    const out = await tx(async (c) => {
+      const u = await auth(req);
+      const row = (await c.query(`${ROW} WHERE x.id = $1 FOR UPDATE OF x`, [idOf(b.assistantId)])).rows[0];
+      if (!row || row.user_id !== u.id) throw new HttpError(404, 'Teklif bulunamadı');
+      if (row.accepted_at && answer === 'accept') return { assistant: await viewOf(c, row), replay: true };
+      if (row.ended_at || row.accepted_at) throw new HttpError(409, 'Bu teklife artık cevap verilemez');
+      if (answer === 'accept') {
+        await c.query('UPDATE agency_assistants SET accepted_at = now(), assigned_at = now() WHERE id = $1', [row.id]);
+        // The agreed share (written when offered; shares are never changed) applies from now: nothing earlier counts.
+        await notice(c, row.agency_id, 'team', `${row.user_name} ajans asistanı oldu`, 'Asistanlık teklifini onayladı.');
+      } else {
+        await c.query("UPDATE agency_assistants SET ended_at = now(), end_reason = 'declined' WHERE id = $1", [row.id]);
+        await notice(c, row.agency_id, 'team', `${row.user_name} asistanlık teklifini reddetti`, '');
+      }
+      await audit(c, u.id, `assistant.offer_${answer}`, 'agency', row.agency_id, { after: { assistant: Number(row.id) } });
+      const owner = (await c.query('SELECT owner_id FROM agencies WHERE id = $1', [row.agency_id])).rows[0]?.owner_id;
+      const v = await viewOf(c, (await c.query(`${ROW} WHERE x.id = $1`, [row.id])).rows[0]);
+      return { assistant: v, owner, name: row.user_name, answer };
+    });
+    if (!out.replay && out.owner)
+      notify([out.owner], { title: 'Asistanlık teklifi', body: out.answer === 'accept' ? `${out.name} teklifini onayladı; artık ajans asistanın.` : `${out.name} asistanlık teklifini reddetti.`, data: { type: 'agency_assistant' } });
+    return { assistant: out.assistant };
   },
 
   /** The assistant answers: accept (it ends now), reject (it stays; the owner may dispute) or dispute (to management). */

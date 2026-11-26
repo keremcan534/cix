@@ -30,6 +30,7 @@ import { HOLD_COLUMNS, answerHolds, holdMessage, holdView, replySeconds } from '
 import { systemNotice } from './system-notices.mjs';
 import { bondTalk } from './bonds.mjs';
 import { checkSequence, getRules, isNumberOnly } from './contact-filter.mjs';
+import { DUP_LIMIT, DUP_MESSAGE, QUALITY_MESSAGE, checkQuality, dupKey } from './message-quality.mjs';
 import { verifyUpload } from './media.mjs';
 import { pairOf, payOneOnOne, wantsMessagePush } from './one-on-one.mjs';
 import { dmRefusal } from './privacy.mjs';
@@ -146,6 +147,15 @@ export const messageRoutes = {
         : await publicText(b.text, 1, 1000, 'Mesaj', me, 'dm', 'text');
     // The look of a gift's line, typed (a fake gift to lure someone): nothing is stored or charged.
     if (!quickNo && fakeGiftLine(body)) throw Object.assign(new HttpError(400, FAKE_GIFT_LINE), { extra: { code: 'fake_gift' } });
+    // Spam (owners, 26 Nov 2026): one letter or digit, a run of one character; the same words a third time in a row.
+    const typed = !quickNo && !(image && body === PHOTO_TEXT);
+    if (typed && !checkQuality(body).ok) throw Object.assign(new HttpError(400, QUALITY_MESSAGE), { extra: { code: 'spam' } });
+    if (typed) {
+      const last = await db.query('SELECT body, ref FROM messages WHERE sender = $1 AND recipient = $2 ORDER BY id DESC LIMIT $3', [me.id, to, DUP_LIMIT]);
+      // A retry of a message already stored is not a repeat.
+      if (last.rows.length === DUP_LIMIT && !last.rows.some((m) => m.ref === b.ref) && last.rows.every((m) => dupKey(m.body) === dupKey(body)))
+        throw Object.assign(new HttpError(400, DUP_MESSAGE), { extra: { code: 'spam_repeat' } });
+    }
     const source = quickNo ? 'quick_reply' : 'manual';
     const peer = await db.query('SELECT 1 FROM users WHERE id = $1 AND deleted_at IS NULL', [to]);
     if (!peer.rowCount) throw new HttpError(404, 'Kullanıcı bulunamadı');

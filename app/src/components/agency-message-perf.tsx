@@ -13,6 +13,26 @@ import { makeStyles, useTheme } from '@/theme';
 
 const fmt = (n: number) => n.toLocaleString('tr-TR');
 const rate = (r: number | null) => (r === null ? '—' : `%${fmt(r)}`);
+/** The five answer rates (owners, 26 Nov 2026), as the server sends them (an older server: none). */
+type Rate = { pct: number | null; n: number };
+type Rates = { message?: Rate; videoCall?: Rate; voiceCall?: Rate; videoMatch?: Rate; voiceMatch?: Rate };
+const RATE_ROWS: [keyof Rates, string][] = [
+  ['message', 'Mesaj cevap verme'],
+  ['videoCall', 'Görüntülü arama cevap verme'],
+  ['voiceCall', 'Sesli arama cevap verme'],
+  ['videoMatch', 'Görüntülü eşleşme cevap verme'],
+  ['voiceMatch', 'Sesli eşleşme cevap verme'],
+];
+const ratesOf = (x: unknown): Rates | null => (x && typeof x === 'object' && 'rates' in x && x.rates && typeof x.rates === 'object' ? (x.rates as Rates) : null);
+function RateRows({ r }: { r: Rates }) {
+  return (
+    <>
+      {RATE_ROWS.map(([k, label]) => (
+        <Row key={k} label={label} value={r[k]?.pct === null || r[k]?.pct === undefined ? '—' : `%${fmt(r[k]!.pct!)}${r[k]!.n ? ` · ${fmt(r[k]!.n)}` : ''}`} />
+      ))}
+    </>
+  );
+}
 
 export function AgencyMessagePerf({ agencyId }: { agencyId: string }) {
   const { colors } = useTheme();
@@ -54,9 +74,9 @@ export function AgencyMessagePerf({ agencyId }: { agencyId: string }) {
         <>
           <Card style={{ gap: 6 }}>
             <Text style={s.title}>Ajans geneli</Text>
+            {ratesOf(d) && <RateRows r={ratesOf(d)!} />}
             <Row label="Ortalama cevap süresi" value={secondsText(t.avgSeconds)} />
             <Row label="5 dakikada cevap oranı" value={`${rate(t.inTimeRate)}${change === null ? '' : ` (${change >= 0 ? '+' : ''}${fmt(change)} puan)`}`} />
-            <Row label="Ödüle uygun mesaj" value={fmt(t.total)} />
             <Row label="Mesajlardan kazanç" value={`💎 ${fmt(t.diamonds)}`} />
             {!!d.fastest.length && <Text style={s.dim}>En hızlı: {d.fastest.map((x) => `${x.name} (${secondsText(x.avgSeconds)})`).join(', ')}</Text>}
             {!!d.lowest.length && <Text style={s.dim}>Oranı en düşük: {d.lowest.map((x) => `${x.name} (${rate(x.inTimeRate)})`).join(', ')}</Text>}
@@ -70,11 +90,16 @@ export function AgencyMessagePerf({ agencyId }: { agencyId: string }) {
                 <Text style={[s.dim, x.online && { color: colors.green }]}>{x.online ? 'Çevrimiçi' : 'Çevrimdışı'}</Text>
               </View>
               {!!x.publicNo && <Text style={s.dim}>ID {x.publicNo}</Text>}
-              <Row label="Ortalama cevap" value={secondsText(x.avgSeconds)} />
-              <Row label="5 dakikada cevap" value={`${rate(x.inTimeRate)} · ${fmt(x.inTime)}/${fmt(x.total)}`} />
-              <Row label="Cevaplanan / yanıtsız / süre aşımı" value={`${fmt(x.answered)} / ${fmt(x.unanswered)} / ${fmt(x.late + x.unanswered)}`} />
-              <Row label="Mesaj kazancı" value={`💎 ${fmt(x.diamonds)}`} />
-              <Row label="Bugün hazır cevap" value={`${fmt(x.quickToday.used)}/${fmt(x.quickToday.total)}`} />
+              {/* The five answer rates (owners, 26 Nov 2026); an older server keeps the message figures. */}
+              {ratesOf(x) ? (
+                <RateRows r={ratesOf(x)!} />
+              ) : (
+                <>
+                  <Row label="Ortalama cevap" value={secondsText(x.avgSeconds)} />
+                  <Row label="5 dakikada cevap" value={`${rate(x.inTimeRate)} · ${fmt(x.inTime)}/${fmt(x.total)}`} />
+                  <Row label="Mesaj kazancı" value={`💎 ${fmt(x.diamonds)}`} />
+                </>
+              )}
             </Card>
           ))}
           {!d.streamers.length && <Text style={s.dim}>Ajansında henüz yayıncı yok.</Text>}
