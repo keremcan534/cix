@@ -12,7 +12,7 @@
 | | |
 |---|---|
 | Adres | `130.61.230.94` · HTTPS: `https://130-61-230-94.sslip.io` (alan adı alınınca değişecek) |
-| Makine | VM.Standard.A1.Flex, 1 OCPU / 6 GB, Ubuntu 24.04 ARM (ücretsiz sınır 4 OCPU / 24 GB) |
+| Makine | VM.Standard.A1.Flex, 1 OCPU / 6 GB, Ubuntu 24.04 ARM (ücretsiz sınır: ücretsiz hesapta 2 OCPU / 12 GB, PAYG hesapta 4 OCPU / 24 GB; bkz. aşağıda "Oracle hesabı ve maliyet") |
 | Giriş | `ssh -i ~/.ssh/oracle.key ubuntu@130.61.230.94` |
 | Dosyalar | `/opt/similar`: `compose.yaml`, `livekit.yaml`, `Caddyfile`, `.env` (anahtarlar, yalnızca sunucuda), `backup.sh`, `restore.sh`, `backups/`, `api/`, `finance/` (finans paneli) |
 | Şablonlar | `server/infra/`: bu dosyaların git'teki hali ve yeni sunucu kurulumu (`setup.sh`). `compose.yaml`, `Caddyfile` ve `backup.sh` otomatik kurulumla (`server.yml`) git'teki hale getirilir; önceki hali `<dosya>.bak` olarak kalır. `.env` ve `livekit.yaml`'a dokunulmaz. |
@@ -627,4 +627,12 @@ DPIA, KVKK standart sözleşmesi ve gizlilik politikası avukatın işi.
 2. Yedekleri Cloudflare R2'ye kopyalama (yeni `backup.sh`).
 3. Uygulamanın ekranlarını sunucuya bağlamak: giriş (telefon), cüzdan, hediye paneli (`/api/gifts/send`), sıralamalar, mesajlar, oda listesi, push kaydı, fotoğraf yükleme; istemci fonksiyonları `app/src/lib/api.ts`'de hazır.
 4. Native'de gerçek ses ve uygulama içi satın alma (development build).
-5. Yük artınca makineyi 4 OCPU / 24 GB'a büyütme (ücretsiz).
+5. Yük artınca makineyi 4 OCPU / 24 GB'a büyütme: hesap PAYG'deyse ücretsiz, ücretsiz hesapta en fazla 2 OCPU / 12 GB.
+
+## Oracle hesabı ve maliyet (Kasım 2026)
+
+- **Ücretsiz hesap (Always Free):** ARM makinede en fazla 2 OCPU / 12 GB ücretsiz. 7 gün boyunca işlemci, ağ ve bellek kullanımı %20'nin altında kalan ücretsiz makineyi Oracle "boşta" sayıp geri alabilir; trafiği az olan bir test sunucusu için gerçek bir risk.
+- **Kullandıkça öde (PAYG):** her ay ilk 3.000 OCPU-saat ve 18.000 GB-saat ARM ücretsiz (4 OCPU / 24 GB'ı ay boyu çalıştırmaya yeter). Fazlası OCPU-saat başına 0,01 USD, GB-saat başına 0,0015 USD: 4 OCPU / 24 GB daha eklemek ayda yaklaşık 55 USD.
+- **Trafik:** ayda ilk 10 TB dışarı trafik ücretsiz. Dolu bir sesli oda bunu yaklaşık 18 günde, tipik bir oda 54 günde bitirir ([`YUK_TESTI.md`](YUK_TESTI.md)); fazlası GB başına ücretli (güncel fiyat Oracle fiyat listesinde).
+- **Yapılacak (siz):** hesabı PAYG'ye geçirin, Billing › Budgets'ta 1 USD'lik bir bütçe uyarısı kurun (ücretsiz sınır aşılırsa e-posta gelir), sonra makineyi 4 OCPU / 24 GB yapın.
+- Kaynak: [Always Free Resources](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm), [Ampere A1 fiyatları](https://www.oracle.com/cloud/compute/arm/pricing/).
