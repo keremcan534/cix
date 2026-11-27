@@ -2,16 +2,26 @@ package expo.modules.similarbeauty;
 
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.LinearGradient;
 import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.PointF;
+import android.graphics.RadialGradient;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.graphics.Shader;
 import android.media.FaceDetector;
 import android.os.Process;
 import android.os.SystemClock;
 import android.util.Log;
+
+import com.google.android.gms.tasks.Tasks;
+import com.google.mlkit.vision.common.InputImage;
+import com.google.mlkit.vision.face.Face;
+import com.google.mlkit.vision.face.FaceDetection;
+import com.google.mlkit.vision.face.FaceDetectorOptions;
+import com.google.mlkit.vision.face.FaceLandmark;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationHandler;
@@ -20,7 +30,11 @@ import java.lang.reflect.Proxy;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.ShortBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -30,9 +44,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Maske for the camera in video calls, so the other side can't recognize me: a video effect of the WebRTC library
  * (com.oney.WebRTCModule.videoEffects, named NAME) that runs right after the beauty filter (BeautyEffect) on my camera
  * track. Kinds: off (the frame passes untouched), eyes (a masquerade over the eyes), mosaic (the face in big blocks),
- * emoji (an emoji over the face). The face is found by android.media.FaceDetector in a small grey copy of the frame
- * turned upright, on a background thread at most five times a second, never holding up a frame; the mask stays where
- * the face was last found, smoothed, with a margin for the way it moves. Privacy first: while a mask is on and no face
+ * emoji (a drawn smiling face over it). The face is found by Google ML Kit's face detection (its model ships in the APK,
+ * no network) in a small grey copy of the frame, up to 25 times a second on a background thread, never holding up a
+ * frame; android.media.FaceDetector stands in on a phone where ML Kit doesn't run. Each face is followed (ML Kit's
+ * tracking id), smoothed less the faster it moves, and placed ahead along its motion for the frames until the next
+ * find; the mask turns with the head (the line between the eyes) and sizes with the face (owners, 27 Nov 2026: the
+ * mask slid behind the face and didn't sit on it). Privacy first: while a mask is on and no face
  * was found in the last HOLD_MS (or the finder doesn't work on this phone), the whole picture goes out in big blocks,
  * and a frame that fails goes out black, never as it came. Reached by reflection like BeautyEffect: a library update
  * that moves these classes leaves the mask unregistered (logged; registerMask() is false), not a broken build.
@@ -47,17 +64,19 @@ public final class MaskEffect implements InvocationHandler {
   private static final String TAG = "SimilarMask";
 
   private static final int OFF = 0, EYES = 1, MOSAIC = 2, EMOJI = 3;
-  /** Faces are looked for at most this often (ms): five times a second. */
-  private static final long FIND_EVERY_MS = 200;
+  /** Faces are looked for at most this often (ms), and only when the last find is done: up to 25 times a second. */
+  private static final long FIND_EVERY_MS = 40;
   /** A face found this long ago (ms) still places the mask; after that the whole picture goes in blocks. */
-  private static final long HOLD_MS = 700;
-  /** The short side of the grey copy (px). The finder needs 20 px between the eyes in it: a face at arm's length. */
-  private static final int SNAP = 240;
+  private static final long HOLD_MS = 500;
+  /** How far ahead (ms) a face is carried along its motion between finds. */
+  private static final long AHEAD_MS = 120;
+  /** The short side of the grey copy (px): ML Kit finds a face at arm's length in it. */
+  private static final int SNAP = 288;
   private static final int MAX_FACES = 3;
-  /** A face is surely there (FaceDetector.Face.CONFIDENCE_THRESHOLD); a weaker one next to it is covered too. */
+  /** The older finder (android.media.FaceDetector): a face is surely there; a weaker one next to it is covered too. */
   private static final float SURE = 0.4f, MAYBE = 0.3f;
-  /** U+1F60A, smiling face with smiling eyes (from its code point: the source stays ASCII). */
-  private static final String EMOJI_TEXT = new String(Character.toChars(0x1F60A));
+  /** The mask's tilt is drawn in steps of this many degrees (each step one cached picture). */
+  private static final int ROLL_STEP = 4;
 
   private static volatile int kind = OFF;
   private static boolean registered = false;
@@ -97,7 +116,14 @@ public final class MaskEffect implements InvocationHandler {
   private int lastW = 640, lastH = 480, failures = 0;
   private byte[] rowA = new byte[0], rowB = new byte[0], scratchBytes = new byte[0];
   private int[] colsA = new int[0], colsB = new int[0], scratchInts = new int[0];
-  private Sprite sprite;
+  // The mask pictures drawn lately (kind, frame turn and tilt step), the least used dropped past 24.
+  private final Map<Integer, Sprite> sprites =
+      new LinkedHashMap<Integer, Sprite>(32, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<Integer, Sprite> eldest) {
+          return size() > 24;
+        }
+      };
   // Handed to the finder: the capture thread fills `snap` only while `finding` is false, the finder reads it while it
   // is true and then publishes `faces` (never changed after).
   private final AtomicBoolean finding = new AtomicBoolean(false);
@@ -351,29 +377,39 @@ public final class MaskEffect implements InvocationHandler {
     }
     float zoom = w / (float) seen.w;
     boolean turned = rot == 90 || rot == 270;
+    // Carried ahead along its motion since the copy was taken (never more than AHEAD_MS), so it doesn't trail the face.
+    float ahead = Math.min(AHEAD_MS, Math.max(0, now - seen.at));
     for (int i = 0; i < seen.n; i++) {
       float e = seen.e[i] * zoom;
-      float pad = seen.pad[i] * zoom;
-      // The mask's centre and half size, upright, in eye distances from the point between the eyes.
+      float moved = (float) Math.hypot(seen.vx[i], seen.vy[i]) * ahead * zoom;
+      // A margin for what the motion can't foresee: more while the face moves.
+      float pad = Math.min(e, seen.pad[i] * zoom + 0.5f * moved);
+      // The mask's centre and half size, upright, in eye distances from the point between the eyes (the eyes ML Kit
+      // finds are ~6.3 cm apart: a face is ~2.3 of them wide and ~3.2 tall, its middle ~0.35 below the eyes).
       float ox, oy, hw, hh;
       if (k == EYES) {
         ox = 0f;
-        oy = -0.1f;
-        hw = 1.45f;
-        hh = 0.68f;
+        oy = -0.05f;
+        hw = 1.3f;
+        hh = 0.6f;
       } else if (k == EMOJI) {
         ox = 0f;
-        oy = 0.15f;
-        hw = 2.1f;
-        hh = 2.1f;
+        oy = 0.35f;
+        hw = 1.6f;
+        hh = 1.6f;
       } else {
         ox = 0f;
-        oy = 0.15f;
-        hw = 1.8f;
-        hh = 2.2f;
+        oy = 0.35f;
+        hw = 1.45f;
+        hh = 1.95f;
       }
+      // The head's tilt (upright, degrees, clockwise on screen): the offset turns with it, and so does the picture.
+      int step = Math.round(seen.roll[i] / ROLL_STEP);
+      double tilt = Math.toRadians(step * ROLL_STEP);
+      float cos = (float) Math.cos(tilt), sin = (float) Math.sin(tilt);
+      float tx = ox * cos - oy * sin, ty = ox * sin + oy * cos;
       // In the frame's own orientation: the offset turned with the rotation, the sizes swapped on a quarter turn.
-      float dx = ox * e, dy = oy * e, bx, by;
+      float dx = tx * e, dy = ty * e, bx, by;
       switch (rot) {
         case 90:
           bx = dy;
@@ -391,19 +427,28 @@ public final class MaskEffect implements InvocationHandler {
           bx = dx;
           by = dy;
       }
-      float cx = seen.x[i] * zoom + bx, cy = seen.y[i] * zoom + by;
-      float halfX = (turned ? hh : hw) * e + pad, halfY = (turned ? hw : hh) * e + pad;
-      // Even edges, so the chroma box (half of it) lines up with the luma one.
-      int x0 = ((int) Math.floor(cx - halfX)) & ~1, y0 = ((int) Math.floor(cy - halfY)) & ~1;
-      int x1 = (((int) Math.ceil(cx + halfX)) + 1) & ~1, y1 = (((int) Math.ceil(cy + halfY)) + 1) & ~1;
+      float cx = seen.x[i] * zoom + seen.vx[i] * ahead * zoom + bx, cy = seen.y[i] * zoom + seen.vy[i] * ahead * zoom + by;
       if (k == MOSAIC) {
-        int block = Math.max(8, Math.round(3.6f * e / 7f)) & ~1;
+        // The tilted face's box, upright: its bounding box at this tilt.
+        float uw = hw * Math.abs(cos) + hh * Math.abs(sin), uh = hw * Math.abs(sin) + hh * Math.abs(cos);
+        float halfX = (turned ? uh : uw) * e + pad, halfY = (turned ? uw : uh) * e + pad;
+        // Even edges, so the chroma box (half of it) lines up with the luma one.
+        int x0 = ((int) Math.floor(cx - halfX)) & ~1, y0 = ((int) Math.floor(cy - halfY)) & ~1;
+        int x1 = (((int) Math.ceil(cx + halfX)) + 1) & ~1, y1 = (((int) Math.ceil(cy + halfY)) + 1) & ~1;
+        int block = Math.max(8, Math.round(e / 2.2f)) & ~1;
         blocks(y, sy, Math.max(0, x0), Math.max(0, y0), Math.min(w, x1), Math.min(h, y1), x0, y0, block);
         int cx0 = Math.max(0, x0 / 2), cy0 = Math.max(0, y0 / 2), cx1 = Math.min(cw, x1 / 2), cy1 = Math.min(ch, y1 / 2);
         blocks(u, su, cx0, cy0, cx1, cy1, x0 / 2, y0 / 2, block / 2);
         blocks(v, sv, cx0, cy0, cx1, cy1, x0 / 2, y0 / 2, block / 2);
       } else {
-        Sprite s = sprite(k, rot);
+        // The picture holds the mask turned by the tilt (and by the frame's turn); its size in the frame follows the
+        // mask's own width, 2 * hw eye distances, plus the margin all round.
+        Sprite s = sprite(k, rot, step);
+        float scale = 2f * hw * e / s.pw;
+        float grow = 1f + 2f * pad / (2f * hw * e);
+        float halfX = s.w * scale * grow / 2f, halfY = s.h * scale * grow / 2f;
+        int x0 = ((int) Math.floor(cx - halfX)) & ~1, y0 = ((int) Math.floor(cy - halfY)) & ~1;
+        int x1 = (((int) Math.ceil(cx + halfX)) + 1) & ~1, y1 = (((int) Math.ceil(cy + halfY)) + 1) & ~1;
         paste(y, sy, w, h, s.y, s.a, s.w, s.h, x0, y0, x1 - x0, y1 - y0);
         paste(u, su, cw, ch, s.u, s.ca, s.w / 2, s.h / 2, x0 / 2, y0 / 2, (x1 - x0) / 2, (y1 - y0) / 2);
         paste(v, sv, cw, ch, s.v, s.ca, s.w / 2, s.h / 2, x0 / 2, y0 / 2, (x1 - x0) / 2, (y1 - y0) / 2);
@@ -555,27 +600,33 @@ public final class MaskEffect implements InvocationHandler {
     ((Buffer) b).position(position);
   }
 
-  private Sprite sprite(int k, int rot) {
-    Sprite s = sprite;
-    if (s == null || s.kind != k || s.rot != rot) {
-      s = render(k, rot);
-      sprite = s;
+  private Sprite sprite(int k, int rot, int step) {
+    int key = (k * 4 + rot / 90) * 1000 + step + 500;
+    Sprite s = sprites.get(key);
+    if (s == null) {
+      s = render(k, rot, step * ROLL_STEP);
+      sprites.put(key, s);
     }
     return s;
   }
 
   /**
-   * The mask drawn upright (emoji 256 x 256, eyes 288 x 136) and turned back by the frame's rotation, so it is upright
-   * on the other side's screen; in YUV with its alpha (chroma: each 2 x 2, weighted by alpha).
+   * The mask drawn upright (emoji 256 x 256, eyes 288 x 132), tilted by the head's `roll` (degrees, clockwise on the
+   * upright picture) and turned back by the frame's rotation, so it sits on the face on the other side's screen; in YUV
+   * with its alpha (chroma: each 2 x 2, weighted by alpha).
    */
-  private static Sprite render(int k, int rot) {
-    int pw = k == EMOJI ? 256 : 288, ph = k == EMOJI ? 256 : 136;
+  private static Sprite render(int k, int rot, int roll) {
+    int pw = k == EMOJI ? 256 : 288, ph = k == EMOJI ? 256 : 132;
+    double t = Math.toRadians(roll);
+    float ac = (float) Math.abs(Math.cos(t)), as0 = (float) Math.abs(Math.sin(t));
+    int bw = ((int) Math.ceil(pw * ac + ph * as0) + 1) & ~1, bh = ((int) Math.ceil(pw * as0 + ph * ac) + 1) & ~1;
     boolean turned = rot == 90 || rot == 270;
-    int w = turned ? ph : pw, h = turned ? pw : ph;
+    int w = turned ? bh : bw, h = turned ? bw : bh;
     Bitmap bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
     Canvas canvas = new Canvas(bitmap);
     canvas.translate(w / 2f, h / 2f);
     canvas.rotate(-rot);
+    canvas.rotate(roll);
     canvas.translate(-pw / 2f, -ph / 2f);
     if (k == EMOJI) drawEmoji(canvas, pw);
     else drawEyes(canvas, pw, ph);
@@ -605,7 +656,7 @@ public final class MaskEffect implements InvocationHandler {
         vs[o] = (byte) (sa > 0 ? sv / sa : 128);
       }
     }
-    return new Sprite(k, rot, w, h, ys, as, us, vs, cas);
+    return new Sprite(pw, w, h, ys, as, us, vs, cas);
   }
 
   // BT.601 in video range, as the library's own YUV conversion.
@@ -624,59 +675,121 @@ public final class MaskEffect implements InvocationHandler {
     return 128 + ((112 * r - 94 * g - 18 * b + 128) >> 8);
   }
 
-  /** An emoji face over a disc of its yellow: the disc covers the face even where the emoji font draws less. */
+  /**
+   * A smiling face drawn here (the same on every phone, no emoji font): a golden disc with light from the top left,
+   * closed smiling eyes, rosy cheeks and a wide smile, a soft rim so its edge sits on the face.
+   */
   private static void drawEmoji(Canvas canvas, int size) {
-    float c = size / 2f;
+    float c = size / 2f, r = size * 0.48f;
     Paint disc = new Paint(Paint.ANTI_ALIAS_FLAG);
-    disc.setColor(0xFFFFC93C);
-    canvas.drawCircle(c, c, size * 0.48f, disc);
-    Paint text = new Paint(Paint.ANTI_ALIAS_FLAG);
-    text.setTextSize(size * 0.8f);
-    Rect bounds = new Rect();
-    text.getTextBounds(EMOJI_TEXT, 0, EMOJI_TEXT.length(), bounds);
-    int big = Math.max(bounds.width(), bounds.height());
-    if (big > 0) {
-      text.setTextSize(text.getTextSize() * size * 0.98f / big);
-      text.getTextBounds(EMOJI_TEXT, 0, EMOJI_TEXT.length(), bounds);
-    }
-    canvas.drawText(EMOJI_TEXT, c - bounds.exactCenterX(), c - bounds.exactCenterY(), text);
+    disc.setShader(new RadialGradient(c - r * 0.35f, c - r * 0.4f, r * 1.5f, new int[] {0xFFFFE98A, 0xFFFFC93C, 0xFFF2A516}, new float[] {0f, 0.55f, 1f}, Shader.TileMode.CLAMP));
+    canvas.drawCircle(c, c, r, disc);
+    Paint rim = new Paint(Paint.ANTI_ALIAS_FLAG);
+    rim.setStyle(Paint.Style.STROKE);
+    rim.setStrokeWidth(size * 0.025f);
+    rim.setColor(0xFFE0901A);
+    canvas.drawCircle(c, c, r - size * 0.012f, rim);
+    Paint cheek = new Paint(Paint.ANTI_ALIAS_FLAG);
+    cheek.setColor(0x66FF6F91);
+    canvas.drawOval(new RectF(c - r * 0.78f, c + r * 0.08f, c - r * 0.38f, c + r * 0.34f), cheek);
+    canvas.drawOval(new RectF(c + r * 0.38f, c + r * 0.08f, c + r * 0.78f, c + r * 0.34f), cheek);
+    Paint line = new Paint(Paint.ANTI_ALIAS_FLAG);
+    line.setStyle(Paint.Style.STROKE);
+    line.setStrokeCap(Paint.Cap.ROUND);
+    line.setStrokeWidth(size * 0.045f);
+    line.setColor(0xFF5B3A12);
+    // Closed, smiling eyes: arcs bowed up.
+    canvas.drawArc(new RectF(c - r * 0.62f, c - r * 0.42f, c - r * 0.18f, c - r * 0.02f), 200, 140, false, line);
+    canvas.drawArc(new RectF(c + r * 0.18f, c - r * 0.42f, c + r * 0.62f, c - r * 0.02f), 200, 140, false, line);
+    // The smile: an open mouth with a tongue.
+    Path mouth = new Path();
+    mouth.moveTo(c - r * 0.5f, c + r * 0.22f);
+    mouth.quadTo(c, c + r * 0.95f, c + r * 0.5f, c + r * 0.22f);
+    mouth.quadTo(c, c + r * 0.38f, c - r * 0.5f, c + r * 0.22f);
+    mouth.close();
+    Paint inside = new Paint(Paint.ANTI_ALIAS_FLAG);
+    inside.setColor(0xFF7A2E1C);
+    canvas.drawPath(mouth, inside);
+    Paint tongue = new Paint(Paint.ANTI_ALIAS_FLAG);
+    tongue.setColor(0xFFFF7A8A);
+    canvas.drawOval(new RectF(c - r * 0.2f, c + r * 0.46f, c + r * 0.2f, c + r * 0.62f), tongue);
+    line.setStrokeWidth(size * 0.03f);
+    canvas.drawPath(mouth, line);
   }
 
-  /** A masquerade over both eyes and the brows: dark satin with a gold rim, closed (nothing of the eyes shows). */
+  /**
+   * A masquerade over both eyes and the brows: night-blue satin lit from above, a gold rim, a gold filigree line along the
+   * top and small stones at the corners; closed (nothing of the eyes shows, only a darker hollow where they are).
+   */
   private static void drawEyes(Canvas canvas, int w, int h) {
-    float rim = h * 0.06f;
+    float rim = h * 0.055f;
     Matrix fit = new Matrix();
     fit.setScale((w - 2 * rim) / 100f, (h - 2 * rim) / 100f);
     fit.postTranslate(rim, rim);
-    // The outline on a 100 x 100 grid: two lobes, a dip over the bridge of the nose, a notch for the nose.
+    // The outline on a 100 x 100 grid: two lobes swept up at the outer ends, a dip over the bridge of the nose, a notch
+    // for the nose.
     Path mask = new Path();
-    mask.moveTo(0, 42);
-    mask.cubicTo(4, 10, 20, 0, 30, 2);
-    mask.cubicTo(40, 4, 46, 16, 50, 18);
-    mask.cubicTo(54, 16, 60, 4, 70, 2);
-    mask.cubicTo(80, 0, 96, 10, 100, 42);
-    mask.cubicTo(98, 80, 86, 100, 72, 98);
-    mask.cubicTo(62, 96, 56, 74, 50, 72);
-    mask.cubicTo(44, 74, 38, 96, 28, 98);
-    mask.cubicTo(14, 100, 2, 80, 0, 42);
+    mask.moveTo(0, 30);
+    mask.cubicTo(6, 6, 22, 4, 32, 8);
+    mask.cubicTo(42, 12, 46, 20, 50, 22);
+    mask.cubicTo(54, 20, 58, 12, 68, 8);
+    mask.cubicTo(78, 4, 94, 6, 100, 30);
+    mask.cubicTo(100, 70, 88, 98, 72, 96);
+    mask.cubicTo(62, 95, 56, 76, 50, 74);
+    mask.cubicTo(44, 76, 38, 95, 28, 96);
+    mask.cubicTo(12, 98, 0, 70, 0, 30);
     mask.close();
     mask.transform(fit);
     Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
-    fill.setColor(0xFF1B1026);
+    fill.setShader(new LinearGradient(0, 0, 0, h, new int[] {0xFF3A2A6E, 0xFF1C1238, 0xFF0E0820}, new float[] {0f, 0.55f, 1f}, Shader.TileMode.CLAMP));
     canvas.drawPath(mask, fill);
-    Paint lid = new Paint(Paint.ANTI_ALIAS_FLAG);
-    lid.setColor(0xFF33224A);
-    RectF eye = new RectF(20, 44, 43, 68);
+    // The hollows where the eyes are, darker, with a gold line round them.
+    Paint hollow = new Paint(Paint.ANTI_ALIAS_FLAG);
+    hollow.setColor(0xFF0A0614);
+    Paint ring = new Paint(Paint.ANTI_ALIAS_FLAG);
+    ring.setStyle(Paint.Style.STROKE);
+    ring.setStrokeWidth(rim * 0.5f);
+    ring.setColor(0xFFD9B15A);
+    RectF eye = new RectF(17, 38, 42, 66);
     fit.mapRect(eye);
-    canvas.drawOval(eye, lid);
-    eye.set(57, 44, 80, 68);
+    canvas.drawOval(eye, hollow);
+    canvas.drawOval(eye, ring);
+    eye.set(58, 38, 83, 66);
     fit.mapRect(eye);
-    canvas.drawOval(eye, lid);
+    canvas.drawOval(eye, hollow);
+    canvas.drawOval(eye, ring);
+    // A soft sheen along the top.
+    Paint sheen = new Paint(Paint.ANTI_ALIAS_FLAG);
+    sheen.setShader(new LinearGradient(0, 0, 0, h * 0.45f, 0x40FFFFFF, 0x00FFFFFF, Shader.TileMode.CLAMP));
+    canvas.drawPath(mask, sheen);
+    // Filigree: a gold line that follows the top edge a little inside it.
+    Path lace = new Path();
+    lace.moveTo(8, 30);
+    lace.cubicTo(14, 14, 26, 14, 34, 18);
+    lace.cubicTo(42, 22, 46, 30, 50, 31);
+    lace.cubicTo(54, 30, 58, 22, 66, 18);
+    lace.cubicTo(74, 14, 86, 14, 92, 30);
+    lace.transform(fit);
+    Paint gold = new Paint(Paint.ANTI_ALIAS_FLAG);
+    gold.setStyle(Paint.Style.STROKE);
+    gold.setStrokeCap(Paint.Cap.ROUND);
+    gold.setStrokeWidth(rim * 0.45f);
+    gold.setShader(new LinearGradient(0, 0, w, 0, new int[] {0xFFB8862B, 0xFFFFE49A, 0xFFB8862B}, null, Shader.TileMode.CLAMP));
+    canvas.drawPath(lace, gold);
+    // The rim.
     Paint edge = new Paint(Paint.ANTI_ALIAS_FLAG);
     edge.setStyle(Paint.Style.STROKE);
     edge.setStrokeWidth(rim);
-    edge.setColor(0xFFE9C46A);
+    edge.setShader(new LinearGradient(0, 0, w, h, new int[] {0xFFFFE49A, 0xFFC9962E, 0xFFFFE49A}, null, Shader.TileMode.CLAMP));
     canvas.drawPath(mask, edge);
+    // Stones at the outer corners and over the nose.
+    Paint stone = new Paint(Paint.ANTI_ALIAS_FLAG);
+    float[] at = {6, 28, 94, 28, 50, 26};
+    fit.mapPoints(at);
+    for (int i = 0; i < at.length; i += 2) {
+      stone.setShader(new RadialGradient(at[i] - rim * 0.3f, at[i + 1] - rim * 0.3f, rim * 1.2f, 0xFFFFD1E8, 0xFFE0457B, Shader.TileMode.CLAMP));
+      canvas.drawCircle(at[i], at[i + 1], rim * (i == 4 ? 0.9f : 1.1f), stone);
+    }
   }
 
   /** The WebRTC frame classes (LiveKit's own package, livekit.org.webrtc), found from the effect interface. */
@@ -718,47 +831,39 @@ public final class MaskEffect implements InvocationHandler {
     }
   }
 
-  /** Faces found in one copy, in the frame's coordinates: the point between the eyes, the eye distance, a margin. */
+  /**
+   * Faces found in one copy, in the frame's coordinates: the point between the eyes, the eye distance, the head's tilt
+   * (upright, degrees, clockwise), the motion (px per ms) and a margin; `at` is when the copy was taken.
+   */
   private static final class Faces {
     final int n, w, h, rot;
     final long at;
-    final float[] x, y, e, pad;
+    final float[] x, y, e, roll, vx, vy, pad;
 
-    Faces(int n, float[] x, float[] y, float[] e, float[] pad, int w, int h, int rot, long at) {
+    Faces(int n, float[] x, float[] y, float[] e, float[] roll, float[] vx, float[] vy, float[] pad, int w, int h, int rot, long at) {
       this.n = n;
       this.x = x;
       this.y = y;
       this.e = e;
+      this.roll = roll;
+      this.vx = vx;
+      this.vy = vy;
       this.pad = pad;
       this.w = w;
       this.h = h;
       this.rot = rot;
       this.at = at;
     }
-
-    /** The face closest to (px, py), or -1. */
-    int nearest(float px, float py) {
-      int best = -1;
-      double bestD = Double.MAX_VALUE;
-      for (int i = 0; i < n; i++) {
-        double d = Math.hypot(px - x[i], py - y[i]);
-        if (d < bestD) {
-          bestD = d;
-          best = i;
-        }
-      }
-      return best;
-    }
   }
 
   /** A mask picture in the frame's orientation: luma and its alpha (w x h, both even), chroma and alpha at half. */
   private static final class Sprite {
-    final int kind, rot, w, h;
+    /** The mask's own width before the tilt (px): what 2 * hw eye distances are. */
+    final int pw, w, h;
     final byte[] y, a, u, v, ca;
 
-    Sprite(int kind, int rot, int w, int h, byte[] y, byte[] a, byte[] u, byte[] v, byte[] ca) {
-      this.kind = kind;
-      this.rot = rot;
+    Sprite(int pw, int w, int h, byte[] y, byte[] a, byte[] u, byte[] v, byte[] ca) {
+      this.pw = pw;
       this.w = w;
       this.h = h;
       this.y = y;
@@ -769,8 +874,192 @@ public final class MaskEffect implements InvocationHandler {
     }
   }
 
-  /** android.media.FaceDetector, on the finder's thread only (one detector, kept while the copy's size stays). */
+  /** One face as a finder saw it, in the frame's coordinates (tracking id -1 when the finder has none). */
+  private static final class Raw {
+    final float x, y, e, roll;
+    final int id;
+
+    Raw(float x, float y, float e, float roll, int id) {
+      this.x = x;
+      this.y = y;
+      this.e = e;
+      this.roll = roll;
+      this.id = id;
+    }
+  }
+
+  /**
+   * The finders, on the finder's thread only: ML Kit, else android.media.FaceDetector. Each find is matched to the faces
+   * before (ML Kit's tracking id, else the nearest), smoothed less the faster the face moves, and given its motion.
+   */
   private static final class Detector {
+    private static int[] ids = new int[0];
+
+    /** False once both finders failed for good on this phone: then the whole picture stays in blocks. */
+    static boolean works() {
+      return MlKit.works() || Legacy.works();
+    }
+
+    /**
+     * The faces in a grey copy (sw x sh, the frame's orientation; `rot` turns it upright), in the frame's coordinates
+     * (w x h), followed on from `before`; null when no face is there.
+     */
+    static synchronized Faces find(byte[] copy, int sw, int sh, int rot, int w, int h, long at, Faces before) {
+      List<Raw> raw = MlKit.works() ? MlKit.find(copy, sw, sh, rot, w, h) : null;
+      if (raw == null && !MlKit.works()) raw = Legacy.find(copy, sw, sh, rot, w, h);
+      if (raw == null || raw.isEmpty()) return null;
+      int m = Math.min(MAX_FACES, raw.size());
+      float[] xs = new float[m], ys = new float[m], es = new float[m], rolls = new float[m];
+      float[] vxs = new float[m], vys = new float[m], pads = new float[m];
+      int[] nextIds = new int[m];
+      boolean same = before != null && before.w == w && before.h == h && before.rot == rot && at - before.at < 600 && before.at < at;
+      float dt = same ? Math.max(1, at - before.at) : 1;
+      boolean[] taken = new boolean[same ? before.n : 0];
+      for (int i = 0; i < m; i++) {
+        Raw f = raw.get(i);
+        nextIds[i] = f.id;
+        int j = -1;
+        if (same) {
+          // The same face: its tracking id, else the nearest one within an eye distance and a half.
+          double best = 1.5 * f.e;
+          for (int q = 0; q < before.n; q++) {
+            if (taken[q]) continue;
+            if (f.id >= 0 && q < ids.length && ids[q] == f.id) {
+              j = q;
+              break;
+            }
+            double d = Math.hypot(f.x - before.x[q], f.y - before.y[q]);
+            if (d < best) {
+              best = d;
+              j = q;
+            }
+          }
+          if (j >= 0) taken[j] = true;
+        }
+        if (j < 0) {
+          xs[i] = f.x;
+          ys[i] = f.y;
+          es[i] = f.e;
+          rolls[i] = f.roll;
+          pads[i] = 0.25f * f.e;
+          continue;
+        }
+        // Where the face was expected now, and how far off the find is: a still face is smoothed a lot (no jitter),
+        // a moving one hardly (no lag).
+        float px = before.x[j] + before.vx[j] * dt, py = before.y[j] + before.vy[j] * dt;
+        float off = (float) Math.hypot(f.x - px, f.y - py) / Math.max(1f, f.e);
+        float k = Math.min(1f, 0.4f + 1.6f * off);
+        xs[i] = px + k * (f.x - px);
+        ys[i] = py + k * (f.y - py);
+        es[i] = before.e[j] + Math.min(1f, 0.35f + 2f * Math.abs(f.e - before.e[j]) / Math.max(1f, f.e)) * (f.e - before.e[j]);
+        float dr = f.roll - before.roll[j];
+        rolls[i] = before.roll[j] + (Math.abs(dr) > 12 ? 0.8f : 0.45f) * dr;
+        // Its motion, itself smoothed, and never more than two eye distances in 100 ms.
+        float cap = 2f * es[i] / 100f;
+        vxs[i] = clamp(0.5f * before.vx[j] + 0.5f * (xs[i] - before.x[j]) / dt, cap);
+        vys[i] = clamp(0.5f * before.vy[j] + 0.5f * (ys[i] - before.y[j]) / dt, cap);
+        pads[i] = 0.12f * es[i] + Math.min(0.6f * es[i], off * es[i]);
+      }
+      ids = nextIds;
+      return new Faces(m, xs, ys, es, rolls, vxs, vys, pads, w, h, rot, at);
+    }
+
+    private static float clamp(float v, float cap) {
+      return Math.max(-cap, Math.min(cap, v));
+    }
+
+    /** A point of the upright picture back in the copy's own orientation (sw x sh). */
+    static PointF back(float ux, float uy, int rot, int sw, int sh) {
+      switch (rot) {
+        case 90:
+          return new PointF(uy, sh - ux);
+        case 180:
+          return new PointF(sw - ux, sh - uy);
+        case 270:
+          return new PointF(sw - uy, ux);
+        default:
+          return new PointF(ux, uy);
+      }
+    }
+  }
+
+  /** Google ML Kit's face detection (fast mode, eye points, tracking), its model in the APK. */
+  private static final class MlKit {
+    private static volatile boolean broken = false;
+    private static int errors = 0;
+    private static com.google.mlkit.vision.face.FaceDetector client;
+    private static byte[] nv21 = new byte[0];
+
+    static boolean works() {
+      return !broken;
+    }
+
+    /** The faces in the copy, or null when finding failed (after five failures in a row, ML Kit is off for this run). */
+    static List<Raw> find(byte[] copy, int sw, int sh, int rot, int w, int h) {
+      try {
+        if (client == null) {
+          FaceDetectorOptions options =
+              new FaceDetectorOptions.Builder()
+                  .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
+                  .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
+                  .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_NONE)
+                  .setContourMode(FaceDetectorOptions.CONTOUR_MODE_NONE)
+                  .setMinFaceSize(0.1f)
+                  .enableTracking()
+                  .build();
+          client = FaceDetection.getClient(options);
+          Log.i(TAG, "ML Kit face finder on");
+        }
+        // NV21 of the grey copy: its luma, then neutral chroma.
+        int size = sw * sh, total = size + 2 * ((sw + 1) / 2) * ((sh + 1) / 2);
+        if (nv21.length != total) {
+          nv21 = new byte[total];
+          Arrays.fill(nv21, size, total, (byte) 128);
+        }
+        System.arraycopy(copy, 0, nv21, 0, size);
+        InputImage image = InputImage.fromByteArray(nv21, sw, sh, rot, InputImage.IMAGE_FORMAT_NV21);
+        List<Face> found = Tasks.await(client.process(image), 600, TimeUnit.MILLISECONDS);
+        errors = 0;
+        float kx = w / (float) sw, ky = h / (float) sh, ke = (kx + ky) / 2f;
+        List<Raw> out = new ArrayList<>();
+        for (Face face : found) {
+          if (out.size() >= MAX_FACES) break;
+          Rect box = face.getBoundingBox();
+          FaceLandmark a = face.getLandmark(FaceLandmark.LEFT_EYE), b = face.getLandmark(FaceLandmark.RIGHT_EYE);
+          float ux, uy, eye, roll;
+          if (a != null && b != null) {
+            PointF pa = a.getPosition(), pb = b.getPosition();
+            PointF l = pa.x <= pb.x ? pa : pb, r = pa.x <= pb.x ? pb : pa;
+            ux = (l.x + r.x) / 2f;
+            uy = (l.y + r.y) / 2f;
+            eye = (float) Math.hypot(r.x - l.x, r.y - l.y);
+            roll = (float) Math.toDegrees(Math.atan2(r.y - l.y, r.x - l.x));
+          } else {
+            ux = box.exactCenterX();
+            uy = box.top + 0.4f * box.height();
+            eye = box.width() / 2.3f;
+            roll = -face.getHeadEulerAngleZ();
+          }
+          // A face turned sideways has its eyes closer together on the picture than its size: the box keeps the mask
+          // as big as the face.
+          eye = Math.max(eye, box.width() / 2.6f);
+          PointF p = Detector.back(ux, uy, rot, sw, sh);
+          Integer id = face.getTrackingId();
+          out.add(new Raw(p.x * kx, p.y * ky, eye * ke, Math.max(-60f, Math.min(60f, roll)), id == null ? -1 : id));
+        }
+        return out;
+      } catch (Throwable t) {
+        if (t instanceof LinkageError || ++errors >= 5) {
+          broken = true;
+          Log.e(TAG, "ML Kit face finder off for this run: the older finder takes over", t);
+        }
+        return null;
+      }
+    }
+  }
+
+  /** android.media.FaceDetector (frontal faces, the point between the eyes): only where ML Kit doesn't run. */
+  private static final class Legacy {
     private static volatile boolean broken = false;
     private static int errors = 0;
     private static FaceDetector detector;
@@ -781,16 +1070,12 @@ public final class MaskEffect implements InvocationHandler {
     private static final FaceDetector.Face[] found = new FaceDetector.Face[MAX_FACES];
     private static final PointF mid = new PointF();
 
-    /** False once the finder failed for good on this phone: then the whole picture stays in blocks. */
     static boolean works() {
       return !broken;
     }
 
-    /**
-     * The faces in a grey copy (sw x sh, the frame's orientation turned by `rot` to be upright), in the frame's
-     * coordinates (w x h), smoothed with the faces found before; null when no face is surely there.
-     */
-    static synchronized Faces find(byte[] copy, int sw, int sh, int rot, int w, int h, long at, Faces before) {
+    /** The faces in the copy, or null when none is surely there or finding failed. */
+    static List<Raw> find(byte[] copy, int sw, int sh, int rot, int w, int h) {
       boolean turned = rot == 90 || rot == 270;
       int uw = turned ? sh : sw, uh = turned ? sw : sh;
       int n;
@@ -849,58 +1134,17 @@ public final class MaskEffect implements InvocationHandler {
         return null;
       }
       float kx = w / (float) sw, ky = h / (float) sh, ke = (kx + ky) / 2f;
-      float[] xs = new float[MAX_FACES], ys = new float[MAX_FACES], es = new float[MAX_FACES], pads = new float[MAX_FACES];
-      int m = 0;
+      List<Raw> out = new ArrayList<>();
       boolean sure = false;
       for (int i = 0; i < n && i < MAX_FACES; i++) {
         FaceDetector.Face face = found[i];
         if (face == null || face.confidence() < MAYBE) continue;
         sure |= face.confidence() >= SURE;
         face.getMidPoint(mid);
-        // Back from upright to the copy's own orientation, then to the frame's size.
-        float bx, by;
-        switch (rot) {
-          case 90:
-            bx = mid.y;
-            by = sh - mid.x;
-            break;
-          case 180:
-            bx = sw - mid.x;
-            by = sh - mid.y;
-            break;
-          case 270:
-            bx = sw - mid.y;
-            by = mid.x;
-            break;
-          default:
-            bx = mid.x;
-            by = mid.y;
-        }
-        xs[m] = bx * kx;
-        ys[m] = by * ky;
-        es[m] = face.eyesDistance() * ke;
-        m++;
+        PointF p = Detector.back(mid.x, mid.y, rot, sw, sh);
+        out.add(new Raw(p.x * kx, p.y * ky, face.eyesDistance() * ke, 0f, -1));
       }
-      if (!sure) return null;
-      // Smoothed with the face found before nearest to it when it barely moved (less jitter), and a margin at least as
-      // big as its last move (up to 1.5 eye distances): it goes on moving until the next find.
-      boolean same = before != null && before.w == w && before.h == h && before.rot == rot && at - before.at < 1000;
-      for (int i = 0; i < m; i++) {
-        float e = es[i];
-        float pad = 0.25f * e;
-        int j = same ? before.nearest(xs[i], ys[i]) : -1;
-        if (j >= 0) {
-          float d = (float) Math.hypot(xs[i] - before.x[j], ys[i] - before.y[j]);
-          if (d < 0.5f * e) {
-            xs[i] = before.x[j] + 0.65f * (xs[i] - before.x[j]);
-            ys[i] = before.y[j] + 0.65f * (ys[i] - before.y[j]);
-            es[i] = before.e[j] + 0.5f * (e - before.e[j]);
-          }
-          pad = Math.max(pad, Math.max(d, 0.6f * before.pad[j]));
-        }
-        pads[i] = Math.min(pad, 1.5f * es[i]);
-      }
-      return new Faces(m, xs, ys, es, pads, w, h, rot, at);
+      return sure ? out : null;
     }
   }
 }

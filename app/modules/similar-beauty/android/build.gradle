@@ -1,5 +1,6 @@
 // Güzellik filtresi (video calls): beauty.c built with CMake (src/main/cpp), a WebRTC video effect
-// (BeautyEffect). Only the architectures the app is built for (reactNativeArchitectures).
+// (BeautyEffect). Only the architectures the app is built for (reactNativeArchitectures). Maske (MaskEffect) finds faces
+// with Google ML Kit, its model bundled in the APK (no download, no network).
 plugins {
   id 'com.android.library'
   id 'expo-module-gradle-plugin'
@@ -35,4 +36,8 @@ android {
   lintOptions {
     abortOnError false
   }
+}
+
+dependencies {
+  implementation "com.google.mlkit:face-detection:16.1.7"
 }
